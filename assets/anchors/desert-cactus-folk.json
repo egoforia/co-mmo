@@ -1,0 +1,34 @@
+{
+  "id": "desert-cactus-folk",
+  "description": {
+    "id": "desert-cactus-folk",
+    "name": "Cactus Elder",
+    "kind": "npc",
+    "biome": "mirage-desert",
+    "silhouetteHook": "a round cactus body with a single pink flower on top like a hat",
+    "body": "small, 3 heads tall, round cactus person with stubby arms and a sleepy smile",
+    "materials": [
+      "cactus",
+      "woven cloth"
+    ],
+    "colors": {
+      "main": "sage green",
+      "secondary": "apricot",
+      "accent": "pink flower"
+    },
+    "details": [
+      "woven poncho",
+      "tiny walking stick"
+    ],
+    "mood": "wise, slow",
+    "extra": {
+      "role": "elder"
+    }
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Cactus Elder (npc). Most recognisable feature: a round cactus body with a single pink flower on top like a hat. Body and shape: small, 3 heads tall, round cactus person with stubby arms and a sleepy smile. Materials: cactus, woven cloth. Colours: main sage green, secondary apricot, small accent of pink flower. Details: woven poncho; tiny walking stick. role: elder. Mood: wise, slow.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:35:48.291Z"
+}

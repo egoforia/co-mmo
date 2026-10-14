@@ -1,0 +1,31 @@
+{
+  "id": "sanctum-flagstones",
+  "description": {
+    "id": "sanctum-flagstones",
+    "name": "Sanctum flagstones",
+    "kind": "tile",
+    "biome": "sanctum",
+    "silhouetteHook": "worn pale flagstones laid in gentle circles",
+    "body": "flat ground, stones with rounded edges",
+    "materials": [
+      "pale stone",
+      "moss"
+    ],
+    "colors": {
+      "main": "cream",
+      "secondary": "pale gold",
+      "accent": "clover green"
+    },
+    "details": [
+      "tufts of clover between stones",
+      "a few small cracks"
+    ],
+    "mood": "peaceful, sacred"
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSeamless square ground texture seen from above at three-quarter view, filling the whole frame, tileable on all edges.\nSubject: Sanctum flagstones (tile). Most recognisable feature: worn pale flagstones laid in gentle circles. Body and shape: flat ground, stones with rounded edges. Materials: pale stone, moss. Colours: main cream, secondary pale gold, small accent of clover green. Details: tufts of clover between stones; a few small cracks. Mood: peaceful, sacred.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:34:38.654Z"
+}

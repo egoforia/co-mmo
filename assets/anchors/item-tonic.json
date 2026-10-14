@@ -1,0 +1,36 @@
+{
+  "id": "item-tonic",
+  "description": {
+    "id": "item-tonic",
+    "name": "Moonpetal Tonic",
+    "kind": "item",
+    "biome": "any",
+    "silhouetteHook": "teardrop bottle with a curled glass stopper shaped like a petal",
+    "body": "small potion bottle",
+    "materials": [
+      "glass",
+      "cork",
+      "silver wire"
+    ],
+    "colors": {
+      "main": "periwinkle liquid",
+      "secondary": "cream label",
+      "accent": "blue glint"
+    },
+    "details": [
+      "tiny floating petal inside",
+      "wire wrapped around the neck"
+    ],
+    "mood": "gentle, magical",
+    "extra": {
+      "category": "potion",
+      "rarity": "Rare"
+    }
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nSubject: Moonpetal Tonic (item). Most recognisable feature: teardrop bottle with a curled glass stopper shaped like a petal. Body and shape: small potion bottle. Materials: glass, cork, silver wire. Colours: main periwinkle liquid, secondary cream label, small accent of blue glint. Details: tiny floating petal inside; wire wrapped around the neck. category: potion. rarity: Rare. Mood: gentle, magical.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:36:09.545Z"
+}

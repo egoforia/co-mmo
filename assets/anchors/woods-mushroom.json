@@ -1,0 +1,34 @@
+{
+  "id": "woods-mushroom",
+  "description": {
+    "id": "woods-mushroom",
+    "name": "Walking Mushroom",
+    "kind": "monster",
+    "biome": "whispering-woods",
+    "silhouetteHook": "big floppy red-brown cap that bounces as it walks",
+    "body": "small round stem body with stubby legs and sleepy eyes",
+    "materials": [
+      "mushroom flesh"
+    ],
+    "colors": {
+      "main": "russet",
+      "secondary": "cream",
+      "accent": "firefly yellow spots"
+    },
+    "details": [
+      "tiny root toes",
+      "spores puffing from the cap"
+    ],
+    "mood": "grumpy, cute",
+    "extra": {
+      "threat": "normal",
+      "movement": "waddle"
+    }
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Walking Mushroom (monster). Most recognisable feature: big floppy red-brown cap that bounces as it walks. Body and shape: small round stem body with stubby legs and sleepy eyes. Materials: mushroom flesh. Colours: main russet, secondary cream, small accent of firefly yellow spots. Details: tiny root toes; spores puffing from the cap. threat: normal. movement: waddle. Mood: grumpy, cute.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:34:25.580Z"
+}

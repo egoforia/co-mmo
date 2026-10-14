@@ -54,6 +54,18 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 
+## Host it
+
+The `Dockerfile` builds one container that serves the game on port 8080.
+Mount a persistent volume at `/data` (accounts, invites and positions are
+stored there) and set `PUBLIC_URL` to the address players will use, so
+invite links point to it. On first start the logs print the Owner invite.
+
+```sh
+docker build -t co-mmo .
+docker run -p 8080:8080 -v co-mmo-data:/data -e PUBLIC_URL=http://localhost:8080 co-mmo
+```
+
 ## Develop
 
 ```sh

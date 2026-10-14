@@ -23,6 +23,7 @@ const BOX: Record<string, { width: number; height: number }> = {
   'set-piece': { width: 512, height: 512 },
   // Trees, palms and cacti; rocks use ROCK_BOX.
   prop: { width: 192, height: 256 },
+  effect: { width: 128, height: 128 },
 };
 const ROCK_BOX = { width: 128, height: 128 };
 
@@ -32,7 +33,8 @@ const SET_PIECE_BOX: Record<string, { width: number; height: number }> = {
 };
 
 await mkdir(outDir, { recursive: true });
-const manifest: ArtManifest = {};
+// Building art (npm run building-art) shares the manifest; keep its entries.
+const manifest: ArtManifest = JSON.parse(await readFile(resolve(outDir, 'manifest.json'), 'utf8').catch(() => '{}'));
 
 for (const file of (await readdir(anchorDir)).filter((f) => f.endsWith('.json')).sort()) {
   const recipe = JSON.parse(await readFile(resolve(anchorDir, file), 'utf8'));
@@ -66,7 +68,8 @@ for (const file of (await readdir(anchorDir)).filter((f) => f.endsWith('.json'))
   }
 }
 
-await writeFile(resolve(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+const sorted = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
+await writeFile(resolve(outDir, 'manifest.json'), `${JSON.stringify(sorted, null, 2)}\n`);
 console.log(`Wrote ${Object.keys(manifest).length} assets to ${outDir}`);
 
 function entry(id: string, kind: string, width: number, height: number): ArtEntry {

@@ -1,5 +1,6 @@
 import type { BiomeId } from './biomes.ts';
 import { rand2, valueNoise } from './random.ts';
+import { furnitureArt } from './buildings.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -86,15 +87,20 @@ export interface Building {
   y: number;
   width: number;
   height: number;
-  /** Left tile of the two-tile doorway. */
+  /** Left tile of the two-tile doorway, in the south wall. */
   door: { x: number; y: number };
-  exterior: {
-    asset: string;
-    /** How wide the art is drawn, in tiles. */
-    width: number;
-    /** Where the door is painted in the art, as fractions of its size, so it lines up with the doorway. */
-    door: { x: number; y: number };
-  };
+  /** Its look, outside and in: a key of BUILDING_STYLES. */
+  style: string;
+  /**
+   * How wide the outside art is drawn, in tiles. The art's door is painted at
+   * the middle of its bottom edge, so it is drawn centred on the doorway.
+   */
+  exteriorWidth: number;
+}
+
+/** Where a building's outside art is drawn: left edge and width, in tiles, bottom on the doorway's outer edge. */
+export function exteriorSpan(b: Building): { left: number; width: number; bottom: number } {
+  return { left: b.door.x + 1 - b.exteriorWidth / 2, width: b.exteriorWidth, bottom: b.door.y + 1 };
 }
 
 /** How close, in tiles, a player must come before a building shows its inside. */
@@ -195,16 +201,16 @@ const woodsLayout: Layout = (map, c) => {
 
 /** Old Bramble's furniture, placed as landmarks from the floor's top-left tile. */
 function furnish(map: RegionMap, fx: number, fy: number): void {
-  const put = (asset: string, x: number, y: number, width: number, height: number) =>
-    map.landmarks.push({ asset, x: fx + x, y: fy + y, footprint: { width, height } });
-  put('furniture-bed', 1, 3, 2, 2);
-  put('furniture-bookshelf', 4, 1, 2, 1);
-  put('furniture-hearth', 8.5, 1, 3, 1);
-  put('furniture-herb-rack', 13, 1, 2, 1);
-  put('furniture-cauldron', 14.5, 4, 1, 1);
-  put('furniture-table', 8, 8, 2, 1);
-  put('furniture-barrel', 14.5, 15, 1, 1);
-  put('furniture-barrel', 15.5, 15, 1, 1);
+  const put = (key: string, x: number, y: number, width: number, height: number) =>
+    map.landmarks.push({ asset: furnitureArt('bramble-cottage', key), x: fx + x, y: fy + y, footprint: { width, height } });
+  put('bed', 1, 3, 2, 2);
+  put('bookshelf', 4, 1, 2, 1);
+  put('hearth', 8.5, 1, 3, 1);
+  put('herb-rack', 13, 1, 2, 1);
+  put('cauldron', 14.5, 4, 1, 1);
+  put('table', 8, 8, 2, 1);
+  put('barrel', 14.5, 15, 1, 1);
+  put('barrel', 15.5, 15, 1, 1);
 }
 
 const shoreLayout: Layout = (map, c) => {
@@ -267,19 +273,23 @@ function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void 
 /**
  * A walled building whose floor is `size` tiles square, its wall's top-left
  * corner at (left, top), in a clearing a tile wide, with a two-tile doorway
- * in the south wall. Its outside is Old Bramble's hollow tree, drawn big.
+ * in the south wall. Its outside is Old Bramble's hollow tree.
  */
 function cottage(map: RegionMap, left: number, top: number, size: number): Building {
   const right = left + size + 1;
   const bottom = top + size + 1;
   for (let y = top - 1; y <= bottom + 1; y++) {
     for (let x = left - 1; x <= right + 1; x++) {
-      const wall = x === left || x === right || y === top || y === bottom;
       const inside = x > left && x < right && y > top && y < bottom;
+      // The walls are the building's own edge; the ring around it is clearing.
+      const within = x >= left && x <= right && y >= top && y <= bottom;
+      const wall = within && !inside;
       set(map, x, y, wall ? Tile.Wall : inside ? Tile.Floor : Tile.Ground);
     }
   }
-  const door = { x: left + 6, y: bottom };
+  // The doorway is in the middle of the south wall, so the outside art,
+  // centred on it, covers the cottage evenly on both sides.
+  const door = { x: left + Math.floor(size / 2), y: bottom };
   set(map, door.x, door.y, Tile.Door);
   set(map, door.x + 1, door.y, Tile.Door);
   return {
@@ -288,7 +298,8 @@ function cottage(map: RegionMap, left: number, top: number, size: number): Build
     width: size + 2,
     height: size + 2,
     door,
-    exterior: { asset: 'woods-tree-house', width: size + 4, door: { x: 0.375, y: 0.836 } },
+    style: 'bramble-cottage',
+    exteriorWidth: size + 4,
   };
 }
 

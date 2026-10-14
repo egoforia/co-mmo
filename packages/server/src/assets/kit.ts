@@ -53,6 +53,12 @@ export const BIOME_KIT: KitAsset[] = [
   },
   // Whispering Woods
   {
+    id: 'woods-path', name: 'Forest path', kind: 'tile', biome: 'whispering-woods',
+    silhouetteHook: 'packed warm brown earth worn smooth by footsteps, with fallen leaves scattered evenly', body: 'flat bare ground, no roots, stones or edges',
+    materials: ['packed earth', 'fallen leaves'], colors: { main: 'dark muted umber brown in deep forest shade', secondary: 'mossy dark brown', accent: 'a few teal-green and russet leaves' },
+    details: ['tiny pebbles', 'scattered small leaves'], mood: 'quiet, well trodden',
+  },
+  {
     id: 'woods-pool', name: 'Dark forest pool water', kind: 'tile', biome: 'whispering-woods',
     silhouetteHook: 'deep dark teal still water with soft reflections', body: OPEN_WATER, centerCrop: 0.5,
     materials: ['water'], colors: { main: 'deep teal', secondary: 'dark green-blue', accent: 'firefly yellow glints' },
@@ -125,5 +131,13 @@ export const BIOME_KIT: KitAsset[] = [
     silhouetteHook: 'a wind-carved sandstone boulder with layered stripes', body: 'low wide boulder, rounded top',
     materials: ['sandstone'], colors: { main: 'ochre', secondary: 'apricot', accent: 'turquoise pebble' },
     details: ['wind-carved layers'], mood: 'ancient, hot',
+  },
+  // Effects
+  {
+    id: 'fx-slash', name: 'Sword slash', kind: 'effect', biome: 'any',
+    silhouetteHook: 'a single bright crescent-moon arc of a sword swing, thick in the middle and tapering to points at both ends, curving from upper left to lower right',
+    body: 'a glowing pale cream and white streak of motion with a few small sparkles trailing it, nothing else',
+    colors: { main: 'warm white', secondary: 'pale gold', accent: 'soft sky blue sparkles' },
+    mood: 'swift, sharp',
   },
 ];

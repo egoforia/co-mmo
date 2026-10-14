@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BUILDING_STYLES,
   COTTAGE_SIZE,
   OPPOSITE,
   PLAYER_SPEED,
@@ -11,6 +12,8 @@ import {
   collides,
   neighbourOffset,
   generateRegion,
+  exteriorSpan,
+  furnitureArt,
   isBlocking,
   nearBuilding,
   outsideSide,
@@ -120,6 +123,9 @@ describe("Old Bramble's cottage", () => {
       if (tileAt(woods, x, bottom) !== Tile.Wall) door.push(tileAt(woods, x, bottom));
     }
     expect(door).toEqual([Tile.Door, Tile.Door]);
+    // No wall pokes out past the corners into the clearing.
+    for (let y = top - 2; y <= bottom + 1; y++) for (const x of [left - 2, right + 1]) expect(tileAt(woods, x, y)).not.toBe(Tile.Wall);
+    for (let x = left - 2; x <= right + 1; x++) for (const y of [top - 2, bottom + 1]) expect(tileAt(woods, x, y)).not.toBe(Tile.Wall);
     // The building the client draws matches the walls.
     expect(woods.buildings).toEqual([expect.objectContaining({ x: left - 1, y: top - 1, width: COTTAGE_SIZE + 2, height: COTTAGE_SIZE + 2 })]);
   });
@@ -137,17 +143,22 @@ describe("Old Bramble's cottage", () => {
     expect(pos.y).toBeLessThan(home.door.y);
     expect(isBlocking(Tile.Wall)).toBe(true);
     expect(isBlocking(Tile.Door)).toBe(false);
-    // The painted door in the exterior art sits over the doorway, with the art covering the cottage.
-    const { width, door } = home.exterior;
-    const artLeft = home.door.x + 1 - door.x * width;
-    expect(artLeft).toBeLessThanOrEqual(home.x);
-    expect(artLeft + width).toBeGreaterThanOrEqual(home.x + home.width);
+    // The outside art is centred on the doorway and covers the whole cottage.
+    const art = exteriorSpan(home);
+    expect(art.left + art.width / 2).toBe(home.door.x + 1);
+    expect(art.bottom).toBe(home.y + home.height);
+    expect(art.left).toBeLessThanOrEqual(home.x);
+    expect(art.left + art.width).toBeGreaterThanOrEqual(home.x + home.width);
+    expect(BUILDING_STYLES[home.style]).toBeDefined();
   });
 
   it('is furnished inside, with room left to walk', () => {
-    const furniture = woods.landmarks.filter((l) => l.asset.startsWith('furniture-'));
-    expect(new Set(furniture.map((f) => f.asset)).size).toBeGreaterThanOrEqual(5);
     const home = woods.buildings[0]!;
+    const style = BUILDING_STYLES[home.style]!;
+    const furniture = woods.landmarks.filter((l) => l.asset.startsWith(`${style.id}-furniture-`));
+    // Every piece is one the building's style paints.
+    for (const f of furniture) expect(Object.keys(style.furniture).map((key) => furnitureArt(style.id, key))).toContain(f.asset);
+    expect(new Set(furniture.map((f) => f.asset)).size).toBeGreaterThanOrEqual(5);
     for (const f of furniture) {
       expect(f.x).toBeGreaterThan(home.x + 1);
       expect(f.x).toBeLessThan(home.x + home.width - 1);

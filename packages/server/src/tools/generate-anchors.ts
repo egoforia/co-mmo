@@ -4,6 +4,7 @@
 //   npm run anchors -- --only woods-mushroom
 //   npm run anchors -- --limit 5
 //   npm run anchors -- --process-only   redo post-processing, no generation
+//   npm run anchors -- --model gemini-3.1-flash-image   (default: the model chosen in God's View)
 //
 // The provider's image is kept in raw/; the game copy next to it has the key
 // background removed (sprites) or is made seamless (tiles, with a 4x4 preview
@@ -18,6 +19,7 @@ import { BIOME_KIT, type KitAsset } from '../assets/kit.ts';
 import { GeminiImageProvider } from '../assets/gemini.ts';
 import { makeSeamless, removeKeyBackground, tileGrid } from '../assets/postprocess.ts';
 import { STYLE_VERSION, buildPrompt } from '../assets/style.ts';
+import { savedImageModel } from './saved-model.ts';
 import sharp from 'sharp';
 
 const args = process.argv.slice(2);
@@ -54,7 +56,9 @@ const previewDir = resolve(outDir, 'previews');
 await mkdir(rawDir, { recursive: true });
 await mkdir(previewDir, { recursive: true });
 
-const provider = new GeminiImageProvider(process.env.GEMINI_API_KEY ?? '', process.env.GEMINI_IMAGE_MODEL);
+// The model chosen in God's View, unless --model names another.
+const model = value('model') ?? (await savedImageModel(resolve(outDir, '../..'))) ?? process.env.GEMINI_IMAGE_MODEL;
+const provider = new GeminiImageProvider(process.env.GEMINI_API_KEY ?? '', model);
 
 if (processOnly) {
   for (const anchor of selected) {
@@ -108,7 +112,7 @@ async function processAnchor(anchor: (typeof ALL)[number], raw: Buffer): Promise
     await writeFile(resolve(previewDir, `${anchor.id}-grid.png`), await tileGrid(tile));
     return;
   }
-  const { png, clean } = await removeKeyBackground(raw, undefined, { holes: anchor.kind === 'prop' });
+  const { png, clean } = await removeKeyBackground(raw, undefined, { holes: anchor.kind === 'prop' || anchor.kind === 'effect' });
   await writeFile(out, png);
   if (!clean) console.warn(`warning ${anchor.id}: background is not one flat colour; check it or regenerate`);
 }

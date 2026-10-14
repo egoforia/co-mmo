@@ -38,11 +38,12 @@ export class GeminiImageProvider implements ImageProvider {
       headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: { responseModalities: ['IMAGE'] },
+        generationConfig: { responseModalities: ['IMAGE'], imageConfig: imageConfig(this.model, request) },
       }),
     });
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string };
+      usageMetadata?: { candidatesTokenCount?: number };
       promptFeedback?: { blockReason?: string };
       candidates?: { finishReason?: string; content?: { parts?: GeminiPart[] } }[];
     };
@@ -52,9 +53,19 @@ export class GeminiImageProvider implements ImageProvider {
     }
     for (const part of body.candidates?.[0]?.content?.parts ?? []) {
       const inline = part.inlineData ?? (part.inline_data && { mimeType: part.inline_data.mime_type, data: part.inline_data.data });
-      if (inline?.data) return { mimeType: inline.mimeType, data: Buffer.from(inline.data, 'base64') };
+      if (inline?.data) {
+        return { mimeType: inline.mimeType, data: Buffer.from(inline.data, 'base64'), outputTokens: body.usageMetadata?.candidatesTokenCount };
+      }
     }
     const reason = body.candidates?.[0]?.finishReason ?? 'no image in response';
     throw new ProviderError(this.id, 502, `no image returned (${reason})`);
   }
+}
+
+/** Shape and size settings; only Gemini 3 image models take a size above 1K. */
+function imageConfig(model: string, request: ImageRequest): Record<string, string> {
+  const config: Record<string, string> = {};
+  if (request.aspectRatio) config.aspectRatio = request.aspectRatio;
+  if (request.size && request.size !== '1K' && !model.startsWith('gemini-2')) config.imageSize = request.size;
+  return config;
 }

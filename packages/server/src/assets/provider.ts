@@ -2,12 +2,18 @@
 export interface GeneratedImage {
   mimeType: string;
   data: Buffer;
+  /** Image tokens the provider billed for it, when it says. */
+  outputTokens?: number;
 }
 
 export interface ImageRequest {
   prompt: string;
   /** Reference images (anchors, a base pose) the result must match in style. */
   references?: GeneratedImage[];
+  /** Width to height, such as "4:5"; square when left out. */
+  aspectRatio?: string;
+  /** Long side: "1K" (about 1024 px, the default), "2K" or "4K", for models that offer it. */
+  size?: '1K' | '2K' | '4K';
 }
 
 /**

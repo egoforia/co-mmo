@@ -31,6 +31,7 @@ const app = createApp({
   updater,
   commit: currentCommit(repoRoot),
   builds: { repoDir: repoRoot },
+  shippedArt: resolve(repoRoot, 'packages/client/public/art/manifest.json'),
   wishes: {
     anchorDir: resolve(repoRoot, 'assets/anchors'),
     artDir: resolve(process.env.ART_DIR ?? resolve(dirname(dataFile), 'art')),

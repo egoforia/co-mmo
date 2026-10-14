@@ -25,6 +25,15 @@ in-game God. TypeScript end to end: `packages/shared` (code both sides run),
 - Wished content is data checked by `validateDefinition`; scripted rules run
   in the QuickJS sandbox (`packages/server/src/rules.ts`). Prefer extending
   those over new special cases.
+- No art is drawn in code (canvas shapes, Phaser graphics, tinted stand-ins).
+  Every picture is painted by the image model chosen in God's View from a
+  description: buildings and their furniture in `BUILDING_STYLES`
+  (`packages/shared/src/buildings.ts`), which the server paints at start-up
+  when the art is missing; scenery in the biome kit
+  (`packages/server/src/assets/kit.ts`). A building's outside art is centred
+  on its doorway in the south wall and covers its walls; its inside is
+  seamless pixel-art tiles matched to the outside. The wish guard refuses
+  drawing code.
 - No new dependencies unless the Owner's approval allows core changes.
 - Never read or print secrets (`.env`, API keys), never change
   `.github/`, never push to main or merge.

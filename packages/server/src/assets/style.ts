@@ -35,8 +35,8 @@ export const NEGATIVE_PROMPT = [
 const SPRITE_NEGATIVE = ['background scenery', 'floor', 'ground shadow', 'cast shadow', 'gradient background'];
 const TILE_NEGATIVE = ['isometric block', 'diamond shape', 'floating island', 'tile sides', 'drop shadow', 'perspective horizon'];
 
-/** A prop is scenery the biome is built from: trees, palms, cacti, rocks. */
-export type AssetKind = 'player' | 'npc' | 'monster' | 'item' | 'set-piece' | 'prop' | 'tile';
+/** A prop is scenery the biome is built from: trees, palms, cacti, rocks. An effect is a flash of action, such as a sword slash. */
+export type AssetKind = 'player' | 'npc' | 'monster' | 'item' | 'set-piece' | 'prop' | 'tile' | 'effect';
 
 /** Pixel size of each kind at full resolution (Style Bible, Global rules). */
 export const ASSET_SIZES: Record<AssetKind, { width: number; height: number }> = {
@@ -47,6 +47,7 @@ export const ASSET_SIZES: Record<AssetKind, { width: number; height: number }> =
   'set-piece': { width: 512, height: 512 },
   prop: { width: 192, height: 256 },
   tile: { width: 128, height: 128 },
+  effect: { width: 128, height: 128 },
 };
 
 /** The structured description the wish compiler fills in (Style Bible, Describing assets). */

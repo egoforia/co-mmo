@@ -11,6 +11,8 @@ import {
   removeContent,
   validateDefinition,
   type ContentEntry,
+  type CreatureWish,
+  type NpcWish,
 } from '../src/index.ts';
 
 const look = { hook: 'a big hat', body: 'small', color: '#2C7FA8', mood: 'jolly' };
@@ -19,7 +21,7 @@ describe('wished content', () => {
   it('clamps a creature to the balance limits and drops unknown or bound items', () => {
     const d = validateDefinition({ kind: 'creature', name: 'Doom Goat', behavior: 'chase', level: 99, count: 40, drops: ['tonic', 'bible', 'gold-mountain'], look });
     expect(d).toMatchObject({ kind: 'creature', level: MAX_WISHED_LEVEL, count: MAX_WISHED_COUNT, drops: ['tonic'] });
-    expect(d.look.color).toBe('#2c7fa8');
+    expect((d as CreatureWish).look.color).toBe('#2c7fa8');
   });
 
   it('caps healing, and only consumables heal', () => {
@@ -30,7 +32,7 @@ describe('wished content', () => {
   it('fills a missing look and greeting, and rejects nameless or unknown wishes', () => {
     const npc = validateDefinition({ kind: 'npc', name: 'Old Pell' });
     expect(npc).toMatchObject({ greeting: expect.stringContaining('Old Pell') });
-    expect(npc.look.color).toMatch(/^#[0-9a-f]{6}$/);
+    expect((npc as NpcWish).look.color).toMatch(/^#[0-9a-f]{6}$/);
     expect(() => validateDefinition({ kind: 'item' })).toThrow(WishError);
     expect(() => validateDefinition({ kind: 'spell', name: 'Fireball' })).toThrow(WishError);
   });

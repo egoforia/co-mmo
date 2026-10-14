@@ -1,0 +1,44 @@
+{
+  "id": "item-crab-lance",
+  "description": {
+    "id": "item-crab-lance",
+    "name": "Crab-shell lance",
+    "kind": "item",
+    "biome": "any",
+    "references": [
+      "item-tonic",
+      "shore-crab-knight"
+    ],
+    "silhouetteHook": "a long slender lance tipped with a pointed coral-orange shell",
+    "body": "thin spear shown diagonally",
+    "materials": [
+      "driftwood",
+      "shell",
+      "rope"
+    ],
+    "colors": {
+      "main": "coral orange",
+      "secondary": "driftwood grey",
+      "accent": "turquoise ribbon"
+    },
+    "details": [
+      "a small plume",
+      "rope binding"
+    ],
+    "mood": "bold, seaside",
+    "extra": {
+      "category": "weapon",
+      "rarity": "Uncommon"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Crab-shell lance (item). Most recognisable feature: a long slender lance tipped with a pointed coral-orange shell. Body and shape: thin spear shown diagonally. Materials: driftwood, shell, rope. Colours: main coral orange, secondary driftwood grey, small accent of turquoise ribbon. Details: a small plume; rope binding. category: weapon. rarity: Uncommon. Mood: bold, seaside.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-tonic",
+    "shore-crab-knight"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T23:02:47.821Z"
+}

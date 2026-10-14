@@ -7,6 +7,7 @@ import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
 import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
+import { KitUi } from './kit-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
 import { WorldScene } from './world-scene.ts';
@@ -84,12 +85,14 @@ function play(token: string): void {
   let scene: WorldScene | null = null;
   let chat: ChatBox | null = null;
   let rpg: RpgUi | null = null;
+  let kit: KitUi | null = null;
   let prayer: PrayerUi | null = null;
   let party: PartyUi | null = null;
   let myId = '';
   onContent(() => {
     scene?.refreshWishes();
     rpg?.refresh();
+    kit?.refresh();
   });
   let name = '';
   let region = '';
@@ -128,13 +131,15 @@ function play(token: string): void {
       case 'welcome':
         region = message.region.name;
         rpg?.setCharacter(message.character);
+        kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
         if (scene) scene.enterRegion(message);
         else void art.then((manifest) => start(message, manifest));
         break;
       case 'snapshot':
         scene?.onSnapshot(message);
-        rpg?.setHp(message.hp);
+        rpg?.setVitals(message.hp, message.energy);
+        kit?.setEnergy(message.energy);
         scene?.setWeakened(rpg?.weakened ?? false);
         setHud(name, message.online, region);
         break;
@@ -162,6 +167,7 @@ function play(token: string): void {
         break;
       case 'character':
         rpg?.setCharacter(message.character);
+        kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
         break;
       case 'god':
@@ -176,6 +182,16 @@ function play(token: string): void {
         break;
       case 'dialogue':
         rpg?.showDialogue(message);
+        break;
+      case 'cooldown':
+        kit?.cooldown(message.ability, message.seconds);
+        break;
+      case 'trade':
+        kit?.showTrade(message.trade);
+        break;
+      case 'trade-request':
+        kit?.tradeRequested(message);
+        chat?.add({ kind: 'system', text: `${message.from.name} wants to trade with you.` });
         break;
       case 'error':
         chat?.add({ kind: 'error', text: message.message });
@@ -193,7 +209,7 @@ function play(token: string): void {
       else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
       else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     party.start(myId);
     const account = new AccountWindow(token);
@@ -217,10 +233,19 @@ function play(token: string): void {
       },
       interact: () => connection.send({ t: 'interact' }),
       use: (item) => connection.send({ t: 'use', item }),
+      unequip: (slot) => connection.send({ t: 'equip', slot }),
+      openShop: (npc) => kit?.openShop(npc),
       accept: (quest) => connection.send({ t: 'accept', quest }),
       report: (kind, target, reason) => connection.send({ t: 'report', kind, target, reason }),
       typing: isTyping,
       prayer: () => prayer?.toggle(true),
+    });
+    kit = new KitUi(welcome.character, {
+      ability: (ability) => connection.send({ t: 'ability', ability }),
+      craft: (recipe) => connection.send({ t: 'craft', recipe }),
+      shop: (action, npc, id, qty) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}) }),
+      trade: (m) => connection.send(m),
+      typing: isTyping,
     });
     scene = new WorldScene({
       welcome,

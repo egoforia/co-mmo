@@ -130,3 +130,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .progress.error { border-color: var(--bad); color: var(--bad); }
 .progress.done { border-color: var(--good); color: var(--good); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.form label.check { display: flex; align-items: center; gap: 8px; }
+.form label.check input { flex: none; }
+.form.approve-engine { margin-top: 8px; }
+.links a, a .progress { color: inherit; }
+a.button { display: inline-block; padding: 6px 12px; border: 1px solid var(--edge); color: var(--ink); text-decoration: none; }
+ol.setup { color: var(--muted); max-width: 640px; line-height: 1.5; }

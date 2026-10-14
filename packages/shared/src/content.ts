@@ -112,19 +112,59 @@ export interface WishProgress {
   label: string;
   /** Why, or what happens next. */
   detail?: string;
+  /** Where to follow it: the pull request or issue a coding agent works on. */
+  link?: string;
+}
+
+/**
+ * An Engine wish (or a Major wish the God could not script) being built as
+ * a code change (design doc, Building Engine wishes automatically):
+ * queued, being built on a GitHub issue, waiting for the Owner's review of
+ * the pull request, merged and waiting for the Updates tab, then live. It
+ * can fail, be closed by the Owner, or be split into smaller wishes.
+ */
+export type BuildState = 'queued' | 'building' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
+
+export interface BuildTrack {
+  state: BuildState;
+  /** When it entered this state. */
+  at: number;
+  /** The Owner's approval note, handed to the coding agent. */
+  note?: string;
+  /** The Owner allowed changes to sign-in, roles, the budget, keys and the sandbox. */
+  allowCore?: boolean;
+  issue?: { number: number; url: string };
+  pr?: { number: number; url: string };
+  /** The merge commit, so the server can tell when it is running it. */
+  sha?: string;
+  /** Why it failed, was closed or split, or why it still waits in the queue. */
+  message?: string;
+  /** A queued build that only a person can unblock (GitHub not connected yet). */
+  held?: boolean;
+  /** When the latest try started (its issue opened). */
+  startedAt?: number;
+  /** Tries so far (each opens a new issue). */
+  tries?: number;
+  /** The wisher heard that it went live. */
+  told?: boolean;
 }
 
 /** The parts of a content record (beyond the entry) that decide its progress. */
 export interface WishTrack {
+  build?: BuildTrack;
   draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; message?: string };
   test?: { passed: boolean; errors: string[]; summary: string[] };
   rule?: { paused: boolean; reason?: string };
 }
 
 export function wishProgress(entry: Pick<ContentEntry, 'status' | 'tier' | 'definition'> & WishTrack): WishProgress {
-  const { status, draft, test, rule } = entry;
+  const { status, draft, test, rule, build } = entry;
   if (status === 'rejected') return { state: 'closed', label: 'Not approved' };
   if (status === 'rolled-back') return { state: 'closed', label: 'Undone' };
+  if (build) {
+    const built = buildProgress(status, build);
+    if (built) return built;
+  }
   if (status === 'granted') {
     if (rule?.paused) {
       const reason = rule.reason ?? '';
@@ -149,6 +189,34 @@ export function wishProgress(entry: Pick<ContentEntry, 'status' | 'tier' | 'defi
   }
   if (draft.state === 'impossible') return { state: 'needs-input', label: 'Waiting for a Steward', detail: `The God cannot make this a scripted rule: ${draft.message ?? ''}`.trim() };
   return { state: 'needs-input', label: 'Ready, waiting for a Steward', detail: 'The rule passed its test run and waits for approval.' };
+}
+
+/** Where a code-change wish stands; undefined hands back to the usual steps. */
+function buildProgress(status: WishStatus, b: BuildTrack): WishProgress | undefined {
+  const link = b.pr?.url ?? b.issue?.url;
+  const withLink = (p: WishProgress): WishProgress => (link ? { ...p, link } : p);
+  switch (b.state) {
+    case 'live':
+      return { state: 'done', label: 'Live' };
+    case 'split':
+      return { state: 'closed', label: 'Split into smaller wishes', detail: b.message };
+    case 'closed':
+      return status === 'pending'
+        ? withLink({ state: 'needs-input', label: 'Waiting for the Owner', detail: `The pull request was closed${b.message ? `: ${b.message}` : '.'} Approve it to build again, or reject it.` })
+        : undefined;
+    case 'queued':
+      return b.held
+        ? { state: 'needs-input', label: 'Queued to be built', detail: b.message ?? 'Waiting for the Owner to connect GitHub.' }
+        : { state: 'in-progress', label: 'Queued to be built', detail: b.message ?? 'It is built when the wishes before it are done.' };
+    case 'building':
+      return withLink({ state: 'in-progress', label: 'Being built', detail: 'A coding agent is writing the change and its tests.' });
+    case 'review':
+      return withLink({ state: 'needs-input', label: "Waiting for the Owner's review", detail: 'The change passed its checks. The Owner merges it, asks for changes, or closes it.' });
+    case 'merged':
+      return withLink({ state: 'in-progress', label: 'Updating', detail: "Merged. It goes live when God's View's Updates tab pulls main and restarts the game." });
+    case 'failed':
+      return withLink({ state: 'error', label: 'Build failed', detail: `${b.message ?? 'The coding agent gave up.'} The Owner can try again or reject it.` });
+  }
 }
 
 /** The wish card a player confirms before anything is built. */

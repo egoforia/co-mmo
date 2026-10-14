@@ -1,0 +1,41 @@
+# Tells the game when the Owner merges or closes a wish's pull request, by a
+# hidden comment on the wish's issue that the game server reads.
+name: Wish merged or closed
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  report:
+    if: startsWith(github.head_ref, 'wish/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.head_ref }}
+      PR: ${{ github.event.pull_request.number }}
+      URL: ${{ github.event.pull_request.html_url }}
+      MERGED: ${{ github.event.pull_request.merged }}
+      SHA: ${{ github.event.pull_request.merge_commit_sha }}
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Report to the wish's issue
+        run: |
+          issue="${HEAD_REF#wish/}"; issue="${issue%%[^0-9]*}"
+          [ -n "$issue" ] || exit 0
+          if [ "$MERGED" = "true" ]; then
+            report=$(jq -nc --argjson pr "$PR" --arg url "$URL" --arg sha "$SHA" '{state:"merged",pr:$pr,url:$url,sha:$sha}')
+            text="Merged. The wish goes live when the Owner updates the game from God's View."
+          else
+            # The Owner's last comment on the pull request is the reason.
+            reason=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json comments --jq "[.comments[] | select(.author.login == \"$OWNER\")] | last | .body // \"\"" | tr '\n' ' ' | tr -d '<>' | cut -c1-300)
+            report=$(jq -nc --argjson pr "$PR" --arg url "$URL" --arg reason "$reason" '{state:"closed",pr:$pr,url:$url,reason:$reason}')
+            text="The Owner closed the pull request, so the wish goes back to them."
+          fi
+          gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$text
+
+          <!-- co-mmo-build $report -->"

@@ -4,7 +4,8 @@ import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import type { Account, ModelChoice, Settings, Store } from './store.ts';
+import { DEFAULT_BUILDS, type Account, type BuildSettings, type ModelChoice, type Settings, type Store } from './store.ts';
+import type { Builds } from './builds.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
@@ -15,6 +16,7 @@ export interface AdminContext {
   wishes: Wishes;
   rules: LiveRules;
   reports: Reports;
+  builds: Builds;
   /** Disconnects a player now (after a suspension). */
   kick(id: string, reason: string): void;
   /** Pulls main and restarts the game; absent in tests. */
@@ -41,7 +43,7 @@ export async function handleAdmin(
   ctx: AdminContext,
 ): Promise<boolean> {
   if (!path.startsWith('/api/admin/')) return false;
-  const { store, world, wishes, rules, reports, json } = ctx;
+  const { store, world, wishes, rules, reports, builds, json } = ctx;
   if (!account) return json(res, 401, { error: 'unauthorized' }), true;
   if (account.suspended) return json(res, 403, { error: 'suspended', message: 'Your account is suspended.' }), true;
   if (account.role === 'player') return json(res, 403, { error: 'forbidden', message: "God's View is for Stewards and the Owner." }), true;
@@ -73,6 +75,7 @@ export async function handleAdmin(
       rules: content.filter((c) => c.status === 'granted' && c.definition?.kind === 'rule').length,
       budget: owner ? wishes.budget() : null,
       update: owner ? updateSummary(ctx.updater) : null,
+      building: store.content.filter((c) => c.build && ['queued', 'building', 'review', 'merged'].includes(c.build.state)).length,
     }), true;
   }
 
@@ -86,12 +89,13 @@ export async function handleAdmin(
     return json(res, 200, { content: records }), true;
   }
 
-  const contentAction = route.match(/^content\/([\w-]+)\/(rollback|review|paint|revise|rule)$/);
+  const contentAction = route.match(/^content\/([\w-]+)\/(rollback|review|paint|revise|rule|build)$/);
   if (contentAction && method === 'POST') {
     const [, id, action] = contentAction;
     const record = store.contentById(id!);
     if (!record) return json(res, 404, { error: 'not_found' }), true;
     if (action === 'rollback') {
+      if (record.build) return json(res, 409, { error: 'code_change', message: 'This wish changed the game\'s code. Undo it by reverting its pull request on GitHub, then update.' }), true;
       const done = wishes.rollback(id!);
       return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_granted', message: 'Only a granted wish can be rolled back.' }), true;
     }
@@ -99,7 +103,28 @@ export async function handleAdmin(
       if (record.tier === 'engine' && ownerOnly()) return true;
       const body = await ctx.readJson(req);
       const done = await wishes.review(id!, body?.approve === true);
-      return json(res, 'error' in done ? 409 : 200, 'error' in done ? done : { ok: true, status: done.record.status }), true;
+      if ('error' in done) return json(res, 409, done), true;
+      // An approved Engine wish goes to the coding agent.
+      if (record.tier === 'engine' && done.record.status === 'approved') {
+        await builds.queue(id!, typeof body?.note === 'string' ? body.note : undefined, body?.allowCore === true);
+      }
+      return json(res, 200, { ok: true, status: store.contentById(id!)?.status, build: store.contentById(id!)?.build?.state }), true;
+    }
+    if (action === 'build') {
+      // Send a Major wish to be built as code, queue an approved one, or try a failed build again.
+      if (ownerOnly()) return true;
+      const body = await ctx.readJson(req);
+      const note = typeof body?.note === 'string' ? body.note : undefined;
+      const allowCore = body?.allowCore === true;
+      if (record.build?.state === 'failed') {
+        const done = await builds.retry(id!, note);
+        return json(res, done ? 200 : 409, done ? { ok: true, build: done.build?.state } : { error: 'not_failed' }), true;
+      }
+      const sendable = (record.status === 'pending' && (record.tier === 'major' || record.tier === 'engine')) || (record.status === 'approved' && !record.build);
+      if (!sendable) return json(res, 409, { error: 'not_buildable', message: 'Only a Major or Engine wish that is not built yet can be sent to be built.' }), true;
+      const done = await builds.queue(id!, note, allowCore);
+      if (record.status === 'pending') wishes.tellWisher(record, `Your wish "${record.title}" was approved. It will be built into the game, and you will hear when it is live.`);
+      return json(res, 200, { ok: true, build: done?.build?.state }), true;
     }
     if (action === 'revise') {
       if (record.status !== 'pending' || record.tier !== 'major') return json(res, 409, { error: 'not_major', message: 'Only a Major wish waiting for review can have a rule drafted.' }), true;
@@ -240,6 +265,27 @@ export async function handleAdmin(
     }
   }
 
+  if (route === 'builds' && method === 'GET') {
+    if (ownerOnly()) return true;
+    return json(res, 200, { settings: builds.settings, connection: builds.connection(), today: builds.buildsToday() }), true;
+  }
+
+  if (route === 'builds' && method === 'PUT') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const next = buildSettings(body);
+    if (!next) return json(res, 400, { error: 'bad_builds', message: 'Builds per day must be 0 to 20, and the cost per build $0 to $50.' }), true;
+    store.updateSettings({ ...store.settings, builds: next });
+    void builds.pump();
+    return json(res, 200, { ok: true }), true;
+  }
+
+  if (route === 'builds/sync' && method === 'POST') {
+    if (ownerOnly()) return true;
+    await builds.sync();
+    return json(res, 200, { ok: true, connection: builds.connection() }), true;
+  }
+
   if (route === 'budget' && method === 'GET') {
     if (ownerOnly()) return true;
     const spend = store.spendThisMonth(Date.now());
@@ -268,13 +314,13 @@ export async function handleAdmin(
   if (route === 'update' && method === 'GET') {
     if (ownerOnly()) return true;
     if (!ctx.updater) return json(res, 200, { available: false, reason: 'Updates are off on this server.' }), true;
-    return json(res, 200, ctx.updater.cached() ?? (await ctx.updater.check())), true;
+    return json(res, 200, { ...(ctx.updater.cached() ?? (await ctx.updater.check())), releases: releases(store) }), true;
   }
 
   if (route === 'update/check' && method === 'POST') {
     if (ownerOnly()) return true;
     if (!ctx.updater) return json(res, 409, { error: 'no_updates', message: 'Updates are off on this server.' }), true;
-    return json(res, 200, await ctx.updater.check(true)), true;
+    return json(res, 200, { ...(await ctx.updater.check(true)), releases: releases(store) }), true;
   }
 
   if (route === 'update' && method === 'POST') {
@@ -296,6 +342,23 @@ export async function handleAdmin(
 function updateSummary(updater: Updater | undefined): { behind: number; blocked?: string } | null {
   const s = updater?.cached();
   return s?.available ? { behind: s.behind, blocked: s.blocked } : null;
+}
+
+/** Merged wishes the next update makes live. */
+function releases(store: Store): { id: string; title: string; wisher: string; pr?: string }[] {
+  return store.content
+    .filter((c) => c.build?.state === 'merged')
+    .map((c) => ({ id: c.id, title: c.title, wisher: c.wisher.name, ...(c.build?.pr ? { pr: c.build.pr.url } : {}) }));
+}
+
+function buildSettings(raw: Record<string, unknown> | null): BuildSettings | null {
+  if (!raw) return null;
+  const agent = raw.agent === 'manual' ? 'manual' : 'claude';
+  const dailyLimit = raw.dailyLimit === undefined ? DEFAULT_BUILDS.dailyLimit : Number(raw.dailyLimit);
+  const usdPerBuild = raw.usdPerBuild === undefined ? DEFAULT_BUILDS.usdPerBuild : Number(raw.usdPerBuild);
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 20) return null;
+  if (!(usdPerBuild >= 0 && usdPerBuild <= 50)) return null;
+  return { agent, dailyLimit, usdPerBuild };
 }
 
 function modelChoice(raw: unknown): ModelChoice | null {

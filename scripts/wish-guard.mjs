@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+// Guardrails for code written by the coding agent (design doc, Building
+// Engine wishes automatically). Run on a wish branch:
+//
+//   node scripts/wish-guard.mjs [--base origin/main] [--allow-core]
+//
+// It fails when the change is too big for one review, or touches what a
+// wish may not change: sign-in, roles, the budget, API keys, the script
+// sandbox and package dependencies (unless the Owner's approval allows
+// them with --allow-core), and never the build workflows or this file.
+
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+/** Most files and changed lines one wish may touch. Lockfiles don't count. */
+export const MAX_FILES = 25;
+export const MAX_LINES = 1500;
+
+/** Never changed by a wish, whatever the Owner allows. */
+export const FORBIDDEN = [
+  /^\.github\//,
+  /^scripts\/wish-guard\.mjs$/,
+  /^scripts\/dev\.mjs$/,
+  /(^|\/)\.env/,
+  /^CLAUDE\.md$/,
+];
+
+/** Changed only when the Owner's approval allows core changes. */
+export const CORE = [
+  { pattern: /^packages\/server\/src\/store\.ts$/, what: 'accounts, roles and saved settings' },
+  { pattern: /^packages\/server\/src\/admin\.ts$/, what: "God's View permissions, keys and the budget" },
+  { pattern: /^packages\/server\/src\/ai\//, what: 'AI providers and their keys' },
+  { pattern: /^packages\/server\/src\/rules\.ts$/, what: 'the script sandbox' },
+  { pattern: /^packages\/server\/src\/live-rules\.ts$/, what: 'the script sandbox' },
+  { pattern: /^packages\/server\/src\/builds\.ts$/, what: 'the build pipeline' },
+  { pattern: /^packages\/server\/src\/updates\.ts$/, what: 'updates and restarts' },
+  { pattern: /^packages\/server\/src\/main\.ts$/, what: 'server start-up and secrets' },
+  { pattern: /(^|\/)package(-lock)?\.json$/, what: 'package dependencies' },
+  { pattern: /^Dockerfile$/, what: 'the server image' },
+];
+
+const UNCOUNTED = /(^|\/)package-lock\.json$/;
+
+/**
+ * Checks a list of changed files ({ path, added, removed }) and returns the
+ * problems, in plain words; an empty list passes.
+ */
+export function checkChanges(files, { allowCore = false } = {}) {
+  const problems = [];
+  for (const f of files) {
+    if (FORBIDDEN.some((p) => p.test(f.path))) problems.push(`${f.path} may not be changed by a wish.`);
+    else if (!allowCore) {
+      const core = CORE.find((c) => c.pattern.test(f.path));
+      if (core) problems.push(`${f.path} holds ${core.what}; the Owner's approval did not allow core changes.`);
+    }
+  }
+  const counted = files.filter((f) => !UNCOUNTED.test(f.path));
+  const lines = counted.reduce((n, f) => n + f.added + f.removed, 0);
+  if (counted.length > MAX_FILES) problems.push(`The change touches ${counted.length} files; one wish may touch at most ${MAX_FILES}. Split the wish into smaller steps.`);
+  if (lines > MAX_LINES) problems.push(`The change is ${lines} lines; one wish may change at most ${MAX_LINES}. Split the wish into smaller steps.`);
+  return problems;
+}
+
+/** Files changed between the base and HEAD, from git. */
+export function changedFiles(base) {
+  const out = execFileSync('git', ['diff', '--numstat', '--no-renames', `${base}...HEAD`], { encoding: 'utf8' });
+  return out.split('\n').filter(Boolean).map((line) => {
+    const [added, removed, ...path] = line.split('\t');
+    // Binary files show "-"; count them as one line each.
+    return { path: path.join('\t'), added: added === '-' ? 1 : Number(added), removed: removed === '-' ? 1 : Number(removed) };
+  });
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'origin/main';
+  const allowCore = args.includes('--allow-core');
+  const files = changedFiles(base);
+  const problems = checkChanges(files, { allowCore });
+  if (!files.length) problems.push('The change is empty.');
+  if (problems.length) {
+    console.log(problems.map((p) => `- ${p}`).join('\n'));
+    process.exit(1);
+  }
+  console.log(`Wish guard passed: ${files.length} files${allowCore ? ' (core changes allowed by the Owner)' : ''}.`);
+}

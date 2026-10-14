@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { PLAYER_COLORS, hashString, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
+import { PLAYER_COLORS, hashString, type BuildTrack, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
 import type { ChatTurn, ProviderId } from './ai/chat.ts';
 import type { RuleTestReport } from './rule-test.ts';
 
@@ -44,6 +44,8 @@ export interface ContentRecord extends ContentEntry {
   test?: RuleTestReport;
   /** A live rule a Steward paused, or that paused itself. */
   rule?: { paused: boolean; reason?: string };
+  /** An Engine wish being built as a code change by a coding agent. */
+  build?: BuildTrack;
 }
 
 /** A player telling the Stewards about a wished thing or another player. */
@@ -81,12 +83,25 @@ export interface Settings {
     /** God's View warns from here. */
     warnUsd: number;
   };
+  /** Building Engine wishes as code changes (missing in older saves). */
+  builds?: BuildSettings;
 }
+
+export interface BuildSettings {
+  /** Who writes the change: Claude Code in GitHub Actions, or a person working from the issue. */
+  agent: 'claude' | 'manual';
+  /** Builds started per day (UTC); more wait in the queue. */
+  dailyLimit: number;
+  /** What one build is guessed to cost, counted against the monthly budget. */
+  usdPerBuild: number;
+}
+
+export const DEFAULT_BUILDS: BuildSettings = { agent: 'claude', dailyLimit: 3, usdPerBuild: 1.5 };
 
 export interface SpendRecord {
   at: number;
   usd: number;
-  kind: 'chat' | 'image';
+  kind: 'chat' | 'image' | 'build';
   provider: string;
   model: string;
   playerId: string | null;
@@ -113,6 +128,7 @@ export function defaultSettings(env: Record<string, string | undefined> = proces
       image: gemini ? { provider: 'gemini', model: 'gemini-2.5-flash-image' } : { provider: 'none', model: '' },
     },
     budget: { monthlyUsd: 70, warnUsd: 50 },
+    builds: { ...DEFAULT_BUILDS },
   };
 }
 

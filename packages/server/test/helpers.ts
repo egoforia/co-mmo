@@ -15,6 +15,7 @@ import { OfflineGod } from '../src/god.ts';
 import type { ImageProvider } from '../src/assets/provider.ts';
 import { Store } from '../src/store.ts';
 import type { Updater } from '../src/updates.ts';
+import type { BuildOptions } from '../src/builds.ts';
 
 export let app: App | null = null;
 const sockets: WebSocket[] = [];
@@ -49,7 +50,7 @@ export const fakePainter = (): ImageProvider & { calls: number } => ({
   },
 });
 
-export async function start(opts: { store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number; updater?: Updater } = {}) {
+export async function start(opts: { store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number; updater?: Updater; builds?: BuildOptions } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-art-'));
   const painter = opts.painter === undefined ? fakePainter() : opts.painter;
@@ -58,6 +59,7 @@ export async function start(opts: { store?: Store; chat?: () => ChatModel[]; com
     publicUrl: 'http://game.test',
     updater: opts.updater,
     commit: 'abc1234',
+    builds: opts.builds ?? { issues: null },
     wishes: {
       env: {},
       anchorDir: '/nonexistent',

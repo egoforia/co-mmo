@@ -11,6 +11,7 @@ import { handleAdmin } from './admin.ts';
 import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
 import type { Updater } from './updates.ts';
+import { Builds, type BuildOptions } from './builds.ts';
 
 export interface AppOptions {
   store: Store;
@@ -26,6 +27,8 @@ export interface AppOptions {
   updater?: Updater;
   /** The commit this server runs, so clients can tell it restarted. */
   commit?: string | null;
+  /** Building Engine wishes on GitHub: test overrides and where the checkout is. */
+  builds?: BuildOptions;
 }
 
 export interface App {
@@ -34,6 +37,7 @@ export interface App {
   wishes: Wishes;
   rules: LiveRules;
   reports: Reports;
+  builds: Builds;
   close(): Promise<void>;
 }
 
@@ -66,6 +70,20 @@ export function createApp(options: AppOptions): App {
   const wishes = new Wishes(store, world, rules, options.wishes);
   wishes.restore();
   const reports = new Reports(store, world);
+  const builds = new Builds(store, {
+    changed: (id) => wishes.changed(id),
+    tellWisher: (record, text) => wishes.tellWisher(record, text),
+    notifyOwner: (text) => wishes.notifyStewards(text),
+    announce: (text) => world.broadcast({ t: 'system', text, at: Date.now() }),
+    addWish: (from, title, summary) => wishes.addStep(from, title, summary),
+  }, {
+    env: options.wishes.env ?? process.env,
+    now: options.wishes.now,
+    ...(options.updater ? { contains: (sha: string) => options.updater!.contains(sha) } : {}),
+    ...options.builds,
+  });
+  const restoring = builds.restore().catch((err) => console.error('Builds did not restore:', (err as Error).message));
+  builds.start();
 
   const server = createServer((req, res) => {
     handleHttp(req, res).catch((err) => {
@@ -122,7 +140,7 @@ export function createApp(options: AppOptions): App {
       return json(res, 200, { code: invite.code, url: inviteUrl(options.publicUrl, invite.code) });
     }
 
-    const admin = { store, world, wishes, rules, reports, kick, updater: options.updater, restarting, env: options.wishes.env ?? process.env, json, readJson };
+    const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env: options.wishes.env ?? process.env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
@@ -195,6 +213,7 @@ export function createApp(options: AppOptions): App {
         }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
         world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
         rules.fire('join', account.id);
+        builds.greet(account.id);
         return;
       }
       if (!isClientMessage(parsed)) return;
@@ -239,9 +258,13 @@ export function createApp(options: AppOptions): App {
     wishes,
     rules,
     reports,
+    builds,
     async close() {
       clearInterval(tickTimer);
       options.updater?.stop();
+      builds.stop();
+      await restoring;
+      await Promise.allSettled([...builds.jobs]);
       await Promise.allSettled([...wishes.drafts]);
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();

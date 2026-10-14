@@ -277,7 +277,8 @@ export class Wishes {
   /** Undoes a granted wish everywhere (God's View, content log). */
   rollback(id: string): ContentRecord | undefined {
     const record = this.store.contentById(id);
-    if (!record || record.status !== 'granted') return undefined;
+    // A code change is undone by reverting its pull request, not from here.
+    if (!record || record.status !== 'granted' || record.build) return undefined;
     this.store.updateContent(id, { status: 'rolled-back' });
     removeContent(record);
     this.rules.stop(id);
@@ -302,7 +303,9 @@ export class Wishes {
    */
   async review(id: string, approve: boolean): Promise<{ record: ContentRecord } | { error: string; message: string }> {
     const record = this.store.contentById(id);
-    if (!record || record.status !== 'pending') return { error: 'not_pending', message: 'This wish is not waiting for review.' };
+    // A build that failed can still be given up on.
+    const failedBuild = record?.status === 'approved' && record.build?.state === 'failed' && !approve;
+    if (!record || (record.status !== 'pending' && !failedBuild)) return { error: 'not_pending', message: 'This wish is not waiting for review.' };
     if (approve && record.definition?.kind === 'rule') {
       if (this.drafting.has(id)) return { error: 'drafting', message: 'The God is still drafting this rule.' };
       if (!record.test?.passed) return { error: 'untested', message: 'This rule has not passed its test run. Ask the God to revise it, or reject it.' };
@@ -313,10 +316,35 @@ export class Wishes {
     this.world.sendTo(record.wisher.id, {
       t: 'god',
       say: approve
-        ? `Your wish "${record.title}" was approved. It will be built for the world.`
+        ? record.tier === 'engine'
+          ? `Your wish "${record.title}" was approved. It will be built into the game, and you will hear when it is live.`
+          : `Your wish "${record.title}" was approved. It will be built for the world.`
         : `Your wish "${record.title}" was not approved this time.`,
     });
     return { record };
+  }
+
+  /**
+   * One step of a wish too big for one code change, recorded as its own
+   * Engine wish for the Owner to approve.
+   */
+  addStep(from: ContentRecord, title: string, summary: string): ContentRecord {
+    const record: ContentRecord = {
+      id: `w${this.now().toString(36)}${randomBytes(2).toString('hex')}`,
+      wisher: from.wisher,
+      regionId: from.regionId,
+      at: this.now(),
+      tier: 'engine',
+      title: title.slice(0, 80),
+      summary,
+      status: 'pending',
+      favor: 0,
+      conversation: from.conversation,
+      usd: 0,
+    };
+    this.store.addContent(record);
+    this.broadcast(record);
+    return record;
   }
 
   private async grantRule(record: ContentRecord): Promise<{ record: ContentRecord } | { error: string; message: string }> {
@@ -576,7 +604,7 @@ export class Wishes {
 
 /** A content record without what only God's View sees (the conversation, cost, and a rule's script). */
 export function publicEntry(record: ContentRecord): ContentEntry {
-  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, ...rest } = record;
+  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, build: _b, ...rest } = record;
   const entry: ContentEntry = { ...rest, progress: wishProgress(record) };
   if (entry.definition?.kind === 'rule') {
     const { script: _s, ...definition } = entry.definition;

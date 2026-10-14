@@ -193,6 +193,17 @@ export class Updater {
     return { ok: true, status };
   }
 
+  /** True when the running checkout already contains this commit. */
+  async contains(sha: string): Promise<boolean> {
+    if (!/^[0-9a-f]{7,40}$/.test(sha)) return false;
+    try {
+      await this.git(['merge-base', '--is-ancestor', sha, 'HEAD']);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private lastUpdate(): UpdateResult | null {
     const file = this.options.resultFile;
     if (!file || !existsSync(file)) return null;

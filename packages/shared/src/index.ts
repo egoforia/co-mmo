@@ -6,3 +6,4 @@ export * from './world.ts';
 export * from './movement.ts';
 export * from './names.ts';
 export * from './prediction.ts';
+export * from './biomes.ts';

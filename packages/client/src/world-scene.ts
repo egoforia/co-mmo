@@ -72,8 +72,7 @@ export class WorldScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, this.map.width * T, this.map.height * T);
-    cam.setZoom(window.innerWidth < 700 ? 1 : 1.5);
-    cam.setRoundPixels(true);
+    cam.setZoom(cameraZoom());
     cam.startFollow(this.me.body, true, 0.2, 0.2);
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
   }
@@ -143,16 +142,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private makeAvatar(name: string, color: number, self: boolean): Avatar {
-    const shadow = this.add.ellipse(0, 0, 18, 6, 0x181425, 0.35);
+    const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.35);
     const body = this.add.image(0, 0, playerTexture(this, color)).setOrigin(0.5, 0.95);
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
-        fontSize: '11px',
+        fontSize: `${Math.round(T * 0.28)}px`,
         color: self ? '#feae34' : '#ffffff',
         stroke: '#181425',
-        strokeThickness: 3,
-        resolution: 2,
+        strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
     return { body, shadow, label };
@@ -161,12 +159,18 @@ export class WorldScene extends Phaser.Scene {
   private placeAvatar(a: Avatar, x: number, y: number): void {
     const px = x * T;
     const py = y * T;
-    a.shadow.setPosition(px, py + 1);
-    a.body.setPosition(px, py + 2);
-    a.label.setPosition(px, py - T + 2);
+    a.shadow.setPosition(px, py + T / 32);
+    a.body.setPosition(px, py + T / 16);
+    a.label.setPosition(px, py - T + T / 16);
     // Lower on screen draws in front.
     a.shadow.setDepth(py - 1);
     a.body.setDepth(py);
     a.label.setDepth(100000);
   }
+}
+
+/** About 64 px per tile on a laptop or desktop screen, smaller on phones. */
+function cameraZoom(): number {
+  if (window.innerWidth < 700) return 0.3;
+  return window.innerWidth < 1280 ? 0.4 : 0.5;
 }

@@ -1,5 +1,7 @@
-// Master palette from the style bible: every pixel the game draws, generated
-// or hand-made, is snapped to one of these 32 colours (ENDESGA 32).
+// Placeholder palette (ENDESGA 32) for the Tier 0 art drawn in code. Generated
+// art is colour-graded toward each biome's key palette instead (see biomes.ts
+// and the Style Bible); nearestPaletteColor maps a wished-for colour to a
+// named one.
 export const PALETTE = [
   0xbe4a2f, 0xd77643, 0xead4aa, 0xe4a672, 0xb86f50, 0x733e39, 0x3e2731, 0xa22633,
   0xe43b44, 0xf77622, 0xfeae34, 0xfee761, 0x63c74d, 0x3e8948, 0x265c42, 0x193c3e,

@@ -4,19 +4,22 @@ import { TILE_PIXELS, Tile, rand2 } from '@co-mmo/shared';
 // Tier 0 placeholder art: drawn in code, pixel by pixel, from the master
 // palette. Generated assets will replace these through the Asset Service.
 
-const S = TILE_PIXELS;
+// Placeholders are drawn on a coarse 32x32 grid, then scaled up to the real
+// tile size, so they stay readable at 128 px.
+const S = 32;
+const UPSCALE = TILE_PIXELS / S;
 const OUTLINE = '#181425';
 
 type Paint = (px: (x: number, y: number, color: string) => void) => void;
 
 function canvasFrom(width: number, height: number, paint: Paint): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = width * UPSCALE;
+  canvas.height = height * UPSCALE;
   const ctx = canvas.getContext('2d')!;
   paint((x, y, color) => {
     ctx.fillStyle = color;
-    ctx.fillRect(x, y, 1, 1);
+    ctx.fillRect(x * UPSCALE, y * UPSCALE, UPSCALE, UPSCALE);
   });
   return canvas;
 }
@@ -104,11 +107,13 @@ export function tilesetKey(): string {
 export function registerTileset(scene: Phaser.Scene): void {
   const tiles = Object.keys(TILE_PAINTERS).map(Number) as Tile[];
   const canvas = document.createElement('canvas');
-  canvas.width = S * tiles.length;
-  canvas.height = S;
+  canvas.width = TILE_PIXELS * tiles.length;
+  canvas.height = TILE_PIXELS;
   const ctx = canvas.getContext('2d')!;
-  for (const tile of tiles) ctx.drawImage(canvasFrom(S, S, TILE_PAINTERS[tile]), tile * S, 0);
-  scene.textures.addCanvas(tilesetKey(), canvas);
+  for (const tile of tiles) ctx.drawImage(canvasFrom(S, S, TILE_PAINTERS[tile]), tile * TILE_PIXELS, 0);
+  // Nearest filtering keeps the blocky placeholders crisp and stops
+  // neighbouring tiles bleeding into each other as thin seams.
+  scene.textures.addCanvas(tilesetKey(), canvas)?.setFilter(Phaser.Textures.FilterMode.NEAREST);
 }
 
 /** A small adventurer in the player's outfit colour, created once per colour. */
@@ -132,6 +137,6 @@ export function playerTexture(scene: Phaser.Scene, color: number): string {
     fillRect(12, 25, 2, 4, '#3a4466');
     fillRect(18, 25, 2, 4, '#3a4466');
   });
-  scene.textures.addCanvas(key, canvas);
+  scene.textures.addCanvas(key, canvas)?.setFilter(Phaser.Textures.FilterMode.NEAREST);
   return key;
 }

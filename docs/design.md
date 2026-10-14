@@ -14,8 +14,13 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
 - Mature content rating with no content-rating limits; players must be 18+.
 - AI and asset providers sit behind adapters and are chosen in settings
   (God's View), never hard-coded.
-- Art: 2D top-down pixel art, a locked style bible, 32-colour master palette
-  (`packages/shared/src/palette.ts`), 32×32 tiles.
+- Art: Legend of Mana-inspired hand-painted 2D on 128×128 tiles, defined by
+  the Style Bible (https://claude.ai/code/artifact/e9e5a8ec-ef6a-4d0b-85fa-c421147ed2d8).
+  Assets are colour-graded toward each biome's key palette
+  (`packages/shared/src/biomes.ts`). Launch biomes: the Sanctum, Whispering
+  Woods, Sunlit Shore, Mirage Desert.
+- The first item is the Bible: every player has it, and it shows the game's
+  documents in-game.
 - Budget ceiling: $50 to $70 a month for AI and assets.
 - Roles: Player, Steward, Owner. egoforia is Owner and first Steward; the
   Owner appoints more Stewards by asking the God.

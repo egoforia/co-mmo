@@ -19,7 +19,10 @@ which milestone the code is at.
 - Area of interest: each player only receives others within 24 tiles.
 - Chat: Say (nearby, 16 tiles) and World, with flood limits.
 - Positions saved every 30 seconds and on disconnect.
-- Tier 0 placeholder art drawn in code from the 32-colour master palette.
+- 128×128 tiles (Style Bible). Tier 0 placeholder art is drawn in code and
+  scaled up; generated hand-painted art replaces it later.
+- Biome definitions for all ten Style Bible biomes; the Sanctum, Whispering
+  Woods, Sunlit Shore and Mirage Desert are the launch set.
 
 Not yet: the God and wishes, RPG systems (stats, combat, items, quests),
 God's View, Postgres, multiple region servers. See the milestone list in

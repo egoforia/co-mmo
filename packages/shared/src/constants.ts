@@ -16,5 +16,8 @@ export const MAX_CHAT_LENGTH = 280;
 export const MAX_NAME_LENGTH = 20;
 export const MIN_NAME_LENGTH = 2;
 
-/** Rendered size of one tile, in pixels, before camera zoom. */
-export const TILE_PIXELS = 32;
+/**
+ * Size of one tile's art, in pixels (Style Bible: 128x128 hand-painted
+ * tiles). The camera shows tiles at about half size on a 1080p screen.
+ */
+export const TILE_PIXELS = 128;

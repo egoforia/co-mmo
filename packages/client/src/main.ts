@@ -106,7 +106,7 @@ function play(token: string): void {
       type: Phaser.AUTO,
       parent: 'game',
       backgroundColor: '#181425',
-      pixelArt: true,
+      antialias: true,
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });

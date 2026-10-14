@@ -1,0 +1,35 @@
+{
+  "id": "woods-herbalist",
+  "description": {
+    "id": "woods-herbalist",
+    "name": "Old Bramble",
+    "kind": "npc",
+    "biome": "whispering-woods",
+    "silhouetteHook": "huge round backpack overflowing with herbs",
+    "body": "stooped elder, long white beard tucked into a belt, round spectacles",
+    "materials": [
+      "patched linen",
+      "wicker",
+      "leather"
+    ],
+    "colors": {
+      "main": "bark brown",
+      "secondary": "teal-green",
+      "accent": "firefly yellow lantern"
+    },
+    "details": [
+      "lantern hanging from the pack",
+      "walking stick"
+    ],
+    "mood": "kindly, absent-minded",
+    "extra": {
+      "role": "herbalist"
+    }
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Old Bramble (npc). Most recognisable feature: huge round backpack overflowing with herbs. Body and shape: stooped elder, long white beard tucked into a belt, round spectacles. Materials: patched linen, wicker, leather. Colours: main bark brown, secondary teal-green, small accent of firefly yellow lantern. Details: lantern hanging from the pack; walking stick. role: herbalist. Mood: kindly, absent-minded.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:35:04.365Z"
+}

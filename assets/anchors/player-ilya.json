@@ -1,0 +1,32 @@
+{
+  "id": "player-ilya",
+  "description": {
+    "id": "player-ilya",
+    "name": "Ilya",
+    "kind": "player",
+    "biome": "any",
+    "silhouetteHook": "long red scarf trailing behind",
+    "body": "small, 3 heads tall, sturdy build, confident stance, facing the viewer",
+    "materials": [
+      "leather",
+      "iron"
+    ],
+    "colors": {
+      "main": "slate blue",
+      "secondary": "brown leather",
+      "accent": "red scarf"
+    },
+    "details": [
+      "short sword at the hip",
+      "messy dark hair",
+      "round shield on the back"
+    ],
+    "mood": "brave, playful"
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nSubject: Ilya (player). Most recognisable feature: long red scarf trailing behind. Body and shape: small, 3 heads tall, sturdy build, confident stance, facing the viewer. Materials: leather, iron. Colours: main slate blue, secondary brown leather, small accent of red scarf. Details: short sword at the hip; messy dark hair; round shield on the back. Mood: brave, playful.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:35:59.279Z"
+}

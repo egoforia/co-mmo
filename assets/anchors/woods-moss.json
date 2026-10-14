@@ -1,0 +1,32 @@
+{
+  "id": "woods-moss",
+  "description": {
+    "id": "woods-moss",
+    "name": "Mossy forest floor",
+    "kind": "tile",
+    "biome": "whispering-woods",
+    "silhouetteHook": "thick soft moss with thin roots and fallen leaves scattered evenly",
+    "body": "flat ground, no large roots",
+    "materials": [
+      "moss",
+      "roots",
+      "fallen leaves"
+    ],
+    "colors": {
+      "main": "deep teal-green",
+      "secondary": "bark brown",
+      "accent": "firefly yellow"
+    },
+    "details": [
+      "small ferns",
+      "scattered leaves"
+    ],
+    "mood": "quiet, mysterious"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Mossy forest floor (tile). Most recognisable feature: thick soft moss with thin roots and fallen leaves scattered evenly. Body and shape: flat ground, no large roots. Materials: moss, roots, fallen leaves. Colours: main deep teal-green, secondary bark brown, small accent of firefly yellow. Details: small ferns; scattered leaves. Mood: quiet, mysterious.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:49:29.913Z"
+}

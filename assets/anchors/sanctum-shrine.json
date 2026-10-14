@@ -1,0 +1,31 @@
+{
+  "id": "sanctum-shrine",
+  "description": {
+    "id": "sanctum-shrine",
+    "name": "Shrine of the God",
+    "kind": "set-piece",
+    "biome": "sanctum",
+    "silhouetteHook": "a glowing golden orb floating above a round white pedestal",
+    "body": "round stepped pedestal with carved arches, about twice a person's height",
+    "materials": [
+      "white marble",
+      "gold"
+    ],
+    "colors": {
+      "main": "cream white",
+      "secondary": "pale gold",
+      "accent": "soft rose"
+    },
+    "details": [
+      "rose vines climbing the steps",
+      "light motes around the orb"
+    ],
+    "mood": "holy, welcoming"
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSubject: Shrine of the God (set-piece). Most recognisable feature: a glowing golden orb floating above a round white pedestal. Body and shape: round stepped pedestal with carved arches, about twice a person's height. Materials: white marble, gold. Colours: main cream white, secondary pale gold, small accent of soft rose. Details: rose vines climbing the steps; light motes around the orb. Mood: holy, welcoming.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:34:43.370Z"
+}

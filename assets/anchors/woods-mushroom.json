@@ -1,0 +1,34 @@
+{
+  "id": "woods-mushroom",
+  "description": {
+    "id": "woods-mushroom",
+    "name": "Walking Mushroom",
+    "kind": "monster",
+    "biome": "whispering-woods",
+    "silhouetteHook": "big floppy red-brown cap that bounces as it walks",
+    "body": "small round stem body with stubby legs and sleepy eyes",
+    "materials": [
+      "mushroom flesh"
+    ],
+    "colors": {
+      "main": "russet",
+      "secondary": "cream",
+      "accent": "firefly yellow spots"
+    },
+    "details": [
+      "tiny root toes",
+      "spores puffing from the cap"
+    ],
+    "mood": "grumpy, cute",
+    "extra": {
+      "threat": "normal",
+      "movement": "waddle"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Walking Mushroom (monster). Most recognisable feature: big floppy red-brown cap that bounces as it walks. Body and shape: small round stem body with stubby legs and sleepy eyes. Materials: mushroom flesh. Colours: main russet, secondary cream, small accent of firefly yellow spots. Details: tiny root toes; spores puffing from the cap. threat: normal. movement: waddle. Mood: grumpy, cute.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:45:11.652Z"
+}

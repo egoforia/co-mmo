@@ -1,0 +1,34 @@
+{
+  "id": "desert-scarab",
+  "description": {
+    "id": "desert-scarab",
+    "name": "Sun Scarab",
+    "kind": "monster",
+    "biome": "mirage-desert",
+    "silhouetteHook": "a round shiny shell with a glowing sun disc on its back",
+    "body": "chunky beetle with stubby legs",
+    "materials": [
+      "chitin"
+    ],
+    "colors": {
+      "main": "ochre",
+      "secondary": "deep brown",
+      "accent": "turquoise sheen"
+    },
+    "details": [
+      "little horn",
+      "sand trailing behind"
+    ],
+    "mood": "stubborn, curious",
+    "extra": {
+      "threat": "normal",
+      "movement": "scuttle and roll"
+    }
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Sun Scarab (monster). Most recognisable feature: a round shiny shell with a glowing sun disc on its back. Body and shape: chunky beetle with stubby legs. Materials: chitin. Colours: main ochre, secondary deep brown, small accent of turquoise sheen. Details: little horn; sand trailing behind. threat: normal. movement: scuttle and roll. Mood: stubborn, curious.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:35:41.580Z"
+}

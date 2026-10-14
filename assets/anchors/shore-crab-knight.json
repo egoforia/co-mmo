@@ -1,0 +1,35 @@
+{
+  "id": "shore-crab-knight",
+  "description": {
+    "id": "shore-crab-knight",
+    "name": "Crab Knight",
+    "kind": "monster",
+    "biome": "sunlit-shore",
+    "silhouetteHook": "one giant claw held up like a shield",
+    "body": "round crab body standing on back legs, tiny helmet",
+    "materials": [
+      "shell",
+      "tin"
+    ],
+    "colors": {
+      "main": "coral pink",
+      "secondary": "sand cream",
+      "accent": "turquoise plume"
+    },
+    "details": [
+      "a plume on the helmet",
+      "a toothpick lance"
+    ],
+    "mood": "proud, comical",
+    "extra": {
+      "threat": "normal",
+      "movement": "sideways scuttle"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Sunlit Shore. Palette leans on its key colours; light tint and mood of Sunlit Shore.\nSubject: Crab Knight (monster). Most recognisable feature: one giant claw held up like a shield. Body and shape: round crab body standing on back legs, tiny helmet. Materials: shell, tin. Colours: main coral pink, secondary sand cream, small accent of turquoise plume. Details: a plume on the helmet; a toothpick lance. threat: normal. movement: sideways scuttle. Mood: proud, comical.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:45:04.837Z"
+}

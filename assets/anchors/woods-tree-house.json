@@ -1,0 +1,33 @@
+{
+  "id": "woods-tree-house",
+  "description": {
+    "id": "woods-tree-house",
+    "name": "Hollow tree house",
+    "kind": "set-piece",
+    "biome": "whispering-woods",
+    "silhouetteHook": "a huge twisting tree with a round door and glowing windows in its trunk",
+    "body": "enormous gnarled trunk, roots spreading wide, canopy of oversized leaves",
+    "materials": [
+      "bark",
+      "wood",
+      "leaves"
+    ],
+    "colors": {
+      "main": "bark brown",
+      "secondary": "deep teal-green",
+      "accent": "warm yellow window light"
+    },
+    "details": [
+      "a little wooden staircase around the trunk",
+      "hanging lantern",
+      "mushrooms at the roots"
+    ],
+    "mood": "cosy, magical"
+  },
+  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Hollow tree house (set-piece). Most recognisable feature: a huge twisting tree with a round door and glowing windows in its trunk. Body and shape: enormous gnarled trunk, roots spreading wide, canopy of oversized leaves. Materials: bark, wood, leaves. Colours: main bark brown, secondary deep teal-green, small accent of warm yellow window light. Details: a little wooden staircase around the trunk; hanging lantern; mushrooms at the roots. Mood: cosy, magical.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T17:34:59.105Z"
+}

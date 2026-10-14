@@ -9,6 +9,7 @@
     "anchors": "tsx src/tools/generate-anchors.ts"
   },
   "dependencies": {
+    "sharp": "^0.35.5",
     "ws": "^8.22.0"
   }
 }

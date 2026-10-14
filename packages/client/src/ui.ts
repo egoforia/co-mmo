@@ -17,6 +17,12 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
+/** True while a text field has focus, so keys type instead of acting. */
+export function isTyping(): boolean {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement;
+}
+
 let toastTimer: number | undefined;
 export function toast(text: string, ms = 6000): void {
   const el = $('toast');
@@ -46,7 +52,7 @@ export class ChatBox {
       this.input.blur();
     });
     window.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && document.activeElement !== this.input) {
+      if (event.key === 'Enter' && !isTyping()) {
         event.preventDefault();
         this.input.focus();
       } else if (event.key === 'Escape' && document.activeElement === this.input) {

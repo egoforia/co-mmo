@@ -6,6 +6,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { TICK_SECONDS, isClientMessage, upgradeCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
 import { World } from './world.ts';
 import { Store, StoreError, type Account } from './store.ts';
+import { Wishes, type WishOptions } from './wishes.ts';
+import { handleAdmin } from './admin.ts';
 
 export interface AppOptions {
   store: Store;
@@ -15,11 +17,14 @@ export interface AppOptions {
   clientDir?: string;
   /** How often player positions are saved, in ms. */
   autosaveMs?: number;
+  /** Prayers and wishes: where art lives, and test overrides. */
+  wishes: WishOptions;
 }
 
 export interface App {
   server: Server;
   world: World;
+  wishes: Wishes;
   close(): Promise<void>;
 }
 
@@ -39,6 +44,9 @@ const MIME: Record<string, string> = {
 export function createApp(options: AppOptions): App {
   const { store } = options;
   const world = new World();
+  world.offlineFavor = (playerId, amount) => store.addFavor(playerId, amount);
+  const wishes = new Wishes(store, world, options.wishes);
+  wishes.restore();
 
   const server = createServer((req, res) => {
     handleHttp(req, res).catch((err) => {
@@ -89,7 +97,12 @@ export function createApp(options: AppOptions): App {
       return json(res, 200, { code: invite.code, url: inviteUrl(options.publicUrl, invite.code) });
     }
 
+    if (await handleAdmin(req, res, path, authenticate(req), { store, world, wishes, env: options.wishes.env ?? process.env, json, readJson })) return;
+
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
+
+    const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
+    if (art && req.method === 'GET') return serveFile(join(options.wishes.artDir, `${art[1]}.png`), res);
 
     if (options.clientDir && req.method === 'GET') return serveStatic(options.clientDir, path, res);
     json(res, 404, { error: 'not_found' });
@@ -132,9 +145,19 @@ export function createApp(options: AppOptions): App {
           },
           close: (reason) => socket.close(4000, reason),
         }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
+        world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
         return;
       }
-      if (isClientMessage(parsed)) world.handle(account.id, parsed);
+      if (!isClientMessage(parsed)) return;
+      if (parsed.t === 'pray') {
+        // The role may have changed since sign-in (a Steward was appointed).
+        const current = store.accountById(account.id) ?? account;
+        void wishes.pray(publicInfo(current), parsed.text);
+      } else if (parsed.t === 'wish') {
+        wishes.answer(publicInfo(store.accountById(account.id) ?? account), parsed.card, parsed.confirm);
+      } else {
+        world.handle(account.id, parsed);
+      }
     });
 
     socket.on('close', () => {
@@ -158,8 +181,10 @@ export function createApp(options: AppOptions): App {
   return {
     server,
     world,
+    wishes,
     async close() {
       clearInterval(tickTimer);
+      await Promise.allSettled([...wishes.painting]);
       clearInterval(autosaveTimer);
       saveAll();
       for (const client of wss.clients) client.terminate();
@@ -209,6 +234,10 @@ async function serveStatic(root: string, urlPath: string, res: ServerResponse): 
     // Unknown paths fall back to the app shell so invite links work.
     file = join(root, 'index.html');
   }
+  return serveFile(file, res);
+}
+
+async function serveFile(file: string, res: ServerResponse): Promise<void> {
   try {
     await stat(file);
   } catch {

@@ -71,6 +71,8 @@ export interface RegionHooks {
   worldChat(message: ServerMessage): void;
   /** Players online across the whole world. */
   online(): number;
+  /** Someone enjoyed a wished thing (defeated a wished creature): reward its wisher. */
+  creatorFavor?(wisherId: string, amount: number): void;
 }
 
 interface PlayerState {
@@ -106,6 +108,8 @@ interface Creature {
   lastAttack: number;
   /** Epoch ms when a defeated creature comes back; null while alive. */
   respawnAt: number | null;
+  /** Who wished it into the world, if anyone. */
+  wisher?: string;
 }
 
 export type Departure = { id: string; side: Side; died?: undefined } | { id: string; died: true; side?: undefined };
@@ -126,7 +130,9 @@ export interface Leaving {
 export class Region {
   readonly map: RegionMap;
   private readonly players = new Map<string, PlayerState>();
-  private readonly creatures: Creature[];
+  private creatures: Creature[];
+  /** NPCs that wishes added, beside the map's own. */
+  private wishedNpcs: NpcPlacement[] = [];
   private tickCount = 0;
 
   private readonly hooks: RegionHooks;
@@ -140,25 +146,95 @@ export class Region {
     // A region on its own is a world of one.
     this.hooks = hooks ?? { worldChat: (m) => this.broadcast(m), online: () => this.players.size };
     this.map = generateRegion(def);
-    this.creatures = this.map.creatures.flatMap((c, i) => {
-      const cdef = CREATURES[c.kind];
-      if (!cdef) return [];
-      return [{
-        id: `${def.id}-${c.kind}-${i}`,
-        kind: c.kind,
-        def: cdef,
-        x: c.x,
-        y: c.y,
-        home: { x: c.x, y: c.y },
-        hp: cdef.hp,
-        target: null,
-        rest: Math.floor(this.random() * TICK_RATE * 3),
-        aggro: null,
-        returning: false,
-        lastAttack: 0,
-        respawnAt: null,
-      }];
-    });
+    this.creatures = this.map.creatures.flatMap((c, i) => this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y));
+  }
+
+  private makeCreature(id: string, kind: string, x: number, y: number, wisher?: string): Creature[] {
+    const cdef = CREATURES[kind];
+    if (!cdef) return [];
+    return [{
+      id,
+      kind,
+      def: cdef,
+      x,
+      y,
+      home: { x, y },
+      hp: cdef.hp,
+      target: null,
+      rest: Math.floor(this.random() * TICK_RATE * 3),
+      aggro: null,
+      returning: false,
+      lastAttack: 0,
+      respawnAt: null,
+      ...(wisher ? { wisher } : {}),
+    }];
+  }
+
+  // --- Wished content ----------------------------------------------------------
+
+  /** Places a wished creature kind at these spots. */
+  addCreatures(kind: string, spots: { x: number; y: number }[], wisher: string): void {
+    spots.forEach((s, i) => this.creatures.push(...this.makeCreature(`${kind}-${i}`, kind, s.x, s.y, wisher)));
+  }
+
+  addNpc(npc: NpcPlacement): void {
+    this.wishedNpcs = this.wishedNpcs.filter((n) => n.id !== npc.id);
+    this.wishedNpcs.push(npc);
+  }
+
+  /** Takes away everything a wish placed here. */
+  removeWish(id: string): void {
+    for (const p of this.players.values()) {
+      if (this.creatures.some((c) => c.kind === id && c.aggro === p.info.id)) p.lastHurt = this.now();
+    }
+    this.creatures = this.creatures.filter((c) => c.kind !== id);
+    this.wishedNpcs = this.wishedNpcs.filter((n) => n.id !== id);
+  }
+
+  /**
+   * Up to `count` walkable spots around a point, nearest first, at least a
+   * tile apart, for placing wished things.
+   */
+  findSpots(x: number, y: number, count: number, min = 1.5, max = 4): { x: number; y: number }[] {
+    const spots: { x: number; y: number }[] = [];
+    for (let r = min; r <= max && spots.length < count; r += 0.75) {
+      for (let a = 0; a < 12 && spots.length < count; a++) {
+        const angle = (a / 12) * Math.PI * 2 + r;
+        const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
+        if (outsideSide(this.map, s.x, s.y) || collides(this.map, s.x, s.y)) continue;
+        if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
+        spots.push(s);
+      }
+    }
+    return spots;
+  }
+
+  /** Short lines about what is near a player, for the God's context. */
+  nearby(id: string): string[] {
+    const p = this.players.get(id);
+    if (!p) return [];
+    const lines: string[] = [];
+    const near = (x: number, y: number, r: number) => Math.hypot(x - p.x, y - p.y) <= r;
+    for (const other of this.players.values()) if (other !== p && near(other.x, other.y, 10)) lines.push(`${other.info.name} (player)`);
+    for (const n of [...this.map.npcs, ...this.wishedNpcs]) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC)`);
+    const kinds = new Map<string, number>();
+    for (const c of this.creatures) if (c.respawnAt === null && near(c.x, c.y, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
+    for (const [name, n] of kinds) lines.push(`${n} ${name}${n > 1 ? 's' : ''}`);
+    return lines;
+  }
+
+  /** Changes a player's character outside the tick (Favor spent on a wish, a wished item given). */
+  updateCharacter(id: string, change: (c: Character) => void): void {
+    const p = this.players.get(id);
+    if (!p) return;
+    change(p.character);
+    p.dirty = true;
+    this.flush(p);
+  }
+
+  /** Sends one player a message. */
+  send(id: string, message: ServerMessage): void {
+    this.players.get(id)?.conn.send(message);
   }
 
   get info(): RegionInfo {
@@ -375,6 +451,7 @@ export class Region {
       }
     }
     discover(ch, c.kind);
+    if (c.wisher && c.wisher !== p.info.id) this.hooks.creatorFavor?.(c.wisher, 1);
     this.notice(p, `Defeated ${c.def.name}: ${gained.join(', ')}.`);
     for (const q of ch.quests) {
       const goal = QUESTS[q.id]?.goal;
@@ -492,7 +569,7 @@ export class Region {
   private interact(p: PlayerState): void {
     let npc: NpcPlacement | undefined;
     let best = TALK_RANGE;
-    for (const n of this.map.npcs) {
+    for (const n of [...this.map.npcs, ...this.wishedNpcs]) {
       const d = Math.hypot(n.x - p.x, n.y - p.y);
       if (d <= best) {
         best = d;

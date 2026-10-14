@@ -4,6 +4,7 @@ import { WebSocket } from 'ws';
 import type { ServerMessage } from '@co-mmo/shared';
 import { createApp, type App } from '../src/app.ts';
 import { Store } from '../src/store.ts';
+import { OfflineGod } from '../src/god.ts';
 
 let app: App | null = null;
 
@@ -14,7 +15,11 @@ afterEach(async () => {
 
 async function start() {
   const store = Store.memory();
-  app = createApp({ store, publicUrl: 'http://game.test' });
+  app = createApp({
+    store,
+    publicUrl: 'http://game.test',
+    wishes: { env: {}, anchorDir: '/nonexistent', artDir: '/nonexistent', chatModel: () => [new OfflineGod()] },
+  });
   await new Promise<void>((resolve) => app!.server.listen(0, resolve));
   const port = (app.server.address() as AddressInfo).port;
   return { store, base: `http://127.0.0.1:${port}`, ws: `ws://127.0.0.1:${port}/ws` };

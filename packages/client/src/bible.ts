@@ -1,5 +1,6 @@
-import { CREATURES, ITEMS, type Character } from '@co-mmo/shared';
+import { CREATURES, ITEMS, regionDef, wishArtKey, type Character } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
+import { artSrc, contentEntries } from './wished.ts';
 
 // The Bible's chapters. The docs stay the source of truth; these are the
 // in-game editions until God's View can publish new versions to everyone.
@@ -10,7 +11,14 @@ export interface Chapter {
   html: (c: Character) => string;
 }
 
-const art = (id: string) => `art/${id}.png`;
+const art = (id: string) => artSrc(id);
+
+const STATUS: Record<string, string> = {
+  pending: 'waiting for a Steward',
+  approved: 'approved, to be built',
+  rejected: 'not approved',
+  'rolled-back': 'undone',
+};
 
 export const CHAPTERS: Chapter[] = [
   {
@@ -38,7 +46,11 @@ export const CHAPTERS: Chapter[] = [
         <li><b>Invite a friend</b> at the top makes a link only you can share.</li>
       </ul>
       <h3>Wishes</h3>
-      <p>Soon you will be able to speak to the God anywhere in the world and ask for something new: a creature, a place, a rule. The God is still waking.</p>`,
+      <ul>
+        <li><b>G</b> opens a prayer, anywhere in the world. Talk to the God, and ask for something new: a thing to carry, a creature to meet, someone to talk to.</li>
+        <li>The God answers with a <b>wish card</b>: what will be made, where, and its cost in <b>Favor</b>. Grant it, or say not now.</li>
+        <li>Bigger wishes (a new system, a new place) go to the Stewards first. The Chronicle in this book lists every wish.</li>
+      </ul>`,
   },
   {
     id: 'style',
@@ -65,7 +77,7 @@ export const CHAPTERS: Chapter[] = [
       <h3>Wishes</h3>
       <p>Any player can speak a wish to the God, anywhere. Small wishes (a new item, a creature, a place) become content the moment they are granted. Larger wishes that change the rules wait for a Steward.</p>
       <h3>Favor</h3>
-      <p>Wishes cost Favor, earned by playing and helping others. Creators earn more when others use, fight or visit what they wished for.</p>
+      <p>Wishes cost Favor: 2 for an item, 6 for a creature or a person. You begin with 10, earn 3 for each quest and 2 for each level, and 1 each time someone else defeats a creature you wished for.</p>
       <h3>Roles</h3>
       <ul>
         <li><b>The Owner</b> keeps the world and its budget.</li>
@@ -78,10 +90,20 @@ export const CHAPTERS: Chapter[] = [
   {
     id: 'chronicle',
     title: 'The Chronicle',
-    html: () => `
+    html: () => {
+      const list = contentEntries();
+      const lines = list.map((e) => {
+        const when = new Date(e.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+        const where = regionDef(e.regionId)?.name ?? e.regionId;
+        const pic = e.definition && e.status === 'granted' ? `<img src="${escapeHtml(art(wishArtKey(e.id)))}" alt="">` : '<div class="mystery">✦</div>';
+        const status = STATUS[e.status] ? ` <i>(${STATUS[e.status]})</i>` : '';
+        return `<figure${e.status === 'granted' ? '' : ' class="unknown"'}>${pic}<figcaption><b>${escapeHtml(e.title)}</b>${status}<br>${escapeHtml(e.summary)}<br><small>Wished by ${escapeHtml(e.wisher.name)} in ${escapeHtml(where)}, ${when}</small></figcaption></figure>`;
+      });
+      return `
       <h2>The Chronicle</h2>
-      <p>Every granted wish is written here, newest first, with who wished it and where.</p>
-      <p class="empty">The pages are still blank. The God has not yet woken to grant the first wish.</p>`,
+      <p>Every wish is written here, newest first, with who wished it and where.</p>
+      ${lines.length ? `<div class="entries chronicle">${lines.join('')}</div>` : '<p class="empty">The pages are still blank. Press G and make the first wish.</p>'}`;
+    },
   },
   {
     id: 'bestiary',

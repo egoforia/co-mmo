@@ -1,6 +1,7 @@
 // Messages exchanged over the game WebSocket. JSON for now; can move to a
 // binary encoding later without changing these shapes.
 
+import type { ContentEntry, WishCard } from './content.ts';
 import type { Character } from './rpg.ts';
 
 export type ChatChannel = 'say' | 'world';
@@ -40,13 +41,28 @@ export interface AcceptQuestMessage {
   quest: string;
 }
 
+/** Speak to the God, from anywhere. */
+export interface PrayMessage {
+  t: 'pray';
+  text: string;
+}
+
+/** Confirm or turn down the wish card the God offered. */
+export interface WishAnswerMessage {
+  t: 'wish';
+  card: string;
+  confirm: boolean;
+}
+
 export type ClientMessage =
   | InputMessage
   | ChatSendMessage
   | AttackMessage
   | InteractMessage
   | UseItemMessage
-  | AcceptQuestMessage;
+  | AcceptQuestMessage
+  | PrayMessage
+  | WishAnswerMessage;
 
 export interface PlayerInfo {
   id: string;
@@ -159,8 +175,27 @@ export interface DialogueMessage {
   offer?: { quest: string; title: string; reward: string };
 }
 
+/** The God speaks, and may offer a wish card. */
+export interface GodMessage {
+  t: 'god';
+  say: string;
+  card?: WishCard;
+}
+
+/**
+ * Wished content. `replace` carries the whole log (on joining); otherwise
+ * these entries are new or changed.
+ */
+export interface ContentMessage {
+  t: 'content';
+  entries: ContentEntry[];
+  replace: boolean;
+}
+
 export type ServerMessage =
   | WelcomeMessage
+  | GodMessage
+  | ContentMessage
   | HitMessage
   | CharacterMessage
   | NoticeMessage
@@ -186,6 +221,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'attack' || m.t === 'interact') return true;
   if (m.t === 'use') return typeof m.item === 'string' && m.item.length <= 64;
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
+  if (m.t === 'pray') return typeof m.text === 'string';
+  if (m.t === 'wish') return typeof m.card === 'string' && m.card.length <= 64 && typeof m.confirm === 'boolean';
   return false;
 }
 

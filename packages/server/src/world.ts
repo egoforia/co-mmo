@@ -38,8 +38,25 @@ export class World {
       this.regions.set(def.id, new Region(def, {
         worldChat: (m) => this.broadcast(m),
         online: () => this.where.size,
+        creatorFavor: (wisher, amount) => this.creatorFavor(wisher, amount),
       }, now, random));
     }
+  }
+
+  /** Credits Favor to a player who is not online (set by the app, which owns storage). */
+  offlineFavor?: (playerId: string, amount: number) => void;
+
+  private creatorFavor(wisher: string, amount: number): void {
+    const region = this.regionOf(wisher);
+    if (!region) return this.offlineFavor?.(wisher, amount);
+    region.updateCharacter(wisher, (c) => {
+      c.favor += amount;
+    });
+  }
+
+  /** Sends one player a message, wherever they are. */
+  sendTo(playerId: string, message: ServerMessage): void {
+    this.regionOf(playerId)?.send(playerId, message);
   }
 
   get home(): Region {

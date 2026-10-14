@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { PLAYER_COLORS, hashString, type Character, type Role } from '@co-mmo/shared';
+import { PLAYER_COLORS, hashString, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
+import type { ChatTurn, ProviderId } from './ai/chat.ts';
 
 export interface Account {
   id: string;
@@ -28,9 +29,63 @@ export interface Invite {
   usedBy: string | null;
 }
 
+/** A content log entry plus what only God's View sees. */
+export interface ContentRecord extends ContentEntry {
+  /** The conversation that led to the wish. */
+  conversation: ChatTurn[];
+  /** Real money it cost (chat and art), US dollars. */
+  usd: number;
+}
+
+export interface ModelChoice {
+  provider: ProviderId;
+  model: string;
+}
+
+export interface Settings {
+  ai: {
+    /** The in-character God conversation, which also compiles wishes. */
+    god: ModelChoice;
+    /** Used when the God model is down, over budget or refuses (e.g. mature requests). */
+    fallback: ModelChoice | null;
+    /** Paints wished things; 'none' keeps tinted placeholders. */
+    image: { provider: 'gemini' | 'none'; model: string };
+  };
+  budget: {
+    /** Monthly ceiling; above it wishes still work, with placeholder art. */
+    monthlyUsd: number;
+    /** God's View warns from here. */
+    warnUsd: number;
+  };
+}
+
+export interface SpendRecord {
+  at: number;
+  usd: number;
+  kind: 'chat' | 'image';
+  provider: string;
+  model: string;
+  playerId: string | null;
+}
+
 interface Data {
   accounts: Account[];
   invites: Invite[];
+  content: ContentRecord[];
+  settings: Settings;
+  spend: SpendRecord[];
+}
+
+export function defaultSettings(env: Record<string, string | undefined> = process.env): Settings {
+  const gemini = Boolean(env.GEMINI_API_KEY);
+  return {
+    ai: {
+      god: gemini ? { provider: 'gemini', model: 'gemini-2.5-flash' } : { provider: 'offline', model: 'scripted' },
+      fallback: null,
+      image: gemini ? { provider: 'gemini', model: 'gemini-2.5-flash-image' } : { provider: 'none', model: '' },
+    },
+    budget: { monthlyUsd: 70, warnUsd: 50 },
+  };
 }
 
 /**
@@ -39,7 +94,7 @@ interface Data {
  * replaces it for hosting (see the design doc, Technical architecture).
  */
 export class Store {
-  private data: Data = { accounts: [], invites: [] };
+  private data: Data = { accounts: [], invites: [], content: [], settings: defaultSettings(), spend: [] };
   private saving: Promise<void> = Promise.resolve();
 
   private constructor(private readonly path: string | null) {}
@@ -48,7 +103,7 @@ export class Store {
   static async open(path: string): Promise<Store> {
     const store = new Store(path);
     try {
-      store.data = JSON.parse(await readFile(path, 'utf8')) as Data;
+      store.data = { ...store.data, ...(JSON.parse(await readFile(path, 'utf8')) as Partial<Data>) };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     }
@@ -132,6 +187,72 @@ export class Store {
     account.y = y;
     if (character) account.character = structuredClone(character);
     this.persist();
+  }
+
+  get accounts(): readonly Account[] {
+    return this.data.accounts;
+  }
+
+  setRole(id: string, role: Role): void {
+    const account = this.accountById(id);
+    if (!account || account.role === 'owner') return;
+    account.role = role;
+    this.persist();
+  }
+
+  /** Favor for a player who is offline (creator rewards). */
+  addFavor(id: string, amount: number): void {
+    const account = this.accountById(id);
+    if (!account?.character) return;
+    account.character.favor += amount;
+    this.persist();
+  }
+
+  // --- Content log -------------------------------------------------------
+
+  get content(): readonly ContentRecord[] {
+    return this.data.content;
+  }
+
+  contentById(id: string): ContentRecord | undefined {
+    return this.data.content.find((c) => c.id === id);
+  }
+
+  addContent(record: ContentRecord): void {
+    this.data.content.push(record);
+    this.persist();
+  }
+
+  updateContent(id: string, change: Partial<ContentRecord>): ContentRecord | undefined {
+    const record = this.contentById(id);
+    if (!record) return undefined;
+    Object.assign(record, change);
+    this.persist();
+    return record;
+  }
+
+  // --- Settings and spending -----------------------------------------------
+
+  get settings(): Settings {
+    return this.data.settings;
+  }
+
+  updateSettings(settings: Settings): void {
+    this.data.settings = settings;
+    this.persist();
+  }
+
+  recordSpend(record: SpendRecord): void {
+    if (record.usd <= 0) return;
+    this.data.spend.push(record);
+    this.persist();
+  }
+
+  /** Spending in the calendar month (UTC) containing `now`. */
+  spendThisMonth(now: number): SpendRecord[] {
+    const d = new Date(now);
+    const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+    return this.data.spend.filter((s) => s.at >= start && s.at <= now);
   }
 
   /** Resolves once every pending write has reached disk. */

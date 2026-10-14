@@ -39,7 +39,7 @@ export const CHAPTERS: Chapter[] = [
       <p>Welcome to the world. It is young, and it grows from what its people wish for.</p>
       <h3>Moving and talking</h3>
       <ul>
-        <li><b>WASD</b> or the <b>arrow keys</b> to walk. Follow a road off the edge of a region to travel to the next.</li>
+        <li><b>WASD</b> or the <b>arrow keys</b> to walk. The regions join up into one land: walk off an edge where you can see the next region and you step straight into it.</li>
         <li><b>Enter</b> to speak. <i>Say</i> reaches those nearby; <i>World</i> reaches everyone.</li>
         <li><b>E</b> beside someone to talk to them. Some will ask for your help.</li>
         <li><b>E</b> with nobody nearby works the land: beside water, a tree or a rock. Wished rules (like fishing) use it; the Chronicle says how to play each one.</li>

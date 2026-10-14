@@ -5,7 +5,9 @@ import {
   TICK_SECONDS,
   Tile,
   WORLD_REGIONS,
+  arrivalPoint,
   collides,
+  neighbourOffset,
   generateRegion,
   isBlocking,
   outsideSide,
@@ -98,6 +100,25 @@ describe('step', () => {
     for (let i = 0; i < 100; i++) pos = step(sanctum, pos, 0, -1);
     expect(collides(sanctum, pos.x, pos.y)).toBe(false);
     expect(pos.y).toBeGreaterThan(sanctum.landmarks[0]!.y - 0.1);
+  });
+
+  it('lands players at the same point along the edge in the next region', () => {
+    const woods = maps.find((m) => m.def.id === 'woods')!;
+    const entry = woods.entries.east!;
+    // Find a spot on the Woods' east edge, off the road, that is open ground.
+    let y = 2;
+    while (collides(woods, entry.x, y)) y++;
+    expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual({ x: entry.x, y });
+    expect(neighbourOffset('west')).toEqual({ x: -sanctum.width, y: 0 });
+  });
+
+  it('falls back to the road when the matching spot is blocked, and has no way into a closed edge', () => {
+    const woods = maps.find((m) => m.def.id === 'woods')!;
+    const entry = woods.entries.east!;
+    let y = 2;
+    while (!collides(woods, entry.x, y)) y++;
+    expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual(entry);
+    expect(arrivalPoint(woods, 'east', { x: 64.1, y: 30 })).toBeUndefined();
   });
 
   it('can walk out of an open edge but not a closed one', () => {

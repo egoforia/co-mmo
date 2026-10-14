@@ -56,6 +56,7 @@ interface Entry {
   draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; at: number; message?: string; model?: string; note?: string };
   test?: { passed: boolean; at: number; summary: string[]; errors: string[]; sample: string[] };
   rule?: { paused: boolean; reason?: string };
+  progress?: { state: 'in-progress' | 'needs-input' | 'error' | 'done' | 'closed'; label: string; detail?: string };
   live?: { paused: boolean; reason?: string; runs: number; errors: { at: number; message: string }[]; effects: Record<string, number>; events: string[]; timers: number } | null;
 }
 
@@ -260,7 +261,7 @@ async function wishes(): Promise<string> {
   const queue = pending.length
     ? pending.map((e) => `
       <article class="wish pending">
-        <header><span class="tier ${e.tier}">${e.tier}</span><b>${escapeHtml(e.title)}</b><small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
+        <header><span class="tier ${e.tier}">${e.tier}</span><b>${escapeHtml(e.title)}</b>${progress(e)}<small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
         <p>${escapeHtml(e.summary)}</p>
         ${conversation(e)}
         ${e.tier === 'major' ? draft(e) : ''}
@@ -275,7 +276,7 @@ async function wishes(): Promise<string> {
       <td>${e.art ? `<img src="${escapeHtml(e.art)}" alt="">` : e.definition ? '<span class="ph" title="Placeholder art">✦</span>' : ''}</td>
       <td><b>${escapeHtml(e.title)}</b><br><small>${escapeHtml(e.summary)}</small>${conversation(e)}</td>
       <td><span class="tier ${e.tier}">${e.tier}</span></td>
-      <td>${escapeHtml(e.status)}</td>
+      <td>${progress(e)}${e.progress?.detail ? `<br><small>${escapeHtml(e.progress.detail)}</small>` : ''}</td>
       <td>${escapeHtml(e.wisher.name)}<br><small>${when(e.at)}</small></td>
       ${owner ? `<td>${e.usd !== undefined ? usd(e.usd) : ''}</td>` : ''}
       <td><div class="actions">
@@ -287,7 +288,17 @@ async function wishes(): Promise<string> {
     <h2>Waiting for review</h2>
     ${queue}
     <h2>Content log</h2>
+    <p class="note legend">${progressLegend()}</p>
     ${content.length ? `<table class="log"><thead><tr><th></th><th>Wish</th><th>Tier</th><th>Status</th><th>Wished by</th>${owner ? '<th>Cost</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="note">No wishes yet.</p>'}`;
+}
+
+const PROGRESS_ICON = { 'in-progress': '⏳', 'needs-input': '✋', error: '✗', done: '✓', closed: '–' } as const;
+
+/** Where a wish stands: in progress, needs a person, error, done (or closed). */
+function progress(e: Entry): string {
+  const p = e.progress;
+  if (!p) return `<span class="progress">${escapeHtml(e.status)}</span>`;
+  return `<span class="progress ${p.state}" title="${escapeHtml(p.detail ?? '')}">${PROGRESS_ICON[p.state]} ${escapeHtml(p.label)}</span>`;
 }
 
 /** The God's drafted rule for a Major wish: script, items, test run, and a way to ask for changes. */
@@ -320,6 +331,15 @@ function draft(e: Entry): string {
     <form class="form revise" data-revise="${e.id}">
       <label>${def ? 'Ask the God to change it' : 'Ask the God to draft a rule'}<span><input name="note" placeholder="${def ? 'e.g. make the Golden Carp rarer' : 'optional notes'}"${busy ? ' disabled' : ''}><button type="submit"${busy ? ' disabled' : ''}>${def ? 'Revise' : 'Draft'}</button></span></label>
     </form>`;
+}
+
+function progressLegend(): string {
+  return [
+    ['in-progress', 'In progress: the God is working on it'],
+    ['needs-input', 'On hold: waiting for a Steward or the Owner'],
+    ['error', 'Error: something failed, see why'],
+    ['done', 'Done: in the world'],
+  ].map(([state, text]) => `<span class="progress ${state}">${PROGRESS_ICON[state as keyof typeof PROGRESS_ICON]} ${text}</span>`).join(' ');
 }
 
 function conversation(e: Entry): string {

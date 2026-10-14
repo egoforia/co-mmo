@@ -56,7 +56,11 @@ export function createApp(options: AppOptions): App {
   world.offlineFavor = (playerId, amount) => store.addFavor(playerId, amount);
   const rules = new LiveRules(store, world, {
     now: options.wishes.now,
-    onPause: (record, reason) => wishes.notifyStewards(`The rule "${record.title}" paused itself: ${reason}`),
+    onPause: (record, reason) => {
+      wishes.notifyStewards(`The rule "${record.title}" paused itself: ${reason}`);
+      wishes.tellWisher(record, `Your wish "${record.title}" stopped itself after errors. The Stewards have been told.`);
+      wishes.changed(record.id);
+    },
   });
   world.onEvent = (type, playerId, data) => rules.fire(type, playerId, data);
   const wishes = new Wishes(store, world, rules, options.wishes);

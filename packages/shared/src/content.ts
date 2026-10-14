@@ -95,6 +95,60 @@ export interface ContentEntry {
   art?: string;
   /** Painted art for a rule's items, by item id. */
   itemArt?: Record<string, string>;
+  /** Where the wish stands now, worked out by the server from its status, draft, test run and rule. */
+  progress?: WishProgress;
+}
+
+/**
+ * Where a wish stands, in four plain states (plus closed for rejected or
+ * undone wishes): the God working on it, waiting for a person, stuck on an
+ * error, or done.
+ */
+export type WishProgressState = 'in-progress' | 'needs-input' | 'error' | 'done' | 'closed';
+
+export interface WishProgress {
+  state: WishProgressState;
+  /** A few words, e.g. "Waiting for a Steward". */
+  label: string;
+  /** Why, or what happens next. */
+  detail?: string;
+}
+
+/** The parts of a content record (beyond the entry) that decide its progress. */
+export interface WishTrack {
+  draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; message?: string };
+  test?: { passed: boolean; errors: string[]; summary: string[] };
+  rule?: { paused: boolean; reason?: string };
+}
+
+export function wishProgress(entry: Pick<ContentEntry, 'status' | 'tier' | 'definition'> & WishTrack): WishProgress {
+  const { status, draft, test, rule } = entry;
+  if (status === 'rejected') return { state: 'closed', label: 'Not approved' };
+  if (status === 'rolled-back') return { state: 'closed', label: 'Undone' };
+  if (status === 'granted') {
+    if (rule?.paused) {
+      const reason = rule.reason ?? '';
+      return reason.startsWith('Paused by')
+        ? { state: 'needs-input', label: 'Paused', detail: `${reason} A Steward can resume it in God's View.` }
+        : { state: 'error', label: 'Stopped itself', detail: `${reason} A Steward can resume or roll it back in God's View.` };
+    }
+    return { state: 'done', label: entry.definition?.kind === 'rule' ? 'Live' : 'Done' };
+  }
+  if (status === 'approved') {
+    return { state: 'needs-input', label: 'Approved, waiting to be built', detail: 'The God cannot build this alone yet; a person has to add it to the game.' };
+  }
+  // Pending.
+  if (entry.tier === 'engine') return { state: 'needs-input', label: 'Waiting for the Owner', detail: 'Engine wishes change the game itself and need the Owner to approve them.' };
+  if (entry.tier !== 'major') return { state: 'needs-input', label: 'Waiting for a Steward' };
+  if (!draft) return { state: 'needs-input', label: 'Waiting for a Steward', detail: 'No rule drafted yet. A Steward can ask the God to draft one.' };
+  if (draft.state === 'drafting') return { state: 'in-progress', label: 'The God is drafting a rule', detail: 'It is written, then put through a test run.' };
+  if (draft.state === 'failed') return { state: 'error', label: 'Drafting failed', detail: `${draft.message ?? 'Unknown error.'} A Steward can ask the God to try again.` };
+  // A drafted rule that failed its test run, even if a later try gave up.
+  if (test && !test.passed) {
+    return { state: 'error', label: 'Test run failed', detail: `${test.errors[0] ?? test.summary[0] ?? 'The drafted rule did not pass.'} A Steward can ask the God to revise it.` };
+  }
+  if (draft.state === 'impossible') return { state: 'needs-input', label: 'Waiting for a Steward', detail: `The God cannot make this a scripted rule: ${draft.message ?? ''}`.trim() };
+  return { state: 'needs-input', label: 'Ready, waiting for a Steward', detail: 'The rule passed its test run and waits for approval.' };
 }
 
 /** The wish card a player confirms before anything is built. */

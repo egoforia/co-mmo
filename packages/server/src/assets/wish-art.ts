@@ -9,6 +9,25 @@ import { buildPrompt, type AssetDescription, type AssetKind } from './style.ts';
 /** Price of one Gemini image (gemini-2.5-flash-image), US dollars: Google's list price for a 1024px image (1290 output tokens at $30 per million). */
 export const IMAGE_USD = 0.039;
 
+/**
+ * US dollars per million image tokens, by model. Gemini 3 Pro Image is
+ * Google's list price; Gemini 3.1 Flash Image is an ESTIMATE until checked.
+ */
+const IMAGE_USD_PER_MILLION: Record<string, number> = {
+  'gemini-2.5-flash-image': 30,
+  'gemini-3-pro-image': 120,
+  'gemini-3-pro-image-preview': 120,
+  'gemini-3.1-flash-image': 60,
+  'gemini-3.1-flash-image-preview': 60,
+};
+
+/** What one generated image cost: from the tokens billed when known, else the 1024 px price. */
+export function imageUsd(model: string, image: GeneratedImage): number {
+  const rate = IMAGE_USD_PER_MILLION[model];
+  if (!rate || !image.outputTokens) return IMAGE_USD;
+  return (image.outputTokens * rate) / 1e6;
+}
+
 /** Approved anchors sent as style references, per kind of wished thing. */
 const REFERENCES: Record<WishDefinition['kind'], string[]> = {
   item: ['item-tonic', 'item-goat-horn'],

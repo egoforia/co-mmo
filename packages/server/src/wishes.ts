@@ -600,7 +600,8 @@ export class Wishes {
     return models;
   }
 
-  private imageProvider(): ImageProvider | undefined {
+  /** The image model chosen in God's View, when it has a key. */
+  imageProvider(): ImageProvider | undefined {
     const settings = this.store.settings;
     if (this.options.imageProvider) return this.options.imageProvider(settings);
     if (settings.ai.image.provider !== 'gemini' || !this.env.GEMINI_API_KEY) return undefined;

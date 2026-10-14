@@ -1,4 +1,70 @@
 {
+  "bramble-cottage-door": {
+    "file": "art/bramble-cottage-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "bramble-cottage-exterior": {
+    "file": "art/bramble-cottage-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2247
+  },
+  "bramble-cottage-floor": {
+    "file": "art/bramble-cottage-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "bramble-cottage-furniture-barrel": {
+    "file": "art/bramble-cottage-furniture-barrel.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 160
+  },
+  "bramble-cottage-furniture-bed": {
+    "file": "art/bramble-cottage-furniture-bed.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 244
+  },
+  "bramble-cottage-furniture-bookshelf": {
+    "file": "art/bramble-cottage-furniture-bookshelf.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 336
+  },
+  "bramble-cottage-furniture-cauldron": {
+    "file": "art/bramble-cottage-furniture-cauldron.png",
+    "kind": "furniture",
+    "width": 152,
+    "height": 148
+  },
+  "bramble-cottage-furniture-hearth": {
+    "file": "art/bramble-cottage-furniture-hearth.png",
+    "kind": "furniture",
+    "width": 384,
+    "height": 432
+  },
+  "bramble-cottage-furniture-herb-rack": {
+    "file": "art/bramble-cottage-furniture-herb-rack.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 304
+  },
+  "bramble-cottage-furniture-table": {
+    "file": "art/bramble-cottage-furniture-table.png",
+    "kind": "furniture",
+    "width": 332,
+    "height": 272
+  },
+  "bramble-cottage-wall": {
+    "file": "art/bramble-cottage-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
   "desert-cactus-a": {
     "file": "art/desert-cactus-a.png",
     "kind": "prop",
@@ -44,6 +110,12 @@
   "desert-scarab": {
     "file": "art/desert-scarab.png",
     "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "fx-slash": {
+    "file": "art/fx-slash.png",
+    "kind": "effect",
     "width": 128,
     "height": 128
   },
@@ -188,6 +260,12 @@
   "woods-mushroom": {
     "file": "art/woods-mushroom.png",
     "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "woods-path": {
+    "file": "art/woods-path.png",
+    "kind": "tile",
     "width": 128,
     "height": 128
   },

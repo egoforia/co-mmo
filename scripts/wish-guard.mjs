@@ -7,7 +7,10 @@
 // It fails when the change is too big for one review, or touches what a
 // wish may not change: sign-in, roles, the budget, API keys, the script
 // sandbox and package dependencies (unless the Owner's approval allows
-// them with --allow-core), and never the build workflows or this file.
+// them with --allow-core), and never the build workflows or this file. It
+// also fails when the change draws art in code: game art is painted by the
+// image model chosen in God's View, from a description (BUILDING_STYLES,
+// the biome kit, or a wish's look).
 
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +44,32 @@ export const CORE = [
 ];
 
 const UNCOUNTED = /(^|\/)package-lock\.json$/;
+
+/** Game code, where drawing calls would mean art made by code. God's View's charts are not game art. */
+const GAME_CODE = /^packages\/(client|shared)\/src\/(?!gods-view)[^/]+\.ts$/;
+/** Canvas and Phaser calls that draw shapes or colour pixels. */
+const DRAWING = /\b(getContext\s*\(|fillRect|strokeRect|beginPath|quadraticCurveTo|bezierCurveTo|roundRect|createLinearGradient|createRadialGradient|add\.graphics|generateTexture)\b|\.(arc|ellipse)\s*\(/;
+
+/**
+ * Checks the lines a change adds ({ path, text }) for art drawn in code, and
+ * returns the problems, in plain words; an empty list passes.
+ */
+export function checkArt(additions) {
+  const drawn = [...new Set(additions.filter((a) => GAME_CODE.test(a.path) && DRAWING.test(a.text)).map((a) => a.path))];
+  return drawn.map((path) => `${path} draws art in code. Describe the picture instead (BUILDING_STYLES in packages/shared/src/buildings.ts for buildings and furniture, the biome kit for scenery) and the game paints it with the image model chosen in God's View.`);
+}
+
+/** Lines added between the base and HEAD, from git. */
+export function addedLines(base) {
+  const out = execFileSync('git', ['diff', '-U0', '--no-renames', `${base}...HEAD`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const lines = [];
+  let path = '';
+  for (const line of out.split('\n')) {
+    if (line.startsWith('+++ ')) path = line.startsWith('+++ b/') ? line.slice(6) : '';
+    else if (line.startsWith('+') && path) lines.push({ path, text: line.slice(1) });
+  }
+  return lines;
+}
 
 /**
  * Checks a list of changed files ({ path, added, removed }) and returns the
@@ -77,7 +106,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'origin/main';
   const allowCore = args.includes('--allow-core');
   const files = changedFiles(base);
-  const problems = checkChanges(files, { allowCore });
+  const problems = [...checkChanges(files, { allowCore }), ...checkArt(addedLines(base))];
   if (!files.length) problems.push('The change is empty.');
   if (problems.length) {
     console.log(problems.map((p) => `- ${p}`).join('\n'));

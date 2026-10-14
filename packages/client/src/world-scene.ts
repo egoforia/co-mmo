@@ -6,6 +6,8 @@ import {
   TILE_PIXELS,
   Tile,
   generateRegion,
+  buildingArt,
+  exteriorSpan,
   nearBuilding,
   neighbourOffset,
   rand2,
@@ -22,7 +24,7 @@ import {
   type WelcomeMessage,
   wishArtKey,
 } from '@co-mmo/shared';
-import { TILE_MARGIN, furnitureTexture, lightTint, playerArt, propTexture, registerTileset } from './textures.ts';
+import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { artSrc, contentEntries, lookArt } from './wished.ts';
 
 interface Avatar {
@@ -47,7 +49,8 @@ interface BuildingView {
   /** The region's top-left corner, in tiles. */
   ox: number;
   oy: number;
-  exterior: Phaser.GameObjects.Image;
+  /** Undefined until the building's outside is painted: then its inside always shows. */
+  exterior?: Phaser.GameObjects.Image;
   /** Floor, walls and furniture: hidden while the exterior shows. */
   inside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[];
   open: boolean;
@@ -294,14 +297,10 @@ export class WorldScene extends Phaser.Scene {
   swing(): void {
     if (!this.predictor) return;
     this.lunge(this.me, this.facing);
-    const slash = this.add.graphics().setDepth(this.me.body.depth + 1);
-    const cx = this.me.body.x + this.facing * T * 0.45;
-    const cy = this.me.body.y - this.me.body.displayHeight * 0.45;
-    slash.lineStyle(T / 14, 0xffffff, 0.9);
-    slash.beginPath();
-    const from = this.facing > 0 ? -1.2 : Math.PI - 1.2;
-    slash.arc(cx, cy, T * 0.42, from, from + 2.4, false);
-    slash.strokePath();
+    if (!this.textures.exists('fx-slash')) return;
+    // The painted slash curves like a C; mirror it so it bulges the way we face.
+    const slash = this.add.image(this.me.body.x + this.facing * T * 0.45, this.me.body.y - this.me.body.displayHeight * 0.45, 'fx-slash');
+    slash.setDisplaySize(T * 0.9, T * 0.9).setFlipX(this.facing > 0).setDepth(this.me.body.depth + 1);
     this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
   }
 
@@ -373,17 +372,19 @@ export class WorldScene extends Phaser.Scene {
         data[y]![x] = around.includes(Tile.Floor) ? Tile.Floor : around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
       }
     }
-    const layer = (tiles: number[][], depth: number) => {
+    const layer = (tiles: number[][], depth: number, key = tilesetKey) => {
       const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
-      const tileset = tilemap.addTilesetImage(tilesetKey, tilesetKey, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
+      const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
       return tilemap.createLayer(0, tileset, ox * T, oy * T)!.setDepth(depth);
     };
-    // Buildings whose exterior art has loaded keep their floor and walls on
-    // a layer of their own, hidden until we come close; the ground runs under.
-    const views = map.buildings.filter((b) => this.textures.exists(b.exterior.asset)).map((b) => {
+    // Each building keeps its floor and walls on a layer of its own, in its
+    // own painted tiles, hidden behind its outside art until we come close;
+    // the ground runs on underneath.
+    const views = map.buildings.map((b) => {
       const inside = data.map((row, y) => row.map((t, x) => (within(b, x, y) ? t : -1)));
       for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-      const view: BuildingView = { building: b, ox, oy, exterior: this.exterior(b, ox, oy), inside: [layer(inside, -0.5)], open: false };
+      const exterior = hasExterior(this, b.style) ? this.exterior(b, ox, oy) : undefined;
+      const view: BuildingView = { building: b, ox, oy, exterior, inside: [layer(inside, -0.5, registerBuildingTileset(this, b.style))], open: !exterior };
       return view;
     });
     layer(data, -1);
@@ -391,15 +392,15 @@ export class WorldScene extends Phaser.Scene {
     this.placeScenery(map, ox, oy, views);
   }
 
-  /** A building's exterior art, drawn so its painted door sits over the doorway. */
+  /**
+   * A building's outside art. Its door is painted at the middle of its bottom
+   * edge, so it is drawn centred on the doorway, standing on the south wall.
+   */
   private exterior(b: Building, ox: number, oy: number): Phaser.GameObjects.Image {
-    const { asset, width, door } = b.exterior;
-    const img = this.add.image(0, 0, asset).setOrigin(0, 0);
-    const w = width * T;
-    const h = (w * img.height) / img.width;
-    img.setDisplaySize(w, h);
-    // The doorway is two tiles wide; the art's door meets the wall's bottom edge.
-    img.setPosition((ox + b.door.x + 1) * T - door.x * w, (oy + b.door.y + 1) * T - door.y * h);
+    const span = exteriorSpan(b);
+    const img = this.add.image((ox + span.left) * T, (oy + span.bottom) * T, buildingArt(b.style, 'exterior')).setOrigin(0, 1);
+    const w = span.width * T;
+    img.setDisplaySize(w, (w * img.height) / img.width);
     return img.setDepth((oy + b.y + b.height) * T);
   }
 
@@ -407,9 +408,8 @@ export class WorldScene extends Phaser.Scene {
   private placeScenery(map: RegionMap, ox: number, oy: number, views: BuildingView[]): void {
     const biome = map.def.biome;
     for (const l of map.landmarks) {
-      const key = furnitureTexture(this, l.asset) ?? l.asset;
-      if (!this.textures.exists(key)) continue;
-      const img = this.add.image((ox + l.x) * T, (oy + l.y) * T, key).setOrigin(0.5, 0.92);
+      if (!this.textures.exists(l.asset)) continue;
+      const img = this.add.image((ox + l.x) * T, (oy + l.y) * T, l.asset).setOrigin(0.5, 0.92);
       img.setDepth((oy + l.y) * T);
       views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
     }
@@ -419,6 +419,7 @@ export class WorldScene extends Phaser.Scene {
         if (tile !== Tile.Tree && tile !== Tile.Rock) continue;
         const variant = Math.floor(rand2(x, y, 5) * 3);
         const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
+        if (!key) continue;
         const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
         const img = this.add.image((ox + x + 0.5) * T + jitter, (oy + y + 1) * T, key).setOrigin(0.5, 0.97);
         img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
@@ -430,6 +431,7 @@ export class WorldScene extends Phaser.Scene {
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
     for (const v of this.buildings) {
+      if (!v.exterior) continue;
       const open = nearBuilding(v.building, this.shown.x - v.ox, this.shown.y - v.oy);
       if (open === v.open && !instant) continue;
       v.open = open;

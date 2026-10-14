@@ -94,9 +94,13 @@ function play(token: string): void {
   let name = '';
   let region = '';
   // Art loads alongside the connection; the world waits for both.
-  const art: Promise<ArtManifest> = fetch('/art/manifest.json')
-    .then((r) => (r.ok ? (r.json() as Promise<ArtManifest>) : {}))
-    .catch(() => ({}));
+  // The art shipped with the game, and building art the server painted since
+  // (say, for a building a wish added); shipped art wins.
+  const manifest = (url: string): Promise<ArtManifest> =>
+    fetch(url)
+      .then((r) => (r.ok ? (r.json() as Promise<ArtManifest>) : {}))
+      .catch(() => ({}));
+  const art: Promise<ArtManifest> = Promise.all([manifest('/api/art'), manifest('/art/manifest.json')]).then(([painted, shipped]) => ({ ...painted, ...shipped }));
 
   const connection = new GameConnection(token, onMessage, (reason, code) => {
     if (code === 4003) {

@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -14,6 +14,7 @@ import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
 import type { Updater } from './updates.ts';
 import { Builds, type BuildOptions } from './builds.ts';
+import { BuildingPainter } from './building-painter.ts';
 
 export interface AppOptions {
   store: Store;
@@ -35,6 +36,11 @@ export interface AppOptions {
   builds?: BuildOptions;
   /** Sign-in by email and Google/GitHub: test overrides for sending email and calling providers. */
   auth?: { mailer?: Mailer; fetch?: typeof fetch };
+  /**
+   * The art manifest shipped with the client. When set, building art missing
+   * from it is painted at start-up with the image model chosen in God's View.
+   */
+  shippedArt?: string;
 }
 
 export interface App {
@@ -56,6 +62,7 @@ const MIME: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
@@ -79,6 +86,15 @@ export function createApp(options: AppOptions): App {
   world.onEvent = (type, playerId, data) => rules.fire(type, playerId, data);
   const wishes = new Wishes(store, world, rules, options.wishes);
   wishes.restore();
+  const buildingPainter = new BuildingPainter({
+    provider: () => wishes.imageProvider(),
+    overBudget: () => wishes.budget().over,
+    spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: null }),
+    anchorDir: options.wishes.anchorDir,
+    artDir: options.wishes.artDir,
+    shipped: async () => (options.shippedArt ? JSON.parse(await readFile(options.shippedArt, 'utf8')) : {}),
+  });
+  if (options.shippedArt) void buildingPainter.start();
   const reports = new Reports(store, world);
   const builds = new Builds(store, {
     changed: (id) => wishes.changed(id),
@@ -204,10 +220,14 @@ export function createApp(options: AppOptions): App {
     const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
+    // Building art painted here, beyond what ships with the game.
+    if (path === '/api/art' && req.method === 'GET') return json(res, 200, buildingPainter.manifest());
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
     const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
     if (art && req.method === 'GET') return serveFile(join(options.wishes.artDir, `${art[1]}.png`), res);
+    const building = path.match(/^\/wished-art\/buildings\/([\w-]+\.(?:png|webp))$/);
+    if (building && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'buildings', building[1]!), res);
 
     if (options.clientDir && req.method === 'GET') return serveStatic(options.clientDir, path, res);
     json(res, 404, { error: 'not_found' });
@@ -346,6 +366,7 @@ export function createApp(options: AppOptions): App {
       await restoring;
       await Promise.allSettled([...builds.jobs]);
       await Promise.allSettled([...wishes.drafts]);
+      await buildingPainter.job;
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();
       clearInterval(autosaveTimer);

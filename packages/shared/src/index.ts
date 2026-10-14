@@ -8,5 +8,6 @@ export * from './names.ts';
 export * from './prediction.ts';
 export * from './biomes.ts';
 export * from './art.ts';
+export * from './buildings.ts';
 export * from './rpg.ts';
 export * from './content.ts';

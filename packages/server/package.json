@@ -7,7 +7,8 @@
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "anchors": "tsx src/tools/generate-anchors.ts",
-    "game-art": "tsx src/tools/build-game-art.ts"
+    "game-art": "tsx src/tools/build-game-art.ts",
+    "building-art": "tsx src/tools/paint-buildings.ts"
   },
   "dependencies": {
     "quickjs-emscripten": "^0.32.0",

@@ -1,0 +1,31 @@
+{
+  "id": "woods-path",
+  "description": {
+    "id": "woods-path",
+    "name": "Forest path",
+    "kind": "tile",
+    "biome": "whispering-woods",
+    "silhouetteHook": "packed warm brown earth worn smooth by footsteps, with fallen leaves scattered evenly",
+    "body": "flat bare ground, no roots, stones or edges",
+    "materials": [
+      "packed earth",
+      "fallen leaves"
+    ],
+    "colors": {
+      "main": "dark muted umber brown in deep forest shade",
+      "secondary": "mossy dark brown",
+      "accent": "a few teal-green and russet leaves"
+    },
+    "details": [
+      "tiny pebbles",
+      "scattered small leaves"
+    ],
+    "mood": "quiet, well trodden"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Forest path (tile). Most recognisable feature: packed warm brown earth worn smooth by footsteps, with fallen leaves scattered evenly. Body and shape: flat bare ground, no roots, stones or edges. Materials: packed earth, fallen leaves. Colours: main dark muted umber brown in deep forest shade, secondary mossy dark brown, small accent of a few teal-green and russet leaves. Details: tiny pebbles; scattered small leaves. Mood: quiet, well trodden.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T23:30:01.788Z"
+}

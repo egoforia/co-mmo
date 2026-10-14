@@ -210,3 +210,53 @@ function median(values: number[]): number {
 }
 
 const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+
+/**
+ * Turns a painting into true pixel art: shrinks it to `width` x `height` art
+ * pixels, keeps at most `colours` colours with hard (on or off) transparency,
+ * then scales each art pixel up to a `scale`-pixel square.
+ */
+export async function pixelate(png: Buffer, width: number, height: number, scale: number, colours = 24): Promise<Buffer> {
+  const small = await toRaw(await sharp(png).resize(width, height, { fit: 'fill', kernel: 'lanczos3' }).png().toBuffer());
+  for (let i = 3; i < small.data.length; i += 4) small.data[i] = small.data[i]! >= 128 ? 255 : 0;
+  const quantized = await sharp(await fromRaw(small)).png({ palette: true, colours, dither: 0 }).toBuffer();
+  return sharp(quantized).ensureAlpha().resize(width * scale, height * scale, { kernel: 'nearest' }).png().toBuffer();
+}
+
+/** Crops the empty rows above and below a sprite, keeping its full width so its middle stays its middle. */
+export async function trimRows(png: Buffer): Promise<Buffer> {
+  const img = await toRaw(png);
+  const { data, width: w, height: h } = img;
+  const filled = (y: number) => {
+    for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3]! > 8) return true;
+    return false;
+  };
+  let top = 0;
+  while (top < h - 1 && !filled(top)) top++;
+  let bottom = h - 1;
+  while (bottom > top && !filled(bottom)) bottom--;
+  return sharp(png).extract({ left: 0, top, width: w, height: bottom - top + 1 }).png().toBuffer();
+}
+
+/**
+ * Clears the key colour that bleeds into soft glows (a lantern's halo painted
+ * over magenta): pixels far more magenta than anything in a subject turn
+ * transparent, and milder ones lose the magenta cast.
+ */
+export async function removeKeySpill(png: Buffer, threshold = 70): Promise<Buffer> {
+  const img = await toRaw(png);
+  const { data } = img;
+  for (let i = 0; i < data.length; i += 4) {
+    if (!data[i + 3]) continue;
+    const [r, g, b] = [data[i]!, data[i + 1]!, data[i + 2]!];
+    const spill = Math.min(r, b) - g;
+    if (spill >= threshold) data[i + 3] = 0;
+    else if (spill > threshold / 2) {
+      // Pull red and blue back towards green, which magenta has none of.
+      const keep = g + threshold / 2;
+      data[i] = Math.min(r, keep);
+      data[i + 2] = Math.min(b, keep);
+    }
+  }
+  return fromRaw(img);
+}

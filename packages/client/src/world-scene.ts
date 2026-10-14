@@ -11,6 +11,7 @@ import {
   type ArtManifest,
   type ClientMessage,
   type CreatureState,
+  type HitMessage,
   type RegionMap,
   type SnapshotMessage,
   type WelcomeMessage,
@@ -21,6 +22,10 @@ interface Avatar {
   body: Phaser.GameObjects.Image;
   shadow: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
+  /** Health bar, shown once hurt. */
+  bar?: { bg: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle };
+  /** Offset for lunges and recoils, in pixels; tweened. */
+  nudge: { x: number; y: number };
 }
 
 interface Remote extends Avatar {
@@ -51,6 +56,8 @@ export class WorldScene extends Phaser.Scene {
   /** Rendered position eases toward the predicted one to hide corrections. */
   private shown = { x: 0, y: 0 };
   private tint?: Phaser.GameObjects.Rectangle;
+  /** Which way we face: 1 right, -1 left. */
+  private facing = 1;
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -145,7 +152,10 @@ export class WorldScene extends Phaser.Scene {
       if (dx !== 0 || dy !== 0) {
         const input = predictor.apply(dx, dy);
         this.options.send({ t: 'input', ...input });
-        if (dx !== 0) this.me.body.setFlipX(dx < 0);
+        if (dx !== 0) {
+          this.facing = dx;
+          this.me.body.setFlipX(dx < 0);
+        }
       }
     }
 
@@ -170,7 +180,78 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private sync<E extends { id: string; x: number; y: number }>(
+  /** A strike landed: number, flash and recoil, or a defeat. */
+  onHit(hit: HitMessage): void {
+    if (!this.predictor) return;
+    const myId = this.welcome.you.id;
+    const target = hit.target === myId ? this.me : this.remotes.get(hit.target) ?? this.creatures.get(hit.target);
+    const attacker = hit.by === myId ? this.me : this.remotes.get(hit.by) ?? this.creatures.get(hit.by);
+    if (attacker && attacker !== this.me && target) this.lunge(attacker, target.body.x - attacker.body.x);
+    if (!target) return;
+    const hurtMe = target === this.me;
+    const number = this.add
+      .text(target.body.x + (Math.random() - 0.5) * T * 0.3, target.body.y - target.body.displayHeight * 0.8, `${hit.amount}`, {
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        fontStyle: 'bold',
+        fontSize: `${Math.round(T * 0.46)}px`,
+        color: hurtMe ? '#f6757a' : '#ffffff',
+        stroke: '#181425',
+        strokeThickness: Math.round(T / 20),
+      })
+      .setOrigin(0.5)
+      .setDepth(LABEL_DEPTH + 1);
+    this.tweens.add({ targets: number, y: number.y - T * 0.6, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => number.destroy() });
+    target.body.setTintFill(0xffffff);
+    this.time.delayedCall(80, () => target.body.active && target.body.clearTint());
+    if (hurtMe) this.cameras.main.shake(120, 0.004);
+    if (hit.defeated && target !== this.me) this.fadeOut(target);
+  }
+
+  /** Our own strike: a lunge and a slash, whether or not it lands. */
+  swing(): void {
+    if (!this.predictor) return;
+    this.lunge(this.me, this.facing);
+    const slash = this.add.graphics().setDepth(this.me.body.depth + 1);
+    const cx = this.me.body.x + this.facing * T * 0.45;
+    const cy = this.me.body.y - this.me.body.displayHeight * 0.45;
+    slash.lineStyle(T / 14, 0xffffff, 0.9);
+    slash.beginPath();
+    const from = this.facing > 0 ? -1.2 : Math.PI - 1.2;
+    slash.arc(cx, cy, T * 0.42, from, from + 2.4, false);
+    slash.strokePath();
+    this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
+  }
+
+  private lunge(a: Avatar, direction: number): void {
+    this.tweens.add({ targets: a.nudge, x: Math.sign(direction || 1) * T * 0.18, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
+  }
+
+  /** A defeated creature sinks away; the real sprite is removed by the next snapshot. */
+  private fadeOut(a: Avatar): void {
+    const ghost = this.add.image(a.body.x, a.body.y, a.body.texture.key).setOrigin(0.5, 0.97);
+    ghost.setScale(a.body.scaleX, a.body.scaleY).setFlipX(a.body.flipX).setDepth(a.body.depth);
+    a.body.setVisible(false);
+    this.tweens.add({ targets: ghost, alpha: 0, scaleY: 0.1, duration: 450, ease: 'Quad.easeIn', onComplete: () => ghost.destroy() });
+  }
+
+  /** Greys our sprite while Weakened after falling. */
+  setWeakened(weakened: boolean): void {
+    if (!this.me?.body.active) return;
+    this.me.body.setAlpha(weakened ? 0.7 : 1);
+  }
+
+  private setHealth(a: Avatar, health: number): void {
+    if (health >= 1 && !a.bar) return;
+    if (!a.bar) {
+      const bg = this.add.rectangle(0, 0, T * 0.6, T * 0.07, 0x181425, 0.8).setOrigin(0, 0.5);
+      const fill = this.add.rectangle(0, 0, T * 0.6, T * 0.05, 0xf6757a).setOrigin(0, 0.5);
+      a.bar = { bg, fill };
+    }
+    a.bar.fill.width = T * 0.6 * Math.max(0, Math.min(1, health));
+    a.bar.fill.setFillStyle(health > 0.5 ? 0x63c74d : health > 0.25 ? 0xfeae34 : 0xf6757a);
+  }
+
+  private sync<E extends { id: string; x: number; y: number; health: number }>(
     group: Map<string, Remote>,
     entities: E[],
     now: number,
@@ -185,12 +266,11 @@ export class WorldScene extends Phaser.Scene {
         group.set(entity.id, remote);
       }
       remote.interp.push(now, entity.x, entity.y);
+      this.setHealth(remote, entity.health);
     }
     for (const [id, remote] of group) {
       if (seen.has(id)) continue;
-      remote.body.destroy();
-      remote.shadow.destroy();
-      remote.label.destroy();
+      destroyAvatar(remote);
       group.delete(id);
     }
   }
@@ -239,7 +319,7 @@ export class WorldScene extends Phaser.Scene {
 
   private makeAvatar(texture: string, name: string, self: boolean): Avatar {
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = this.add.image(0, 0, texture).setOrigin(0.5, 0.97);
+    const body = this.add.image(0, 0, this.textures.exists(texture) ? texture : 'player-mara').setOrigin(0.5, 0.97);
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -249,15 +329,20 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, shadow, label };
+    return { body, shadow, label, nudge: { x: 0, y: 0 } };
   }
 
   private placeAvatar(a: Avatar, x: number, y: number): void {
     const px = x * T;
     const py = y * T;
     a.shadow.setPosition(px, py + T / 16);
-    a.body.setPosition(px, py + T / 10);
-    a.label.setPosition(px, py + T / 10 - a.body.displayHeight - 4);
+    a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
+    const top = py + T / 10 - a.body.displayHeight;
+    a.label.setPosition(px, top - 4);
+    if (a.bar) {
+      a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
+      a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
+    }
     // Lower on screen draws in front.
     a.shadow.setDepth(py - 2);
     a.body.setDepth(py);
@@ -268,6 +353,14 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.tint?.setPosition(cam.width / 2, cam.height / 2).setSize(cam.width / cam.zoom + 8, cam.height / cam.zoom + 8);
   }
+}
+
+function destroyAvatar(a: Avatar): void {
+  a.body.destroy();
+  a.shadow.destroy();
+  a.label.destroy();
+  a.bar?.bg.destroy();
+  a.bar?.fill.destroy();
 }
 
 /** About 64 px per tile on a laptop or desktop screen, smaller on phones. */

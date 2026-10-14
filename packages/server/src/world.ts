@@ -1,10 +1,28 @@
-import { OPPOSITE, WORLD_REGIONS, type ClientMessage, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import {
+  OPPOSITE,
+  WEAKENED_MS,
+  WORLD_REGIONS,
+  maxHp,
+  type Character,
+  type ClientMessage,
+  type PlayerInfo,
+  type ServerMessage,
+} from '@co-mmo/shared';
 import { Region, type Connection } from './region.ts';
 
 export interface SavedPlace {
   regionId: string;
   x: number | null;
   y: number | null;
+}
+
+/** Where a player is and who they are, for saving. */
+export interface Place {
+  id: string;
+  regionId: string;
+  x: number;
+  y: number;
+  character: Character;
 }
 
 /**
@@ -15,7 +33,7 @@ export class World {
   readonly regions = new Map<string, Region>();
   private readonly where = new Map<string, string>();
 
-  constructor(now: () => number = Date.now, random: () => number = Math.random) {
+  constructor(private readonly now: () => number = Date.now, random: () => number = Math.random) {
     for (const def of WORLD_REGIONS) {
       this.regions.set(def.id, new Region(def, {
         worldChat: (m) => this.broadcast(m),
@@ -41,51 +59,66 @@ export class World {
     return this.where.has(playerId);
   }
 
-  join(info: PlayerInfo, conn: Connection, saved: SavedPlace): void {
-    // A second window replaces the first wherever it was.
+  join(info: PlayerInfo, conn: Connection, saved: SavedPlace, character: Character): void {
+    // A second window replaces the first wherever it was, keeping its progress.
     const previous = this.regionOf(info.id);
+    character = previous?.character(info.id) ?? character;
     if (previous && previous.def.id !== saved.regionId) {
       previous.remove(info.id, `${info.name} left.`)?.conn.close('Signed in from another window.');
     }
     const region = this.regions.get(saved.regionId) ?? this.home;
     this.where.set(info.id, region.def.id);
-    region.join(info, conn, saved);
+    region.join(info, conn, saved, character);
   }
 
-  leave(playerId: string): (SavedPlace & { x: number; y: number }) | undefined {
+  leave(playerId: string): Place | undefined {
     const region = this.regionOf(playerId);
     if (!region) return undefined;
     const left = region.remove(playerId);
     this.where.delete(playerId);
-    return left && { regionId: region.def.id, x: left.x, y: left.y };
+    return left && { id: playerId, regionId: region.def.id, x: left.x, y: left.y, character: left.character };
   }
 
   handle(playerId: string, message: ClientMessage): void {
     this.regionOf(playerId)?.handle(playerId, message);
   }
 
-  /** Ticks every region, then moves players who walked off an open edge. */
+  /** Ticks every region, then moves players who walked off an open edge or fell. */
   tick(): void {
     for (const region of this.regions.values()) {
-      for (const { id, side } of region.tick()) {
-        const target = this.regions.get(region.def.exits[side] ?? '');
-        const arrival = target?.map.entries[OPPOSITE[side]];
+      for (const departure of region.tick()) {
+        const name = region.nameOf(departure.id) ?? 'Someone';
+        if (departure.died) {
+          // Respawn at the shrine, Weakened for a while; nothing is lost.
+          const home = this.home;
+          const fallen = region.remove(departure.id, `${name} fell in ${region.def.name}.`);
+          if (!fallen) continue;
+          fallen.character.hp = maxHp(fallen.character);
+          fallen.character.weakenedUntil = this.now() + WEAKENED_MS;
+          this.where.set(departure.id, home.def.id);
+          home.join(fallen.info, fallen.conn, home.map.spawn, fallen.character, `${name} woke at the shrine of ${home.def.name}.`);
+          fallen.conn.send({ t: 'notice', text: `You fell, and woke at the shrine. You are Weakened for ${WEAKENED_MS / 1000} seconds.` });
+          continue;
+        }
+        const target = this.regions.get(region.def.exits[departure.side] ?? '');
+        const arrival = target?.map.entries[OPPOSITE[departure.side]];
         if (!target || !arrival) continue;
-        const name = region.nameOf(id) ?? 'Someone';
-        const moving = region.remove(id, `${name} set off for ${target.def.name}.`);
+        const moving = region.remove(departure.id, `${name} set off for ${target.def.name}.`);
         if (!moving) continue;
-        this.where.set(id, target.def.id);
-        target.join(moving.info, moving.conn, arrival, `${moving.info.name} arrived from ${region.def.name}.`);
+        this.where.set(departure.id, target.def.id);
+        target.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`);
       }
     }
   }
 
   /** Where every online player is, for saving. */
-  places(): { id: string; regionId: string; x: number; y: number }[] {
-    const result: { id: string; regionId: string; x: number; y: number }[] = [];
+  places(): Place[] {
+    const result: Place[] = [];
     for (const [id, regionId] of this.where) {
-      const pos = this.regions.get(regionId)?.position(id);
-      if (pos) result.push({ id, regionId, ...pos });
+      const region = this.regions.get(regionId);
+      const pos = region?.position(id);
+      const character = region?.character(id);
+      if (pos && character) result.push({ id, regionId, ...pos, character });
     }
     return result;
   }

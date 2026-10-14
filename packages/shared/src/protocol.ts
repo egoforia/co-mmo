@@ -1,6 +1,8 @@
 // Messages exchanged over the game WebSocket. JSON for now; can move to a
 // binary encoding later without changing these shapes.
 
+import type { Character } from './rpg.ts';
+
 export type ChatChannel = 'say' | 'world';
 
 export interface InputMessage {
@@ -18,7 +20,33 @@ export interface ChatSendMessage {
   text: string;
 }
 
-export type ClientMessage = InputMessage | ChatSendMessage;
+/** Strike the nearest creature in reach. */
+export interface AttackMessage {
+  t: 'attack';
+}
+
+/** Talk to the nearest NPC in reach. */
+export interface InteractMessage {
+  t: 'interact';
+}
+
+export interface UseItemMessage {
+  t: 'use';
+  item: string;
+}
+
+export interface AcceptQuestMessage {
+  t: 'accept';
+  quest: string;
+}
+
+export type ClientMessage =
+  | InputMessage
+  | ChatSendMessage
+  | AttackMessage
+  | InteractMessage
+  | UseItemMessage
+  | AcceptQuestMessage;
 
 export interface PlayerInfo {
   id: string;
@@ -42,6 +70,7 @@ export interface WelcomeMessage {
   x: number;
   y: number;
   tickRate: number;
+  character: Character;
 }
 
 export interface EntityState {
@@ -50,14 +79,18 @@ export interface EntityState {
   color: number;
   x: number;
   y: number;
+  /** Health as a fraction of the maximum, 0 to 1. */
+  health: number;
 }
 
 export interface CreatureState {
   id: string;
+  kind: string;
   asset: string;
   name: string;
   x: number;
   y: number;
+  health: number;
 }
 
 export interface SnapshotMessage {
@@ -67,6 +100,7 @@ export interface SnapshotMessage {
   ack: number;
   x: number;
   y: number;
+  hp: number;
   /** Other players inside the view radius. */
   players: EntityState[];
   /** Creatures inside the view radius. */
@@ -94,8 +128,43 @@ export interface ErrorMessage {
   message: string;
 }
 
+/** Someone or something took damage; drives hit flashes and numbers. */
+export interface HitMessage {
+  t: 'hit';
+  /** Who struck: a player or creature id. */
+  by: string;
+  target: string;
+  amount: number;
+  /** The target was defeated by this hit. */
+  defeated: boolean;
+}
+
+/** The player's own character changed (XP, items, quests, level...). */
+export interface CharacterMessage {
+  t: 'character';
+  character: Character;
+}
+
+/** Something happened to you worth a line in the log ("+7 XP"). */
+export interface NoticeMessage {
+  t: 'notice';
+  text: string;
+}
+
+export interface DialogueMessage {
+  t: 'dialogue';
+  npc: { id: string; name: string; asset: string };
+  text: string;
+  /** A quest the NPC is offering, to accept or decline. */
+  offer?: { quest: string; title: string; reward: string };
+}
+
 export type ServerMessage =
   | WelcomeMessage
+  | HitMessage
+  | CharacterMessage
+  | NoticeMessage
+  | DialogueMessage
   | SnapshotMessage
   | ChatMessage
   | SystemMessage
@@ -114,6 +183,9 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'chat') {
     return (m.channel === 'say' || m.channel === 'world') && typeof m.text === 'string';
   }
+  if (m.t === 'attack' || m.t === 'interact') return true;
+  if (m.t === 'use') return typeof m.item === 'string' && m.item.length <= 64;
+  if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   return false;
 }
 

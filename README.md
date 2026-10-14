@@ -8,7 +8,7 @@ The approved design lives in the project's design doc ("co-MMO: Initial
 Design Document"); [docs/design.md](docs/design.md) summarises it and tracks
 which milestone the code is at.
 
-## Status: milestone 2, "Walk together"
+## Status: milestone 2 done, milestone 3 "RPG core" under way
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
@@ -30,8 +30,23 @@ which milestone the code is at.
 - Biome definitions for all ten Style Bible biomes; the Sanctum, Whispering
   Woods, Sunlit Shore and Mirage Desert are the launch set.
 
-Not yet: the God and wishes, RPG systems (stats, combat, items, quests),
-God's View, Postgres, multiple region servers. See the milestone list in
+RPG core (milestone 3, first version):
+
+- Characters with level, XP, health, gold and four stats (Might, Agility,
+  Wit, Spirit). Each level raises every stat. Saved with the account.
+- Real-time combat, server-authoritative: Space strikes the nearest creature.
+  Walking Mushrooms fight back, Crab Knights guard their sand, Sun Scarabs
+  chase. Creatures drop gold, Tonics and Goat Horns, and come back later.
+- Falling in battle wakes you at the Sanctum shrine with nothing lost,
+  Weakened (half damage) for 30 seconds.
+- Items: everyone starts with the Bible (B), an in-game book with First
+  Steps, the Style Bible, the Book of Making, the Chronicle and a Bestiary and
+  Armoury that fills in as you play. Tonics heal (I opens your bag).
+- Quests from the four NPCs (E to talk): Sister Amala sends you to Old
+  Bramble, then each region's NPC asks you to deal with its creatures.
+
+Not yet: the God and wishes, abilities, equipment, shops and crafting,
+parties, God's View, Postgres, multiple region servers. See the milestone list in
 [docs/design.md](docs/design.md).
 
 ## Run it

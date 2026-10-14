@@ -1,4 +1,4 @@
-import { CREATURES, ITEMS, regionDef, ruleItemId, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
+import { CREATURES, ITEMS, RARITIES, bonusText, regionDef, ruleItemId, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
 
@@ -13,6 +13,8 @@ export interface Chapter {
 
 const art = (id: string) => artSrc(id);
 
+const RARITY_NAMES = Object.fromEntries(RARITIES.map((r) => [r, r[0]!.toUpperCase() + r.slice(1)])) as Record<string, string>;
+
 const PROGRESS_ICON: Record<string, string> = { 'in-progress': '⏳', 'needs-input': '✋', error: '✗', done: '', closed: '' };
 
 /** Where a wish stands, e.g. "(⏳ The God is drafting a rule)", with why underneath when it matters. */
@@ -23,9 +25,10 @@ function progress(e: ContentEntry): string {
   return ` <i class="progress ${p.state}">(${PROGRESS_ICON[p.state] ? `${PROGRESS_ICON[p.state]} ` : ''}${escapeHtml(p.label)})</i>${detail}`;
 }
 
-/** A rule is pictured by its first item (the fishing rod). */
+/** A rule is pictured by its first item (the fishing rod), a recipe by what it makes. */
 function pictureKey(e: ContentEntry): string {
   const def = e.definition;
+  if (def?.kind === 'recipe') return ITEMS[def.result.item]?.art ?? 'item-scroll';
   const first = def?.kind === 'rule' ? Object.keys(def.items)[0] : undefined;
   return wishArtKey(first ? ruleItemId(e.id, first) : e.id);
 }
@@ -51,10 +54,14 @@ export const CHAPTERS: Chapter[] = [
         <li><b>Space</b> to strike the nearest creature. Walking Mushrooms only fight back; Crab Knights guard their sand; Sun Scarabs chase anyone they see.</li>
         <li>Health returns slowly once you are out of the fight. A <b>Tonic</b> restores it at once.</li>
         <li>If you fall, you wake at the Sanctum shrine with everything you carried, Weakened for a short while.</li>
+        <li><b>1</b> to <b>4</b> use your abilities. Each costs <b>Energy</b> (the blue bar), which comes back by itself, and rests a few seconds after use. Old Bramble teaches Power Strike when you help her, Sister Amala teaches Mend for a little gold, and the Cactus Elder sells the Scroll of Firebolt.</li>
       </ul>
       <h3>Your things</h3>
       <ul>
-        <li><b>I</b> opens your bag. Click a Tonic to drink it.</li>
+        <li><b>I</b> opens your bag. Click a Tonic to drink it, a weapon, hat, coat or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off.</li>
+        <li><b>C</b> opens the crafting book. Creatures drop materials (mushroom caps, crab shells, scarab wing cases) that become Tonics and gear. Finer things need more Wit.</li>
+        <li><b>Trade</b> with Marina on the Shore or the Cactus Elder in the desert to buy, and to sell what you found. Sister Amala gives lessons.</li>
+        <li><b>/trade</b> and a name trades with a player close by. You both put things and gold on the table; nothing changes hands until you both agree.</li>
         <li><b>B</b> opens this book.</li>
         <li><b>Invite a friend</b> at the top makes a link only you can share.</li>
       </ul>
@@ -62,6 +69,7 @@ export const CHAPTERS: Chapter[] = [
       <ul>
         <li><b>G</b> opens a prayer, anywhere in the world. Talk to the God, and ask for something new: a thing to carry, a creature to meet, someone to talk to.</li>
         <li>The God answers with a <b>wish card</b>: what will be made, where, and its cost in <b>Favor</b>. Grant it, or say not now.</li>
+        <li>You can wish for gear to wear, a new crafting recipe, or a new ability (it comes as a scroll you can read, sell or give away).</li>
         <li>Bigger wishes (a new system, a new place) go to the Stewards first. The Chronicle in this book lists every wish.</li>
       </ul>
       <h3>Keeping the peace</h3>
@@ -98,7 +106,11 @@ export const CHAPTERS: Chapter[] = [
       <h3>New rules</h3>
       <p>A wish for a new thing to do (fishing, foraging, a blessing at a shrine) becomes a <b>scripted rule</b>. The God drafts it, tries it in a copy of the world, and a Steward reads it before it goes live. Rules can only act through the world's own building blocks (items, health, gold, XP, messages), with limits on how much they give, and a rule that misbehaves stops itself.</p>
       <h3>Favor</h3>
-      <p>Wishes cost Favor: 2 for an item, 6 for a creature or a person. You begin with 10, earn 3 for each quest and 2 for each level, and 1 each time someone else defeats a creature you wished for.</p>
+      <p>Wishes cost Favor: 2 for an item or a recipe, 6 for a creature, a person or an ability. You begin with 10, earn 3 for each quest and 2 for each level.</p>
+      <h3>Creator XP</h3>
+      <p>When other players fight what you wished for, talk to it, wear it, use it, craft with it or learn from it, you earn <b>Creator XP</b>. Each Creator level brings 3 Favor, so making things people love pays for more wishes.</p>
+      <h3>Gear</h3>
+      <p>Weapons, hats, coats and charms add to your stats, damage and armour. Rarity runs from Common through Uncommon, Rare and Epic to Legendary. The world sets how strong wished gear is from its rarity; wishes reach Rare at most, and the rest must be earned.</p>
       <h3>Roles</h3>
       <ul>
         <li><b>The Owner</b> keeps the world and its budget.</li>
@@ -106,7 +118,7 @@ export const CHAPTERS: Chapter[] = [
         <li><b>Players</b> are everyone, and anyone can invite a friend.</li>
       </ul>
       <h3>Characters</h3>
-      <p>Four stats: <b>Might</b> (strength and health), <b>Agility</b> (attack speed), <b>Wit</b> (magic and crafting) and <b>Spirit</b> (healing). Each level raises them all. There is no level cap.</p>`,
+      <p>Four stats: <b>Might</b> (strength and health), <b>Agility</b> (attack speed), <b>Wit</b> (magic, Energy and crafting) and <b>Spirit</b> (healing, and Energy coming back). Each level raises them all. There is no level cap.</p>`,
   },
   {
     id: 'chronicle',
@@ -139,7 +151,7 @@ export const CHAPTERS: Chapter[] = [
       );
       const items = Object.entries(ITEMS).map(([id, d]) =>
         c.discovered.includes(id)
-          ? `<figure><img src="${art(d.art)}" alt=""><figcaption><b>${escapeHtml(d.name)}</b><br>${escapeHtml(d.description)}</figcaption></figure>`
+          ? `<figure><img src="${art(d.art)}" alt=""><figcaption><b>${escapeHtml(d.name)}</b>${d.rarity ? ` · <i>${RARITY_NAMES[d.rarity]}</i>` : ''}<br>${escapeHtml(d.description)}${d.bonus ? `<br><small>${escapeHtml(bonusText(d.bonus))}</small>` : ''}</figcaption></figure>`
           : `<figure class="unknown"><div class="mystery">?</div><figcaption><b>Not yet found</b></figcaption></figure>`,
       );
       return `

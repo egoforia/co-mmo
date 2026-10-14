@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  ABILITIES,
   Interpolator,
   Predictor,
   TICK_SECONDS,
@@ -269,7 +270,9 @@ export class WorldScene extends Phaser.Scene {
     const myId = this.welcome.you.id;
     const target = hit.target === myId ? this.me : this.remotes.get(hit.target) ?? this.creatures.get(hit.target);
     const attacker = hit.by === myId ? this.me : this.remotes.get(hit.by) ?? this.creatures.get(hit.by);
-    if (attacker && attacker !== this.me && target) this.lunge(attacker, target.body.x - attacker.body.x);
+    const bolt = hit.ability && ABILITIES[hit.ability]?.effect === 'bolt';
+    if (attacker && target && bolt) this.bolt(attacker, target);
+    else if (attacker && attacker !== this.me && target) this.lunge(attacker, target.body.x - attacker.body.x);
     if (!target) return;
     const hurtMe = target === this.me;
     const number = this.add
@@ -303,6 +306,16 @@ export class WorldScene extends Phaser.Scene {
     slash.arc(cx, cy, T * 0.42, from, from + 2.4, false);
     slash.strokePath();
     this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
+  }
+
+  /** A glowing spark flies from the caster to the target. */
+  private bolt(from: Avatar, to: Avatar): void {
+    const y = (a: Avatar) => a.body.y - a.body.displayHeight * 0.5;
+    const spark = this.add.circle(from.body.x, y(from), T * 0.12, 0xfeae34).setStrokeStyle(T / 24, 0xfee761).setDepth(LABEL_DEPTH);
+    this.tweens.add({
+      targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn',
+      onComplete: () => this.tweens.add({ targets: spark, scale: 2.2, alpha: 0, duration: 160, onComplete: () => spark.destroy() }),
+    });
   }
 
   private lunge(a: Avatar, direction: number): void {

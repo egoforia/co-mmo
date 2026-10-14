@@ -72,6 +72,42 @@ export function parseReport(body: string): BuildReport | undefined {
   return undefined;
 }
 
+/**
+ * What one coding-agent run really cost, as Claude Code reported it. The
+ * workflows add it to their comments next to the build report: `build` for
+ * the run that wrote the wish, `followup` for an @claude run on its pull
+ * request.
+ */
+export interface CostReport {
+  run: string;
+  usd: number;
+  kind: 'build' | 'followup';
+}
+
+const COST_MARKER = /<!--\s*co-mmo-cost\s+(\{[\s\S]*?\})\s*-->/g;
+/** More than any one run could cost; anything above is a mistake, not a bill. */
+const MAX_RUN_USD = 200;
+
+export function parseCosts(body: string): CostReport[] {
+  const out: CostReport[] = [];
+  for (const m of body.matchAll(COST_MARKER)) {
+    try {
+      const r = JSON.parse(m[1]!) as Record<string, unknown>;
+      const run = typeof r.run === 'string' && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/actions\/runs\/\d+(\/attempts\/\d+)?$/.test(r.run) ? r.run : '';
+      const usd = typeof r.usd === 'number' && Number.isFinite(r.usd) && r.usd >= 0 && r.usd <= MAX_RUN_USD ? r.usd : -1;
+      if (run && usd >= 0) out.push({ run, usd, kind: r.kind === 'followup' ? 'followup' : 'build' });
+    } catch {
+      // Not a cost report.
+    }
+  }
+  return out;
+}
+
+/** Every cost reported on an issue by a trusted workflow. */
+export function reportedCosts(comments: IssueComment[], trusted = TRUSTED_REPORTERS): CostReport[] {
+  return comments.filter((c) => trusted.includes(c.author)).flatMap((c) => parseCosts(c.body));
+}
+
 /** The latest report on an issue from a trusted workflow. */
 export function latestReport(comments: IssueComment[], trusted = TRUSTED_REPORTERS): BuildReport | undefined {
   let latest: BuildReport | undefined;
@@ -238,7 +274,8 @@ export class Builds {
     }
     const { message: _m, held: _h, ...rest } = build;
     this.store.updateContent(record.id, { build: { ...rest, state: 'building', at: this.now(), startedAt: this.now(), issue, tries: (build.tries ?? 0) + 1 } });
-    this.store.recordSpend({ at: this.now(), usd: s.usdPerBuild, kind: 'build', provider: s.agent === 'claude' ? 'claude-code' : 'manual', model: 'github-actions', playerId: record.wisher.id });
+    // A guess until the run reports what it really cost (see recordCosts).
+    if (s.agent === 'claude') this.store.recordSpend({ at: this.now(), usd: s.usdPerBuild, kind: 'build', provider: 'anthropic', model: 'claude-code', playerId: record.wisher.id, ref: estimateRef(issue.number), estimate: true });
     this.hooks.changed(record.id);
     if (s.agent === 'manual') this.hooks.notifyOwner(`"${record.title}" is on GitHub as issue #${issue.number}, waiting for someone to build it.`);
   }
@@ -262,6 +299,7 @@ export class Builds {
         this.lastError = (err as Error).message;
         continue;
       }
+      this.recordCosts(record, build.issue.number, comments);
       const report = latestReport(comments);
       if (report) await this.apply(record, report);
       else if (build.state === 'building' && this.settings.agent === 'claude' && this.now() - build.at > BUILD_TIMEOUT_MS) {
@@ -270,6 +308,15 @@ export class Builds {
     }
     this.lastSync = this.now();
     await this.pump();
+  }
+
+  /** Counts what each coding-agent run on this wish really cost, once per run. */
+  private recordCosts(record: ContentRecord, issue: number, comments: IssueComment[]): void {
+    for (const cost of reportedCosts(comments)) {
+      const spend = { at: this.now(), usd: cost.usd, kind: 'build' as const, provider: 'anthropic', model: 'claude-code', playerId: record.wisher.id, ref: cost.run };
+      if (cost.kind === 'build') this.store.settleSpend(estimateRef(issue), spend);
+      else this.store.recordSpend(spend);
+    }
   }
 
   private async apply(record: ContentRecord, report: BuildReport): Promise<void> {
@@ -367,6 +414,11 @@ export class Builds {
     const tracked = job.catch((err) => console.error('Builds:', (err as Error).message)).finally(() => this.jobs.delete(tracked));
     this.jobs.add(tracked);
   }
+}
+
+/** Names the guessed cost of the build on an issue, until its real cost replaces it. */
+function estimateRef(issue: number): string {
+  return `build-estimate:${issue}`;
 }
 
 /**

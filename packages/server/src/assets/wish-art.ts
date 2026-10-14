@@ -6,7 +6,7 @@ import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
 import { buildPrompt, type AssetDescription, type AssetKind } from './style.ts';
 
-/** Price of one Gemini image (gemini-2.5-flash-image), US dollars. */
+/** Price of one Gemini image (gemini-2.5-flash-image), US dollars: Google's list price for a 1024px image (1290 output tokens at $30 per million). */
 export const IMAGE_USD = 0.039;
 
 /** Approved anchors sent as style references, per kind of wished thing. */

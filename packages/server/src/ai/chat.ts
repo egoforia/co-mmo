@@ -37,15 +37,22 @@ export class ChatError extends Error {
   }
 }
 
-/** Approximate list prices, US dollars per million tokens (input, output). */
+/**
+ * List prices, US dollars per million tokens (input, output). Claude prices
+ * are Anthropic's list as of October 2026 (Haiku 5.5's is for prompts up to
+ * 100K tokens). ESTIMATE marks prices nobody has checked against the
+ * provider's own list yet: the budget is only as right as these numbers.
+ */
 const PRICES: Record<string, [number, number]> = {
-  // Google retired gemini-2.5-flash for new keys (October 2026). The 3.8 price is an estimate, not yet checked against Google's list.
+  // ESTIMATE: Google retired gemini-2.5-flash for new keys (October 2026); the 3.8 price is not yet checked against Google's list.
   'gemini-3.8-flash': [0.5, 3],
   'gemini-2.5-flash': [0.3, 2.5],
   'gemini-2.5-flash-lite': [0.1, 0.4],
   'gemini-2.5-pro': [1.25, 10],
-  'claude-haiku-5-5': [1, 5],
-  'claude-sonnet-5-5': [3, 15],
+  'claude-haiku-5-5': [0.1, 0.5],
+  'claude-sonnet-5-5': [2, 10],
+  'claude-opus-5-5': [4, 20],
+  // ESTIMATE: not checked against OpenAI's current list.
   'gpt-4o-mini': [0.15, 0.6],
 };
 
@@ -92,13 +99,15 @@ export class GeminiChat implements ChatModel {
       error?: { message?: string };
       promptFeedback?: { blockReason?: string };
       candidates?: { content?: { parts?: { text?: string }[] } }[];
-      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
     };
     if (!res.ok) throw new ChatError(this.provider, res.status, body.error?.message ?? res.statusText);
     if (body.promptFeedback?.blockReason) throw new ChatError(this.provider, 422, `blocked (${body.promptFeedback.blockReason})`);
     const text = (body.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join('');
     if (!text) throw new ChatError(this.provider, 502, 'empty reply');
-    return result(this.model, text, body.usageMetadata?.promptTokenCount ?? 0, body.usageMetadata?.candidatesTokenCount ?? 0);
+    // Thinking tokens are billed as output but counted apart from the reply.
+    const usage = body.usageMetadata;
+    return result(this.model, text, usage?.promptTokenCount ?? 0, (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0));
   }
 }
 

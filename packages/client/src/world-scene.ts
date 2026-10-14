@@ -327,12 +327,12 @@ export class WorldScene extends Phaser.Scene {
     for (let y = 0; y < map.height; y++) {
       data.push(Array.from(map.tiles.subarray(y * map.width, (y + 1) * map.width)));
     }
-    // Under landmarks, paint whatever ground surrounds them.
+    // Under landmarks, paint whatever ground surrounds them (indoors, the floor).
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         if (data[y]![x] !== Tile.Blocked) continue;
         const around = [data[y - 1]?.[x], data[y + 1]?.[x], data[y]![x - 1], data[y]![x + 1]];
-        data[y]![x] = around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
+        data[y]![x] = around.includes(Tile.Floor) ? Tile.Floor : around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
       }
     }
     const tilemap = this.make.tilemap({ data, tileWidth: T, tileHeight: T });

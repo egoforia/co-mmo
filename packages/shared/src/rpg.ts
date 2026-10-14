@@ -302,7 +302,7 @@ export const QUESTS: Record<string, QuestDef> = {
     title: 'A Walk in the Woods',
     giver: 'sister-amala',
     offer: 'Welcome, pilgrim. The God is still waking, so the world needs hands like yours. Go west into the Whispering Woods and find Old Bramble. She knows what troubles the trees.',
-    waiting: 'Old Bramble lives by the great tree house, west along the road.',
+    waiting: 'Old Bramble lives in her cottage at the end of the road west. Walk right in, she keeps the door open.',
     thanks: 'Amala sent you? Good. I could use the help.',
     goal: { kind: 'talk', npc: 'old-bramble' },
     reward: { xp: 15, gold: 5, items: [{ item: 'tonic', qty: 2 }] },

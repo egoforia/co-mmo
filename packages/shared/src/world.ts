@@ -11,9 +11,13 @@ export enum Tile {
   Rock = 4,
   /** Under a landmark: drawn as ground, never walkable. */
   Blocked = 5,
+  /** Wooden floor inside a building, part of the region so players walk straight in. */
+  Floor = 6,
+  /** A building's timber wall. */
+  Wall = 7,
 }
 
-const BLOCKING = new Set<Tile>([Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked]);
+const BLOCKING = new Set<Tile>([Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Wall]);
 
 export function isBlocking(tile: Tile): boolean {
   return BLOCKING.has(tile);
@@ -131,14 +135,21 @@ const sanctumLayout: Layout = (map, c) => {
   map.spawn = { x: c + 1, y: c + 4 };
 };
 
+/** Old Bramble's cottage: its floor is this many tiles square, inside the walls. */
+export const COTTAGE_SIZE = 16;
+
 const woodsLayout: Layout = (map, c) => {
   scatter(map, (x, y) => (valueNoise(x, y, map.seed, 5) > 0.42 && rand2(x, y, map.seed + 1) < 0.75 ? Tile.Tree : Tile.Ground));
-  const hx = c - 12;
-  disc(map, hx, c, 6, Tile.Ground);
+  // The cottage stands west of the middle, its door facing the road.
+  const left = 3;
+  const top = c - 8;
+  const door = cottage(map, left, top, COTTAGE_SIZE);
   disc(map, c, c, 4, Tile.Ground);
-  road(map, hx + 1, c + 1, c, c);
-  map.landmarks.push({ asset: 'woods-tree-house', x: hx + 0.5, y: c - 1, footprint: { width: 3, height: 2 } });
-  map.npcs.push({ id: 'old-bramble', name: 'Old Bramble', asset: 'woods-herbalist', x: hx + 3.5, y: c + 3.5 });
+  road(map, door.x + 1, door.y, c, c);
+  // Her hollow tree grows up against the cottage's back wall.
+  const mid = left + 1 + COTTAGE_SIZE / 2;
+  map.landmarks.push({ asset: 'woods-tree-house', x: mid, y: top + 3, footprint: { width: 3, height: 2 } });
+  map.npcs.push({ id: 'old-bramble', name: 'Old Bramble', asset: 'woods-herbalist', x: mid + 0.5, y: door.y + 0.5 });
   creatures(map, 'walking-mushroom', 'Walking Mushroom', 'woods-mushroom', 5);
   map.spawn = { x: c, y: c + 1 };
 };
@@ -198,6 +209,27 @@ function set(map: RegionMap, x: number, y: number, t: Tile): void {
 
 function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void {
   for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r) set(map, cx + x, cy + y, t);
+}
+
+/**
+ * A walled building whose floor is `size` tiles square, its wall's top-left
+ * corner at (left, top), in a clearing a tile wide. Returns the top of the
+ * two-tile doorway in the east wall, for the road to meet.
+ */
+function cottage(map: RegionMap, left: number, top: number, size: number): { x: number; y: number } {
+  const right = left + size + 1;
+  const bottom = top + size + 1;
+  for (let y = top - 1; y <= bottom + 1; y++) {
+    for (let x = left - 1; x <= right + 1; x++) {
+      const wall = x === left || x === right || y === top || y === bottom;
+      const inside = x > left && x < right && y > top && y < bottom;
+      set(map, x, y, wall ? Tile.Wall : inside ? Tile.Floor : Tile.Ground);
+    }
+  }
+  const door = { x: right, y: top + Math.floor(size / 2) };
+  set(map, door.x, door.y, Tile.Floor);
+  set(map, door.x, door.y + 1, Tile.Floor);
+  return door;
 }
 
 /** A two-tile-wide road: horizontal leg first, then vertical. */

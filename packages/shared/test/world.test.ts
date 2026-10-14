@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COTTAGE_SIZE,
   OPPOSITE,
   PLAYER_SPEED,
   TICK_SECONDS,
@@ -83,6 +84,50 @@ describe('world layout', () => {
     expect(tileAt(sanctum, 32.5, -0.5)).toBe(Tile.Water);
     expect(outsideSide(sanctum, -0.1, 10)).toBe('west');
     expect(outsideSide(sanctum, 10, 64.2)).toBe('south');
+  });
+});
+
+describe("Old Bramble's cottage", () => {
+  const woods = maps.find((m) => m.def.id === 'woods')!;
+  const bramble = woods.npcs.find((n) => n.id === 'old-bramble')!;
+  const floorAt = (x: number, y: number) => {
+    const t = woods.tiles[y * woods.width + x];
+    return t === Tile.Floor || t === Tile.Blocked;
+  };
+
+  it('has a 16 by 16 floor inside its walls', () => {
+    // Bramble stands inside; find the room around her.
+    let left = Math.floor(bramble.x);
+    while (floorAt(left - 1, Math.floor(bramble.y))) left--;
+    let top = Math.floor(bramble.y);
+    while (floorAt(left, top - 1)) top--;
+    let floor = 0;
+    for (let y = top; y < top + COTTAGE_SIZE; y++) for (let x = left; x < left + COTTAGE_SIZE; x++) if (floorAt(x, y)) floor++;
+    expect(COTTAGE_SIZE).toBe(16);
+    expect(floor).toBe(COTTAGE_SIZE * COTTAGE_SIZE);
+    // Walled all round, but for the doorway in the east wall.
+    const right = left + COTTAGE_SIZE;
+    const bottom = top + COTTAGE_SIZE;
+    for (let x = left - 1; x <= right; x++) {
+      expect(tileAt(woods, x, top - 1)).toBe(Tile.Wall);
+      expect(tileAt(woods, x, bottom)).toBe(Tile.Wall);
+    }
+    const door = [];
+    for (let y = top; y < bottom; y++) {
+      expect(tileAt(woods, left - 1, y)).toBe(Tile.Wall);
+      if (tileAt(woods, right, y) !== Tile.Wall) door.push(y);
+    }
+    expect(door).toHaveLength(2);
+  });
+
+  it('can be walked into from the road without leaving the Woods', () => {
+    expect(reachable(woods, woods.spawn)[Math.floor(bramble.y) * woods.width + Math.floor(bramble.x)]).toBe(1);
+    let pos = { ...woods.spawn };
+    for (let i = 0; i < 400; i++) pos = step(woods, pos, -1, 0);
+    expect(tileAt(woods, pos.x, pos.y)).toBe(Tile.Floor);
+    expect(pos.x).toBeLessThan(bramble.x);
+    expect(isBlocking(Tile.Wall)).toBe(true);
+    expect(isBlocking(Tile.Floor)).toBe(false);
   });
 });
 

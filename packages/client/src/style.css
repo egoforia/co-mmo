@@ -1,0 +1,81 @@
+:root {
+  --ink: #ffffff;
+  --muted: #c0cbdc;
+  --bg: #181425;
+  --panel: rgba(24, 20, 37, 0.88);
+  --edge: #5a6988;
+  --accent: #feae34;
+  --say: #ffffff;
+  --world: #2ce8f5;
+  --system: #feae34;
+  --error: #f6757a;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+#game, #game canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+
+#hud {
+  position: fixed; top: 12px; left: 12px; right: 12px;
+  display: flex; gap: 12px; align-items: center;
+  font-size: 13px; pointer-events: none;
+}
+#hud > * { background: var(--panel); border: 1px solid var(--edge); padding: 6px 10px; }
+#hud button { pointer-events: auto; margin-left: auto; color: var(--ink); font: inherit; cursor: pointer; }
+#hud button:hover { border-color: var(--accent); }
+
+#chat {
+  position: fixed; left: 12px; bottom: 12px;
+  width: min(440px, calc(100vw - 24px));
+  background: var(--panel); border: 1px solid var(--edge);
+  font-size: 13px;
+}
+#chat-log { list-style: none; margin: 0; padding: 8px 10px; height: 160px; overflow-y: auto; }
+#chat-log li { margin: 2px 0; word-wrap: break-word; }
+#chat-log .say { color: var(--say); }
+#chat-log .world { color: var(--world); }
+#chat-log .system { color: var(--system); font-style: italic; }
+#chat-log .error { color: var(--error); }
+#chat-log b { color: var(--accent); font-weight: 600; }
+#chat-form { display: flex; border-top: 1px solid var(--edge); }
+#chat-form select, #chat-form input {
+  background: transparent; color: var(--ink); border: 0; font: inherit; padding: 8px 10px;
+}
+#chat-form select { border-right: 1px solid var(--edge); }
+#chat-form select option { background: var(--bg); }
+#chat-form input { flex: 1; outline: none; min-width: 0; }
+
+.panel {
+  position: fixed; inset: 0; margin: auto;
+  width: min(420px, calc(100vw - 32px)); height: fit-content;
+  background: var(--panel); border: 1px solid var(--edge);
+  padding: 24px; font-size: 14px; line-height: 1.5;
+}
+.panel h1 { margin: 0 0 12px; font-size: 20px; color: var(--accent); }
+.panel p { margin: 0 0 12px; color: var(--muted); }
+.panel label { display: block; margin: 12px 0 4px; }
+.panel input[type='text'] {
+  width: 100%; padding: 8px 10px; background: var(--bg); color: var(--ink);
+  border: 1px solid var(--edge); font: inherit;
+}
+.panel .check { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); }
+.panel button {
+  margin-top: 16px; width: 100%; padding: 10px; background: var(--accent); color: var(--bg);
+  border: 0; font: inherit; font-weight: 700; cursor: pointer;
+}
+.panel .error { color: var(--error); min-height: 1.5em; margin: 8px 0 0; }
+
+#toast {
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--accent);
+  padding: 10px 14px; font-size: 13px; max-width: calc(100vw - 32px); word-break: break-all;
+}

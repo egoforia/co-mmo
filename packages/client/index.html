@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>co-MMO</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="game"></div>
+
+    <div id="hud" hidden>
+      <span id="hud-name"></span>
+      <span id="hud-online"></span>
+      <button id="invite-button" type="button">Invite a friend</button>
+    </div>
+
+    <div id="chat" hidden>
+      <ol id="chat-log" aria-live="polite"></ol>
+      <form id="chat-form" autocomplete="off">
+        <select id="chat-channel" aria-label="Channel">
+          <option value="say">Say</option>
+          <option value="world">World</option>
+        </select>
+        <input id="chat-input" maxlength="280" placeholder="Press Enter to talk" />
+      </form>
+    </div>
+
+    <div id="panel" class="panel" hidden></div>
+    <div id="toast" role="status" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

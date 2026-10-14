@@ -1,0 +1,30 @@
+{
+  "name": "co-mmo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A browser MMORPG built by its players through wishes to a God.",
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w @co-mmo/server\" \"npm run dev -w @co-mmo/client\"",
+    "build": "npm run build -w @co-mmo/client",
+    "start": "npm run start -w @co-mmo/server",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/ws": "^8.18.2",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.4"
+  }
+}

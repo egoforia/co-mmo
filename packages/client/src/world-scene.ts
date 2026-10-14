@@ -6,6 +6,7 @@ import {
   TILE_PIXELS,
   Tile,
   generateRegion,
+  neighbourOffset,
   rand2,
   regionDef,
   type ArtManifest,
@@ -14,6 +15,7 @@ import {
   type HitMessage,
   type NpcState,
   type RegionMap,
+  type Side,
   type SnapshotMessage,
   type WelcomeMessage,
   wishArtKey,
@@ -67,6 +69,8 @@ export class WorldScene extends Phaser.Scene {
   private tint?: Phaser.GameObjects.Rectangle;
   /** Which way we face: 1 right, -1 left. */
   private facing = 1;
+  /** True while restarting for a walk into the next region, so there is no fade. */
+  private crossing = false;
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -79,14 +83,17 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** The server moved us to another region: rebuild the scene around it. */
+  /**
+   * The server moved us to another region: rebuild the scene around it. The
+   * neighbours are already drawn beside us, so we restart without a fade and
+   * the ground carries on where it was.
+   */
   enterRegion(welcome: WelcomeMessage): void {
     this.welcome = welcome;
-    // Stop moving on the old map while the new one loads.
     this.lastSeq = this.predictor?.lastSeq ?? this.lastSeq;
     this.predictor = undefined;
-    this.cameras.main.fadeOut(150, 24, 20, 37);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.restart());
+    this.crossing = true;
+    this.scene.restart();
   }
 
   create(): void {
@@ -98,24 +105,19 @@ export class WorldScene extends Phaser.Scene {
     this.npcs = new Map();
     this.accumulator = 0;
 
-    const tilesetKey = registerTileset(this, def);
-    const data: number[][] = [];
-    for (let y = 0; y < this.map.height; y++) {
-      data.push(Array.from(this.map.tiles.subarray(y * this.map.width, (y + 1) * this.map.width)));
+    // Our region, and every neighbour beside it, so the world reads as one.
+    this.drawRegion(this.map, 0, 0);
+    const bounds = { left: 0, top: 0, right: this.map.width, bottom: this.map.height };
+    for (const [side, id] of Object.entries(def.exits) as [Side, string][]) {
+      const next = regionDef(id);
+      if (!next) continue;
+      const offset = neighbourOffset(side, this.map.width);
+      this.drawRegion(generateRegion(next), offset.x, offset.y);
+      if (side === 'west') bounds.left = offset.x;
+      if (side === 'north') bounds.top = offset.y;
+      if (side === 'east') bounds.right = offset.x + this.map.width;
+      if (side === 'south') bounds.bottom = offset.y + this.map.height;
     }
-    // Under landmarks, paint whatever ground surrounds them.
-    for (let y = 0; y < this.map.height; y++) {
-      for (let x = 0; x < this.map.width; x++) {
-        if (data[y]![x] !== Tile.Blocked) continue;
-        const around = [data[y - 1]?.[x], data[y + 1]?.[x], data[y]![x - 1], data[y]![x + 1]];
-        data[y]![x] = around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
-      }
-    }
-    const tilemap = this.make.tilemap({ data, tileWidth: T, tileHeight: T });
-    const tileset = tilemap.addTilesetImage(tilesetKey, tilesetKey, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-    tilemap.createLayer(0, tileset, 0, 0)!.setDepth(-1);
-
-    this.placeScenery(def.biome);
     this.refreshWishes();
 
     this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
@@ -129,12 +131,13 @@ export class WorldScene extends Phaser.Scene {
     }, false) as typeof this.keys;
 
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, this.map.width * T, this.map.height * T);
+    cam.setBounds(bounds.left * T, bounds.top * T, (bounds.right - bounds.left) * T, (bounds.bottom - bounds.top) * T);
     cam.setZoom(cameraZoom());
     cam.setRoundPixels(true);
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     cam.startFollow(this.me.body, true, 0.2, 0.2);
-    cam.fadeIn(250, 24, 20, 37);
+    if (!this.crossing) cam.fadeIn(250, 24, 20, 37);
+    this.crossing = false;
 
     // The biome's light grades everything under the labels.
     this.tint = this.add.rectangle(0, 0, 10, 10, lightTint(def.biome)).setOrigin(0.5).setScrollFactor(0);
@@ -332,13 +335,34 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Paints a region's ground and scenery with its top-left corner at (ox, oy), in tiles. */
+  private drawRegion(map: RegionMap, ox: number, oy: number): void {
+    const tilesetKey = registerTileset(this, map.def);
+    const data: number[][] = [];
+    for (let y = 0; y < map.height; y++) {
+      data.push(Array.from(map.tiles.subarray(y * map.width, (y + 1) * map.width)));
+    }
+    // Under landmarks, paint whatever ground surrounds them (indoors, the floor).
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        if (data[y]![x] !== Tile.Blocked) continue;
+        const around = [data[y - 1]?.[x], data[y + 1]?.[x], data[y]![x - 1], data[y]![x + 1]];
+        data[y]![x] = around.includes(Tile.Floor) ? Tile.Floor : around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
+      }
+    }
+    const tilemap = this.make.tilemap({ data, tileWidth: T, tileHeight: T });
+    const tileset = tilemap.addTilesetImage(tilesetKey, tilesetKey, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
+    tilemap.createLayer(0, tileset, ox * T, oy * T)!.setDepth(-1);
+    this.placeScenery(map, ox, oy);
+  }
+
   /** Landmarks, and the trees and rocks standing on blocking tiles. */
-  private placeScenery(biome: string): void {
-    const { map } = this;
+  private placeScenery(map: RegionMap, ox: number, oy: number): void {
+    const biome = map.def.biome;
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
-      const img = this.add.image(l.x * T, l.y * T, l.asset).setOrigin(0.5, 0.92);
-      img.setDepth(l.y * T);
+      const img = this.add.image((ox + l.x) * T, (oy + l.y) * T, l.asset).setOrigin(0.5, 0.92);
+      img.setDepth((oy + l.y) * T);
     }
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
@@ -347,9 +371,9 @@ export class WorldScene extends Phaser.Scene {
         const variant = Math.floor(rand2(x, y, 5) * 3);
         const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
         const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
-        const img = this.add.image((x + 0.5) * T + jitter, (y + 1) * T, key).setOrigin(0.5, 0.97);
+        const img = this.add.image((ox + x + 0.5) * T + jitter, (oy + y + 1) * T, key).setOrigin(0.5, 0.97);
         img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
-        img.setDepth((y + 1) * T - 1);
+        img.setDepth((oy + y + 1) * T - 1);
       }
     }
   }

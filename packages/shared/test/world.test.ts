@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  COTTAGE_SIZE,
   OPPOSITE,
   PLAYER_SPEED,
   TICK_SECONDS,
   Tile,
   WORLD_REGIONS,
+  arrivalPoint,
   collides,
+  neighbourOffset,
   generateRegion,
   isBlocking,
   outsideSide,
@@ -84,6 +87,50 @@ describe('world layout', () => {
   });
 });
 
+describe("Old Bramble's cottage", () => {
+  const woods = maps.find((m) => m.def.id === 'woods')!;
+  const bramble = woods.npcs.find((n) => n.id === 'old-bramble')!;
+  const floorAt = (x: number, y: number) => {
+    const t = woods.tiles[y * woods.width + x];
+    return t === Tile.Floor || t === Tile.Blocked;
+  };
+
+  it('has a 16 by 16 floor inside its walls', () => {
+    // Bramble stands inside; find the room around her.
+    let left = Math.floor(bramble.x);
+    while (floorAt(left - 1, Math.floor(bramble.y))) left--;
+    let top = Math.floor(bramble.y);
+    while (floorAt(left, top - 1)) top--;
+    let floor = 0;
+    for (let y = top; y < top + COTTAGE_SIZE; y++) for (let x = left; x < left + COTTAGE_SIZE; x++) if (floorAt(x, y)) floor++;
+    expect(COTTAGE_SIZE).toBe(16);
+    expect(floor).toBe(COTTAGE_SIZE * COTTAGE_SIZE);
+    // Walled all round, but for the doorway in the east wall.
+    const right = left + COTTAGE_SIZE;
+    const bottom = top + COTTAGE_SIZE;
+    for (let x = left - 1; x <= right; x++) {
+      expect(tileAt(woods, x, top - 1)).toBe(Tile.Wall);
+      expect(tileAt(woods, x, bottom)).toBe(Tile.Wall);
+    }
+    const door = [];
+    for (let y = top; y < bottom; y++) {
+      expect(tileAt(woods, left - 1, y)).toBe(Tile.Wall);
+      if (tileAt(woods, right, y) !== Tile.Wall) door.push(y);
+    }
+    expect(door).toHaveLength(2);
+  });
+
+  it('can be walked into from the road without leaving the Woods', () => {
+    expect(reachable(woods, woods.spawn)[Math.floor(bramble.y) * woods.width + Math.floor(bramble.x)]).toBe(1);
+    let pos = { ...woods.spawn };
+    for (let i = 0; i < 400; i++) pos = step(woods, pos, -1, 0);
+    expect(tileAt(woods, pos.x, pos.y)).toBe(Tile.Floor);
+    expect(pos.x).toBeLessThan(bramble.x);
+    expect(isBlocking(Tile.Wall)).toBe(true);
+    expect(isBlocking(Tile.Floor)).toBe(false);
+  });
+});
+
 describe('step', () => {
   it('moves at player speed and normalises diagonals', () => {
     const start = sanctum.spawn;
@@ -98,6 +145,25 @@ describe('step', () => {
     for (let i = 0; i < 100; i++) pos = step(sanctum, pos, 0, -1);
     expect(collides(sanctum, pos.x, pos.y)).toBe(false);
     expect(pos.y).toBeGreaterThan(sanctum.landmarks[0]!.y - 0.1);
+  });
+
+  it('lands players at the same point along the edge in the next region', () => {
+    const woods = maps.find((m) => m.def.id === 'woods')!;
+    const entry = woods.entries.east!;
+    // Find a spot on the Woods' east edge, off the road, that is open ground.
+    let y = 2;
+    while (collides(woods, entry.x, y)) y++;
+    expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual({ x: entry.x, y });
+    expect(neighbourOffset('west')).toEqual({ x: -sanctum.width, y: 0 });
+  });
+
+  it('falls back to the road when the matching spot is blocked, and has no way into a closed edge', () => {
+    const woods = maps.find((m) => m.def.id === 'woods')!;
+    const entry = woods.entries.east!;
+    let y = 2;
+    while (!collides(woods, entry.x, y)) y++;
+    expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual(entry);
+    expect(arrivalPoint(woods, 'east', { x: 64.1, y: 30 })).toBeUndefined();
   });
 
   it('can walk out of an open edge but not a closed one', () => {

@@ -39,7 +39,7 @@ export const CHAPTERS: Chapter[] = [
       <p>Welcome to the world. It is young, and it grows from what its people wish for.</p>
       <h3>Moving and talking</h3>
       <ul>
-        <li><b>WASD</b> or the <b>arrow keys</b> to walk. Follow a road off the edge of a region to travel to the next.</li>
+        <li><b>WASD</b> or the <b>arrow keys</b> to walk. The regions join up into one land: walk off an edge where you can see the next region and you step straight into it.</li>
         <li><b>Enter</b> to speak. <i>Say</i> reaches those nearby, <i>Region</i> everyone in this region, <i>Party</i> your party, <i>World</i> everyone. <b>/w</b> and a name whispers to one player; <b>/r</b> answers. Type <b>/help</b> for the rest.</li>
         <li><b>/invite</b> and a name asks someone into your party. A party shares the XP of every creature its members defeat together, and their defeat quests.</li>
         <li><b>Account</b> (top right) adds an email or Google/GitHub to sign in from any device, and is where you describe your look if you have not yet.</li>

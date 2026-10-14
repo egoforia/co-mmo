@@ -28,6 +28,9 @@ interface Budget {
   warn: boolean;
   byKind?: Record<string, number>;
   byPlayer?: Record<string, number>;
+  byProvider?: Record<string, number>;
+  /** The part of the spending that is still a guess (builds whose run has not reported its cost). */
+  estimatedUsd?: number;
   calls?: number;
 }
 
@@ -519,7 +522,7 @@ function codingAgent(b: BuildsInfo): string {
         <option value="manual"${b.settings.agent === 'manual' ? ' selected' : ''}>A person (the game only opens the issue)</option>
       </select></span></label>
       <label>Builds per day<span><input name="dailyLimit" type="number" min="0" max="20" step="1" value="${b.settings.dailyLimit}"></span></label>
-      <label>Cost per build, counted in the budget (USD)<span><input name="usdPerBuild" type="number" min="0" max="50" step="0.5" value="${b.settings.usdPerBuild}"></span></label>
+      <label>Guessed cost per build, counted until the run reports its real cost (USD)<span><input name="usdPerBuild" type="number" min="0" max="50" step="0.5" value="${b.settings.usdPerBuild}"></span></label>
       <button type="submit">Save</button>
     </form>
     <p class="actions"><button type="button" class="quiet" data-builds-sync${c.connected ? '' : ' disabled'}>Check GitHub now</button></p>
@@ -543,9 +546,10 @@ async function budget(): Promise<string> {
     <h2>This month</h2>
     <div class="budget ${b.over ? 'bad' : b.warn ? 'warn' : ''}">
       <div class="bar"><span style="width:${pct}%"></span><i style="left:${(100 * b.warnUsd) / Math.max(b.monthlyUsd, 0.0001)}%"></i></div>
-      <p><b>${usd(b.spentUsd)}</b> of ${usd(b.monthlyUsd)} · ${b.calls ?? 0} paid calls${b.over ? ' · <b>Over the ceiling: the offline God answers and no art is painted.</b>' : b.warn ? ' · Past the warning line.' : ''}</p>
+      <p><b>${usd(b.spentUsd)}</b> of ${usd(b.monthlyUsd)} · ${b.calls ?? 0} paid calls${b.estimatedUsd ? ` · ${usd(b.estimatedUsd)} of it is a guess until those builds report their real cost` : ''}${b.over ? ' · <b>Over the ceiling: the offline God answers and no art is painted.</b>' : b.warn ? ' · Past the warning line.' : ''}</p>
     </div>
     <div class="cols">
+      <div><h3>By provider</h3><ul class="spend">${list(b.byProvider)}</ul></div>
       <div><h3>By kind</h3><ul class="spend">${list(b.byKind)}</ul></div>
       <div><h3>By player</h3><ul class="spend">${list(b.byPlayer)}</ul></div>
     </div>

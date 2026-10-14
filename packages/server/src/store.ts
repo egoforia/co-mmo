@@ -115,7 +115,7 @@ export interface BuildSettings {
   agent: 'claude' | 'manual';
   /** Builds started per day (UTC); more wait in the queue. */
   dailyLimit: number;
-  /** What one build is guessed to cost, counted against the monthly budget. */
+  /** What one build is guessed to cost, counted until its run reports the real cost. */
   usdPerBuild: number;
 }
 
@@ -128,6 +128,10 @@ export interface SpendRecord {
   provider: string;
   model: string;
   playerId: string | null;
+  /** Identifies one charge (a build run), so a report read twice is counted once. */
+  ref?: string;
+  /** A guess waiting for the real figure (a build before its run reports its cost). */
+  estimate?: boolean;
 }
 
 interface Data {
@@ -418,7 +422,20 @@ export class Store {
 
   recordSpend(record: SpendRecord): void {
     if (record.usd <= 0) return;
+    if (record.ref && this.data.spend.some((s) => s.ref === record.ref)) return;
     this.data.spend.push(record);
+    this.persist();
+  }
+
+  /**
+   * Swaps the guess recorded under `estimateRef` for what was really spent.
+   * Without a guess (already settled, or never made) the record is just added.
+   */
+  settleSpend(estimateRef: string, record: SpendRecord): void {
+    if (record.ref && this.data.spend.some((s) => s.ref === record.ref)) return;
+    const i = this.data.spend.findIndex((s) => s.ref === estimateRef && s.estimate);
+    if (i >= 0) this.data.spend.splice(i, 1);
+    if (record.usd > 0) this.data.spend.push(record);
     this.persist();
   }
 

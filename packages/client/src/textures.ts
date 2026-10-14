@@ -8,7 +8,7 @@ import { BIOMES, TILE_PIXELS, Tile, hashString, rand2, type BiomeId, type Region
 const T = TILE_PIXELS;
 /** Each tile is extruded by this much so filtered tiles never show seams. */
 export const TILE_MARGIN = 2;
-const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked];
+const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Floor, Tile.Wall];
 
 type Paint = (ctx: CanvasRenderingContext2D) => void;
 /** An art asset id, a painter, or an asset with a painter to fall back on. */
@@ -97,8 +97,13 @@ export function registerTileset(scene: Phaser.Scene, def: RegionDef): string {
   const paintWaterLook: Paint = (c) => paintWater(c, look.water);
   const water = tileCanvas((c) => paintSource(scene, c, look.waterArt ? { art: look.waterArt, paint: paintWaterLook } : paintWaterLook));
 
+  // Buildings are wood in every biome.
+  const floor = tileCanvas((c) => planks(c, ['#8a6a45', '#a07c52', '#6b4a33']));
+  const wall = tileCanvas((c) => planks(c, ['#4a3324', '#5a3d2a', '#2f2018']));
+  const sources: Partial<Record<Tile, HTMLCanvasElement>> = { [Tile.Path]: path, [Tile.Water]: water, [Tile.Floor]: floor, [Tile.Wall]: wall };
+
   for (const tile of TILE_ORDER) {
-    const source = tile === Tile.Path ? path : tile === Tile.Water ? water : ground;
+    const source = sources[tile] ?? ground;
     const x = tile * step;
     // Extrude the edges so linear filtering samples matching colours.
     ctx.drawImage(source, 0, 0, T, 1, x + TILE_MARGIN, 0, T, TILE_MARGIN);
@@ -158,6 +163,26 @@ function meadow(ctx: CanvasRenderingContext2D, greens: string[], flowers: string
       ctx.arc(px, py, 2.5, 0, Math.PI * 2);
       ctx.fill();
     });
+  }
+}
+
+/** Rows of boards with soft grain, wrapping at the tile edges: body, light, seam. */
+function planks(ctx: CanvasRenderingContext2D, [body, light, seam]: string[]): void {
+  ctx.fillStyle = body!;
+  ctx.fillRect(0, 0, T, T);
+  const rows = 4;
+  const h = T / rows;
+  for (let row = 0; row < rows; row++) {
+    const y = row * h;
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = light!;
+    ctx.fillRect(0, y + 3, T, h * 0.3);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = seam!;
+    ctx.fillRect(0, y, T, 2);
+    // Board ends are staggered row by row, like a laid floor.
+    const end = ((row % 2) * 0.5 + 0.25 + rand2(row, 1, 13) * 0.1) * T;
+    ctx.fillRect(end, y, 2, h);
   }
 }
 

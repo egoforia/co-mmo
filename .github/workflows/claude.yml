@@ -32,6 +32,7 @@ jobs:
           cache: npm
       - run: npm ci
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -39,3 +40,21 @@ jobs:
             --max-turns 80
             --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,LS,Bash(npm test),Bash(npm run typecheck),Bash(npx vitest run:*),Bash(node scripts/wish-guard.mjs:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*)"
             --append-system-prompt "Follow CLAUDE.md. Never change files under .github/, never merge, and never push to main."
+
+      # Counts this run in the game's budget: on a wish's pull request (branch
+      # wish/<issue>), the real cost goes to the wish's issue, which the game reads.
+      - name: Tell the game what it cost
+        if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+        run: |
+          branch=$(gh pr view "$PR" --json headRefName --jq .headRefName 2>/dev/null || true)
+          case "$branch" in wish/*) issue=${branch#wish/} ;; *) exit 0 ;; esac
+          cost=$(jq -c --arg run "$RUN_URL" '[.[]? | select(.type == "result")] | last | (.total_cost_usd // .cost_usd) | numbers | {run:$run,usd:.,kind:"followup"}' "$EXECUTION_FILE" 2>/dev/null || true)
+          [ -n "$cost" ] || exit 0
+          gh issue comment "$issue" --body "The coding agent worked on pull request #$PR again ([run]($RUN_URL)).
+
+          <!-- co-mmo-cost $cost -->"

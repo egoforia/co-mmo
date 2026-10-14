@@ -113,8 +113,11 @@ jobs:
         env:
           RESULT: ${{ steps.answer.outputs.result }}
           CHECK: ${{ steps.check.outcome }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
         run: |
           [ -f .wish/answer.json ] || echo '{}' > .wish/answer.json
+          # What the run really cost, as Claude Code reported it, so God's View counts the real bill.
+          cost=$(jq -c --arg run "$RUN_URL/attempts/$GITHUB_RUN_ATTEMPT" '[.[]? | select(.type == "result")] | last | (.total_cost_usd // .cost_usd) | numbers | {run:$run,usd:.,kind:"build"}' "$EXECUTION_FILE" 2>/dev/null || true)
           pr=$(gh pr list --head "$BRANCH" --state open --json number,url --jq '.[0] // empty')
           if [ "$RESULT" = "too-big" ]; then
             report=$(jq -c '{state:"too-big",steps:[(.steps // [])[] | gsub("[<>]";"")],reason:((.reason // "") | gsub("[<>]";""))}' .wish/answer.json)
@@ -134,4 +137,5 @@ jobs:
           fi
           gh issue comment "$ISSUE" --body "$text
 
-          <!-- co-mmo-build $report -->"
+          <!-- co-mmo-build $report -->${cost:+
+          <!-- co-mmo-cost $cost -->}"

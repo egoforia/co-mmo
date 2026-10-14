@@ -1,7 +1,7 @@
 import {
-  OPPOSITE,
   WEAKENED_MS,
   WORLD_REGIONS,
+  arrivalPoint,
   maxHp,
   type Character,
   type ChatMessage,
@@ -235,7 +235,9 @@ export class World {
           continue;
         }
         const target = this.regions.get(region.def.exits[departure.side] ?? '');
-        const arrival = target?.map.entries[OPPOSITE[departure.side]];
+        // Keep the player's place along the edge, so crossing feels like one more step.
+        const at = region.position(departure.id);
+        const arrival = target && at && arrivalPoint(target.map, departure.side, at);
         if (!target || !arrival) continue;
         const moving = region.remove(departure.id, `${name} set off for ${target.def.name}.`);
         if (!moving) continue;

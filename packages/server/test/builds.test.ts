@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { wishProgress } from '@co-mmo/shared';
-import { issueBody, latestReport, parseReport, type BuildIssues, type BuildReport, type IssueComment } from '../src/builds.ts';
+import { issueBody, latestReport, parseCosts, parseReport, type BuildIssues, type BuildReport, type IssueComment } from '../src/builds.ts';
 import { Store, type ContentRecord } from '../src/store.ts';
 import { account, api, joined, start, stop } from './helpers.ts';
 
@@ -77,6 +77,15 @@ describe('build reports', () => {
     expect(parseReport('<!-- co-mmo-build {"state":"merged","pr":3,"url":"https://github.com/a/b/pull/3","sha":"nope"} -->')).toBeUndefined();
     expect(parseReport('<!-- co-mmo-build not json -->')).toBeUndefined();
     expect(parseReport('no marker')).toBeUndefined();
+  });
+
+  it('reads the cost of a run and ignores anything odd', () => {
+    const run = 'https://github.com/a/b/actions/runs/42/attempts/2';
+    expect(parseCosts(`x <!-- co-mmo-cost {"run":"${run}","usd":1.25,"kind":"followup"} -->`)).toEqual([{ run, usd: 1.25, kind: 'followup' }]);
+    expect(parseCosts(`<!-- co-mmo-cost {"run":"${run}","usd":-1} -->`)).toEqual([]);
+    expect(parseCosts(`<!-- co-mmo-cost {"run":"${run}","usd":5000} -->`)).toEqual([]);
+    expect(parseCosts('<!-- co-mmo-cost {"run":"https://evil.example/actions/runs/1","usd":1} -->')).toEqual([]);
+    expect(parseCosts('<!-- co-mmo-cost nope -->')).toEqual([]);
   });
 
   it('only trusts the workflows, and the latest report wins', () => {
@@ -157,6 +166,29 @@ describe('building Engine wishes', () => {
       expect(rollback.status).toBe(409);
       expect(rollback.body.message).toMatch(/reverting its pull request/);
     });
+  });
+
+  it('counts what each run really cost instead of the guess, once per run', async () => {
+    const { store, base, github, owner, mara } = await setup();
+    const record = engineWish(store, mara.id);
+    await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true });
+    const builds = () => store.spendThisMonth(Date.now()).filter((s) => s.kind === 'build');
+    expect(builds()).toMatchObject([{ usd: 1.5, estimate: true, provider: 'anthropic' }]);
+    let { body } = await api(base, '/api/admin/budget', owner.token);
+    expect(body).toMatchObject({ estimatedUsd: 1.5, byProvider: { 'Anthropic (Claude)': 1.5 } });
+
+    const run = (n: number) => `https://github.com/egoforia/co-mmo/actions/runs/${n}/attempts/1`;
+    const cost = (c: object, author = 'github-actions[bot]') => github.issues.get(1)!.comments.push({ author, body: `Done.\n<!-- co-mmo-cost ${JSON.stringify(c)} -->`, at: Date.now() });
+    github.report(1, { state: 'review', pr: 7, url: pr(7) });
+    cost({ run: run(1), usd: 2.21, kind: 'build' });
+    cost({ run: run(2), usd: 0.4, kind: 'followup' });
+    cost({ run: run(3), usd: 90, kind: 'followup' }, 'mallory');
+    await api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    await api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    expect(builds().map((s) => s.usd).sort()).toEqual([0.4, 2.21]);
+    ({ body } = await api(base, '/api/admin/budget', owner.token));
+    expect(body.estimatedUsd).toBe(0);
+    expect(body.byProvider['Anthropic (Claude)']).toBeCloseTo(2.61);
   });
 
   it('ignores reports from people who are not the workflows', async () => {

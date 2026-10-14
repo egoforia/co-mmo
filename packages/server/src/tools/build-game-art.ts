@@ -1,4 +1,4 @@
-// Turns the approved reference images (assets/anchors, 1024 px) into the
+// Turns the approved reference images and biome kit (assets/anchors, 1024 px) into the
 // sizes the game draws (Style Bible, Global rules: Size), and writes a
 // manifest the client loads.
 //
@@ -21,7 +21,10 @@ const BOX: Record<string, { width: number; height: number }> = {
   monster: { width: 128, height: 128 },
   item: { width: 128, height: 128 },
   'set-piece': { width: 512, height: 512 },
+  // Trees, palms and cacti; rocks use ROCK_BOX.
+  prop: { width: 192, height: 256 },
 };
+const ROCK_BOX = { width: 128, height: 128 };
 
 /** Set pieces that should stand smaller than the 512 px maximum. */
 const SET_PIECE_BOX: Record<string, { width: number; height: number }> = {
@@ -43,7 +46,7 @@ for (const file of (await readdir(anchorDir)).filter((f) => f.endsWith('.json'))
     continue;
   }
 
-  const box = SET_PIECE_BOX[id] ?? BOX[kind] ?? BOX.item!;
+  const box = SET_PIECE_BOX[id] ?? (kind === 'prop' && id.endsWith('-rock') ? ROCK_BOX : BOX[kind]) ?? BOX.item!;
   // Trim the transparent margin so every sprite is scaled by its own size.
   const trimmed = await sharp(png).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
   const scale = Math.min(box.width / trimmed.info.width, box.height / trimmed.info.height);

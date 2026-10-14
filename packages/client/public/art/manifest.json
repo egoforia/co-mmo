@@ -1,4 +1,16 @@
 {
+  "desert-cactus-a": {
+    "file": "art/desert-cactus-a.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
+  "desert-cactus-b": {
+    "file": "art/desert-cactus-b.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
   "desert-cactus-folk": {
     "file": "art/desert-cactus-folk.png",
     "kind": "npc",
@@ -8,6 +20,18 @@
   "desert-dunes": {
     "file": "art/desert-dunes.png",
     "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-oasis": {
+    "file": "art/desert-oasis.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-rock": {
+    "file": "art/desert-rock.png",
+    "kind": "prop",
     "width": 128,
     "height": 128
   },
@@ -53,8 +77,26 @@
     "width": 128,
     "height": 192
   },
+  "sanctum-blossom-tree-a": {
+    "file": "art/sanctum-blossom-tree-a.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
+  "sanctum-blossom-tree-b": {
+    "file": "art/sanctum-blossom-tree-b.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
   "sanctum-flagstones": {
     "file": "art/sanctum-flagstones.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-meadow": {
+    "file": "art/sanctum-meadow.png",
     "kind": "tile",
     "width": 128,
     "height": 128
@@ -64,6 +106,18 @@
     "kind": "npc",
     "width": 128,
     "height": 192
+  },
+  "sanctum-pond": {
+    "file": "art/sanctum-pond.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-rock": {
+    "file": "art/sanctum-rock.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 128
   },
   "sanctum-shrine": {
     "file": "art/sanctum-shrine.png",
@@ -83,8 +137,32 @@
     "width": 512,
     "height": 512
   },
+  "shore-palm-a": {
+    "file": "art/shore-palm-a.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
+  "shore-palm-b": {
+    "file": "art/shore-palm-b.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
+  "shore-rock": {
+    "file": "art/shore-rock.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 128
+  },
   "shore-sand": {
     "file": "art/shore-sand.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-sea": {
+    "file": "art/shore-sea.png",
     "kind": "tile",
     "width": 128,
     "height": 128
@@ -112,6 +190,30 @@
     "kind": "monster",
     "width": 128,
     "height": 128
+  },
+  "woods-pool": {
+    "file": "art/woods-pool.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-rock": {
+    "file": "art/woods-rock.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 128
+  },
+  "woods-tree-a": {
+    "file": "art/woods-tree-a.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
+  },
+  "woods-tree-b": {
+    "file": "art/woods-tree-b.png",
+    "kind": "prop",
+    "width": 192,
+    "height": 256
   },
   "woods-tree-house": {
     "file": "art/woods-tree-house.png",

@@ -1,0 +1,31 @@
+{
+  "id": "sanctum-meadow",
+  "description": {
+    "id": "sanctum-meadow",
+    "name": "Sanctum meadow",
+    "kind": "tile",
+    "biome": "sanctum",
+    "silhouetteHook": "soft short grass with clover and tiny scattered flowers",
+    "body": "flat lawn, small brushy grass clumps spread evenly",
+    "materials": [
+      "grass",
+      "clover"
+    ],
+    "colors": {
+      "main": "fresh sage green",
+      "secondary": "clover green",
+      "accent": "cream, rose and pale gold flower specks"
+    },
+    "details": [
+      "tiny daisies",
+      "clover leaves"
+    ],
+    "mood": "peaceful, sacred"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSubject: Sanctum meadow (tile). Most recognisable feature: soft short grass with clover and tiny scattered flowers. Body and shape: flat lawn, small brushy grass clumps spread evenly. Materials: grass, clover. Colours: main fresh sage green, secondary clover green, small accent of cream, rose and pale gold flower specks. Details: tiny daisies; clover leaves. Mood: peaceful, sacred.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T18:29:07.014Z"
+}

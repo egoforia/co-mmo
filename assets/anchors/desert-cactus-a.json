@@ -1,0 +1,37 @@
+{
+  "id": "desert-cactus-a",
+  "description": {
+    "id": "desert-cactus-a",
+    "name": "Arm cactus",
+    "kind": "prop",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-ruin",
+      "desert-cactus-folk"
+    ],
+    "silhouetteHook": "a tall rounded cactus with two arms raised and a pink flower on top",
+    "body": "chunky ribbed cactus",
+    "materials": [
+      "cactus"
+    ],
+    "colors": {
+      "main": "sage green",
+      "secondary": "deep green",
+      "accent": "pink flower"
+    },
+    "details": [
+      "tiny pale spines"
+    ],
+    "mood": "hot, still"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Arm cactus (prop). Most recognisable feature: a tall rounded cactus with two arms raised and a pink flower on top. Body and shape: chunky ribbed cactus. Materials: cactus. Colours: main sage green, secondary deep green, small accent of pink flower. Details: tiny pale spines. Mood: hot, still.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-ruin",
+    "desert-cactus-folk"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T18:30:39.606Z"
+}

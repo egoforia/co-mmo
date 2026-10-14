@@ -24,8 +24,9 @@ which milestone the code is at.
 - Chat: Say (nearby, 16 tiles) and World, with flood limits.
 - Positions saved every 30 seconds and on disconnect.
 - 128×128 tiles (Style Bible), using the approved reference art: ground
-  tiles, characters, NPCs, creatures and landmarks. Water, trees, rocks, palms
-  and cacti are still painted in code until a biome kit is generated.
+  tiles, characters, NPCs, creatures and landmarks, plus the biome kit
+  (water, trees, palms, cacti, rocks and the Sanctum meadow). Code-painted
+  versions stand in for any asset that is missing.
 - Biome definitions for all ten Style Bible biomes; the Sanctum, Whispering
   Woods, Sunlit Shore and Mirage Desert are the launch set.
 
@@ -92,8 +93,14 @@ provider's image is kept in `assets/anchors/raw/`; the game copy has its
 magenta background removed (sprites) or is made seamless (ground tiles, with a
 4×4 repeat preview in `assets/anchors/previews/`).
 
+The same command makes the biome kit (`packages/server/src/assets/kit.ts`):
+each launch biome's trees, palms or cacti, rocks and water, plus the Sanctum
+meadow. Kit images are painted with their biome's approved anchors as style
+references, and water tiles keep only the middle of the image, since the
+model frames water as a pool with banks.
+
 `npm run game-art` turns the anchors into game sizes (128 px tiles and
-creatures, 128×192 characters, larger set pieces) in
+creatures, 128×192 characters, 192×256 trees, larger set pieces) in
 `packages/client/public/art/`, with a `manifest.json` the client loads. It
 needs no API key; run it after adding or changing anchors.
 

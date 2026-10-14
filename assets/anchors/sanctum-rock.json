@@ -1,0 +1,36 @@
+{
+  "id": "sanctum-rock",
+  "description": {
+    "id": "sanctum-rock",
+    "name": "Mossy white stone",
+    "kind": "prop",
+    "biome": "sanctum",
+    "references": [
+      "sanctum-shrine"
+    ],
+    "silhouetteHook": "a rounded pale stone boulder with clover at its base",
+    "body": "low wide boulder, smooth rounded shape",
+    "materials": [
+      "pale stone",
+      "moss"
+    ],
+    "colors": {
+      "main": "cream stone",
+      "secondary": "lavender-grey shadow",
+      "accent": "clover green"
+    },
+    "details": [
+      "a patch of moss on top"
+    ],
+    "mood": "calm"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSubject: Mossy white stone (prop). Most recognisable feature: a rounded pale stone boulder with clover at its base. Body and shape: low wide boulder, smooth rounded shape. Materials: pale stone, moss. Colours: main cream stone, secondary lavender-grey shadow, small accent of clover green. Details: a patch of moss on top. Mood: calm.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "sanctum-shrine"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T18:29:37.664Z"
+}

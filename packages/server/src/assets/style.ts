@@ -35,7 +35,8 @@ export const NEGATIVE_PROMPT = [
 const SPRITE_NEGATIVE = ['background scenery', 'floor', 'ground shadow', 'cast shadow', 'gradient background'];
 const TILE_NEGATIVE = ['isometric block', 'diamond shape', 'floating island', 'tile sides', 'drop shadow', 'perspective horizon'];
 
-export type AssetKind = 'player' | 'npc' | 'monster' | 'item' | 'set-piece' | 'tile';
+/** A prop is scenery the biome is built from: trees, palms, cacti, rocks. */
+export type AssetKind = 'player' | 'npc' | 'monster' | 'item' | 'set-piece' | 'prop' | 'tile';
 
 /** Pixel size of each kind at full resolution (Style Bible, Global rules). */
 export const ASSET_SIZES: Record<AssetKind, { width: number; height: number }> = {
@@ -44,6 +45,7 @@ export const ASSET_SIZES: Record<AssetKind, { width: number; height: number }> =
   monster: { width: 128, height: 128 },
   item: { width: 128, height: 128 },
   'set-piece': { width: 512, height: 512 },
+  prop: { width: 192, height: 256 },
   tile: { width: 128, height: 128 },
 };
 

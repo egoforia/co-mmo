@@ -1,0 +1,31 @@
+{
+  "id": "woods-pool",
+  "description": {
+    "id": "woods-pool",
+    "name": "Dark forest pool water",
+    "kind": "tile",
+    "biome": "whispering-woods",
+    "silhouetteHook": "deep dark teal still water with soft reflections",
+    "body": "flat open water seen from directly above, as if cut from the middle of a large lake: no shore, bank, rim, border or ripple rings, no centre point",
+    "centerCrop": 0.5,
+    "materials": [
+      "water"
+    ],
+    "colors": {
+      "main": "deep teal",
+      "secondary": "dark green-blue",
+      "accent": "firefly yellow glints"
+    },
+    "details": [
+      "short soft ripple strokes spread evenly",
+      "faint reflections"
+    ],
+    "mood": "quiet, mysterious"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Dark forest pool water (tile). Most recognisable feature: deep dark teal still water with soft reflections. Body and shape: flat open water seen from directly above, as if cut from the middle of a large lake: no shore, bank, rim, border or ripple rings, no centre point. Materials: water. Colours: main deep teal, secondary dark green-blue, small accent of firefly yellow glints. Details: short soft ripple strokes spread evenly; faint reflections. Mood: quiet, mysterious.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T18:31:53.521Z"
+}

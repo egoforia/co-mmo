@@ -37,7 +37,7 @@ describe('building art jobs', () => {
     const jobs = buildingArtJobs(cottage);
     expect(jobs.map((j) => j.id)).toEqual(buildingArtIds(cottage));
     expect(jobs[0]!.kind).toBe('exterior');
-    expect(jobs[0]!.prompt).toMatch(/front door is exactly where the dark arch is, at the middle of the bottom edge/);
+    expect(jobs[0]!.prompt).toMatch(/front door of the building is exactly where the dark arch is, at the middle of the bottom edge/);
     for (const job of jobs.slice(1)) {
       expect(job.references).toEqual([jobs[0]!.id]);
       expect(job.prompt).toMatch(/Pixel art/);

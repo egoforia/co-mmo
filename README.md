@@ -69,6 +69,20 @@ docker build -t co-mmo .
 docker run -p 8080:8080 -v co-mmo-data:/data -e PUBLIC_URL=http://localhost:8080 co-mmo
 ```
 
+## Reference art (anchors)
+
+The Style Bible's reference images are generated with Google AI Studio
+(Gemini) through `packages/server/src/assets`, where the provider sits behind
+an `ImageProvider` interface. With `GEMINI_API_KEY` set:
+
+```sh
+npm run anchors -- --dry-run   # show every prompt and the estimated cost
+npm run anchors                # generate into assets/anchors/ (skips existing)
+```
+
+Each image is saved next to a JSON recipe (description, prompt, model, style
+version), so the set can be regenerated later with a better model.
+
 ## Develop
 
 ```sh

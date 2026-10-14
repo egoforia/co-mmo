@@ -9,7 +9,7 @@ export const ANCHORS: (AssetDescription & { id: string })[] = [
   // The Sanctum
   {
     id: 'sanctum-flagstones', name: 'Sanctum flagstones', kind: 'tile', biome: 'sanctum',
-    silhouetteHook: 'worn pale flagstones laid in gentle circles', body: 'flat ground, stones with rounded edges',
+    silhouetteHook: 'worn pale flagstones of mixed sizes in an irregular random-laid pattern', body: 'flat ground, stones with rounded edges, all about the same scale',
     materials: ['pale stone', 'moss'], colors: { main: 'cream', secondary: 'pale gold', accent: 'clover green' },
     details: ['tufts of clover between stones', 'a few small cracks'], mood: 'peaceful, sacred',
   },
@@ -30,7 +30,7 @@ export const ANCHORS: (AssetDescription & { id: string })[] = [
   // Whispering Woods
   {
     id: 'woods-moss', name: 'Mossy forest floor', kind: 'tile', biome: 'whispering-woods',
-    silhouetteHook: 'thick moss with tangled roots crossing it', body: 'flat ground',
+    silhouetteHook: 'thick soft moss with thin roots and fallen leaves scattered evenly', body: 'flat ground, no large roots',
     materials: ['moss', 'roots', 'fallen leaves'], colors: { main: 'deep teal-green', secondary: 'bark brown', accent: 'firefly yellow' },
     details: ['small ferns', 'scattered leaves'], mood: 'quiet, mysterious',
   },
@@ -56,9 +56,9 @@ export const ANCHORS: (AssetDescription & { id: string })[] = [
   // Sunlit Shore
   {
     id: 'shore-sand', name: 'Shell-strewn sand', kind: 'tile', biome: 'sunlit-shore',
-    silhouetteHook: 'soft cream sand with little shells and a starfish', body: 'flat ground with gentle ripples',
+    silhouetteHook: 'soft cream sand with tiny shells scattered evenly', body: 'flat ground with gentle ripples',
     materials: ['sand', 'shells'], colors: { main: 'sand cream', secondary: 'warm beige', accent: 'coral pink' },
-    details: ['tiny shells', 'one starfish'], mood: 'bright, carefree',
+    details: ['tiny shells', 'a few grains of coral'], mood: 'bright, carefree',
   },
   {
     id: 'shore-lighthouse', name: 'Driftwood lighthouse', kind: 'set-piece', biome: 'sunlit-shore',
@@ -82,9 +82,9 @@ export const ANCHORS: (AssetDescription & { id: string })[] = [
   // Mirage Desert
   {
     id: 'desert-dunes', name: 'Rippled dunes', kind: 'tile', biome: 'mirage-desert',
-    silhouetteHook: 'wind-rippled apricot sand', body: 'flat ground with soft parallel ripples',
+    silhouetteHook: 'fine wind ripples in apricot sand', body: 'flat ground with small, evenly spaced ripples, no dunes or large shadows',
     materials: ['sand', 'clay'], colors: { main: 'apricot', secondary: 'ochre', accent: 'turquoise pebble' },
-    details: ['a small cracked-clay patch', 'one tiny succulent'], mood: 'hot, still',
+    details: ['faint cracked-clay specks', 'a few tiny turquoise pebbles'], mood: 'hot, still',
   },
   {
     id: 'desert-ruin', name: 'Half-buried dome', kind: 'set-piece', biome: 'mirage-desert',
@@ -133,7 +133,7 @@ export const ANCHORS: (AssetDescription & { id: string })[] = [
     id: 'item-tonic', name: 'Moonpetal Tonic', kind: 'item', biome: 'any',
     silhouetteHook: 'teardrop bottle with a curled glass stopper shaped like a petal',
     body: 'small potion bottle', materials: ['glass', 'cork', 'silver wire'],
-    colors: { main: 'periwinkle liquid', secondary: 'cream label', accent: 'blue glint' },
+    colors: { main: 'periwinkle liquid', secondary: 'blank cream tag tied with string', accent: 'blue glint' },
     details: ['tiny floating petal inside', 'wire wrapped around the neck'], mood: 'gentle, magical',
     extra: { category: 'potion', rarity: 'Rare' },
   },

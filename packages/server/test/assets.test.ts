@@ -14,7 +14,7 @@ describe('buildPrompt', () => {
   });
 
   it('asks tiles to be seamless', () => {
-    expect(buildPrompt(ANCHORS.find((a) => a.kind === 'tile')!)).toContain('tileable on all edges');
+    expect(buildPrompt(ANCHORS.find((a) => a.kind === 'tile')!)).toContain('repeats seamlessly on all four edges');
   });
 });
 

@@ -5,7 +5,7 @@
     "name": "Shell-strewn sand",
     "kind": "tile",
     "biome": "sunlit-shore",
-    "silhouetteHook": "soft cream sand with little shells and a starfish",
+    "silhouetteHook": "soft cream sand with tiny shells scattered evenly",
     "body": "flat ground with gentle ripples",
     "materials": [
       "sand",
@@ -18,14 +18,14 @@
     },
     "details": [
       "tiny shells",
-      "one starfish"
+      "a few grains of coral"
     ],
     "mood": "bright, carefree"
   },
-  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Sunlit Shore. Palette leans on its key colours; light tint and mood of Sunlit Shore.\nSeamless square ground texture seen from above at three-quarter view, filling the whole frame, tileable on all edges.\nSubject: Shell-strewn sand (tile). Most recognisable feature: soft cream sand with little shells and a starfish. Body and shape: flat ground with gentle ripples. Materials: sand, shells. Colours: main sand cream, secondary warm beige, small accent of coral pink. Details: tiny shells; one starfish. Mood: bright, carefree.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nBiome: Sunlit Shore. Palette leans on its key colours; light tint and mood of Sunlit Shore.\nSubject: Shell-strewn sand (tile). Most recognisable feature: soft cream sand with tiny shells scattered evenly. Body and shape: flat ground with gentle ripples. Materials: sand, shells. Colours: main sand cream, secondary warm beige, small accent of coral pink. Details: tiny shells; a few grains of coral. Mood: bright, carefree.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
   "provider": "gemini",
   "model": "gemini-2.5-flash-image",
-  "styleVersion": 1,
+  "styleVersion": 2,
   "mimeType": "image/png",
-  "createdAt": "2026-10-14T17:35:09.406Z"
+  "createdAt": "2026-10-14T17:49:00.573Z"
 }

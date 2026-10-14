@@ -78,10 +78,14 @@ an `ImageProvider` interface. With `GEMINI_API_KEY` set:
 ```sh
 npm run anchors -- --dry-run   # show every prompt and the estimated cost
 npm run anchors                # generate into assets/anchors/ (skips existing)
+npm run anchors -- --process-only   # redo post-processing without new images
 ```
 
 Each image is saved next to a JSON recipe (description, prompt, model, style
-version), so the set can be regenerated later with a better model.
+version), so the set can be regenerated later with a better model. The
+provider's image is kept in `assets/anchors/raw/`; the game copy has its
+magenta background removed (sprites) or is made seamless (ground tiles, with a
+4×4 repeat preview in `assets/anchors/previews/`).
 
 ## Develop
 

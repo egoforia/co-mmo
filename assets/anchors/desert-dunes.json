@@ -5,8 +5,8 @@
     "name": "Rippled dunes",
     "kind": "tile",
     "biome": "mirage-desert",
-    "silhouetteHook": "wind-rippled apricot sand",
-    "body": "flat ground with soft parallel ripples",
+    "silhouetteHook": "fine wind ripples in apricot sand",
+    "body": "flat ground with small, evenly spaced ripples, no dunes or large shadows",
     "materials": [
       "sand",
       "clay"
@@ -17,15 +17,15 @@
       "accent": "turquoise pebble"
     },
     "details": [
-      "a small cracked-clay patch",
-      "one tiny succulent"
+      "faint cracked-clay specks",
+      "a few tiny turquoise pebbles"
     ],
     "mood": "hot, still"
   },
-  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSeamless square ground texture seen from above at three-quarter view, filling the whole frame, tileable on all edges.\nSubject: Rippled dunes (tile). Most recognisable feature: wind-rippled apricot sand. Body and shape: flat ground with soft parallel ripples. Materials: sand, clay. Colours: main apricot, secondary ochre, small accent of turquoise pebble. Details: a small cracked-clay patch; one tiny succulent. Mood: hot, still.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and small details spread evenly, with no single large feature, so it repeats seamlessly on all four edges.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Rippled dunes (tile). Most recognisable feature: fine wind ripples in apricot sand. Body and shape: flat ground with small, evenly spaced ripples, no dunes or large shadows. Materials: sand, clay. Colours: main apricot, secondary ochre, small accent of turquoise pebble. Details: faint cracked-clay specks; a few tiny turquoise pebbles. Mood: hot, still.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
   "provider": "gemini",
   "model": "gemini-2.5-flash-image",
-  "styleVersion": 1,
+  "styleVersion": 2,
   "mimeType": "image/png",
-  "createdAt": "2026-10-14T17:35:31.087Z"
+  "createdAt": "2026-10-14T17:47:23.392Z"
 }

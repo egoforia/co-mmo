@@ -56,8 +56,26 @@ interface Entry {
   draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; at: number; message?: string; model?: string; note?: string };
   test?: { passed: boolean; at: number; summary: string[]; errors: string[]; sample: string[] };
   rule?: { paused: boolean; reason?: string };
-  progress?: { state: 'in-progress' | 'needs-input' | 'error' | 'done' | 'closed'; label: string; detail?: string };
+  build?: Build;
+  progress?: { state: 'in-progress' | 'needs-input' | 'error' | 'done' | 'closed'; label: string; detail?: string; link?: string };
   live?: { paused: boolean; reason?: string; runs: number; errors: { at: number; message: string }[]; effects: Record<string, number>; events: string[]; timers: number } | null;
+}
+
+interface Build {
+  state: 'queued' | 'building' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
+  at: number;
+  note?: string;
+  allowCore?: boolean;
+  issue?: { number: number; url: string };
+  pr?: { number: number; url: string };
+  message?: string;
+  tries?: number;
+}
+
+interface BuildsInfo {
+  settings: { agent: 'claude' | 'manual'; dailyLimit: number; usdPerBuild: number };
+  connection: { connected: boolean; repo: string | null; reason?: string; lastError?: string; lastSync: number | null };
+  today: number;
 }
 
 interface Report {
@@ -110,6 +128,7 @@ interface UpdateStatus {
   canRestart: boolean;
   blocked?: string;
   lastUpdate: { at: number; ok: boolean; by?: string; message: string } | null;
+  releases?: { id: string; title: string; wisher: string; pr?: string }[];
 }
 
 let owner = false;
@@ -198,7 +217,7 @@ async function render(): Promise<void> {
 let regions: Region[] = [];
 
 async function world(): Promise<string> {
-  const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; reports: number; rules: number; budget: Budget | null; update: { behind: number; blocked?: string } | null }>('overview');
+  const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; reports: number; rules: number; budget: Budget | null; update: { behind: number; blocked?: string } | null; building: number }>('overview');
   regions = o.regions;
   const byId = new Map(regions.map((r) => [r.id, r]));
   const cell = (id: string) => {
@@ -218,6 +237,7 @@ async function world(): Promise<string> {
       <div class="stat ${o.queue ? 'warn' : ''}"><b>${o.queue}</b><span>wishes waiting for review</span></div>
       <div class="stat ${o.reports ? 'warn' : ''}"><b>${o.reports}</b><span>open reports</span></div>
       <div class="stat"><b>${o.rules}</b><span>scripted rules live</span></div>
+      ${o.building ? `<a class="stat" href="#wishes"><b>${o.building}</b><span>wish${o.building === 1 ? '' : 'es'} being built</span></a>` : ''}
       ${budgetCard}
       ${o.update?.behind ? `<a class="stat warn" href="#updates"><b>${o.update.behind}</b><span>new commit${o.update.behind === 1 ? '' : 's'} on main</span></a>` : ''}
     </div>
@@ -265,10 +285,12 @@ async function wishes(): Promise<string> {
         <p>${escapeHtml(e.summary)}</p>
         ${conversation(e)}
         ${e.tier === 'major' ? draft(e) : ''}
-        <div class="actions">
+        ${e.build?.state === 'closed' ? `<p class="note warn">You closed its pull request${e.build.message ? `: ${escapeHtml(e.build.message)}` : '.'} Approve to build it again.</p>` : ''}
+        ${e.tier === 'engine' ? engineApproval(e) : `<div class="actions">
           <button type="button" data-review="${e.id}" data-approve="yes"${e.definition?.kind === 'rule' && !e.test?.passed ? ' disabled title="The rule has not passed its test run"' : ''}>${e.definition?.kind === 'rule' ? 'Approve and go live' : 'Approve'}</button>
+          ${owner && e.tier === 'major' && e.definition?.kind !== 'rule' ? `<button type="button" class="quiet" data-build="${e.id}" title="A coding agent writes it as a change to the game">Send to be built as code</button>` : ''}
           <button type="button" class="quiet" data-review="${e.id}" data-approve="no">Reject</button>
-        </div>
+        </div>`}
       </article>`).join('')
     : '<p class="note">Nothing is waiting. Major and engine wishes appear here for review.</p>';
   const rows = content.map((e) => `
@@ -280,13 +302,27 @@ async function wishes(): Promise<string> {
       <td>${escapeHtml(e.wisher.name)}<br><small>${when(e.at)}</small></td>
       ${owner ? `<td>${e.usd !== undefined ? usd(e.usd) : ''}</td>` : ''}
       <td><div class="actions">
-        ${e.status === 'granted' ? `<button type="button" class="quiet" data-rollback="${e.id}">Roll back</button>` : ''}
+        ${e.status === 'granted' && !e.build ? `<button type="button" class="quiet" data-rollback="${e.id}">Roll back</button>` : ''}
+        ${owner && e.build?.state === 'failed' ? `<button type="button" class="quiet" data-build="${e.id}">Try again</button>` : ''}
+        ${owner && e.status === 'approved' && !e.build ? `<button type="button" class="quiet" data-build="${e.id}">Build it</button>` : ''}
         ${owner && e.status === 'granted' && e.definition ? `<button type="button" class="quiet" data-paint="${e.id}">${e.art ? 'Repaint' : 'Paint'}</button>` : ''}
       </div></td>
     </tr>`).join('');
+  const active = content.filter((e) => e.build && ['queued', 'building', 'review', 'merged', 'failed'].includes(e.build.state));
+  const building = active.length
+    ? active.map((e) => `
+      <article class="wish">
+        <header><span class="tier ${e.tier}">${e.tier}</span><b>${escapeHtml(e.title)}</b>${progress(e)}<small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
+        ${e.progress?.detail ? `<p>${escapeHtml(e.progress.detail)}</p>` : ''}
+        <p class="links">${e.build!.issue ? `<a href="${escapeHtml(e.build!.issue.url)}" target="_blank" rel="noopener">Issue #${e.build!.issue.number}</a>` : ''}${e.build!.pr ? ` · <a href="${escapeHtml(e.build!.pr.url)}" target="_blank" rel="noopener">Pull request #${e.build!.pr.number}</a>` : ''}${e.build!.tries && e.build!.tries > 1 ? ` · try ${e.build!.tries}` : ''}</p>
+        ${owner && e.build!.state === 'failed' ? `<div class="actions"><button type="button" data-build="${e.id}">Try again</button><button type="button" class="quiet" data-reject-built="${e.id}">Give up</button></div>` : ''}
+        ${e.build!.state === 'merged' ? '<p class="actions"><a class="button" href="#updates">Open Updates to release it</a></p>' : ''}
+      </article>`).join('')
+    : '';
   return `
     <h2>Waiting for review</h2>
     ${queue}
+    ${building ? `<h2>Being built</h2><p class="note">Approved Engine wishes become GitHub issues. A coding agent writes the change with tests and opens a pull request; you merge it, then release it from Updates.</p>${building}` : ''}
     <h2>Content log</h2>
     <p class="note legend">${progressLegend()}</p>
     ${content.length ? `<table class="log"><thead><tr><th></th><th>Wish</th><th>Tier</th><th>Status</th><th>Wished by</th>${owner ? '<th>Cost</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="note">No wishes yet.</p>'}`;
@@ -298,7 +334,22 @@ const PROGRESS_ICON = { 'in-progress': '⏳', 'needs-input': '✋', error: '✗'
 function progress(e: Entry): string {
   const p = e.progress;
   if (!p) return `<span class="progress">${escapeHtml(e.status)}</span>`;
-  return `<span class="progress ${p.state}" title="${escapeHtml(p.detail ?? '')}">${PROGRESS_ICON[p.state]} ${escapeHtml(p.label)}</span>`;
+  const badge = `<span class="progress ${p.state}" title="${escapeHtml(p.detail ?? '')}">${PROGRESS_ICON[p.state]} ${escapeHtml(p.label)}</span>`;
+  return p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener">${badge}</a>` : badge;
+}
+
+/** Approving an Engine wish hands it to the coding agent, with the Owner's note. */
+function engineApproval(e: Entry): string {
+  if (!owner) return '<p class="note">Engine wishes change the game\'s code. Only the Owner can approve them.</p>';
+  return `
+    <form class="form approve-engine" data-approve-engine="${e.id}">
+      <label>Note for the coding agent<span><input name="note" maxlength="1000" placeholder="optional, e.g. keep it to the Shore region" value="${escapeHtml(e.build?.note ?? '')}"></span></label>
+      <label class="check"><input type="checkbox" name="allowCore"${e.build?.allowCore ? ' checked' : ''}> Allow changes to sign-in, roles, the budget, keys and the script sandbox</label>
+      <div class="actions">
+        <button type="submit">Approve and build</button>
+        <button type="button" class="quiet" data-review="${e.id}" data-approve="no">Reject</button>
+      </div>
+    </form>`;
 }
 
 /** The God's drafted rule for a Major wish: script, items, test run, and a way to ask for changes. */
@@ -425,7 +476,8 @@ async function players(): Promise<string> {
 let aiState: AiSettings | null = null;
 
 async function ai(): Promise<string> {
-  aiState = await api<AiSettings>('ai');
+  const [settings, b] = await Promise.all([api<AiSettings>('ai'), api<BuildsInfo>('builds')]);
+  aiState = settings;
   const s = aiState;
   const options = (selected: string, none = false) =>
     (none ? ['<option value="">None</option>'] : [])
@@ -447,7 +499,35 @@ async function ai(): Promise<string> {
     <form id="ai-test" class="form">
       <label>Prayer<span><input name="prompt" placeholder="I wish for a glowing blue hat"><button type="submit">Ask</button></span></label>
     </form>
-    <pre id="ai-result" hidden></pre>`;
+    <pre id="ai-result" hidden></pre>
+    ${codingAgent(b)}`;
+}
+
+/** Who builds Engine wishes, how many a day, and whether GitHub is connected. */
+function codingAgent(b: BuildsInfo): string {
+  const c = b.connection;
+  const status = c.connected
+    ? `<p class="note"><b class="ok">Connected</b> to <code>${escapeHtml(c.repo ?? '')}</code>${c.lastSync ? ` · checked ${when(c.lastSync)}` : ''} · ${b.today} of ${b.settings.dailyLimit} builds started today</p>${c.lastError ? `<p class="note bad">${escapeHtml(c.lastError)}</p>` : ''}`
+    : `<p class="note warn"><b>Not connected.</b> ${escapeHtml(c.reason ?? '')}</p>`;
+  return `
+    <h2>Coding agent</h2>
+    <p class="note">Builds approved Engine wishes as pull requests on GitHub. It can only open pull requests: you merge them, then release them from Updates.</p>
+    ${status}
+    <form id="builds-form" class="form">
+      <label>Who builds<span><select name="agent">
+        <option value="claude"${b.settings.agent === 'claude' ? ' selected' : ''}>Claude Code in GitHub Actions</option>
+        <option value="manual"${b.settings.agent === 'manual' ? ' selected' : ''}>A person (the game only opens the issue)</option>
+      </select></span></label>
+      <label>Builds per day<span><input name="dailyLimit" type="number" min="0" max="20" step="1" value="${b.settings.dailyLimit}"></span></label>
+      <label>Cost per build, counted in the budget (USD)<span><input name="usdPerBuild" type="number" min="0" max="50" step="0.5" value="${b.settings.usdPerBuild}"></span></label>
+      <button type="submit">Save</button>
+    </form>
+    <p class="actions"><button type="button" class="quiet" data-builds-sync${c.connected ? '' : ' disabled'}>Check GitHub now</button></p>
+    ${c.connected ? '' : `<details open><summary>Setting it up (once)</summary><ol class="setup">
+      <li>Install the Claude GitHub app on the repository: github.com/apps/claude.</li>
+      <li>Add your Anthropic API key to the repository's secrets as <code>ANTHROPIC_API_KEY</code> (Settings, Secrets and variables, Actions).</li>
+      <li>Make a fine-grained GitHub token for this repository only, with Issues set to read and write and nothing else. Put it in the server's <code>.env</code> as <code>GITHUB_ISSUES_TOKEN=…</code> and restart the game.</li>
+    </ol></details>`}`;
 }
 
 const label = (id: string) => ({ gemini: 'Google Gemini', anthropic: 'Anthropic Claude', openai: 'OpenAI-compatible', offline: 'Offline God' })[id] ?? id;
@@ -495,6 +575,7 @@ async function updates(): Promise<string> {
     <h2>Game code</h2>
     <p>${headline}</p>
     ${list}
+    ${u.releases?.length ? `<p><b>Wishes this update makes live:</b></p><ul class="recent">${u.releases.map((r) => `<li><b>${escapeHtml(r.title)}</b>, wished by ${escapeHtml(r.wisher)}${r.pr ? ` · <a href="${escapeHtml(r.pr)}" target="_blank" rel="noopener">pull request</a>` : ''}</li>`).join('')}</ul>` : ''}
     ${u.fetchError ? `<p class="note bad">Could not reach GitHub: ${escapeHtml(u.fetchError)}</p>` : ''}
     ${u.blocked && u.behind ? `<p class="note warn">${escapeHtml(u.blocked)}</p>` : ''}
     <p class="actions">
@@ -514,6 +595,17 @@ main.addEventListener('click', async (e) => {
     if (t.dataset.review) {
       const r = await api<{ status: string }>(`content/${t.dataset.review}/review`, 'POST', { approve: t.dataset.approve === 'yes' });
       toast(r.status === 'granted' ? 'Approved. The rule is live and everyone was told.' : t.dataset.approve === 'yes' ? 'Approved. The wisher has been told.' : 'Rejected. The wisher has been told.');
+    } else if (t.dataset.build) {
+      const r = await api<{ build?: string }>(`content/${t.dataset.build}/build`, 'POST', {});
+      toast(r.build === 'building' ? 'Sent. A coding agent is building it on GitHub.' : 'Queued to be built.');
+    } else if (t.dataset.rejectBuilt) {
+      if (!confirm('Give up on this wish? The wisher is told it was not approved.')) return;
+      await api(`content/${t.dataset.rejectBuilt}/review`, 'POST', { approve: false });
+      toast('Rejected. The wisher has been told.');
+    } else if (t.dataset.buildsSync !== undefined) {
+      t.disabled = true;
+      await api('builds/sync', 'POST');
+      toast('Checked GitHub.');
     } else if (t.dataset.rollback) {
       if (!confirm('Roll this wish back for everyone? It disappears from the world and from bags.')) return;
       await api(`content/${t.dataset.rollback}/rollback`, 'POST');
@@ -573,7 +665,13 @@ main.addEventListener('submit', async (e) => {
   const form = e.target as HTMLFormElement;
   const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
   try {
-    if (form.dataset.revise) {
+    if (form.dataset.approveEngine) {
+      const r = await api<{ build?: string }>(`content/${form.dataset.approveEngine}/review`, 'POST', { approve: true, note: f.note ?? '', allowCore: f.allowCore === 'on' });
+      toast(r.build === 'building' ? 'Approved. A coding agent is building it on GitHub.' : 'Approved and queued to be built.');
+    } else if (form.id === 'builds-form') {
+      await api('builds', 'PUT', { agent: f.agent, dailyLimit: Number(f.dailyLimit), usdPerBuild: Number(f.usdPerBuild) });
+      toast('Saved.');
+    } else if (form.dataset.revise) {
       await api(`content/${form.dataset.revise}/revise`, 'POST', { note: f.note ?? '' });
       toast('The God is drafting. The new version appears here when its test run is done.');
       pollDrafting();

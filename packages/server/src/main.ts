@@ -30,6 +30,7 @@ const app = createApp({
   clientDir,
   updater,
   commit: currentCommit(repoRoot),
+  builds: { repoDir: repoRoot },
   wishes: {
     anchorDir: resolve(repoRoot, 'assets/anchors'),
     artDir: resolve(process.env.ART_DIR ?? resolve(dirname(dataFile), 'art')),

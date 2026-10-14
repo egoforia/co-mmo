@@ -1,0 +1,47 @@
+# Tests and type checks on every pull request and on main. Wish pull
+# requests (branches named wish/<issue>) also go through the wish guard.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  wish-guard:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'wish/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.head_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check size and protected files
+        run: |
+          issue="${HEAD_REF#wish/}"; issue="${issue%%[^0-9]*}"
+          flag=""
+          if [ -n "$issue" ] && gh issue view "$issue" --json body --jq .body | grep -q '<!-- co-mmo-allow-core: yes -->'; then flag="--allow-core"; fi
+          git fetch --quiet origin main
+          node scripts/wish-guard.mjs --base origin/main $flag

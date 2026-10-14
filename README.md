@@ -8,7 +8,7 @@ The approved design lives in the project's design doc ("co-MMO: Initial
 Design Document"); [docs/design.md](docs/design.md) summarises it and tracks
 which milestone the code is at.
 
-## Status: milestones 2 to 5 done (first versions)
+## Status: milestones 2 to 6 done (first versions)
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
@@ -89,6 +89,37 @@ Stewards and scripted rules (milestone 5, first version):
 - Without an AI key the offline God still drafts one rule: fishing (a rod
   for everyone, fish by biome, a rare Golden Carp).
 
+Wishes that change the game (milestone 6, first version):
+
+- When the Owner approves an Engine wish in God's View (with an optional note
+  for the coding agent, and a box that allows changes to sign-in, roles, the
+  budget, keys and the sandbox), the server opens a GitHub issue holding the
+  wish card, the note and the conversation with the God. A Major wish the God
+  could not script can be sent the same way ("Send to be built as code").
+- The "Build a wish" workflow (`.github/workflows/build-wish.yml`) runs
+  Claude Code in GitHub Actions on that issue: it writes the change with
+  tests on the branch `wish/<issue>`, runs the checks (three rounds of fixes
+  at most), and opens a pull request that says in plain words what players
+  will see. A wish too big for one change comes back split into smaller
+  Engine wishes. One wish builds at a time, with a daily cap, and each build
+  counts against the monthly budget (an estimate set in God's View).
+- Guardrails: the agent can only push its wish branch and open a pull
+  request; it cannot merge or push to main, and `scripts/wish-guard.mjs`
+  (run by the build and by CI) refuses changes over 25 files or 1,500 lines,
+  changes to the workflows, and changes to core files unless the Owner
+  allowed them.
+- The workflows report back as hidden comments on the issue, and the server
+  reads them with a token that can only use issues. Wish badges gain the new
+  steps: Queued to be built, Being built, Waiting for the Owner's review,
+  Updating, Live, or Build failed (with Try again). The Owner reviews and
+  merges on GitHub (or asks for changes with `@claude` in a comment); a closed
+  pull request sends the wish back to the Owner and tells the wisher.
+- Updates lists the merged wishes it will release. After the pull and
+  restart the wish turns Live, the world is told, and the wisher hears it the
+  next time they are in the world. Code changes are undone by reverting the
+  pull request, not with Roll back.
+- Set up once: see [docs/building-wishes.md](docs/building-wishes.md).
+
 Not yet: abilities, equipment, shops and crafting, parties, Postgres,
 multiple region servers. See the milestone list in
 [docs/design.md](docs/design.md).
@@ -135,6 +166,8 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`) and wish art |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none | Optional: OpenAI or any OpenAI-compatible service |
+| `GITHUB_ISSUES_TOKEN` | none | Fine-grained GitHub token with only Issues read and write on the game's repository; lets approved Engine wishes become issues for the coding agent |
+| `GITHUB_REPO` | from `git remote origin` | The repository wishes are built in, as `owner/name` |
 
 Without any key the offline God answers: it understands simple wishes ("I
 wish for a red hat", "make a pink slime", "I want a fish trader") and can

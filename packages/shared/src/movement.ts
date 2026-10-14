@@ -1,5 +1,5 @@
 import { PLAYER_RADIUS, PLAYER_SPEED, TICK_SECONDS } from './constants.ts';
-import { isBlocking, tileAt, type RegionMap } from './world.ts';
+import { OPPOSITE, isBlocking, tileAt, type RegionMap, type Side } from './world.ts';
 
 export interface Vec2 {
   x: number;
@@ -33,4 +33,19 @@ export function collides(map: RegionMap, x: number, y: number): boolean {
     isBlocking(tileAt(map, x - r, y + r)) ||
     isBlocking(tileAt(map, x + r, y + r))
   );
+}
+
+/**
+ * Where a player who walked off an edge through `side`, at `at`, lands in the
+ * neighbour `to`: at the same point along the edge, just inside it, so the two
+ * regions read as one stretch of ground. Falls back to the road's entry when
+ * that spot is blocked; undefined when `to` has no way back.
+ */
+export function arrivalPoint(to: RegionMap, side: Side, at: Vec2): Vec2 | undefined {
+  const entry = to.entries[OPPOSITE[side]];
+  if (!entry) return undefined;
+  const spot = side === 'east' || side === 'west'
+    ? { x: entry.x, y: Math.max(1, Math.min(to.height - 1, at.y)) }
+    : { x: Math.max(1, Math.min(to.width - 1, at.x)), y: entry.y };
+  return collides(to, spot.x, spot.y) ? { ...entry } : spot;
 }

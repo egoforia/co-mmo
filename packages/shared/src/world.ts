@@ -251,6 +251,11 @@ export function tileAt(map: RegionMap, x: number, y: number): Tile {
   return map.tiles[ty * map.width + tx] as Tile;
 }
 
+/** Where the neighbour beyond `side` sits, in tiles, so regions can be drawn side by side. */
+export function neighbourOffset(side: Side, size = REGION_SIZE): { x: number; y: number } {
+  return { north: { x: 0, y: -size }, south: { x: 0, y: size }, east: { x: size, y: 0 }, west: { x: -size, y: 0 } }[side];
+}
+
 /** Which edge a position has crossed, if any. */
 export function outsideSide(map: RegionMap, x: number, y: number): Side | null {
   if (x < 0) return 'west';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { collides, newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { type Connection } from '../src/region.ts';
 import { World } from '../src/world.ts';
 
@@ -46,6 +46,23 @@ describe('World', () => {
     expect(woods.position('a')).toEqual(woods.map.entries.east);
     expect(watcher.messages.some((m) => m.t === 'system' && m.text === 'Mara set off for Whispering Woods.')).toBe(true);
     expect(world.places().find((p) => p.id === 'a')).toMatchObject({ regionId: 'woods' });
+  });
+
+  it('keeps a player at the same point along the edge when they cross off the road', () => {
+    const world = new World();
+    const home = world.home;
+    const woods = world.region('woods')!;
+    const entry = woods.map.entries.east!;
+    // A row open on both sides of the Sanctum's west edge, away from the road.
+    let y = 2;
+    while (collides(home.map, 0.5, y) || collides(woods.map, entry.x, y) || Math.abs(y - entry.y) < 3) y++;
+    world.join(info('a', 'Mara'), fakeConn(), { regionId: 'sanctum', x: 0.5, y }, newCharacter());
+    for (let seq = 1; seq <= 10 && world.regionOf('a') === home; seq++) {
+      world.handle('a', { t: 'input', seq, dx: -1, dy: 0 });
+      world.tick();
+    }
+    expect(world.regionOf('a')).toBe(woods);
+    expect(woods.position('a')).toEqual({ x: entry.x, y });
   });
 
   it('counts everyone online and shares world chat across regions', () => {

@@ -3,6 +3,7 @@ import {
   COTTAGE_SIZE,
   OPPOSITE,
   PLAYER_SPEED,
+  REVEAL_REACH,
   TICK_SECONDS,
   Tile,
   WORLD_REGIONS,
@@ -11,6 +12,7 @@ import {
   neighbourOffset,
   generateRegion,
   isBlocking,
+  nearBuilding,
   outsideSide,
   step,
   tileAt,
@@ -105,29 +107,62 @@ describe("Old Bramble's cottage", () => {
     for (let y = top; y < top + COTTAGE_SIZE; y++) for (let x = left; x < left + COTTAGE_SIZE; x++) if (floorAt(x, y)) floor++;
     expect(COTTAGE_SIZE).toBe(16);
     expect(floor).toBe(COTTAGE_SIZE * COTTAGE_SIZE);
-    // Walled all round, but for the doorway in the east wall.
+    // Walled all round, but for the doorway in the south wall.
     const right = left + COTTAGE_SIZE;
     const bottom = top + COTTAGE_SIZE;
-    for (let x = left - 1; x <= right; x++) {
-      expect(tileAt(woods, x, top - 1)).toBe(Tile.Wall);
-      expect(tileAt(woods, x, bottom)).toBe(Tile.Wall);
+    for (let y = top - 1; y <= bottom; y++) {
+      expect(tileAt(woods, left - 1, y)).toBe(Tile.Wall);
+      expect(tileAt(woods, right, y)).toBe(Tile.Wall);
     }
     const door = [];
-    for (let y = top; y < bottom; y++) {
-      expect(tileAt(woods, left - 1, y)).toBe(Tile.Wall);
-      if (tileAt(woods, right, y) !== Tile.Wall) door.push(y);
+    for (let x = left; x < right; x++) {
+      expect(tileAt(woods, x, top - 1)).toBe(Tile.Wall);
+      if (tileAt(woods, x, bottom) !== Tile.Wall) door.push(tileAt(woods, x, bottom));
     }
-    expect(door).toHaveLength(2);
+    expect(door).toEqual([Tile.Door, Tile.Door]);
+    // The building the client draws matches the walls.
+    expect(woods.buildings).toEqual([expect.objectContaining({ x: left - 1, y: top - 1, width: COTTAGE_SIZE + 2, height: COTTAGE_SIZE + 2 })]);
   });
 
-  it('can be walked into from the road without leaving the Woods', () => {
-    expect(reachable(woods, woods.spawn)[Math.floor(bramble.y) * woods.width + Math.floor(bramble.x)]).toBe(1);
-    let pos = { ...woods.spawn };
-    for (let i = 0; i < 400; i++) pos = step(woods, pos, -1, 0);
-    expect(tileAt(woods, pos.x, pos.y)).toBe(Tile.Floor);
-    expect(pos.x).toBeLessThan(bramble.x);
+  it('can be walked into through the door you see from the road', () => {
+    const home = woods.buildings[0]!;
+    const doorstep = { x: home.door.x + 1, y: home.door.y + 1.5 };
+    expect(tileAt(woods, doorstep.x, doorstep.y)).toBe(Tile.Path);
+    const seen = reachable(woods, woods.spawn);
+    expect(seen[Math.floor(doorstep.y) * woods.width + Math.floor(doorstep.x)]).toBe(1);
+    expect(seen[Math.floor(bramble.y) * woods.width + Math.floor(bramble.x)]).toBe(1);
+    let pos = { ...doorstep };
+    for (let i = 0; i < 60; i++) pos = step(woods, pos, 0, -1);
+    expect(tileAt(woods, pos.x, pos.y)).not.toBe(Tile.Path);
+    expect(pos.y).toBeLessThan(home.door.y);
     expect(isBlocking(Tile.Wall)).toBe(true);
-    expect(isBlocking(Tile.Floor)).toBe(false);
+    expect(isBlocking(Tile.Door)).toBe(false);
+    // The painted door in the exterior art sits over the doorway, with the art covering the cottage.
+    const { width, door } = home.exterior;
+    const artLeft = home.door.x + 1 - door.x * width;
+    expect(artLeft).toBeLessThanOrEqual(home.x);
+    expect(artLeft + width).toBeGreaterThanOrEqual(home.x + home.width);
+  });
+
+  it('is furnished inside, with room left to walk', () => {
+    const furniture = woods.landmarks.filter((l) => l.asset.startsWith('furniture-'));
+    expect(new Set(furniture.map((f) => f.asset)).size).toBeGreaterThanOrEqual(5);
+    const home = woods.buildings[0]!;
+    for (const f of furniture) {
+      expect(f.x).toBeGreaterThan(home.x + 1);
+      expect(f.x).toBeLessThan(home.x + home.width - 1);
+      expect(f.y).toBeGreaterThan(home.y + 1);
+      expect(f.y).toBeLessThan(home.y + home.height);
+      expect(tileAt(woods, f.x, f.y - 0.5)).toBe(Tile.Blocked);
+    }
+  });
+
+  it('shows its inside only to players close by', () => {
+    const home = woods.buildings[0]!;
+    expect(nearBuilding(home, bramble.x, bramble.y)).toBe(true);
+    expect(nearBuilding(home, home.door.x + 1, home.door.y + 1 + REVEAL_REACH - 0.5)).toBe(true);
+    expect(nearBuilding(home, home.door.x + 1, home.door.y + 1 + REVEAL_REACH + 0.5)).toBe(false);
+    expect(nearBuilding(home, woods.spawn.x, woods.spawn.y)).toBe(false);
   });
 });
 

@@ -77,6 +77,10 @@ function play(token: string): void {
     .catch(() => ({}));
 
   const connection = new GameConnection(token, onMessage, (reason, code) => {
+    if (code === 4003) {
+      showPanel(`<h1>Suspended</h1><p>${escapeHtml(reason || 'Your account is suspended.')}</p>`);
+      return;
+    }
     if (code === 4001) {
       clearToken();
       showPanel('<h1>co-MMO</h1><p>Your session is no longer valid. Use an invite link to join again.</p>');
@@ -135,7 +139,16 @@ function play(token: string): void {
   function start(welcome: WelcomeMessage, manifest: ArtManifest): void {
     hidePanel();
     name = welcome.you.name;
-    chat = new ChatBox((channel, text) => connection.send({ t: 'chat', channel, text }));
+    chat = new ChatBox((channel, text) => {
+      // "/report Name what happened" tells the Stewards about a player.
+      const report = text.match(/^\/report\s+(\S+)\s*(.*)$/i);
+      if (report) {
+        if (!report[2]) chat?.add({ kind: 'error', text: 'Write /report, their name, and what happened.' });
+        else connection.send({ t: 'report', kind: 'player', target: report[1]!, reason: report[2] });
+        return;
+      }
+      connection.send({ t: 'chat', channel, text });
+    });
     chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible, G prays to the God. Press Enter to chat.' });
     prayer = new PrayerUi({
       pray: (text) => connection.send({ t: 'pray', text }),
@@ -154,6 +167,7 @@ function play(token: string): void {
       interact: () => connection.send({ t: 'interact' }),
       use: (item) => connection.send({ t: 'use', item }),
       accept: (quest) => connection.send({ t: 'accept', quest }),
+      report: (kind, target, reason) => connection.send({ t: 'report', kind, target, reason }),
       typing: isTyping,
       prayer: () => prayer?.toggle(true),
     });

@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ITEMS, type Role } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
+import type { LiveRules } from './live-rules.ts';
+import type { Reports } from './reports.ts';
 import type { Account, ModelChoice, Settings, Store } from './store.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
@@ -10,6 +12,10 @@ export interface AdminContext {
   store: Store;
   world: World;
   wishes: Wishes;
+  rules: LiveRules;
+  reports: Reports;
+  /** Disconnects a player now (after a suspension). */
+  kick(id: string, reason: string): void;
   env: Record<string, string | undefined>;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
@@ -30,8 +36,9 @@ export async function handleAdmin(
   ctx: AdminContext,
 ): Promise<boolean> {
   if (!path.startsWith('/api/admin/')) return false;
-  const { store, world, wishes, json } = ctx;
+  const { store, world, wishes, rules, reports, json } = ctx;
   if (!account) return json(res, 401, { error: 'unauthorized' }), true;
+  if (account.suspended) return json(res, 403, { error: 'suspended', message: 'Your account is suspended.' }), true;
   if (account.role === 'player') return json(res, 403, { error: 'forbidden', message: "God's View is for Stewards and the Owner." }), true;
   const owner = account.role === 'owner';
   const ownerOnly = () => (owner ? false : (json(res, 403, { error: 'forbidden', message: 'Only the Owner can do that.' }), true));
@@ -57,16 +64,22 @@ export async function handleAdmin(
       online: regions.reduce((n, r) => n + r.players.length, 0),
       recent: content.filter((c) => c.status === 'granted').slice(-10).reverse(),
       queue: content.filter((c) => c.status === 'pending').length,
+      reports: reports.open().length,
+      rules: content.filter((c) => c.status === 'granted' && c.definition?.kind === 'rule').length,
       budget: owner ? wishes.budget() : null,
     }), true;
   }
 
   if (route === 'content' && method === 'GET') {
-    const records = [...store.content].reverse().map((r) => (owner ? r : { ...r, usd: undefined }));
+    const records = [...store.content].reverse().map((r) => ({
+      ...r,
+      usd: owner ? r.usd : undefined,
+      live: r.status === 'granted' && r.definition?.kind === 'rule' ? rules.status(r.id) ?? null : undefined,
+    }));
     return json(res, 200, { content: records }), true;
   }
 
-  const contentAction = route.match(/^content\/([\w-]+)\/(rollback|review|paint)$/);
+  const contentAction = route.match(/^content\/([\w-]+)\/(rollback|review|paint|revise|rule)$/);
   if (contentAction && method === 'POST') {
     const [, id, action] = contentAction;
     const record = store.contentById(id!);
@@ -78,8 +91,20 @@ export async function handleAdmin(
     if (action === 'review') {
       if (record.tier === 'engine' && ownerOnly()) return true;
       const body = await ctx.readJson(req);
-      const done = wishes.review(id!, body?.approve === true);
-      return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_pending', message: 'This wish is not waiting for review.' }), true;
+      const done = await wishes.review(id!, body?.approve === true);
+      return json(res, 'error' in done ? 409 : 200, 'error' in done ? done : { ok: true, status: done.record.status }), true;
+    }
+    if (action === 'revise') {
+      if (record.status !== 'pending' || record.tier !== 'major') return json(res, 409, { error: 'not_major', message: 'Only a Major wish waiting for review can have a rule drafted.' }), true;
+      const body = await ctx.readJson(req);
+      const note = typeof body?.note === 'string' ? body.note : '';
+      const job = wishes.draft(id!, note);
+      return json(res, 202, { ok: true, drafting: Boolean(job) }), true;
+    }
+    if (action === 'rule') {
+      const body = await ctx.readJson(req);
+      const done = rules.setPaused(id!, body?.paused === true, `Paused by ${account.name}.`);
+      return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_live', message: 'This rule is not running.' }), true;
     }
     if (ownerOnly()) return true;
     const job = wishes.paint(record, true);
@@ -100,9 +125,44 @@ export async function handleAdmin(
         favor: c?.favor ?? null,
         createdAt: a.createdAt,
         invitedBy: a.invitedBy ? store.accountById(a.invitedBy)?.name ?? null : null,
+        suspended: a.suspended ? { ...a.suspended, by: store.accountById(a.suspended.by)?.name ?? 'someone' } : null,
       };
     });
-    return json(res, 200, { players }), true;
+    return json(res, 200, { players, you: account.id }), true;
+  }
+
+  const suspend = route.match(/^players\/([\w-]+)\/suspend$/);
+  if (suspend && method === 'POST') {
+    const target = store.accountById(suspend[1]!);
+    if (!target) return json(res, 404, { error: 'not_found' }), true;
+    // Stewards can suspend players; only the Owner can suspend a Steward. Nobody suspends the Owner.
+    if (target.role === 'owner' || target.id === account.id || (target.role === 'steward' && !owner)) {
+      return json(res, 403, { error: 'forbidden', message: target.role === 'steward' ? 'Only the Owner can suspend a Steward.' : 'You cannot suspend this account.' }), true;
+    }
+    const body = await ctx.readJson(req);
+    if (body?.suspend === true) {
+      const reason = typeof body.reason === 'string' ? body.reason.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+      store.setSuspended(target.id, { by: account.id, at: Date.now(), reason });
+      ctx.kick(target.id, `You were suspended${reason ? `: ${reason}` : ''}.`);
+    } else {
+      store.setSuspended(target.id, null);
+    }
+    return json(res, 200, { ok: true }), true;
+  }
+
+  if (route === 'reports' && method === 'GET') {
+    const list = [...store.reports].sort((a, b) => Number(b.status === 'open') - Number(a.status === 'open') || b.at - a.at).slice(0, 200);
+    const named = list.map((r) => (r.closed ? { ...r, closed: { ...r.closed, by: store.accountById(r.closed.by)?.name ?? 'someone' } } : r));
+    return json(res, 200, { reports: named }), true;
+  }
+
+  const closeReport = route.match(/^reports\/([\w-]+)\/close$/);
+  if (closeReport && method === 'POST') {
+    const body = await ctx.readJson(req);
+    const status = body?.status === 'resolved' ? 'resolved' : 'dismissed';
+    const action = typeof body?.action === 'string' && body.action.trim() ? body.action.trim().slice(0, 200) : status === 'resolved' ? 'handled' : 'no action';
+    const done = reports.close(closeReport[1]!, account.id, status, action);
+    return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_open', message: 'This report is already closed.' }), true;
   }
 
   const role = route.match(/^players\/([\w-]+)\/role$/);
@@ -141,11 +201,12 @@ export async function handleAdmin(
     const god = modelChoice(body?.god);
     if (!god) return json(res, 400, { error: 'bad_model', message: 'Choose a provider and model for the God.' }), true;
     const fallback = body?.fallback ? modelChoice(body.fallback) : null;
+    const compiler = body?.compiler ? modelChoice(body.compiler) : null;
     const img = body?.image as Record<string, unknown> | undefined;
     const image: Settings['ai']['image'] = img?.provider === 'gemini'
       ? { provider: 'gemini', model: typeof img.model === 'string' && img.model ? img.model.slice(0, 80) : 'gemini-2.5-flash-image' }
       : { provider: 'none', model: '' };
-    store.updateSettings({ ...store.settings, ai: { god, fallback, image } });
+    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image } });
     return json(res, 200, { ok: true }), true;
   }
 

@@ -10,6 +10,7 @@
     "game-art": "tsx src/tools/build-game-art.ts"
   },
   "dependencies": {
+    "quickjs-emscripten": "^0.32.0",
     "sharp": "^0.35.5",
     "ws": "^8.22.0"
   }

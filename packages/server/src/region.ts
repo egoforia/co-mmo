@@ -28,6 +28,8 @@ import {
   rewardText,
   step,
   takeItem,
+  tileAt,
+  Tile,
   type Character,
   type ChatChannel,
   type ClientMessage,
@@ -73,7 +75,12 @@ export interface RegionHooks {
   online(): number;
   /** Someone enjoyed a wished thing (defeated a wished creature): reward its wisher. */
   creatorFavor?(wisherId: string, amount: number): void;
+  /** Something a scripted rule may answer happened (an item used, E pressed, a creature defeated). */
+  event?(type: 'use' | 'interact' | 'defeat', playerId: string, data: Record<string, string | number>): void;
 }
+
+/** Tile kinds scripted rules can ask about, by name. */
+export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock };
 
 interface PlayerState {
   info: PlayerInfo;
@@ -232,6 +239,32 @@ export class Region {
     this.flush(p);
   }
 
+  /** True when a tile of this kind lies within `radius` tiles of the player. */
+  nearTile(id: string, tile: Tile, radius: number): boolean {
+    const p = this.players.get(id);
+    return Boolean(p && this.nearestTile(p.x, p.y, [tile], radius));
+  }
+
+  /** XP from a scripted rule, with the usual level-up messages. */
+  grantXp(id: string, amount: number): void {
+    const p = this.players.get(id);
+    if (!p) return;
+    this.levelUps(p, gainXp(p.character, amount));
+    p.dirty = true;
+    this.flush(p);
+  }
+
+  /** A line in one player's log. */
+  tell(id: string, text: string): void {
+    const p = this.players.get(id);
+    if (p) this.notice(p, text);
+  }
+
+  /** A system line for everyone in the region. */
+  announce(text: string): void {
+    this.broadcastSystem(text);
+  }
+
   /** Sends one player a message. */
   send(id: string, message: ServerMessage): void {
     this.players.get(id)?.conn.send(message);
@@ -274,6 +307,12 @@ export class Region {
   creature(id: string): { kind: string; x: number; y: number; hp: number; alive: boolean } | undefined {
     const c = this.creatures.find((k) => k.id === id);
     return c && { kind: c.kind, x: c.x, y: c.y, hp: c.hp, alive: c.respawnAt === null };
+  }
+
+  /** Moves a player, for tests and tools. */
+  placePlayer(id: string, x: number, y: number): void {
+    const p = this.players.get(id);
+    if (p) Object.assign(p, { x, y });
   }
 
   /** Moves a creature, for tests and (later) wishes. */
@@ -451,6 +490,7 @@ export class Region {
       }
     }
     discover(ch, c.kind);
+    this.hooks.event?.('defeat', p.info.id, { creature: c.kind });
     if (c.wisher && c.wisher !== p.info.id) this.hooks.creatorFavor?.(c.wisher, 1);
     this.notice(p, `Defeated ${c.def.name}: ${gained.join(', ')}.`);
     for (const q of ch.quests) {
@@ -576,7 +616,14 @@ export class Region {
         npc = n;
       }
     }
-    if (!npc) return;
+    if (!npc) {
+      // Nobody to talk to: the player is acting on the land (fishing at water, say).
+      const spot = this.nearestTile(p.x, p.y, [Tile.Water, Tile.Tree, Tile.Rock], 1.6);
+      const tile = spot ? spot.tile : tileAt(this.map, p.x, p.y);
+      const name = Object.keys(TILE_NAMES).find((k) => TILE_NAMES[k] === tile) ?? 'ground';
+      this.hooks.event?.('interact', p.info.id, { tile: name, x: spot?.x ?? Math.floor(p.x), y: spot?.y ?? Math.floor(p.y) });
+      return;
+    }
     const ch = p.character;
     let text: string | undefined;
 
@@ -619,13 +666,39 @@ export class Region {
   private useItem(p: PlayerState, item: string): void {
     const def = ITEMS[item];
     const ch = p.character;
-    if (!def?.heal || itemCount(ch, item) === 0 || ch.hp <= 0) return;
+    if (!def || itemCount(ch, item) === 0 || ch.hp <= 0) return;
+    // Items without a built-in use are for scripted rules (a fishing rod).
+    if (!def.heal) {
+      if (def.kind !== 'book') this.hooks.event?.('use', p.info.id, { item });
+      return;
+    }
     const max = maxHp(ch);
     if (ch.hp >= max) return this.notice(p, 'You are already at full health.');
     takeItem(ch, item);
     ch.hp = Math.min(max, ch.hp + def.heal);
     this.notice(p, `You drink a ${def.name}.`);
     p.dirty = true;
+  }
+
+  /** The nearest tile of these kinds within a radius of a point (tile coordinates). */
+  private nearestTile(x: number, y: number, kinds: Tile[], radius: number): { tile: Tile; x: number; y: number } | undefined {
+    let best: { tile: Tile; x: number; y: number } | undefined;
+    let bestD = Infinity;
+    const r = Math.ceil(radius);
+    for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
+      for (let tx = Math.floor(x) - r; tx <= Math.floor(x) + r; tx++) {
+        if (tx < 0 || ty < 0 || tx >= this.map.width || ty >= this.map.height) continue;
+        const tile = tileAt(this.map, tx, ty);
+        if (!kinds.includes(tile)) continue;
+        // Distance from the player to the closest point of the tile.
+        const d = Math.hypot(Math.max(tx - x, 0, x - (tx + 1)), Math.max(ty - y, 0, y - (ty + 1)));
+        if (d <= radius && d < bestD) {
+          bestD = d;
+          best = { tile, x: tx, y: ty };
+        }
+      }
+    }
+    return best;
   }
 
   // --- Messages --------------------------------------------------------------

@@ -10,7 +10,7 @@ import {
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
 import { escapeHtml } from './ui.ts';
-import { artSrc } from './wished.ts';
+import { artSrc, contentEntries } from './wished.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -19,6 +19,8 @@ export interface RpgActions {
   interact(): void;
   use(item: string): void;
   accept(quest: string): void;
+  /** Tells the Stewards about a wished thing. */
+  report(kind: 'content' | 'player', target: string, reason: string): void;
   /** True while typing in chat, so letters are not shortcuts. */
   typing(): boolean;
   /** Opens the prayer window. */
@@ -50,6 +52,11 @@ export class RpgUi {
       if (chapter) {
         this.chapter = chapter;
         this.renderBible();
+      }
+      const report = target.closest<HTMLElement>('[data-report]');
+      if (report) {
+        const reason = window.prompt(`What is wrong with ${report.dataset.title ?? 'this'}? The Stewards will read it.`);
+        if (reason?.trim()) actions.report('content', report.dataset.report!, reason.trim());
       }
       if (target.closest('[data-close]')) this.toggle('bible', false);
     });
@@ -168,7 +175,8 @@ export class RpgUi {
       .map((s) => {
         const def = ITEMS[s.item];
         if (!def) return '';
-        const hint = def.kind === 'book' ? 'Click to read' : def.heal ? 'Click to drink' : 'Keep it for now';
+        const ruled = contentEntries().some((e) => e.definition?.kind === 'rule' && s.item.startsWith(`${e.id}-`));
+        const hint = def.kind === 'book' ? 'Click to read' : def.heal ? 'Click to drink' : ruled ? 'Click to use' : 'Keep it for now';
         return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}`)}">
           <img src="${escapeHtml(artSrc(def.art, true))}" alt="">
           ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}

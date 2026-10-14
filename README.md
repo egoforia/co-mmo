@@ -8,7 +8,7 @@ The approved design lives in the project's design doc ("co-MMO: Initial
 Design Document"); [docs/design.md](docs/design.md) summarises it and tracks
 which milestone the code is at.
 
-## Status: milestones 2 to 4 done (first versions)
+## Status: milestones 2 to 5 done (first versions)
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
@@ -64,8 +64,33 @@ The God (milestone 4, first version):
   image model, and the monthly budget. Over the ceiling, the offline God
   answers and nothing is painted.
 
-Not yet: scripted rules for major wishes, abilities, equipment, shops and
-crafting, parties, Postgres, multiple region servers. See the milestone list in
+Stewards and scripted rules (milestone 5, first version):
+
+- A Major wish ("let us go fishing") is drafted by the God into a scripted
+  rule: a short JavaScript event script plus the items it needs. Scripts
+  react to players joining, entering a region, using an item, pressing E on
+  water, trees or rocks, and defeating creatures, and act only through a
+  narrow `game` API (give and take items, heal, gold, XP, messages, timers,
+  small saved state).
+- Scripts run in a QuickJS sandbox (`packages/server/src/rules.ts`): no
+  network, files or timers of their own, 4 MB of memory, 30 ms and 60 actions
+  per event, and per-player hourly caps on gold, XP and items. A rule that
+  keeps throwing errors or hitting its limits pauses itself and Stewards are
+  told.
+- Every draft is played through an automated test run in a fresh copy of the
+  launch world (`rule-test.ts`). A failing draft is retried once with the
+  problems; Stewards see the script, its items and the test report in God's
+  View, can ask the God to revise it with a note, and approve it to go live
+  at once for everyone.
+- God's View also has Rules (pause, resume, roll back, errors and effects),
+  Reports, and suspensions. Players report a creation from the Bible's
+  Chronicle, or a player with `/report Name what happened` in chat.
+- The Owner names Stewards by praying: "make Ilya a Steward".
+- Without an AI key the offline God still drafts one rule: fishing (a rod
+  for everyone, fish by biome, a rare Golden Carp).
+
+Not yet: abilities, equipment, shops and crafting, parties, Postgres,
+multiple region servers. See the milestone list in
 [docs/design.md](docs/design.md).
 
 ## Run it
@@ -97,13 +122,13 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
-| `GEMINI_API_KEY` | none | Google AI Studio: the God's default model and wish art |
+| `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`) and wish art |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none | Optional: OpenAI or any OpenAI-compatible service |
 
 Without any key the offline God answers: it understands simple wishes ("I
-wish for a red hat", "make a pink slime", "I want a fish trader") so the game
-works with no paid service. Which provider and model the God uses is chosen
+wish for a red hat", "make a pink slime", "I want a fish trader") and can
+draft the fishing rule, so the game works with no paid service. Which provider and model the God uses is chosen
 in God's View, not in code.
 
 ## Host it

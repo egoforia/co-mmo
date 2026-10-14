@@ -39,9 +39,13 @@ export class World {
         worldChat: (m) => this.broadcast(m),
         online: () => this.where.size,
         creatorFavor: (wisher, amount) => this.creatorFavor(wisher, amount),
+        event: (type, playerId, data) => this.onEvent?.(type, playerId, data),
       }, now, random));
     }
   }
+
+  /** Events for scripted rules: set by whoever runs them (the app, or a rule's test run). */
+  onEvent?: (type: 'use' | 'interact' | 'defeat' | 'enter' | 'join', playerId: string, data: Record<string, string | number>) => void;
 
   /** Credits Favor to a player who is not online (set by the app, which owns storage). */
   offlineFavor?: (playerId: string, amount: number) => void;
@@ -124,6 +128,7 @@ export class World {
         if (!moving) continue;
         this.where.set(departure.id, target.def.id);
         target.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`);
+        this.onEvent?.('enter', departure.id, { region: target.def.id });
       }
     }
   }

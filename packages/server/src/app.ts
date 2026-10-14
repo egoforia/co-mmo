@@ -8,6 +8,8 @@ import { World } from './world.ts';
 import { Store, StoreError, type Account } from './store.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
 import { handleAdmin } from './admin.ts';
+import { LiveRules } from './live-rules.ts';
+import { Reports } from './reports.ts';
 
 export interface AppOptions {
   store: Store;
@@ -25,6 +27,8 @@ export interface App {
   server: Server;
   world: World;
   wishes: Wishes;
+  rules: LiveRules;
+  reports: Reports;
   close(): Promise<void>;
 }
 
@@ -45,8 +49,14 @@ export function createApp(options: AppOptions): App {
   const { store } = options;
   const world = new World();
   world.offlineFavor = (playerId, amount) => store.addFavor(playerId, amount);
-  const wishes = new Wishes(store, world, options.wishes);
+  const rules = new LiveRules(store, world, {
+    now: options.wishes.now,
+    onPause: (record, reason) => wishes.notifyStewards(`The rule "${record.title}" paused itself: ${reason}`),
+  });
+  world.onEvent = (type, playerId, data) => rules.fire(type, playerId, data);
+  const wishes = new Wishes(store, world, rules, options.wishes);
   wishes.restore();
+  const reports = new Reports(store, world);
 
   const server = createServer((req, res) => {
     handleHttp(req, res).catch((err) => {
@@ -87,17 +97,20 @@ export function createApp(options: AppOptions): App {
     if (path === '/api/me' && req.method === 'GET') {
       const account = authenticate(req);
       if (!account) return json(res, 401, { error: 'unauthorized' });
+      if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) });
       return json(res, 200, { player: publicInfo(account) });
     }
 
     if (path === '/api/invites' && req.method === 'POST') {
       const account = authenticate(req);
       if (!account) return json(res, 401, { error: 'unauthorized' });
+      if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) });
       const invite = store.createInvite(account.id);
       return json(res, 200, { code: invite.code, url: inviteUrl(options.publicUrl, invite.code) });
     }
 
-    if (await handleAdmin(req, res, path, authenticate(req), { store, world, wishes, env: options.wishes.env ?? process.env, json, readJson })) return;
+    const admin = { store, world, wishes, rules, reports, kick, env: options.wishes.env ?? process.env, json, readJson };
+    if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
@@ -112,6 +125,14 @@ export function createApp(options: AppOptions): App {
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     return token ? store.accountByToken(token) : undefined;
+  }
+
+  /** Disconnects a player who was just suspended. */
+  function kick(id: string, reason: string): void {
+    const socket = sockets.get(id);
+    if (!socket) return;
+    socket.send(JSON.stringify({ t: 'error', code: 'suspended', message: reason }));
+    socket.close(4003, reason.slice(0, 120));
   }
 
   // Game connections. The session token arrives as the first message rather
@@ -138,6 +159,13 @@ export function createApp(options: AppOptions): App {
           socket.close(4001, 'Unauthorized');
           return;
         }
+        if (account.suspended) {
+          const message = suspendedText(account);
+          socket.send(JSON.stringify({ t: 'error', code: 'suspended', message }));
+          socket.close(4003, message.slice(0, 120));
+          account = undefined;
+          return;
+        }
         sockets.set(account.id, socket);
         world.join(publicInfo(account), {
           send: (m) => {
@@ -146,6 +174,7 @@ export function createApp(options: AppOptions): App {
           close: (reason) => socket.close(4000, reason),
         }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
         world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
+        rules.fire('join', account.id);
         return;
       }
       if (!isClientMessage(parsed)) return;
@@ -153,6 +182,9 @@ export function createApp(options: AppOptions): App {
         // The role may have changed since sign-in (a Steward was appointed).
         const current = store.accountById(account.id) ?? account;
         void wishes.pray(publicInfo(current), parsed.text);
+      } else if (parsed.t === 'report') {
+        const say = reports.file(publicInfo(account), parsed.kind, parsed.target, parsed.reason);
+        world.sendTo(account.id, { t: 'god', say });
       } else if (parsed.t === 'wish') {
         wishes.answer(publicInfo(store.accountById(account.id) ?? account), parsed.card, parsed.confirm);
       } else {
@@ -171,7 +203,10 @@ export function createApp(options: AppOptions): App {
     });
   });
 
-  const tickTimer = setInterval(() => world.tick(), TICK_SECONDS * 1000);
+  const tickTimer = setInterval(() => {
+    world.tick();
+    rules.tick();
+  }, TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 
   function saveAll(): void {
@@ -182,9 +217,13 @@ export function createApp(options: AppOptions): App {
     server,
     world,
     wishes,
+    rules,
+    reports,
     async close() {
       clearInterval(tickTimer);
+      await Promise.allSettled([...wishes.drafts]);
       await Promise.allSettled([...wishes.painting]);
+      rules.dispose();
       clearInterval(autosaveTimer);
       saveAll();
       for (const client of wss.clients) client.terminate();
@@ -197,6 +236,10 @@ export function createApp(options: AppOptions): App {
 
 export function inviteUrl(publicUrl: string, code: string): string {
   return `${publicUrl.replace(/\/$/, '')}/?invite=${encodeURIComponent(code)}`;
+}
+
+function suspendedText(account: Account): string {
+  return `Your account is suspended${account.suspended?.reason ? `: ${account.suspended.reason}` : ''}. Talk to the Owner.`;
 }
 
 function publicInfo(account: Account): PlayerInfo {

@@ -10,6 +10,7 @@ import {
   removeContent,
   ruleItemId,
   validateDefinition,
+  wishProgress,
   wishArtKey,
   type BiomeId,
   type ContentEntry,
@@ -330,6 +331,7 @@ export class Wishes {
     } catch (err) {
       this.store.updateContent(record.id, { status: 'pending', summary, test: { ...record.test!, passed: false, errors: [(err as Error).message] } });
       removeContent(record);
+      this.changed(record.id);
       return { error: 'load_failed', message: `The rule did not load: ${(err as Error).message}` };
     }
     this.broadcast(record);
@@ -360,6 +362,7 @@ export class Wishes {
   private async runDraft(record: ContentRecord, note: string | undefined): Promise<ContentRecord | undefined> {
     const id = record.id;
     this.store.updateContent(id, { draft: { state: 'drafting', at: this.now(), ...(note ? { note } : {}) } });
+    this.changed(id);
     let previous = record.definition?.kind === 'rule' ? record.definition : undefined;
     let problems = record.test && !record.test.passed ? [...record.test.errors, ...record.test.summary] : undefined;
     let usd = 0;
@@ -379,6 +382,8 @@ export class Wishes {
             draft: { state: result.impossible ? 'impossible' : 'failed', at: this.now(), message: result.reason, ...(result.model ? { model: `${result.model.provider}/${result.model.model}` } : {}), ...(note ? { note } : {}) },
           });
           this.notifyStewards(`The God could not draft a rule for "${record.title}": ${result.reason}`);
+          this.tellWisher(record, `The God could not finish your wish "${record.title}" yet. The Stewards will decide what happens next.`);
+          this.changed(id);
           return this.store.contentById(id);
         }
         const test = await testRule(id, result.definition, this.now());
@@ -396,6 +401,8 @@ export class Wishes {
         note = note ?? 'The automated test run did not pass; fix the problems.';
       }
       const done = this.store.contentById(id)!;
+      this.changed(id);
+      if (!done.test?.passed) this.tellWisher(done, `The God's first try at your wish "${record.title}" did not pass its test run. The Stewards can ask for another.`);
       this.notifyStewards(done.test?.passed
         ? `A scripted rule waits for your review: "${record.title}". Open God's View.`
         : `The God's rule for "${record.title}" did not pass its test run. Open God's View to revise or reject it.`);
@@ -403,6 +410,7 @@ export class Wishes {
     } catch (err) {
       console.error(`Drafting ${id} failed:`, err);
       this.store.updateContent(id, { draft: { state: 'failed', at: this.now(), message: (err as Error).message } });
+      this.changed(id);
       return this.store.contentById(id);
     }
   }
@@ -546,6 +554,17 @@ export class Wishes {
     }
   }
 
+  /** Tells every client a wish's progress changed (drafting, a test run, a pause). */
+  changed(id: string): void {
+    const record = this.store.contentById(id);
+    if (record) this.broadcast(record);
+  }
+
+  /** A line to the wisher, if they are online. */
+  tellWisher(record: ContentRecord, text: string): void {
+    if (this.world.has(record.wisher.id)) this.world.sendTo(record.wisher.id, { t: 'notice', text: `✦ ${text}` });
+  }
+
   private broadcast(record: ContentRecord): void {
     this.world.broadcast({ t: 'content', entries: [publicEntry(record)], replace: false });
   }
@@ -557,7 +576,8 @@ export class Wishes {
 
 /** A content record without what only God's View sees (the conversation, cost, and a rule's script). */
 export function publicEntry(record: ContentRecord): ContentEntry {
-  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, ...entry } = record;
+  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, ...rest } = record;
+  const entry: ContentEntry = { ...rest, progress: wishProgress(record) };
   if (entry.definition?.kind === 'rule') {
     const { script: _s, ...definition } = entry.definition;
     return { ...entry, definition };

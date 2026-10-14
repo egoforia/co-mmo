@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, type Role } from '@co-mmo/shared';
+import { ITEMS, wishProgress, type Role } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
@@ -79,6 +79,7 @@ export async function handleAdmin(
   if (route === 'content' && method === 'GET') {
     const records = [...store.content].reverse().map((r) => ({
       ...r,
+      progress: wishProgress(r),
       usd: owner ? r.usd : undefined,
       live: r.status === 'granted' && r.definition?.kind === 'rule' ? rules.status(r.id) ?? null : undefined,
     }));
@@ -110,6 +111,7 @@ export async function handleAdmin(
     if (action === 'rule') {
       const body = await ctx.readJson(req);
       const done = rules.setPaused(id!, body?.paused === true, `Paused by ${account.name}.`);
+      if (done) wishes.changed(id!);
       return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_live', message: 'This rule is not running.' }), true;
     }
     if (ownerOnly()) return true;

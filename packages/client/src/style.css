@@ -249,3 +249,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
   #bible nav button { width: auto; }
   #quests { display: none; }
 }
+
+#bible .chronicle .progress.error { color: #a8433a; }
+#bible .chronicle .progress.in-progress { color: #4f6f8a; }
+#bible .chronicle .why { font-size: 13px; color: #8a6a45; }

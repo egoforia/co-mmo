@@ -13,12 +13,15 @@ export interface Chapter {
 
 const art = (id: string) => artSrc(id);
 
-const STATUS: Record<string, string> = {
-  pending: 'waiting for a Steward',
-  approved: 'approved, to be built',
-  rejected: 'not approved',
-  'rolled-back': 'undone',
-};
+const PROGRESS_ICON: Record<string, string> = { 'in-progress': '⏳', 'needs-input': '✋', error: '✗', done: '', closed: '' };
+
+/** Where a wish stands, e.g. "(⏳ The God is drafting a rule)", with why underneath when it matters. */
+function progress(e: ContentEntry): string {
+  const p = e.progress;
+  if (!p || p.state === 'done') return '';
+  const detail = p.detail && (p.state === 'error' || p.state === 'needs-input') ? `<br><span class="why">${escapeHtml(p.detail)}</span>` : '';
+  return ` <i class="progress ${p.state}">(${PROGRESS_ICON[p.state] ? `${PROGRESS_ICON[p.state]} ` : ''}${escapeHtml(p.label)})</i>${detail}`;
+}
 
 /** A rule is pictured by its first item (the fishing rod). */
 function pictureKey(e: ContentEntry): string {
@@ -112,7 +115,7 @@ export const CHAPTERS: Chapter[] = [
         const when = new Date(e.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
         const where = regionDef(e.regionId)?.name ?? e.regionId;
         const pic = e.definition && e.status === 'granted' ? `<img src="${escapeHtml(art(pictureKey(e)))}" alt="">` : '<div class="mystery">✦</div>';
-        const status = STATUS[e.status] ? ` <i>(${STATUS[e.status]})</i>` : '';
+        const status = progress(e);
         const howTo = e.definition?.kind === 'rule' && e.status === 'granted' ? `<br><b>How:</b> ${escapeHtml(e.definition.howTo)}` : '';
         const report = e.status === 'granted' ? ` <button type="button" class="report" data-report="${escapeHtml(e.id)}" data-title="${escapeHtml(e.title)}">Report</button>` : '';
         return `<figure${e.status === 'granted' ? '' : ' class="unknown"'}>${pic}<figcaption><b>${escapeHtml(e.title)}</b>${status}<br>${escapeHtml(e.summary)}${howTo}<br><small>Wished by ${escapeHtml(e.wisher.name)} in ${escapeHtml(where)}, ${when}</small>${report}</figcaption></figure>`;

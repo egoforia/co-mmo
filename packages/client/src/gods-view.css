@@ -122,3 +122,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 a.stat { color: inherit; text-decoration: none; }
 .note.warn { color: var(--accent); }
 button:disabled { opacity: 0.5; cursor: default; }
+
+/* Wish progress: in progress, on hold, error, done */
+.progress { display: inline-block; font-size: 12px; padding: 1px 7px; border: 1px solid var(--edge); border-radius: 10px; color: var(--muted); white-space: nowrap; }
+.progress.in-progress { border-color: var(--accent); color: var(--accent); }
+.progress.needs-input { border-color: var(--gold); color: var(--gold); }
+.progress.error { border-color: var(--bad); color: var(--bad); }
+.progress.done { border-color: var(--good); color: var(--good); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }

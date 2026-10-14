@@ -196,11 +196,14 @@ describe('scripted wishes in the game', () => {
     const record = store.content[0]!;
     expect(record).toMatchObject({ status: 'pending', draft: { state: 'ready' }, test: { passed: true }, definition: { kind: 'rule', name: 'Fishing' } });
     await s.waitFor((m) => m.t === 'notice' && m.text.includes('waits for your review'));
+    // Everyone sees where the wish stands, live.
+    await c.waitFor((m) => m.t === 'content' && m.entries.some((e) => e.progress?.label === 'Ready, waiting for a Steward'));
 
     // Players never see the script.
     const log = await api(base, '/api/admin/content', mara.token);
     expect(log.body.content[0].definition.script).toContain("on('interact'");
     expect(app!.wishes.entries()[0]!.definition).not.toHaveProperty('script');
+    expect(log.body.content[0].progress).toMatchObject({ state: 'needs-input' });
 
     expect((await api(base, `/api/admin/content/${record.id}/review`, mara.token, 'POST', { approve: true })).body).toMatchObject({ ok: true, status: 'granted' });
     await c.waitFor((m) => m.t === 'system' && m.text.includes('Fishing'));
@@ -216,6 +219,7 @@ describe('scripted wishes in the game', () => {
     clock += 10_000;
     await c.waitFor((m) => m.t === 'notice' && /caught a fish|Nothing bites/.test(m.text) || m.t === 'system' && m.text.includes('Golden Carp'));
     expect(app!.rules.status(record.id)).toMatchObject({ paused: false });
+    expect(app!.wishes.entries()[0]!.progress).toMatchObject({ state: 'done', label: 'Live' });
 
     // Rolling the rule back stops it and takes its items away.
     expect((await api(base, `/api/admin/content/${record.id}/rollback`, mara.token, 'POST')).status).toBe(200);
@@ -255,6 +259,8 @@ describe('scripted wishes in the game', () => {
     await Promise.all([...app!.wishes.drafts]);
     const record = store.content[0]!;
     expect(record.test?.passed).toBe(false);
+    expect(app!.wishes.entries()[0]!.progress).toMatchObject({ state: 'error', label: 'Test run failed' });
+    await c.waitFor((m) => m.t === 'notice' && m.text.includes('could not finish your wish'));
     const refused = await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true });
     expect(refused).toMatchObject({ status: 409, body: { error: 'untested' } });
 
@@ -264,6 +270,7 @@ describe('scripted wishes in the game', () => {
     expect((await api(base, `/api/admin/content/${record.id}/rule`, owner.token, 'POST', { paused: true })).status).toBe(200);
     expect(app!.rules.status(record.id)).toMatchObject({ paused: true, reason: 'Paused by Mara.' });
     expect(store.contentById(record.id)!.rule).toMatchObject({ paused: true });
+    await c.waitFor((m) => m.t === 'content' && m.entries.some((e) => e.progress?.label === 'Paused'));
     expect((await api(base, `/api/admin/content/${record.id}/rule`, owner.token, 'POST', { paused: false })).status).toBe(200);
     expect(app!.rules.status(record.id)!.paused).toBe(false);
   });

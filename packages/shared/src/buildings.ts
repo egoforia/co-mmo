@@ -51,7 +51,7 @@ export const BUILDING_STYLES: Record<string, BuildingStyle> = {
     biome: 'whispering-woods',
     exterior:
       "Old Bramble the herbalist's home inside a huge, wide hollow tree: a carved round-topped wooden front door with a little round window, " +
-      'a few short wooden steps down from the door, glowing round windows in the trunk, a hanging lantern, teal moss on the bark, ' +
+      'a few short wooden steps down from the door, glowing round windows in the trunk, teal moss on the bark, ' +
       'thick roots reaching out to both sides, colourful mushrooms among the roots, a vast canopy of deep teal-green leaves',
     floor: "smooth honey-brown wooden floorboards cut from the tree's own heartwood, running left to right, with faint grain and a few small knots",
     wall: 'the top of a thick wall of living tree wood: dark rough bark-brown wood with ridged grain and small patches of teal moss',

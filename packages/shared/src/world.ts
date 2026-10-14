@@ -280,8 +280,10 @@ function cottage(map: RegionMap, left: number, top: number, size: number): Build
   const bottom = top + size + 1;
   for (let y = top - 1; y <= bottom + 1; y++) {
     for (let x = left - 1; x <= right + 1; x++) {
-      const wall = x === left || x === right || y === top || y === bottom;
       const inside = x > left && x < right && y > top && y < bottom;
+      // The walls are the building's own edge; the ring around it is clearing.
+      const within = x >= left && x <= right && y >= top && y <= bottom;
+      const wall = within && !inside;
       set(map, x, y, wall ? Tile.Wall : inside ? Tile.Floor : Tile.Ground);
     }
   }

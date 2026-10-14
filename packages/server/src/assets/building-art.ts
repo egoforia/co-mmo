@@ -67,9 +67,9 @@ export function buildingArtJobs(style: BuildingStyle): BuildingArtJob[] {
     size: '2K',
     prompt: [
       BASE_PROMPT,
-      'The first image is a rough layout sketch made of flat shapes. Repaint it as finished, richly detailed game art, keeping the layout:',
-      'the building fills the frame from side to side, and its front door is exactly where the dark arch is, at the middle of the bottom edge,',
-      'the same size as the arch. The other shapes only mark where the top and the body go: give them the natural outline the subject has.',
+      'The first image is a layout sketch: a dark door arch on a magenta background. Paint finished, richly detailed game art over it:',
+      'the front door of the building is exactly where the dark arch is, at the middle of the bottom edge,',
+      'the same size as the arch. Paint the whole building around that door, filling the frame from side to side and top to bottom, with its natural outline.',
       'with a few short steps or a threshold leading down from the door to the bottom edge. Nothing else stands in front of the door.',
       style.references?.length ? 'The other images show the approved art style and, where it is the same place, how it looked before: keep its character.' : '',
       biome,
@@ -173,18 +173,16 @@ export function artExtension(job: BuildingArtJob): 'webp' | 'png' {
 }
 
 /**
- * The layout sketch sent with every building's outside: flat shapes on the
- * key colour (a top mass, a body, and the door arch at the middle of the
- * bottom edge), neutral so it suits a tree, a house or a tower alike. The model
- * paints over it, which is what puts the door where the doorway is.
+ * The layout sketch sent with every building's outside: the door arch at the
+ * middle of the bottom edge, on the key colour. The model paints the building
+ * around it, which is what puts the door where the doorway is; anything more
+ * in the sketch gets copied as it is.
  */
 export async function layoutSketch(): Promise<Buffer> {
   const w = 800;
   const h = 1000;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
 <rect width="100%" height="100%" fill="${KEY_COLOR.hex}"/>
-<ellipse cx="${w / 2}" cy="${h * 0.27}" rx="${w * 0.46}" ry="${h * 0.25}" fill="#5a4a5a"/>
-<path d="M ${w * 0.04} ${h * 0.97} L ${w * 0.12} ${h * 0.42} L ${w * 0.88} ${h * 0.42} L ${w * 0.96} ${h * 0.97} Z" fill="#9a8270"/>
 <path d="M ${w * 0.44} ${h * 0.97} L ${w * 0.44} ${h * 0.85} A ${w * 0.06} ${w * 0.06} 0 0 1 ${w * 0.56} ${h * 0.85} L ${w * 0.56} ${h * 0.97} Z" fill="#3a2418"/>
 </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();

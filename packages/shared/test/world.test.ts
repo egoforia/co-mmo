@@ -123,6 +123,9 @@ describe("Old Bramble's cottage", () => {
       if (tileAt(woods, x, bottom) !== Tile.Wall) door.push(tileAt(woods, x, bottom));
     }
     expect(door).toEqual([Tile.Door, Tile.Door]);
+    // No wall pokes out past the corners into the clearing.
+    for (let y = top - 2; y <= bottom + 1; y++) for (const x of [left - 2, right + 1]) expect(tileAt(woods, x, y)).not.toBe(Tile.Wall);
+    for (let x = left - 2; x <= right + 1; x++) for (const y of [top - 2, bottom + 1]) expect(tileAt(woods, x, y)).not.toBe(Tile.Wall);
     // The building the client draws matches the walls.
     expect(woods.buildings).toEqual([expect.objectContaining({ x: left - 1, y: top - 1, width: COTTAGE_SIZE + 2, height: COTTAGE_SIZE + 2 })]);
   });

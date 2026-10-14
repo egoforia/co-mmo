@@ -21,6 +21,8 @@ export interface AppOptions {
   clientDir?: string;
   /** How often player positions are saved, in ms. */
   autosaveMs?: number;
+  /** How often idle connections are pinged, in ms. */
+  heartbeatMs?: number;
   /** Prayers and wishes: where art lives, and test overrides. */
   wishes: WishOptions;
   /** Checks GitHub for new commits and pulls them (Owner, God's View). */
@@ -177,8 +179,23 @@ export function createApp(options: AppOptions): App {
   // than in the URL, so it never shows up in proxy or server logs.
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
   const sockets = new Map<string, WebSocket>();
+  // Heartbeat: ping every client so idle connections stay open through proxies,
+  // and drop any that stopped answering (a sleeping laptop, a dead network).
+  const alive = new WeakSet<WebSocket>();
+  const heartbeatTimer = setInterval(() => {
+    for (const client of wss.clients) {
+      if (!alive.has(client)) {
+        client.terminate();
+        continue;
+      }
+      alive.delete(client);
+      client.ping();
+    }
+  }, options.heartbeatMs ?? 25_000);
   wss.on('connection', (socket: WebSocket) => {
     let account: Account | undefined;
+    alive.add(socket);
+    socket.on('pong', () => alive.add(socket));
     const authTimer = setTimeout(() => socket.close(4001, 'Sign-in timed out.'), 5000);
 
     socket.on('message', (raw) => {
@@ -262,6 +279,7 @@ export function createApp(options: AppOptions): App {
     async close() {
       clearInterval(tickTimer);
       options.updater?.stop();
+      clearInterval(heartbeatTimer);
       builds.stop();
       await restoring;
       await Promise.allSettled([...builds.jobs]);

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_NAME_LENGTH } from '@co-mmo/shared';
-import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, reloadWhenBack, saveToken } from './api.ts';
+import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { GameConnection } from './net.ts';
 import { ChatBox, escapeHtml, hidePanel, isTyping, onInviteClick, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
@@ -91,7 +91,14 @@ function play(token: string): void {
       showPanel('<h1>co-MMO</h1><p>Your session is no longer valid. Use an invite link to join again.</p>');
       return;
     }
-    showPanel(`<h1>Disconnected</h1><p>${escapeHtml(reason || 'Lost connection to the world.')}</p><button type="button" onclick="location.reload()">Reconnect</button>`);
+    if (code === 4000) {
+      // Replaced by another window: rejoining here would kick that one out.
+      showPanel(`<h1>Disconnected</h1><p>${escapeHtml(reason || 'Lost connection to the world.')}</p><button type="button" onclick="location.reload()">Reconnect</button>`);
+      return;
+    }
+    // The server restarted or the network dropped: rejoin once it answers again.
+    showPanel('<h1>Reconnecting...</h1><p>Lost connection to the world. Rejoining as soon as it is back.</p><button type="button" onclick="location.reload()">Reconnect now</button>');
+    void rejoinWhenBack();
   });
 
   function onMessage(message: ServerMessage): void {

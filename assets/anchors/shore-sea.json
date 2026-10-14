@@ -1,0 +1,30 @@
+{
+  "id": "shore-sea",
+  "description": {
+    "id": "shore-sea",
+    "name": "Shallow sea water",
+    "kind": "tile",
+    "biome": "sunlit-shore",
+    "silhouetteHook": "bright turquoise shallow sea water with soft white ripple glints",
+    "body": "flat open water seen from directly above, as if cut from the middle of a large lake: no shore, bank, rim, border or ripple rings, no centre point",
+    "centerCrop": 0.5,
+    "materials": [
+      "water"
+    ],
+    "colors": {
+      "main": "turquoise",
+      "secondary": "ocean blue",
+      "accent": "white glints"
+    },
+    "details": [
+      "soft ripple strokes evenly spread"
+    ],
+    "mood": "bright, carefree"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nBiome: Sunlit Shore. Palette leans on its key colours; light tint and mood of Sunlit Shore.\nSubject: Shallow sea water (tile). Most recognisable feature: bright turquoise shallow sea water with soft white ripple glints. Body and shape: flat open water seen from directly above, as if cut from the middle of a large lake: no shore, bank, rim, border or ripple rings, no centre point. Materials: water. Colours: main turquoise, secondary ocean blue, small accent of white glints. Details: soft ripple strokes evenly spread. Mood: bright, carefree.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T18:31:59.952Z"
+}

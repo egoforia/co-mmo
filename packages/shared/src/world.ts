@@ -147,6 +147,8 @@ const shoreLayout: Layout = (map, c) => {
     const coast = map.width * 0.66 + (valueNoise(0, y, map.seed, 6) - 0.5) * 10;
     if (x > coast) return Tile.Water;
     if (rand2(x, y, map.seed + 1) < 0.015) return Tile.Rock;
+    // Palms line the beach and thin out inland.
+    if (rand2(x, y, map.seed + 2) < (x > coast - 6 ? 0.12 : 0.015)) return Tile.Tree;
     return Tile.Ground;
   });
   const lx = Math.floor(map.width * 0.58);
@@ -160,8 +162,11 @@ const shoreLayout: Layout = (map, c) => {
 
 const desertLayout: Layout = (map, c) => {
   scatter(map, (x, y) => {
-    if (valueNoise(x, y, map.seed, 8) < 0.12) return Tile.Water;
+    const water = valueNoise(x, y, map.seed, 8);
+    if (water < 0.12) return Tile.Water;
     if (rand2(x, y, map.seed + 1) < 0.025) return Tile.Rock;
+    // Cacti, a little thicker around the oases.
+    if (rand2(x, y, map.seed + 2) < (water < 0.2 ? 0.08 : 0.02)) return Tile.Tree;
     return Tile.Ground;
   });
   const ry = c + 12;

@@ -1,46 +1,67 @@
 import Phaser from 'phaser';
 import { BIOMES, TILE_PIXELS, Tile, hashString, rand2, type BiomeId, type RegionDef } from '@co-mmo/shared';
 
-// Ground tiles come from the approved art. Water, trees and rocks are still
-// painted in code with soft brushes until a biome kit is generated; they keep
-// to each biome's colours so they sit beside the real art.
+// Ground, water, trees and rocks come from the approved art and biome kit.
+// Each also has a version painted in code with soft brushes in the biome's
+// colours, used when an asset is missing (say, a new biome before its kit).
 
 const T = TILE_PIXELS;
 /** Each tile is extruded by this much so filtered tiles never show seams. */
 export const TILE_MARGIN = 2;
 const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked];
 
+type Paint = (ctx: CanvasRenderingContext2D) => void;
+/** An art asset id, a painter, or an asset with a painter to fall back on. */
+type TileSource = string | Paint | { art: string; paint: Paint };
+
 interface BiomeLook {
-  ground: string | ((ctx: CanvasRenderingContext2D) => void);
-  path: string | ((ctx: CanvasRenderingContext2D) => void);
+  ground: TileSource;
+  path: TileSource;
   water: [string, string, string];
+  /** The biome kit's water tile. */
+  waterArt?: string;
   prop: 'tree' | 'blossom' | 'palm' | 'cactus';
+  /** The biome kit's tree (or palm, or cactus) and rock sprites. */
+  trees?: string[];
+  rocks?: string[];
 }
 
 const LOOKS: Record<string, BiomeLook> = {
   sanctum: {
-    ground: (ctx) => meadow(ctx, ['#7fa860', '#93b96b', '#6c9452'], ['#f3e6c8', '#e7a3a6', '#e8c66a']),
+    ground: { art: 'sanctum-meadow', paint: (ctx) => meadow(ctx, ['#7fa860', '#93b96b', '#6c9452'], ['#f3e6c8', '#e7a3a6', '#e8c66a']) },
     path: 'sanctum-flagstones',
     water: ['#5c9cc0', '#8cc4de', '#d8eef5'],
+    waterArt: 'sanctum-pond',
     prop: 'blossom',
+    trees: ['sanctum-blossom-tree-a', 'sanctum-blossom-tree-b'],
+    rocks: ['sanctum-rock'],
   },
   'whispering-woods': {
     ground: 'woods-moss',
     path: (ctx) => meadow(ctx, ['#6b4a33', '#7a573c', '#5a3d2a'], ['#5f9468', '#8a6a45']),
     water: ['#1f4f4a', '#2f6b5e', '#7fb8a0'],
+    waterArt: 'woods-pool',
     prop: 'tree',
+    trees: ['woods-tree-a', 'woods-tree-b'],
+    rocks: ['woods-rock'],
   },
   'sunlit-shore': {
     ground: 'shore-sand',
     path: 'shore-sand',
     water: ['#2c7fa8', '#46c2c2', '#e8fbff'],
+    waterArt: 'shore-sea',
     prop: 'palm',
+    trees: ['shore-palm-a', 'shore-palm-b'],
+    rocks: ['shore-rock'],
   },
   'mirage-desert': {
     ground: 'desert-dunes',
     path: 'desert-dunes',
     water: ['#2a8f8a', '#4fc4b8', '#e6fff6'],
+    waterArt: 'desert-oasis',
     prop: 'cactus',
+    trees: ['desert-cactus-a', 'desert-cactus-b'],
+    rocks: ['desert-rock'],
   },
 };
 
@@ -73,7 +94,8 @@ export function registerTileset(scene: Phaser.Scene, def: RegionDef): string {
 
   const ground = tileCanvas((c) => paintSource(scene, c, look.ground));
   const path = tileCanvas((c) => paintSource(scene, c, look.path));
-  const water = tileCanvas((c) => paintWater(c, look.water));
+  const paintWaterLook: Paint = (c) => paintWater(c, look.water);
+  const water = tileCanvas((c) => paintSource(scene, c, look.waterArt ? { art: look.waterArt, paint: paintWaterLook } : paintWaterLook));
 
   for (const tile of TILE_ORDER) {
     const source = tile === Tile.Path ? path : tile === Tile.Water ? water : ground;
@@ -97,11 +119,13 @@ function tileCanvas(paint: (ctx: CanvasRenderingContext2D) => void): HTMLCanvasE
   return canvas;
 }
 
-function paintSource(scene: Phaser.Scene, ctx: CanvasRenderingContext2D, source: BiomeLook['ground']): void {
+function paintSource(scene: Phaser.Scene, ctx: CanvasRenderingContext2D, source: TileSource): void {
   if (typeof source === 'function') return source(ctx);
-  const image = scene.textures.exists(source) ? scene.textures.get(source).getSourceImage() : null;
-  if (image) ctx.drawImage(image as CanvasImageSource, 0, 0, T, T);
-  else meadow(ctx, ['#7fa860', '#93b96b', '#6c9452'], []);
+  const { art, paint } = typeof source === 'string'
+    ? { art: source, paint: (c: CanvasRenderingContext2D) => meadow(c, ['#7fa860', '#93b96b', '#6c9452'], []) }
+    : source;
+  if (scene.textures.exists(art)) ctx.drawImage(scene.textures.get(art).getSourceImage() as CanvasImageSource, 0, 0, T, T);
+  else paint(ctx);
 }
 
 /** Soft brushy grass that wraps at the tile edges. */
@@ -171,9 +195,14 @@ function paintWater(ctx: CanvasRenderingContext2D, [deep, mid, glint]: [string, 
   ctx.globalAlpha = 1;
 }
 
-/** A painted tree, palm, cactus or rock for a biome; a few variants each. */
+/**
+ * A tree, palm, cactus or rock for a biome: the biome kit's art when loaded,
+ * otherwise one painted in code. A few variants each.
+ */
 export function propTexture(scene: Phaser.Scene, biome: string, kind: 'tree' | 'rock', variant: number): string {
   const look = biomeLook(biome);
+  const art = (kind === 'rock' ? look.rocks : look.trees)?.filter((id) => scene.textures.exists(id)) ?? [];
+  if (art.length) return art[variant % art.length]!;
   const shape = kind === 'rock' ? 'rock' : look.prop;
   const key = `prop-${biome}-${shape}-${variant}`;
   if (scene.textures.exists(key)) return key;

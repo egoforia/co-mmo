@@ -23,8 +23,14 @@ const fromRaw = (r: Raw) => sharp(r.data, { raw: { width: r.width, height: r.hei
  * the edges, so key-like colours inside the subject survive. Pixels on the
  * boundary get partial alpha with the key colour un-mixed, so edges stay soft.
  * `clean` is false when the border is not mostly one flat colour.
+ * With `holes`, enclosed pockets of near-exact key colour (gaps between a
+ * tree's branches) are removed too.
  */
-export async function removeKeyBackground(png: Buffer, tolerance = 70): Promise<{ png: Buffer; clean: boolean }> {
+export async function removeKeyBackground(
+  png: Buffer,
+  tolerance = 70,
+  { holes = false }: { holes?: boolean } = {},
+): Promise<{ png: Buffer; clean: boolean }> {
   const img = await toRaw(png);
   const { data, width: w, height: h } = img;
   const border: number[] = [];
@@ -49,6 +55,8 @@ export async function removeKeyBackground(png: Buffer, tolerance = 70): Promise<
     }
   }
 
+  if (holes) fillHoles(bg, dist, w, h, tolerance * 0.6);
+
   for (let i = 0; i < w * h; i++) {
     if (bg[i]) {
       data[i * 4 + 3] = 0;
@@ -67,6 +75,26 @@ export async function removeKeyBackground(png: Buffer, tolerance = 70): Promise<
     data[i * 4 + 3] = Math.round(a * 255);
   }
   return { png: await fromRaw(img), clean };
+}
+
+/** Marks enclosed runs of near-key pixels as background when big enough to be a gap, not a speck. */
+function fillHoles(bg: Uint8Array, dist: (i: number) => number, w: number, h: number, tolerance: number, minSize = 24): void {
+  const seen = new Uint8Array(w * h);
+  for (let start = 0; start < w * h; start++) {
+    if (bg[start] || seen[start] || dist(start) >= tolerance) continue;
+    const region = [start];
+    seen[start] = 1;
+    for (let k = 0; k < region.length; k++) {
+      const i = region[k]!;
+      const x = i % w;
+      for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
+        if (n < 0 || n >= w * h || bg[n] || seen[n] || dist(n) >= tolerance) continue;
+        seen[n] = 1;
+        region.push(n);
+      }
+    }
+    if (region.length >= minSize) for (const i of region) bg[i] = 1;
+  }
 }
 
 /**

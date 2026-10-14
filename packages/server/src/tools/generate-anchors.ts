@@ -1,4 +1,4 @@
-// Generates the Style Bible's reference images.
+// Generates the Style Bible's reference images and the biome kit.
 //
 //   npm run anchors -- --dry-run        print prompts and estimated cost
 //   npm run anchors -- --only woods-mushroom
@@ -14,9 +14,11 @@ import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ANCHORS } from '../assets/anchors.ts';
+import { BIOME_KIT, type KitAsset } from '../assets/kit.ts';
 import { GeminiImageProvider } from '../assets/gemini.ts';
 import { makeSeamless, removeKeyBackground, tileGrid } from '../assets/postprocess.ts';
 import { STYLE_VERSION, buildPrompt } from '../assets/style.ts';
+import sharp from 'sharp';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
@@ -34,9 +36,10 @@ const limit = Number(value('limit') ?? Infinity);
 const pricePerImage = Number(process.env.IMAGE_PRICE_USD ?? 0.04);
 const outDir = resolve(fileURLToPath(new URL('../../../../assets/anchors/', import.meta.url)));
 
-const selected = ANCHORS.filter((a) => !only || a.id === only).slice(0, limit);
+const ALL: KitAsset[] = [...ANCHORS, ...BIOME_KIT];
+const selected = ALL.filter((a) => !only || a.id === only).slice(0, limit);
 if (selected.length === 0) {
-  console.error(`No anchor matches ${only}. Known: ${ANCHORS.map((a) => a.id).join(', ')}`);
+  console.error(`No anchor matches ${only}. Known: ${ALL.map((a) => a.id).join(', ')}`);
   process.exit(1);
 }
 
@@ -70,12 +73,18 @@ for (const anchor of selected) {
   }
   const prompt = buildPrompt(anchor);
   try {
-    const image = await provider.generate({ prompt });
+    // Kit items are painted beside their biome's approved anchors (the raw
+    // provider images, magenta background included) so the style matches.
+    const references = await Promise.all((anchor.references ?? []).map(async (ref) => ({
+      mimeType: 'image/png', data: await readFile(resolve(rawDir, `${ref}.png`)),
+    })));
+    const image = await provider.generate({ prompt, references });
     await writeFile(raw, image.data);
     await writeFile(resolve(outDir, `${anchor.id}.json`), JSON.stringify({
       id: anchor.id,
       description: anchor,
       prompt,
+      references: anchor.references,
       provider: provider.id,
       model: provider.model,
       styleVersion: STYLE_VERSION,
@@ -91,17 +100,28 @@ for (const anchor of selected) {
 }
 console.log(`Done: ${made} new images in ${outDir}`);
 
-async function processAnchor(anchor: (typeof ANCHORS)[number], raw: Buffer): Promise<void> {
+async function processAnchor(anchor: (typeof ALL)[number], raw: Buffer): Promise<void> {
   const out = resolve(outDir, `${anchor.id}.png`);
   if (anchor.kind === 'tile') {
-    const tile = await makeSeamless(raw);
+    const tile = await makeSeamless(anchor.centerCrop ? await cropCenter(raw, anchor.centerCrop) : raw);
     await writeFile(out, tile);
     await writeFile(resolve(previewDir, `${anchor.id}-grid.png`), await tileGrid(tile));
     return;
   }
-  const { png, clean } = await removeKeyBackground(raw);
+  const { png, clean } = await removeKeyBackground(raw, undefined, { holes: anchor.kind === 'prop' });
   await writeFile(out, png);
   if (!clean) console.warn(`warning ${anchor.id}: background is not one flat colour; check it or regenerate`);
+}
+
+async function cropCenter(png: Buffer, share: number): Promise<Buffer> {
+  const { width = 0, height = 0 } = await sharp(png).metadata();
+  const w = Math.round(width * share);
+  const h = Math.round(height * share);
+  return sharp(png)
+    .extract({ left: Math.round((width - w) / 2), top: Math.round((height - h) / 2), width: w, height: h })
+    .resize(width, height, { kernel: 'lanczos3' })
+    .png()
+    .toBuffer();
 }
 
 async function exists(path: string): Promise<boolean> {

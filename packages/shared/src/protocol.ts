@@ -2,7 +2,8 @@
 // binary encoding later without changing these shapes.
 
 import type { ContentEntry, WishCard } from './content.ts';
-import type { Character } from './rpg.ts';
+import type { TradeOffer } from './kit.ts';
+import { EQUIP_SLOTS, type Character, type EquipSlot } from './rpg.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -71,6 +72,48 @@ export interface ReportMessage {
   reason: string;
 }
 
+/** Wear an item from the bag, or take off what is worn in a slot. */
+export interface EquipMessage {
+  t: 'equip';
+  item?: string;
+  /** Unequip: the slot to empty. */
+  slot?: EquipSlot;
+}
+
+/** Use a learned ability; bolts aim at `target` (a creature id) or the nearest creature. */
+export interface AbilityMessage {
+  t: 'ability';
+  ability: string;
+  target?: string;
+}
+
+/** Make a recipe from materials in the bag. */
+export interface CraftMessage {
+  t: 'craft';
+  recipe: string;
+}
+
+/** Buy, sell or learn at the NPC you are talking to. */
+export interface ShopMessage {
+  t: 'shop';
+  action: 'buy' | 'sell' | 'learn';
+  npc: string;
+  /** Buy and sell: the item; learn: the ability. */
+  id: string;
+  qty?: number;
+}
+
+/**
+ * Trading with another player nearby: ask them by name, answer, change what
+ * you offer (which clears both confirmations), confirm, or call it off.
+ */
+export interface TradeActionMessage {
+  t: 'trade';
+  action: 'request' | 'accept' | 'decline' | 'offer' | 'confirm' | 'cancel';
+  name?: string;
+  offer?: TradeOffer;
+}
+
 /** Party actions: invite someone by name, answer an invite, or leave. */
 export interface PartyActionMessage {
   t: 'party';
@@ -80,6 +123,11 @@ export interface PartyActionMessage {
 }
 
 export type ClientMessage =
+  | EquipMessage
+  | AbilityMessage
+  | CraftMessage
+  | ShopMessage
+  | TradeActionMessage
   | PartyActionMessage
   | InputMessage
   | ChatSendMessage
@@ -153,6 +201,7 @@ export interface SnapshotMessage {
   x: number;
   y: number;
   hp: number;
+  energy: number;
   /** Other players inside the view radius. */
   players: EntityState[];
   /** Creatures inside the view radius. */
@@ -222,6 +271,8 @@ export interface HitMessage {
   amount: number;
   /** The target was defeated by this hit. */
   defeated: boolean;
+  /** The ability that struck, when it was one (bolts fly across the screen). */
+  ability?: string;
 }
 
 /** The player's own character changed (XP, items, quests, level...). */
@@ -242,6 +293,36 @@ export interface DialogueMessage {
   text: string;
   /** A quest the NPC is offering, to accept or decline. */
   offer?: { quest: string; title: string; reward: string };
+  /** The NPC keeps a shop or teaches: the prices come from SHOPS. */
+  shop?: boolean;
+}
+
+/** A trade as one side sees it; null when it closed. */
+export interface TradeView {
+  with: { id: string; name: string };
+  mine: TradeOffer;
+  theirs: TradeOffer;
+  /** Who has confirmed the current offers. */
+  myConfirm: boolean;
+  theirConfirm: boolean;
+}
+
+export interface TradeMessage {
+  t: 'trade';
+  trade: TradeView | null;
+}
+
+/** An ability you used is resting for this long. */
+export interface CooldownMessage {
+  t: 'cooldown';
+  ability: string;
+  seconds: number;
+}
+
+/** Someone nearby asked to trade with you. */
+export interface TradeRequestMessage {
+  t: 'trade-request';
+  from: { id: string; name: string };
 }
 
 /** The God speaks, and may offer a wish card. */
@@ -262,6 +343,9 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | CooldownMessage
+  | TradeMessage
+  | TradeRequestMessage
   | PartyMessage
   | PartyInviteMessage
   | AwayMessage
@@ -303,7 +387,25 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     return (m.kind === 'content' || m.kind === 'player') && typeof m.target === 'string' && m.target.length <= 64 && typeof m.reason === 'string';
   }
   if (m.t === 'wish') return typeof m.card === 'string' && m.card.length <= 64 && typeof m.confirm === 'boolean';
+  if (m.t === 'equip') {
+    return (typeof m.item === 'string' && m.item.length <= 64) || EQUIP_SLOTS.includes(m.slot as EquipSlot);
+  }
+  if (m.t === 'ability') return isId(m.ability) && (m.target === undefined || isId(m.target));
+  if (m.t === 'craft') return isId(m.recipe);
+  if (m.t === 'shop') {
+    return ['buy', 'sell', 'learn'].includes(m.action as string) && isId(m.npc) && isId(m.id) &&
+      (m.qty === undefined || (Number.isInteger(m.qty) && (m.qty as number) > 0 && (m.qty as number) <= 99));
+  }
+  if (m.t === 'trade') {
+    return ['request', 'accept', 'decline', 'offer', 'confirm', 'cancel'].includes(m.action as string) &&
+      (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64)) &&
+      (m.offer === undefined || (typeof m.offer === 'object' && m.offer !== null));
+  }
   return false;
+}
+
+function isId(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0 && v.length <= 64;
 }
 
 function isAxis(v: unknown): v is number {

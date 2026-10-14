@@ -7,11 +7,23 @@ export interface Stats {
   might: number;
   /** Attack speed. */
   agility: number;
-  /** Magic and crafting (used once abilities arrive). */
+  /** Magic, Energy and crafting. */
   wit: number;
-  /** Health regeneration. */
+  /** Healing: health and Energy come back faster. */
   spirit: number;
 }
+
+/** Where equipment is worn (design doc, Items: equipment slots). */
+export type EquipSlot = 'weapon' | 'head' | 'body' | 'charm';
+export const EQUIP_SLOTS: readonly EquipSlot[] = ['weapon', 'head', 'body', 'charm'];
+export const SLOT_NAMES: Record<EquipSlot, string> = { weapon: 'Weapon', head: 'Head', body: 'Body', charm: 'Charm' };
+
+/** Rarity from Common to Legendary (design doc, Items). */
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+/** What a piece of equipment adds while worn: stats, weapon damage and armour. */
+export type Bonus = Partial<Stats> & { attack?: number; armor?: number };
 
 export interface InventorySlot {
   item: string;
@@ -41,6 +53,15 @@ export interface Character {
   discovered: string[];
   /** Epoch ms until which the Weakened debuff (after dying) lasts. */
   weakenedUntil: number;
+  /** Spent by abilities; comes back over time. */
+  energy: number;
+  /** Item ids worn, by slot. Worn items are not in the bag. */
+  equipment: Partial<Record<EquipSlot, string>>;
+  /** Abilities learned, in the order they fill the 1 to 4 keys. */
+  abilities: string[];
+  /** Creator XP: earned when others use, fight or visit what this player wished for. */
+  creatorXp: number;
+  creatorLevel: number;
 }
 
 /** Favor a new character starts with: enough for a first small wish or two. */
@@ -70,8 +91,14 @@ export function newCharacter(): Character {
     quests: [],
     discovered: ['bible'],
     weakenedUntil: 0,
+    energy: 0,
+    equipment: {},
+    abilities: [],
+    creatorXp: 0,
+    creatorLevel: 1,
   };
   c.hp = maxHp(c);
+  c.energy = maxEnergy(c);
   return c;
 }
 
@@ -81,14 +108,61 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   if (!saved) return fresh;
   const c: Character = { ...fresh, ...saved, stats: { ...fresh.stats, ...saved.stats } };
   if (!c.inventory.some((s) => s.item === 'bible')) c.inventory.unshift({ item: 'bible', qty: 1 });
-  // Things a rolled-back wish made are gone from every bag.
-  c.inventory = c.inventory.filter((s) => ITEMS[s.item]);
+  c.equipment = { ...c.equipment };
+  c.abilities = [...c.abilities];
+  forgetVanished(c);
   c.hp = Math.min(Math.max(1, c.hp), maxHp(c));
+  c.energy = Math.min(Math.max(0, c.energy), maxEnergy(c));
   return c;
 }
 
-export function maxHp(c: Pick<Character, 'level' | 'stats'>): number {
-  return 20 + c.level * 10 + c.stats.might * 2;
+/** Things and abilities a rolled-back wish made are gone from every bag, body and spellbook. */
+export function forgetVanished(c: Character): void {
+  c.inventory = c.inventory.filter((s) => ITEMS[s.item]);
+  for (const slot of EQUIP_SLOTS) {
+    const worn = c.equipment[slot];
+    if (worn && ITEMS[worn]?.slot !== slot) delete c.equipment[slot];
+  }
+  c.abilities = c.abilities.filter((a) => ABILITIES[a]);
+}
+
+/** Stats with what the character wears added. */
+export function totalStats(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): Stats {
+  const total = { ...c.stats };
+  for (const id of Object.values(c.equipment ?? {})) {
+    const bonus = id ? ITEMS[id]?.bonus : undefined;
+    if (!bonus) continue;
+    for (const k of Object.keys(total) as (keyof Stats)[]) total[k] += bonus[k] ?? 0;
+  }
+  return total;
+}
+
+/** Weapon damage or armour from everything worn. */
+export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: 'attack' | 'armor'): number {
+  let sum = 0;
+  for (const id of Object.values(c.equipment ?? {})) sum += (id ? ITEMS[id]?.bonus?.[key] : 0) ?? 0;
+  return sum;
+}
+
+type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>>;
+
+export function maxHp(c: Gear): number {
+  return 20 + c.level * 10 + totalStats(c).might * 2;
+}
+
+/** Energy for abilities: Wit raises it. */
+export function maxEnergy(c: Gear): number {
+  return 20 + c.level * 2 + totalStats(c).wit * 2;
+}
+
+/** Energy regained per second, always (Spirit speeds it up). */
+export function energyPerSecond(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): number {
+  return 1.5 + totalStats(c).spirit * 0.1;
+}
+
+/** Damage left after armour: each point of armour takes off a little, never all of it. */
+export function afterArmor(amount: number, armor: number): number {
+  return Math.max(1, Math.round((amount * 12) / (12 + Math.max(0, armor))));
 }
 
 /** XP needed to go from this level to the next. */
@@ -97,18 +171,18 @@ export function xpToNext(level: number): number {
 }
 
 /** Damage before randomness and debuffs. */
-export function attackPower(c: Pick<Character, 'level' | 'stats'>): number {
-  return 3 + c.stats.might + c.level;
+export function attackPower(c: Gear): number {
+  return 3 + totalStats(c).might + c.level + gearBonus(c, 'attack');
 }
 
 /** Seconds between attacks. */
-export function attackCooldown(c: Pick<Character, 'stats'>): number {
-  return Math.max(0.35, 0.8 - c.stats.agility * 0.03);
+export function attackCooldown(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): number {
+  return Math.max(0.35, 0.8 - totalStats(c).agility * 0.03);
 }
 
 /** Health regained per second once out of combat. */
-export function regenPerSecond(c: Pick<Character, 'stats'>): number {
-  return 1 + c.stats.spirit * 0.25;
+export function regenPerSecond(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): number {
+  return 1 + totalStats(c).spirit * 0.25;
 }
 
 /**
@@ -141,6 +215,7 @@ export function gainXp(c: Character, amount: number): number {
   }
   if (levels) {
     c.hp = maxHp(c);
+    c.energy = maxEnergy(c);
     c.favor += levels * LEVEL_FAVOR;
   }
   return levels;
@@ -174,13 +249,21 @@ export function discover(c: Character, id: string): void {
 
 export interface ItemDef {
   name: string;
-  kind: 'book' | 'consumable' | 'material';
+  kind: 'book' | 'consumable' | 'material' | 'equipment' | 'scroll';
   art: string;
   description: string;
-  /** Cannot be dropped, sold or destroyed. */
+  /** Cannot be dropped, sold, traded or destroyed. */
   bound?: boolean;
   /** Health restored when used. */
   heal?: number;
+  /** Equipment: where it is worn, and what it adds. */
+  slot?: EquipSlot;
+  bonus?: Bonus;
+  rarity?: Rarity;
+  /** Scrolls: the ability reading it teaches. */
+  teaches?: string;
+  /** What a shop pays for it is half of this, in gold. */
+  value?: number;
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -203,8 +286,210 @@ export const ITEMS: Record<string, ItemDef> = {
     kind: 'material',
     art: 'item-goat-horn',
     description: 'A curled horn, sun-bleached and carved with old caravan marks. Traders and crafters will want it.',
+    value: 12,
+  },
+  'mushroom-cap': {
+    name: 'Mushroom Cap',
+    kind: 'material',
+    art: 'item-mushroom-cap',
+    description: 'A springy spotted cap from a Walking Mushroom. Herbalists brew it; hatters wear it.',
+    value: 2,
+  },
+  'crab-shell': {
+    name: 'Crab Shell',
+    kind: 'material',
+    art: 'item-crab-shell',
+    description: "A hard coral plate from a Crab Knight's back. Good for armour and lance tips.",
+    value: 4,
+  },
+  'scarab-shell': {
+    name: 'Scarab Wing Case',
+    kind: 'material',
+    art: 'item-scarab-shell',
+    description: 'A golden wing case that never quite cools. Charm makers prize it.',
+    value: 6,
+  },
+  'wooden-sword': {
+    name: 'Wooden Sword',
+    kind: 'equipment',
+    art: 'item-wooden-sword',
+    slot: 'weapon',
+    rarity: 'common',
+    bonus: { attack: 2 },
+    description: 'A carved practice sword with a twine grip. Better than bare hands.',
+    value: 15,
+  },
+  'crab-lance': {
+    name: 'Crab-Shell Lance',
+    kind: 'equipment',
+    art: 'item-crab-lance',
+    slot: 'weapon',
+    rarity: 'uncommon',
+    bonus: { attack: 5, agility: 1 },
+    description: 'A driftwood lance tipped with a needle of crab shell, light and quick.',
+    value: 40,
+  },
+  'mushroom-hat': {
+    name: 'Toadstool Hat',
+    kind: 'equipment',
+    art: 'item-mushroom-hat',
+    slot: 'head',
+    rarity: 'common',
+    bonus: { armor: 1, spirit: 1 },
+    description: 'A floppy hat sewn from mushroom caps. It smells of rain and makes you feel calm.',
+    value: 10,
+  },
+  'traveller-coat': {
+    name: "Traveller's Coat",
+    kind: 'equipment',
+    art: 'item-traveller-coat',
+    slot: 'body',
+    rarity: 'common',
+    bonus: { armor: 2 },
+    description: 'A hooded wool coat with brass buttons, patched at the elbows.',
+    value: 20,
+  },
+  'shell-mail': {
+    name: 'Shell Mail',
+    kind: 'equipment',
+    art: 'item-shell-mail',
+    slot: 'body',
+    rarity: 'uncommon',
+    bonus: { armor: 5, might: 1 },
+    description: 'A vest of overlapping crab-shell scales. It clicks when you walk.',
+    value: 45,
+  },
+  'scarab-charm': {
+    name: 'Scarab Charm',
+    kind: 'equipment',
+    art: 'item-scarab-charm',
+    slot: 'charm',
+    rarity: 'rare',
+    bonus: { agility: 2, wit: 2 },
+    description: 'A golden scarab amulet on a braided cord. Luck clings to it.',
+    value: 60,
+  },
+  'scroll-firebolt': {
+    name: 'Scroll of Firebolt',
+    kind: 'scroll',
+    art: 'item-scroll',
+    teaches: 'firebolt',
+    rarity: 'uncommon',
+    description: 'Read it to learn Firebolt: a spark of Wit flung at a creature up to five steps away.',
+    value: 40,
   },
 };
+
+// --- Abilities ---------------------------------------------------------------
+
+/**
+ * What an ability does: `strike` hits the creature in reach with your weapon,
+ * `bolt` hits one further away, `heal` mends you. The amount grows with a
+ * stat, so the same ability gets better as you do.
+ */
+export type AbilityEffect = 'strike' | 'bolt' | 'heal';
+
+export interface AbilityDef {
+  name: string;
+  description: string;
+  effect: AbilityEffect;
+  /** Energy it costs. */
+  energy: number;
+  /** Seconds before it can be used again. */
+  cooldown: number;
+  /** How far it reaches, in tiles (not used by heal). */
+  range: number;
+  /** The amount is base + level + stat × factor (+ weapon damage for strikes). */
+  base: number;
+  stat: keyof Stats;
+  factor: number;
+}
+
+/** Abilities are learned from trainers, scrolls and quests (design doc, Characters and progression). */
+export const ABILITIES: Record<string, AbilityDef> = {
+  'power-strike': {
+    name: 'Power Strike',
+    description: 'A heavy two-handed blow at the creature in reach. Might and your weapon make it hurt.',
+    effect: 'strike', energy: 8, cooldown: 6, range: 1.8, base: 4, stat: 'might', factor: 1.5,
+  },
+  mend: {
+    name: 'Mend',
+    description: 'A quiet prayer that closes wounds. Spirit makes it stronger.',
+    effect: 'heal', energy: 10, cooldown: 12, range: 0, base: 8, stat: 'spirit', factor: 3,
+  },
+  firebolt: {
+    name: 'Firebolt',
+    description: 'A spark of Wit flung at a creature up to five steps away.',
+    effect: 'bolt', energy: 6, cooldown: 3, range: 5, base: 3, stat: 'wit', factor: 1.5,
+  },
+};
+
+/** Damage or healing an ability does for this character, before randomness. */
+export function abilityAmount(c: Gear, a: AbilityDef): number {
+  const amount = a.base + c.level + Math.round(totalStats(c)[a.stat] * a.factor);
+  return a.effect === 'strike' ? amount + gearBonus(c, 'attack') : amount;
+}
+
+/** Learns an ability; false when it is unknown or already known. */
+export function learnAbility(c: Character, id: string): boolean {
+  if (!ABILITIES[id] || c.abilities.includes(id)) return false;
+  c.abilities.push(id);
+  return true;
+}
+
+// --- Equipment ----------------------------------------------------------------
+
+/**
+ * Wears an item from the bag, putting back whatever was in its slot.
+ * Returns why not, or undefined when done.
+ */
+export function equip(c: Character, item: string): string | undefined {
+  const def = ITEMS[item];
+  if (!def?.slot) return 'That is not something you can wear.';
+  if (itemCount(c, item) === 0) return 'That is not in your bag.';
+  takeItem(c, item);
+  const old = c.equipment[def.slot];
+  c.equipment[def.slot] = item;
+  if (old) addItem(c, old);
+  clampVitals(c);
+  return undefined;
+}
+
+/** Takes off what is worn in a slot and puts it in the bag. */
+export function unequip(c: Character, slot: EquipSlot): boolean {
+  const old = c.equipment[slot];
+  if (!old) return false;
+  delete c.equipment[slot];
+  addItem(c, old);
+  clampVitals(c);
+  return true;
+}
+
+/** Health and Energy never stay above a maximum that gear just lowered. */
+function clampVitals(c: Character): void {
+  c.hp = Math.min(c.hp, maxHp(c));
+  c.energy = Math.min(c.energy, maxEnergy(c));
+}
+
+/** A short line of what an item adds, e.g. "+2 damage, +1 Spirit". */
+export function bonusText(bonus: Bonus | undefined): string {
+  if (!bonus) return '';
+  const names: Record<string, string> = { attack: 'damage', armor: 'armour', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit' };
+  return Object.entries(bonus).filter(([, v]) => v).map(([k, v]) => `+${v} ${names[k] ?? k}`).join(', ');
+}
+
+/**
+ * What wished equipment adds, worked out from its slot and rarity, never
+ * from the wish itself. `focus` is the stat the wisher wanted it to help.
+ */
+export function equipmentBonus(slot: EquipSlot, rarity: Rarity, focus?: keyof Stats): Bonus {
+  const tier = RARITIES.indexOf(rarity) + 1;
+  const bonus: Bonus = slot === 'weapon' ? { attack: 1 + tier } : slot === 'charm' ? {} : { armor: tier + (slot === 'body' ? 1 : 0) };
+  const stat = focus ?? (slot === 'weapon' ? 'might' : slot === 'charm' ? 'wit' : 'spirit');
+  const extra = slot === 'charm' ? tier + 1 : tier - 1;
+  if (extra > 0) bonus[stat] = (bonus[stat] ?? 0) + extra;
+  return bonus;
+}
 
 // --- Creatures -----------------------------------------------------------
 
@@ -255,7 +540,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     notice: 0,
     xp: 7,
     gold: [0, 2],
-    drops: [{ item: 'tonic', chance: 0.35 }],
+    drops: [{ item: 'mushroom-cap', chance: 0.6 }, { item: 'tonic', chance: 0.25 }],
     respawnSeconds: 20,
   },
   'crab-knight': {
@@ -271,7 +556,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     notice: 2.5,
     xp: 14,
     gold: [2, 6],
-    drops: [{ item: 'tonic', chance: 0.25 }],
+    drops: [{ item: 'crab-shell', chance: 0.5 }, { item: 'tonic', chance: 0.2 }],
     respawnSeconds: 25,
   },
   'sun-scarab': {
@@ -287,7 +572,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     notice: 4,
     xp: 16,
     gold: [1, 5],
-    drops: [{ item: 'goat-horn', chance: 0.3 }, { item: 'tonic', chance: 0.15 }],
+    drops: [{ item: 'scarab-shell', chance: 0.45 }, { item: 'goat-horn', chance: 0.25 }, { item: 'tonic', chance: 0.15 }],
     respawnSeconds: 25,
   },
 };
@@ -309,7 +594,7 @@ export interface QuestDef {
   thanks: string;
   goal: QuestGoal;
   requires?: string;
-  reward: { xp: number; gold: number; items?: InventorySlot[] };
+  reward: { xp: number; gold: number; items?: InventorySlot[]; ability?: string };
 }
 
 export const QUESTS: Record<string, QuestDef> = {
@@ -328,9 +613,9 @@ export const QUESTS: Record<string, QuestDef> = {
     requires: 'meet-bramble',
     offer: 'The walking mushrooms keep trampling my herb beds. Knock four of them back into the moss and I will make it worth your while. Press Space to strike.',
     waiting: 'Still mushrooms underfoot. Four, I said.',
-    thanks: 'Ha! My herbs thank you. Take these.',
+    thanks: 'Ha! My herbs thank you. Let me show you how to swing properly: put your back into it. Press 1 for a Power Strike.',
     goal: { kind: 'defeat', creature: 'walking-mushroom', count: 4 },
-    reward: { xp: 40, gold: 15, items: [{ item: 'tonic', qty: 2 }] },
+    reward: { xp: 40, gold: 15, items: [{ item: 'tonic', qty: 2 }], ability: 'power-strike' },
   },
   'crab-tolls': {
     title: 'Crab Tolls',
@@ -356,7 +641,7 @@ export const QUESTS: Record<string, QuestDef> = {
 export const NPC_GREETINGS: Record<string, string> = {
   'sister-amala': 'May the God hear you. Speak your wishes at the shrine, once it wakes.',
   'old-bramble': 'Mind the roots, and mind the mushrooms.',
-  marina: 'Shells, salt and stories. Nothing for sale yet, but come back soon.',
+  marina: 'Shells, salt and stories. Have a look at what I have, or show me what you found.',
   'cactus-elder': 'Slow down, traveller. The desert has time.',
 };
 
@@ -383,6 +668,7 @@ export function completeQuest(c: Character, state: QuestState): number {
   c.gold += q.reward.gold;
   c.favor += QUEST_FAVOR;
   for (const r of q.reward.items ?? []) addItem(c, r.item, r.qty);
+  if (q.reward.ability) learnAbility(c, q.reward.ability);
   return gainXp(c, q.reward.xp);
 }
 
@@ -392,6 +678,7 @@ export function rewardText(id: string): string {
   if (r.gold) parts.push(`${r.gold} gold`);
   parts.push(`${QUEST_FAVOR} Favor`);
   for (const i of r.items ?? []) parts.push(`${i.qty > 1 ? `${i.qty} × ` : ''}${ITEMS[i.item]?.name ?? i.item}`);
+  if (r.ability) parts.push(`the ${ABILITIES[r.ability]?.name ?? r.ability} ability`);
   return parts.join(', ');
 }
 

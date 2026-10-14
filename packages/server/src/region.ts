@@ -1,7 +1,23 @@
 import {
+  ABILITIES,
   ATTACK_RANGE,
   CREATURES,
   ITEMS,
+  RECIPES,
+  SHOPS,
+  abilityAmount,
+  afterArmor,
+  buy,
+  craft,
+  energyPerSecond,
+  equip,
+  gearBonus,
+  maxEnergy,
+  readScroll,
+  sell,
+  train,
+  unequip,
+  wisherOf,
   MAX_CHAT_LENGTH,
   NPC_GREETINGS,
   QUESTS,
@@ -32,6 +48,8 @@ import {
   tileAt,
   Tile,
   type Character,
+  type CreatorCredit,
+  type EquipSlot,
   type ChatChannel,
   type ClientMessage,
   type CreatureDef,
@@ -45,8 +63,10 @@ import {
   type RegionInfo,
   type RegionMap,
   type ServerMessage,
+  type ShopMessage,
   type Side,
 } from '@co-mmo/shared';
+import { TradeDesk } from './trades.ts';
 
 /** Inputs a player may queue; extra inputs are dropped (anti speed-hack). */
 const MAX_QUEUED_INPUTS = 10;
@@ -79,8 +99,8 @@ export interface RegionHooks {
   worldChat(message: ServerMessage): void;
   /** Players online across the whole world. */
   online(): number;
-  /** Someone enjoyed a wished thing (defeated a wished creature): reward its wisher. */
-  creatorFavor?(wisherId: string, amount: number): void;
+  /** Someone enjoyed a wished thing (fought, used, wore, crafted, learned or talked to it): its wisher earns Creator XP. */
+  creator?(thingId: string, playerId: string, credit: CreatorCredit): void;
   /** Something a scripted rule may answer happened (an item used, E pressed, a creature defeated). */
   event?(type: 'use' | 'interact' | 'defeat', playerId: string, data: Record<string, string | number>): void;
   /** Delivers party and whisper chat, which can cross regions; returns why it could not. */
@@ -105,6 +125,8 @@ interface PlayerState {
   chatTimes: number[];
   lastAttack: number;
   lastHurt: number;
+  /** When each ability can be used again, epoch ms. */
+  readyAt: Map<string, number>;
   /** Character changed this tick; send it once the tick ends. */
   dirty: boolean;
 }
@@ -134,8 +156,6 @@ interface Creature extends Walker {
   lastAttack: number;
   /** Epoch ms when a defeated creature comes back; null while alive. */
   respawnAt: number | null;
-  /** Who wished it into the world, if anyone. */
-  wisher?: string;
 }
 
 export type Departure = { id: string; side: Side; died?: undefined } | { id: string; died: true; side?: undefined };
@@ -162,6 +182,7 @@ export class Region {
   private tickCount = 0;
 
   private readonly hooks: RegionHooks;
+  private readonly trades: TradeDesk;
 
   constructor(
     readonly def: RegionDef,
@@ -174,6 +195,22 @@ export class Region {
     this.map = generateRegion(def);
     this.creatures = this.map.creatures.flatMap((c, i) => this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y));
     this.townsfolk = this.map.npcs.map((n) => this.makeStroller(n));
+    this.trades = new TradeDesk({
+      character: (id) => this.players.get(id)?.character,
+      nameOf: (id) => this.players.get(id)?.info.name,
+      findByName: (name) => [...this.players.values()].find((p) => p.info.name.toLowerCase() === name.toLowerCase())?.info.id,
+      distance: (a, b) => {
+        const pa = this.players.get(a);
+        const pb = this.players.get(b);
+        return pa && pb ? Math.hypot(pa.x - pb.x, pa.y - pb.y) : Infinity;
+      },
+      send: (id, m) => this.send(id, m),
+      changed: (id) => {
+        const p = this.players.get(id);
+        if (p) p.dirty = true;
+      },
+      now: this.now,
+    });
   }
 
   /** Lets an NPC stroll about where they were placed. */
@@ -181,7 +218,7 @@ export class Region {
     return Object.assign(npc, { home: { x: npc.x, y: npc.y }, target: null, rest: Math.floor(this.random() * TICK_RATE * 3) });
   }
 
-  private makeCreature(id: string, kind: string, x: number, y: number, wisher?: string): Creature[] {
+  private makeCreature(id: string, kind: string, x: number, y: number): Creature[] {
     const cdef = CREATURES[kind];
     if (!cdef) return [];
     return [{
@@ -198,15 +235,14 @@ export class Region {
       returning: false,
       lastAttack: 0,
       respawnAt: null,
-      ...(wisher ? { wisher } : {}),
     }];
   }
 
   // --- Wished content ----------------------------------------------------------
 
   /** Places a wished creature kind at these spots. */
-  addCreatures(kind: string, spots: { x: number; y: number }[], wisher: string): void {
-    spots.forEach((s, i) => this.creatures.push(...this.makeCreature(`${kind}-${i}`, kind, s.x, s.y, wisher)));
+  addCreatures(kind: string, spots: { x: number; y: number }[]): void {
+    spots.forEach((s, i) => this.creatures.push(...this.makeCreature(`${kind}-${i}`, kind, s.x, s.y)));
   }
 
   /** Places a wished NPC, who strolls about that spot. */
@@ -369,7 +405,7 @@ export class Region {
       y = at.y;
     }
     this.players.set(info.id, {
-      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, dirty: false,
+      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false,
     });
     conn.send({ t: 'welcome', you: info, region: this.info, x, y, tickRate: TICK_RATE, character });
     this.broadcastSystem(announce ?? `${info.name} entered ${this.def.name}.`);
@@ -379,6 +415,7 @@ export class Region {
   remove(id: string, announce?: string): Leaving | undefined {
     const p = this.players.get(id);
     if (!p) return undefined;
+    this.trades.leave(id);
     this.players.delete(id);
     for (const c of this.creatures) if (c.aggro === id) this.giveUp(c);
     this.broadcastSystem(announce ?? `${p.info.name} left.`);
@@ -408,6 +445,21 @@ export class Region {
         break;
       case 'use':
         this.useItem(p, message.item);
+        break;
+      case 'equip':
+        this.wear(p, message.item, message.slot);
+        break;
+      case 'ability':
+        this.useAbility(p, message.ability, message.target);
+        break;
+      case 'craft':
+        this.craft(p, message.recipe);
+        break;
+      case 'shop':
+        this.shop(p, message);
+        break;
+      case 'trade':
+        this.trades.handle(id, message);
         break;
     }
     this.flush(p);
@@ -440,6 +492,10 @@ export class Region {
       if (p.character.hp > 0 && p.character.hp < max && now - p.lastHurt >= REGEN_DELAY_MS) {
         p.character.hp = Math.min(max, p.character.hp + regenPerSecond(p.character) * TICK_SECONDS);
       }
+      const maxE = maxEnergy(p.character);
+      if (p.character.hp > 0 && p.character.energy < maxE) {
+        p.character.energy = Math.min(maxE, p.character.energy + energyPerSecond(p.character) * TICK_SECONDS);
+      }
     }
     for (const c of this.creatures) this.think(c, now);
     for (const n of this.townsfolk) this.stroll(n);
@@ -471,7 +527,7 @@ export class Region {
         if (near(n.x, n.y)) npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
       }
       p.conn.send({
-        t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), players, creatures, npcs, online,
+        t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, npcs, online,
       });
       this.flush(p);
     }
@@ -484,31 +540,121 @@ export class Region {
     const now = this.now();
     if (p.character.hp <= 0 || now - p.lastAttack < attackCooldown(p.character) * 1000 - 1) return;
     p.lastAttack = now;
+    const target = this.creatureInReach(p, ATTACK_RANGE);
+    if (!target) return;
+    this.strike(p, target, attackPower(p.character) * (0.8 + this.random() * 0.4));
+  }
+
+  /** The nearest live creature within reach, or the one asked for if it is in reach. */
+  private creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined {
     let target: Creature | undefined;
-    let best = ATTACK_RANGE;
+    let best = range;
     for (const c of this.creatures) {
-      if (c.respawnAt !== null) continue;
+      if (c.respawnAt !== null || (id && c.id !== id)) continue;
       const d = Math.hypot(c.x - p.x, c.y - p.y);
       if (d <= best) {
         best = d;
         target = c;
       }
     }
-    if (!target) return;
-    const weakened = now < p.character.weakenedUntil ? 0.5 : 1;
-    const amount = Math.max(1, Math.round(attackPower(p.character) * (0.8 + this.random() * 0.4) * weakened));
+    return target;
+  }
+
+  /** Damages a creature (halved while Weakened); a defeat pays the rewards. */
+  private strike(p: PlayerState, target: Creature, raw: number, ability?: string): void {
+    const weakened = this.now() < p.character.weakenedUntil ? 0.5 : 1;
+    const amount = Math.max(1, Math.round(raw * weakened));
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
-    this.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated });
+    this.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, ...(ability ? { ability } : {}) });
     if (!defeated) {
       target.aggro = p.info.id;
       target.returning = false;
       target.target = null;
       return;
     }
-    target.respawnAt = now + target.def.respawnSeconds * 1000;
+    target.respawnAt = this.now() + target.def.respawnSeconds * 1000;
     target.aggro = null;
     this.reward(p, target);
+  }
+
+  // --- Abilities ---------------------------------------------------------------
+
+  private useAbility(p: PlayerState, id: string, targetId?: string): void {
+    const a = ABILITIES[id];
+    const ch = p.character;
+    if (!a || !ch.abilities.includes(id) || ch.hp <= 0) return;
+    const now = this.now();
+    if (now < (p.readyAt.get(id) ?? 0) - 1) return;
+    if (ch.energy < a.energy) return this.notice(p, `Not enough Energy for ${a.name}.`);
+    const max = maxHp(ch);
+    let target: Creature | undefined;
+    if (a.effect === 'heal') {
+      if (ch.hp >= max) return this.notice(p, 'You are already at full health.');
+    } else {
+      target = this.creatureInReach(p, a.range, targetId) ?? (targetId ? this.creatureInReach(p, a.range) : undefined);
+      if (!target) return this.notice(p, a.effect === 'bolt' ? `No creature within ${a.range} steps.` : 'Nothing in reach to strike.');
+    }
+    ch.energy -= a.energy;
+    p.readyAt.set(id, now + a.cooldown * 1000);
+    p.conn.send({ t: 'cooldown', ability: id, seconds: a.cooldown });
+    p.dirty = true;
+    const amount = abilityAmount(ch, a) * (0.9 + this.random() * 0.2);
+    if (target) this.strike(p, target, amount, id);
+    else {
+      const healed = Math.min(max - ch.hp, Math.round(amount));
+      ch.hp += healed;
+      this.notice(p, `${a.name} restores ${healed} health.`);
+    }
+    this.credit(id, p, 'use');
+  }
+
+  // --- The Adventurer's kit: gear, crafting, shops --------------------------------
+
+  /** Wears an item from the bag, or takes off what is in a slot. */
+  private wear(p: PlayerState, item?: string, slot?: EquipSlot): void {
+    if (item) {
+      const why = equip(p.character, item);
+      if (why) return this.notice(p, why);
+      this.notice(p, `You put on the ${ITEMS[item]!.name}.`);
+      this.credit(item, p, 'equip');
+    } else if (slot && !unequip(p.character, slot)) {
+      return;
+    }
+    p.dirty = true;
+  }
+
+  private craft(p: PlayerState, recipe: string): void {
+    const why = craft(p.character, recipe);
+    if (why) return this.notice(p, why);
+    const r = RECIPES[recipe]!;
+    this.notice(p, `You made ${r.result.qty > 1 ? `${r.result.qty} × ` : 'a '}${ITEMS[r.result.item]!.name}.`);
+    this.credit(recipe, p, 'craft');
+    p.dirty = true;
+  }
+
+  /** Buying, selling and lessons, only while standing by the shopkeeper. */
+  private shop(p: PlayerState, m: ShopMessage): void {
+    const keeper = this.townsfolk.find((n) => n.id === m.npc);
+    if (!keeper || !SHOPS[m.npc] || Math.hypot(keeper.x - p.x, keeper.y - p.y) > TALK_RANGE + 1) {
+      return this.notice(p, `Walk up to ${npcName(m.npc)} to trade.`);
+    }
+    const ch = p.character;
+    const before = ch.gold;
+    const why = m.action === 'buy' ? buy(ch, m.npc, m.id) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);
+    if (why) return this.notice(p, why);
+    const name = m.action === 'learn' ? ABILITIES[m.id]!.name : ITEMS[m.id]?.name ?? m.id;
+    this.notice(p, m.action === 'buy'
+      ? `You bought a ${name} for ${before - ch.gold} gold.`
+      : m.action === 'sell'
+        ? `You sold ${m.qty && m.qty > 1 ? `${m.qty} × ` : 'a '}${name} for ${ch.gold - before} gold.`
+        : `${npcName(m.npc)} teaches you ${name}. It is on the ${ch.abilities.length} key.`);
+    p.dirty = true;
+  }
+
+  /** Someone enjoyed a wished thing; its wisher earns Creator XP (the world decides how much). */
+  private credit(thing: string, p: PlayerState, credit: CreatorCredit): void {
+    if (wisherOf(thing)) this.hooks.creator?.(thing, p.info.id, credit);
   }
 
   private reward(p: PlayerState, c: Creature): void {
@@ -534,7 +680,7 @@ export class Region {
     }
     discover(ch, c.kind);
     this.hooks.event?.('defeat', p.info.id, { creature: c.kind });
-    if (c.wisher && c.wisher !== p.info.id) this.hooks.creatorFavor?.(c.wisher, 1);
+    this.credit(c.kind, p, 'defeat');
     this.notice(p, `Defeated ${c.def.name}: ${gained.join(', ')}.`);
     for (const m of sharers) {
       if (m !== p) {
@@ -620,7 +766,7 @@ export class Region {
   }
 
   private hurt(p: PlayerState, c: Creature, now: number): void {
-    const amount = Math.max(1, Math.round(c.def.damage * (0.8 + this.random() * 0.4)));
+    const amount = afterArmor(c.def.damage * (0.8 + this.random() * 0.4), gearBonus(p.character, 'armor'));
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
     const defeated = p.character.hp === 0;
@@ -683,6 +829,7 @@ export class Region {
         npc = n;
       }
     }
+    if (npc) this.credit(npc.id, p, 'talk');
     if (!npc) {
       // Nobody to talk to: the player is acting on the land (fishing at water, say).
       const spot = this.nearestTile(p.x, p.y, [Tile.Water, Tile.Tree, Tile.Rock], 1.6);
@@ -717,6 +864,7 @@ export class Region {
       text: [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || NPC_GREETINGS[npc.id] || '...',
     };
     if (offer) message.offer = { quest: offer, title: QUESTS[offer]!.title, reward: rewardText(offer) };
+    if (SHOPS[npc.id]) message.shop = true;
     p.conn.send(message);
   }
 
@@ -734,9 +882,21 @@ export class Region {
     const def = ITEMS[item];
     const ch = p.character;
     if (!def || itemCount(ch, item) === 0 || ch.hp <= 0) return;
+    if (def.slot) return this.wear(p, item);
+    if (def.teaches) {
+      const why = readScroll(ch, item);
+      if (why) return this.notice(p, why);
+      this.notice(p, `You read the scroll and learn ${ABILITIES[def.teaches]!.name}. It is on the ${ch.abilities.length} key.`);
+      this.credit(item, p, 'learn');
+      p.dirty = true;
+      return;
+    }
     // Items without a built-in use are for scripted rules (a fishing rod).
     if (!def.heal) {
-      if (def.kind !== 'book') this.hooks.event?.('use', p.info.id, { item });
+      if (def.kind !== 'book') {
+        this.hooks.event?.('use', p.info.id, { item });
+        this.credit(item, p, 'use');
+      }
       return;
     }
     const max = maxHp(ch);
@@ -744,6 +904,7 @@ export class Region {
     takeItem(ch, item);
     ch.hp = Math.min(max, ch.hp + def.heal);
     this.notice(p, `You drink a ${def.name}.`);
+    this.credit(item, p, 'use');
     p.dirty = true;
   }
 

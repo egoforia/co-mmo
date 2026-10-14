@@ -9,4 +9,5 @@ export * from './prediction.ts';
 export * from './biomes.ts';
 export * from './art.ts';
 export * from './rpg.ts';
+export * from './kit.ts';
 export * from './content.ts';

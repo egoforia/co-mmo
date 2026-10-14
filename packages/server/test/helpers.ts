@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { WebSocket } from 'ws';
-import { CREATURES, ITEMS, NPC_GREETINGS, type GodMessage, type ServerMessage, type WishCard } from '@co-mmo/shared';
+import { ABILITIES, CREATURES, ITEMS, NPC_GREETINGS, RECIPES, type GodMessage, type ServerMessage, type WishCard } from '@co-mmo/shared';
 import { createApp, type App } from '../src/app.ts';
 import type { ChatModel } from '../src/ai/chat.ts';
 import { OfflineGod } from '../src/god.ts';
@@ -31,10 +31,11 @@ afterEach(async () => {
   for (const s of sockets.splice(0)) s.close();
   await app?.close();
   app = null;
-  for (const id of Object.keys(ITEMS)) if (id.startsWith('w')) delete ITEMS[id];
-  for (const id of Object.keys(CREATURES)) if (id.startsWith('w')) delete CREATURES[id];
-  for (const id of Object.keys(NPC_GREETINGS)) if (id.startsWith('w')) delete NPC_GREETINGS[id];
+  // Forget wished things; built-in ones (the Walking Mushroom, the Wooden Sword) stay.
+  for (const [registry, keep] of BUILT_IN) for (const id of Object.keys(registry)) if (!keep.has(id)) delete registry[id];
 });
+
+const BUILT_IN: [Record<string, unknown>, Set<string>][] = [ITEMS, CREATURES, NPC_GREETINGS, RECIPES, ABILITIES].map((r) => [r, new Set(Object.keys(r))]);
 
 /** Paints a small magenta-backed square, like the image service would. */
 export const fakePainter = (): ImageProvider & { calls: number } => ({

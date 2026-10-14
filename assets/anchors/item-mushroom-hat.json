@@ -1,0 +1,43 @@
+{
+  "id": "item-mushroom-hat",
+  "description": {
+    "id": "item-mushroom-hat",
+    "name": "Toadstool hat",
+    "kind": "item",
+    "biome": "any",
+    "references": [
+      "item-tonic",
+      "woods-mushroom"
+    ],
+    "silhouetteHook": "a floppy wide-brimmed hat made from a red spotted toadstool cap",
+    "body": "hat with a droopy brim",
+    "materials": [
+      "mushroom",
+      "leaves"
+    ],
+    "colors": {
+      "main": "russet red",
+      "secondary": "cream spots",
+      "accent": "leaf green band"
+    },
+    "details": [
+      "a leaf hatband",
+      "a tiny sprout on top"
+    ],
+    "mood": "whimsical, cosy",
+    "extra": {
+      "category": "headgear",
+      "rarity": "Common"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Toadstool hat (item). Most recognisable feature: a floppy wide-brimmed hat made from a red spotted toadstool cap. Body and shape: hat with a droopy brim. Materials: mushroom, leaves. Colours: main russet red, secondary cream spots, small accent of leaf green band. Details: a leaf hatband; a tiny sprout on top. category: headgear. rarity: Common. Mood: whimsical, cosy.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-tonic",
+    "woods-mushroom"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T23:02:57.562Z"
+}

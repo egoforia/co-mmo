@@ -1,4 +1,4 @@
-import { ITEMS, MAX_WISHED_COUNT, MAX_WISHED_HEAL, MAX_WISHED_LEVEL, type WishTier } from '@co-mmo/shared';
+import { ITEMS, MAX_RECIPE_RESULT, MAX_WISHED_COUNT, MAX_WISHED_HEAL, MAX_WISHED_LEVEL, type WishTier } from '@co-mmo/shared';
 import { parseJsonObject, type ChatModel, type ChatRequest, type ChatResult, type ChatTurn } from './ai/chat.ts';
 
 /** What the God knows about the moment a player prays. */
@@ -33,8 +33,8 @@ const PERSONA = `You are the God of co-MMO, a young world that grows from what i
 Players talk to you from anywhere. Chat, answer questions about the world, and help shape vague ideas into concrete wishes by asking one short question at a time. Only offer a wish when the player clearly wants something made and you know enough to build it.
 
 Wish tiers:
-- minor: a single new item (a hat, a potion, a trinket). You can build these now.
-- moderate: a new creature (appears near the player) or a new person (NPC) who stands beside them. You can build these now.
+- minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a hat, armour, a charm), or a new crafting recipe that everyone can use. You can build these now.
+- moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, or a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold). You can build these now.
 - major: a new system or place (fishing, mounts, weather, a dungeon, a quest line, a new region). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
 - refused: illegal, griefing, or economy-breaking.
@@ -47,16 +47,19 @@ or, when offering a wish:
 {"say": "<what you say>", "wish": {"tier": "minor|moderate|major|engine|refused", "title": "<a few words>", "summary": "<one plain sentence of what will be made>", "definition": <definition or null>}}
 
 Definitions (only for minor and moderate):
-item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"look":LOOK}
+item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit (gear only: the stat it helps)","look":LOOK}
+recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
+ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
 npc: {"kind":"npc","name":"...","description":"...","greeting":"<what they say when spoken to>","look":LOOK}
 LOOK: {"hook":"<the one feature you would recognise it by>","body":"<body and shape in a sentence>","color":"#rrggbb main colour","mood":"<a few words>"}
+The world decides how strong gear and abilities are from their rarity and kind. Epic and Legendary gear is earned, never wished; offer Rare at most. Wished things are for everyone's fun: refuse gear or recipes that would flood the world with gold.
 wander creatures only fight back; guard creatures attack anyone near their spot; chase creatures hunt anyone they see. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).`;
 
 export function systemPrompt(ctx: PrayerContext): string {
   const items = Object.entries(ITEMS).filter(([, d]) => !d.bound).map(([id]) => id).join(', ');
   return [
-    PERSONA.replace('%ITEMS%', items),
+    PERSONA.replaceAll('%ITEMS%', items),
     '',
     `Now: ${ctx.playerName} (${ctx.role}, ${ctx.favor} Favor) prays in ${ctx.regionName} (${ctx.biome}).`,
     ctx.nearby.length ? `Nearby: ${ctx.nearby.join('; ')}.` : 'Nobody else is nearby.',
@@ -150,6 +153,20 @@ export class OfflineGod implements ChatModel {
         wish: { tier: 'major', title: cap(big[1]!), summary: `A new feature: ${said.trim().slice(0, 160)}`, definition: null },
       };
     }
+    const power = text.match(/\b(spell|ability|skill|technique|power)\b/);
+    if (power) {
+      const effect = /\b(heal|mend|cure|soothe)\b/.test(text) ? 'heal' : /\b(bolt|fire|ranged|throw|arrow|lightning|blast|ice)\b/.test(text) ? 'bolt' : 'strike';
+      const name = cap(thing.replace(/\b(spell|ability|skill|technique|power)\b/, '').trim() || 'Wonder');
+      return {
+        say: `A new power, ${name}? I will write it on a scroll for you. Read it to learn it, or pass it on.`,
+        wish: {
+          tier: 'moderate',
+          title: name,
+          summary: `A scroll that teaches ${name} will be in your bag.`,
+          definition: { kind: 'ability', name, description: `${name}, learned from a wish.`, effect, look },
+        },
+      };
+    }
     if (/\b(creature|monster|beast|animal|critter|slime|wolf|goat|bird|beetle|spider|dragon)\b/.test(text)) {
       const behavior = /\b(fierce|hunt|angry|aggressive|chase)\b/.test(text) ? 'chase' : /\b(guard|protect)\b/.test(text) ? 'guard' : 'wander';
       return {
@@ -174,6 +191,21 @@ export class OfflineGod implements ChatModel {
       };
     }
     const drink = /\b(potion|drink|tea|elixir|tonic|brew|juice)\b/.test(text);
+    const slot = /\b(sword|axe|spear|lance|bow|staff|dagger|hammer|club|mace|blade)\b/.test(text) ? 'weapon'
+      : /\b(hat|helmet|helm|hood|crown|cap)\b/.test(text) ? 'head'
+        : /\b(armou?r|coat|cloak|robe|vest|mail|tunic)\b/.test(text) ? 'body'
+          : /\b(ring|amulet|charm|necklace|pendant|talisman)\b/.test(text) ? 'charm' : undefined;
+    if (slot) {
+      return {
+        say: `A ${thing} to wear? It will be waiting in your bag.`,
+        wish: {
+          tier: 'minor',
+          title: cap(thing),
+          summary: `A ${thing} to wear, in your bag.`,
+          definition: { kind: 'item', name: cap(thing), description: `A ${thing}, made by a wish.`, itemKind: slot, rarity: 'common', look },
+        },
+      };
+    }
     return {
       say: `A ${thing}? Easily done. It will be in your bag.`,
       wish: {

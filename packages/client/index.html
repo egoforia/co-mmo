@@ -19,6 +19,7 @@
 
     <div id="stats" hidden>
       <div class="bar hp"><span id="hp-fill"></span><b id="hp-text"></b></div>
+      <div class="bar energy"><span id="energy-fill"></span><b id="energy-text"></b></div>
       <div class="bar xp"><span id="xp-fill"></span><b id="xp-text"></b></div>
       <div id="stats-line"></div>
     </div>
@@ -26,10 +27,16 @@
     <div id="keys" hidden>
       <span><kbd>Space</kbd> strike</span><span><kbd>E</kbd> talk</span>
       <button type="button" data-open="inventory"><kbd>I</kbd> bag</button>
+      <button type="button" data-open="crafting"><kbd>C</kbd> craft</button>
       <button type="button" data-open="bible"><kbd>B</kbd> Bible</button>
       <button type="button" data-open="prayer" class="pray"><kbd>G</kbd> Pray</button>
     </div>
+    <div id="abilities" hidden></div>
     <div id="dialogue" hidden></div>
+    <div id="crafting" class="window" hidden></div>
+    <div id="shop" class="window" hidden></div>
+    <div id="trade" class="window" hidden></div>
+    <div id="trade-request" hidden></div>
     <div id="inventory" class="window" hidden></div>
     <div id="bible" hidden></div>
     <div id="prayer" class="window" hidden></div>

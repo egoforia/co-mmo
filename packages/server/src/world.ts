@@ -1,10 +1,16 @@
 import {
+  CREATOR_LEVEL_FAVOR,
+  CREATOR_REPEAT_MS,
+  CREATOR_XP,
   WEAKENED_MS,
+  gainCreatorXp,
+  wisherOf,
   WORLD_REGIONS,
   arrivalPoint,
   maxHp,
   type Character,
   type ChatMessage,
+  type CreatorCredit,
   type ClientMessage,
   type PartyActionMessage,
   type PartyMessage,
@@ -41,6 +47,8 @@ export class World {
   private readonly names = new Map<string, string>();
   /** Who last whispered to each player, for replying. */
   private readonly lastWhisper = new Map<string, string>();
+  /** When a player last earned someone Creator XP for a thing, per kind of enjoyment. */
+  private readonly credited = new Map<string, number>();
 
   constructor(private readonly now: () => number = Date.now, random: () => number = Math.random) {
     this.parties = new Parties(now);
@@ -48,7 +56,7 @@ export class World {
       this.regions.set(def.id, new Region(def, {
         worldChat: (m) => this.broadcast(m),
         online: () => this.where.size,
-        creatorFavor: (wisher, amount) => this.creatorFavor(wisher, amount),
+        creator: (thing, playerId, credit) => this.creatorCredit(thing, playerId, credit),
         event: (type, playerId, data) => this.onEvent?.(type, playerId, data),
         route: (message, to) => this.route(message, to),
         party: (playerId) => this.parties.members(playerId),
@@ -63,15 +71,42 @@ export class World {
   /** Events for scripted rules: set by whoever runs them (the app, or a rule's test run). */
   onEvent?: (type: 'use' | 'interact' | 'defeat' | 'enter' | 'join', playerId: string, data: Record<string, string | number>) => void;
 
-  /** Credits Favor to a player who is not online (set by the app, which owns storage). */
-  offlineFavor?: (playerId: string, amount: number) => void;
+  /** Credits Creator XP to a player who is not online; returns Creator levels gained (set by the app, which owns storage). */
+  offlineCreatorXp?: (playerId: string, amount: number) => number;
 
-  private creatorFavor(wisher: string, amount: number): void {
+  /**
+   * Someone enjoyed a thing another player wished for: its wisher earns
+   * Creator XP (design doc, Characters and progression). Talking, using,
+   * wearing, crafting and learning count once per player, thing and kind
+   * every few minutes, so nobody farms a friend's creation.
+   */
+  creatorCredit(thing: string, playerId: string, credit: CreatorCredit): void {
+    const wisher = wisherOf(thing);
+    if (!wisher || wisher === playerId) return;
+    if (credit !== 'defeat') {
+      const key = `${playerId} ${thing} ${credit}`;
+      const last = this.credited.get(key);
+      if (last !== undefined && this.now() - last < CREATOR_REPEAT_MS) return;
+      this.credited.set(key, this.now());
+      if (this.credited.size > 10_000) this.credited.clear();
+    }
+    const amount = CREATOR_XP[credit];
     const region = this.regionOf(wisher);
-    if (!region) return this.offlineFavor?.(wisher, amount);
-    region.updateCharacter(wisher, (c) => {
-      c.favor += amount;
-    });
+    let levels = 0;
+    if (region) {
+      region.updateCharacter(wisher, (c) => {
+        levels = gainCreatorXp(c, amount);
+      });
+    } else {
+      levels = this.offlineCreatorXp?.(wisher, amount) ?? 0;
+    }
+    if (!levels) return;
+    const name = this.names.get(wisher);
+    const level = region?.character(wisher)?.creatorLevel;
+    if (region && level) {
+      region.tell(wisher, `✦ Others love what you wished into the world. You reached Creator level ${level} and earned ${levels * CREATOR_LEVEL_FAVOR} Favor.`);
+    }
+    if (name && level) this.onJournal?.(`${name}'s creations earned them Creator level ${level}.`, wisher);
   }
 
   /** Sends one player a message, wherever they are. */

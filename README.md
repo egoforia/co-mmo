@@ -53,7 +53,7 @@ The God (milestone 4, first version):
 - Press G anywhere to pray. The God chats, helps shape an idea, and offers a
   wish card: what will be made, where, and its Favor cost (2 for an item, 6
   for a creature or a person). Favor: 10 to start, 3 per quest, 2 per level,
-  and 1 each time someone else defeats a creature you wished for.
+  and 3 per Creator level (milestone 8).
 - Granted wishes are content data checked against balance limits: items go
   into your bag, creatures appear around you, people stand beside you and
   talk. Everyone sees a line in chat, and the Bible's Chronicle lists them.
@@ -114,6 +114,32 @@ Play together (milestone 7, first version):
   hard limit. Parties live in memory and break up on a restart.
 - "While you were away": on joining, a short feed of what others wished and
   did (new players, level-ups) since you last played.
+
+Adventurer's kit (milestone 8, first version):
+
+- Equipment: weapon, head, body and charm slots, worn from the bag (I) and
+  taken off with a click. Gear adds stats, weapon damage and armour, with
+  rarity from Common to Legendary. Armour softens creature blows.
+- Abilities on the 1 to 4 keys, paid for with Energy (a new bar; Wit raises
+  it, Spirit refills it faster) and resting a few seconds after use: Power
+  Strike from Old Bramble's quest, Mend from Sister Amala's lessons, Firebolt
+  (hits a creature five steps away) from a scroll the Cactus Elder sells.
+- Crafting (C): creatures now drop mushroom caps, crab shells and scarab wing
+  cases; recipes turn them into Tonics, a Toadstool Hat, a Crab-Shell Lance,
+  Shell Mail and a Scarab Charm. Finer recipes need more Wit.
+- Shops: Marina and the Cactus Elder sell and buy (at half value); Sister
+  Amala teaches. Shop rules live in `packages/shared/src/kit.ts`, so the
+  windows show what the server charges.
+- Trading: /trade Name with someone close by. Both put items and gold on the
+  table; any change clears both agreements; the swap is all or nothing.
+- Creator XP: when others fight, talk to, wear, use, craft with or learn from
+  what you wished for, you earn Creator XP (once every ten minutes per player,
+  thing and way, except fights). Each Creator level pays 3 Favor.
+- New wishes: gear to wear (rarity up to Rare; the world sets its numbers),
+  crafting recipes (only from things that exist, never making more than they
+  use), and abilities that arrive as a scroll you can read, sell or trade.
+- New item art (materials, gear, the scroll) was painted with the anchor
+  pipeline (`npm run anchors -- --only item-...`, then `npm run game-art`).
 
 Wishes that change the game (milestone 6, first version):
 

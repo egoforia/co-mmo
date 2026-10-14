@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  ABILITIES,
   Interpolator,
   Predictor,
   TICK_SECONDS,
@@ -272,7 +273,9 @@ export class WorldScene extends Phaser.Scene {
     const myId = this.welcome.you.id;
     const target = hit.target === myId ? this.me : this.remotes.get(hit.target) ?? this.creatures.get(hit.target);
     const attacker = hit.by === myId ? this.me : this.remotes.get(hit.by) ?? this.creatures.get(hit.by);
-    if (attacker && attacker !== this.me && target) this.lunge(attacker, target.body.x - attacker.body.x);
+    const bolt = hit.ability && ABILITIES[hit.ability]?.effect === 'bolt';
+    if (attacker && target && bolt) this.bolt(attacker, target);
+    else if (attacker && attacker !== this.me && target) this.lunge(attacker, target.body.x - attacker.body.x);
     if (!target) return;
     const hurtMe = target === this.me;
     const number = this.add
@@ -302,6 +305,18 @@ export class WorldScene extends Phaser.Scene {
     const slash = this.add.image(this.me.body.x + this.facing * T * 0.45, this.me.body.y - this.me.body.displayHeight * 0.45, 'fx-slash');
     slash.setDisplaySize(T * 0.9, T * 0.9).setFlipX(this.facing > 0).setDepth(this.me.body.depth + 1);
     this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
+  }
+
+  /** The painted Firebolt spark flies from the caster to the target. */
+  private bolt(from: Avatar, to: Avatar): void {
+    if (!this.textures.exists('item-firebolt')) return;
+    const y = (a: Avatar) => a.body.y - a.body.displayHeight * 0.5;
+    const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
+    const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
+    this.tweens.add({
+      targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn',
+      onComplete: () => this.tweens.add({ targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onComplete: () => spark.destroy() }),
+    });
   }
 
   private lunge(a: Avatar, direction: number): void {

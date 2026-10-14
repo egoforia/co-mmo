@@ -125,14 +125,80 @@
     "width": 128,
     "height": 128
   },
+  "item-crab-lance": {
+    "file": "art/item-crab-lance.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-crab-shell": {
+    "file": "art/item-crab-shell.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-firebolt": {
+    "file": "art/item-firebolt.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-goat-horn": {
     "file": "art/item-goat-horn.png",
     "kind": "item",
     "width": 128,
     "height": 128
   },
+  "item-mushroom-cap": {
+    "file": "art/item-mushroom-cap.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-mushroom-hat": {
+    "file": "art/item-mushroom-hat.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-scarab-charm": {
+    "file": "art/item-scarab-charm.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-scarab-shell": {
+    "file": "art/item-scarab-shell.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-scroll": {
+    "file": "art/item-scroll.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-shell-mail": {
+    "file": "art/item-shell-mail.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-tonic": {
     "file": "art/item-tonic.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-traveller-coat": {
+    "file": "art/item-traveller-coat.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-wooden-sword": {
+    "file": "art/item-wooden-sword.png",
     "kind": "item",
     "width": 128,
     "height": 128

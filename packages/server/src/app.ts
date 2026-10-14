@@ -71,7 +71,7 @@ const MIME: Record<string, string> = {
 export function createApp(options: AppOptions): App {
   const { store } = options;
   const world = new World();
-  world.offlineFavor = (playerId, amount) => store.addFavor(playerId, amount);
+  world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   const env = options.wishes.env ?? process.env;
   const auth = new Auth({ store, publicUrl: options.publicUrl, env, ...options.auth, ...(options.wishes.now ? { now: options.wishes.now } : {}) });

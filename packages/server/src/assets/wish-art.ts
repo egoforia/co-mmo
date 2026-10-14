@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import type { BiomeId, WishDefinition } from '@co-mmo/shared';
+import type { BiomeId, PicturedWish } from '@co-mmo/shared';
 import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
 import { buildPrompt, type AssetDescription, type AssetKind } from './style.ts';
@@ -29,29 +29,31 @@ export function imageUsd(model: string, image: GeneratedImage): number {
 }
 
 /** Approved anchors sent as style references, per kind of wished thing. */
-const REFERENCES: Record<WishDefinition['kind'], string[]> = {
+const REFERENCES: Record<PicturedWish['kind'], string[]> = {
   item: ['item-tonic', 'item-goat-horn'],
+  ability: ['item-scroll', 'item-tonic'],
   creature: ['woods-mushroom', 'shore-crab-knight'],
   npc: ['sanctum-pilgrim', 'woods-herbalist'],
   player: ['player-mara', 'player-ilya'],
 };
 
-const KIND: Record<WishDefinition['kind'], AssetKind> = { item: 'item', creature: 'monster', npc: 'npc', player: 'player' };
+const KIND: Record<PicturedWish['kind'], AssetKind> = { item: 'item', ability: 'item', creature: 'monster', npc: 'npc', player: 'player' };
 
 /** Box the art is fitted into, feet at the bottom centre (as build-game-art). */
-const BOX: Record<WishDefinition['kind'], { width: number; height: number }> = {
+const BOX: Record<PicturedWish['kind'], { width: number; height: number }> = {
   item: { width: 128, height: 128 },
+  ability: { width: 128, height: 128 },
   creature: { width: 128, height: 128 },
   npc: { width: 128, height: 192 },
   player: { width: 128, height: 192 },
 };
 
-export function describeWish(def: WishDefinition, biome: BiomeId): AssetDescription {
+export function describeWish(def: PicturedWish, biome: BiomeId): AssetDescription {
   return {
-    name: def.name,
+    name: def.kind === 'ability' ? `Scroll of ${def.name}` : def.name,
     kind: KIND[def.kind],
-    biome: def.kind === 'item' || def.kind === 'player' ? 'any' : biome,
-    silhouetteHook: def.look.hook,
+    biome: def.kind === 'creature' || def.kind === 'npc' ? biome : 'any',
+    silhouetteHook: def.kind === 'ability' ? `a rolled spell scroll with a seal showing ${def.look.hook}` : def.look.hook,
     body: def.look.body,
     colors: { main: def.look.color },
     details: [def.description],
@@ -65,7 +67,7 @@ export function describeWish(def: WishDefinition, biome: BiomeId): AssetDescript
  */
 export async function paintWish(
   id: string,
-  def: WishDefinition,
+  def: PicturedWish,
   biome: BiomeId,
   provider: ImageProvider,
   anchorDir: string,

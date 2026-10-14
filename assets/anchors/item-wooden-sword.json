@@ -1,0 +1,43 @@
+{
+  "id": "item-wooden-sword",
+  "description": {
+    "id": "item-wooden-sword",
+    "name": "Wooden practice sword",
+    "kind": "item",
+    "biome": "any",
+    "references": [
+      "item-tonic",
+      "item-goat-horn"
+    ],
+    "silhouetteHook": "a short carved wooden sword with a twine-wrapped hilt",
+    "body": "simple short blade, round crossguard",
+    "materials": [
+      "pale wood",
+      "twine"
+    ],
+    "colors": {
+      "main": "honey wood",
+      "secondary": "brown twine",
+      "accent": "leaf green paint"
+    },
+    "details": [
+      "small painted leaf on the guard",
+      "wood grain"
+    ],
+    "mood": "humble, friendly",
+    "extra": {
+      "category": "weapon",
+      "rarity": "Common"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Wooden practice sword (item). Most recognisable feature: a short carved wooden sword with a twine-wrapped hilt. Body and shape: simple short blade, round crossguard. Materials: pale wood, twine. Colours: main honey wood, secondary brown twine, small accent of leaf green paint. Details: small painted leaf on the guard; wood grain. category: weapon. rarity: Common. Mood: humble, friendly.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-tonic",
+    "item-goat-horn"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T23:02:37.226Z"
+}

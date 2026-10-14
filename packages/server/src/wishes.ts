@@ -6,6 +6,8 @@ import {
   WishError,
   addItem,
   applyContent,
+  contentTier,
+  forgetVanished,
   lookFromWords,
   regionDef,
   removeContent,
@@ -16,6 +18,7 @@ import {
   type BiomeId,
   type ContentEntry,
   type ItemWish,
+  type PicturedWish,
   type PlayerInfo,
   type Role,
   type WishCard,
@@ -188,8 +191,8 @@ export class Wishes {
         // Not buildable as content: a person will have to build it.
         tier = 'major';
       }
-      // Items are minor, creatures and people moderate, whatever the model said.
-      if (definition) tier = definition.kind === 'item' ? 'minor' : 'moderate';
+      // Things for your bag are minor; creatures, people and abilities moderate, whatever the model said.
+      if (definition) tier = contentTier(definition);
     }
     for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
     const instant = tier === 'minor' || tier === 'moderate';
@@ -201,7 +204,10 @@ export class Wishes {
       cost: WISH_COSTS[tier],
       where: !instant
         ? tier === 'engine' ? 'Set before the Owner for the next game update' : 'Set before the Stewards for review'
-        : definition?.kind === 'item' ? 'In your bag' : `Beside you, in ${regionName}`,
+        : definition?.kind === 'item' ? 'In your bag'
+          : definition?.kind === 'ability' ? 'A scroll in your bag'
+            : definition?.kind === 'recipe' ? 'Known to everyone, in the crafting book (C)'
+              : `Beside you, in ${regionName}`,
       instant,
     };
     this.cards.set(card.id, { card, playerId, definition, conversation: [...conversation], usd });
@@ -238,11 +244,13 @@ export class Wishes {
     this.place(record);
     region.updateCharacter(player.id, (c) => {
       c.favor -= open.card.cost;
-      if (def.kind === 'item') addItem(c, record.id);
+      if (def.kind === 'item' || def.kind === 'ability') addItem(c, record.id);
     });
     this.broadcast(record);
     this.world.broadcast({ t: 'system', text: `✦ The God granted ${player.name}'s wish: ${record.title}.`, at: this.now() });
-    this.say(player.id, def.kind === 'item' ? 'It is done. Look in your bag.' : 'It is done. Look around you.');
+    this.say(player.id, def.kind === 'item' || def.kind === 'ability' ? 'It is done. Look in your bag.'
+      : def.kind === 'recipe' ? 'It is done. Anyone can make it now: press C to open the crafting book.'
+        : 'It is done. Look around you.');
     this.paint(record);
   }
 
@@ -321,10 +329,9 @@ export class Wishes {
     for (const region of this.world.regions.values()) {
       region.removeWish(id);
       for (const playerId of region.playerIds()) {
-        if (region.character(playerId)?.inventory.some((s) => !ITEMS[s.item])) {
-          region.updateCharacter(playerId, (c) => {
-            c.inventory = c.inventory.filter((s) => ITEMS[s.item]);
-          });
+        const c = region.character(playerId);
+        if (c && (c.inventory.some((s) => !ITEMS[s.item]) || Object.values(c.equipment).some((i) => i && !ITEMS[i]) || c.abilities.includes(id))) {
+          region.updateCharacter(playerId, forgetVanished);
         }
       }
     }
@@ -531,13 +538,13 @@ export class Wishes {
    * one picture for an item, creature or person, one per item for a rule.
    */
   paint(record: ContentRecord, force = false): Promise<void> | undefined {
-    if (!record.definition || record.status !== 'granted') return undefined;
+    if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe') return undefined;
     const provider = this.imageProvider();
     if (!provider) return undefined;
     if (!force && this.budget().over) return undefined;
     const def = record.definition;
     const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
-    const pictures: { id: string; def: WishDefinition }[] = def.kind === 'rule'
+    const pictures: { id: string; def: PicturedWish }[] = def.kind === 'rule'
       ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
       : [{ id: record.id, def }];
     const job = (async () => {
@@ -612,7 +619,7 @@ export class Wishes {
     const def = record.definition;
     const region = this.world.region(record.regionId);
     if (!def || !region || !record.placements) return;
-    if (def.kind === 'creature') region.addCreatures(record.id, record.placements, record.wisher.id);
+    if (def.kind === 'creature') region.addCreatures(record.id, record.placements);
     if (def.kind === 'npc') {
       const at = record.placements[0]!;
       region.addNpc({ id: record.id, name: def.name, asset: wishArtKey(record.id), x: at.x, y: at.y });

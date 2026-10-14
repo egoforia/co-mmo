@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { PLAYER_COLORS, hashString, type BuildTrack, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
+import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
 import type { ChatTurn, ProviderId } from './ai/chat.ts';
 import type { RuleTestReport } from './rule-test.ts';
 
@@ -348,12 +348,23 @@ export class Store {
     this.persist();
   }
 
-  /** Favor for a player who is offline (creator rewards). */
+  /** Favor for a player who is offline. */
   addFavor(id: string, amount: number): void {
     const account = this.accountById(id);
     if (!account?.character) return;
     account.character.favor += amount;
     this.persist();
+  }
+
+  /** Creator XP for a player who is offline; returns Creator levels gained. */
+  addCreatorXp(id: string, amount: number): number {
+    const account = this.accountById(id);
+    if (!account?.character) return 0;
+    const character = upgradeCharacter(account.character);
+    const levels = gainCreatorXp(character, amount);
+    account.character = character;
+    this.persist();
+    return levels;
   }
 
   // --- Content log -------------------------------------------------------

@@ -1,4 +1,4 @@
-import { applyContent, placeholderArt, ruleItemId, wishArtKey, type ContentEntry, type RuleItem, type WishDefinition } from '@co-mmo/shared';
+import { applyContent, placeholderArt, ruleItemId, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until the image model paints a wish's own
@@ -56,10 +56,10 @@ async function prepareArt(entry: ContentEntry): Promise<void> {
     }));
     return;
   }
-  await picture(wishArtKey(entry.id), entry.art, def);
+  if (def.kind !== 'recipe') await picture(wishArtKey(entry.id), entry.art, def);
 }
 
-async function picture(key: string, painted: string | undefined, def: WishDefinition | RuleItem): Promise<void> {
+async function picture(key: string, painted: string | undefined, def: PicturedWish | RuleItem): Promise<void> {
   if (painted) {
     urls.set(key, painted);
     return;

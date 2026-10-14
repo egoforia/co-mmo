@@ -1,0 +1,40 @@
+{
+  "id": "item-firebolt",
+  "description": {
+    "id": "item-firebolt",
+    "name": "Firebolt spark",
+    "kind": "item",
+    "biome": "any",
+    "references": [
+      "item-tonic",
+      "item-goat-horn"
+    ],
+    "silhouetteHook": "a round glowing ball of warm orange fire with a short swirling flame tail",
+    "body": "small fireball flying to the right",
+    "materials": [
+      "magic fire"
+    ],
+    "colors": {
+      "main": "amber orange",
+      "secondary": "pale gold core",
+      "accent": "rose sparks"
+    },
+    "details": [
+      "a few tiny embers trailing behind"
+    ],
+    "mood": "bright, magical",
+    "extra": {
+      "category": "spell effect"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Firebolt spark (item). Most recognisable feature: a round glowing ball of warm orange fire with a short swirling flame tail. Body and shape: small fireball flying to the right. Materials: magic fire. Colours: main amber orange, secondary pale gold core, small accent of rose sparks. Details: a few tiny embers trailing behind. category: spell effect. Mood: bright, magical.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-tonic",
+    "item-goat-horn"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-14T23:17:57.257Z"
+}

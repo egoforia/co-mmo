@@ -1,4 +1,4 @@
-import type { ChatChannel, ChatSendMessage, PartyActionMessage, ReportMessage } from '@co-mmo/shared';
+import type { ChatChannel, ChatSendMessage, PartyActionMessage, ReportMessage, TradeActionMessage } from '@co-mmo/shared';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -40,7 +40,7 @@ export type ChatLine =
 const PREFIX: Partial<Record<ChatChannel, string>> = { region: '[Region] ', party: '[Party] ', world: '[World] ' };
 
 /** What a line typed in the chat box asks for. */
-export type ChatIntent = ChatSendMessage | PartyActionMessage | ReportMessage | { t: 'help' } | { t: 'problem'; text: string };
+export type ChatIntent = ChatSendMessage | PartyActionMessage | ReportMessage | TradeActionMessage | { t: 'help' } | { t: 'problem'; text: string };
 
 /**
  * Reads a chat line: a slash command (/w Name hi, /p, /invite Name, /report
@@ -87,6 +87,8 @@ export function readChat(channel: ChatChannel, raw: string): ChatIntent {
       return { t: 'party', action: 'decline' };
     case 'leave':
       return { t: 'party', action: 'leave' };
+    case 'trade':
+      return rest ? { t: 'trade', action: 'request', name: rest.replace(/^@/, '') } : { t: 'problem', text: 'Write /trade and the name of someone nearby.' };
     case 'report': {
       const m = nameThen(rest);
       if (!m?.[2]) return { t: 'problem', text: 'Write /report, their name, and what happened.' };
@@ -99,7 +101,7 @@ export function readChat(channel: ChatChannel, raw: string): ChatIntent {
   }
 }
 
-export const CHAT_HELP = 'Chat: /s nearby, /region everyone here, /p your party, /w Name to whisper, /r to answer a whisper, /world everyone. Party: /invite Name, /accept, /decline, /leave. /report Name what happened tells the Stewards.';
+export const CHAT_HELP = 'Chat: /s nearby, /region everyone here, /p your party, /w Name to whisper, /r to answer a whisper, /world everyone. Party: /invite Name, /accept, /decline, /leave. /trade Name trades with someone nearby. /report Name what happened tells the Stewards.';
 
 export class ChatBox {
   private readonly log = $<HTMLOListElement>('chat-log');

@@ -3,7 +3,25 @@
 // the engine already understands (design doc, "How wishes become
 // mechanics", layer 1), never code.
 
-import { CREATURES, ITEMS, NPC_GREETINGS, type Behavior, type CreatureDef, type ItemDef } from './rpg.ts';
+import { RECIPES } from './kit.ts';
+import {
+  ABILITIES,
+  CREATURES,
+  EQUIP_SLOTS,
+  ITEMS,
+  NPC_GREETINGS,
+  RARITIES,
+  equipmentBonus,
+  type AbilityDef,
+  type AbilityEffect,
+  type Behavior,
+  type CreatureDef,
+  type EquipSlot,
+  type InventorySlot,
+  type ItemDef,
+  type Rarity,
+  type Stats,
+} from './rpg.ts';
 
 export type WishTier = 'minor' | 'moderate' | 'major' | 'engine' | 'refused';
 
@@ -22,9 +40,33 @@ export interface ItemWish {
   kind: 'item';
   name: string;
   description: string;
-  /** consumable items heal; trinkets and materials are kept. */
-  itemKind: 'consumable' | 'material' | 'trinket';
+  /** consumable items heal; trinkets and materials are kept; the rest are worn in that slot. */
+  itemKind: 'consumable' | 'material' | 'trinket' | EquipSlot;
   heal?: number;
+  /** Equipment: how rare it is (Common to Rare for wishes) and which stat it helps. */
+  rarity?: Rarity;
+  focus?: keyof Stats;
+  look: WishLook;
+}
+
+/** A new way to make something from materials (design doc, Crafting: new recipes can be wished). */
+export interface RecipeWish {
+  kind: 'recipe';
+  name: string;
+  description: string;
+  /** Existing item ids and how many of each it takes. */
+  materials: InventorySlot[];
+  /** The existing item it makes, and how many. */
+  result: InventorySlot;
+}
+
+/** A new ability, taught by a scroll that appears in the wisher's bag. */
+export interface AbilityWish {
+  kind: 'ability';
+  name: string;
+  description: string;
+  effect: AbilityEffect;
+  /** How the scroll looks. */
   look: WishLook;
 }
 
@@ -63,7 +105,10 @@ export interface PlayerLookWish {
   look: WishLook;
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish;
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | RecipeWish | AbilityWish;
+
+/** Wished things that have a picture (everything but recipes). */
+export type PicturedWish = Exclude<WishDefinition, RecipeWish>;
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
 export type RuleItem = Omit<ItemWish, 'kind'>;
@@ -252,6 +297,18 @@ export const MAX_WISHED_COUNT = 5;
 export const MAX_WISHED_HEAL = 50;
 export const MAX_RULE_ITEMS = 6;
 export const MAX_SCRIPT_LENGTH = 8000;
+/** Wished equipment is at most this rare; Epic and Legendary things are earned, not wished. */
+export const MAX_WISHED_RARITY: Rarity = 'rare';
+export const MAX_RECIPE_MATERIALS = 4;
+export const MAX_RECIPE_RESULT = 3;
+
+/** The tier a buildable wish costs: things for your bag are minor, the rest moderate. */
+export function contentTier(def: WishDefinition): 'minor' | 'moderate' {
+  return def.kind === 'item' || def.kind === 'recipe' ? 'minor' : 'moderate';
+}
+
+/** The built-in picture each equipment slot is drawn with until its own is painted. */
+const SLOT_ART: Record<EquipSlot, string> = { weapon: 'item-wooden-sword', head: 'item-mushroom-hat', body: 'item-traveller-coat', charm: 'item-scarab-charm' };
 
 /** The art key a wished thing is drawn with. */
 export function wishArtKey(id: string): string {
@@ -265,8 +322,10 @@ export function ruleItemId(entryId: string, key: string): string {
 
 /** Built-in art drawn (tinted) until a wish's own art is painted. */
 export function placeholderArt(def: WishDefinition | RuleItem): string {
-  if (!('kind' in def)) return 'itemKind' in def && def.itemKind === 'consumable' ? 'item-tonic' : 'item-goat-horn';
-  if (def.kind === 'item') return def.itemKind === 'consumable' ? 'item-tonic' : 'item-goat-horn';
+  const itemArt = (kind: ItemWish['itemKind']) => kind === 'consumable' ? 'item-tonic' : (SLOT_ART as Record<string, string>)[kind] ?? 'item-goat-horn';
+  if (!('kind' in def)) return itemArt(def.itemKind);
+  if (def.kind === 'item') return itemArt(def.itemKind);
+  if (def.kind === 'ability' || def.kind === 'recipe') return 'item-scroll';
   if (def.kind === 'npc') return 'sanctum-pilgrim';
   if (def.kind === 'player') return 'player-mara';
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';
@@ -282,11 +341,20 @@ export function validateDefinition(raw: unknown): WishDefinition {
   const name = text(d.name, 40);
   const description = text(d.description, 240);
   if (!name) throw new WishError('It needs a name.');
+  if (d.kind === 'recipe') return validateRecipe(name, description, d);
   const look = cleanLook(d.look);
   if (d.kind === 'item') {
-    const itemKind = d.itemKind === 'consumable' || d.itemKind === 'material' ? d.itemKind : 'trinket';
+    const slot = EQUIP_SLOTS.find((s) => s === d.itemKind);
+    const itemKind = d.itemKind === 'consumable' || d.itemKind === 'material' ? d.itemKind : slot ?? 'trinket';
     const heal = itemKind === 'consumable' ? clamp(Math.round(Number(d.heal) || 20), 5, MAX_WISHED_HEAL) : undefined;
-    return { kind: 'item', name, description, itemKind, ...(heal ? { heal } : {}), look };
+    if (!slot) return { kind: 'item', name, description, itemKind, ...(heal ? { heal } : {}), look };
+    const rarity = RARITIES.slice(0, RARITIES.indexOf(MAX_WISHED_RARITY) + 1).find((r) => r === d.rarity) ?? 'common';
+    const focus = (['might', 'agility', 'wit', 'spirit'] as const).find((k) => k === d.focus);
+    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), look };
+  }
+  if (d.kind === 'ability') {
+    const effect: AbilityEffect = d.effect === 'bolt' || d.effect === 'heal' ? d.effect : 'strike';
+    return { kind: 'ability', name, description, effect, look };
   }
   if (d.kind === 'creature') {
     const behavior: Behavior = d.behavior === 'guard' || d.behavior === 'chase' ? d.behavior : 'wander';
@@ -308,7 +376,26 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const greeting = text(d.greeting, 280) || `Hello, traveller. I am ${name}.`;
     return { kind: 'npc', name, description, greeting, look };
   }
-  throw new WishError('The God can only make items, creatures and people so far.');
+  throw new WishError('The God can only make items, creatures, people, recipes and abilities so far.');
+}
+
+/** A recipe must use things that exist, and give back no more than it takes. */
+function validateRecipe(name: string, description: string, d: Record<string, unknown>): RecipeWish {
+  const tradable = (id: unknown): id is string => typeof id === 'string' && !!ITEMS[id] && !ITEMS[id]!.bound;
+  const materials: InventorySlot[] = [];
+  for (const m of Array.isArray(d.materials) ? d.materials : []) {
+    const slot = (m ?? {}) as Record<string, unknown>;
+    if (!tradable(slot.item) || materials.some((x) => x.item === slot.item)) continue;
+    materials.push({ item: slot.item, qty: clamp(Math.round(Number(slot.qty) || 1), 1, 10) });
+    if (materials.length >= MAX_RECIPE_MATERIALS) break;
+  }
+  const r = (d.result ?? {}) as Record<string, unknown>;
+  if (!materials.length) throw new WishError('A recipe needs materials that exist in the world.');
+  if (!tradable(r.item)) throw new WishError('A recipe has to make something that exists in the world.');
+  if (materials.some((m) => m.item === r.item)) throw new WishError('A recipe cannot use what it makes.');
+  const taken = materials.reduce((sum, m) => sum + m.qty, 0);
+  const qty = clamp(Math.round(Number(r.qty) || 1), 1, Math.min(MAX_RECIPE_RESULT, taken));
+  return { kind: 'recipe', name, description, materials, result: { item: r.item, qty } };
 }
 
 /**
@@ -365,6 +452,20 @@ export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
 }
 
 export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
+  const slot = EQUIP_SLOTS.find((s) => s === w.itemKind);
+  if (slot) {
+    const rarity = w.rarity ?? 'common';
+    return {
+      name: w.name,
+      kind: 'equipment',
+      art: wishArtKey(id),
+      description: w.description,
+      slot,
+      rarity,
+      bonus: equipmentBonus(slot, rarity, w.focus),
+      value: 10 * (RARITIES.indexOf(rarity) + 1),
+    };
+  }
   return {
     name: w.name,
     kind: w.itemKind === 'consumable' ? 'consumable' : 'material',
@@ -372,6 +473,35 @@ export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
     description: w.description,
     ...(w.heal ? { heal: w.heal } : {}),
   };
+}
+
+/** Numbers for a wished ability come from its effect, a little below the built-in ones. */
+export function abilityFromWish(w: AbilityWish): AbilityDef {
+  const base = { name: w.name, description: w.description, effect: w.effect };
+  if (w.effect === 'bolt') return { ...base, energy: 6, cooldown: 3, range: 5, base: 2, stat: 'wit', factor: 1.3 };
+  if (w.effect === 'heal') return { ...base, energy: 10, cooldown: 12, range: 0, base: 6, stat: 'spirit', factor: 2.5 };
+  return { ...base, energy: 8, cooldown: 6, range: 1.8, base: 3, stat: 'might', factor: 1.3 };
+}
+
+/** The scroll a wished ability comes on; it shares the wish's id. */
+export function scrollFromWish(id: string, w: AbilityWish): ItemDef {
+  return {
+    name: `Scroll of ${w.name}`,
+    kind: 'scroll',
+    art: wishArtKey(id),
+    description: `Read it to learn ${w.name}: ${w.description}`.slice(0, 280),
+    teaches: id,
+    rarity: 'uncommon',
+    value: 20,
+  };
+}
+
+/** Who wished each thing into the world, by item, creature, person, recipe or ability id. */
+const WISHERS = new Map<string, string>();
+
+/** The player who wished for this thing, if anyone (for Creator XP). */
+export function wisherOf(id: string): string | undefined {
+  return WISHERS.get(id);
 }
 
 /**
@@ -382,18 +512,36 @@ export function applyContent(entry: ContentEntry): void {
   const d = entry.definition;
   if (!d) return;
   if (entry.status !== 'granted') return removeContent(entry);
+  if (d.kind === 'player') return;
+  WISHERS.set(entry.id, entry.wisher.id);
   if (d.kind === 'rule') {
-    for (const [key, item] of Object.entries(d.items)) ITEMS[ruleItemId(entry.id, key)] = itemFromWish(ruleItemId(entry.id, key), item);
+    for (const [key, item] of Object.entries(d.items)) {
+      ITEMS[ruleItemId(entry.id, key)] = itemFromWish(ruleItemId(entry.id, key), item);
+      WISHERS.set(ruleItemId(entry.id, key), entry.wisher.id);
+    }
   } else if (d.kind === 'item') ITEMS[entry.id] = itemFromWish(entry.id, d);
   else if (d.kind === 'creature') CREATURES[entry.id] = creatureFromWish(entry.id, d);
   else if (d.kind === 'npc') NPC_GREETINGS[entry.id] = d.greeting;
+  else if (d.kind === 'recipe') RECIPES[entry.id] = { name: d.name, materials: d.materials, result: d.result, wit: 0 };
+  else if (d.kind === 'ability') {
+    ABILITIES[entry.id] = abilityFromWish(d);
+    ITEMS[entry.id] = scrollFromWish(entry.id, d);
+  }
 }
 
 export function removeContent(entry: ContentEntry): void {
-  if (entry.definition?.kind === 'rule') for (const key of Object.keys(entry.definition.items)) delete ITEMS[ruleItemId(entry.id, key)];
+  if (entry.definition?.kind === 'rule') {
+    for (const key of Object.keys(entry.definition.items)) {
+      delete ITEMS[ruleItemId(entry.id, key)];
+      WISHERS.delete(ruleItemId(entry.id, key));
+    }
+  }
   delete ITEMS[entry.id];
   delete CREATURES[entry.id];
   delete NPC_GREETINGS[entry.id];
+  delete RECIPES[entry.id];
+  delete ABILITIES[entry.id];
+  WISHERS.delete(entry.id);
 }
 
 export const MAX_LOOK_LENGTH = 300;

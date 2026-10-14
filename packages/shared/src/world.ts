@@ -15,6 +15,8 @@ export enum Tile {
   Floor = 6,
   /** A building's timber wall. */
   Wall = 7,
+  /** An open doorway in a building's wall: walk through it to go inside. */
+  Door = 8,
 }
 
 const BLOCKING = new Set<Tile>([Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Wall]);
@@ -74,6 +76,37 @@ export interface CreatureSpawn {
   y: number;
 }
 
+/**
+ * A walled building. From afar players see its exterior art; close by, the
+ * art fades to show the floor and furniture inside.
+ */
+export interface Building {
+  /** Top-left corner of the walls, in tiles; the size includes the walls. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Left tile of the two-tile doorway. */
+  door: { x: number; y: number };
+  exterior: {
+    asset: string;
+    /** How wide the art is drawn, in tiles. */
+    width: number;
+    /** Where the door is painted in the art, as fractions of its size, so it lines up with the doorway. */
+    door: { x: number; y: number };
+  };
+}
+
+/** How close, in tiles, a player must come before a building shows its inside. */
+export const REVEAL_REACH = 3;
+
+/** True when (x, y) is close enough to a building to see inside it. */
+export function nearBuilding(b: Building, x: number, y: number, reach = REVEAL_REACH): boolean {
+  const dx = Math.max(b.x - x, 0, x - (b.x + b.width));
+  const dy = Math.max(b.y - y, 0, y - (b.y + b.height));
+  return Math.hypot(dx, dy) <= reach;
+}
+
 export interface RegionMap {
   def: RegionDef;
   width: number;
@@ -85,6 +118,7 @@ export interface RegionMap {
   /** Where a player arriving through each open edge appears. */
   entries: Partial<Record<Side, { x: number; y: number }>>;
   landmarks: Landmark[];
+  buildings: Building[];
   npcs: NpcPlacement[];
   creatures: CreatureSpawn[];
 }
@@ -102,6 +136,7 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
     spawn: { x: size / 2, y: size / 2 },
     entries: {},
     landmarks: [],
+    buildings: [],
     npcs: [],
     creatures: [],
   };
@@ -140,19 +175,37 @@ export const COTTAGE_SIZE = 16;
 
 const woodsLayout: Layout = (map, c) => {
   scatter(map, (x, y) => (valueNoise(x, y, map.seed, 5) > 0.42 && rand2(x, y, map.seed + 1) < 0.75 ? Tile.Tree : Tile.Ground));
-  // The cottage stands west of the middle, its door facing the road.
+  // The cottage stands west of the middle. From outside it is her great
+  // hollow tree, and the doorway sits in the south wall right where the
+  // tree's door is painted, so the door you see is the door you walk through.
   const left = 3;
-  const top = c - 8;
-  const door = cottage(map, left, top, COTTAGE_SIZE);
+  const top = c - 10;
+  const home = cottage(map, left, top, COTTAGE_SIZE);
+  map.buildings.push(home);
   disc(map, c, c, 4, Tile.Ground);
-  road(map, door.x + 1, door.y, c, c);
-  // Her hollow tree grows up against the cottage's back wall.
-  const mid = left + 1 + COTTAGE_SIZE / 2;
-  map.landmarks.push({ asset: 'woods-tree-house', x: mid, y: top + 3, footprint: { width: 3, height: 2 } });
-  map.npcs.push({ id: 'old-bramble', name: 'Old Bramble', asset: 'woods-herbalist', x: mid + 0.5, y: door.y + 0.5 });
+  // The road leaves the doorstep southward, turns east, then runs up to the middle.
+  const lane = home.y + home.height + 1;
+  road(map, c, lane, home.door.x, home.door.y + 1);
+  road(map, c, c, c, lane);
+  furnish(map, left + 1, top + 1);
+  map.npcs.push({ id: 'old-bramble', name: 'Old Bramble', asset: 'woods-herbalist', x: left + 9.5, y: top + 12.5 });
   creatures(map, 'walking-mushroom', 'Walking Mushroom', 'woods-mushroom', 5);
   map.spawn = { x: c, y: c + 1 };
 };
+
+/** Old Bramble's furniture, placed as landmarks from the floor's top-left tile. */
+function furnish(map: RegionMap, fx: number, fy: number): void {
+  const put = (asset: string, x: number, y: number, width: number, height: number) =>
+    map.landmarks.push({ asset, x: fx + x, y: fy + y, footprint: { width, height } });
+  put('furniture-bed', 1, 3, 2, 2);
+  put('furniture-bookshelf', 4, 1, 2, 1);
+  put('furniture-hearth', 8.5, 1, 3, 1);
+  put('furniture-herb-rack', 13, 1, 2, 1);
+  put('furniture-cauldron', 14.5, 4, 1, 1);
+  put('furniture-table', 8, 8, 2, 1);
+  put('furniture-barrel', 14.5, 15, 1, 1);
+  put('furniture-barrel', 15.5, 15, 1, 1);
+}
 
 const shoreLayout: Layout = (map, c) => {
   scatter(map, (x, y) => {
@@ -213,10 +266,10 @@ function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void 
 
 /**
  * A walled building whose floor is `size` tiles square, its wall's top-left
- * corner at (left, top), in a clearing a tile wide. Returns the top of the
- * two-tile doorway in the east wall, for the road to meet.
+ * corner at (left, top), in a clearing a tile wide, with a two-tile doorway
+ * in the south wall. Its outside is Old Bramble's hollow tree, drawn big.
  */
-function cottage(map: RegionMap, left: number, top: number, size: number): { x: number; y: number } {
+function cottage(map: RegionMap, left: number, top: number, size: number): Building {
   const right = left + size + 1;
   const bottom = top + size + 1;
   for (let y = top - 1; y <= bottom + 1; y++) {
@@ -226,10 +279,17 @@ function cottage(map: RegionMap, left: number, top: number, size: number): { x: 
       set(map, x, y, wall ? Tile.Wall : inside ? Tile.Floor : Tile.Ground);
     }
   }
-  const door = { x: right, y: top + Math.floor(size / 2) };
-  set(map, door.x, door.y, Tile.Floor);
-  set(map, door.x, door.y + 1, Tile.Floor);
-  return door;
+  const door = { x: left + 6, y: bottom };
+  set(map, door.x, door.y, Tile.Door);
+  set(map, door.x + 1, door.y, Tile.Door);
+  return {
+    x: left,
+    y: top,
+    width: size + 2,
+    height: size + 2,
+    door,
+    exterior: { asset: 'woods-tree-house', width: size + 4, door: { x: 0.375, y: 0.836 } },
+  };
 }
 
 /** A two-tile-wide road: horizontal leg first, then vertical. */

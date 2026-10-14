@@ -8,10 +8,12 @@ The approved design lives in the project's design doc ("co-MMO: Initial
 Design Document"); [docs/design.md](docs/design.md) summarises it and tracks
 which milestone the code is at.
 
-## Status: milestones 2 to 6 done (first versions)
+## Status: milestones 2 to 7 done (first versions)
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
+  Players sign back in with an email link or a linked Google or GitHub account
+  (milestone 7, below).
 - Four regions, each a procedurally generated 64×64 tile map: the Sanctum
   (the God's shrine, Sister Amala) in the middle, with Whispering Woods to the
   west, Sunlit Shore to the east and Mirage Desert to the south. Walk off the
@@ -21,7 +23,8 @@ which milestone the code is at.
 - Server-authoritative movement at 20 ticks per second, with client-side
   prediction for your own character and interpolation for everyone else.
 - Area of interest: each player only receives others within 24 tiles.
-- Chat: Say (nearby, 16 tiles) and World, with flood limits.
+- Chat: Say (nearby, 16 tiles), Region, Party, Whisper and World, with flood
+  limits.
 - Positions saved every 30 seconds and on disconnect.
 - 128×128 tiles (Style Bible), using the approved reference art: ground
   tiles, characters, NPCs, creatures and landmarks, plus the biome kit
@@ -88,6 +91,29 @@ Stewards and scripted rules (milestone 5, first version):
 - The Owner names Stewards by praying: "make Ilya a Steward".
 - Without an AI key the offline God still drafts one rule: fishing (a rod
   for everyone, fish by biome, a rare Golden Carp).
+
+Play together (milestone 7, first version):
+
+- Signing in: invite links still create every account. A player can add an
+  email (confirmed by a link) and link Google or GitHub from Account, then
+  sign in on any device with a one-time email link (15 minutes) or the
+  provider. Sign-in links and provider callbacks carry a one-time code, never
+  the session token; each device gets its own session and can sign out alone.
+  Setup: [docs/sign-in.md](docs/sign-in.md).
+- Your look: the invite form asks how you look. That is your first wish, free
+  and granted at once: a tinted placeholder until Gemini paints you, then
+  everyone sees your own sprite. Players who joined earlier describe theirs
+  from Account. A Steward can roll a look back, and then the player describes
+  themself again.
+- Chat channels: Say, Region (everyone in your region), Party, Whisper (one
+  player, any region) and World. `/w Name`, `/r` to answer, `/p`, `/region`,
+  `/world`, `/help`.
+- Parties: `/invite Name` or the party box, `/accept`, `/leave`. Members
+  close by (24 tiles) share each defeat's XP, a little more in total than
+  alone, and their defeat-quest progress. Six is the tuning default, not a
+  hard limit. Parties live in memory and break up on a restart.
+- "While you were away": on joining, a short feed of what others wished and
+  did (new players, level-ups) since you last played.
 
 Wishes that change the game (milestone 6, first version):
 
@@ -168,6 +194,9 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none | Optional: OpenAI or any OpenAI-compatible service |
 | `GITHUB_ISSUES_TOKEN` | none | Fine-grained GitHub token with only Issues read and write on the game's repository; lets approved Engine wishes become issues for the coding agent |
 | `GITHUB_REPO` | from `git remote origin` | The repository wishes are built in, as `owner/name` |
+| `RESEND_API_KEY`, `MAIL_FROM` | none | Sends sign-in emails through Resend; without them the links are printed in the server console |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | none | Turns on "Sign in with Google" ([docs/sign-in.md](docs/sign-in.md)) |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | none | Turns on "Sign in with GitHub" |
 
 Without any key the offline God answers: it understands simple wishes ("I
 wish for a red hat", "make a pink slime", "I want a fish trader") and can

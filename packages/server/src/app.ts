@@ -3,7 +3,9 @@ import { stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { TICK_SECONDS, isClientMessage, upgradeCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
+import { TICK_SECONDS, WishError, isClientMessage, upgradeCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
+import { Auth, cleanEmail, type Mailer } from './auth.ts';
+import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
 import { Store, StoreError, type Account } from './store.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
@@ -31,6 +33,8 @@ export interface AppOptions {
   commit?: string | null;
   /** Building Engine wishes on GitHub: test overrides and where the checkout is. */
   builds?: BuildOptions;
+  /** Sign-in by email and Google/GitHub: test overrides for sending email and calling providers. */
+  auth?: { mailer?: Mailer; fetch?: typeof fetch };
 }
 
 export interface App {
@@ -40,6 +44,7 @@ export interface App {
   rules: LiveRules;
   reports: Reports;
   builds: Builds;
+  auth: Auth;
   close(): Promise<void>;
 }
 
@@ -60,6 +65,9 @@ export function createApp(options: AppOptions): App {
   const { store } = options;
   const world = new World();
   world.offlineFavor = (playerId, amount) => store.addFavor(playerId, amount);
+  world.onJournal = (text, playerId) => store.addJournal(text, playerId);
+  const env = options.wishes.env ?? process.env;
+  const auth = new Auth({ store, publicUrl: options.publicUrl, env, ...options.auth, ...(options.wishes.now ? { now: options.wishes.now } : {}) });
   const rules = new LiveRules(store, world, {
     now: options.wishes.now,
     onPause: (record, reason) => {
@@ -114,13 +122,35 @@ export function createApp(options: AppOptions): App {
       }
       const nameError = validateName(name);
       if (nameError) return json(res, 400, { error: 'name_invalid', message: nameError });
+      // An email and a look are optional; both can be added later from Account.
+      const rawEmail = typeof body?.email === 'string' ? body.email.trim() : '';
+      const email = rawEmail ? cleanEmail(rawEmail) : '';
+      if (rawEmail && !email) return json(res, 400, { error: 'email_invalid', message: 'That does not look like an email address.' });
+      if (email && store.accountByEmail(email)) return json(res, 400, { error: 'email_taken', message: 'Another player already signs in with that email.' });
+      const look = typeof body?.look === 'string' ? body.look.trim() : '';
+      let created: ReturnType<Store['acceptInvite']>;
       try {
-        const { account, token } = store.acceptInvite(code, name, world.home.def.id);
-        return json(res, 200, { token, player: publicInfo(account) });
+        created = store.acceptInvite(code, name, world.home.def.id);
       } catch (err) {
         if (err instanceof StoreError) return json(res, 400, { error: err.code, message: err.message });
         throw err;
       }
+      const { account, token } = created;
+      const inviter = account.invitedBy ? store.accountById(account.invitedBy)?.name : undefined;
+      store.addJournal(`${account.name} joined the world${inviter ? `, invited by ${inviter}` : ''}.`, account.id);
+      const notes: string[] = [];
+      if (look) {
+        try {
+          wishes.grantLook(account, look);
+        } catch (err) {
+          if (!(err instanceof WishError)) throw err;
+          notes.push(err.message);
+        }
+      }
+      if (email) {
+        notes.push(await auth.confirmEmail(account, email, req.socket.remoteAddress ?? '').catch((err: Error) => `We could not send the email: ${err.message}`));
+      }
+      return json(res, 200, { token, player: publicInfo(account), notes });
     }
 
     if (path === '/api/version' && req.method === 'GET') {
@@ -142,7 +172,36 @@ export function createApp(options: AppOptions): App {
       return json(res, 200, { code: invite.code, url: inviteUrl(options.publicUrl, invite.code) });
     }
 
-    const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env: options.wishes.env ?? process.env, json, readJson };
+    if (path === '/api/account' && req.method === 'GET') {
+      const account = authenticate(req);
+      if (!account) return json(res, 401, { error: 'unauthorized' });
+      const look = wishes.lookOf(account.id);
+      return json(res, 200, {
+        name: account.name,
+        email: account.email ?? null,
+        logins: (account.logins ?? []).map((l) => l.provider),
+        providers: auth.providers(),
+        look: look ? { description: look.summary, ...(look.art ? { art: look.art } : {}) } : null,
+      });
+    }
+
+    if (path === '/api/account/look' && req.method === 'POST') {
+      const account = authenticate(req);
+      if (!account) return json(res, 401, { error: 'unauthorized' });
+      if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) });
+      const body = await readJson(req);
+      try {
+        wishes.grantLook(account, typeof body?.look === 'string' ? body.look : '');
+      } catch (err) {
+        if (err instanceof WishError) return json(res, 400, { error: 'look_invalid', message: err.message });
+        throw err;
+      }
+      return json(res, 200, { message: 'The God has heard how you look. Your picture is being painted.' });
+    }
+
+    if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
+
+    const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
@@ -222,6 +281,7 @@ export function createApp(options: AppOptions): App {
           return;
         }
         sockets.set(account.id, socket);
+        const away = awayFeed(store, account);
         world.join(publicInfo(account), {
           send: (m) => {
             if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
@@ -229,6 +289,7 @@ export function createApp(options: AppOptions): App {
           close: (reason) => socket.close(4000, reason),
         }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
         world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
+        if (away) world.sendTo(account.id, away);
         rules.fire('join', account.id);
         builds.greet(account.id);
         return;
@@ -276,6 +337,7 @@ export function createApp(options: AppOptions): App {
     rules,
     reports,
     builds,
+    auth,
     async close() {
       clearInterval(tickTimer);
       options.updater?.stop();

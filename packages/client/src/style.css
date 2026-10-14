@@ -7,6 +7,9 @@
   --accent: #feae34;
   --say: #ffffff;
   --world: #2ce8f5;
+  --region: #a7f070;
+  --party: #73eff7;
+  --whisper: #f4a6d7;
   --system: #feae34;
   --error: #f6757a;
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -46,6 +49,9 @@ html, body {
 #chat-log li { margin: 2px 0; word-wrap: break-word; }
 #chat-log .say { color: var(--say); }
 #chat-log .world { color: var(--world); }
+#chat-log .region { color: var(--region); }
+#chat-log .party { color: var(--party); }
+#chat-log .whisper { color: var(--whisper); }
 #chat-log .system { color: var(--system); font-style: italic; }
 #chat-log .error { color: var(--error); }
 #chat-log b { color: var(--accent); font-weight: 600; }
@@ -66,7 +72,7 @@ html, body {
 .panel h1 { margin: 0 0 12px; font-size: 20px; color: var(--accent); }
 .panel p { margin: 0 0 12px; color: var(--muted); }
 .panel label { display: block; margin: 12px 0 4px; }
-.panel input[type='text'] {
+.panel input[type='text'], .panel input[type='email'], .panel textarea, #account input, #account textarea {
   width: 100%; padding: 8px 10px; background: var(--bg); color: var(--ink);
   border: 1px solid var(--edge); font: inherit;
 }
@@ -75,7 +81,51 @@ html, body {
   margin-top: 16px; width: 100%; padding: 10px; background: var(--accent); color: var(--bg);
   border: 0; font: inherit; font-weight: 700; cursor: pointer;
 }
+.panel textarea, #account textarea { resize: vertical; }
+.panel .hint { color: var(--muted); font-size: 12px; }
+.panel .button {
+  display: block; margin-top: 10px; padding: 9px; text-align: center; text-decoration: none;
+  color: var(--ink); border: 1px solid var(--edge); font-weight: 700;
+}
+.panel .button:hover { border-color: var(--accent); }
 .panel .error { color: var(--error); min-height: 1.5em; margin: 8px 0 0; }
+.panel .note, #account .note, #away .note { color: var(--region); }
+#account .error { color: var(--error); }
+
+/* --- Account, party, while you were away --------------------------------- */
+
+#account h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+#account button:not(.close), #away button:not(.close) {
+  padding: 7px 12px; margin: 6px 6px 0 0; background: var(--accent); color: var(--bg);
+  border: 0; font: inherit; font-weight: 700; cursor: pointer;
+}
+#account button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
+#account .row { display: flex; gap: 6px; align-items: center; }
+#account .row input { flex: 1; }
+#account .row button { margin: 0; }
+.look { display: flex; gap: 10px; align-items: center; }
+.look img { width: 48px; height: 72px; object-fit: contain; flex: none; }
+#away ul { margin: 0; padding: 0 0 0 16px; line-height: 1.6; }
+#away li span { color: var(--muted); font-size: 11px; }
+
+#party {
+  position: fixed; left: 12px; bottom: 222px; width: 240px;
+  background: var(--panel); border: 1px solid var(--edge); padding: 6px 8px; font-size: 12px;
+}
+#party h3 { margin: 0 0 4px; font-size: 12px; color: var(--party); display: flex; justify-content: space-between; align-items: center; }
+#party h3 button { background: none; border: 1px solid var(--edge); color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
+#party ol { list-style: none; margin: 0 0 6px; padding: 0; }
+#party li { display: flex; justify-content: space-between; gap: 6px; }
+#party li .where { color: var(--muted); }
+#party li.away { opacity: 0.55; }
+#party input { width: 100%; padding: 4px 6px; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; }
+#party-invite {
+  position: fixed; top: 100px; left: 50%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px));
+  background: var(--panel); border: 1px solid var(--party); padding: 12px; font-size: 13px;
+}
+#party-invite p { margin: 0 0 8px; }
+#party-invite button { padding: 6px 12px; background: var(--party); color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+#party-invite button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
 
 #toast {
   position: fixed; top: 56px; left: 50%; transform: translateX(-50%);

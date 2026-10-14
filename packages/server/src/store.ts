@@ -21,6 +21,29 @@ export interface Account {
   character?: Character;
   /** Set while a Steward or the Owner has suspended the account. */
   suspended?: { by: string; at: number; reason: string };
+  /** A confirmed email address: magic sign-in links go here. */
+  email?: string;
+  /** Google or GitHub accounts linked for signing in. */
+  logins?: { provider: LoginProvider; subject: string }[];
+  /** SHA-256 of tokens for other devices and browsers signed in later. */
+  sessions?: string[];
+  /** When the player was last in the world, for the "While you were away" feed. */
+  lastSeen?: number;
+}
+
+export type LoginProvider = 'google' | 'github';
+
+/** Devices one account may stay signed in on; the oldest is signed out first. */
+const MAX_SESSIONS = 10;
+/** Lines kept for the "While you were away" feed. */
+const MAX_JOURNAL = 500;
+
+/** A notable thing that happened, for players who were away. */
+export interface JournalEntry {
+  at: number;
+  text: string;
+  /** Who it is about; they are not told about their own doings. */
+  playerId: string | null;
 }
 
 export interface Invite {
@@ -120,6 +143,7 @@ interface Data {
   reports: Report[];
   /** Scripted rules' saved state: rule id → player id (or "_" for shared) → values. */
   ruleData: Record<string, Record<string, Record<string, unknown>>>;
+  journal: JournalEntry[];
 }
 
 export function defaultSettings(env: Record<string, string | undefined> = process.env): Settings {
@@ -142,7 +166,7 @@ export function defaultSettings(env: Record<string, string | undefined> = proces
  * replaces it for hosting (see the design doc, Technical architecture).
  */
 export class Store {
-  private data: Data = { accounts: [], invites: [], content: [], settings: defaultSettings(), spend: [], reports: [], ruleData: {} };
+  private data: Data = { accounts: [], invites: [], content: [], settings: defaultSettings(), spend: [], reports: [], ruleData: {}, journal: [] };
   private saving: Promise<void> = Promise.resolve();
 
   private constructor(private readonly path: string | null) {}
@@ -220,7 +244,69 @@ export class Store {
 
   accountByToken(token: string): Account | undefined {
     const hash = hashToken(token);
-    return this.data.accounts.find((a) => a.tokenHash === hash);
+    return this.data.accounts.find((a) => a.tokenHash === hash || a.sessions?.includes(hash));
+  }
+
+  /** Signs an account in on another device; returns the new session token. */
+  issueSession(id: string): string {
+    const account = this.accountById(id);
+    if (!account) throw new StoreError('no_account', 'That player no longer exists.');
+    const token = randomBytes(32).toString('base64url');
+    account.sessions = [...(account.sessions ?? []), hashToken(token)].slice(-MAX_SESSIONS);
+    this.persist();
+    return token;
+  }
+
+  /** Signs this one device out. */
+  endSession(token: string): void {
+    const hash = hashToken(token);
+    for (const a of this.data.accounts) {
+      if (a.tokenHash === hash) a.tokenHash = '';
+      if (a.sessions?.includes(hash)) a.sessions = a.sessions.filter((s) => s !== hash);
+    }
+    this.persist();
+  }
+
+  accountByEmail(email: string): Account | undefined {
+    const lower = email.trim().toLowerCase();
+    return this.data.accounts.find((a) => a.email === lower);
+  }
+
+  /** Sets a confirmed email, or throws if another player uses it. */
+  setEmail(id: string, email: string): void {
+    const lower = email.trim().toLowerCase();
+    const other = this.accountByEmail(lower);
+    if (other && other.id !== id) throw new StoreError('email_taken', 'Another player already signs in with that email.');
+    const account = this.accountById(id);
+    if (!account) return;
+    account.email = lower;
+    this.persist();
+  }
+
+  accountByLogin(provider: LoginProvider, subject: string): Account | undefined {
+    return this.data.accounts.find((a) => a.logins?.some((l) => l.provider === provider && l.subject === subject));
+  }
+
+  /** Links a Google or GitHub account, or throws if another player has it. */
+  linkLogin(id: string, provider: LoginProvider, subject: string): void {
+    const other = this.accountByLogin(provider, subject);
+    if (other && other.id !== id) throw new StoreError('login_taken', `That ${provider === 'google' ? 'Google' : 'GitHub'} account already belongs to another player.`);
+    const account = this.accountById(id);
+    if (!account || other) return;
+    account.logins = [...(account.logins ?? []).filter((l) => l.provider !== provider), { provider, subject }];
+    this.persist();
+  }
+
+  // --- While you were away ------------------------------------------------------
+
+  addJournal(text: string, playerId: string | null, at = Date.now()): void {
+    this.data.journal.push({ at, text, playerId });
+    if (this.data.journal.length > MAX_JOURNAL) this.data.journal.splice(0, this.data.journal.length - MAX_JOURNAL);
+    this.persist();
+  }
+
+  journalSince(since: number): JournalEntry[] {
+    return this.data.journal.filter((j) => j.at > since);
   }
 
   accountById(id: string): Account | undefined {
@@ -244,6 +330,7 @@ export class Store {
     const account = this.accountById(id);
     if (!account) return;
     if (regionId) account.regionId = regionId;
+    account.lastSeen = Date.now();
     account.x = x;
     account.y = y;
     if (character) account.character = structuredClone(character);

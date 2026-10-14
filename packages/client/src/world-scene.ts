@@ -21,7 +21,7 @@ import {
   wishArtKey,
 } from '@co-mmo/shared';
 import { TILE_MARGIN, lightTint, playerArt, propTexture, registerTileset } from './textures.ts';
-import { artSrc, contentEntries } from './wished.ts';
+import { artSrc, contentEntries, lookArt } from './wished.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Image;
@@ -122,7 +122,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
     this.shown = { x: welcome.x, y: welcome.y };
-    this.me = this.makeAvatar(playerArt(welcome.you.id), welcome.you.name, true);
+    this.me = this.makeAvatar(this.playerTexture(welcome.you.id), welcome.you.name, true);
 
     const kb = this.input.keyboard!;
     kb.disableGlobalCapture();
@@ -151,7 +151,7 @@ export class WorldScene extends Phaser.Scene {
     if (!this.predictor || !this.sys.isActive()) return;
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y });
     const now = performance.now();
-    this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(playerArt(e.id), e.name, false));
+    this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
     this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
   }
@@ -200,11 +200,26 @@ export class WorldScene extends Phaser.Scene {
    * re-dress any avatar waiting for it. Snapshots say where wished people stand.
    */
   refreshWishes(): void {
-    if (!this.sys.isActive() || !this.map) return;
+    // Not isActive(): that is still false while create() runs, and art
+    // that arrived before the scene existed is loaded from there.
+    if (!this.map) return;
     for (const entry of contentEntries()) {
       const key = wishArtKey(entry.id);
       if (entry.status === 'granted' && entry.definition) void this.loadArt(key, artSrc(key));
     }
+    // A look described, painted or rolled back: players change clothes.
+    const players: [string, Avatar][] = [[this.welcome.you.id, this.me], ...this.remotes];
+    for (const [id, a] of players) {
+      const art = this.playerTexture(id);
+      if (!a || a.art === art) continue;
+      a.art = art;
+      if (this.textures.exists(art)) a.body.setTexture(art);
+    }
+  }
+
+  /** A player's own painted look, or one of the two approved player looks. */
+  private playerTexture(id: string): string {
+    return lookArt(id) ?? playerArt(id);
   }
 
   private async loadArt(key: string, url: string): Promise<void> {
@@ -220,8 +235,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.loadedArt.get(key) !== url) return;
     if (this.textures.exists(key)) this.textures.remove(key);
     this.textures.addImage(key, img);
-    for (const a of [...this.creatures.values(), ...this.npcs.values()]) {
-      if (a.art === key) a.body.setTexture(key);
+    for (const a of [...this.creatures.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
+      if (a?.art === key) a.body.setTexture(key);
     }
   }
 

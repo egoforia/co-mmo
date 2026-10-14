@@ -80,3 +80,12 @@ export async function reloadWhenBack(from: string | null = null): Promise<void> 
   }
   location.reload();
 }
+
+/** After a dropped connection: waits until the server answers, then reloads to rejoin. */
+export async function rejoinWhenBack(): Promise<void> {
+  for (let delay = 1000; ; delay = Math.min(delay * 1.5, 10_000)) {
+    await new Promise((r) => setTimeout(r, delay));
+    const up = await fetch('/api/version', { cache: 'no-store' }).then((r) => r.ok, () => false);
+    if (up) return location.reload();
+  }
+}

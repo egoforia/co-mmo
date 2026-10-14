@@ -13,11 +13,12 @@ afterEach(async () => {
   app = null;
 });
 
-async function start() {
+async function start(heartbeatMs?: number) {
   const store = Store.memory();
   app = createApp({
     store,
     publicUrl: 'http://game.test',
+    heartbeatMs,
     wishes: { env: {}, anchorDir: '/nonexistent', artDir: '/nonexistent', chatModel: () => [new OfflineGod()] },
   });
   await new Promise<void>((resolve) => app!.server.listen(0, resolve));
@@ -113,5 +114,18 @@ describe('game connection', () => {
     const c = connect(ws, 'nope');
     const closed = await new Promise<number>((resolve) => c.socket.on('close', (code) => resolve(code)));
     expect(closed).toBe(4001);
+  });
+
+  it('keeps answering clients connected and drops silent ones', async () => {
+    const { store, ws } = await start(50);
+    const invite = store.createInvite(null, 'player');
+    const a = store.acceptInvite(invite.code, 'Mara', 'sanctum');
+    const live = connect(ws, a.token);
+    await live.waitFor((m) => m.t === 'welcome');
+    const silent = new WebSocket(ws, { autoPong: false });
+    const dropped = await new Promise<number>((resolve) => silent.on('close', (code) => resolve(code)));
+    expect(dropped).toBe(1006);
+    expect(live.socket.readyState).toBe(WebSocket.OPEN);
+    live.socket.close();
   });
 });

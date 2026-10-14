@@ -119,3 +119,6 @@ li.err { color: var(--bad); }
 .form.revise input { min-width: 280px; }
 tr.dismissed, tr.resolved { opacity: 0.6; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+a.stat { color: inherit; text-decoration: none; }
+.note.warn { color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: default; }

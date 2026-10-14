@@ -108,6 +108,16 @@ time; open it, pick a name, and you are in. Use "Invite a friend" in the
 top bar to make more invite links. To try multiplayer alone, open an invite
 link in a private window.
 
+Updating from GitHub: God's View has an Updates tab (Owner only) that lists
+commits on GitHub `main` that this machine doesn't have yet; the server checks
+every ten minutes, and the World tab shows a card when something is new.
+"Pull main and restart" fast-forwards the checkout, runs `npm install` if
+`package.json` or `package-lock.json` changed, restarts the server and Vite,
+and every open page reloads itself once the game is back. It refuses, with
+the reason, when the machine has uncommitted changes, local commits, or is
+on another branch. This needs `npm run dev`, which runs `scripts/dev.mjs` to
+do the restart (`npm run dev:raw` runs the game without it).
+
 Production-style, on one port:
 
 ```sh

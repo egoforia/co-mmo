@@ -5,6 +5,7 @@ import { askGod } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
 import type { Account, ModelChoice, Settings, Store } from './store.ts';
+import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
 
@@ -16,6 +17,10 @@ export interface AdminContext {
   reports: Reports;
   /** Disconnects a player now (after a suspension). */
   kick(id: string, reason: string): void;
+  /** Pulls main and restarts the game; absent in tests. */
+  updater?: Updater;
+  /** Disconnects everyone with a "the world is updating" notice and saves. */
+  restarting(): Promise<void>;
   env: Record<string, string | undefined>;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
@@ -67,6 +72,7 @@ export async function handleAdmin(
       reports: reports.open().length,
       rules: content.filter((c) => c.status === 'granted' && c.definition?.kind === 'rule').length,
       budget: owner ? wishes.budget() : null,
+      update: owner ? updateSummary(ctx.updater) : null,
     }), true;
   }
 
@@ -257,12 +263,37 @@ export async function handleAdmin(
     return json(res, 200, { ok: true }), true;
   }
 
+  if (route === 'update' && method === 'GET') {
+    if (ownerOnly()) return true;
+    if (!ctx.updater) return json(res, 200, { available: false, reason: 'Updates are off on this server.' }), true;
+    return json(res, 200, ctx.updater.cached() ?? (await ctx.updater.check())), true;
+  }
+
+  if (route === 'update/check' && method === 'POST') {
+    if (ownerOnly()) return true;
+    if (!ctx.updater) return json(res, 409, { error: 'no_updates', message: 'Updates are off on this server.' }), true;
+    return json(res, 200, await ctx.updater.check(true)), true;
+  }
+
+  if (route === 'update' && method === 'POST') {
+    if (ownerOnly()) return true;
+    if (!ctx.updater) return json(res, 409, { error: 'no_updates', message: 'Updates are off on this server.' }), true;
+    const done = await ctx.updater.request(account.name, ctx.restarting);
+    if (!done.ok) return json(res, 409, { error: 'blocked', message: done.message }), true;
+    return json(res, 202, { ok: true, from: done.status.commit, to: done.status.upstream }), true;
+  }
+
   if (route === 'items' && method === 'GET') {
     return json(res, 200, { items: Object.keys(ITEMS) }), true;
   }
 
   json(res, 404, { error: 'not_found' });
   return true;
+}
+
+function updateSummary(updater: Updater | undefined): { behind: number; blocked?: string } | null {
+  const s = updater?.cached();
+  return s?.available ? { behind: s.behind, blocked: s.blocked } : null;
 }
 
 function modelChoice(raw: unknown): ModelChoice | null {

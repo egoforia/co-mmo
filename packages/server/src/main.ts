@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp, inviteUrl } from './app.ts';
 import { Store } from './store.ts';
+import { Updater, currentCommit } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 3001);
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -16,10 +17,19 @@ const clientDir = process.env.CLIENT_DIR
   : existsSync(builtClient) ? builtClient : undefined;
 
 const store = await Store.open(dataFile);
+// scripts/dev.mjs (npm run dev) watches the request file and does the pull
+// and restart; without it the Owner still sees what is new on GitHub.
+const updater = new Updater({
+  repoDir: repoRoot,
+  requestFile: process.env.CO_MMO_UPDATE_REQUEST,
+  resultFile: process.env.CO_MMO_UPDATE_RESULT,
+});
 const app = createApp({
   store,
   publicUrl,
   clientDir,
+  updater,
+  commit: currentCommit(repoRoot),
   wishes: {
     anchorDir: resolve(repoRoot, 'assets/anchors'),
     artDir: resolve(process.env.ART_DIR ?? resolve(dirname(dataFile), 'art')),
@@ -28,6 +38,7 @@ const app = createApp({
 
 app.server.listen(port, () => {
   console.log(`co-MMO server listening on http://localhost:${port}`);
+  updater.start();
   // First run: nobody exists yet, so print a one-time invite that makes its
   // user the Owner.
   if (store.accountCount === 0) {

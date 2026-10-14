@@ -8,7 +8,7 @@ import { BIOMES, TILE_PIXELS, Tile, hashString, rand2, type BiomeId, type Region
 const T = TILE_PIXELS;
 /** Each tile is extruded by this much so filtered tiles never show seams. */
 export const TILE_MARGIN = 2;
-const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Floor, Tile.Wall];
+const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Floor, Tile.Wall, Tile.Door];
 
 type Paint = (ctx: CanvasRenderingContext2D) => void;
 /** An art asset id, a painter, or an asset with a painter to fall back on. */
@@ -100,7 +100,13 @@ export function registerTileset(scene: Phaser.Scene, def: RegionDef): string {
   // Buildings are wood in every biome.
   const floor = tileCanvas((c) => planks(c, ['#8a6a45', '#a07c52', '#6b4a33']));
   const wall = tileCanvas((c) => planks(c, ['#4a3324', '#5a3d2a', '#2f2018']));
-  const sources: Partial<Record<Tile, HTMLCanvasElement>> = { [Tile.Path]: path, [Tile.Water]: water, [Tile.Floor]: floor, [Tile.Wall]: wall };
+  // The doorway: a worn threshold of pale boards between dark door posts.
+  const door = tileCanvas((c) => {
+    planks(c, ['#b08c5e', '#c9a576', '#7a573c']);
+    c.fillStyle = '#2f2018';
+    c.fillRect(0, 0, T, T / 8);
+  });
+  const sources: Partial<Record<Tile, HTMLCanvasElement>> = { [Tile.Path]: path, [Tile.Water]: water, [Tile.Floor]: floor, [Tile.Wall]: wall, [Tile.Door]: door };
 
   for (const tile of TILE_ORDER) {
     const source = sources[tile] ?? ground;
@@ -293,6 +299,95 @@ export function propTexture(scene: Phaser.Scene, biome: string, kind: 'tree' | '
   }
   scene.textures.addCanvas(key, canvas);
   return key;
+}
+
+/** Painted furniture for inside buildings: [width, height] in tiles, and a painter. */
+const FURNITURE: Record<string, [number, number, (ctx: CanvasRenderingContext2D, w: number, h: number) => void]> = {
+  'furniture-bed': [2, 2.6, (ctx, w, h) => {
+    box(ctx, 8, h * 0.2, w - 16, h * 0.7, ['#4a3324', '#6b4a33']);
+    box(ctx, 8, 0, w - 16, h * 0.28, ['#4a3324', '#7a573c']);
+    box(ctx, 24, h * 0.24, w - 48, h * 0.58, ['#3e6b3a', '#5f9468']);
+    box(ctx, 34, h * 0.16, w - 68, h * 0.14, ['#c9bfae', '#f3e6c8']);
+  }],
+  'furniture-bookshelf': [2, 2.4, (ctx, w, h) => {
+    box(ctx, 6, 0, w - 12, h - 8, ['#2f2018', '#5a3d2a']);
+    const books = ['#a8423a', '#3e6b8a', '#c9a24a', '#5f9468', '#7a4a8a'];
+    for (let shelf = 0; shelf < 3; shelf++) {
+      const y = 18 + shelf * (h - 30) / 3;
+      for (let i = 0, x = 20; x < w - 30; i++) {
+        const bw = 12 + rand2(i, shelf, 21) * 10;
+        ctx.fillStyle = books[(i + shelf) % books.length]!;
+        ctx.fillRect(x, y + 10 + rand2(i, shelf, 22) * 12, bw - 3, (h - 30) / 3 - 20);
+        x += bw;
+      }
+    }
+  }],
+  'furniture-hearth': [3, 2.6, (ctx, w, h) => {
+    box(ctx, 0, 0, w, h - 8, ['#4a4550', '#8a8290']);
+    box(ctx, w * 0.3, h * 0.4, w * 0.4, h * 0.5, ['#181425', '#2a2230']);
+    dot(ctx, w * 0.5, h * 0.78, 22, '#f08e3a');
+    dot(ctx, w * 0.5, h * 0.74, 12, '#feae34');
+    box(ctx, -4, h * 0.3, w + 8, 16, ['#4a3324', '#6b4a33']);
+  }],
+  'furniture-herb-rack': [2, 2.4, (ctx, w, h) => {
+    box(ctx, 10, 20, 12, h - 28, ['#4a3324', '#6b4a33']);
+    box(ctx, w - 22, 20, 12, h - 28, ['#4a3324', '#6b4a33']);
+    box(ctx, 4, 20, w - 8, 12, ['#4a3324', '#7a573c']);
+    for (let i = 0; i < 6; i++) {
+      const x = 30 + i * (w - 60) / 5;
+      ctx.fillStyle = i % 2 ? '#5f9468' : '#8aa04a';
+      ctx.beginPath();
+      ctx.ellipse(x, 70 + rand2(i, 1, 23) * 20, 12, 34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }],
+  'furniture-cauldron': [1.2, 1.2, (ctx, w, h) => {
+    blob(ctx, w / 2, h * 0.58, w * 0.42, h * 0.34, ['#181425', '#3a3440', '#6a6270']);
+    ctx.fillStyle = '#63c74d';
+    ctx.beginPath();
+    ctx.ellipse(w / 2, h * 0.36, w * 0.34, h * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }],
+  'furniture-table': [2.6, 1.6, (ctx, w, h) => {
+    box(ctx, 4, h * 0.45, 26, h * 0.45, ['#4a3324', '#7a573c']);
+    box(ctx, w - 30, h * 0.45, 26, h * 0.45, ['#4a3324', '#7a573c']);
+    box(ctx, 40, h * 0.3, 12, h * 0.6, ['#4a3324', '#5a3d2a']);
+    box(ctx, w - 52, h * 0.3, 12, h * 0.6, ['#4a3324', '#5a3d2a']);
+    box(ctx, 30, h * 0.1, w - 60, h * 0.32, ['#5a3d2a', '#a07c52']);
+    dot(ctx, w * 0.45, h * 0.2, 9, '#f3e6c8');
+    dot(ctx, w * 0.58, h * 0.22, 7, '#e8c66a');
+  }],
+  'furniture-barrel': [1, 1.4, (ctx, w, h) => {
+    box(ctx, 14, 8, w - 28, h - 16, ['#4a3324', '#8a6a45']);
+    ctx.fillStyle = '#3a3440';
+    for (const f of [0.25, 0.7]) ctx.fillRect(14, 8 + (h - 16) * f, w - 28, 8);
+  }],
+};
+
+/** Painted furniture by asset id, or undefined when it is not furniture. */
+export function furnitureTexture(scene: Phaser.Scene, asset: string): string | undefined {
+  const spec = FURNITURE[asset];
+  if (!spec) return undefined;
+  if (scene.textures.exists(asset)) return asset;
+  const [tw, th, paint] = spec;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(tw * T);
+  canvas.height = Math.round(th * T);
+  paint(canvas.getContext('2d')!, canvas.width, canvas.height);
+  scene.textures.addCanvas(asset, canvas);
+  return asset;
+}
+
+/** A rounded block with a darker rim: [rim, body]. */
+function box(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, [rim, body]: string[]): void {
+  ctx.fillStyle = rim!;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
+  ctx.fillStyle = body!;
+  ctx.beginPath();
+  ctx.roundRect(x + 4, y + 4, w - 8, h - 10, 6);
+  ctx.fill();
 }
 
 /** A shaded rounded mass: dark base, mid body, light top-left. */

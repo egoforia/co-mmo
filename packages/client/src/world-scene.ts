@@ -6,10 +6,12 @@ import {
   TILE_PIXELS,
   Tile,
   generateRegion,
+  nearBuilding,
   neighbourOffset,
   rand2,
   regionDef,
   type ArtManifest,
+  type Building,
   type ClientMessage,
   type CreatureState,
   type HitMessage,
@@ -20,7 +22,7 @@ import {
   type WelcomeMessage,
   wishArtKey,
 } from '@co-mmo/shared';
-import { TILE_MARGIN, lightTint, playerArt, propTexture, registerTileset } from './textures.ts';
+import { TILE_MARGIN, furnitureTexture, lightTint, playerArt, propTexture, registerTileset } from './textures.ts';
 import { artSrc, contentEntries, lookArt } from './wished.ts';
 
 interface Avatar {
@@ -37,6 +39,18 @@ interface Avatar {
 
 interface Remote extends Avatar {
   interp: Interpolator;
+}
+
+/** A building drawn as its exterior art until we come close, then its inside. */
+interface BuildingView {
+  building: Building;
+  /** The region's top-left corner, in tiles. */
+  ox: number;
+  oy: number;
+  exterior: Phaser.GameObjects.Image;
+  /** Floor, walls and furniture: hidden while the exterior shows. */
+  inside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[];
+  open: boolean;
 }
 
 export interface WorldSceneOptions {
@@ -60,6 +74,7 @@ export class WorldScene extends Phaser.Scene {
   private creatures = new Map<string, Remote>();
   /** NPCs, the map's own and those called by wishes, strolling where the server says. */
   private npcs = new Map<string, Remote>();
+  private buildings: BuildingView[] = [];
   /** Wished art already turned into textures, by key: the URL it came from. */
   private loadedArt = new Map<string, string>();
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
@@ -103,6 +118,7 @@ export class WorldScene extends Phaser.Scene {
     this.remotes = new Map();
     this.creatures = new Map();
     this.npcs = new Map();
+    this.buildings = [];
     this.accumulator = 0;
 
     // Our region, and every neighbour beside it, so the world reads as one.
@@ -135,6 +151,7 @@ export class WorldScene extends Phaser.Scene {
     cam.setZoom(cameraZoom());
     cam.setRoundPixels(true);
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
+    this.revealBuildings(true);
     cam.startFollow(this.me.body, true, 0.2, 0.2);
     if (!this.crossing) cam.fadeIn(250, 24, 20, 37);
     this.crossing = false;
@@ -182,6 +199,7 @@ export class WorldScene extends Phaser.Scene {
       this.shown.y += (target.y - this.shown.y) * 0.5;
     }
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
+    this.revealBuildings(false);
 
     const now = performance.now();
     for (const group of [this.remotes, this.creatures, this.npcs]) {
@@ -191,6 +209,11 @@ export class WorldScene extends Phaser.Scene {
         const before = remote.body.x;
         this.placeAvatar(remote, pos.x, pos.y);
         if (Math.abs(remote.body.x - before) > 0.5) remote.body.setFlipX(remote.body.x < before);
+        // People indoors stay out of sight until we come close enough to see in.
+        if (group !== this.creatures) {
+          const seen = !this.buildings.some((v) => !v.open && within(v.building, Math.floor(pos.x - v.ox), Math.floor(pos.y - v.oy)));
+          for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
+        }
       }
     }
   }
@@ -350,19 +373,45 @@ export class WorldScene extends Phaser.Scene {
         data[y]![x] = around.includes(Tile.Floor) ? Tile.Floor : around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
       }
     }
-    const tilemap = this.make.tilemap({ data, tileWidth: T, tileHeight: T });
-    const tileset = tilemap.addTilesetImage(tilesetKey, tilesetKey, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-    tilemap.createLayer(0, tileset, ox * T, oy * T)!.setDepth(-1);
-    this.placeScenery(map, ox, oy);
+    const layer = (tiles: number[][], depth: number) => {
+      const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
+      const tileset = tilemap.addTilesetImage(tilesetKey, tilesetKey, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
+      return tilemap.createLayer(0, tileset, ox * T, oy * T)!.setDepth(depth);
+    };
+    // Buildings whose exterior art has loaded keep their floor and walls on
+    // a layer of their own, hidden until we come close; the ground runs under.
+    const views = map.buildings.filter((b) => this.textures.exists(b.exterior.asset)).map((b) => {
+      const inside = data.map((row, y) => row.map((t, x) => (within(b, x, y) ? t : -1)));
+      for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
+      const view: BuildingView = { building: b, ox, oy, exterior: this.exterior(b, ox, oy), inside: [layer(inside, -0.5)], open: false };
+      return view;
+    });
+    layer(data, -1);
+    this.buildings.push(...views);
+    this.placeScenery(map, ox, oy, views);
+  }
+
+  /** A building's exterior art, drawn so its painted door sits over the doorway. */
+  private exterior(b: Building, ox: number, oy: number): Phaser.GameObjects.Image {
+    const { asset, width, door } = b.exterior;
+    const img = this.add.image(0, 0, asset).setOrigin(0, 0);
+    const w = width * T;
+    const h = (w * img.height) / img.width;
+    img.setDisplaySize(w, h);
+    // The doorway is two tiles wide; the art's door meets the wall's bottom edge.
+    img.setPosition((ox + b.door.x + 1) * T - door.x * w, (oy + b.door.y + 1) * T - door.y * h);
+    return img.setDepth((oy + b.y + b.height) * T);
   }
 
   /** Landmarks, and the trees and rocks standing on blocking tiles. */
-  private placeScenery(map: RegionMap, ox: number, oy: number): void {
+  private placeScenery(map: RegionMap, ox: number, oy: number, views: BuildingView[]): void {
     const biome = map.def.biome;
     for (const l of map.landmarks) {
-      if (!this.textures.exists(l.asset)) continue;
-      const img = this.add.image((ox + l.x) * T, (oy + l.y) * T, l.asset).setOrigin(0.5, 0.92);
+      const key = furnitureTexture(this, l.asset) ?? l.asset;
+      if (!this.textures.exists(key)) continue;
+      const img = this.add.image((ox + l.x) * T, (oy + l.y) * T, key).setOrigin(0.5, 0.92);
       img.setDepth((oy + l.y) * T);
+      views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
     }
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
@@ -374,6 +423,21 @@ export class WorldScene extends Phaser.Scene {
         const img = this.add.image((ox + x + 0.5) * T + jitter, (oy + y + 1) * T, key).setOrigin(0.5, 0.97);
         img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
         img.setDepth((oy + y + 1) * T - 1);
+      }
+    }
+  }
+
+  /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
+  private revealBuildings(instant: boolean): void {
+    for (const v of this.buildings) {
+      const open = nearBuilding(v.building, this.shown.x - v.ox, this.shown.y - v.oy);
+      if (open === v.open && !instant) continue;
+      v.open = open;
+      const fades = [{ target: v.exterior, alpha: open ? 0 : 1 }, ...v.inside.map((target) => ({ target, alpha: open ? 1 : 0 }))];
+      for (const { target, alpha } of fades) {
+        this.tweens.killTweensOf(target);
+        if (instant) target.setAlpha(alpha);
+        else this.tweens.add({ targets: target, alpha, duration: 350, ease: 'Sine.easeInOut' });
       }
     }
   }
@@ -435,6 +499,11 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.tint?.setPosition(cam.width / 2, cam.height / 2).setSize(cam.width / cam.zoom + 8, cam.height / cam.zoom + 8);
   }
+}
+
+/** True when tile (x, y) lies within a building's walls. */
+function within(b: Building, x: number, y: number): boolean {
+  return x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height;
 }
 
 function destroyAvatar(a: Avatar): void {

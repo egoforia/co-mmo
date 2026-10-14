@@ -115,6 +115,21 @@ export function regenPerSecond(c: Pick<Character, 'stats'>): number {
  * Adds XP, levelling up as many times as it covers. Each level raises every
  * stat by one and restores health. Returns the number of levels gained.
  */
+/** A party's tuning default, not a server limit (design doc, Social play). */
+export const PARTY_SIZE = 6;
+/** Each extra party member sharing a defeat adds this much to the XP shared out. */
+export const PARTY_XP_BONUS = 0.2;
+
+/**
+ * XP each of `sharers` party members gets for a defeat worth `xp`: the
+ * total grows a little with each member, then is split evenly, so fighting
+ * together never pays less than a fair share.
+ */
+export function partyXp(xp: number, sharers: number): number {
+  if (sharers <= 1) return xp;
+  return Math.ceil((xp * (1 + PARTY_XP_BONUS * (sharers - 1))) / sharers);
+}
+
 export function gainXp(c: Character, amount: number): number {
   c.xp += amount;
   let levels = 0;

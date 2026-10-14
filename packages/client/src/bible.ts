@@ -40,7 +40,9 @@ export const CHAPTERS: Chapter[] = [
       <h3>Moving and talking</h3>
       <ul>
         <li><b>WASD</b> or the <b>arrow keys</b> to walk. Follow a road off the edge of a region to travel to the next.</li>
-        <li><b>Enter</b> to speak. <i>Say</i> reaches those nearby; <i>World</i> reaches everyone.</li>
+        <li><b>Enter</b> to speak. <i>Say</i> reaches those nearby, <i>Region</i> everyone in this region, <i>Party</i> your party, <i>World</i> everyone. <b>/w</b> and a name whispers to one player; <b>/r</b> answers. Type <b>/help</b> for the rest.</li>
+        <li><b>/invite</b> and a name asks someone into your party. A party shares the XP of every creature its members defeat together, and their defeat quests.</li>
+        <li><b>Account</b> (top right) adds an email or Google/GitHub to sign in from any device, and is where you describe your look if you have not yet.</li>
         <li><b>E</b> beside someone to talk to them. Some will ask for your help.</li>
         <li><b>E</b> with nobody nearby works the land: beside water, a tree or a rock. Wished rules (like fishing) use it; the Chronicle says how to play each one.</li>
       </ul>

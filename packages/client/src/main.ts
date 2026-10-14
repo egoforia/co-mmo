@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
-import { MAX_NAME_LENGTH } from '@co-mmo/shared';
-import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
+import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH } from '@co-mmo/shared';
+import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
+import { AccountWindow, showSignIn } from './account-ui.ts';
 import { GameConnection } from './net.ts';
-import { ChatBox, escapeHtml, hidePanel, isTyping, onInviteClick, setHud, showPanel, toast } from './ui.ts';
+import { PartyUi, showAway } from './social-ui.ts';
+import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
@@ -12,14 +14,28 @@ import { WorldScene } from './world-scene.ts';
 async function boot(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const invite = params.get('invite');
-  const token = loadToken();
+  const login = params.get('login');
+  const signInError = params.get('signin_error');
+  const linked = params.get('linked');
+  if (invite || login || signInError || linked) history.replaceState(null, '', location.pathname);
 
+  // A sign-in link from an email, or the way back from Google or GitHub.
+  if (login) {
+    showPanel('<h1>co-MMO</h1><p>Signing you in...</p>');
+    try {
+      saveToken(await redeemLogin(login));
+    } catch (err) {
+      return showSignIn((err as Error).message);
+    }
+  }
+  const token = loadToken();
   if (invite && !token) return showInvite(invite);
-  if (invite && token) history.replaceState(null, '', location.pathname);
-  if (token) return play(token);
-  showPanel(`
-    <h1>co-MMO</h1>
-    <p>This world is invite-only. Ask a friend who plays for an invite link.</p>`);
+  if (token) {
+    if (linked) toast(`${linked === 'google' ? 'Google' : 'GitHub'} is linked. You can sign in with it from now on.`);
+    if (signInError) toast(signInError, 10000);
+    return play(token);
+  }
+  return showSignIn(signInError ?? '');
 }
 
 async function showInvite(code: string): Promise<void> {
@@ -37,6 +53,10 @@ async function showInvite(code: string): Promise<void> {
     <form id="accept-form">
       <label for="name">Character name</label>
       <input id="name" type="text" maxlength="${MAX_NAME_LENGTH}" required autofocus />
+      <label for="look">How do you look? <span class="hint">Your first wish, free: the God paints you.</span></label>
+      <textarea id="look" maxlength="${MAX_LOOK_LENGTH}" rows="3" placeholder="A stout dwarf with a braided red beard and a copper helmet"></textarea>
+      <label for="email">Email <span class="hint">(optional) to sign in from other devices</span></label>
+      <input id="email" type="email" autocomplete="email" />
       <label class="check"><input id="adult" type="checkbox" required /> I am 18 or older. This game has mature content.</label>
       <button type="submit">Enter the world</button>
       <p class="error" id="accept-error"></p>
@@ -44,14 +64,14 @@ async function showInvite(code: string): Promise<void> {
   const form = panel.querySelector<HTMLFormElement>('#accept-form')!;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const name = panel.querySelector<HTMLInputElement>('#name')!.value;
+    const field = (id: string) => panel.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)!.value;
     const adult = panel.querySelector<HTMLInputElement>('#adult')!.checked;
     const error = panel.querySelector<HTMLElement>('#accept-error')!;
     error.textContent = '';
     try {
-      const { token } = await acceptInvite(code, name, adult);
+      const { token, notes } = await acceptInvite(code, { name: field('name'), adult, email: field('email'), look: field('look') });
       saveToken(token);
-      history.replaceState(null, '', location.pathname);
+      if (notes?.length) toast(notes.join(' '), 12000);
       play(token);
     } catch (err) {
       error.textContent = (err as Error).message;
@@ -65,6 +85,8 @@ function play(token: string): void {
   let chat: ChatBox | null = null;
   let rpg: RpgUi | null = null;
   let prayer: PrayerUi | null = null;
+  let party: PartyUi | null = null;
+  let myId = '';
   onContent(() => {
     scene?.refreshWishes();
     rpg?.refresh();
@@ -88,7 +110,7 @@ function play(token: string): void {
     }
     if (code === 4001) {
       clearToken();
-      showPanel('<h1>co-MMO</h1><p>Your session is no longer valid. Use an invite link to join again.</p>');
+      void showSignIn('You were signed out. Sign in again to keep playing.');
       return;
     }
     if (code === 4000) {
@@ -117,7 +139,20 @@ function play(token: string): void {
         setHud(name, message.online, region);
         break;
       case 'chat':
-        chat?.add({ kind: 'chat', channel: message.channel, from: message.from.name, text: message.text });
+        chat?.add({
+          kind: 'chat', channel: message.channel, from: message.from.name, text: message.text,
+          ...(message.to ? { to: message.to.name, outgoing: message.from.id === myId } : {}),
+        });
+        break;
+      case 'party':
+        party?.show(message.party);
+        break;
+      case 'party-invite':
+        party?.invited(message);
+        chat?.add({ kind: 'system', text: `${message.from.name} invites you to their party. Type /accept or /decline.` });
+        break;
+      case 'away':
+        showAway(message);
         break;
       case 'system':
         chat?.add({ kind: 'system', text: message.text });
@@ -151,17 +186,21 @@ function play(token: string): void {
   function start(welcome: WelcomeMessage, manifest: ArtManifest): void {
     hidePanel();
     name = welcome.you.name;
+    myId = welcome.you.id;
     chat = new ChatBox((channel, text) => {
-      // "/report Name what happened" tells the Stewards about a player.
-      const report = text.match(/^\/report\s+(\S+)\s*(.*)$/i);
-      if (report) {
-        if (!report[2]) chat?.add({ kind: 'error', text: 'Write /report, their name, and what happened.' });
-        else connection.send({ t: 'report', kind: 'player', target: report[1]!, reason: report[2] });
-        return;
-      }
-      connection.send({ t: 'chat', channel, text });
+      const intent = readChat(channel, text);
+      if (intent.t === 'help') chat?.add({ kind: 'system', text: CHAT_HELP });
+      else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
+      else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible, G prays to the God. Press Enter to chat.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    party = new PartyUi((m) => connection.send(m));
+    party.start(myId);
+    const account = new AccountWindow(token);
+    onAccountClick(() => void account.toggle());
+    void accountInfo(token).then((info) => {
+      if (!info.look) chat?.add({ kind: 'system', text: '✦ You have not described your look yet. Open Account to make your first wish, free: the God paints you as you describe.' });
+    }, () => undefined);
     prayer = new PrayerUi({
       pray: (text) => connection.send({ t: 'pray', text }),
       answer: (card, confirm) => connection.send({ t: 'wish', card, confirm }),

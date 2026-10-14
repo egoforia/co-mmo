@@ -22,6 +22,7 @@ import {
   maxHp,
   npcName,
   outsideSide,
+  partyXp,
   questComplete,
   questOffered,
   regenPerSecond,
@@ -34,6 +35,7 @@ import {
   type ChatChannel,
   type ClientMessage,
   type CreatureDef,
+  type ChatMessage,
   type CreatureState,
   type EntityState,
   type NpcPlacement,
@@ -81,6 +83,12 @@ export interface RegionHooks {
   creatorFavor?(wisherId: string, amount: number): void;
   /** Something a scripted rule may answer happened (an item used, E pressed, a creature defeated). */
   event?(type: 'use' | 'interact' | 'defeat', playerId: string, data: Record<string, string | number>): void;
+  /** Delivers party and whisper chat, which can cross regions; returns why it could not. */
+  route?(message: ChatMessage, to?: string): string | void;
+  /** Everyone in a player's party, themself included. */
+  party?(playerId: string): string[];
+  /** Something worth a line in the "While you were away" feed. */
+  journal?(text: string, playerId: string): void;
 }
 
 /** Tile kinds scripted rules can ask about, by name. */
@@ -387,7 +395,7 @@ export class Region {
         p.inputs.push({ seq: message.seq, dx: message.dx, dy: message.dy });
         break;
       case 'chat':
-        this.chat(p, message.channel, message.text);
+        this.chat(p, message.channel, message.text, message.to);
         break;
       case 'attack':
         this.attack(p);
@@ -505,7 +513,13 @@ export class Region {
 
   private reward(p: PlayerState, c: Creature): void {
     const ch = p.character;
-    const gained: string[] = [`+${c.def.xp} XP`];
+    // Party members close by share the XP and the quest progress.
+    const party = this.hooks.party?.(p.info.id) ?? [p.info.id];
+    const sharers = party
+      .map((id) => this.players.get(id))
+      .filter((m): m is PlayerState => !!m && (m === p || (m.character.hp > 0 && Math.abs(m.x - c.x) <= VIEW_RADIUS && Math.abs(m.y - c.y) <= VIEW_RADIUS)));
+    const xp = partyXp(c.def.xp, sharers.length);
+    const gained: string[] = [sharers.length > 1 ? `+${xp} XP (shared)` : `+${xp} XP`];
     const [lo, hi] = c.def.gold;
     const gold = lo + Math.floor(this.random() * (hi - lo + 1));
     if (gold) {
@@ -522,20 +536,32 @@ export class Region {
     this.hooks.event?.('defeat', p.info.id, { creature: c.kind });
     if (c.wisher && c.wisher !== p.info.id) this.hooks.creatorFavor?.(c.wisher, 1);
     this.notice(p, `Defeated ${c.def.name}: ${gained.join(', ')}.`);
-    for (const q of ch.quests) {
+    for (const m of sharers) {
+      if (m !== p) {
+        discover(m.character, c.kind);
+        this.notice(m, `${p.info.name} defeated ${c.def.name}: +${xp} XP (shared).`);
+      }
+      this.countDefeat(m, c.kind);
+      this.levelUps(m, gainXp(m.character, xp));
+      m.dirty = true;
+    }
+  }
+
+  /** A defeat counts toward the player's defeat quests for that creature. */
+  private countDefeat(p: PlayerState, kind: string): void {
+    for (const q of p.character.quests) {
       const goal = QUESTS[q.id]?.goal;
-      if (q.done || goal?.kind !== 'defeat' || goal.creature !== c.kind || q.count >= goal.count) continue;
+      if (q.done || goal?.kind !== 'defeat' || goal.creature !== kind || q.count >= goal.count) continue;
       q.count++;
       if (q.count === goal.count) this.notice(p, `${QUESTS[q.id]!.title}: done! Return to ${npcName(QUESTS[q.id]!.giver)}.`);
     }
-    this.levelUps(p, gainXp(ch, c.def.xp));
-    p.dirty = true;
   }
 
   private levelUps(p: PlayerState, levels: number): void {
     if (!levels) return;
     this.notice(p, `You reached level ${p.character.level}! Every stat rose by ${levels}.`);
     this.broadcastSystem(`${p.info.name} reached level ${p.character.level}.`);
+    this.hooks.journal?.(`${p.info.name} reached level ${p.character.level}.`, p.info.id);
   }
 
   /** Creature behaviour for one tick: respawn, fight, walk home or wander. */
@@ -760,7 +786,7 @@ export class Region {
     }
   }
 
-  private chat(from: PlayerState, channel: ChatChannel, raw: string): void {
+  private chat(from: PlayerState, channel: ChatChannel, raw: string, to?: string): void {
     const text = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_CHAT_LENGTH);
     if (!text) return;
     const now = this.now();
@@ -770,9 +796,15 @@ export class Region {
       return;
     }
     from.chatTimes.push(now);
-    const message: ServerMessage = { t: 'chat', channel, from: { id: from.info.id, name: from.info.name }, text, at: now };
+    const message: ChatMessage = { t: 'chat', channel, from: { id: from.info.id, name: from.info.name }, text, at: now };
     if (channel === 'world') {
       this.hooks.worldChat(message);
+      return;
+    }
+    if (channel === 'region') return this.broadcast(message);
+    if (channel === 'party' || channel === 'whisper') {
+      const why = this.hooks.route ? this.hooks.route(message, to) : 'Nobody can hear that here.';
+      if (why) from.conn.send({ t: 'error', code: 'chat_undelivered', message: why });
       return;
     }
     for (const p of this.players.values()) {

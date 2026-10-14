@@ -31,6 +31,14 @@ export function contentEntries(): ContentEntry[] {
   return [...entries.values()].sort((a, b) => b.at - a.at);
 }
 
+/** The art key of a player's own look, once they have described it. */
+export function lookArt(playerId: string): string | undefined {
+  for (const e of entries.values()) {
+    if (e.status === 'granted' && e.definition?.kind === 'player' && e.wisher.id === playerId) return wishArtKey(e.id);
+  }
+  return undefined;
+}
+
 /** Picture for an asset key, wished or built-in. */
 export function artSrc(asset: string, icon = false): string {
   if (asset.startsWith('wished-')) return urls.get(asset) ?? 'art/item-goat-horn-icon.png';

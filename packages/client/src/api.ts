@@ -37,15 +37,103 @@ export async function checkInvite(code: string): Promise<InviteCheck> {
   return (await res.json()) as InviteCheck;
 }
 
-export async function acceptInvite(code: string, name: string, adult: boolean): Promise<{ token: string; player: PlayerInfo }> {
+export interface Joining {
+  name: string;
+  adult: boolean;
+  /** Optional: an email to sign in with later. */
+  email?: string;
+  /** Optional: how the player looks, in their own words. */
+  look?: string;
+}
+
+/** Accepts an invite; `notes` are things to tell the player (an email was sent). */
+export async function acceptInvite(code: string, joining: Joining): Promise<{ token: string; player: PlayerInfo; notes?: string[] }> {
   const res = await fetch('/api/accept', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code, name, adult }),
+    body: JSON.stringify({ code, ...joining }),
   });
   const body = await res.json();
   if (!res.ok) throw new Error(body.message ?? 'Could not accept the invite.');
   return body;
+}
+
+/** Which ways to sign in this world offers. */
+export interface SignInOptions {
+  /** 'log' when no email service is set up and links go to the server console. */
+  email: 'email' | 'log';
+  google: boolean;
+  github: boolean;
+}
+
+export async function signInOptions(): Promise<SignInOptions> {
+  const res = await fetch('/api/auth/options');
+  return res.ok ? ((await res.json()) as SignInOptions) : { email: 'log', google: false, github: false };
+}
+
+/** Asks for a sign-in link by email; resolves with what to tell the player. */
+export async function emailSignIn(email: string): Promise<string> {
+  return post('/api/auth/email', { email });
+}
+
+/** Trades the one-time code from a sign-in link for a session token. */
+export async function redeemLogin(code: string): Promise<string> {
+  const res = await fetch('/api/auth/redeem', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.message ?? 'That sign-in link did not work. Ask for a new one.');
+  return body.token as string;
+}
+
+export async function signOut(token: string): Promise<void> {
+  await fetch('/api/auth/logout', { method: 'POST', headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
+  clearToken();
+}
+
+export interface AccountInfo {
+  name: string;
+  email: string | null;
+  logins: ('google' | 'github')[];
+  providers: SignInOptions;
+  look: { description: string; art?: string } | null;
+}
+
+export async function accountInfo(token: string): Promise<AccountInfo> {
+  const res = await fetch('/api/account', { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error('Could not load your account.');
+  return (await res.json()) as AccountInfo;
+}
+
+/** Sends a confirm link to a new sign-in email. */
+export async function setEmail(token: string, email: string): Promise<string> {
+  return post('/api/account/email', { email }, token);
+}
+
+/** Describes your look: your first, free wish. */
+export async function describeLook(token: string, look: string): Promise<string> {
+  return post('/api/account/look', { look }, token);
+}
+
+/** Where to go to link Google or GitHub to this account. */
+export async function linkUrl(token: string, provider: 'google' | 'github'): Promise<string> {
+  const res = await fetch(`/api/auth/${provider}/link`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.message ?? 'Could not link that account.');
+  return body.url as string;
+}
+
+async function post(path: string, body: unknown, token?: string): Promise<string> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(answer.message ?? 'Something went wrong. Try again.');
+  return answer.message as string;
 }
 
 export async function createInvite(token: string): Promise<string> {

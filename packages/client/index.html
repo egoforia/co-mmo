@@ -14,6 +14,7 @@
       <span id="hud-online"></span>
       <a id="gods-view-link" href="/gods-view.html" target="_blank" hidden>God's View</a>
       <button id="invite-button" type="button">Invite a friend</button>
+      <button id="account-button" type="button">Account</button>
     </div>
 
     <div id="stats" hidden>
@@ -32,12 +33,19 @@
     <div id="inventory" class="window" hidden></div>
     <div id="bible" hidden></div>
     <div id="prayer" class="window" hidden></div>
+    <div id="account" class="window" hidden></div>
+    <div id="away" class="window" hidden></div>
+    <form id="party" autocomplete="off" hidden></form>
+    <div id="party-invite" hidden></div>
 
     <div id="chat" hidden>
       <ol id="chat-log" aria-live="polite"></ol>
       <form id="chat-form" autocomplete="off">
         <select id="chat-channel" aria-label="Channel">
           <option value="say">Say</option>
+          <option value="region">Region</option>
+          <option value="party">Party</option>
+          <option value="whisper">Whisper</option>
           <option value="world">World</option>
         </select>
         <input id="chat-input" maxlength="280" placeholder="Press Enter to talk" />

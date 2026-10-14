@@ -1,0 +1,122 @@
+{
+  "desert-cactus-folk": {
+    "file": "art/desert-cactus-folk.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "desert-dunes": {
+    "file": "art/desert-dunes.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-ruin": {
+    "file": "art/desert-ruin.png",
+    "kind": "set-piece",
+    "width": 512,
+    "height": 512
+  },
+  "desert-scarab": {
+    "file": "art/desert-scarab.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "item-bible": {
+    "file": "art/item-bible.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-goat-horn": {
+    "file": "art/item-goat-horn.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-tonic": {
+    "file": "art/item-tonic.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "player-ilya": {
+    "file": "art/player-ilya.png",
+    "kind": "player",
+    "width": 128,
+    "height": 192
+  },
+  "player-mara": {
+    "file": "art/player-mara.png",
+    "kind": "player",
+    "width": 128,
+    "height": 192
+  },
+  "sanctum-flagstones": {
+    "file": "art/sanctum-flagstones.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-pilgrim": {
+    "file": "art/sanctum-pilgrim.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "sanctum-shrine": {
+    "file": "art/sanctum-shrine.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 256
+  },
+  "shore-crab-knight": {
+    "file": "art/shore-crab-knight.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "shore-lighthouse": {
+    "file": "art/shore-lighthouse.png",
+    "kind": "set-piece",
+    "width": 512,
+    "height": 512
+  },
+  "shore-sand": {
+    "file": "art/shore-sand.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-trader": {
+    "file": "art/shore-trader.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "woods-herbalist": {
+    "file": "art/woods-herbalist.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "woods-moss": {
+    "file": "art/woods-moss.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-mushroom": {
+    "file": "art/woods-mushroom.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "woods-tree-house": {
+    "file": "art/woods-tree-house.png",
+    "kind": "set-piece",
+    "width": 512,
+    "height": 512
+  }
+}

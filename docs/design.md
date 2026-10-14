@@ -28,7 +28,7 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
 ## Milestones
 
 1. Design approved. Done.
-2. Walk together: invites, login, one region, movement, chat, presence. **In progress (first version done).**
+2. Walk together: invites, login, regions, movement, chat, presence. **Done:** four launch regions linked by roads, with the approved art.
 3. RPG core: stats, combat, creatures, items, quests, saving.
 4. God v1: prayer panel, conversation, wish cards, Minor and Moderate wishes as content data, Tier 0 and Tier 1 assets, first God's View panels.
 5. Stewards and scripts: sandboxed scripted rules, review queue, rollback tools, reports.

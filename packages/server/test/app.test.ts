@@ -90,7 +90,7 @@ describe('game connection', () => {
 
     for (let seq = 1; seq <= 5; seq++) ca.socket.send(JSON.stringify({ t: 'input', seq, dx: 1, dy: 0 }));
     const seen = await cb.waitFor(
-      (m) => m.t === 'snapshot' && m.players.some((p) => p.name === 'Mara' && p.x > app!.region.map.spawn.x + 0.5),
+      (m) => m.t === 'snapshot' && m.players.some((p) => p.name === 'Mara' && p.x > app!.world.home.map.spawn.x + 0.5),
     );
     expect(seen).toBeTruthy();
 
@@ -99,7 +99,7 @@ describe('game connection', () => {
 
     ca.socket.close();
     await cb.waitFor((m) => m.t === 'system' && m.text === 'Mara left.');
-    expect(store.accountById(a.account.id)!.x).toBeGreaterThan(app!.region.map.spawn.x);
+    expect(store.accountById(a.account.id)!.x).toBeGreaterThan(app!.world.home.map.spawn.x);
     cb.socket.close();
   });
 

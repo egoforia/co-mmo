@@ -14,11 +14,20 @@ interface PendingInput {
  */
 export class Predictor {
   private pending: PendingInput[] = [];
-  private seq = 0;
+  private seq: number;
   position: Vec2;
 
-  constructor(private readonly map: RegionMap, start: Vec2) {
+  /**
+   * `lastSeq` carries numbering over when the player changes region, since
+   * the server ignores any input numbered at or below one it has applied.
+   */
+  constructor(private readonly map: RegionMap, start: Vec2, lastSeq = 0) {
     this.position = { ...start };
+    this.seq = lastSeq;
+  }
+
+  get lastSeq(): number {
+    return this.seq;
   }
 
   /** Applies one tick of input locally; returns the message to send. */

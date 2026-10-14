@@ -77,9 +77,9 @@ export class ChatBox {
   }
 }
 
-export function setHud(name: string, online: number): void {
+export function setHud(name: string, online: number, region: string): void {
   $('hud').hidden = false;
-  $('hud-name').textContent = name;
+  $('hud-name').textContent = region ? `${name} · ${region}` : name;
   $('hud-online').textContent = `${online} online`;
 }
 

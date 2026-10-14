@@ -15,7 +15,8 @@
     "start": "npm run start -w @co-mmo/server",
     "test": "vitest run",
     "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client",
-    "anchors": "npm run anchors -w @co-mmo/server --"
+    "anchors": "npm run anchors -w @co-mmo/server --",
+    "game-art": "npm run game-art -w @co-mmo/server"
   },
   "engines": {
     "node": ">=20"

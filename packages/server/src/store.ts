@@ -122,9 +122,10 @@ export class Store {
     return this.data.accounts.find((a) => a.id === id);
   }
 
-  savePosition(id: string, x: number, y: number): void {
+  savePosition(id: string, x: number, y: number, regionId?: string): void {
     const account = this.accountById(id);
     if (!account) return;
+    if (regionId) account.regionId = regionId;
     account.x = x;
     account.y = y;
     this.persist();

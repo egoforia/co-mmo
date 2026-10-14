@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ServerMessage, WelcomeMessage } from '@co-mmo/shared';
+import type { ArtManifest, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_NAME_LENGTH } from '@co-mmo/shared';
 import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, saveToken } from './api.ts';
 import { GameConnection } from './net.ts';
@@ -61,6 +61,11 @@ function play(token: string): void {
   let scene: WorldScene | null = null;
   let chat: ChatBox | null = null;
   let name = '';
+  let region = '';
+  // Art loads alongside the connection; the world waits for both.
+  const art: Promise<ArtManifest> = fetch('/art/manifest.json')
+    .then((r) => (r.ok ? (r.json() as Promise<ArtManifest>) : {}))
+    .catch(() => ({}));
 
   const connection = new GameConnection(token, onMessage, (reason, code) => {
     if (code === 4001) {
@@ -74,11 +79,13 @@ function play(token: string): void {
   function onMessage(message: ServerMessage): void {
     switch (message.t) {
       case 'welcome':
-        start(message);
+        region = message.region.name;
+        if (scene) scene.enterRegion(message);
+        else void art.then((manifest) => start(message, manifest));
         break;
       case 'snapshot':
         scene?.onSnapshot(message);
-        setHud(name, message.online);
+        setHud(name, message.online, region);
         break;
       case 'chat':
         chat?.add({ kind: 'chat', channel: message.channel, from: message.from.name, text: message.text });
@@ -92,13 +99,14 @@ function play(token: string): void {
     }
   }
 
-  function start(welcome: WelcomeMessage): void {
+  function start(welcome: WelcomeMessage, manifest: ArtManifest): void {
     hidePanel();
     name = welcome.you.name;
     chat = new ChatBox((channel, text) => connection.send({ t: 'chat', channel, text }));
     chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Press Enter to talk.' });
     scene = new WorldScene({
       welcome,
+      art: manifest,
       send: (m) => connection.send(m),
       typing: () => chat?.typing ?? false,
     });
@@ -110,7 +118,7 @@ function play(token: string): void {
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });
-    setHud(name, 1);
+    setHud(name, 1, region);
     onInviteClick(async () => {
       try {
         const url = await createInvite(token);

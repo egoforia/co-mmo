@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { Interpolator, Predictor, generateSanctum, step } from '../src/index.ts';
+import { Interpolator, Predictor, WORLD_REGIONS, generateRegion, step } from '../src/index.ts';
 
 describe('Predictor', () => {
-  const map = generateSanctum(1337);
+  const map = generateRegion(WORLD_REGIONS[0]!);
+
+  it('continues input numbering after a region change', () => {
+    const p = new Predictor(map, map.spawn, 41);
+    expect(p.apply(1, 0).seq).toBe(42);
+    expect(p.lastSeq).toBe(42);
+  });
 
   it('replays unacknowledged inputs on top of the server position', () => {
     const p = new Predictor(map, map.spawn);

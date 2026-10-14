@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
-    "anchors": "tsx src/tools/generate-anchors.ts"
+    "anchors": "tsx src/tools/generate-anchors.ts",
+    "game-art": "tsx src/tools/build-game-art.ts"
   },
   "dependencies": {
     "sharp": "^0.35.5",

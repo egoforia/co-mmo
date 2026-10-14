@@ -29,12 +29,10 @@ export interface PlayerInfo {
 
 export type Role = 'player' | 'steward' | 'owner';
 
+/** Clients rebuild the map from the shared region definition with this id. */
 export interface RegionInfo {
   id: string;
   name: string;
-  width: number;
-  height: number;
-  seed: number;
 }
 
 export interface WelcomeMessage {
@@ -54,6 +52,14 @@ export interface EntityState {
   y: number;
 }
 
+export interface CreatureState {
+  id: string;
+  asset: string;
+  name: string;
+  x: number;
+  y: number;
+}
+
 export interface SnapshotMessage {
   t: 'snapshot';
   tick: number;
@@ -63,6 +69,8 @@ export interface SnapshotMessage {
   y: number;
   /** Other players inside the view radius. */
   players: EntityState[];
+  /** Creatures inside the view radius. */
+  creatures: CreatureState[];
   online: number;
 }
 

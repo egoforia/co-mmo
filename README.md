@@ -12,15 +12,20 @@ which milestone the code is at.
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
-- One region, the Sanctum: a procedurally generated 64×64 tile map with the
-  God's shrine in a central plaza.
+- Four regions, each a procedurally generated 64×64 tile map: the Sanctum
+  (the God's shrine, Sister Amala) in the middle, with Whispering Woods to the
+  west, Sunlit Shore to the east and Mirage Desert to the south. Walk off the
+  end of a road to travel; your region and position are saved.
+- Each region has its landmark, an NPC and wandering creatures (walking
+  mushrooms, crab knights, sun scarabs). Creatures only wander for now.
 - Server-authoritative movement at 20 ticks per second, with client-side
   prediction for your own character and interpolation for everyone else.
 - Area of interest: each player only receives others within 24 tiles.
 - Chat: Say (nearby, 16 tiles) and World, with flood limits.
 - Positions saved every 30 seconds and on disconnect.
-- 128×128 tiles (Style Bible). Tier 0 placeholder art is drawn in code and
-  scaled up; generated hand-painted art replaces it later.
+- 128×128 tiles (Style Bible), using the approved reference art: ground
+  tiles, characters, NPCs, creatures and landmarks. Water, trees, rocks, palms
+  and cacti are still painted in code until a biome kit is generated.
 - Biome definitions for all ten Style Bible biomes; the Sanctum, Whispering
   Woods, Sunlit Shore and Mirage Desert are the launch set.
 
@@ -86,6 +91,11 @@ version), so the set can be regenerated later with a better model. The
 provider's image is kept in `assets/anchors/raw/`; the game copy has its
 magenta background removed (sprites) or is made seamless (ground tiles, with a
 4×4 repeat preview in `assets/anchors/previews/`).
+
+`npm run game-art` turns the anchors into game sizes (128 px tiles and
+creatures, 128×192 characters, larger set pieces) in
+`packages/client/public/art/`, with a `manifest.json` the client loads. It
+needs no API key; run it after adding or changing anchors.
 
 ## Develop
 

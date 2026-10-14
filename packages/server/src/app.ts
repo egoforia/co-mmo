@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { TICK_SECONDS, isClientMessage, validateName, type PlayerInfo } from '@co-mmo/shared';
-import { Region } from './region.ts';
+import { World } from './world.ts';
 import { Store, StoreError, type Account } from './store.ts';
 
 export interface AppOptions {
@@ -19,7 +19,7 @@ export interface AppOptions {
 
 export interface App {
   server: Server;
-  region: Region;
+  world: World;
   close(): Promise<void>;
 }
 
@@ -38,7 +38,7 @@ const MIME: Record<string, string> = {
 /** HTTP API, static client, and game WebSocket on one server. */
 export function createApp(options: AppOptions): App {
   const { store } = options;
-  const region = new Region({ id: 'sanctum', name: 'the Sanctum', seed: 1337 });
+  const world = new World();
 
   const server = createServer((req, res) => {
     handleHttp(req, res).catch((err) => {
@@ -68,7 +68,7 @@ export function createApp(options: AppOptions): App {
       const nameError = validateName(name);
       if (nameError) return json(res, 400, { error: 'name_invalid', message: nameError });
       try {
-        const { account, token } = store.acceptInvite(code, name, region.info.id);
+        const { account, token } = store.acceptInvite(code, name, world.home.def.id);
         return json(res, 200, { token, player: publicInfo(account) });
       } catch (err) {
         if (err instanceof StoreError) return json(res, 400, { error: err.code, message: err.message });
@@ -104,6 +104,7 @@ export function createApp(options: AppOptions): App {
   // Game connections. The session token arrives as the first message rather
   // than in the URL, so it never shows up in proxy or server logs.
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
+  const sockets = new Map<string, WebSocket>();
   wss.on('connection', (socket: WebSocket) => {
     let account: Account | undefined;
     const authTimer = setTimeout(() => socket.close(4001, 'Sign-in timed out.'), 5000);
@@ -124,40 +125,39 @@ export function createApp(options: AppOptions): App {
           socket.close(4001, 'Unauthorized');
           return;
         }
-        region.join(publicInfo(account), {
+        sockets.set(account.id, socket);
+        world.join(publicInfo(account), {
           send: (m) => {
             if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
           },
           close: (reason) => socket.close(4000, reason),
-        }, account);
+        }, { regionId: account.regionId, x: account.x, y: account.y });
         return;
       }
-      if (isClientMessage(parsed)) region.handle(account.id, parsed);
+      if (isClientMessage(parsed)) world.handle(account.id, parsed);
     });
 
     socket.on('close', () => {
       clearTimeout(authTimer);
       if (!account) return;
       // A replaced connection must not remove the newer session.
-      if (!region.has(account.id)) return;
-      const pos = region.leave(account.id);
-      if (pos) store.savePosition(account.id, pos.x, pos.y);
+      if (sockets.get(account.id) !== socket) return;
+      sockets.delete(account.id);
+      const place = world.leave(account.id);
+      if (place) store.savePosition(account.id, place.x, place.y, place.regionId);
     });
   });
 
-  const tickTimer = setInterval(() => region.tick(), TICK_SECONDS * 1000);
+  const tickTimer = setInterval(() => world.tick(), TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 
   function saveAll(): void {
-    for (const id of region.playerIds()) {
-      const pos = region.position(id);
-      if (pos) store.savePosition(id, pos.x, pos.y);
-    }
+    for (const p of world.places()) store.savePosition(p.id, p.x, p.y, p.regionId);
   }
 
   return {
     server,
-    region,
+    world,
     async close() {
       clearInterval(tickTimer);
       clearInterval(autosaveTimer);

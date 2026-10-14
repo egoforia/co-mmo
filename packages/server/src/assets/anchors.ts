@@ -204,4 +204,10 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[] })
     body: 'scroll half unrolled, blank inside', materials: ['parchment', 'ribbon', 'wax'], colors: { main: 'cream parchment', secondary: 'rose ribbon', accent: 'gold glowing seal' },
     details: ['curled edges', 'a few light motes'], mood: 'magical, inviting', extra: { category: 'scroll', rarity: 'Uncommon' },
   },
+  {
+    id: 'item-firebolt', name: 'Firebolt spark', kind: 'item', biome: 'any', references: ['item-tonic', 'item-goat-horn'],
+    silhouetteHook: 'a round glowing ball of warm orange fire with a short swirling flame tail',
+    body: 'small fireball flying to the right', materials: ['magic fire'], colors: { main: 'amber orange', secondary: 'pale gold core', accent: 'rose sparks' },
+    details: ['a few tiny embers trailing behind'], mood: 'bright, magical', extra: { category: 'spell effect' },
+  },
 ];

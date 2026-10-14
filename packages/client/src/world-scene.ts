@@ -308,13 +308,15 @@ export class WorldScene extends Phaser.Scene {
     this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
   }
 
-  /** A glowing spark flies from the caster to the target. */
+  /** The painted Firebolt spark flies from the caster to the target. */
   private bolt(from: Avatar, to: Avatar): void {
+    if (!this.textures.exists('item-firebolt')) return;
     const y = (a: Avatar) => a.body.y - a.body.displayHeight * 0.5;
-    const spark = this.add.circle(from.body.x, y(from), T * 0.12, 0xfeae34).setStrokeStyle(T / 24, 0xfee761).setDepth(LABEL_DEPTH);
+    const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
+    const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
     this.tweens.add({
       targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn',
-      onComplete: () => this.tweens.add({ targets: spark, scale: 2.2, alpha: 0, duration: 160, onComplete: () => spark.destroy() }),
+      onComplete: () => this.tweens.add({ targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onComplete: () => spark.destroy() }),
     });
   }
 

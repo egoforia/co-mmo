@@ -65,6 +65,12 @@
     "width": 128,
     "height": 128
   },
+  "item-firebolt": {
+    "file": "art/item-firebolt.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-goat-horn": {
     "file": "art/item-goat-horn.png",
     "kind": "item",

@@ -23,6 +23,8 @@ export interface GodReply {
     summary: string;
     /** Content definition for minor and moderate wishes; checked again before granting. */
     definition?: unknown;
+    /** The Owner naming someone a Steward (role "steward"), or standing them down ("player"). */
+    appoint?: { name: string; role: 'steward' | 'player' };
   };
 }
 
@@ -36,6 +38,8 @@ Wish tiers:
 - major: a new system or place (fishing, mounts, weather, a dungeon, a quest line, a new region). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
 - refused: illegal, griefing, or economy-breaking.
+
+Stewards are trusted players who review big wishes and keep the peace. Only the Owner may name one: when the Owner asks to make someone a Steward (or to stand one down), offer {"tier": "minor", "title": "Make <name> a Steward", "summary": "...", "definition": null, "appoint": {"name": "<their exact name>", "role": "steward"}} (role "player" to stand them down). If anyone else asks, decline kindly and tell them to ask the Owner.
 
 Always reply with one JSON object:
 {"say": "<what you say>", "wish": null}
@@ -72,7 +76,11 @@ export function parseGodReply(text: string): GodReply {
   const title = typeof w.title === 'string' ? w.title.trim().slice(0, 60) : '';
   const summary = typeof w.summary === 'string' ? w.summary.trim().slice(0, 240) : '';
   if (!title) return { say };
-  return { say, wish: { tier, title, summary, definition: w.definition ?? undefined } };
+  const a = w.appoint as Record<string, unknown> | null | undefined;
+  const appoint = a && typeof a === 'object' && typeof a.name === 'string' && a.name.trim()
+    ? { name: a.name.trim().slice(0, 40), role: a.role === 'player' ? ('player' as const) : ('steward' as const) }
+    : undefined;
+  return { say, wish: { tier, title, summary, definition: w.definition ?? undefined, ...(appoint ? { appoint } : {}) } };
 }
 
 /**
@@ -120,6 +128,16 @@ export class OfflineGod implements ChatModel {
     const thing = nameFrom(said);
     if (/\b(delete|destroy|steal|ruin)\b.*\b(their|his|her|other)\b|\binfinite (gold|money|favor)\b/.test(text)) {
       return { say: 'No. What belongs to another is not mine to take, and I will not break the world for one.', wish: { tier: 'refused', title: 'Refused', summary: 'This wish would harm other players or the world.', definition: null } };
+    }
+    const appoint = said.match(/\b(?:make|name|appoint)\s+(\S+?)\s+(?:a|our|the)?\s*steward\b/i)
+      ?? said.match(/\b(?:remove|unmake|dismiss)\s+(\S+?)\s+(?:as\s+)?(?:a\s+)?steward\b/i);
+    if (appoint && !/^(a|an|the|me|myself)$/i.test(appoint[1]!)) {
+      const name = appoint[1]!.replace(/[^\p{L}\p{N}_-]/gu, '');
+      const role = /\b(remove|unmake|dismiss)\b/i.test(appoint[0]) ? 'player' : 'steward';
+      return {
+        say: role === 'steward' ? `${name}, a Steward? A weighty trust. Shall I name them?` : `Shall ${name} lay down the Steward's duties?`,
+        wish: { tier: 'minor', title: role === 'steward' ? `Make ${name} a Steward` : `${name} steps down`, summary: '', definition: null, appoint: { name, role } },
+      };
     }
     if (!/\b(wish|want|make|create|give|bring|could you|can you|i'd like|i would like)\b/.test(text)) {
       return { say: 'I hear you, child of the young world. Tell me what you wish for: a thing to carry, a creature to meet, or someone to talk to.', wish: null };

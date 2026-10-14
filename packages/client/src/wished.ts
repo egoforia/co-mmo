@@ -1,4 +1,4 @@
-import { applyContent, placeholderArt, wishArtKey, type ContentEntry } from '@co-mmo/shared';
+import { applyContent, placeholderArt, ruleItemId, wishArtKey, type ContentEntry, type RuleItem, type WishDefinition } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until a wish's own art is painted, it wears
@@ -38,17 +38,29 @@ export function artSrc(asset: string, icon = false): string {
 }
 
 async function prepareArt(entry: ContentEntry): Promise<void> {
-  const key = wishArtKey(entry.id);
-  if (!entry.definition || entry.status !== 'granted') return;
-  if (entry.art) {
-    urls.set(key, entry.art);
+  const def = entry.definition;
+  if (!def || entry.status !== 'granted') return;
+  // A scripted rule brings items, each with its own picture.
+  if (def.kind === 'rule') {
+    await Promise.all(Object.entries(def.items).map(([key, item]) => {
+      const id = ruleItemId(entry.id, key);
+      return picture(wishArtKey(id), entry.itemArt?.[id], item);
+    }));
+    return;
+  }
+  await picture(wishArtKey(entry.id), entry.art, def);
+}
+
+async function picture(key: string, painted: string | undefined, def: WishDefinition | RuleItem): Promise<void> {
+  if (painted) {
+    urls.set(key, painted);
     return;
   }
   if (urls.has(key)) return;
   try {
-    urls.set(key, await tinted(`art/${placeholderArt(entry.definition)}.png`, entry.definition.look.color));
+    urls.set(key, await tinted(`art/${placeholderArt(def)}.png`, def.look.color));
   } catch {
-    urls.set(key, `art/${placeholderArt(entry.definition)}.png`);
+    urls.set(key, `art/${placeholderArt(def)}.png`);
   }
 }
 

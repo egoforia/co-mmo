@@ -1,0 +1,131 @@
+// Shared by the server tests: an app on a random port, accounts, and a
+// WebSocket client that collects messages.
+
+import { afterEach, expect } from 'vitest';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { AddressInfo } from 'node:net';
+import sharp from 'sharp';
+import { WebSocket } from 'ws';
+import { CREATURES, ITEMS, NPC_GREETINGS, type GodMessage, type ServerMessage, type WishCard } from '@co-mmo/shared';
+import { createApp, type App } from '../src/app.ts';
+import type { ChatModel } from '../src/ai/chat.ts';
+import { OfflineGod } from '../src/god.ts';
+import type { ImageProvider } from '../src/assets/provider.ts';
+import { Store } from '../src/store.ts';
+
+export let app: App | null = null;
+const sockets: WebSocket[] = [];
+
+/** Closes the running app, as a server shutdown would. */
+export async function stop(): Promise<void> {
+  await app?.close();
+  app = null;
+}
+
+afterEach(async () => {
+  for (const s of sockets.splice(0)) s.close();
+  await app?.close();
+  app = null;
+  for (const id of Object.keys(ITEMS)) if (id.startsWith('w')) delete ITEMS[id];
+  for (const id of Object.keys(CREATURES)) if (id.startsWith('w')) delete CREATURES[id];
+  for (const id of Object.keys(NPC_GREETINGS)) if (id.startsWith('w')) delete NPC_GREETINGS[id];
+});
+
+/** Paints a small magenta-backed square, like the image service would. */
+export const fakePainter = (): ImageProvider & { calls: number } => ({
+  id: 'fake',
+  model: 'fake-image',
+  calls: 0,
+  async generate() {
+    this.calls++;
+    const data = await sharp({ create: { width: 256, height: 256, channels: 3, background: { r: 255, g: 0, b: 255 } } })
+      .composite([{ input: await sharp({ create: { width: 100, height: 120, channels: 3, background: { r: 40, g: 90, b: 160 } } }).png().toBuffer(), left: 78, top: 70 }])
+      .png()
+      .toBuffer();
+    return { mimeType: 'image/png', data };
+  },
+});
+
+export async function start(opts: { store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number } = {}) {
+  const store = opts.store ?? Store.memory();
+  const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-art-'));
+  const painter = opts.painter === undefined ? fakePainter() : opts.painter;
+  app = createApp({
+    store,
+    publicUrl: 'http://game.test',
+    wishes: {
+      env: {},
+      anchorDir: '/nonexistent',
+      artDir,
+      chatModel: opts.chat ?? (() => [new OfflineGod()]),
+      ...(opts.compiler ? { compilerModel: opts.compiler } : {}),
+      ...(opts.now ? { now: opts.now } : {}),
+      imageProvider: () => painter ?? undefined,
+    },
+  });
+  await new Promise<void>((resolve) => app!.server.listen(0, resolve));
+  const port = (app.server.address() as AddressInfo).port;
+  return { store, artDir, painter, base: `http://127.0.0.1:${port}`, ws: `ws://127.0.0.1:${port}/ws` };
+}
+
+export function account(store: Store, name: string, role: 'owner' | 'steward' | 'player' = 'player') {
+  const invite = store.createInvite(null, role === 'owner' ? 'owner' : 'player');
+  const { account, token } = store.acceptInvite(invite.code, name, 'sanctum');
+  if (role === 'steward') store.setRole(account.id, 'steward');
+  return { id: account.id, token };
+}
+
+export function connect(url: string, token: string) {
+  const socket = new WebSocket(url);
+  sockets.push(socket);
+  const messages: ServerMessage[] = [];
+  socket.on('message', (raw) => messages.push(JSON.parse(raw.toString())));
+  const opened = new Promise<void>((resolve) => socket.on('open', () => {
+    socket.send(JSON.stringify({ t: 'hello', token }));
+    resolve();
+  }));
+  const send = async (m: unknown) => {
+    await opened;
+    socket.send(JSON.stringify(m));
+  };
+  const waitFor = async <T extends ServerMessage>(pred: (m: ServerMessage) => boolean, ms = 3000): Promise<T> => {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      const i = messages.findIndex(pred);
+      if (i >= 0) return messages.splice(i, 1)[0] as T;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    throw new Error('timed out waiting for message');
+  };
+  return { socket, messages, send, waitFor };
+}
+
+export async function joined(url: string, token: string) {
+  const c = connect(url, token);
+  await c.waitFor((m) => m.t === 'welcome');
+  return c;
+}
+
+export async function pray(c: ReturnType<typeof connect>, text: string): Promise<GodMessage> {
+  await c.send({ t: 'pray', text });
+  return c.waitFor<GodMessage>((m) => m.t === 'god');
+}
+
+export async function wish(c: ReturnType<typeof connect>, text: string): Promise<WishCard> {
+  const answer = await pray(c, text);
+  expect(answer.card).toBeDefined();
+  await c.send({ t: 'wish', card: answer.card!.id, confirm: true });
+  return answer.card!;
+}
+
+export async function api(base: string, path: string, token: string, method = 'GET', body?: unknown) {
+  const res = await fetch(`${base}${path}`, {
+    method,
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: res.status, body: (await res.json()) as Record<string, any> };
+}
+

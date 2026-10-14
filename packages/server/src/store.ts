@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { PLAYER_COLORS, hashString, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
 import type { ChatTurn, ProviderId } from './ai/chat.ts';
+import type { RuleTestReport } from './rule-test.ts';
 
 export interface Account {
   id: string;
@@ -18,6 +19,8 @@ export interface Account {
   y: number | null;
   /** Missing until the character first plays. */
   character?: Character;
+  /** Set while a Steward or the Owner has suspended the account. */
+  suspended?: { by: string; at: number; reason: string };
 }
 
 export interface Invite {
@@ -35,6 +38,25 @@ export interface ContentRecord extends ContentEntry {
   conversation: ChatTurn[];
   /** Real money it cost (chat and art), US dollars. */
   usd: number;
+  /** For Major wishes: the God drafting a scripted rule for it. */
+  draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; at: number; message?: string; model?: string; note?: string };
+  /** The automated test run of the drafted rule. */
+  test?: RuleTestReport;
+  /** A live rule a Steward paused, or that paused itself. */
+  rule?: { paused: boolean; reason?: string };
+}
+
+/** A player telling the Stewards about a wished thing or another player. */
+export interface Report {
+  id: string;
+  at: number;
+  reporter: { id: string; name: string };
+  kind: 'content' | 'player';
+  target: { id: string; name: string };
+  reason: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  /** Who closed it, how, and when. */
+  closed?: { by: string; at: number; action: string };
 }
 
 export interface ModelChoice {
@@ -48,6 +70,8 @@ export interface Settings {
     god: ModelChoice;
     /** Used when the God model is down, over budget or refuses (e.g. mature requests). */
     fallback: ModelChoice | null;
+    /** Drafts scripted rules for Major wishes; null uses the God's model. */
+    compiler?: ModelChoice | null;
     /** Paints wished things; 'none' keeps tinted placeholders. */
     image: { provider: 'gemini' | 'none'; model: string };
   };
@@ -74,14 +98,18 @@ interface Data {
   content: ContentRecord[];
   settings: Settings;
   spend: SpendRecord[];
+  reports: Report[];
+  /** Scripted rules' saved state: rule id → player id (or "_" for shared) → values. */
+  ruleData: Record<string, Record<string, Record<string, unknown>>>;
 }
 
 export function defaultSettings(env: Record<string, string | undefined> = process.env): Settings {
   const gemini = Boolean(env.GEMINI_API_KEY);
   return {
     ai: {
-      god: gemini ? { provider: 'gemini', model: 'gemini-2.5-flash' } : { provider: 'offline', model: 'scripted' },
+      god: gemini ? { provider: 'gemini', model: 'gemini-3.8-flash' } : { provider: 'offline', model: 'scripted' },
       fallback: null,
+      compiler: null,
       image: gemini ? { provider: 'gemini', model: 'gemini-2.5-flash-image' } : { provider: 'none', model: '' },
     },
     budget: { monthlyUsd: 70, warnUsd: 50 },
@@ -94,7 +122,7 @@ export function defaultSettings(env: Record<string, string | undefined> = proces
  * replaces it for hosting (see the design doc, Technical architecture).
  */
 export class Store {
-  private data: Data = { accounts: [], invites: [], content: [], settings: defaultSettings(), spend: [] };
+  private data: Data = { accounts: [], invites: [], content: [], settings: defaultSettings(), spend: [], reports: [], ruleData: {} };
   private saving: Promise<void> = Promise.resolve();
 
   private constructor(private readonly path: string | null) {}
@@ -179,6 +207,19 @@ export class Store {
     return this.data.accounts.find((a) => a.id === id);
   }
 
+  accountByName(name: string): Account | undefined {
+    const lower = name.trim().toLowerCase();
+    return this.data.accounts.find((a) => a.name.toLowerCase() === lower);
+  }
+
+  setSuspended(id: string, suspended: Account['suspended'] | null): void {
+    const account = this.accountById(id);
+    if (!account || account.role === 'owner') return;
+    if (suspended) account.suspended = suspended;
+    else delete account.suspended;
+    this.persist();
+  }
+
   savePosition(id: string, x: number, y: number, regionId?: string, character?: Character): void {
     const account = this.accountById(id);
     if (!account) return;
@@ -231,6 +272,36 @@ export class Store {
     return record;
   }
 
+  // --- Reports ------------------------------------------------------------
+
+  get reports(): readonly Report[] {
+    return this.data.reports;
+  }
+
+  addReport(report: Report): void {
+    this.data.reports.push(report);
+    this.persist();
+  }
+
+  updateReport(id: string, change: Partial<Report>): Report | undefined {
+    const report = this.data.reports.find((r) => r.id === id);
+    if (!report) return undefined;
+    Object.assign(report, change);
+    this.persist();
+    return report;
+  }
+
+  // --- Scripted rule state ----------------------------------------------------
+
+  ruleData(ruleId: string): Record<string, Record<string, unknown>> {
+    return this.data.ruleData[ruleId] ?? {};
+  }
+
+  setRuleData(ruleId: string, data: Record<string, Record<string, unknown>>): void {
+    this.data.ruleData[ruleId] = data;
+    this.persistSoon();
+  }
+
   // --- Settings and spending -----------------------------------------------
 
   get settings(): Settings {
@@ -255,8 +326,25 @@ export class Store {
     return this.data.spend.filter((s) => s.at >= start && s.at <= now);
   }
 
+  private soon: NodeJS.Timeout | null = null;
+
+  /** Rule state can change many times a second; write it at most once a second. */
+  private persistSoon(): void {
+    if (this.soon || !this.path) return;
+    this.soon = setTimeout(() => {
+      this.soon = null;
+      this.persist();
+    }, 1000);
+    this.soon.unref();
+  }
+
   /** Resolves once every pending write has reached disk. */
   flush(): Promise<void> {
+    if (this.soon) {
+      clearTimeout(this.soon);
+      this.soon = null;
+      this.persist();
+    }
     return this.saving;
   }
 

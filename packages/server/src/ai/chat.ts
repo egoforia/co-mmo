@@ -39,6 +39,8 @@ export class ChatError extends Error {
 
 /** Approximate list prices, US dollars per million tokens (input, output). */
 const PRICES: Record<string, [number, number]> = {
+  // Google retired gemini-2.5-flash for new keys (October 2026). The 3.8 price is an estimate, not yet checked against Google's list.
+  'gemini-3.8-flash': [0.5, 3],
   'gemini-2.5-flash': [0.3, 2.5],
   'gemini-2.5-flash-lite': [0.1, 0.4],
   'gemini-2.5-pro': [1.25, 10],
@@ -60,7 +62,7 @@ export const KEY_ENV: Record<Exclude<ProviderId, 'offline'>, string> = {
 };
 
 export const DEFAULT_MODELS: Record<ProviderId, string> = {
-  gemini: 'gemini-2.5-flash',
+  gemini: 'gemini-3.8-flash',
   anthropic: 'claude-haiku-5-5',
   openai: 'gpt-4o-mini',
   offline: 'scripted',

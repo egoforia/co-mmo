@@ -41,10 +41,33 @@ interface Entry {
   summary: string;
   status: string;
   favor: number;
-  definition?: { kind: string; name: string; description: string };
+  definition?: {
+    kind: string;
+    name: string;
+    description: string;
+    howTo?: string;
+    items?: Record<string, { name: string; description: string; itemKind: string; heal?: number }>;
+    script?: string;
+  };
   art?: string;
+  itemArt?: Record<string, string>;
   conversation?: { role: string; content: string }[];
   usd?: number;
+  draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; at: number; message?: string; model?: string; note?: string };
+  test?: { passed: boolean; at: number; summary: string[]; errors: string[]; sample: string[] };
+  rule?: { paused: boolean; reason?: string };
+  live?: { paused: boolean; reason?: string; runs: number; errors: { at: number; message: string }[]; effects: Record<string, number>; events: string[]; timers: number } | null;
+}
+
+interface Report {
+  id: string;
+  at: number;
+  reporter: { id: string; name: string };
+  kind: 'content' | 'player';
+  target: { id: string; name: string };
+  reason: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  closed?: { by: string; at: number; action: string };
 }
 
 interface Player {
@@ -57,12 +80,14 @@ interface Player {
   favor: number | null;
   createdAt: number;
   invitedBy: string | null;
+  suspended: { by: string; at: number; reason: string } | null;
 }
 
 interface AiSettings {
   ai: {
     god: { provider: string; model: string };
     fallback: { provider: string; model: string } | null;
+    compiler?: { provider: string; model: string } | null;
     image: { provider: string; model: string };
   };
   providers: { id: string; keySet: boolean; keyName: string | null; defaultModel: string }[];
@@ -109,6 +134,8 @@ async function boot(): Promise<void> {
   const tabs = [
     ['world', 'World'],
     ['wishes', 'Wishes'],
+    ['rules', 'Rules'],
+    ['reports', 'Reports'],
     ['players', 'Players'],
     ...(owner ? [['ai', 'AI models'], ['budget', 'Budget']] : []),
   ];
@@ -135,7 +162,8 @@ async function render(): Promise<void> {
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
-    const html = current === 'world' ? await world() : current === 'wishes' ? await wishes() : current === 'players' ? await players() : current === 'ai' ? await ai() : await budget();
+    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, ai, budget };
+    const html = await (pages[current] ?? world)();
     if (tab !== current) return;
     // Keep what the Owner is typing when the panel refreshes.
     if (panel.contains(document.activeElement) && current !== 'world') return;
@@ -151,7 +179,7 @@ async function render(): Promise<void> {
 let regions: Region[] = [];
 
 async function world(): Promise<string> {
-  const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; budget: Budget | null }>('overview');
+  const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; reports: number; rules: number; budget: Budget | null }>('overview');
   regions = o.regions;
   const byId = new Map(regions.map((r) => [r.id, r]));
   const cell = (id: string) => {
@@ -169,6 +197,8 @@ async function world(): Promise<string> {
     <div class="stats">
       <div class="stat"><b>${o.online}</b><span>online now</span></div>
       <div class="stat ${o.queue ? 'warn' : ''}"><b>${o.queue}</b><span>wishes waiting for review</span></div>
+      <div class="stat ${o.reports ? 'warn' : ''}"><b>${o.reports}</b><span>open reports</span></div>
+      <div class="stat"><b>${o.rules}</b><span>scripted rules live</span></div>
       ${budgetCard}
     </div>
     <div class="map">${['', '', '', 'woods', 'sanctum', 'shore', '', 'desert', ''].map((id) => (id ? cell(id) : '<div></div>')).join('')}</div>
@@ -207,14 +237,16 @@ function drawMaps(): void {
 async function wishes(): Promise<string> {
   const { content } = await api<{ content: Entry[] }>('content');
   const pending = content.filter((e) => e.status === 'pending');
+  if (pending.some((e) => e.draft?.state === 'drafting')) setTimeout(pollDrafting);
   const queue = pending.length
     ? pending.map((e) => `
       <article class="wish pending">
         <header><span class="tier ${e.tier}">${e.tier}</span><b>${escapeHtml(e.title)}</b><small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
         <p>${escapeHtml(e.summary)}</p>
         ${conversation(e)}
+        ${e.tier === 'major' ? draft(e) : ''}
         <div class="actions">
-          <button type="button" data-review="${e.id}" data-approve="yes">Approve</button>
+          <button type="button" data-review="${e.id}" data-approve="yes"${e.definition?.kind === 'rule' && !e.test?.passed ? ' disabled title="The rule has not passed its test run"' : ''}>${e.definition?.kind === 'rule' ? 'Approve and go live' : 'Approve'}</button>
           <button type="button" class="quiet" data-review="${e.id}" data-approve="no">Reject</button>
         </div>
       </article>`).join('')
@@ -239,30 +271,114 @@ async function wishes(): Promise<string> {
     ${content.length ? `<table class="log"><thead><tr><th></th><th>Wish</th><th>Tier</th><th>Status</th><th>Wished by</th>${owner ? '<th>Cost</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="note">No wishes yet.</p>'}`;
 }
 
+/** The God's drafted rule for a Major wish: script, items, test run, and a way to ask for changes. */
+function draft(e: Entry): string {
+  const d = e.draft;
+  const def = e.definition?.kind === 'rule' ? e.definition : undefined;
+  const state = !d
+    ? '<p class="note">No rule drafted yet.</p>'
+    : d.state === 'drafting'
+      ? '<p class="note">The God is drafting a rule and testing it…</p>'
+      : d.state === 'impossible'
+        ? `<p class="note">The God says this cannot be a scripted rule: ${escapeHtml(d.message ?? '')} Approving records it for people to build.</p>`
+        : d.state === 'failed'
+          ? `<p class="note bad">Drafting failed: ${escapeHtml(d.message ?? '')}</p>`
+          : '';
+  const items = def?.items && Object.keys(def.items).length
+    ? `<ul class="items">${Object.entries(def.items).map(([k, i]) => `<li><b>${escapeHtml(i.name)}</b> <code>${escapeHtml(k)}</code> · ${escapeHtml(i.itemKind)}${i.heal ? `, heals ${i.heal}` : ''}<br><small>${escapeHtml(i.description)}</small></li>`).join('')}</ul>`
+    : '';
+  const test = e.test
+    ? `<div class="test ${e.test.passed ? 'ok' : 'bad'}"><b>${e.test.passed ? '✓ Test run passed' : '✗ Test run failed'}</b>
+        <ul>${e.test.summary.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}${e.test.errors.map((l) => `<li class="err">${escapeHtml(l)}</li>`).join('')}</ul>
+        ${e.test.sample.length ? `<details><summary>What players would see</summary><ul>${e.test.sample.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul></details>` : ''}</div>`
+    : '';
+  const rule = def
+    ? `<div class="rule"><p><b>${escapeHtml(def.name)}</b>: ${escapeHtml(def.description)}<br><small>How to play: ${escapeHtml(def.howTo ?? '')}</small></p>${items}
+        <details><summary>Script${d?.model ? ` · drafted by ${escapeHtml(d.model)}` : ''}</summary><pre class="script">${escapeHtml(def.script ?? '')}</pre></details>${test}</div>`
+    : '';
+  const busy = d?.state === 'drafting';
+  return `${state}${rule}
+    <form class="form revise" data-revise="${e.id}">
+      <label>${def ? 'Ask the God to change it' : 'Ask the God to draft a rule'}<span><input name="note" placeholder="${def ? 'e.g. make the Golden Carp rarer' : 'optional notes'}"${busy ? ' disabled' : ''}><button type="submit"${busy ? ' disabled' : ''}>${def ? 'Revise' : 'Draft'}</button></span></label>
+    </form>`;
+}
+
 function conversation(e: Entry): string {
   if (!e.conversation?.length) return '';
   const lines = e.conversation.map((t) => `<li class="${t.role}"><b>${t.role === 'user' ? escapeHtml(e.wisher.name) : 'God'}:</b> ${escapeHtml(t.content)}</li>`).join('');
   return `<details><summary>Conversation</summary><ol class="talk">${lines}</ol></details>`;
 }
 
+// --- Rules ---------------------------------------------------------------------
+
+async function rules(): Promise<string> {
+  const { content } = await api<{ content: Entry[] }>('content');
+  const live = content.filter((e) => e.status === 'granted' && e.definition?.kind === 'rule');
+  if (!live.length) return '<h2>Scripted rules</h2><p class="note">No rules are live yet. Approve a Major wish with a tested rule to add one.</p>';
+  const cards = live.map((e) => {
+    const s = e.live;
+    const paused = s?.paused ?? e.rule?.paused ?? false;
+    const effects = s ? Object.entries(s.effects).map(([k, n]) => `${k} ${n}`).join(', ') || 'none yet' : '';
+    const errors = s?.errors.length ? `<details><summary>${s.errors.length} recent errors</summary><ul>${s.errors.map((x) => `<li class="err">${when(x.at)} · ${escapeHtml(x.message)}</li>`).join('')}</ul></details>` : '';
+    return `
+      <article class="wish ${paused ? 'paused' : ''}">
+        <header><span class="tier major">rule</span><b>${escapeHtml(e.title)}</b><small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
+        <p>${paused ? `<b class="bad">Paused:</b> ${escapeHtml(s?.reason ?? e.rule?.reason ?? '')}` : '<b class="ok">Running.</b>'} ${s ? `${s.runs} events handled · listens to ${escapeHtml(s.events.join(', '))} · ${s.timers} timers waiting` : 'Not loaded.'}</p>
+        ${s ? `<p><small>Effects so far: ${escapeHtml(effects)}</small></p>` : ''}
+        ${errors}
+        <details><summary>Script</summary><pre class="script">${escapeHtml(e.definition?.script ?? '')}</pre></details>
+        <div class="actions">
+          <button type="button" class="quiet" data-pause="${e.id}" data-to="${paused ? 'resume' : 'pause'}">${paused ? 'Resume' : 'Pause'}</button>
+          <button type="button" class="quiet" data-rollback="${e.id}">Roll back</button>
+        </div>
+      </article>`;
+  }).join('');
+  return `<h2>Scripted rules</h2><p class="note">Each rule runs in its own sandbox. A rule that throws errors or hits its limits pauses itself, and Stewards are told.</p>${cards}`;
+}
+
+// --- Reports -------------------------------------------------------------------
+
+async function reports(): Promise<string> {
+  const { reports } = await api<{ reports: Report[] }>('reports');
+  if (!reports.length) return '<h2>Reports</h2><p class="note">No reports. Players report from the Bible\'s Chronicle, or with /report in chat.</p>';
+  const rows = reports.map((r) => `
+    <tr class="${r.status}">
+      <td>${when(r.at)}</td>
+      <td>${escapeHtml(r.reporter.name)}</td>
+      <td>${r.kind === 'player' ? 'Player' : 'Creation'}: <b>${escapeHtml(r.target.name)}</b></td>
+      <td>${escapeHtml(r.reason)}</td>
+      <td>${r.status === 'open'
+        ? `<div class="actions">
+            ${r.kind === 'content' ? `<button type="button" class="quiet" data-report-rollback="${r.id}" data-target="${r.target.id}">Roll back</button>` : `<button type="button" class="quiet" data-report-suspend="${r.id}" data-target="${r.target.id}">Suspend</button>`}
+            <button type="button" class="quiet" data-report-close="${r.id}" data-status="resolved">Handled</button>
+            <button type="button" class="quiet" data-report-close="${r.id}" data-status="dismissed">Dismiss</button>
+          </div>`
+        : `<small>${r.status} by ${escapeHtml(r.closed?.by ?? '')}: ${escapeHtml(r.closed?.action ?? '')}</small>`}</td>
+    </tr>`).join('');
+  return `<h2>Reports</h2>
+    <table class="log"><thead><tr><th>When</th><th>From</th><th>About</th><th>Why</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 // --- Players -------------------------------------------------------------------
 
 async function players(): Promise<string> {
-  const { players } = await api<{ players: Player[] }>('players');
+  const { players, you } = await api<{ players: Player[]; you: string }>('players');
+  const canSuspend = (p: Player) => p.id !== you && p.role !== 'owner' && (owner || p.role === 'player');
   const rows = players.map((p) => `
     <tr>
       <td><b>${escapeHtml(p.name)}</b>${p.invitedBy ? `<br><small>invited by ${escapeHtml(p.invitedBy)}</small>` : ''}</td>
       <td>${p.role === 'owner' ? 'Owner' : p.role === 'steward' ? 'Steward' : 'Player'}</td>
-      <td>${p.online ? `<span class="online">online</span> · ${escapeHtml(p.region ?? '')}` : '<small>offline</small>'}</td>
+      <td>${p.suspended ? `<span class="bad">suspended</span><br><small>by ${escapeHtml(p.suspended.by)}${p.suspended.reason ? `: ${escapeHtml(p.suspended.reason)}` : ''}</small>` : p.online ? `<span class="online">online</span> · ${escapeHtml(p.region ?? '')}` : '<small>offline</small>'}</td>
       <td>${p.level}</td>
       <td>${p.favor ?? ''}</td>
       ${owner ? `<td>${p.role === 'owner' ? '' : p.role === 'steward'
         ? `<button type="button" class="quiet" data-role="${p.id}" data-to="player">Remove Steward</button>`
         : `<button type="button" class="quiet" data-role="${p.id}" data-to="steward">Make Steward</button>`}</td>` : ''}
+      <td>${canSuspend(p) ? `<button type="button" class="quiet" data-suspend="${p.id}" data-to="${p.suspended ? 'lift' : 'suspend'}">${p.suspended ? 'Lift suspension' : 'Suspend'}</button>` : ''}</td>
     </tr>`).join('');
   return `
     <h2>Players</h2>
-    <table class="log"><thead><tr><th>Name</th><th>Role</th><th>Where</th><th>Level</th><th>Favor</th>${owner ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table>`;
+    <table class="log"><thead><tr><th>Name</th><th>Role</th><th>Where</th><th>Level</th><th>Favor</th>${owner ? '<th></th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // --- AI models -----------------------------------------------------------------
@@ -282,6 +398,7 @@ async function ai(): Promise<string> {
     <form id="ai-form" class="form">
       <label>Model<span><select name="godProvider">${options(s.ai.god.provider)}</select><input name="godModel" value="${escapeHtml(s.ai.god.model)}"></span></label>
       <label>Fallback, if it fails<span><select name="fallbackProvider">${options(s.ai.fallback?.provider ?? '', true)}</select><input name="fallbackModel" value="${escapeHtml(s.ai.fallback?.model ?? '')}" placeholder="default model"></span></label>
+      <label>Rule compiler<span><select name="compilerProvider">${options(s.ai.compiler?.provider ?? '', true).replace('>None<', '>Same as the God<')}</select><input name="compilerModel" value="${escapeHtml(s.ai.compiler?.model ?? '')}" placeholder="drafts scripts for Major wishes"></span></label>
       <label>Images for wishes<span><select name="imageProvider"><option value="gemini"${s.ai.image.provider === 'gemini' ? ' selected' : ''}>Google AI Studio${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.image.provider === 'none' ? ' selected' : ''}>None (placeholder art only)</option></select><input name="imageModel" value="${escapeHtml(s.ai.image.model)}"></span></label>
       <button type="submit">Save</button>
     </form>
@@ -328,8 +445,8 @@ main.addEventListener('click', async (e) => {
   if (!t) return;
   try {
     if (t.dataset.review) {
-      await api(`content/${t.dataset.review}/review`, 'POST', { approve: t.dataset.approve === 'yes' });
-      toast(t.dataset.approve === 'yes' ? 'Approved. The wisher has been told.' : 'Rejected. The wisher has been told.');
+      const r = await api<{ status: string }>(`content/${t.dataset.review}/review`, 'POST', { approve: t.dataset.approve === 'yes' });
+      toast(r.status === 'granted' ? 'Approved. The rule is live and everyone was told.' : t.dataset.approve === 'yes' ? 'Approved. The wisher has been told.' : 'Rejected. The wisher has been told.');
     } else if (t.dataset.rollback) {
       if (!confirm('Roll this wish back for everyone? It disappears from the world and from bags.')) return;
       await api(`content/${t.dataset.rollback}/rollback`, 'POST');
@@ -337,6 +454,33 @@ main.addEventListener('click', async (e) => {
     } else if (t.dataset.paint) {
       await api(`content/${t.dataset.paint}/paint`, 'POST');
       toast('Painting. The new art appears in a few seconds.');
+    } else if (t.dataset.pause) {
+      await api(`content/${t.dataset.pause}/rule`, 'POST', { paused: t.dataset.to === 'pause' });
+      toast(t.dataset.to === 'pause' ? 'Paused. Nothing it does happens until you resume it.' : 'Resumed.');
+    } else if (t.dataset.suspend) {
+      if (t.dataset.to === 'suspend') {
+        const reason = prompt('Why? The player sees this.');
+        if (reason === null) return;
+        await api(`players/${t.dataset.suspend}/suspend`, 'POST', { suspend: true, reason });
+        toast('Suspended. They were disconnected.');
+      } else {
+        await api(`players/${t.dataset.suspend}/suspend`, 'POST', { suspend: false });
+        toast('Suspension lifted.');
+      }
+    } else if (t.dataset.reportRollback) {
+      if (!confirm('Roll this wish back for everyone and close the report?')) return;
+      await api(`content/${t.dataset.target}/rollback`, 'POST').catch((err: Error) => toast(err.message));
+      await api(`reports/${t.dataset.reportRollback}/close`, 'POST', { status: 'resolved', action: 'rolled the wish back' });
+      toast('Rolled back. The reporter has been told.');
+    } else if (t.dataset.reportSuspend) {
+      const reason = prompt('Why? The player sees this.');
+      if (reason === null) return;
+      await api(`players/${t.dataset.target}/suspend`, 'POST', { suspend: true, reason });
+      await api(`reports/${t.dataset.reportSuspend}/close`, 'POST', { status: 'resolved', action: 'suspended the player' });
+      toast('Suspended. The reporter has been told.');
+    } else if (t.dataset.reportClose) {
+      await api(`reports/${t.dataset.reportClose}/close`, 'POST', { status: t.dataset.status });
+      toast(t.dataset.status === 'resolved' ? 'Marked handled.' : 'Dismissed.');
     } else if (t.dataset.role) {
       await api(`players/${t.dataset.role}/role`, 'POST', { role: t.dataset.to });
       toast(t.dataset.to === 'steward' ? 'Appointed. The God has told them.' : 'Steward role removed.');
@@ -353,10 +497,15 @@ main.addEventListener('submit', async (e) => {
   const form = e.target as HTMLFormElement;
   const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
   try {
-    if (form.id === 'ai-form') {
+    if (form.dataset.revise) {
+      await api(`content/${form.dataset.revise}/revise`, 'POST', { note: f.note ?? '' });
+      toast('The God is drafting. The new version appears here when its test run is done.');
+      pollDrafting();
+    } else if (form.id === 'ai-form') {
       await api('ai', 'PUT', {
         god: { provider: f.godProvider, model: f.godModel },
         fallback: f.fallbackProvider ? { provider: f.fallbackProvider, model: f.fallbackModel } : null,
+        compiler: f.compilerProvider ? { provider: f.compilerProvider, model: f.compilerModel } : null,
         image: { provider: f.imageProvider, model: f.imageModel },
       });
       toast('Saved. The next prayer uses these models.');
@@ -377,6 +526,21 @@ main.addEventListener('submit', async (e) => {
     toast((err as Error).message);
   }
 });
+
+/** While a rule is being drafted, refresh the Wishes tab until it is done. */
+let polling = 0;
+function pollDrafting(): void {
+  clearInterval(polling);
+  polling = window.setInterval(async () => {
+    if (tab !== 'wishes') return clearInterval(polling);
+    const { content } = await api<{ content: Entry[] }>('content').catch(() => ({ content: [] as Entry[] }));
+    if (!content.some((e) => e.draft?.state === 'drafting')) {
+      clearInterval(polling);
+      (document.activeElement as HTMLElement | null)?.blur();
+      void render();
+    }
+  }, 2000);
+}
 
 // A provider change suggests its default model.
 main.addEventListener('change', (e) => {

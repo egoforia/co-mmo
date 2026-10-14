@@ -99,3 +99,23 @@ pre { background: var(--panel); border: 1px solid var(--edge); padding: 12px; wh
   .log th:nth-child(3), .log td:nth-child(3) { display: none; }
   table.log { font-size: 13px; }
 }
+
+/* Scripted rules, test runs and reports */
+.bad { color: var(--bad); }
+.ok { color: var(--good); }
+.note.bad { color: var(--bad); }
+.wish.paused { border-color: var(--bad); }
+.rule { border-top: 1px solid var(--edge); margin-top: 10px; padding-top: 6px; }
+.rule .items { margin: 6px 0; padding-left: 18px; }
+.rule code { color: var(--muted); }
+pre.script { max-height: 420px; overflow: auto; white-space: pre; tab-size: 2; }
+.test { border-left: 3px solid var(--edge); padding: 4px 12px; margin: 8px 0; }
+.test.ok { border-color: var(--good); }
+.test.bad { border-color: var(--bad); }
+.test b { color: inherit; }
+.test ul { margin: 4px 0; padding-left: 18px; color: var(--ink); }
+li.err { color: var(--bad); }
+.form.revise { margin-top: 8px; }
+.form.revise input { min-width: 280px; }
+tr.dismissed, tr.resolved { opacity: 0.6; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }

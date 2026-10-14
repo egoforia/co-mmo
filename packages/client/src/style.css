@@ -238,6 +238,8 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 
 #bible .chronicle { grid-template-columns: 1fr; }
 #bible .chronicle small { color: #8a6a45; }
+#bible .chronicle .report { margin-left: 8px; font: inherit; font-size: 12px; padding: 1px 8px; border: 1px solid #c9ab76; border-radius: 10px; background: transparent; color: #8a6a45; cursor: pointer; }
+#bible .chronicle .report:hover { background: #c9ab7633; }
 
 @media (max-width: 700px) {
   #prayer { inset: 52px 8px auto 8px; width: auto; }

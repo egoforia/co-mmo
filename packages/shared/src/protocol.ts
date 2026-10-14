@@ -54,6 +54,15 @@ export interface WishAnswerMessage {
   confirm: boolean;
 }
 
+/** Tell the Stewards about a wished thing or a player that should not be here. */
+export interface ReportMessage {
+  t: 'report';
+  kind: 'content' | 'player';
+  /** A content entry id, or a player's name. */
+  target: string;
+  reason: string;
+}
+
 export type ClientMessage =
   | InputMessage
   | ChatSendMessage
@@ -62,7 +71,8 @@ export type ClientMessage =
   | UseItemMessage
   | AcceptQuestMessage
   | PrayMessage
-  | WishAnswerMessage;
+  | WishAnswerMessage
+  | ReportMessage;
 
 export interface PlayerInfo {
   id: string;
@@ -222,6 +232,9 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'use') return typeof m.item === 'string' && m.item.length <= 64;
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   if (m.t === 'pray') return typeof m.text === 'string';
+  if (m.t === 'report') {
+    return (m.kind === 'content' || m.kind === 'player') && typeof m.target === 'string' && m.target.length <= 64 && typeof m.reason === 'string';
+  }
   if (m.t === 'wish') return typeof m.card === 'string' && m.card.length <= 64 && typeof m.confirm === 'boolean';
   return false;
 }

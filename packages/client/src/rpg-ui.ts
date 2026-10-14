@@ -10,6 +10,7 @@ import {
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
 import { escapeHtml } from './ui.ts';
+import { artSrc } from './wished.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -20,6 +21,8 @@ export interface RpgActions {
   accept(quest: string): void;
   /** True while typing in chat, so letters are not shortcuts. */
   typing(): boolean;
+  /** Opens the prayer window. */
+  prayer(): void;
 }
 
 /** Health, XP, quests, dialogue, the bag and the Bible: everything in DOM. */
@@ -60,7 +63,8 @@ export class RpgUi {
       // Let Space strike rather than press the button again.
       (e.target as HTMLElement).closest('button')?.blur();
       const panel = (e.target as HTMLElement).closest<HTMLElement>('[data-open]')?.dataset.open;
-      if (panel) this.toggle(panel, true);
+      if (panel === 'prayer') actions.prayer();
+      else if (panel) this.toggle(panel, true);
     });
     this.render();
   }
@@ -89,7 +93,7 @@ export class RpgUi {
          <div class="buttons"><button type="button" data-accept="${escapeHtml(d.offer.quest)}">Accept</button><button type="button" class="quiet" data-close>Not now</button></div>`
       : `<div class="buttons"><button type="button" class="quiet" data-close>Goodbye</button></div>`;
     box.innerHTML = `
-      <img src="art/${escapeHtml(d.npc.asset)}.png" alt="">
+      <img src="${escapeHtml(artSrc(d.npc.asset))}" alt="">
       <div class="words"><h3>${escapeHtml(d.npc.name)}</h3>${paragraphs}${offer}</div>`;
     box.hidden = false;
   }
@@ -124,6 +128,11 @@ export class RpgUi {
     }
   }
 
+  /** Redraws open windows, e.g. when wished things change. */
+  refresh(): void {
+    this.render();
+  }
+
   private render(): void {
     this.renderStats();
     this.renderQuests();
@@ -141,7 +150,7 @@ export class RpgUi {
     ($('xp-fill') as HTMLElement).style.width = `${(100 * c.xp) / next}%`;
     $('xp-text').textContent = `${c.xp} / ${next} XP`;
     const weak = this.weakened ? ' · <span class="weak">Weakened</span>' : '';
-    $('stats-line').innerHTML = `Level ${c.level} · ${c.gold} gold${weak}`;
+    $('stats-line').innerHTML = `Level ${c.level} · ${c.gold} gold · <span class="favor">✦ ${c.favor} Favor</span>${weak}`;
   }
 
   private renderQuests(): void {
@@ -161,7 +170,7 @@ export class RpgUi {
         if (!def) return '';
         const hint = def.kind === 'book' ? 'Click to read' : def.heal ? 'Click to drink' : 'Keep it for now';
         return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}`)}">
-          <img src="art/${escapeHtml(def.art)}-icon.png" alt="">
+          <img src="${escapeHtml(artSrc(def.art, true))}" alt="">
           ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
           <span class="name">${escapeHtml(def.name)}</span><span class="hint">${hint}</span></button>`;
       })

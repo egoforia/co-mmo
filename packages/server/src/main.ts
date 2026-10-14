@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp, inviteUrl } from './app.ts';
 import { Store } from './store.ts';
@@ -16,7 +16,15 @@ const clientDir = process.env.CLIENT_DIR
   : existsSync(builtClient) ? builtClient : undefined;
 
 const store = await Store.open(dataFile);
-const app = createApp({ store, publicUrl, clientDir });
+const app = createApp({
+  store,
+  publicUrl,
+  clientDir,
+  wishes: {
+    anchorDir: resolve(repoRoot, 'assets/anchors'),
+    artDir: resolve(process.env.ART_DIR ?? resolve(dirname(dataFile), 'art')),
+  },
+});
 
 app.server.listen(port, () => {
   console.log(`co-MMO server listening on http://localhost:${port}`);

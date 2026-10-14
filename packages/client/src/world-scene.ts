@@ -15,11 +15,15 @@ import {
   type RegionMap,
   type SnapshotMessage,
   type WelcomeMessage,
+  wishArtKey,
 } from '@co-mmo/shared';
 import { TILE_MARGIN, lightTint, playerArt, propTexture, registerTileset } from './textures.ts';
+import { artSrc, contentEntries } from './wished.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Image;
+  /** The texture this avatar should wear, once it has loaded. */
+  art: string;
   shadow: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
   /** Health bar, shown once hurt. */
@@ -51,6 +55,10 @@ export class WorldScene extends Phaser.Scene {
   private me!: Avatar;
   private remotes = new Map<string, Remote>();
   private creatures = new Map<string, Remote>();
+  /** People called by wishes, standing in this region. */
+  private wishedNpcs = new Map<string, Avatar>();
+  /** Wished art already turned into textures, by key: the URL it came from. */
+  private loadedArt = new Map<string, string>();
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
   private accumulator = 0;
   /** Rendered position eases toward the predicted one to hide corrections. */
@@ -86,6 +94,7 @@ export class WorldScene extends Phaser.Scene {
     this.map = generateRegion(def);
     this.remotes = new Map();
     this.creatures = new Map();
+    this.wishedNpcs = new Map();
     this.accumulator = 0;
 
     const tilesetKey = registerTileset(this, def);
@@ -106,6 +115,7 @@ export class WorldScene extends Phaser.Scene {
     tilemap.createLayer(0, tileset, 0, 0)!.setDepth(-1);
 
     this.placeScenery(def.biome);
+    this.refreshWishes();
 
     this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
     this.shown = { x: welcome.x, y: welcome.y };
@@ -177,6 +187,50 @@ export class WorldScene extends Phaser.Scene {
         this.placeAvatar(remote, pos.x, pos.y);
         if (Math.abs(remote.body.x - before) > 0.5) remote.body.setFlipX(remote.body.x < before);
       }
+    }
+  }
+
+  /**
+   * Wished things changed (granted, painted, rolled back): load their art,
+   * re-dress any avatar waiting for it, and stand wished people in place.
+   */
+  refreshWishes(): void {
+    if (!this.sys.isActive() || !this.map) return;
+    const here = this.welcome.region.id;
+    const keep = new Set<string>();
+    for (const entry of contentEntries()) {
+      const key = wishArtKey(entry.id);
+      if (entry.status === 'granted' && entry.definition) void this.loadArt(key, artSrc(key));
+      if (entry.status !== 'granted' || entry.definition?.kind !== 'npc' || entry.regionId !== here || !entry.placements?.[0]) continue;
+      keep.add(entry.id);
+      if (this.wishedNpcs.has(entry.id)) continue;
+      const a = this.makeAvatar(key, entry.definition.name, false, 'sanctum-pilgrim');
+      a.label.setColor('#bfe0f2');
+      this.placeAvatar(a, entry.placements[0].x, entry.placements[0].y);
+      this.wishedNpcs.set(entry.id, a);
+    }
+    for (const [id, a] of this.wishedNpcs) {
+      if (keep.has(id)) continue;
+      destroyAvatar(a);
+      this.wishedNpcs.delete(id);
+    }
+  }
+
+  private async loadArt(key: string, url: string): Promise<void> {
+    if (this.loadedArt.get(key) === url) return;
+    this.loadedArt.set(key, url);
+    const img = new Image();
+    img.src = url;
+    try {
+      await img.decode();
+    } catch {
+      return;
+    }
+    if (this.loadedArt.get(key) !== url) return;
+    if (this.textures.exists(key)) this.textures.remove(key);
+    this.textures.addImage(key, img);
+    for (const a of [...this.creatures.values(), ...this.wishedNpcs.values()]) {
+      if (a.art === key) a.body.setTexture(key);
     }
   }
 
@@ -311,15 +365,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private makeCreature(c: CreatureState): Avatar {
-    const a = this.makeAvatar(c.asset, c.name, false);
+    const a = this.makeAvatar(c.asset, c.name, false, 'woods-mushroom');
     a.label.setColor('#f6b48a').setFontSize(Math.round(T * 0.2));
     a.body.setScale(0.8);
     return a;
   }
 
-  private makeAvatar(texture: string, name: string, self: boolean): Avatar {
+  private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = this.add.image(0, 0, this.textures.exists(texture) ? texture : 'player-mara').setOrigin(0.5, 0.97);
+    const body = this.add.image(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97);
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -329,7 +383,7 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, shadow, label, nudge: { x: 0, y: 0 } };
+    return { body, art: texture, shadow, label, nudge: { x: 0, y: 0 } };
   }
 
   private placeAvatar(a: Avatar, x: number, y: number): void {

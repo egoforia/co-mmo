@@ -32,6 +32,8 @@ export interface Character {
   xp: number;
   hp: number;
   gold: number;
+  /** The wish currency (design doc, The God: Favor). */
+  favor: number;
   stats: Stats;
   inventory: InventorySlot[];
   quests: QuestState[];
@@ -40,6 +42,12 @@ export interface Character {
   /** Epoch ms until which the Weakened debuff (after dying) lasts. */
   weakenedUntil: number;
 }
+
+/** Favor a new character starts with: enough for a first small wish or two. */
+export const STARTING_FAVOR_POINTS = 10;
+/** Favor earned per quest completed and per level gained. */
+export const QUEST_FAVOR = 3;
+export const LEVEL_FAVOR = 2;
 
 export const STARTING_STATS: Stats = { might: 3, agility: 3, wit: 3, spirit: 3 };
 export const WEAKENED_MS = 30_000;
@@ -55,6 +63,7 @@ export function newCharacter(): Character {
     xp: 0,
     hp: 0,
     gold: 0,
+    favor: STARTING_FAVOR_POINTS,
     stats: { ...STARTING_STATS },
     // The Bible is item number one: every character starts with it.
     inventory: [{ item: 'bible', qty: 1 }],
@@ -72,6 +81,8 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   if (!saved) return fresh;
   const c: Character = { ...fresh, ...saved, stats: { ...fresh.stats, ...saved.stats } };
   if (!c.inventory.some((s) => s.item === 'bible')) c.inventory.unshift({ item: 'bible', qty: 1 });
+  // Things a rolled-back wish made are gone from every bag.
+  c.inventory = c.inventory.filter((s) => ITEMS[s.item]);
   c.hp = Math.min(Math.max(1, c.hp), maxHp(c));
   return c;
 }
@@ -113,7 +124,10 @@ export function gainXp(c: Character, amount: number): number {
     levels++;
     for (const k of Object.keys(c.stats) as (keyof Stats)[]) c.stats[k]++;
   }
-  if (levels) c.hp = maxHp(c);
+  if (levels) {
+    c.hp = maxHp(c);
+    c.favor += levels * LEVEL_FAVOR;
+  }
   return levels;
 }
 
@@ -352,6 +366,7 @@ export function completeQuest(c: Character, state: QuestState): number {
   const q = QUESTS[state.id]!;
   state.done = true;
   c.gold += q.reward.gold;
+  c.favor += QUEST_FAVOR;
   for (const r of q.reward.items ?? []) addItem(c, r.item, r.qty);
   return gainXp(c, q.reward.xp);
 }
@@ -360,6 +375,7 @@ export function rewardText(id: string): string {
   const r = QUESTS[id]!.reward;
   const parts = [`${r.xp} XP`];
   if (r.gold) parts.push(`${r.gold} gold`);
+  parts.push(`${QUEST_FAVOR} Favor`);
   for (const i of r.items ?? []) parts.push(`${i.qty > 1 ? `${i.qty} × ` : ''}${ITEMS[i.item]?.name ?? i.item}`);
   return parts.join(', ');
 }

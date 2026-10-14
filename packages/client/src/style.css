@@ -31,8 +31,10 @@ html, body {
   font-size: 13px; pointer-events: none;
 }
 #hud > * { background: var(--panel); border: 1px solid var(--edge); padding: 6px 10px; }
-#hud button { pointer-events: auto; margin-left: auto; color: var(--ink); font: inherit; cursor: pointer; }
-#hud button:hover { border-color: var(--accent); }
+#hud-online { margin-right: auto; }
+#hud button, #hud a { pointer-events: auto; color: var(--ink); font: inherit; cursor: pointer; text-decoration: none; }
+#hud a { color: var(--accent); }
+#hud button:hover, #hud a:hover { border-color: var(--accent); }
 
 #chat {
   position: fixed; left: 12px; bottom: 12px;
@@ -189,7 +191,56 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #bible .mystery { display: grid; place-items: center; font-size: 34px; color: #c9ab76; border: 2px dashed #c9ab76; border-radius: 50%; }
 #bible .unknown figcaption { color: #8a6a45; }
 
+/* --- Prayer ------------------------------------------------------------ */
+
+#stats-line .favor { color: #f2dc6b; }
+#keys .pray { color: #f2dc6b; }
+#keys .pray.calling { border-color: #f2dc6b; box-shadow: 0 0 10px rgba(242, 220, 107, 0.7); }
+
+#prayer {
+  inset: 60px 12px auto auto; margin: 0; height: min(560px, calc(100vh - 140px));
+  width: min(420px, calc(100vw - 24px)); display: flex; flex-direction: column; padding: 14px;
+  border-color: #b8955a; box-shadow: 0 0 30px rgba(242, 220, 107, 0.18);
+}
+#prayer[hidden] { display: none; }
+#prayer h2 small { color: #f2dc6b; font-weight: 400; font-size: 13px; margin-left: 8px; }
+#prayer-log { list-style: none; margin: 0; padding: 0 2px 0 0; flex: 1; overflow-y: auto; font: 14px/1.45 Georgia, 'Times New Roman', serif; }
+#prayer-log li { margin: 0 0 10px; padding: 8px 10px; border-radius: 4px; max-width: 92%; }
+#prayer-log .you { margin-left: auto; background: #262b44; color: var(--ink); }
+#prayer-log .god { background: rgba(242, 220, 107, 0.08); border-left: 3px solid #f2dc6b; color: #f3e6c8; }
+#prayer-log .listening { color: var(--muted); font-style: italic; animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: 0.45; } }
+#prayer-form { display: flex; gap: 8px; margin-top: 10px; }
+#prayer-form input { flex: 1; min-width: 0; padding: 8px 10px; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; }
+#prayer-form input:focus { outline: none; border-color: #f2dc6b; }
+#prayer-form button { padding: 8px 14px; background: #f2dc6b; color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+#prayer.waiting #prayer-form button { opacity: 0.5; cursor: wait; }
+
+.card {
+  margin-top: 10px; padding: 10px 12px; background: #f3e6c8; color: #3e2731;
+  border: 2px solid #b8955a; border-radius: 6px; font-size: 14px;
+}
+.card .tier { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #8a6a45; }
+.card > b { display: block; font-size: 17px; color: #733e39; margin: 2px 0 4px; }
+.card p { margin: 0 0 8px; }
+.card dl { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 0 0 10px; font-size: 13px; }
+.card dt { font-size: 11px; color: #8a6a45; }
+.card dd { margin: 0; }
+.card .buttons { display: flex; gap: 8px; }
+.card button { font: inherit; font-size: 14px; padding: 6px 14px; cursor: pointer; background: #733e39; color: #f3e6c8; border: 0; border-radius: 3px; }
+.card button.quiet { background: transparent; color: #733e39; border: 1px solid #c28569; }
+.card button:disabled { opacity: 0.45; cursor: default; }
+.card .short { margin: 8px 0 0; font-size: 12px; color: #a22633; }
+.card .short:empty { display: none; }
+.card.major, .card.engine { border-color: #8e5bb8; }
+.card.confirmed { border-color: #63c74d; }
+.card.declined { opacity: 0.6; }
+
+#bible .chronicle { grid-template-columns: 1fr; }
+#bible .chronicle small { color: #8a6a45; }
+
 @media (max-width: 700px) {
+  #prayer { inset: 52px 8px auto 8px; width: auto; }
   #bible { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   #bible nav { border-right: 0; border-bottom: 2px solid #c9ab76; }
   #bible nav ol { display: flex; flex-wrap: wrap; }

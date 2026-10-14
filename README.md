@@ -8,7 +8,7 @@ The approved design lives in the project's design doc ("co-MMO: Initial
 Design Document"); [docs/design.md](docs/design.md) summarises it and tracks
 which milestone the code is at.
 
-## Status: milestone 2 done, milestone 3 "RPG core" under way
+## Status: milestones 2 to 4 done (first versions)
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
@@ -45,8 +45,27 @@ RPG core (milestone 3, first version):
 - Quests from the four NPCs (E to talk): Sister Amala sends you to Old
   Bramble, then each region's NPC asks you to deal with its creatures.
 
-Not yet: the God and wishes, abilities, equipment, shops and crafting,
-parties, God's View, Postgres, multiple region servers. See the milestone list in
+The God (milestone 4, first version):
+
+- Press G anywhere to pray. The God chats, helps shape an idea, and offers a
+  wish card: what will be made, where, and its Favor cost (2 for an item, 6
+  for a creature or a person). Favor: 10 to start, 3 per quest, 2 per level,
+  and 1 each time someone else defeats a creature you wished for.
+- Granted wishes are content data checked against balance limits: items go
+  into your bag, creatures appear around you, people stand beside you and
+  talk. Everyone sees a line in chat, and the Bible's Chronicle lists them.
+- Bigger wishes (new systems or places) are recorded for a Steward, or the
+  Owner for engine changes, to approve or reject. The wisher is told.
+- Wished things first wear a built-in sprite tinted with the wish's colour,
+  then their own painted art once Gemini has made it (when a key is set).
+- God's View (`/gods-view.html`, linked in the top bar for Stewards and the
+  Owner): world map, review queue, content log with rollback and repaint,
+  players (the Owner appoints Stewards), the God's model and fallback, the
+  image model, and the monthly budget. Over the ceiling, the offline God
+  answers and nothing is painted.
+
+Not yet: scripted rules for major wishes, abilities, equipment, shops and
+crafting, parties, Postgres, multiple region servers. See the milestone list in
 [docs/design.md](docs/design.md).
 
 ## Run it
@@ -77,6 +96,15 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `PUBLIC_URL` | `http://localhost:5173` | Base URL used in invite links |
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
+| `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
+| `GEMINI_API_KEY` | none | Google AI Studio: the God's default model and wish art |
+| `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none | Optional: OpenAI or any OpenAI-compatible service |
+
+Without any key the offline God answers: it understands simple wishes ("I
+wish for a red hat", "make a pink slime", "I want a fish trader") so the game
+works with no paid service. Which provider and model the God uses is chosen
+in God's View, not in code.
 
 ## Host it
 

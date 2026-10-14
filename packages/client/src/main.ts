@@ -3,8 +3,10 @@ import type { ArtManifest, ServerMessage, WelcomeMessage } from '@co-mmo/shared'
 import { MAX_NAME_LENGTH } from '@co-mmo/shared';
 import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, saveToken } from './api.ts';
 import { GameConnection } from './net.ts';
-import { ChatBox, escapeHtml, hidePanel, onInviteClick, setHud, showPanel, toast } from './ui.ts';
+import { ChatBox, escapeHtml, hidePanel, isTyping, onInviteClick, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
+import { PrayerUi } from './prayer-ui.ts';
+import { onContent, updateContent } from './wished.ts';
 import { WorldScene } from './world-scene.ts';
 
 async function boot(): Promise<void> {
@@ -62,6 +64,11 @@ function play(token: string): void {
   let scene: WorldScene | null = null;
   let chat: ChatBox | null = null;
   let rpg: RpgUi | null = null;
+  let prayer: PrayerUi | null = null;
+  onContent(() => {
+    scene?.refreshWishes();
+    rpg?.refresh();
+  });
   let name = '';
   let region = '';
   // Art loads alongside the connection; the world waits for both.
@@ -83,6 +90,7 @@ function play(token: string): void {
       case 'welcome':
         region = message.region.name;
         rpg?.setCharacter(message.character);
+        prayer?.setFavor(message.character.favor);
         if (scene) scene.enterRegion(message);
         else void art.then((manifest) => start(message, manifest));
         break;
@@ -103,6 +111,14 @@ function play(token: string): void {
         break;
       case 'character':
         rpg?.setCharacter(message.character);
+        prayer?.setFavor(message.character.favor);
+        break;
+      case 'god':
+        prayer?.onGod(message);
+        if (!prayer?.open) chat?.add({ kind: 'system', text: `✦ The God: ${message.say}` });
+        break;
+      case 'content':
+        updateContent(message.entries, message.replace);
         break;
       case 'notice':
         chat?.add({ kind: 'system', text: message.text });
@@ -120,7 +136,16 @@ function play(token: string): void {
     hidePanel();
     name = welcome.you.name;
     chat = new ChatBox((channel, text) => connection.send({ t: 'chat', channel, text }));
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible. Press Enter to chat.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible, G prays to the God. Press Enter to chat.' });
+    prayer = new PrayerUi({
+      pray: (text) => connection.send({ t: 'pray', text }),
+      answer: (card, confirm) => connection.send({ t: 'wish', card, confirm }),
+    });
+    prayer.setFavor(welcome.character.favor);
+    if (welcome.you.role !== 'player') {
+      const link = document.getElementById('gods-view-link')!;
+      link.hidden = false;
+    }
     rpg = new RpgUi(welcome.character, {
       attack: () => {
         connection.send({ t: 'attack' });
@@ -129,13 +154,14 @@ function play(token: string): void {
       interact: () => connection.send({ t: 'interact' }),
       use: (item) => connection.send({ t: 'use', item }),
       accept: (quest) => connection.send({ t: 'accept', quest }),
-      typing: () => chat?.typing ?? false,
+      typing: isTyping,
+      prayer: () => prayer?.toggle(true),
     });
     scene = new WorldScene({
       welcome,
       art: manifest,
       send: (m) => connection.send(m),
-      typing: () => chat?.typing ?? false,
+      typing: isTyping,
     });
     new Phaser.Game({
       type: Phaser.AUTO,

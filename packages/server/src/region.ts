@@ -84,7 +84,7 @@ export interface RegionHooks {
 }
 
 /** Tile kinds scripted rules can ask about, by name. */
-export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock };
+export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, floor: Tile.Floor, wall: Tile.Wall };
 
 interface PlayerState {
   info: PlayerInfo;

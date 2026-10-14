@@ -2,7 +2,7 @@
 // Plain DOM over the /api/admin endpoints; the session token is the one the
 // game saved in this browser.
 
-import { loadToken } from './api.ts';
+import { loadToken, reloadWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 
 const token = loadToken();
@@ -94,6 +94,23 @@ interface AiSettings {
   imageKeySet: boolean;
 }
 
+interface UpdateStatus {
+  available: boolean;
+  reason?: string;
+  branch?: string;
+  commit?: string;
+  upstream?: string;
+  behind: number;
+  ahead: number;
+  dirty: string[];
+  commits: { hash: string; subject: string; author: string; at: number }[];
+  checkedAt: number | null;
+  fetchError?: string;
+  canRestart: boolean;
+  blocked?: string;
+  lastUpdate: { at: number; ok: boolean; by?: string; message: string } | null;
+}
+
 let owner = false;
 let tab = 'world';
 
@@ -137,7 +154,7 @@ async function boot(): Promise<void> {
     ['rules', 'Rules'],
     ['reports', 'Reports'],
     ['players', 'Players'],
-    ...(owner ? [['ai', 'AI models'], ['budget', 'Budget']] : []),
+    ...(owner ? [['ai', 'AI models'], ['budget', 'Budget'], ['updates', 'Updates']] : []),
   ];
   main.innerHTML = `
     <nav>${tabs.map(([id, label]) => `<button type="button" data-tab="${id}">${label}</button>`).join('')}</nav>
@@ -147,6 +164,7 @@ async function boot(): Promise<void> {
     if (id) show(id);
   });
   show(location.hash.slice(1) || 'world');
+  addEventListener('hashchange', () => show(location.hash.slice(1) || 'world'));
   // The world moves; keep the map fresh while it is open.
   setInterval(() => tab === 'world' && document.visibilityState === 'visible' && void render(), 3000);
 }
@@ -162,7 +180,7 @@ async function render(): Promise<void> {
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
-    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, ai, budget };
+    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, ai, budget, updates };
     const html = await (pages[current] ?? world)();
     if (tab !== current) return;
     // Keep what the Owner is typing when the panel refreshes.
@@ -179,7 +197,7 @@ async function render(): Promise<void> {
 let regions: Region[] = [];
 
 async function world(): Promise<string> {
-  const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; reports: number; rules: number; budget: Budget | null }>('overview');
+  const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; reports: number; rules: number; budget: Budget | null; update: { behind: number; blocked?: string } | null }>('overview');
   regions = o.regions;
   const byId = new Map(regions.map((r) => [r.id, r]));
   const cell = (id: string) => {
@@ -200,6 +218,7 @@ async function world(): Promise<string> {
       <div class="stat ${o.reports ? 'warn' : ''}"><b>${o.reports}</b><span>open reports</span></div>
       <div class="stat"><b>${o.rules}</b><span>scripted rules live</span></div>
       ${budgetCard}
+      ${o.update?.behind ? `<a class="stat warn" href="#updates"><b>${o.update.behind}</b><span>new commit${o.update.behind === 1 ? '' : 's'} on main</span></a>` : ''}
     </div>
     <div class="map">${['', '', '', 'woods', 'sanctum', 'shore', '', 'desert', ''].map((id) => (id ? cell(id) : '<div></div>')).join('')}</div>
     <p class="legend"><i class="p"></i> players <i class="c"></i> creatures <i class="n"></i> people <i class="l"></i> landmarks</p>
@@ -438,6 +457,34 @@ async function budget(): Promise<string> {
     </form>`;
 }
 
+// --- Updates -------------------------------------------------------------------
+
+async function updates(): Promise<string> {
+  const u = await api<UpdateStatus>('update');
+  if (!u.available) return `<p class="note">${escapeHtml(u.reason ?? 'Updates are not available on this server.')}</p>`;
+  const last = u.lastUpdate
+    ? `<p class="note ${u.lastUpdate.ok ? '' : 'bad'}">Last update ${when(u.lastUpdate.at)}${u.lastUpdate.by ? ` by ${escapeHtml(u.lastUpdate.by)}` : ''}: ${escapeHtml(u.lastUpdate.message)}</p>`
+    : '';
+  const list = u.commits.length
+    ? `<ul class="recent">${u.commits.map((c) => `<li><code>${escapeHtml(c.hash)}</code> <b>${escapeHtml(c.subject)}</b> · ${escapeHtml(c.author)} · ${when(c.at)}</li>`).join('')}</ul>`
+    : '';
+  const headline = u.behind
+    ? `<b>${u.behind} new commit${u.behind === 1 ? '' : 's'}</b> on GitHub main since this server's ${escapeHtml(u.commit ?? '')}.`
+    : `This server runs <code>${escapeHtml(u.commit ?? '?')}</code>, the latest main.`;
+  return `
+    <h2>Game code</h2>
+    <p>${headline}</p>
+    ${list}
+    ${u.fetchError ? `<p class="note bad">Could not reach GitHub: ${escapeHtml(u.fetchError)}</p>` : ''}
+    ${u.blocked && u.behind ? `<p class="note warn">${escapeHtml(u.blocked)}</p>` : ''}
+    <p class="actions">
+      <button type="button" data-update-check>Check now</button>
+      <button type="button" data-update-pull ${u.blocked ? 'disabled' : ''}>Pull main and restart</button>
+    </p>
+    <p class="note">Checked ${u.checkedAt ? when(u.checkedAt) : 'never'}${u.branch ? ` · on branch ${escapeHtml(u.branch)}` : ''}. The server checks every ten minutes. Pulling only fast-forwards: local changes are never overwritten. Everyone is disconnected for a moment and their page reloads.</p>
+    ${last}`;
+}
+
 // --- Actions -------------------------------------------------------------------
 
 main.addEventListener('click', async (e) => {
@@ -481,6 +528,15 @@ main.addEventListener('click', async (e) => {
     } else if (t.dataset.reportClose) {
       await api(`reports/${t.dataset.reportClose}/close`, 'POST', { status: t.dataset.status });
       toast(t.dataset.status === 'resolved' ? 'Marked handled.' : 'Dismissed.');
+    } else if (t.dataset.updateCheck !== undefined) {
+      t.disabled = true;
+      await api('update/check', 'POST');
+    } else if (t.dataset.updatePull !== undefined) {
+      if (!confirm('Pull main and restart the game? Everyone is disconnected for a moment.')) return;
+      const r = await api<{ from: string }>('update', 'POST');
+      main.innerHTML = '<p class="note">Pulling main and restarting. This page reloads when the game is back…</p>';
+      void reloadWhenBack(r.from);
+      return;
     } else if (t.dataset.role) {
       await api(`players/${t.dataset.role}/role`, 'POST', { role: t.dataset.to });
       toast(t.dataset.to === 'steward' ? 'Appointed. The God has told them.' : 'Steward role removed.');

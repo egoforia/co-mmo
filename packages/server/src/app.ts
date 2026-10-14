@@ -10,6 +10,7 @@ import { Wishes, type WishOptions } from './wishes.ts';
 import { handleAdmin } from './admin.ts';
 import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
+import type { Updater } from './updates.ts';
 
 export interface AppOptions {
   store: Store;
@@ -21,6 +22,10 @@ export interface AppOptions {
   autosaveMs?: number;
   /** Prayers and wishes: where art lives, and test overrides. */
   wishes: WishOptions;
+  /** Checks GitHub for new commits and pulls them (Owner, God's View). */
+  updater?: Updater;
+  /** The commit this server runs, so clients can tell it restarted. */
+  commit?: string | null;
 }
 
 export interface App {
@@ -94,6 +99,10 @@ export function createApp(options: AppOptions): App {
       }
     }
 
+    if (path === '/api/version' && req.method === 'GET') {
+      return json(res, 200, { commit: options.commit ?? null, updating: options.updater?.requested ?? false });
+    }
+
     if (path === '/api/me' && req.method === 'GET') {
       const account = authenticate(req);
       if (!account) return json(res, 401, { error: 'unauthorized' });
@@ -109,7 +118,7 @@ export function createApp(options: AppOptions): App {
       return json(res, 200, { code: invite.code, url: inviteUrl(options.publicUrl, invite.code) });
     }
 
-    const admin = { store, world, wishes, rules, reports, kick, env: options.wishes.env ?? process.env, json, readJson };
+    const admin = { store, world, wishes, rules, reports, kick, updater: options.updater, restarting, env: options.wishes.env ?? process.env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
@@ -133,6 +142,13 @@ export function createApp(options: AppOptions): App {
     if (!socket) return;
     socket.send(JSON.stringify({ t: 'error', code: 'suspended', message: reason }));
     socket.close(4003, reason.slice(0, 120));
+  }
+
+  /** Tells every player the world is restarting for an update, and saves. */
+  async function restarting(): Promise<void> {
+    for (const socket of sockets.values()) socket.close(4010, 'The world is updating. Back in a moment.');
+    saveAll();
+    await store.flush();
   }
 
   // Game connections. The session token arrives as the first message rather
@@ -221,6 +237,7 @@ export function createApp(options: AppOptions): App {
     reports,
     async close() {
       clearInterval(tickTimer);
+      options.updater?.stop();
       await Promise.allSettled([...wishes.drafts]);
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();

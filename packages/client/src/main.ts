@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_NAME_LENGTH } from '@co-mmo/shared';
-import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, saveToken } from './api.ts';
+import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, reloadWhenBack, saveToken } from './api.ts';
 import { GameConnection } from './net.ts';
 import { ChatBox, escapeHtml, hidePanel, isTyping, onInviteClick, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
@@ -79,6 +79,11 @@ function play(token: string): void {
   const connection = new GameConnection(token, onMessage, (reason, code) => {
     if (code === 4003) {
       showPanel(`<h1>Suspended</h1><p>${escapeHtml(reason || 'Your account is suspended.')}</p>`);
+      return;
+    }
+    if (code === 4010) {
+      showPanel(`<h1>The world is updating</h1><p>${escapeHtml(reason || 'Back in a moment.')} This page reloads by itself.</p>`);
+      void reloadWhenBack();
       return;
     }
     if (code === 4001) {

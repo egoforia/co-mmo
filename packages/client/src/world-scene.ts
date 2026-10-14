@@ -12,6 +12,7 @@ import {
   type ClientMessage,
   type CreatureState,
   type HitMessage,
+  type NpcState,
   type RegionMap,
   type SnapshotMessage,
   type WelcomeMessage,
@@ -55,8 +56,8 @@ export class WorldScene extends Phaser.Scene {
   private me!: Avatar;
   private remotes = new Map<string, Remote>();
   private creatures = new Map<string, Remote>();
-  /** People called by wishes, standing in this region. */
-  private wishedNpcs = new Map<string, Avatar>();
+  /** NPCs, the map's own and those called by wishes, strolling where the server says. */
+  private npcs = new Map<string, Remote>();
   /** Wished art already turned into textures, by key: the URL it came from. */
   private loadedArt = new Map<string, string>();
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
@@ -94,7 +95,7 @@ export class WorldScene extends Phaser.Scene {
     this.map = generateRegion(def);
     this.remotes = new Map();
     this.creatures = new Map();
-    this.wishedNpcs = new Map();
+    this.npcs = new Map();
     this.accumulator = 0;
 
     const tilesetKey = registerTileset(this, def);
@@ -102,7 +103,7 @@ export class WorldScene extends Phaser.Scene {
     for (let y = 0; y < this.map.height; y++) {
       data.push(Array.from(this.map.tiles.subarray(y * this.map.width, (y + 1) * this.map.width)));
     }
-    // Under landmarks and NPCs, paint whatever ground surrounds them.
+    // Under landmarks, paint whatever ground surrounds them.
     for (let y = 0; y < this.map.height; y++) {
       for (let x = 0; x < this.map.width; x++) {
         if (data[y]![x] !== Tile.Blocked) continue;
@@ -149,6 +150,7 @@ export class WorldScene extends Phaser.Scene {
     const now = performance.now();
     this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(playerArt(e.id), e.name, false));
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
+    this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
   }
 
   update(_time: number, deltaMs: number): void {
@@ -179,7 +181,7 @@ export class WorldScene extends Phaser.Scene {
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
 
     const now = performance.now();
-    for (const group of [this.remotes, this.creatures]) {
+    for (const group of [this.remotes, this.creatures, this.npcs]) {
       for (const remote of group.values()) {
         const pos = remote.interp.sample(now);
         if (!pos) continue;
@@ -191,28 +193,14 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Wished things changed (granted, painted, rolled back): load their art,
-   * re-dress any avatar waiting for it, and stand wished people in place.
+   * Wished things changed (granted, painted, rolled back): load their art and
+   * re-dress any avatar waiting for it. Snapshots say where wished people stand.
    */
   refreshWishes(): void {
     if (!this.sys.isActive() || !this.map) return;
-    const here = this.welcome.region.id;
-    const keep = new Set<string>();
     for (const entry of contentEntries()) {
       const key = wishArtKey(entry.id);
       if (entry.status === 'granted' && entry.definition) void this.loadArt(key, artSrc(key));
-      if (entry.status !== 'granted' || entry.definition?.kind !== 'npc' || entry.regionId !== here || !entry.placements?.[0]) continue;
-      keep.add(entry.id);
-      if (this.wishedNpcs.has(entry.id)) continue;
-      const a = this.makeAvatar(key, entry.definition.name, false, 'sanctum-pilgrim');
-      a.label.setColor('#bfe0f2');
-      this.placeAvatar(a, entry.placements[0].x, entry.placements[0].y);
-      this.wishedNpcs.set(entry.id, a);
-    }
-    for (const [id, a] of this.wishedNpcs) {
-      if (keep.has(id)) continue;
-      destroyAvatar(a);
-      this.wishedNpcs.delete(id);
     }
   }
 
@@ -229,7 +217,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.loadedArt.get(key) !== url) return;
     if (this.textures.exists(key)) this.textures.remove(key);
     this.textures.addImage(key, img);
-    for (const a of [...this.creatures.values(), ...this.wishedNpcs.values()]) {
+    for (const a of [...this.creatures.values(), ...this.npcs.values()]) {
       if (a.art === key) a.body.setTexture(key);
     }
   }
@@ -305,7 +293,7 @@ export class WorldScene extends Phaser.Scene {
     a.bar.fill.setFillStyle(health > 0.5 ? 0x63c74d : health > 0.25 ? 0xfeae34 : 0xf6757a);
   }
 
-  private sync<E extends { id: string; x: number; y: number; health: number }>(
+  private sync<E extends { id: string; x: number; y: number; health?: number }>(
     group: Map<string, Remote>,
     entities: E[],
     now: number,
@@ -320,7 +308,7 @@ export class WorldScene extends Phaser.Scene {
         group.set(entity.id, remote);
       }
       remote.interp.push(now, entity.x, entity.y);
-      this.setHealth(remote, entity.health);
+      if (entity.health !== undefined) this.setHealth(remote, entity.health);
     }
     for (const [id, remote] of group) {
       if (seen.has(id)) continue;
@@ -329,18 +317,13 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Landmarks, NPCs, and the trees and rocks standing on blocking tiles. */
+  /** Landmarks, and the trees and rocks standing on blocking tiles. */
   private placeScenery(biome: string): void {
     const { map } = this;
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
       const img = this.add.image(l.x * T, l.y * T, l.asset).setOrigin(0.5, 0.92);
       img.setDepth(l.y * T);
-    }
-    for (const n of map.npcs) {
-      const a = this.makeAvatar(n.asset, n.name, false);
-      a.label.setColor('#bfe0f2');
-      this.placeAvatar(a, n.x, n.y);
     }
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
@@ -368,6 +351,12 @@ export class WorldScene extends Phaser.Scene {
     const a = this.makeAvatar(c.asset, c.name, false, 'woods-mushroom');
     a.label.setColor('#f6b48a').setFontSize(Math.round(T * 0.2));
     a.body.setScale(0.8);
+    return a;
+  }
+
+  private makeNpc(n: NpcState): Avatar {
+    const a = this.makeAvatar(n.asset, n.name, false, 'sanctum-pilgrim');
+    a.label.setColor('#bfe0f2');
     return a;
   }
 

@@ -37,6 +37,7 @@ import {
   type CreatureState,
   type EntityState,
   type NpcPlacement,
+  type NpcState,
   type PlayerInfo,
   type RegionDef,
   type RegionInfo,
@@ -55,6 +56,9 @@ const CHAT_WINDOW_MS = 5000;
 /** Creatures stroll at this speed (tiles per second) within this many tiles of home. */
 const WANDER_SPEED = 1.5;
 const WANDER_RADIUS = 4;
+/** NPCs stroll more slowly, and stay closer to their spot so players can find them. */
+const STROLL_SPEED = 1;
+const STROLL_RADIUS = 2.5;
 /** A chasing creature gives up this far from home and walks back. */
 const LEASH = 8;
 /** Creatures strike from this close. */
@@ -97,18 +101,25 @@ interface PlayerState {
   dirty: boolean;
 }
 
-interface Creature {
-  id: string;
-  kind: string;
-  def: CreatureDef;
+/** Anything that strolls about a home spot: creatures and NPCs. */
+interface Walker {
   x: number;
   y: number;
   home: { x: number; y: number };
-  hp: number;
   /** Where it is strolling to. */
   target: { x: number; y: number } | null;
   /** Ticks to rest before choosing the next spot. */
   rest: number;
+}
+
+/** An NPC, where they stand now. */
+type Townsperson = NpcPlacement & Walker;
+
+interface Creature extends Walker {
+  id: string;
+  kind: string;
+  def: CreatureDef;
+  hp: number;
   /** The player it is fighting. */
   aggro: string | null;
   returning: boolean;
@@ -138,8 +149,8 @@ export class Region {
   readonly map: RegionMap;
   private readonly players = new Map<string, PlayerState>();
   private creatures: Creature[];
-  /** NPCs that wishes added, beside the map's own. */
-  private wishedNpcs: NpcPlacement[] = [];
+  /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
+  private townsfolk: Townsperson[];
   private tickCount = 0;
 
   private readonly hooks: RegionHooks;
@@ -154,6 +165,12 @@ export class Region {
     this.hooks = hooks ?? { worldChat: (m) => this.broadcast(m), online: () => this.players.size };
     this.map = generateRegion(def);
     this.creatures = this.map.creatures.flatMap((c, i) => this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y));
+    this.townsfolk = this.map.npcs.map((n) => this.makeStroller(n));
+  }
+
+  /** Lets an NPC stroll about where they were placed. */
+  private makeStroller(npc: NpcPlacement): Townsperson {
+    return Object.assign(npc, { home: { x: npc.x, y: npc.y }, target: null, rest: Math.floor(this.random() * TICK_RATE * 3) });
   }
 
   private makeCreature(id: string, kind: string, x: number, y: number, wisher?: string): Creature[] {
@@ -184,9 +201,10 @@ export class Region {
     spots.forEach((s, i) => this.creatures.push(...this.makeCreature(`${kind}-${i}`, kind, s.x, s.y, wisher)));
   }
 
+  /** Places a wished NPC, who strolls about that spot. */
   addNpc(npc: NpcPlacement): void {
-    this.wishedNpcs = this.wishedNpcs.filter((n) => n.id !== npc.id);
-    this.wishedNpcs.push(npc);
+    this.townsfolk = this.townsfolk.filter((n) => n.id !== npc.id);
+    this.townsfolk.push(this.makeStroller({ ...npc }));
   }
 
   /** Takes away everything a wish placed here. */
@@ -195,7 +213,7 @@ export class Region {
       if (this.creatures.some((c) => c.kind === id && c.aggro === p.info.id)) p.lastHurt = this.now();
     }
     this.creatures = this.creatures.filter((c) => c.kind !== id);
-    this.wishedNpcs = this.wishedNpcs.filter((n) => n.id !== id);
+    this.townsfolk = this.townsfolk.filter((n) => n.id !== id);
   }
 
   /**
@@ -223,7 +241,7 @@ export class Region {
     const lines: string[] = [];
     const near = (x: number, y: number, r: number) => Math.hypot(x - p.x, y - p.y) <= r;
     for (const other of this.players.values()) if (other !== p && near(other.x, other.y, 10)) lines.push(`${other.info.name} (player)`);
-    for (const n of [...this.map.npcs, ...this.wishedNpcs]) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC)`);
+    for (const n of this.townsfolk) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC)`);
     const kinds = new Map<string, number>();
     for (const c of this.creatures) if (c.respawnAt === null && near(c.x, c.y, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
     for (const [name, n] of kinds) lines.push(`${n} ${name}${n > 1 ? 's' : ''}`);
@@ -302,6 +320,12 @@ export class Region {
   /** Live creature ids, for tests and tools. */
   creatureIds(): string[] {
     return this.creatures.filter((c) => c.respawnAt === null).map((c) => c.id);
+  }
+
+  /** Where an NPC stands now, for tests and tools. */
+  npc(id: string): { x: number; y: number; home: { x: number; y: number } } | undefined {
+    const n = this.townsfolk.find((t) => t.id === id);
+    return n && { x: n.x, y: n.y, home: { ...n.home } };
   }
 
   creature(id: string): { kind: string; x: number; y: number; hp: number; alive: boolean } | undefined {
@@ -410,6 +434,7 @@ export class Region {
       }
     }
     for (const c of this.creatures) this.think(c, now);
+    for (const n of this.townsfolk) this.stroll(n);
     for (const p of this.players.values()) {
       if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id)) departures.push({ id: p.info.id, died: true });
     }
@@ -433,8 +458,12 @@ export class Region {
           id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp),
         });
       }
+      const npcs: NpcState[] = [];
+      for (const n of this.townsfolk) {
+        if (near(n.x, n.y)) npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
+      }
       p.conn.send({
-        t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), players, creatures, online,
+        t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), players, creatures, npcs, online,
       });
       this.flush(p);
     }
@@ -543,7 +572,19 @@ export class Region {
       }
       return;
     }
-    this.wander(c);
+    this.wander(c, WANDER_SPEED, WANDER_RADIUS);
+  }
+
+  /** NPCs stroll about their spot, but stand still while someone is close enough to talk. */
+  private stroll(n: Townsperson): void {
+    for (const p of this.players.values()) {
+      if (p.character.hp > 0 && Math.hypot(p.x - n.x, p.y - n.y) <= TALK_RANGE) {
+        n.target = null;
+        n.rest = TICK_RATE;
+        return;
+      }
+    }
+    this.wander(n, STROLL_SPEED, STROLL_RADIUS);
   }
 
   private giveUp(c: Creature): void {
@@ -562,7 +603,7 @@ export class Region {
   }
 
   /** Steps toward a point, sliding along walls. True once it arrives. */
-  private moveToward(c: Creature, tx: number, ty: number, speed: number): boolean {
+  private moveToward(c: Walker, tx: number, ty: number, speed: number): boolean {
     const dx = tx - c.x;
     const dy = ty - c.y;
     const dist = Math.hypot(dx, dy);
@@ -581,13 +622,13 @@ export class Region {
     return false;
   }
 
-  /** Creatures stroll between spots near home, resting in between. */
-  private wander(c: Creature): void {
+  /** Creatures and NPCs stroll between spots near home, resting in between. */
+  private wander(c: Walker, speed: number, radius: number): void {
     if (!c.target) {
       if (c.rest-- > 0) return;
       for (let tries = 0; tries < 5 && !c.target; tries++) {
         const angle = this.random() * Math.PI * 2;
-        const dist = 1 + this.random() * (WANDER_RADIUS - 1);
+        const dist = 1 + this.random() * (radius - 1);
         const t = { x: c.home.x + Math.cos(angle) * dist, y: c.home.y + Math.sin(angle) * dist };
         if (!outsideSide(this.map, t.x, t.y) && !collides(this.map, t.x, t.y)) c.target = t;
       }
@@ -595,7 +636,7 @@ export class Region {
       return;
     }
     const before = { x: c.x, y: c.y };
-    if (this.moveToward(c, c.target.x, c.target.y, WANDER_SPEED)) {
+    if (this.moveToward(c, c.target.x, c.target.y, speed)) {
       c.target = null;
       c.rest = Math.floor(TICK_RATE * (1 + this.random() * 3));
     } else if (c.x === before.x && c.y === before.y) {
@@ -609,7 +650,7 @@ export class Region {
   private interact(p: PlayerState): void {
     let npc: NpcPlacement | undefined;
     let best = TALK_RANGE;
-    for (const n of [...this.map.npcs, ...this.wishedNpcs]) {
+    for (const n of this.townsfolk) {
       const d = Math.hypot(n.x - p.x, n.y - p.y);
       if (d <= best) {
         best = d;

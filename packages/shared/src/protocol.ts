@@ -119,6 +119,15 @@ export interface CreatureState {
   health: number;
 }
 
+/** A person of the town (an NPC), where they are strolling now. */
+export interface NpcState {
+  id: string;
+  name: string;
+  asset: string;
+  x: number;
+  y: number;
+}
+
 export interface SnapshotMessage {
   t: 'snapshot';
   tick: number;
@@ -131,6 +140,8 @@ export interface SnapshotMessage {
   players: EntityState[];
   /** Creatures inside the view radius. */
   creatures: CreatureState[];
+  /** NPCs inside the view radius. */
+  npcs: NpcState[];
   online: number;
 }
 

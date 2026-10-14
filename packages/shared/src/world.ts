@@ -9,7 +9,7 @@ export enum Tile {
   Water = 2,
   Tree = 3,
   Rock = 4,
-  /** Under a landmark or NPC: drawn as ground, never walkable. */
+  /** Under a landmark: drawn as ground, never walkable. */
   Blocked = 5,
 }
 
@@ -53,6 +53,7 @@ export interface Landmark {
   footprint: { width: number; height: number };
 }
 
+/** Where an NPC starts; on the server, where they stand now as they stroll. */
 export interface NpcPlacement {
   id: string;
   name: string;
@@ -110,8 +111,8 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
     const inward = { north: [0, 1], south: [0, -1], east: [-1, 0], west: [1, 0] }[side];
     map.entries[side] = { x: edge.x + 1 + inward[0]! * 1.5, y: edge.y + 1 + inward[1]! * 1.5 };
   }
+  // NPCs stroll around their spot, so only landmarks block tiles.
   for (const l of map.landmarks) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
-  for (const n of map.npcs) block(map, n.x, n.y, 1, 1);
   return map;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLAYER_SPEED, TICK_SECONDS, newCharacter, regionDef, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { PLAYER_SPEED, TICK_RATE, TICK_SECONDS, collides, newCharacter, regionDef, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 
 function fakeConn() {
@@ -108,5 +108,52 @@ describe('Region', () => {
     region.join(info('a'), fakeConn(), none, newCharacter());
     expect(first.closed).toBeTruthy();
     expect(region.online).toBe(1);
+  });
+
+  it('lets NPCs stroll near their spot, and shows where they are', () => {
+    const region = new Region(sanctum);
+    const amala = region.npc('sister-amala')!;
+    let moved = 0;
+    for (let i = 0; i < TICK_RATE * 30; i++) {
+      region.tick();
+      const now = region.npc('sister-amala')!;
+      moved = Math.max(moved, Math.hypot(now.x - amala.home.x, now.y - amala.home.y));
+      expect(moved).toBeLessThanOrEqual(2.5 + 1e-9);
+      expect(collides(region.map, now.x, now.y)).toBe(false);
+    }
+    expect(moved).toBeGreaterThan(0.5);
+
+    const a = fakeConn();
+    region.join(info('a'), a, none, newCharacter());
+    region.tick();
+    const snap = a.messages.at(-1) as Extract<ServerMessage, { t: 'snapshot' }>;
+    const shown = snap.npcs.find((n) => n.id === 'sister-amala')!;
+    expect(shown).toMatchObject({ name: 'Sister Amala', asset: 'sanctum-pilgrim' });
+    const now = region.npc('sister-amala')!;
+    expect(shown.x).toBeCloseTo(now.x, 2);
+    expect(shown.y).toBeCloseTo(now.y, 2);
+  });
+
+  it('stops an NPC strolling while someone is close enough to talk', () => {
+    const region = new Region(sanctum);
+    const amala = region.npc('sister-amala')!;
+    region.join(info('a'), fakeConn(), { x: amala.x, y: amala.y + 1 }, newCharacter());
+    for (let i = 0; i < TICK_RATE * 10; i++) region.tick();
+    expect(region.npc('sister-amala')).toMatchObject({ x: amala.x, y: amala.y });
+  });
+
+  it('lets wished NPCs stroll too, and takes them away with their wish', () => {
+    const region = new Region(sanctum);
+    const { spawn } = region.map;
+    region.addNpc({ id: 'w-pell', name: 'Old Pell', asset: 'wish-w-pell', x: spawn.x, y: spawn.y });
+    let moved = false;
+    for (let i = 0; i < TICK_RATE * 30 && !moved; i++) {
+      region.tick();
+      const pell = region.npc('w-pell')!;
+      moved = pell.x !== spawn.x || pell.y !== spawn.y;
+    }
+    expect(moved).toBe(true);
+    region.removeWish('w-pell');
+    expect(region.npc('w-pell')).toBeUndefined();
   });
 });

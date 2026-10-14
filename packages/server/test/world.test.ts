@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { type Connection } from '../src/region.ts';
 import { World } from '../src/world.ts';
 
@@ -21,8 +21,8 @@ const info = (id: string, name = id): PlayerInfo => ({ id, name, color: 0xffffff
 describe('World', () => {
   it('puts players in their saved region, or home when it is unknown', () => {
     const world = new World();
-    world.join(info('a'), fakeConn(), { regionId: 'shore', x: null, y: null });
-    world.join(info('b'), fakeConn(), { regionId: 'nowhere', x: null, y: null });
+    world.join(info('a'), fakeConn(), { regionId: 'shore', x: null, y: null }, newCharacter());
+    world.join(info('b'), fakeConn(), { regionId: 'nowhere', x: null, y: null }, newCharacter());
     expect(world.regionOf('a')!.def.id).toBe('shore');
     expect(world.regionOf('b')!.def.id).toBe('sanctum');
   });
@@ -33,8 +33,8 @@ describe('World', () => {
     const west = home.map.entries.west!;
     const a = fakeConn();
     const watcher = fakeConn();
-    world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: west.x, y: west.y });
-    world.join(info('w'), watcher, { regionId: 'sanctum', x: null, y: null });
+    world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: west.x, y: west.y }, newCharacter());
+    world.join(info('w'), watcher, { regionId: 'sanctum', x: null, y: null }, newCharacter());
     for (let seq = 1; seq <= 40; seq++) {
       world.handle('a', { t: 'input', seq, dx: -1, dy: 0 });
       world.tick();
@@ -52,8 +52,8 @@ describe('World', () => {
     const world = new World();
     const a = fakeConn();
     const b = fakeConn();
-    world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: null, y: null });
-    world.join(info('b'), b, { regionId: 'desert', x: null, y: null });
+    world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: null, y: null }, newCharacter());
+    world.join(info('b'), b, { regionId: 'desert', x: null, y: null }, newCharacter());
     world.handle('a', { t: 'chat', channel: 'world', text: 'hi all' });
     world.tick();
     expect(b.messages.some((m) => m.t === 'chat' && m.text === 'hi all')).toBe(true);
@@ -62,7 +62,7 @@ describe('World', () => {
 
   it('leaves with the region and position to save', () => {
     const world = new World();
-    world.join(info('a'), fakeConn(), { regionId: 'desert', x: null, y: null });
+    world.join(info('a'), fakeConn(), { regionId: 'desert', x: null, y: null }, newCharacter());
     const place = world.leave('a');
     expect(place).toMatchObject({ regionId: 'desert' });
     expect(world.has('a')).toBe(false);

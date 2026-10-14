@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
@@ -78,4 +79,120 @@ html, body {
   position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--accent);
   padding: 10px 14px; font-size: 13px; max-width: calc(100vw - 32px); word-break: break-all;
+}
+
+/* --- RPG --------------------------------------------------------------- */
+
+#stats {
+  position: fixed; top: 56px; left: 12px; width: 240px;
+  background: var(--panel); border: 1px solid var(--edge); padding: 8px 10px;
+  font-size: 12px; pointer-events: none;
+}
+.bar { position: relative; height: 16px; background: #262b44; margin-bottom: 6px; overflow: hidden; }
+.bar span { position: absolute; inset: 0 auto 0 0; transition: width 0.2s; }
+.bar.hp span { background: linear-gradient(#e43b44, #a22633); }
+.bar.xp { height: 10px; }
+.bar.xp span { background: linear-gradient(#fee761, #feae34); }
+.bar b { position: relative; display: block; text-align: center; font-weight: 600; line-height: 16px; text-shadow: 0 1px 0 #000; }
+.bar.xp b { line-height: 10px; font-size: 9px; }
+#stats-line { color: var(--muted); }
+#stats-line .weak { color: #b79ad6; }
+
+#quests {
+  position: fixed; top: 56px; right: 12px; width: 260px; margin: 0; padding: 8px 10px; list-style: none;
+  background: var(--panel); border: 1px solid var(--edge); font-size: 12px; pointer-events: none;
+}
+#quests li + li { margin-top: 8px; }
+#quests b { display: block; color: var(--accent); }
+#quests span { color: var(--muted); }
+
+#keys {
+  position: fixed; right: 12px; bottom: 12px; display: flex; gap: 6px; font-size: 12px;
+}
+#keys > * {
+  background: var(--panel); border: 1px solid var(--edge); padding: 5px 8px; color: var(--muted); font: inherit;
+}
+#keys button { cursor: pointer; }
+#keys button:hover { border-color: var(--accent); color: var(--ink); }
+kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
+
+#dialogue {
+  position: fixed; right: 12px; bottom: 52px; width: min(480px, calc(100vw - 24px));
+  display: flex; gap: 12px; align-items: flex-start;
+  background: #f3e6c8; color: #3e2731; border: 3px solid #8a6a45; border-radius: 6px;
+  padding: 12px 14px; font: 15px/1.45 Georgia, 'Times New Roman', serif;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+#dialogue img { width: 72px; height: 108px; object-fit: contain; flex: none; }
+#dialogue h3 { margin: 0 0 4px; font-size: 16px; color: #733e39; }
+#dialogue p { margin: 0 0 8px; }
+#dialogue .offer { border-top: 1px dashed #c28569; padding-top: 8px; margin-bottom: 8px; }
+#dialogue .offer b { display: block; }
+#dialogue .offer span { font-size: 13px; color: #6b4a33; }
+#dialogue .buttons { display: flex; gap: 8px; }
+#dialogue button {
+  font: inherit; font-size: 14px; padding: 6px 14px; cursor: pointer;
+  background: #733e39; color: #f3e6c8; border: 0; border-radius: 3px;
+}
+#dialogue button.quiet { background: transparent; color: #733e39; border: 1px solid #c28569; }
+
+.window {
+  position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100vh - 32px); overflow: auto;
+  width: min(460px, calc(100vw - 32px));
+  background: var(--panel); border: 1px solid var(--edge); padding: 16px; font-size: 13px;
+}
+.window h2 { margin: 0 0 12px; font-size: 16px; color: var(--accent); display: flex; justify-content: space-between; }
+.close { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.close:hover { color: var(--ink); }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.slot {
+  position: relative; display: grid; grid-template-columns: 48px 1fr; grid-template-rows: auto auto; gap: 0 8px; align-items: center;
+  text-align: left; padding: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--edge);
+  color: var(--ink); font: inherit; cursor: pointer;
+}
+.slot:hover { border-color: var(--accent); }
+.slot img { grid-row: span 2; width: 48px; height: 48px; object-fit: contain; }
+.slot .name { font-weight: 600; }
+.slot .hint { color: var(--muted); font-size: 11px; }
+.slot .qty { position: absolute; left: 36px; top: 34px; background: var(--bg); padding: 0 4px; font-size: 11px; border: 1px solid var(--edge); }
+.sheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0 0; }
+.sheet div { text-align: center; border: 1px solid var(--edge); padding: 6px; }
+.sheet dt { color: var(--muted); font-size: 11px; }
+.sheet dd { margin: 0; font-size: 18px; font-weight: 700; }
+
+#bible {
+  position: fixed; inset: 0; margin: auto; width: min(880px, calc(100vw - 24px)); height: min(640px, calc(100vh - 24px));
+  display: grid; grid-template-columns: 210px 1fr;
+  background: #f3e6c8; color: #3e2731; border: 10px solid #5a3d2a; border-radius: 8px;
+  box-shadow: inset 0 0 0 3px #b8955a, 0 10px 40px rgba(0, 0, 0, 0.6);
+  font: 15px/1.55 Georgia, 'Times New Roman', serif;
+}
+#bible nav { background: #e8d6ae; border-right: 2px solid #c9ab76; padding: 18px 12px; overflow-y: auto; }
+#bible nav h1 { margin: 0 0 14px; font-size: 20px; color: #733e39; text-align: center; }
+#bible nav ol { list-style: none; margin: 0; padding: 0; }
+#bible nav button {
+  width: 100%; text-align: left; font: inherit; font-size: 14px; color: #5a3d2a; background: none;
+  border: 0; border-left: 3px solid transparent; padding: 6px 8px; cursor: pointer;
+}
+#bible nav button[aria-current] { border-left-color: #b8955a; background: #f3e6c8; color: #3e2731; font-weight: 700; }
+#bible article { padding: 22px 30px; overflow-y: auto; }
+#bible h2 { margin: 0 0 8px; color: #733e39; font-size: 22px; }
+#bible h2:not(:first-child) { margin-top: 22px; }
+#bible h3 { margin: 18px 0 6px; color: #5a3d2a; font-size: 16px; }
+#bible ul { padding-left: 20px; }
+#bible li { margin: 4px 0; }
+#bible .empty { font-style: italic; color: #8a6a45; }
+#bible .close { position: absolute; top: 6px; right: 10px; color: #733e39; }
+#bible .entries { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+#bible figure { margin: 0; display: flex; gap: 10px; align-items: center; font-size: 13px; }
+#bible figure img, #bible .mystery { width: 72px; height: 72px; object-fit: contain; flex: none; }
+#bible .mystery { display: grid; place-items: center; font-size: 34px; color: #c9ab76; border: 2px dashed #c9ab76; border-radius: 50%; }
+#bible .unknown figcaption { color: #8a6a45; }
+
+@media (max-width: 700px) {
+  #bible { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  #bible nav { border-right: 0; border-bottom: 2px solid #c9ab76; }
+  #bible nav ol { display: flex; flex-wrap: wrap; }
+  #bible nav button { width: auto; }
+  #quests { display: none; }
 }

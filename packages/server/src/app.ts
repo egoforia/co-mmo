@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { TICK_SECONDS, isClientMessage, validateName, type PlayerInfo } from '@co-mmo/shared';
+import { TICK_SECONDS, isClientMessage, upgradeCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
 import { World } from './world.ts';
 import { Store, StoreError, type Account } from './store.ts';
 
@@ -131,7 +131,7 @@ export function createApp(options: AppOptions): App {
             if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
           },
           close: (reason) => socket.close(4000, reason),
-        }, { regionId: account.regionId, x: account.x, y: account.y });
+        }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
         return;
       }
       if (isClientMessage(parsed)) world.handle(account.id, parsed);
@@ -144,7 +144,7 @@ export function createApp(options: AppOptions): App {
       if (sockets.get(account.id) !== socket) return;
       sockets.delete(account.id);
       const place = world.leave(account.id);
-      if (place) store.savePosition(account.id, place.x, place.y, place.regionId);
+      if (place) store.savePosition(account.id, place.x, place.y, place.regionId, place.character);
     });
   });
 
@@ -152,7 +152,7 @@ export function createApp(options: AppOptions): App {
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 
   function saveAll(): void {
-    for (const p of world.places()) store.savePosition(p.id, p.x, p.y, p.regionId);
+    for (const p of world.places()) store.savePosition(p.id, p.x, p.y, p.regionId, p.character);
   }
 
   return {

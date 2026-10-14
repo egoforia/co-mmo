@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { PLAYER_COLORS, hashString, type Role } from '@co-mmo/shared';
+import { PLAYER_COLORS, hashString, type Character, type Role } from '@co-mmo/shared';
 
 export interface Account {
   id: string;
@@ -15,6 +15,8 @@ export interface Account {
   regionId: string;
   x: number | null;
   y: number | null;
+  /** Missing until the character first plays. */
+  character?: Character;
 }
 
 export interface Invite {
@@ -122,12 +124,13 @@ export class Store {
     return this.data.accounts.find((a) => a.id === id);
   }
 
-  savePosition(id: string, x: number, y: number, regionId?: string): void {
+  savePosition(id: string, x: number, y: number, regionId?: string, character?: Character): void {
     const account = this.accountById(id);
     if (!account) return;
     if (regionId) account.regionId = regionId;
     account.x = x;
     account.y = y;
+    if (character) account.character = structuredClone(character);
     this.persist();
   }
 

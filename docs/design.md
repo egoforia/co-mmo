@@ -29,7 +29,7 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
 
 1. Design approved. Done.
 2. Walk together: invites, login, regions, movement, chat, presence. **Done:** four launch regions linked by roads, with the approved art.
-3. RPG core: stats, combat, creatures, items, quests, saving.
+3. RPG core: stats, combat, creatures, items, quests, saving. **In progress:** stats and levels, combat with three creature behaviours, death and respawn, the Bible, Tonics and drops, talk and defeat quests, saved characters.
 4. God v1: prayer panel, conversation, wish cards, Minor and Moderate wishes as content data, Tier 0 and Tier 1 assets, first God's View panels.
 5. Stewards and scripts: sandboxed scripted rules, review queue, rollback tools, reports.
 6. Scale and polish: multiple region servers, crowded-region splitting, asset tier upgrade tooling.

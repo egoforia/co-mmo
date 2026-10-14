@@ -15,6 +15,21 @@
       <button id="invite-button" type="button">Invite a friend</button>
     </div>
 
+    <div id="stats" hidden>
+      <div class="bar hp"><span id="hp-fill"></span><b id="hp-text"></b></div>
+      <div class="bar xp"><span id="xp-fill"></span><b id="xp-text"></b></div>
+      <div id="stats-line"></div>
+    </div>
+    <ol id="quests" hidden></ol>
+    <div id="keys" hidden>
+      <span><kbd>Space</kbd> strike</span><span><kbd>E</kbd> talk</span>
+      <button type="button" data-open="inventory"><kbd>I</kbd> bag</button>
+      <button type="button" data-open="bible"><kbd>B</kbd> Bible</button>
+    </div>
+    <div id="dialogue" hidden></div>
+    <div id="inventory" class="window" hidden></div>
+    <div id="bible" hidden></div>
+
     <div id="chat" hidden>
       <ol id="chat-log" aria-live="polite"></ol>
       <form id="chat-form" autocomplete="off">

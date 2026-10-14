@@ -4,6 +4,7 @@ import { MAX_NAME_LENGTH } from '@co-mmo/shared';
 import { acceptInvite, checkInvite, clearToken, createInvite, loadToken, saveToken } from './api.ts';
 import { GameConnection } from './net.ts';
 import { ChatBox, escapeHtml, hidePanel, onInviteClick, setHud, showPanel, toast } from './ui.ts';
+import { RpgUi } from './rpg-ui.ts';
 import { WorldScene } from './world-scene.ts';
 
 async function boot(): Promise<void> {
@@ -60,6 +61,7 @@ function play(token: string): void {
   showPanel('<h1>co-MMO</h1><p>Entering the world...</p>');
   let scene: WorldScene | null = null;
   let chat: ChatBox | null = null;
+  let rpg: RpgUi | null = null;
   let name = '';
   let region = '';
   // Art loads alongside the connection; the world waits for both.
@@ -80,11 +82,14 @@ function play(token: string): void {
     switch (message.t) {
       case 'welcome':
         region = message.region.name;
+        rpg?.setCharacter(message.character);
         if (scene) scene.enterRegion(message);
         else void art.then((manifest) => start(message, manifest));
         break;
       case 'snapshot':
         scene?.onSnapshot(message);
+        rpg?.setHp(message.hp);
+        scene?.setWeakened(rpg?.weakened ?? false);
         setHud(name, message.online, region);
         break;
       case 'chat':
@@ -92,6 +97,18 @@ function play(token: string): void {
         break;
       case 'system':
         chat?.add({ kind: 'system', text: message.text });
+        break;
+      case 'hit':
+        scene?.onHit(message);
+        break;
+      case 'character':
+        rpg?.setCharacter(message.character);
+        break;
+      case 'notice':
+        chat?.add({ kind: 'system', text: message.text });
+        break;
+      case 'dialogue':
+        rpg?.showDialogue(message);
         break;
       case 'error':
         chat?.add({ kind: 'error', text: message.message });
@@ -103,7 +120,17 @@ function play(token: string): void {
     hidePanel();
     name = welcome.you.name;
     chat = new ChatBox((channel, text) => connection.send({ t: 'chat', channel, text }));
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Press Enter to talk.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, E talks, I opens your bag, B opens the Bible. Press Enter to chat.' });
+    rpg = new RpgUi(welcome.character, {
+      attack: () => {
+        connection.send({ t: 'attack' });
+        scene?.swing();
+      },
+      interact: () => connection.send({ t: 'interact' }),
+      use: (item) => connection.send({ t: 'use', item }),
+      accept: (quest) => connection.send({ t: 'accept', quest }),
+      typing: () => chat?.typing ?? false,
+    });
     scene = new WorldScene({
       welcome,
       art: manifest,

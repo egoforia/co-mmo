@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLAYER_SPEED, TICK_SECONDS, regionDef, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { PLAYER_SPEED, TICK_SECONDS, newCharacter, regionDef, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 
 function fakeConn() {
@@ -23,7 +23,7 @@ describe('Region', () => {
   it('welcomes a player at spawn and announces them', () => {
     const region = new Region(sanctum);
     const a = fakeConn();
-    region.join(info('a', 'Mara'), a, none);
+    region.join(info('a', 'Mara'), a, none, newCharacter());
     expect(a.messages[0]).toMatchObject({ t: 'welcome', x: region.map.spawn.x, y: region.map.spawn.y });
     expect(a.messages[1]).toMatchObject({ t: 'system', text: 'Mara entered the Sanctum.' });
   });
@@ -31,18 +31,18 @@ describe('Region', () => {
   it('restores a saved position only when it is walkable', () => {
     const region = new Region(sanctum);
     const ok = { x: region.map.spawn.x + 1, y: region.map.spawn.y };
-    region.join(info('a'), fakeConn(), ok);
+    region.join(info('a'), fakeConn(), ok, newCharacter());
     expect(region.position('a')).toEqual(ok);
     const shrine = region.map.landmarks.find((l) => l.asset === 'sanctum-shrine')!;
     const blocked = { x: Math.floor(shrine.x) + 0.5, y: Math.floor(shrine.y) - 0.5 };
-    region.join(info('b'), fakeConn(), blocked);
+    region.join(info('b'), fakeConn(), blocked, newCharacter());
     expect(region.position('b')).toEqual(region.map.spawn);
   });
 
   it('applies inputs on tick and acknowledges them', () => {
     const region = new Region(sanctum);
     const a = fakeConn();
-    region.join(info('a'), a, none);
+    region.join(info('a'), a, none, newCharacter());
     region.handle('a', { t: 'input', seq: 1, dx: 1, dy: 0 });
     region.tick();
     const snap = a.messages.at(-1)!;
@@ -52,7 +52,7 @@ describe('Region', () => {
 
   it('limits how far a flooding client can move per tick', () => {
     const region = new Region(sanctum);
-    region.join(info('a'), fakeConn(), none);
+    region.join(info('a'), fakeConn(), none, newCharacter());
     for (let seq = 1; seq <= 50; seq++) region.handle('a', { t: 'input', seq, dx: 1, dy: 0 });
     region.tick();
     const moved = region.position('a')!.x - region.map.spawn.x;
@@ -63,9 +63,9 @@ describe('Region', () => {
     const region = new Region(sanctum);
     const a = fakeConn();
     const { spawn } = region.map;
-    region.join(info('a'), a, none);
-    region.join(info('near'), fakeConn(), { x: spawn.x + 2, y: spawn.y });
-    region.join(info('far'), fakeConn(), { x: 1.5, y: 32.5 });
+    region.join(info('a'), a, none, newCharacter());
+    region.join(info('near'), fakeConn(), { x: spawn.x + 2, y: spawn.y }, newCharacter());
+    region.join(info('far'), fakeConn(), { x: 1.5, y: 32.5 }, newCharacter());
     region.tick();
     const snap = a.messages.at(-1) as Extract<ServerMessage, { t: 'snapshot' }>;
     expect(snap.online).toBe(3);
@@ -78,9 +78,9 @@ describe('Region', () => {
     const near = fakeConn();
     const far = fakeConn();
     const { spawn } = region.map;
-    region.join(info('a', 'Mara'), a, none);
-    region.join(info('near'), near, { x: spawn.x + 2, y: spawn.y });
-    region.join(info('far'), far, { x: 1.5, y: 32.5 });
+    region.join(info('a', 'Mara'), a, none, newCharacter());
+    region.join(info('near'), near, { x: spawn.x + 2, y: spawn.y }, newCharacter());
+    region.join(info('far'), far, { x: 1.5, y: 32.5 }, newCharacter());
     region.handle('a', { t: 'chat', channel: 'say', text: '  hello   there ' });
     region.handle('a', { t: 'chat', channel: 'world', text: 'hi all' });
     const chats = (c: typeof a) => c.messages.filter((m) => m.t === 'chat').map((m) => (m as { text: string }).text);
@@ -92,7 +92,7 @@ describe('Region', () => {
     let now = 0;
     const region = new Region(sanctum, undefined, () => now);
     const a = fakeConn();
-    region.join(info('a'), a, none);
+    region.join(info('a'), a, none, newCharacter());
     for (let i = 0; i < 7; i++) region.handle('a', { t: 'chat', channel: 'say', text: `m${i}` });
     expect(a.messages.filter((m) => m.t === 'chat')).toHaveLength(5);
     expect(a.messages.some((m) => m.t === 'error' && m.code === 'chat_rate')).toBe(true);
@@ -104,8 +104,8 @@ describe('Region', () => {
   it('replaces an older connection for the same player', () => {
     const region = new Region(sanctum);
     const first = fakeConn();
-    region.join(info('a'), first, none);
-    region.join(info('a'), fakeConn(), none);
+    region.join(info('a'), first, none, newCharacter());
+    region.join(info('a'), fakeConn(), none, newCharacter());
     expect(first.closed).toBeTruthy();
     expect(region.online).toBe(1);
   });

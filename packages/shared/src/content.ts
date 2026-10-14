@@ -50,7 +50,20 @@ export interface NpcWish {
   look: WishLook;
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish;
+/**
+ * A player's own look, described in words when the character is created:
+ * their first, free wish (design doc, Characters and progression).
+ */
+export interface PlayerLookWish {
+  kind: 'player';
+  /** The player's name. */
+  name: string;
+  /** Their words, as written. */
+  description: string;
+  look: WishLook;
+}
+
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish;
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
 export type RuleItem = Omit<ItemWish, 'kind'>;
@@ -255,6 +268,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   if (!('kind' in def)) return 'itemKind' in def && def.itemKind === 'consumable' ? 'item-tonic' : 'item-goat-horn';
   if (def.kind === 'item') return def.itemKind === 'consumable' ? 'item-tonic' : 'item-goat-horn';
   if (def.kind === 'npc') return 'sanctum-pilgrim';
+  if (def.kind === 'player') return 'player-mara';
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';
 }
 
@@ -372,7 +386,7 @@ export function applyContent(entry: ContentEntry): void {
     for (const [key, item] of Object.entries(d.items)) ITEMS[ruleItemId(entry.id, key)] = itemFromWish(ruleItemId(entry.id, key), item);
   } else if (d.kind === 'item') ITEMS[entry.id] = itemFromWish(entry.id, d);
   else if (d.kind === 'creature') CREATURES[entry.id] = creatureFromWish(entry.id, d);
-  else NPC_GREETINGS[entry.id] = d.greeting;
+  else if (d.kind === 'npc') NPC_GREETINGS[entry.id] = d.greeting;
 }
 
 export function removeContent(entry: ContentEntry): void {
@@ -380,6 +394,42 @@ export function removeContent(entry: ContentEntry): void {
   delete ITEMS[entry.id];
   delete CREATURES[entry.id];
   delete NPC_GREETINGS[entry.id];
+}
+
+export const MAX_LOOK_LENGTH = 300;
+
+/** Colour words a look may mention, for the placeholder tint until it is painted. */
+const LOOK_COLORS: [RegExp, string][] = [
+  [/\b(crimson|scarlet|red)\b/, '#b13e53'],
+  [/\b(orange|amber|copper)\b/, '#ef7d57'],
+  [/\b(gold|golden|yellow|blond|blonde)\b/, '#e8c170'],
+  [/\b(green|emerald|moss)\b/, '#38b764'],
+  [/\b(teal|turquoise)\b/, '#257179'],
+  [/\b(blue|azure|navy|sapphire)\b/, '#3b5dc9'],
+  [/\b(purple|violet|lilac|plum)\b/, '#8a4fa8'],
+  [/\b(pink|rose)\b/, '#e58fb5'],
+  [/\b(brown|leather|chestnut)\b/, '#8b5a3c'],
+  [/\b(white|silver|pale)\b/, '#d8dce6'],
+  [/\b(black|dark|shadow)\b/, '#3a3550'],
+  [/\b(grey|gray|ash)\b/, '#8a8aa0'],
+];
+
+/**
+ * Turns a player's own words about how they look into their look wish.
+ * Throws a WishError with a friendly message when there is nothing to draw.
+ */
+export function lookFromWords(name: string, raw: string): PlayerLookWish {
+  const description = text(raw, MAX_LOOK_LENGTH);
+  if (description.length < 3) throw new WishError('Tell the God a little about how you look.');
+  const lower = description.toLowerCase();
+  const color = LOOK_COLORS.find(([re]) => re.test(lower))?.[1] ?? '#c8a2c8';
+  const first = description.split(/[.!?;]/)[0]!.trim();
+  return {
+    kind: 'player',
+    name: text(name, 40),
+    description,
+    look: { hook: first.slice(0, 120) || description.slice(0, 120), body: `An adventurer: ${description}`.slice(0, 200), color, mood: 'warm and adventurous' },
+  };
 }
 
 function cleanLook(raw: unknown): WishLook {

@@ -6,6 +6,7 @@ import {
   WishError,
   addItem,
   applyContent,
+  lookFromWords,
   regionDef,
   removeContent,
   ruleItemId,
@@ -269,6 +270,41 @@ export class Wishes {
     };
     this.store.addContent(record);
     if (status !== 'granted') this.broadcast(record);
+    return record;
+  }
+
+  // --- A player's look ------------------------------------------------------------
+
+  /** The player's look wish, while it stands. */
+  lookOf(playerId: string): ContentRecord | undefined {
+    return this.store.content.find((c) => c.definition?.kind === 'player' && c.wisher.id === playerId && c.status === 'granted');
+  }
+
+  /**
+   * A new player describes how they look: their first wish, free, granted at
+   * once and painted like any wished thing. A Steward can roll it back, and
+   * then the player may describe themself again. Throws a WishError.
+   */
+  grantLook(player: { id: string; name: string }, words: string): ContentRecord {
+    if (this.lookOf(player.id)) throw new WishError('Your look is already chosen. Changing it later will be a wish of its own.');
+    const definition = lookFromWords(player.name, words);
+    const record: ContentRecord = {
+      id: `w${this.now().toString(36)}${randomBytes(2).toString('hex')}`,
+      wisher: { id: player.id, name: player.name },
+      regionId: this.world.home.def.id,
+      at: this.now(),
+      tier: 'minor',
+      title: `${player.name}'s look`,
+      summary: definition.description,
+      status: 'granted',
+      favor: 0,
+      definition,
+      conversation: [{ role: 'user', content: words }],
+      usd: 0,
+    };
+    this.store.addContent(record);
+    this.broadcast(record);
+    this.paint(record);
     return record;
   }
 

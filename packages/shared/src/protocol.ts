@@ -4,7 +4,13 @@
 import type { ContentEntry, WishCard } from './content.ts';
 import type { Character } from './rpg.ts';
 
-export type ChatChannel = 'say' | 'world';
+/**
+ * Say: players nearby. Region: everyone in your region. Party: your party.
+ * Whisper: one player. World: everyone online.
+ */
+export type ChatChannel = 'say' | 'region' | 'party' | 'whisper' | 'world';
+
+export const CHAT_CHANNELS: readonly ChatChannel[] = ['say', 'region', 'party', 'whisper', 'world'];
 
 export interface InputMessage {
   t: 'input';
@@ -19,6 +25,8 @@ export interface ChatSendMessage {
   t: 'chat';
   channel: ChatChannel;
   text: string;
+  /** Whisper: the name of the player to whisper to. */
+  to?: string;
 }
 
 /** Strike the nearest creature in reach. */
@@ -63,7 +71,16 @@ export interface ReportMessage {
   reason: string;
 }
 
+/** Party actions: invite someone by name, answer an invite, or leave. */
+export interface PartyActionMessage {
+  t: 'party';
+  action: 'invite' | 'accept' | 'decline' | 'leave';
+  /** Invite: the player's name. */
+  name?: string;
+}
+
 export type ClientMessage =
+  | PartyActionMessage
   | InputMessage
   | ChatSendMessage
   | AttackMessage
@@ -149,8 +166,39 @@ export interface ChatMessage {
   t: 'chat';
   channel: ChatChannel;
   from: { id: string; name: string };
+  /** Whisper: who it was sent to (the sender sees their own whisper too). */
+  to?: { id: string; name: string };
   text: string;
   at: number;
+}
+
+export interface PartyMember {
+  id: string;
+  name: string;
+  online: boolean;
+  /** Region name while online. */
+  region?: string;
+}
+
+/** Your party as it is now; null when you are in none. */
+export interface PartyMessage {
+  t: 'party';
+  party: { leader: string; members: PartyMember[] } | null;
+}
+
+/** Someone asked you to join their party. */
+export interface PartyInviteMessage {
+  t: 'party-invite';
+  from: { id: string; name: string };
+}
+
+/** What happened in the world since you last played, sent on joining. */
+export interface AwayMessage {
+  t: 'away';
+  since: number;
+  items: { at: number; text: string }[];
+  /** Lines left out to keep the feed short. */
+  more: number;
 }
 
 export interface SystemMessage {
@@ -214,6 +262,9 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | PartyMessage
+  | PartyInviteMessage
+  | AwayMessage
   | WelcomeMessage
   | GodMessage
   | ContentMessage
@@ -237,7 +288,12 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     );
   }
   if (m.t === 'chat') {
-    return (m.channel === 'say' || m.channel === 'world') && typeof m.text === 'string';
+    return CHAT_CHANNELS.includes(m.channel as ChatChannel) && typeof m.text === 'string' &&
+      (m.to === undefined || (typeof m.to === 'string' && m.to.length <= 64));
+  }
+  if (m.t === 'party') {
+    return ['invite', 'accept', 'decline', 'leave'].includes(m.action as string) &&
+      (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64));
   }
   if (m.t === 'attack' || m.t === 'interact') return true;
   if (m.t === 'use') return typeof m.item === 'string' && m.item.length <= 64;

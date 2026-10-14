@@ -16,6 +16,7 @@ import type { ImageProvider } from '../src/assets/provider.ts';
 import { Store } from '../src/store.ts';
 import type { Updater } from '../src/updates.ts';
 import type { BuildOptions } from '../src/builds.ts';
+import type { Mail, Mailer } from '../src/auth.ts';
 
 export let app: App | null = null;
 const sockets: WebSocket[] = [];
@@ -50,7 +51,19 @@ export const fakePainter = (): ImageProvider & { calls: number } => ({
   },
 });
 
-export async function start(opts: { store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number; updater?: Updater; builds?: BuildOptions } = {}) {
+/** Keeps the emails the game sends, instead of sending them. */
+export const fakeMailer = (): Mailer & { sent: Mail[] } => ({
+  kind: 'email',
+  sent: [],
+  async send(mail) {
+    this.sent.push(mail);
+  },
+});
+
+export async function start(opts: {
+  store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number;
+  updater?: Updater; builds?: BuildOptions; env?: Record<string, string>; mailer?: Mailer; fetch?: typeof fetch;
+} = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-art-'));
   const painter = opts.painter === undefined ? fakePainter() : opts.painter;
@@ -60,8 +73,9 @@ export async function start(opts: { store?: Store; chat?: () => ChatModel[]; com
     updater: opts.updater,
     commit: 'abc1234',
     builds: opts.builds ?? { issues: null },
+    auth: { mailer: opts.mailer ?? fakeMailer(), ...(opts.fetch ? { fetch: opts.fetch } : {}) },
     wishes: {
-      env: {},
+      env: opts.env ?? {},
       anchorDir: '/nonexistent',
       artDir,
       chatModel: opts.chat ?? (() => [new OfflineGod()]),

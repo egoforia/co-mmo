@@ -291,12 +291,16 @@ export async function handleAdmin(
     const spend = store.spendThisMonth(Date.now());
     const byKind: Record<string, number> = {};
     const byPlayer: Record<string, number> = {};
+    const byProvider: Record<string, number> = {};
+    let estimatedUsd = 0;
     for (const s of spend) {
       byKind[s.kind] = (byKind[s.kind] ?? 0) + s.usd;
+      byProvider[providerName(s.provider)] = (byProvider[providerName(s.provider)] ?? 0) + s.usd;
+      if (s.estimate) estimatedUsd += s.usd;
       const name = s.playerId ? store.accountById(s.playerId)?.name ?? 'unknown' : 'system';
       byPlayer[name] = (byPlayer[name] ?? 0) + s.usd;
     }
-    return json(res, 200, { ...wishes.budget(), byKind, byPlayer, calls: spend.length }), true;
+    return json(res, 200, { ...wishes.budget(), byKind, byPlayer, byProvider, estimatedUsd, calls: spend.length }), true;
   }
 
   if (route === 'budget' && method === 'PUT') {
@@ -367,4 +371,9 @@ function modelChoice(raw: unknown): ModelChoice | null {
   const provider = r.provider as ProviderId;
   const model = typeof r.model === 'string' && r.model.trim() ? r.model.trim().slice(0, 80) : DEFAULT_MODELS[provider];
   return { provider, model };
+}
+
+/** The company that bills each provider id, as the Owner sees it on their invoices. */
+function providerName(provider: string): string {
+  return ({ gemini: 'Google (Gemini)', anthropic: 'Anthropic (Claude)', 'claude-code': 'Anthropic (Claude)', openai: 'OpenAI' } as Record<string, string>)[provider] ?? provider;
 }

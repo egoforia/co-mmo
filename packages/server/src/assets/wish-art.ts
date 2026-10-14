@@ -6,7 +6,7 @@ import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
 import { buildPrompt, type AssetDescription, type AssetKind } from './style.ts';
 
-/** Price of one Gemini image (gemini-2.5-flash-image), US dollars. */
+/** Price of one Gemini image (gemini-2.5-flash-image), US dollars: Google's list price for a 1024px image (1290 output tokens at $30 per million). */
 export const IMAGE_USD = 0.039;
 
 /** Approved anchors sent as style references, per kind of wished thing. */
@@ -14,22 +14,24 @@ const REFERENCES: Record<WishDefinition['kind'], string[]> = {
   item: ['item-tonic', 'item-goat-horn'],
   creature: ['woods-mushroom', 'shore-crab-knight'],
   npc: ['sanctum-pilgrim', 'woods-herbalist'],
+  player: ['player-mara', 'player-ilya'],
 };
 
-const KIND: Record<WishDefinition['kind'], AssetKind> = { item: 'item', creature: 'monster', npc: 'npc' };
+const KIND: Record<WishDefinition['kind'], AssetKind> = { item: 'item', creature: 'monster', npc: 'npc', player: 'player' };
 
 /** Box the art is fitted into, feet at the bottom centre (as build-game-art). */
 const BOX: Record<WishDefinition['kind'], { width: number; height: number }> = {
   item: { width: 128, height: 128 },
   creature: { width: 128, height: 128 },
   npc: { width: 128, height: 192 },
+  player: { width: 128, height: 192 },
 };
 
 export function describeWish(def: WishDefinition, biome: BiomeId): AssetDescription {
   return {
     name: def.name,
     kind: KIND[def.kind],
-    biome: def.kind === 'item' ? 'any' : biome,
+    biome: def.kind === 'item' || def.kind === 'player' ? 'any' : biome,
     silhouetteHook: def.look.hook,
     body: def.look.body,
     colors: { main: def.look.color },

@@ -130,6 +130,7 @@ interface AiSettings {
     image: { provider: string; model: string; uses?: Partial<Record<ArtUse, string>> };
     video: { provider: string; model: string };
     sound: { effects: { provider: string; model: string }; music: { provider: string; model: string } };
+    styleCheck: { judge: { provider: string; model: string } | null; retries: number; reuse: boolean };
   };
   providers: { id: string; keySet: boolean; keyName: string | null; defaultModel: string }[];
   imageKeySet: boolean;
@@ -583,6 +584,11 @@ async function ai(): Promise<string> {
       <label>Walk videos<span><select name="videoProvider"><option value="gemini"${s.ai.video.provider === 'gemini' ? ' selected' : ''}>Google Veo${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.video.provider === 'none' ? ' selected' : ''}>None (no new walks)</option></select><input name="videoModel" list="video-models" value="${escapeHtml(s.ai.video.model)}" placeholder="veo-3.1-lite-generate-preview"></span></label>
       <label>Sound effects<span><select name="effectsProvider"><option value="elevenlabs"${s.ai.sound.effects.provider === 'elevenlabs' ? ' selected' : ''}>ElevenLabs${s.effectsKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.effects.provider === 'none' ? ' selected' : ''}>None (no sound effects)</option></select><input name="effectsModel" list="effects-models" value="${escapeHtml(s.ai.sound.effects.model)}" placeholder="eleven_text_to_sound_v2"></span></label>
       <label>Music<span><select name="musicProvider"><option value="gemini"${s.ai.sound.music.provider === 'gemini' ? ' selected' : ''}>Google Lyria${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.music.provider === 'none' ? ' selected' : ''}>None (no music)</option></select><input name="musicModel" list="music-models" value="${escapeHtml(s.ai.sound.music.model)}" placeholder="lyria-3-clip-preview"></span></label>
+      <h3>Style check</h3>
+      <label>Judge<span><select name="judgeProvider">${options(s.ai.styleCheck.judge?.provider ?? '', true).replace('>None<', '>Same as the God<').replace(/>Offline God[^<]*</, '>Free checks only<')}</select><input name="judgeModel" value="${escapeHtml(s.ai.styleCheck.judge?.provider === 'offline' ? '' : s.ai.styleCheck.judge?.model ?? '')}" placeholder="a model that can see pictures"></span></label>
+      <label>Paint again when a picture fails<span><select name="retries">${[0, 1, 2].map((n) => `<option value="${n}"${n === s.ai.styleCheck.retries ? ' selected' : ''}>${n === 0 ? 'Never' : n === 1 ? 'Once' : 'Up to twice'}</option>`).join('')}</select></span></label>
+      <label class="check"><input type="checkbox" name="reuse"${s.ai.styleCheck.reuse ? ' checked' : ''}> Show an existing picture when a new wish looks the same, instead of painting one</label>
+      <p class="note">Every wished picture is checked for free first: a clean background, nothing cut off, no pure black, white or neon. The judge then compares it with the approved anchors and the wish, for well under a cent. A picture that still fails after its retries is shown anyway, marked on the Art tab, and the Stewards are told.</p>
       ${(['image', 'video', 'effects', 'music'] as const).map((kind) => `<datalist id="${kind}-models">${s.catalog[kind].map((m) => `<option value="${escapeHtml(m.model)}">about ${usd(m.usd)} a ${m.per}</option>`).join('')}</datalist>`).join('')}
       <p class="note">Prices per model: ${(['image', 'video', 'effects', 'music'] as const).flatMap((kind) => s.catalog[kind].map((m) => `<code>${escapeHtml(m.model)}</code> about ${usd(m.usd)} a ${m.per}`)).join(' · ')}. A dearer picture model can be used only where it shows most, such as buildings.</p>
       <button type="submit">Save</button>
@@ -713,6 +719,8 @@ interface ArtItem {
   takesNote: boolean;
   versions?: { id: string; url: string }[];
   shippedBack?: boolean;
+  check?: { pass: boolean; why?: string; tries: number };
+  reused?: string;
 }
 
 type WalkStrip = { url: string; frames: number; width: number; height: number; cycleSeconds: number };
@@ -840,7 +848,10 @@ function artItemHtml(item: ArtItem): string {
         <button type="submit">Paint again</button>
       </form>
     </details>` : item.why ? `<small>${escapeHtml(item.why)}</small>` : '';
-  return `<figure class="art-item ${item.source}">${picture}<figcaption><b>${escapeHtml(item.name)}</b><br><small>${SOURCE[item.source]}</small>${form}${versionsHtml(item)}</figcaption></figure>`;
+  const check = item.reused ? `<br><small>Shows the picture of ${escapeHtml(item.reused)}</small>`
+    : item.check && !item.check.pass ? `<br><small class="bad">Style check not passed after ${item.check.tries} ${item.check.tries === 1 ? 'try' : 'tries'}: ${escapeHtml(item.check.why ?? '')}</small>`
+    : item.check ? `<br><small>Style check passed${item.check.tries > 1 ? ` on try ${item.check.tries}` : ''}</small>` : '';
+  return `<figure class="art-item ${item.source}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${escapeHtml(item.name)}</b><br><small>${SOURCE[item.source]}</small>${check}${form}${versionsHtml(item)}</figcaption></figure>`;
 }
 
 function soundHtml(s: SoundItem): string {
@@ -996,6 +1007,7 @@ main.addEventListener('submit', async (e) => {
         image: { provider: f.imageProvider, model: f.imageModel, uses: Object.fromEntries(ART_USES.map(([use]) => [use, f[`use-${use}`] ?? ''])) },
         video: { provider: f.videoProvider, model: f.videoModel },
         sound: { effects: { provider: f.effectsProvider, model: f.effectsModel }, music: { provider: f.musicProvider, model: f.musicModel } },
+        styleCheck: { judge: f.judgeProvider ? { provider: f.judgeProvider, model: f.judgeModel } : null, retries: Number(f.retries), reuse: f.reuse === 'on' },
       });
       toast('Saved. The next prayer uses these models.');
     } else if (form.id === 'ai-test') {

@@ -31,7 +31,7 @@ export class GeminiImageProvider implements ImageProvider {
     for (const ref of request.references ?? []) {
       parts.push({ inline_data: { mime_type: ref.mimeType, data: ref.data.toString('base64') } });
     }
-    if (request.references?.length) {
+    if (request.references?.length && !request.edit) {
       parts.push({ text: REFERENCE_NOTE });
     }
     parts.push({ text: request.prompt });

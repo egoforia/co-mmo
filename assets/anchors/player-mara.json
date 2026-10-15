@@ -8,8 +8,7 @@
     "silhouetteHook": "oversized floppy wizard hat with a drooping tip",
     "body": "small, 3 heads tall, round face, cheerful stance, facing the viewer",
     "materials": [
-      "cloth",
-      "wood"
+      "cloth"
     ],
     "colors": {
       "main": "moss green",
@@ -18,15 +17,19 @@
     },
     "details": [
       "short russet bob",
-      "crooked wooden staff with a leaf sprouting at the top",
+      "empty hands, carrying nothing",
       "brown boots"
     ],
     "mood": "curious, warm"
   },
-  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nSubject: Mara (player). Most recognisable feature: oversized floppy wizard hat with a drooping tip. Body and shape: small, 3 heads tall, round face, cheerful stance, facing the viewer. Materials: cloth, wood. Colours: main moss green, secondary cream, small accent of rose hat band. Details: short russet bob; crooked wooden staff with a leaf sprouting at the top; brown boots. Mood: curious, warm.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nPaint the character in the reference picture again, exactly the same: face, hair, clothes, colours, proportions, pose, size and framing.\nChange only this: a neutral base pose for walk animation: standing straight and still, facing the viewer directly from the front (not turned to either side), body and face symmetric, eye-level front view with no tilt, feet a little apart under the hips, both arms relaxed and hanging at the sides, empty hands; the hat stays the same.",
+  "references": [
+    "player-mara (before)"
+  ],
+  "edit": "a neutral base pose for walk animation: standing straight and still, facing the viewer directly from the front (not turned to either side), body and face symmetric, eye-level front view with no tilt, feet a little apart under the hips, both arms relaxed and hanging at the sides, empty hands; the hat stays the same",
   "provider": "gemini",
-  "model": "gemini-2.5-flash-image",
-  "styleVersion": 1,
-  "mimeType": "image/png",
-  "createdAt": "2026-10-14T17:35:54.247Z"
+  "model": "gemini-3.1-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/jpeg",
+  "createdAt": "2026-10-15T19:58:45.951Z"
 }

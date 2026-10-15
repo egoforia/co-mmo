@@ -59,6 +59,10 @@ export interface ArtItem {
   versions?: ArtVersion[];
   /** Painted again over a shipped picture, which can be put back. */
   shippedBack?: boolean;
+  /** What the style check made of a wished picture, when it ran. */
+  check?: { pass: boolean; why?: string; tries: number };
+  /** The existing picture a wished thing shows instead of its own. */
+  reused?: string;
 }
 
 /** A group of pictures in the Art tab. */
@@ -211,7 +215,13 @@ export class ArtStudio {
     for (const record of this.options.store.content) {
       const def = record.definition;
       if (record.status !== 'granted' || !def || def.kind === 'recipe') continue;
-      const item = (id: string, name: string, art?: string): ArtItem => ({ id: `${record.id}:${id}`, name: `${name} (${record.title})`, ...(art ? { url: art } : {}), source: art ? 'painted' : 'missing', estimateUsd: picture, repaintable: true, takesNote: true });
+      const item = (id: string, name: string, art?: string): ArtItem => {
+        const kept = record.artPrompts?.[id];
+        return {
+          id: `${record.id}:${id}`, name: `${name} (${record.title})`, ...(art ? { url: art } : {}), source: art ? 'painted' : 'missing', estimateUsd: picture, repaintable: true, takesNote: true,
+          ...(kept?.check ? { check: kept.check } : {}), ...(kept?.reused ? { reused: kept.reused.name } : {}),
+        };
+      };
       if (def.kind === 'region') {
         kits.set(def.biome, kits.get(def.biome) ?? record);
         for (const p of regionPictures(record.id, def)) items.push(item(p.id, p.def.name, record.itemArt?.[p.id]));

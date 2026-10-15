@@ -5,6 +5,8 @@
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
+  /** Pictures shown with a user turn, before its words (the style check's judge). */
+  images?: { mimeType: string; data: Buffer }[];
 }
 
 export interface ChatRequest {
@@ -87,7 +89,10 @@ export class GeminiChat implements ChatModel {
         headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: req.system }] },
-          contents: req.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+          contents: req.messages.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [...(m.images ?? []).map((i) => ({ inlineData: { mimeType: i.mimeType, data: i.data.toString('base64') } })), { text: m.content }],
+          })),
           generationConfig: {
             maxOutputTokens: req.maxTokens ?? 1024,
             ...(req.json ? { responseMimeType: 'application/json' } : {}),
@@ -123,7 +128,9 @@ export class AnthropicChat implements ChatModel {
         model: this.model,
         max_tokens: req.maxTokens ?? 1024,
         system: req.json ? `${req.system}\n\nReply with one JSON object and nothing else.` : req.system,
-        messages: req.messages,
+        messages: req.messages.map((m) => (m.images?.length
+          ? { role: m.role, content: [...m.images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mimeType, data: i.data.toString('base64') } })), { type: 'text', text: m.content }] }
+          : { role: m.role, content: m.content })),
       }),
     });
     const body = (await res.json().catch(() => ({}))) as {
@@ -155,7 +162,9 @@ export class OpenAiChat implements ChatModel {
       body: JSON.stringify({
         model: this.model,
         max_tokens: req.maxTokens ?? 1024,
-        messages: [{ role: 'system', content: req.system }, ...req.messages],
+        messages: [{ role: 'system', content: req.system }, ...req.messages.map((m) => (m.images?.length
+          ? { role: m.role, content: [...m.images.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mimeType};base64,${i.data.toString('base64')}` } })), { type: 'text', text: m.content }] }
+          : { role: m.role, content: m.content }))],
         ...(req.json ? { response_format: { type: 'json_object' } } : {}),
       }),
     });

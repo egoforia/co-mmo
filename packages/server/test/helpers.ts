@@ -67,7 +67,7 @@ export const fakeMailer = (): Mailer & { sent: Mail[] } => ({
 });
 
 export async function start(opts: {
-  store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number;
+  store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; judge?: () => ChatModel | undefined; painter?: ImageProvider | null; now?: () => number;
   updater?: Updater; builds?: BuildOptions; env?: Record<string, string>; mailer?: Mailer; fetch?: typeof fetch;
   /** Art: the shipped manifest, the anchors, and a video model with its frame cutter. */
   shippedArt?: string; anchorDir?: string; video?: VideoProvider; frames?: (mp4: Buffer) => Promise<Buffer[]>;
@@ -99,6 +99,7 @@ export async function start(opts: {
       artDir,
       chatModel: opts.chat ?? (() => [new OfflineGod()]),
       ...(opts.compiler ? { compilerModel: opts.compiler } : {}),
+      ...(opts.judge ? { judgeModel: opts.judge } : {}),
       ...(opts.now ? { now: opts.now } : {}),
       ...(opts.realImages ? {} : { imageProvider: () => painter ?? undefined }),
     },

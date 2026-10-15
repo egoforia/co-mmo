@@ -89,6 +89,10 @@ export interface ArtPromptRecord {
   model: string;
   at: number;
   usd: number;
+  /** What the style check made of it, and how many paintings it took. */
+  check?: { pass: boolean; why?: string; tries: number };
+  /** An existing picture shown instead of painting a new one. */
+  reused?: { from: string; name: string };
 }
 
 /** A player telling the Stewards about a wished thing or another player. */
@@ -123,6 +127,8 @@ export interface Settings {
     video?: { provider: 'gemini' | 'none'; model: string };
     /** Makes sound effects and music (missing in older saves: see soundSettings). */
     sound?: SoundSettings;
+    /** Checks painted pictures and looks for one to reuse (missing in older saves: see styleCheckSettings). */
+    styleCheck?: StyleCheckSettings;
   };
   budget: {
     /** Monthly ceiling; above it wishes still work, with placeholder art. */
@@ -151,6 +157,21 @@ export const ART_USES: ArtUse[] = ['wishes', 'buildings', 'scenery', 'walks'];
 /** The video model in use: the saved choice, or Veo Lite when the Gemini key is set (as walks worked before the choice existed). */
 export function videoSettings(settings: Settings, env: NodeJS.ProcessEnv): { provider: 'gemini' | 'none'; model: string } {
   return settings.ai.video ?? (env.GEMINI_API_KEY ? { provider: 'gemini', model: 'veo-3.1-lite-generate-preview' } : { provider: 'none', model: '' });
+}
+
+/** The style check and reuse (design doc, Art style, step 5; Keeping costs down). */
+export interface StyleCheckSettings {
+  /** The vision model that judges pictures and confirms reuse; null uses the God's, 'offline' runs the free checks only. */
+  judge: ModelChoice | null;
+  /** How many times a picture that fails is painted again (0 to 2). */
+  retries: number;
+  /** Whether a new wish may show an existing picture that fits instead of painting one. */
+  reuse: boolean;
+}
+
+/** The style check as saved, or on with the God's model, two retries and reuse. */
+export function styleCheckSettings(settings: Settings): StyleCheckSettings {
+  return settings.ai.styleCheck ?? { judge: null, retries: 2, reuse: true };
 }
 
 export interface SoundSettings {

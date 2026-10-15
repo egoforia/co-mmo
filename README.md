@@ -72,6 +72,16 @@ The God (milestone 4, first version):
   raised. The Art tab can paint a whole group again with today's model and
   keeps every replaced picture, so any earlier version (or the shipped one)
   can be put back.
+- Every wished picture goes through the style check: free checks on its
+  pixels (a plain background that cut away, nothing cut off by the frame, no
+  big areas of pure black, white or neon), then a judge model (the God's
+  model unless the AI models tab picks another; about $0.003 a picture on
+  Gemini) compares it with the anchors and the wish. A picture that fails is
+  painted again with what went wrong, up to twice; if it never passes, its
+  best try is shown, marked on the Art tab, and the Stewards are told.
+- Before painting a new wish, the judge looks for an already painted wished
+  picture of the same kind of thing in a close colour; when one would do,
+  the new wish shows a copy of it instead of a new painting.
 
 Stewards and scripted rules (milestone 5, first version):
 

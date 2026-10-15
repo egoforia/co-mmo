@@ -204,6 +204,8 @@ export interface EntityState {
   y: number;
   /** Health as a fraction of the maximum, 0 to 1. */
   health: number;
+  /** The item shown in their hand (see heldItem), when they wear one. */
+  held?: string;
 }
 
 export interface CreatureState {

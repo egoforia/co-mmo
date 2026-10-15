@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import type { ArtManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH } from '@co-mmo/shared';
+import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
+import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { GameConnection } from './net.ts';
@@ -111,6 +111,14 @@ function play(token: string): void {
     fetch(url)
       .then((r) => (r.ok ? (r.json() as Promise<ArtManifest>) : {}))
       .catch(() => ({}));
+  // Where hands and grips are in painted pictures, for held items; found by the server over time.
+  const points = (): Promise<ArtPointsManifest> =>
+    fetch('/api/art-points')
+      .then((r) => (r.ok ? (r.json() as Promise<ArtPointsManifest>) : {}))
+      .catch(() => ({}));
+  const artPoints = points();
+  // Hands and grips found since: a newly painted look or a new sword shows in hand without a reload.
+  setInterval(() => void points().then((p) => scene?.setPoints(p)), 3 * 60_000);
   // Shipped art wins over painted art, except what the Owner had painted again in God's View.
   const art: Promise<ArtManifest> = Promise.all([manifest('/api/art'), manifest('/art/manifest.json')]).then(([painted, shipped]) => ({
     ...painted,
@@ -153,7 +161,7 @@ function play(token: string): void {
         kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
         if (scene) scene.enterRegion(message);
-        else void art.then((manifest) => start(message, manifest));
+        else void Promise.all([art, artPoints]).then(([manifest, found]) => start(message, manifest, found));
         break;
       case 'snapshot':
         scene?.onSnapshot(message);
@@ -197,6 +205,7 @@ function play(token: string): void {
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
+        scene?.setMyHeld(heldItem(message.character));
         break;
       case 'god':
         sound.play('god-speaks');
@@ -247,7 +256,7 @@ function play(token: string): void {
     return now;
   }
 
-  function start(welcome: WelcomeMessage, manifest: ArtManifest): void {
+  function start(welcome: WelcomeMessage, manifest: ArtManifest, found: ArtPointsManifest): void {
     hidePanel();
     name = welcome.you.name;
     myId = welcome.you.id;
@@ -304,6 +313,7 @@ function play(token: string): void {
     scene = new WorldScene({
       welcome,
       art: manifest,
+      points: found,
       send: (m) => connection.send(m),
       typing: isTyping,
     });

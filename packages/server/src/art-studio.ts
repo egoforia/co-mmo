@@ -24,6 +24,7 @@ import { plain, type ArtJob, type ArtJobHandle, type ArtJobs } from './art-jobs.
 import type { BuildingPainter } from './building-painter.ts';
 import { watched } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
+import type { SoundItem, SoundMaker } from './sound-maker.ts';
 import type { ContentRecord, Store } from './store.ts';
 import { estimateClipUsd, type WalkPainter, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
@@ -91,6 +92,8 @@ export interface ArtStudioOptions {
   shipped: () => Promise<ArtManifest>;
   /** Requests kept across a restart until they are painted. */
   requests?: PaintRequests;
+  /** The game's sound effects and music. */
+  sounds?: SoundMaker;
 }
 
 /** A refusal the Owner reads as it is. */
@@ -126,6 +129,9 @@ export class ArtStudio {
     groups: ArtGroup[];
     walkers: WalkerView[];
     bodies: { id: string; name: string }[];
+    sounds: SoundItem[];
+    effectsModel: string | null;
+    musicModel: string | null;
   }> {
     await this.load();
     await this.options.walks.load();
@@ -179,6 +185,9 @@ export class ArtStudio {
       groups,
       walkers: await this.walkerViews(shipped, painted, picture),
       bodies: Object.values(BODY_TYPES).map((b) => ({ id: b.id, name: b.name })),
+      sounds: (await this.options.sounds?.list()) ?? [],
+      effectsModel: this.options.sounds?.models().effects ?? null,
+      musicModel: this.options.sounds?.models().music ?? null,
     };
   }
 
@@ -315,6 +324,22 @@ export class ArtStudio {
       await this.options.walks.paintWalker(walker, 'gods-view', true, plan);
     }, undefined, { kind: 'walk', walker: walkerId, body });
     return { estimateUsd };
+  }
+
+  /**
+   * Makes a sound effect or a land's music again, with the Owner's `note`
+   * added to its description. Sounds are quick, so they do not wait behind
+   * start-up painting.
+   */
+  async sound(id: string, note = ''): Promise<{ estimateUsd: number }> {
+    this.refuseWhenSpent();
+    const sounds = this.options.sounds;
+    const item = (await sounds?.list())?.find((s) => s.id === id);
+    if (!sounds || !item) throw new ArtRequestError('There is no sound by that name.');
+    if (!item.makeable) throw new ArtRequestError(item.why ?? 'That sound cannot be made now.');
+    const handle = sounds.queue(id, 'gods-view');
+    this.hold(sounds.remake(id, note.trim().slice(0, 1000), handle).catch((err) => console.error(`Making ${id} again failed:`, (err as Error).message)));
+    return { estimateUsd: item.estimateUsd };
   }
 
   /** The painting log, newest first. */

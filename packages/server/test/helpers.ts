@@ -9,7 +9,7 @@ import type { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { WebSocket } from 'ws';
 import { ABILITIES, CREATURES, ITEMS, NPC_GREETINGS, RECIPES, WISHED_REGIONS, type GodMessage, type ServerMessage, type WishCard } from '@co-mmo/shared';
-import { createApp, type App } from '../src/app.ts';
+import { createApp, type App, type AppOptions } from '../src/app.ts';
 import type { ChatModel } from '../src/ai/chat.ts';
 import { OfflineGod } from '../src/god.ts';
 import type { ImageProvider } from '../src/assets/provider.ts';
@@ -73,6 +73,8 @@ export async function start(opts: {
   shippedArt?: string; anchorDir?: string; video?: VideoProvider; frames?: (mp4: Buffer) => Promise<Buffer[]>;
   /** Paint turns: no rate limits unless a test gives some; `artDir` to start again on the same art. */
   paintQueue?: PaintQueue; artDir?: string;
+  /** Sound services, how made sounds are finished, and whether to make them at start-up. */
+  sound?: AppOptions['sound'];
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
@@ -88,6 +90,7 @@ export async function start(opts: {
     videoProvider: () => opts.video,
     ...(opts.frames ? { videoFrames: opts.frames } : {}),
     paintQueue: opts.paintQueue ?? new MemoryPaintQueue({ limit: () => undefined }),
+    ...(opts.sound ? { sound: opts.sound } : {}),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',

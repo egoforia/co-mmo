@@ -169,6 +169,11 @@ ul.brief { margin: 4px 0 8px; padding-left: 18px; }
 .art-item textarea, .walker textarea { width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); padding: 6px; font: inherit; font-size: 13px; }
 .walkers { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .walker { background: var(--panel); border: 1px solid var(--edge); padding: 10px 12px; }
+.sounds { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.sound { background: var(--panel); border: 1px solid var(--edge); padding: 10px 12px; display: grid; gap: 6px; }
+.sound.missing { opacity: 0.75; }
+.sound audio { width: 100%; }
+.sound pre { white-space: pre-wrap; font-size: 12px; }
 .walker > header { display: flex; gap: 10px; align-items: center; padding: 0; border: 0; }
 .walker > header img { width: 48px; height: 48px; object-fit: contain; }
 .walker .form { margin-top: 8px; }

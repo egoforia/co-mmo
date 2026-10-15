@@ -15,3 +15,4 @@ export * from './content.ts';
 export * from './workshop.ts';
 export * from './walk-rig.ts';
 export * from './walk.ts';
+export * from './sounds.ts';

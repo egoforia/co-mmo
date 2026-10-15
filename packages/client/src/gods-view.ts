@@ -123,9 +123,11 @@ interface AiSettings {
     fallback: { provider: string; model: string } | null;
     compiler?: { provider: string; model: string } | null;
     image: { provider: string; model: string };
+    sound: { effects: { provider: string; model: string }; music: { provider: string; model: string } };
   };
   providers: { id: string; keySet: boolean; keyName: string | null; defaultModel: string }[];
   imageKeySet: boolean;
+  effectsKeySet: boolean;
 }
 
 interface UpdateStatus {
@@ -565,6 +567,8 @@ async function ai(): Promise<string> {
       <label>Fallback, if it fails<span><select name="fallbackProvider">${options(s.ai.fallback?.provider ?? '', true)}</select><input name="fallbackModel" value="${escapeHtml(s.ai.fallback?.model ?? '')}" placeholder="default model"></span></label>
       <label>Rule compiler<span><select name="compilerProvider">${options(s.ai.compiler?.provider ?? '', true).replace('>None<', '>Same as the God<')}</select><input name="compilerModel" value="${escapeHtml(s.ai.compiler?.model ?? '')}" placeholder="drafts scripts for Major wishes"></span></label>
       <label>Images for wishes<span><select name="imageProvider"><option value="gemini"${s.ai.image.provider === 'gemini' ? ' selected' : ''}>Google AI Studio${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.image.provider === 'none' ? ' selected' : ''}>None (placeholder art only)</option></select><input name="imageModel" value="${escapeHtml(s.ai.image.model)}"></span></label>
+      <label>Sound effects<span><select name="effectsProvider"><option value="elevenlabs"${s.ai.sound.effects.provider === 'elevenlabs' ? ' selected' : ''}>ElevenLabs${s.effectsKeySet ? '' : ' (no key: ELEVENLABS_API_KEY)'}</option><option value="none"${s.ai.sound.effects.provider === 'none' ? ' selected' : ''}>None (no sound effects)</option></select><input name="effectsModel" value="${escapeHtml(s.ai.sound.effects.model)}" placeholder="eleven_text_to_sound_v2"></span></label>
+      <label>Music<span><select name="musicProvider"><option value="gemini"${s.ai.sound.music.provider === 'gemini' ? ' selected' : ''}>Google Lyria${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.music.provider === 'none' ? ' selected' : ''}>None (no music)</option></select><input name="musicModel" value="${escapeHtml(s.ai.sound.music.model)}" placeholder="lyria-3-clip-preview"></span></label>
       <button type="submit">Save</button>
     </form>
     <p class="note">The offline God needs no key: it understands simple wishes and is always the last fallback. Keys live in the server's environment, never here.</p>
@@ -669,7 +673,7 @@ interface ArtJob {
   id: string;
   asset: string;
   label: string;
-  media: 'picture' | 'clip';
+  media: 'picture' | 'clip' | 'sound';
   source: 'start-up' | 'gods-view' | 'wish';
   status: 'queued' | 'waiting' | 'painting' | 'done' | 'failed' | 'skipped';
   estimateUsd: number;
@@ -712,11 +716,26 @@ interface ArtOverview {
   groups: { id: string; title: string; note?: string; items: ArtItem[] }[];
   walkers: WalkerView[];
   bodies: { id: string; name: string }[];
+  sounds: SoundItem[];
+  effectsModel: string | null;
+  musicModel: string | null;
+}
+
+interface SoundItem {
+  id: string;
+  name: string;
+  kind: 'effect' | 'music';
+  url?: string;
+  prompt: string;
+  estimateUsd: number;
+  makeable: boolean;
+  why?: string;
 }
 
 const DIRECTIONS = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']] as const;
 const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
 const STATUS: Record<ArtJob['status'], string> = { queued: 'In line', waiting: 'Waiting for a turn', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
+const MEDIA: Record<ArtJob['media'], string> = { picture: 'picture', clip: 'video clip', sound: 'sound' };
 const ASKED: Record<ArtJob['source'], string> = { 'start-up': 'start-up', 'gods-view': "God's View", wish: 'a wish' };
 let artBudget: Budget | null = null;
 
@@ -730,6 +749,9 @@ async function art(): Promise<string> {
     <h2>Walk animations</h2>
     <p class="note">One short clip per direction, made from a standing picture of each view. Directions already made are kept, so painting one again only pays for that one.</p>
     <div class="walkers">${o.walkers.map((w) => walkerHtml(w, o.bodies)).join('')}</div>
+    <h2>Sounds and music</h2>
+    <p class="note">Effects: ${o.effectsModel ? `<b>${escapeHtml(o.effectsModel)}</b>` : '<b class="bad">no service set</b> (AI models tab; ElevenLabs needs ELEVENLABS_API_KEY)'} · Music: ${o.musicModel ? `<b>${escapeHtml(o.musicModel)}</b>` : '<b class="bad">no service set</b> (AI models tab)'}. Each land has its own looping track. Making one again keeps the old file on the server.</p>
+    <div class="sounds">${o.sounds.map(soundHtml).join('')}</div>
     ${o.groups.map((g) => `
       <h2>${escapeHtml(g.title)}</h2>
       ${g.note ? `<p class="note">${escapeHtml(g.note)}</p>` : ''}
@@ -743,7 +765,7 @@ function artJobsHtml(jobs: ArtJob[], b: Budget): string {
   const row = (j: ArtJob) => `
     <tr class="${j.status}">
       <td>${when(j.endedAt ?? j.startedAt ?? j.queuedAt)}</td>
-      <td><b>${escapeHtml(j.label)}</b><br><small>${j.media === 'clip' ? 'video clip' : 'picture'} · asked by ${ASKED[j.source]}</small></td>
+      <td><b>${escapeHtml(j.label)}</b><br><small>${MEDIA[j.media]} · asked by ${ASKED[j.source]}</small></td>
       <td><span class="job ${j.status}">${STATUS[j.status]}</span>${j.reason ? `<br><small>${escapeHtml(j.reason)}</small>` : ''}</td>
       <td>${j.usd !== undefined ? usd(j.usd) : `about ${usd(j.estimateUsd)}`}</td>
     </tr>`;
@@ -777,6 +799,23 @@ function artItemHtml(item: ArtItem): string {
       </form>
     </details>` : item.why ? `<small>${escapeHtml(item.why)}</small>` : '';
   return `<figure class="art-item ${item.source}">${picture}<figcaption><b>${escapeHtml(item.name)}</b><br><small>${SOURCE[item.source]}</small>${form}</figcaption></figure>`;
+}
+
+function soundHtml(s: SoundItem): string {
+  const form = s.makeable ? `
+    <details><summary>Make again · about ${usd(s.estimateUsd)}</summary>
+      <form class="form art-sound" data-sound="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-usd="${s.estimateUsd}">
+        <label>Anything to change? (optional)<span><textarea name="note" rows="2" maxlength="1000" placeholder="${s.kind === 'music' ? 'slower, more flute' : 'softer, less metallic'}"></textarea></span></label>
+        <button type="submit">Make again</button>
+      </form>
+    </details>` : `<small>${escapeHtml(s.why ?? '')}</small>`;
+  return `
+    <div class="sound ${s.url ? '' : 'missing'}">
+      <b>${escapeHtml(s.name)}</b> <small>${s.kind === 'music' ? 'music' : 'effect'}${s.url ? '' : ' · not made yet'}</small>
+      ${s.url ? `<audio controls preload="none" src="${escapeHtml(s.url)}"${s.kind === 'music' ? ' loop' : ''}></audio>` : ''}
+      <details><summary>What the service is asked</summary><pre>${escapeHtml(s.prompt)}</pre></details>
+      ${form}
+    </div>`;
 }
 
 function walkStripHtml(strip: WalkStrip | undefined, label: string): string {
@@ -913,6 +952,7 @@ main.addEventListener('submit', async (e) => {
         fallback: f.fallbackProvider ? { provider: f.fallbackProvider, model: f.fallbackModel } : null,
         compiler: f.compilerProvider ? { provider: f.compilerProvider, model: f.compilerModel } : null,
         image: { provider: f.imageProvider, model: f.imageModel },
+        sound: { effects: { provider: f.effectsProvider, model: f.effectsModel }, music: { provider: f.musicProvider, model: f.musicModel } },
       });
       toast('Saved. The next prayer uses these models.');
     } else if (form.id === 'ai-test') {
@@ -925,6 +965,10 @@ main.addEventListener('submit', async (e) => {
     } else if (form.classList.contains('art-paint')) {
       if (!confirmSpend(`Paint "${form.dataset.name}" again`, Number(form.dataset.usd))) return;
       await api('art/paint', 'POST', { asset: form.dataset.asset, note: f.note ?? '' });
+      toast('Asked. Follow it under Painting now.');
+    } else if (form.classList.contains('art-sound')) {
+      if (!confirmSpend(`Make "${form.dataset.name}" again`, Number(form.dataset.usd))) return;
+      await api('art/sound', 'POST', { sound: form.dataset.sound, note: f.note ?? '' });
       toast('Asked. Follow it under Painting now.');
     } else if (form.classList.contains('art-walk')) {
       const directions = ['front', 'right', 'back', 'left'].filter((d) => f[`dir-${d}`] === 'on');
@@ -969,7 +1013,7 @@ main.addEventListener('change', (e) => {
   const select = e.target as HTMLSelectElement;
   const input = select.parentElement?.querySelector<HTMLInputElement>('input');
   const provider = aiState?.providers.find((p) => p.id === select.value);
-  if (input && provider && /Provider$/.test(select.name) && select.name !== 'imageProvider') input.value = provider.defaultModel;
+  if (input && provider && /Provider$/.test(select.name) && !['imageProvider', 'effectsProvider', 'musicProvider'].includes(select.name)) input.value = provider.defaultModel;
 });
 
 void boot();

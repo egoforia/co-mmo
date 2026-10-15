@@ -1,5 +1,6 @@
 import { ProviderError } from './assets/provider.ts';
 import type { ImageProvider } from './assets/provider.ts';
+import type { SoundProvider } from './assets/sound.ts';
 import type { VideoProvider } from './assets/video.ts';
 
 // Every picture and clip the server asks for takes a turn here, so the image
@@ -28,6 +29,9 @@ export const MODEL_LIMITS: [prefix: string, limit: RateLimit][] = [
   ['veo-', { perMinute: 2, atOnce: 1 }],
   ['gemini-', { perMinute: 10, atOnce: 2 }],
   ['imagen-', { perMinute: 10, atOnce: 2 }],
+  ['lyria-', { perMinute: 10, atOnce: 1 }],
+  // ElevenLabs' free and starter plans take a few requests at a time.
+  ['eleven_', { perMinute: 30, atOnce: 2 }],
 ];
 
 /** A model's limit, or undefined when it has none. */
@@ -229,6 +233,17 @@ export function queuedVideo(queue: PaintQueue, provider: VideoProvider): VideoPr
   return wrap();
 }
 
+/** A sound or music model whose requests take turns in the queue. */
+export function queuedSound(queue: PaintQueue, provider: SoundProvider): SoundProvider & Watchable<SoundProvider> {
+  const wrap = (watcher?: PaintTurnWatcher): SoundProvider & Watchable<SoundProvider> => ({
+    id: provider.id,
+    model: provider.model,
+    generate: (request) => queue.turn(provider.model, () => provider.generate(request), watcher),
+    watchedBy: (w) => wrap(w),
+  });
+  return wrap();
+}
+
 interface Watchable<P> {
   watchedBy(watcher: PaintTurnWatcher): P;
 }
@@ -237,7 +252,7 @@ interface Watchable<P> {
  * The same model, telling a painting-log job when it waits and starts, so
  * God's View shows a held-back request as waiting rather than painting.
  */
-export function watched<P extends ImageProvider | VideoProvider>(provider: P, watcher: PaintTurnWatcher | undefined): P {
+export function watched<P extends ImageProvider | VideoProvider | SoundProvider>(provider: P, watcher: PaintTurnWatcher | undefined): P {
   const watchable = provider as P & Partial<Watchable<P>>;
   return watcher && watchable.watchedBy ? watchable.watchedBy(watcher) : provider;
 }

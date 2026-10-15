@@ -119,6 +119,8 @@ export interface Settings {
     compiler?: ModelChoice | null;
     /** Paints wished things; 'none' keeps tinted placeholders. */
     image: { provider: 'gemini' | 'none'; model: string };
+    /** Makes sound effects and music (missing in older saves: see soundSettings). */
+    sound?: SoundSettings;
   };
   budget: {
     /** Monthly ceiling; above it wishes still work, with placeholder art. */
@@ -130,6 +132,21 @@ export interface Settings {
   builds?: BuildSettings;
   /** The Wish Workshop (missing in older saves). */
   workshop?: WorkshopSettings;
+}
+
+export interface SoundSettings {
+  /** Short sound effects; 'none' plays the game without them. */
+  effects: { provider: 'elevenlabs' | 'none'; model: string };
+  /** One looping track per land; 'none' plays the game without music. */
+  music: { provider: 'gemini' | 'none'; model: string };
+}
+
+/** The sound services in use: the saved choice, or whatever the server's keys allow. */
+export function soundSettings(settings: Settings, env: Record<string, string | undefined> = process.env): SoundSettings {
+  return settings.ai.sound ?? {
+    effects: env.ELEVENLABS_API_KEY ? { provider: 'elevenlabs', model: 'eleven_text_to_sound_v2' } : { provider: 'none', model: '' },
+    music: env.GEMINI_API_KEY ? { provider: 'gemini', model: 'lyria-3-clip-preview' } : { provider: 'none', model: '' },
+  };
 }
 
 export interface WorkshopSettings {
@@ -155,7 +172,7 @@ export const DEFAULT_BUILDS: BuildSettings = { agent: 'claude', dailyLimit: 3, u
 export interface SpendRecord {
   at: number;
   usd: number;
-  kind: 'chat' | 'image' | 'video' | 'build';
+  kind: 'chat' | 'image' | 'video' | 'sound' | 'build';
   provider: string;
   model: string;
   playerId: string | null;

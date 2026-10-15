@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ArtManifest, DraftView, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
+import type { ArtManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
@@ -10,6 +10,7 @@ import { RpgUi } from './rpg-ui.ts';
 import { KitUi } from './kit-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
+import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
 
 async function boot(): Promise<void> {
@@ -90,6 +91,12 @@ function play(token: string): void {
   let draft: DraftView | null = null;
   let party: PartyUi | null = null;
   let myId = '';
+  const sound = new GameSound();
+  soundControls(sound);
+  void sound.refresh(true);
+  let character: Character | null = null;
+  /** Wishes of yours already granted, so only a new one rings. */
+  const granted = new Set<string>();
   onContent(() => {
     scene?.refreshWishes();
     rpg?.refresh();
@@ -140,6 +147,8 @@ function play(token: string): void {
     switch (message.t) {
       case 'welcome':
         region = message.region.name;
+        character = message.character;
+        sound.music(message.region.def.biome);
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
@@ -154,6 +163,7 @@ function play(token: string): void {
         setHud(name, message.online, region);
         break;
       case 'chat':
+        if (message.channel === 'whisper' && message.from.id !== myId) sound.play('notify');
         chat?.add({
           kind: 'chat', channel: message.channel, from: message.from.name, text: message.text,
           ...(message.to ? { to: message.to.name, outgoing: message.from.id === myId } : {}),
@@ -163,6 +173,7 @@ function play(token: string): void {
         party?.show(message.party);
         break;
       case 'party-invite':
+        sound.play('notify');
         party?.invited(message);
         chat?.add({ kind: 'system', text: `${message.from.name} invites you to their party. Type /accept or /decline.` });
         break;
@@ -173,18 +184,27 @@ function play(token: string): void {
         chat?.add({ kind: 'system', text: message.text });
         break;
       case 'hit':
+        if (message.target === myId) sound.play('hurt');
+        else if (message.by === myId) sound.play(message.defeated ? 'defeat' : 'hit');
         scene?.onHit(message);
         break;
       case 'character':
+        if (character) {
+          const change = characterSound(character, message.character);
+          if (change) sound.play(change);
+        }
+        character = message.character;
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
         break;
       case 'god':
+        sound.play('god-speaks');
         prayer?.onGod(message);
         if (!prayer?.open) chat?.add({ kind: 'system', text: `✦ The God: ${message.say}` });
         break;
       case 'content':
+        if (grantedNow(message.entries, message.replace)) sound.play('wish-granted');
         updateContent(message.entries, message.replace);
         break;
       case 'draft':
@@ -196,6 +216,7 @@ function play(token: string): void {
         chat?.add({ kind: 'system', text: message.text });
         break;
       case 'dialogue':
+        sound.play('talk');
         rpg?.showDialogue(message);
         break;
       case 'cooldown':
@@ -205,6 +226,7 @@ function play(token: string): void {
         kit?.showTrade(message.trade);
         break;
       case 'trade-request':
+        sound.play('notify');
         kit?.tradeRequested(message);
         chat?.add({ kind: 'system', text: `${message.from.name} wants to trade with you.` });
         break;
@@ -212,6 +234,17 @@ function play(token: string): void {
         chat?.add({ kind: 'error', text: message.message });
         break;
     }
+  }
+
+  /** Whether one of your wishes was granted just now (the first list only says what was granted before). */
+  function grantedNow(entries: ContentEntry[], replace: boolean): boolean {
+    let now = false;
+    for (const e of entries) {
+      if (e.wisher.id !== myId || e.status !== 'granted' || granted.has(e.id)) continue;
+      granted.add(e.id);
+      if (!replace) now = true;
+    }
+    return now;
   }
 
   function start(welcome: WelcomeMessage, manifest: ArtManifest): void {
@@ -246,6 +279,7 @@ function play(token: string): void {
     rpg = new RpgUi(welcome.character, {
       attack: () => {
         connection.send({ t: 'attack' });
+        sound.play('swing');
         scene?.swing();
       },
       interact: () => connection.send({ t: 'interact' }),
@@ -258,7 +292,10 @@ function play(token: string): void {
       prayer: () => prayer?.toggle(true),
     });
     kit = new KitUi(welcome.character, {
-      ability: (ability) => connection.send({ t: 'ability', ability }),
+      ability: (ability) => {
+        connection.send({ t: 'ability', ability });
+        sound.play('spell');
+      },
       craft: (recipe) => connection.send({ t: 'craft', recipe }),
       shop: (action, npc, id, qty) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}) }),
       trade: (m) => connection.send(m),
@@ -289,6 +326,16 @@ function play(token: string): void {
       }
     });
   }
+}
+
+/** The sound for what changed on your character, if any: the biggest news wins. */
+function characterSound(before: Character, after: Character): SoundId | undefined {
+  if (after.level > before.level) return 'level-up';
+  if (after.favor > before.favor) return 'favor';
+  if (after.gold !== before.gold) return 'coin';
+  const count = (c: Character) => c.inventory.reduce((n, slot) => n + slot.qty, 0);
+  if (count(after) > count(before)) return 'pickup';
+  return undefined;
 }
 
 boot();

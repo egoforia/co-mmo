@@ -7,7 +7,7 @@ import { TICK_SECONDS, WishError, isClientMessage, upgradeCharacter, validateNam
 import { Auth, cleanEmail, type Mailer } from './auth.ts';
 import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
-import { Store, StoreError, type Account } from './store.ts';
+import { Store, StoreError, soundSettings, type Account } from './store.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
 import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
@@ -20,7 +20,10 @@ import { WalkPainter } from './walk-painter.ts';
 import { GeminiVideoProvider, type VideoProvider } from './assets/video.ts';
 import { ArtJobs } from './art-jobs.ts';
 import { ArtStudio } from './art-studio.ts';
-import { MemoryPaintQueue, queuedVideo, type PaintQueue } from './paint-queue.ts';
+import { MemoryPaintQueue, queuedSound, queuedVideo, type PaintQueue } from './paint-queue.ts';
+import { SoundMaker } from './sound-maker.ts';
+import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from './assets/sound.ts';
+import type { FinishedSound } from './assets/sound-finish.ts';
 import { FilePaintRequests } from './paint-requests.ts';
 
 export interface AppOptions {
@@ -54,6 +57,14 @@ export interface AppOptions {
   videoFrames?: (mp4: Buffer) => Promise<Buffer[]>;
   /** Turns at the image and video models; per-model rate limits unless a test says otherwise. */
   paintQueue?: PaintQueue;
+  /** Sound services: ElevenLabs and Lyria from the server's keys unless a test says otherwise. */
+  sound?: {
+    effects?: () => SoundProvider | undefined;
+    music?: () => SoundProvider | undefined;
+    finish?: { effect: (raw: Buffer) => Promise<FinishedSound>; music: (raw: Buffer) => Promise<FinishedSound> };
+    /** Make missing sounds at start-up (on whenever shipped art is given). */
+    start?: boolean;
+  };
 }
 
 export interface App {
@@ -77,6 +88,7 @@ const MIME: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.mp3': 'audio/mpeg',
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
@@ -131,10 +143,35 @@ export function createApp(options: AppOptions): App {
     spendVideo: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'video', provider: provider.id, model: provider.model, playerId: null }),
     ...(options.videoFrames ? { toFrames: options.videoFrames } : {}),
   });
+  // Sound effects from ElevenLabs and music from Google's Lyria, as chosen in God's View.
+  const sound = () => soundSettings(store.settings, env);
+  const effects = options.sound?.effects ?? (() => {
+    const s = sound().effects;
+    return s.provider === 'elevenlabs' && env.ELEVENLABS_API_KEY ? new ElevenLabsSoundProvider(env.ELEVENLABS_API_KEY, s.model) : undefined;
+  });
+  const music = options.sound?.music ?? (() => {
+    const s = sound().music;
+    return s.provider === 'gemini' && env.GEMINI_API_KEY ? new LyriaMusicProvider(env.GEMINI_API_KEY, s.model) : undefined;
+  });
+  const queued = (make: () => SoundProvider | undefined) => () => {
+    const provider = make();
+    return provider && queuedSound(paintQueue, provider);
+  };
+  const sounds = new SoundMaker({
+    effects: queued(effects),
+    music: queued(music),
+    overBudget: () => wishes.budget().over,
+    spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'sound', provider: provider.id, model: provider.model, playerId: null }),
+    artDir: options.wishes.artDir,
+    jobs: artJobs,
+    ...(options.sound?.finish ? { finish: options.sound.finish } : {}),
+  });
   // Buildings first: a building without its picture matters more than a stiff walk.
   if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
+  // Sounds use other services, so they are made alongside.
+  if (options.sound?.start ?? Boolean(options.shippedArt)) void sounds.start();
   const artStudio = new ArtStudio({
-    store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video,
+    store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests,
   });
   // Paintings a restart cut short are asked for again, behind start-up painting.
@@ -270,6 +307,8 @@ export function createApp(options: AppOptions): App {
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
     if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
+    // Sound effects and each land's music, made here.
+    if (path === '/api/sounds' && req.method === 'GET') return json(res, 200, await sounds.manifest());
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
     const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
@@ -282,6 +321,8 @@ export function createApp(options: AppOptions): App {
     if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
     const redone = path.match(/^\/wished-art\/redone\/([\w-]+\.png)$/);
     if (redone && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'redone', redone[1]!), res);
+    const soundFile = path.match(/^\/wished-art\/sounds\/([\w-]+\.mp3)$/);
+    if (soundFile && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'sounds', soundFile[1]!), res);
     const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
     if (kit && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'biomes', kit[1]!), res);
 
@@ -440,6 +481,8 @@ export function createApp(options: AppOptions): App {
       await Promise.allSettled([...wishes.drafts]);
       await buildingPainter.job;
       await walkPainter.job;
+      await sounds.job;
+      await Promise.allSettled([...sounds.pending]);
       await artStudio.idle();
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();

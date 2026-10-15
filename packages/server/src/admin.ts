@@ -7,7 +7,7 @@ import { knownVideoModels, videoUsd } from './assets/video.ts';
 import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, DEFAULT_WORKSHOP, soundSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type Store } from './store.ts';
+import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
 import { ArtRequestError, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
@@ -234,7 +234,7 @@ export async function handleAdmin(
   if (route === 'ai' && method === 'GET') {
     if (ownerOnly()) return true;
     return json(res, 200, {
-      ai: { ...store.settings.ai, video: videoSettings(store.settings, ctx.env), sound: soundSettings(store.settings, ctx.env) },
+      ai: { ...store.settings.ai, video: videoSettings(store.settings, ctx.env), sound: soundSettings(store.settings, ctx.env), styleCheck: styleCheckSettings(store.settings) },
       providers: PROVIDERS.map((id) => ({
         id,
         keySet: id === 'offline' || Boolean(ctx.env[KEY_ENV[id as Exclude<ProviderId, 'offline'>]]),
@@ -280,7 +280,8 @@ export async function handleAdmin(
       : vid.provider === 'gemini' ? { provider: 'gemini', model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
       : { provider: 'none', model: '' };
     const sound = soundChoice(body?.sound, soundSettings(store.settings, ctx.env));
-    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image, video, sound } });
+    const styleCheck = styleCheckChoice(body?.styleCheck, styleCheckSettings(store.settings));
+    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image, video, sound, styleCheck } });
     return json(res, 200, { ok: true }), true;
   }
 
@@ -458,6 +459,15 @@ function modelChoice(raw: unknown): ModelChoice | null {
   const provider = r.provider as ProviderId;
   const model = typeof r.model === 'string' && r.model.trim() ? r.model.trim().slice(0, 80) : DEFAULT_MODELS[provider];
   return { provider, model };
+}
+
+/** The style check as God's View set it; anything missing keeps what was set. */
+function styleCheckChoice(raw: unknown, current: StyleCheckSettings): StyleCheckSettings {
+  const r = raw as Record<string, unknown> | undefined;
+  if (!r || typeof r !== 'object') return current;
+  const judge = r.judge === null ? null : r.judge === undefined ? current.judge : modelChoice(r.judge) ?? current.judge;
+  const retries = typeof r.retries === 'number' && Number.isFinite(r.retries) ? Math.max(0, Math.min(2, Math.round(r.retries))) : current.retries;
+  return { judge, retries, reuse: typeof r.reuse === 'boolean' ? r.reuse : current.reuse };
 }
 
 /** The company that bills each provider id, as the Owner sees it on their invoices. */

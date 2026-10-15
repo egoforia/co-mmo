@@ -123,7 +123,7 @@ export async function paintWish(
   artDir: string,
   /** A Steward's or the Owner's own wording, in place of the built prompt. */
   prompt?: string,
-): Promise<{ request: ArtRequest; image: GeneratedImage }> {
+): Promise<PaintedWish> {
   const built = artRequest(def, biome);
   const request = prompt ? { ...built, prompt } : built;
   const references: GeneratedImage[] = [];
@@ -137,11 +137,27 @@ export async function paintWish(
     }
   }
   const raw = await provider.generate({ prompt: request.prompt, references });
-  const { png } = await removeKeyBackground(await sharp(raw.data).png().toBuffer());
+  const { png, clean } = await removeKeyBackground(await sharp(raw.data).png().toBuffer());
   const fitted = await fitToBox(png, request.box);
   await mkdir(artDir, { recursive: true });
   await writeFile(resolve(artDir, `${id}.png`), fitted);
-  return { request: { ...request, references: sent }, image: raw };
+  return { request: { ...request, references: sent }, image: raw, cutOut: png, plainBackground: clean, fitted, referenceImages: references.map((r) => r.data) };
+}
+
+/** A painted wish picture, with what the style check looks at. */
+export interface PaintedWish {
+  /** What was sent, with only the references that were found. */
+  request: ArtRequest;
+  /** The provider's image as it came. */
+  image: GeneratedImage;
+  /** At full size with the background cut away, before fitting. */
+  cutOut: Buffer;
+  /** Whether the background was one plain key colour. */
+  plainBackground: boolean;
+  /** The game-sized picture written to disk. */
+  fitted: Buffer;
+  /** The anchors that were sent. */
+  referenceImages: Buffer[];
 }
 
 /** Trims the transparent margin, scales to fit and pads with the feet on the bottom row. */

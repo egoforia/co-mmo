@@ -36,7 +36,9 @@ import {
 import { createChatModel, type ChatModel, type ChatResult, type ChatTurn } from './ai/chat.ts';
 import { GeminiImageProvider, REFERENCE_NOTE } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
-import { artRequest, estimateImageUsd, imageUsd, paintWish } from './assets/wish-art.ts';
+import { artRequest, estimateImageUsd, imageUsd, paintWish, type PaintedWish } from './assets/wish-art.ts';
+import { confirmReuse, lookLine, reuseCandidates, type LibraryPicture } from './assets/reuse.ts';
+import { freeChecks, judgePicture, retryNote } from './assets/style-check.ts';
 import type { ArtJobHandle, ArtJobs } from './art-jobs.ts';
 import { queuedImages, watched, type PaintQueue } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
@@ -45,7 +47,7 @@ import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, askWorkshopGod, type GodReply, type PrayerContext, type WorkshopContext, type WorkshopReply } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import { testRule } from './rule-test.ts';
-import { DEFAULT_DAILY_USD, type ArtUse, type ArtPromptRecord, type ContentRecord, type Settings, type Store } from './store.ts';
+import { DEFAULT_DAILY_USD, styleCheckSettings, type ArtUse, type ArtPromptRecord, type ContentRecord, type Settings, type Store } from './store.ts';
 import type { World } from './world.ts';
 
 /** Turns of conversation the God remembers per player. */
@@ -118,6 +120,8 @@ export interface WishOptions {
   compilerModel?: (settings: Settings) => ChatModel[];
   /** Overrides image provider creation (tests). */
   imageProvider?: (settings: Settings, use?: ArtUse) => ImageProvider | undefined;
+  /** Overrides the style check's judge (tests); with chatModel set and no judge, only the free checks run. */
+  judgeModel?: (settings: Settings) => ChatModel | undefined;
 }
 
 /**
@@ -769,21 +773,16 @@ export class Wishes {
           break;
         }
         let painted;
-        handle?.start();
         try {
-          painted = await paintWish(picture.id, picture.def, biome, watched(provider, handle), this.options.anchorDir, this.options.artDir, prompts[picture.id]);
-        } catch (err) {
-          console.error(`Painting ${picture.id} failed:`, (err as Error).message);
-          handle?.fail((err as Error).message);
+          painted = await this.paintPicture(picture, biome, provider, handle, record.wisher.id, { prompt: prompts[picture.id], reuse: !force });
+        } catch {
           continue;
         }
-        const usd = imageUsd(provider.model, painted.image);
-        handle?.done(usd);
-        this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
+        const { usd } = painted;
         const current = this.store.contentById(record.id);
         if (!current) return;
         const url = `/wished-art/${picture.id}.png?v=${this.now().toString(36)}`;
-        const artPrompts = { ...current.artPrompts, [picture.id]: this.promptRecord(provider, painted.request.prompt, painted.request.references, usd) };
+        const artPrompts = { ...current.artPrompts, [picture.id]: painted.record };
         const updated = this.store.updateContent(record.id, def.kind === 'rule'
           ? { itemArt: { ...current.itemArt, [picture.id]: url }, usd: current.usd + usd, artPrompts }
           : { art: url, usd: current.usd + usd, artPrompts });
@@ -867,23 +866,17 @@ export class Wishes {
     for (const [i, picture] of pictures.entries()) {
       if (!force && this.budget().paused) return skipAll();
       let painted;
-      pictureJobs[i]?.start();
       try {
-        painted = await paintWish(picture.id, picture.def, def.biome, watched(provider, pictureJobs[i]), this.options.anchorDir, this.options.artDir, prompts[picture.id]);
-      } catch (err) {
-        console.error(`Painting ${picture.id} failed:`, (err as Error).message);
-        pictureJobs[i]?.fail((err as Error).message);
+        painted = await this.paintPicture(picture, def.biome, provider, pictureJobs[i], record.wisher.id, { prompt: prompts[picture.id], reuse: !force });
+      } catch {
         continue;
       }
-      const usd = imageUsd(provider.model, painted.image);
-      pictureJobs[i]?.done(usd);
-      this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
       const current = this.store.contentById(record.id);
       if (!current) return;
       update({
         itemArt: { ...current.itemArt, [picture.id]: `/wished-art/${picture.id}.png?v=${this.now().toString(36)}` },
-        usd: current.usd + usd,
-        artPrompts: { ...current.artPrompts, [picture.id]: this.promptRecord(provider, painted.request.prompt, painted.request.references, usd) },
+        usd: current.usd + painted.usd,
+        artPrompts: { ...current.artPrompts, [picture.id]: painted.record },
       });
     }
   }
@@ -903,6 +896,106 @@ export class Wishes {
   /** Adds a wished picture to the painting log as waiting its turn. */
   private queueArt(id: string, name: string, force: boolean, provider: ImageProvider): ArtJobHandle | undefined {
     return this.artJobs?.add(id, name, 'picture', force ? 'gods-view' : 'wish', estimateImageUsd(provider.model));
+  }
+
+  /**
+   * Paints one wished picture (design doc, Art style). A new wish first looks
+   * for an existing picture that fits and shows it for nearly nothing. Else it
+   * is painted and style-checked, and painted again with what went wrong, up
+   * to the retries set in God's View. A picture that never passes keeps its
+   * best attempt and the Stewards are told. Spending is recorded as it
+   * happens; a painting that fails outright throws after logging.
+   */
+  private async paintPicture(
+    picture: { id: string; def: PicturedWish },
+    biome: BiomeId,
+    provider: ImageProvider,
+    handle: ArtJobHandle | undefined,
+    wisherId: string,
+    { prompt, reuse }: { prompt?: string; reuse: boolean },
+  ): Promise<{ record: ArtPromptRecord; usd: number }> {
+    const settings = styleCheckSettings(this.store.settings);
+    const judge = this.judgeModel();
+    const file = resolve(this.options.artDir, `${picture.id}.png`);
+    let usd = 0;
+    const spendChat = (cost: number) => {
+      usd += cost;
+      if (cost > 0 && judge) this.store.recordSpend({ at: this.now(), usd: cost, kind: 'chat', provider: judge.provider, model: judge.model, playerId: wisherId });
+    };
+    handle?.start();
+    if (reuse && settings.reuse && judge && !prompt) {
+      const found = await confirmReuse(judge, picture.def, reuseCandidates(picture.def, this.library(picture.id)));
+      spendChat(found.usd);
+      if (found.picture) {
+        const copied = await mkdir(this.options.artDir, { recursive: true }).then(() => copyFile(resolve(this.options.artDir, `${found.picture!.id}.png`), file)).then(() => true, () => false);
+        if (copied) {
+          handle?.done(usd);
+          const base = this.promptRecord(provider, artRequest(picture.def, biome).prompt, [], usd);
+          return { record: { ...base, provider: judge.provider, model: judge.model, reused: { from: found.picture.id, name: found.picture.def.name } }, usd };
+        }
+      }
+    }
+    const asked = prompt ?? artRequest(picture.def, biome).prompt;
+    let best: { painted: PaintedWish; rank: number; why?: string } | undefined;
+    let last: PaintedWish | undefined;
+    let tries = 0;
+    for (let attempt = 0; attempt <= settings.retries; attempt++) {
+      if (attempt > 0 && this.budget().paused) break;
+      try {
+        last = await paintWish(picture.id, picture.def, biome, watched(provider, handle), this.options.anchorDir, this.options.artDir, best?.why ? `${asked}\n${retryNote(best.why)}` : prompt);
+      } catch (err) {
+        console.error(`Painting ${picture.id} failed:`, (err as Error).message);
+        if (best) break;
+        handle?.fail((err as Error).message);
+        throw err;
+      }
+      tries++;
+      const cost = imageUsd(provider.model, last.image);
+      usd += cost;
+      this.store.recordSpend({ at: this.now(), usd: cost, kind: 'image', provider: provider.id, model: provider.model, playerId: wisherId });
+      let verdict = await freeChecks(last.cutOut, last.plainBackground);
+      const free = verdict.pass;
+      if (free && judge) {
+        const judged = await judgePicture(judge, last.fitted, last.referenceImages, lookLine(picture.def));
+        spendChat(judged.usd);
+        verdict = judged;
+      }
+      // A picture the judge passed beats one that only passed the free checks, which beats a broken one; ties go to the later try.
+      const rank = verdict.pass ? 2 : free ? 1 : 0;
+      if (!best || rank >= best.rank) best = { painted: last, rank, ...(verdict.why ? { why: verdict.why } : {}) };
+      if (verdict.pass) break;
+    }
+    const kept = best!;
+    if (kept.painted !== last) await writeFile(file, kept.painted.fitted);
+    handle?.done(usd);
+    const pass = kept.rank === 2 || (kept.rank === 1 && !judge);
+    if (!pass) this.notifyStewards(`The style check was not happy with the picture of ${picture.def.name} after ${tries} tries: ${kept.why}. It is shown for now; the Art tab in God's View can paint it again.`);
+    const record = this.promptRecord(provider, asked, kept.painted.request.references, usd);
+    return { record: { ...record, check: { pass, ...(pass ? {} : { why: kept.why }), tries } }, usd };
+  }
+
+  /** Painted wished pictures a new one might borrow, leaving out the picture being painted. */
+  private library(except: string): LibraryPicture[] {
+    const pictures: LibraryPicture[] = [];
+    for (const record of this.store.content) {
+      const def = record.definition;
+      if (record.status !== 'granted' || !def || def.kind === 'recipe') continue;
+      const all: LibraryPicture[] = def.kind === 'region' ? regionPictures(record.id, def)
+        : def.kind === 'rule' ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
+        : [{ id: record.id, def }];
+      // Reused pictures are copies: borrowing the original keeps one source.
+      for (const p of all) if (p.id !== except && hasArt(record, p.id) && !record.artPrompts?.[p.id]?.reused) pictures.push(p);
+    }
+    return pictures;
+  }
+
+  /** The style check's judge: its own model, else the God's, when it has a key; none runs the free checks only. */
+  judgeModel(settings = this.store.settings): ChatModel | undefined {
+    if (this.options.judgeModel) return this.options.judgeModel(settings);
+    if (this.options.chatModel) return undefined;
+    const choice = styleCheckSettings(settings).judge ?? settings.ai.god;
+    if (choice.provider === 'offline') return undefined;
+    return createChatModel(choice.provider, choice.model, this.env, () => this.offline);
   }
 
   /** What one painting asked of the image model, as God's View shows it. */

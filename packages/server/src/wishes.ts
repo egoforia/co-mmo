@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   BIOMES,
@@ -18,6 +18,7 @@ import {
   removeContent,
   ruleItemId,
   validateDefinition,
+  validateLookWish,
   wishProgress,
   wishArtKey,
   type BiomeId,
@@ -35,7 +36,7 @@ import {
 import { createChatModel, type ChatModel, type ChatResult, type ChatTurn } from './ai/chat.ts';
 import { GeminiImageProvider, REFERENCE_NOTE } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
-import { imageUsd, paintWish } from './assets/wish-art.ts';
+import { artRequest, imageUsd, paintWish } from './assets/wish-art.ts';
 import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, askWorkshopGod, type GodReply, type PrayerContext, type WorkshopContext, type WorkshopReply } from './god.ts';
@@ -62,6 +63,25 @@ interface OpenCard {
   edge?: { side: Side; cell: { x: number; y: number } };
   conversation: ChatTurn[];
   usd: number;
+  /** Shaped in the Wish Workshop: its subcategory and brief. */
+  shaped?: ContentRecord['shaped'];
+  /** A sample painted in the Workshop, used as the final art if its prompt still matches. */
+  sample?: PaintedSample;
+}
+
+/** A sample picture painted for a Workshop draft, and how it was asked for. */
+export interface PaintedSample {
+  /** The player whose sample it is (the file is samples/<player id>.png in the art directory). */
+  playerId: string;
+  record: ArtPromptRecord;
+}
+
+/** What the Workshop adds to a wish it offers. */
+export interface ShapedWish {
+  shaped: NonNullable<ContentRecord['shaped']>;
+  sample?: PaintedSample;
+  /** A new look for the player: allowed only from the Workshop, never from a prayer. */
+  look?: boolean;
 }
 
 export interface WishOptions {
@@ -242,14 +262,19 @@ export class Wishes {
     regionName: string,
     conversation: ChatTurn[],
     usd: number,
+    extra?: ShapedWish,
   ): { card?: WishCard; note?: string } | undefined {
     if (wish.tier === 'refused') return undefined;
     if (wish.appoint) return this.appointCard(playerId, wish.appoint, conversation);
-    const made = this.cardFor(playerId, wish, regionName);
+    const made = this.cardFor(playerId, wish, regionName, extra?.look);
     if (!made || 'note' in made) return made;
     for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
     const card: WishCard = { id: randomBytes(6).toString('hex'), ...made.card };
-    this.cards.set(card.id, { card, playerId, definition: made.definition, conversation: [...conversation], usd, ...(made.edge ? { edge: made.edge } : {}) });
+    this.cards.set(card.id, {
+      card, playerId, definition: made.definition, conversation: [...conversation], usd,
+      ...(made.edge ? { edge: made.edge } : {}),
+      ...(extra ? { shaped: extra.shaped, ...(extra.sample ? { sample: extra.sample } : {}) } : {}),
+    });
     return { card };
   }
 
@@ -262,13 +287,15 @@ export class Wishes {
     playerId: string,
     wish: Pick<NonNullable<GodReply['wish']>, 'tier' | 'title' | 'summary' | 'definition'>,
     regionName: string,
+    look = false,
   ): { card: Omit<WishCard, 'id'>; definition?: WishDefinition; edge?: OpenCard['edge'] } | { note: string } | undefined {
     if (wish.tier === 'refused') return undefined;
     let definition: WishDefinition | undefined;
     let tier = wish.tier;
     if (tier === 'minor' || tier === 'moderate') {
       try {
-        definition = validateDefinition(wish.definition);
+        const raw = wish.definition as { kind?: unknown } | undefined;
+        definition = look && raw?.kind === 'player' ? validateLookWish(raw) : validateDefinition(raw);
       } catch (err) {
         if (!(err instanceof WishError)) throw err;
         // Not buildable as content: a person will have to build it.
@@ -292,6 +319,7 @@ export class Wishes {
       cost: definition && instant ? wishCost(definition) : WISH_COSTS[tier],
       where: !instant
         ? tier === 'engine' ? 'Set before the Owner for the next game update' : 'Set before the Stewards for review'
+        : definition?.kind === 'player' ? 'Your look, painted for everyone to see'
         : definition?.kind === 'item' ? 'In your bag'
           : definition?.kind === 'ability' ? 'A scroll in your bag'
             : definition?.kind === 'recipe' ? 'Known to everyone, in the crafting book (C)'
@@ -311,10 +339,11 @@ export class Wishes {
     wish: Pick<NonNullable<GodReply['wish']>, 'tier' | 'title' | 'summary' | 'definition'>,
     conversation: ChatTurn[],
     say: string,
+    extra?: ShapedWish,
   ): string | undefined {
     const region = this.world.regionOf(player.id);
     if (!region) return undefined;
-    const made = this.makeCard(player.id, wish, region.def.name, conversation, 0);
+    const made = this.makeCard(player.id, wish, region.def.name, conversation, 0, extra);
     this.world.sendTo(player.id, { t: 'god', say: made?.note ?? say, ...(made?.card ? { card: made.card } : {}) });
     return made?.card?.id;
   }
@@ -359,8 +388,48 @@ export class Wishes {
     this.say(player.id, def.kind === 'item' || def.kind === 'ability' ? 'It is done. Look in your bag.'
       : def.kind === 'recipe' ? 'It is done. Anyone can make it now: press C to open the crafting book.'
         : def.kind === 'region' ? `It is done. A road now leads ${open.edge!.side} to ${def.name}.`
-          : 'It is done. Look around you.');
-    this.paint(record);
+          : def.kind === 'player' ? 'It is done. Everyone will see your new look.'
+            : 'It is done. Look around you.');
+    if (!open.sample) this.paint(record);
+    else void this.track(this.useSample(record, open.sample).then((used) => (used ? undefined : this.paint(record))));
+  }
+
+  /**
+   * Uses a Workshop sample as a granted wish's art when it was painted from
+   * exactly the prompt the wish would be painted from now. True if used.
+   */
+  private async useSample(record: ContentRecord, sample: PaintedSample): Promise<boolean> {
+    const def = record.definition;
+    if (!def || def.kind === 'recipe' || def.kind === 'region' || def.kind === 'rule') return false;
+    const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
+    if (artRequest(def, biome).prompt !== sample.record.prompt) return false;
+    try {
+      await copyFile(resolve(this.options.artDir, 'samples', `${sample.playerId}.png`), resolve(this.options.artDir, `${record.id}.png`));
+    } catch {
+      return false;
+    }
+    const current = this.store.contentById(record.id);
+    if (!current) return true;
+    const updated = this.store.updateContent(record.id, {
+      art: `/wished-art/${record.id}.png?v=${this.now().toString(36)}`,
+      usd: current.usd + sample.record.usd,
+      artPrompts: { [record.id]: { ...sample.record, at: this.now() } },
+    });
+    if (updated) this.broadcast(updated);
+    return true;
+  }
+
+  /**
+   * Paints a Workshop sample of a draft's picture for a player, recorded as
+   * sample spend. The Workshop checks the switch, the budget and the Favor.
+   */
+  async paintSample(playerId: string, def: PicturedWish, biome: BiomeId): Promise<PaintedSample | undefined> {
+    const provider = this.imageProvider();
+    if (!provider) return undefined;
+    const painted = await paintWish(playerId, def, biome, provider, this.options.anchorDir, resolve(this.options.artDir, 'samples'));
+    const usd = imageUsd(provider.model, painted.image);
+    this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId, sample: true });
+    return { playerId, record: this.promptRecord(provider, painted.request.prompt, painted.request.references, usd) };
   }
 
   private record(
@@ -385,6 +454,7 @@ export class Wishes {
       ...(placements ? { placements } : {}),
       ...(cell ? { cell } : {}),
       conversation: open.conversation,
+      ...(open.shaped ? { shaped: open.shaped } : {}),
       usd: open.usd,
     };
     this.store.addContent(record);
@@ -397,7 +467,8 @@ export class Wishes {
 
   /** The player's look wish, while it stands. */
   lookOf(playerId: string): ContentRecord | undefined {
-    return this.store.content.find((c) => c.definition?.kind === 'player' && c.wisher.id === playerId && c.status === 'granted');
+    // A look changed in the Workshop replaces the older one; rolling it back brings the older one back.
+    return [...this.store.content].reverse().find((c) => c.definition?.kind === 'player' && c.wisher.id === playerId && c.status === 'granted');
   }
 
   /**
@@ -554,7 +625,7 @@ export class Wishes {
       for (let attempt = 0; attempt < 2; attempt++) {
         const result = await compileRule(
           this.compilerModels(),
-          { title: record.title, summary: record.summary, conversation: record.conversation, ...(note || previous ? { revise: { note: note ?? '', previous, problems } } : {}) },
+          { title: record.title, summary: record.summary, conversation: record.conversation, ...(record.shaped?.brief ? { brief: record.shaped.brief } : {}), ...(note || previous ? { revise: { note: note ?? '', previous, problems } } : {}) },
           (r, model) => {
             usd += r.usd;
             this.store.recordSpend({ at: this.now(), usd: r.usd, kind: 'chat', provider: model.provider, model: model.model, playerId: record.wisher.id });
@@ -650,7 +721,7 @@ export class Wishes {
    * Paints a granted wish's art when a provider is set and the budget allows:
    * one picture for an item, creature or person, one per item for a rule.
    */
-  paint(record: ContentRecord, force = false): Promise<void> | undefined {
+  paint(record: ContentRecord, force = false, prompts: Record<string, string> = {}): Promise<void> | undefined {
     if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe') return undefined;
     const provider = this.imageProvider();
     if (!provider) return undefined;
@@ -666,7 +737,7 @@ export class Wishes {
         if (!force && this.budget().over) break;
         let painted;
         try {
-          painted = await paintWish(picture.id, picture.def, biome, provider, this.options.anchorDir, this.options.artDir);
+          painted = await paintWish(picture.id, picture.def, biome, provider, this.options.anchorDir, this.options.artDir, prompts[picture.id]);
         } catch (err) {
           console.error(`Painting ${picture.id} failed:`, (err as Error).message);
           continue;
@@ -858,7 +929,7 @@ export class Wishes {
 
 /** A content record without what only God's View sees (the conversation, cost, image prompts, and a rule's script). */
 export function publicEntry(record: ContentRecord): ContentEntry {
-  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, build: _b, artPrompts: _p, ...rest } = record;
+  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, build: _b, artPrompts: _p, shaped: _s, ...rest } = record;
   const entry: ContentEntry = { ...rest, progress: wishProgress(record) };
   if (entry.definition?.kind === 'rule') {
     const { script: _s, ...definition } = entry.definition;

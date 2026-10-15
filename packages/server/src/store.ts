@@ -62,6 +62,8 @@ export interface Invite {
 export interface ContentRecord extends ContentEntry {
   /** The conversation that led to the wish. */
   conversation: ChatTurn[];
+  /** A wish shaped in the Wish Workshop: its subcategory and, for wishes people build, its brief ("Label: answer" lines). */
+  shaped?: { category: string; brief?: string[] };
   /** Real money it cost (chat and art), US dollars. */
   usd: number;
   /** For Major wishes: the God drafting a scripted rule for it. */
@@ -126,7 +128,18 @@ export interface Settings {
   };
   /** Building Engine wishes as code changes (missing in older saves). */
   builds?: BuildSettings;
+  /** The Wish Workshop (missing in older saves). */
+  workshop?: WorkshopSettings;
 }
+
+export interface WorkshopSettings {
+  /** Players may pay Favor to have a sample painted before sending a wish. Off unless the Owner turns it on. */
+  samples: boolean;
+  /** Favor one sample costs. */
+  sampleFavor: number;
+}
+
+export const DEFAULT_WORKSHOP: WorkshopSettings = { samples: false, sampleFavor: 1 };
 
 export interface BuildSettings {
   /** Who writes the change: Claude Code in GitHub Actions, or a person working from the issue. */
@@ -150,6 +163,8 @@ export interface SpendRecord {
   ref?: string;
   /** A guess waiting for the real figure (a build before its run reports its cost). */
   estimate?: boolean;
+  /** A picture painted as a Wish Workshop sample. */
+  sample?: boolean;
 }
 
 interface Data {

@@ -13,7 +13,9 @@ import {
   contentTier,
   creatureFromWish,
   itemFromWish,
+  MAX_LOOK_LENGTH,
   validateDefinition,
+  validateLookWish,
   wishCost,
   type WishCard,
   type WishDefinition,
@@ -111,6 +113,8 @@ export const WISH_CATEGORIES: WishCategory[] = [
           { key: 'drops', label: 'What it may drop', kind: 'items', optional: true }, ...LOOK] },
       { id: 'person', name: 'Person', blurb: 'Someone who stands beside you and talks.', tier: 'moderate', makes: 'npc',
         fields: [NAME, DESCRIPTION, { key: 'greeting', label: 'What they say when spoken to', kind: 'long', length: 280 }, ...LOOK] },
+      { id: 'look', name: 'Your look', blurb: 'Change how you look. Your new picture replaces the old one.', tier: 'minor', makes: 'player',
+        fields: [{ key: 'description', label: 'How you look, in your own words', kind: 'long', length: MAX_LOOK_LENGTH, hint: 'a tall fox-eared ranger in a moss-green cloak' }, ...LOOK] },
     ],
   },
   {
@@ -176,6 +180,23 @@ export interface WishDraft {
   chat?: WorkshopLine[];
   /** Quick answers the God offered to its last question. */
   choices?: string[];
+  /** A sample painted for this draft (when the Owner allows samples); used as the final art if the prompt is unchanged. */
+  sample?: DraftSample;
+}
+
+/** A picture painted for a draft before it was sent. */
+export interface DraftSample {
+  /** The exact prompt it was painted from. */
+  prompt: string;
+  /** Where the picture is served. */
+  url: string;
+  at: number;
+  /** How it was painted, kept for the wish's record if the sample becomes its art. */
+  references: string[];
+  note?: string;
+  provider: string;
+  model: string;
+  usd: number;
 }
 
 /** One line of the Workshop talk. */
@@ -209,25 +230,27 @@ export const MAX_FIELD_LENGTH = 400;
 /**
  * Reads a draft into what it would make and what is still missing. Never
  * throws: a definition the game would refuse becomes a problem to show.
+ * `who` is the player's name, which a new look is painted under.
  */
-export function checkDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>): CheckedDraft {
+export function checkDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>, who = 'You'): CheckedDraft {
   const sub = wishSubcategory(draft.category, draft.sub);
-  const checked = readDraft(draft);
+  const checked = readDraft(draft, who);
   return sub ? { ...checked, makes: sub.makes } : checked;
 }
 
-function readDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>): CheckedDraft {
+function readDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>, who: string): CheckedDraft {
   const sub = wishSubcategory(draft.category, draft.sub);
   if (!sub) return { tier: 'refused', title: '', summary: '', problems: ['Pick what kind of wish this is.'] };
   const f = draft.fields;
   const problems: string[] = [];
   for (const field of sub.fields) {
-    if (field.optional || field.kind === 'number' || field.kind === 'color' || field.kind === 'items') continue;
+    // A colour is asked for, not assumed: the picker's starting colour would otherwise override the player's words.
+    if (field.optional || field.kind === 'number' || field.kind === 'items') continue;
     // A region may bring a new creature instead of one that exists.
     if (field.kind === 'creature' && str(f.creatureName)) continue;
     if (field.kind === 'materials' ? !materials(f[field.key]).length : !str(f[field.key])) problems.push(missing(field));
   }
-  const title = str(f.name) || sub.name;
+  const title = sub.makes === 'player' ? 'Your new look' : str(f.name) || sub.name;
   if (sub.makes === 'rule' || sub.makes === 'engine') {
     const lines = sub.fields.filter((x) => x.key !== 'name' && str(f[x.key])).map((x) => `${x.label}: ${str(f[x.key])}`);
     const first = sub.fields.find((x) => x.key !== 'name' && str(f[x.key]));
@@ -236,8 +259,9 @@ function readDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>): Check
   }
   if (problems.length) return { tier: sub.tier, title, summary: str(f.description), problems };
   try {
-    const definition = validateDefinition(rawDefinition(sub, f));
-    return { tier: contentTier(definition), title: definition.name, summary: definition.description || definition.name, definition, problems };
+    const raw = rawDefinition(sub, f);
+    const definition = sub.makes === 'player' ? validateLookWish({ ...raw, name: who }) : validateDefinition(raw);
+    return { tier: contentTier(definition), title: definition.kind === 'player' ? title : definition.name, summary: definition.description || definition.name, definition, problems };
   } catch (err) {
     if (!(err instanceof WishError)) throw err;
     return { tier: sub.tier, title, summary: str(f.description), problems: [err.message] };
@@ -260,6 +284,7 @@ function rawDefinition(sub: WishSubcategory, f: DraftFields): Record<string, unk
     case 'ability': return { ...base, effect: str(f.effect), look };
     case 'creature': return { ...base, behavior: str(f.behavior), level: num(f.level), count: num(f.count), drops: list(f.drops), look };
     case 'npc': return { ...base, greeting: str(f.greeting), look };
+    case 'player': return { ...base, look };
     case 'region': {
       const creature = str(f.creatureName)
         ? { name: str(f.creatureName), description: `${str(f.creatureName)}, living in ${str(f.name)}.`, behavior: 'wander', look: { hook: str(f.creatureHook) } }
@@ -275,6 +300,7 @@ function missing(field: WorkshopField): string {
   if (field.key === 'name') return 'Give it a name.';
   if (field.key === 'hook') return 'Describe the one feature you would know it by.';
   if (field.key === 'body') return 'Describe its body and shape.';
+  if (field.kind === 'color') return 'Choose its main colour.';
   if (field.kind === 'choice' || field.kind === 'item' || field.kind === 'creature') return `Choose ${lower(field.label)}.`;
   if (field.kind === 'materials') return 'Add at least one thing the recipe takes.';
   return `Fill in "${field.label}".`;
@@ -378,6 +404,7 @@ export function draftFromDefinition(def: WishDefinition): { category: string; su
     case 'ability': return pick('know', 'ability', { effect: def.effect });
     case 'creature': return pick('living', 'creature', { behavior: def.behavior, level: def.level, count: def.count, drops: def.drops });
     case 'npc': return pick('living', 'person', { greeting: def.greeting });
+    case 'player': return pick('living', 'look', {});
     case 'region': {
       const first = def.creatures[0];
       const creature = first?.existing !== undefined ? { creature: first.existing } : { creatureName: first?.name, creatureHook: first?.look?.hook };
@@ -413,6 +440,20 @@ export interface ArtPreview {
   pictures: PicturePreview[];
   /** The player's own words, to tell apart from the Style Bible's in the prompt. */
   mine: string[];
+  /** Painting a sample now, when the Owner has switched samples on. */
+  sample?: SamplePreview;
+}
+
+/** Whether a sample can be painted for this draft, and the one already painted. */
+export interface SamplePreview {
+  /** Favor a sample costs. */
+  favor: number;
+  /** Why a sample cannot be painted now, in plain words. */
+  blocked?: string;
+  /** The sample painted for this draft, if any. */
+  url?: string;
+  /** Whether the painted sample still matches the prompt, so it becomes the final art. */
+  current?: boolean;
 }
 
 /** Everything the Workshop shows about a draft before it is sent. Worked out by the server. */

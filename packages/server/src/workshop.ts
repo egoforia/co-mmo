@@ -16,6 +16,9 @@ import {
   worldLines,
   type ArtPreview,
   type BiomeId,
+  type CheckedDraft,
+  type PicturedWish,
+  type SamplePreview,
   type DraftView,
   type PicturePreview,
   type PlayerInfo,
@@ -29,8 +32,8 @@ import { FILL_REQUEST } from './god.ts';
 import { buildPrompt } from './assets/style.ts';
 import { readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd } from './assets/wish-art.ts';
-import type { Store } from './store.ts';
-import type { Wishes } from './wishes.ts';
+import { DEFAULT_WORKSHOP, type Store } from './store.ts';
+import type { PaintedSample, Wishes } from './wishes.ts';
 import type { World } from './world.ts';
 
 export interface WorkshopOptions {
@@ -49,6 +52,8 @@ export interface WorkshopOptions {
  */
 export class Workshop {
   private readonly now: () => number;
+  /** Players whose sample is being painted, so one click paints one picture. */
+  private readonly sampling = new Set<string>();
 
   constructor(
     private readonly store: Store,
@@ -174,21 +179,95 @@ export class Workshop {
   /** Turns the draft into the usual wish card, offered in the Prayer window. */
   async send(player: PlayerInfo): Promise<void> {
     const draft = this.store.draftOf(player.id, this.now());
-    if (!draft) return;
-    const checked = checkDraft(draft);
+    const category = draft && WISH_CATEGORIES.find((c) => c.id === draft.category);
+    const sub = draft && wishSubcategory(draft.category, draft.sub);
+    if (!draft || !category || !sub) return;
+    const checked = checkDraft(draft, player.name);
     if (checked.problems.length) {
       this.world.sendTo(player.id, { t: 'god', say: `Not yet: ${checked.problems[0]}` });
       return;
     }
-    // The brief (or a plain account of the shaped wish) is what reviewers and the rule compiler read.
-    const words = checked.brief?.join('\n') ?? `Shaped in the Wish Workshop: ${checked.title}. ${checked.summary}`;
+    // Reviewers and the rule compiler read the brief first, then the talk that shaped it.
+    const talk: ChatTurn[] = (draft.chat ?? []).map((l) => ({ role: l.who === 'you' ? 'user' : 'assistant', content: l.text }));
+    const conversation = talk.length ? talk : [{ role: 'user' as const, content: `Shaped in the Wish Workshop: ${checked.title}. ${checked.summary}` }];
     const cardId = this.wishes.offer(
       player,
       { tier: checked.tier, title: checked.title, summary: checked.summary, definition: checked.definition },
-      [{ role: 'user', content: words }],
+      conversation,
       'Here is your wish, as you shaped it. Grant it when you are ready.',
+      {
+        shaped: { category: `${category.name}: ${sub.name}`, ...(checked.brief ? { brief: checked.brief } : {}) },
+        ...(draft.sample ? { sample: paintedSample(player.id, draft.sample) } : {}),
+        look: sub.makes === 'player',
+      },
     );
     if (cardId) this.store.saveDraft(player.id, { ...draft, card: cardId });
+  }
+
+  /**
+   * Paints one sample of the draft's picture for Favor, when the Owner has
+   * switched samples on and the month's spending is under the warning line.
+   * A sample painted from the prompt the wish is sent with becomes its art.
+   */
+  async sample(player: PlayerInfo): Promise<void> {
+    const id = player.id;
+    const draft = this.store.draftOf(id, this.now());
+    if (!draft || this.sampling.has(id)) return;
+    const checked = checkDraft(draft, player.name);
+    const region = this.world.regionOf(id);
+    const biome = (region?.def.biome ?? 'sanctum') as BiomeId;
+    const blocked = this.sampleBlocked(id, draft, checked);
+    const def = checked.definition;
+    const favor = this.sampleFavor();
+    if (blocked || !def || !region || !pictured(def)) return this.tell(id, blocked ?? 'There is nothing to paint yet.');
+
+    this.sampling.add(id);
+    region.updateCharacter(id, (c) => { c.favor -= favor; });
+    let painted: PaintedSample | undefined;
+    try {
+      painted = await this.wishes.paintSample(id, def, biome);
+    } catch (err) {
+      console.error('Sample failed:', (err as Error).message);
+    } finally {
+      this.sampling.delete(id);
+    }
+    if (!painted) {
+      this.world.regionOf(id)?.updateCharacter(id, (c) => { c.favor += favor; });
+      return this.tell(id, 'The paint would not take. Your Favor is returned; try again later.');
+    }
+    const latest = this.store.draftOf(id, this.now()) ?? draft;
+    const { prompt, references, note, provider, model, usd } = painted.record;
+    this.store.saveDraft(id, {
+      ...latest,
+      sample: { prompt, references, ...(note ? { note } : {}), provider, model, usd, url: `/wished-art/samples/${id}.png?v=${this.now().toString(36)}`, at: this.now() },
+      chat: addLine(latest.chat, { who: 'god', text: 'Here is a sample. If you send the wish as it is, this picture becomes its art.' }),
+      at: this.now(),
+    });
+    await this.greet(id, true);
+  }
+
+  /** Why a sample cannot be painted for this draft now, in plain words; undefined when it can. */
+  private sampleBlocked(playerId: string, draft: WishDraft, checked: CheckedDraft): string | undefined {
+    const settings = this.store.settings.workshop ?? DEFAULT_WORKSHOP;
+    if (!settings.samples) return 'Samples are switched off in this world.';
+    if (draft.sample) return 'Each draft gets one sample, and this one has had it.';
+    if (checked.problems.length || !checked.definition) return 'Finish the wish first, then a sample can be painted.';
+    if (!this.wishes.imageProvider()) return 'No image model is chosen in God\'s View, so nothing can be painted.';
+    if (this.wishes.budget().warn) return 'This month\'s art budget is nearly spent, so samples are paused.';
+    const favor = this.world.regionOf(playerId)?.character(playerId)?.favor ?? 0;
+    if (favor < settings.sampleFavor) return `A sample costs ${settings.sampleFavor} Favor, and you hold ${favor}.`;
+    return undefined;
+  }
+
+  private sampleFavor(): number {
+    return (this.store.settings.workshop ?? DEFAULT_WORKSHOP).sampleFavor;
+  }
+
+  /** A line from the God in the Workshop talk. */
+  private async tell(playerId: string, text: string): Promise<void> {
+    const draft = this.store.draftOf(playerId, this.now());
+    if (draft) this.store.saveDraft(playerId, { ...draft, chat: addLine(draft.chat, { who: 'god', text }), at: this.now() });
+    await this.greet(playerId, true);
   }
 
   /** Throws the draft away. */
@@ -199,12 +278,12 @@ export class Workshop {
 
   /** The draft as the Workshop shows it: what is missing, the card, the numbers and the art. */
   async view(playerId: string, draft: WishDraft): Promise<DraftView> {
-    const checked = checkDraft(draft);
+    const checked = checkDraft(draft, this.store.accountById(playerId)?.name);
     const region = this.world.regionOf(playerId);
     const problems = [...checked.problems];
     // An unfinished draft has no definition yet, so its card shows only the tier and price it will have.
     const made = region && !checked.problems.length && checked.tier !== 'refused'
-      ? this.wishes.cardFor(playerId, { tier: checked.tier, title: checked.title, summary: checked.summary, definition: checked.definition }, region.def.name)
+      ? this.wishes.cardFor(playerId, { tier: checked.tier, title: checked.title, summary: checked.summary, definition: checked.definition }, region.def.name, checked.makes === 'player')
       : undefined;
     if (made && 'note' in made) problems.push(made.note);
     const instant = checked.tier === 'minor' || checked.tier === 'moderate';
@@ -218,13 +297,13 @@ export class Workshop {
         card,
         world: checked.definition ? worldLines(checked.definition) : [],
         ...(checked.brief ? { plan: reviewPlan(checked.tier) } : {}),
-        ...(checked.definition && checked.definition.kind !== 'recipe' ? { art: await this.art(checked.definition, biome, draft) } : {}),
+        ...(checked.definition && checked.definition.kind !== 'recipe' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
       },
     };
   }
 
   /** What the image model would be asked for, built by the same code that paints. */
-  private async art(def: Exclude<WishDefinition, { kind: 'recipe' }>, biome: BiomeId, draft: WishDraft): Promise<ArtPreview> {
+  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
     const provider = this.wishes.imageProvider();
     const pictures: PicturePreview[] = [];
     const picture = (label: string, prompt: string, wanted: string[], withRaw = false): void => {
@@ -257,8 +336,33 @@ export class Workshop {
       placeholder: placeholderArt(def),
       pictures,
       mine: playerWords(draft),
+      ...this.samplePreview(playerId, draft, checked, pictured(def) ? pictures[0]?.prompt : undefined),
     };
   }
+
+  /** The sample part of the art preview: shown when samples are on, or when one was painted. */
+  private samplePreview(playerId: string, draft: WishDraft, checked: CheckedDraft, prompt: string | undefined): { sample?: SamplePreview } {
+    const on = (this.store.settings.workshop ?? DEFAULT_WORKSHOP).samples;
+    if (!prompt || (!on && !draft.sample)) return {};
+    const blocked = this.sampleBlocked(playerId, draft, checked);
+    return {
+      sample: {
+        favor: this.sampleFavor(),
+        ...(blocked ? { blocked } : {}),
+        ...(draft.sample ? { url: draft.sample.url, current: draft.sample.prompt === prompt } : {}),
+      },
+    };
+  }
+}
+
+/** Wishes with one picture of their own, which a sample can stand in for. */
+function pictured(def: WishDefinition): def is PicturedWish {
+  return def.kind !== 'recipe' && def.kind !== 'region';
+}
+
+/** A draft's sample as the wish's record will keep it. */
+function paintedSample(playerId: string, s: NonNullable<WishDraft['sample']>): PaintedSample {
+  return { playerId, record: { prompt: s.prompt, references: s.references, ...(s.note ? { note: s.note } : {}), provider: s.provider, model: s.model, at: s.at, usd: s.usd } };
 }
 
 /** Adds a line to a draft's talk, keeping the latest few. */

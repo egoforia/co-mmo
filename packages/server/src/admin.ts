@@ -4,7 +4,7 @@ import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import { DEFAULT_BUILDS, type Account, type BuildSettings, type ModelChoice, type Settings, type Store } from './store.ts';
+import { DEFAULT_BUILDS, DEFAULT_WORKSHOP, type Account, type BuildSettings, type ModelChoice, type Settings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
@@ -143,9 +143,15 @@ export async function handleAdmin(
       if (done) wishes.changed(id!);
       return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_live', message: 'This rule is not running.' }), true;
     }
-    if (ownerOnly()) return true;
-    const job = wishes.paint(record, true);
-    return json(res, job ? 202 : 409, job ? { ok: true } : { error: 'no_image_provider', message: 'Set an image provider with a key first.' }), true;
+    // A Steward or the Owner may reword one picture's prompt before it is painted again; a plain repaint is the Owner's.
+    const body = await ctx.readJson(req);
+    const prompt = typeof body?.prompt === 'string' ? body.prompt.trim().slice(0, 4000) : '';
+    const picture = typeof body?.picture === 'string' ? body.picture : '';
+    if (!prompt && ownerOnly()) return true;
+    if (prompt && !record.artPrompts?.[picture]) return json(res, 409, { error: 'no_prompt', message: 'Only a picture that was painted before can be repainted with new words.' }), true;
+    if (prompt && record.definition?.kind === 'region') return json(res, 409, { error: 'region', message: 'A region\'s pictures are repainted together, with the Owner\'s Repaint.' }), true;
+    const job = wishes.paint(record, owner, prompt ? { [picture]: prompt } : {});
+    return json(res, job ? 202 : 409, job ? { ok: true } : { error: 'no_image_provider', message: 'Nothing can be painted now: no image model is set, or this month\'s budget is spent.' }), true;
   }
 
   if (route === 'players' && method === 'GET') {
@@ -298,13 +304,14 @@ export async function handleAdmin(
     const byProvider: Record<string, number> = {};
     let estimatedUsd = 0;
     for (const s of spend) {
-      byKind[s.kind] = (byKind[s.kind] ?? 0) + s.usd;
+      const kind = s.sample ? 'sample' : s.kind;
+      byKind[kind] = (byKind[kind] ?? 0) + s.usd;
       byProvider[providerName(s.provider)] = (byProvider[providerName(s.provider)] ?? 0) + s.usd;
       if (s.estimate) estimatedUsd += s.usd;
       const name = s.playerId ? store.accountById(s.playerId)?.name ?? 'unknown' : 'system';
       byPlayer[name] = (byPlayer[name] ?? 0) + s.usd;
     }
-    return json(res, 200, { ...wishes.budget(), byKind, byPlayer, byProvider, estimatedUsd, calls: spend.length }), true;
+    return json(res, 200, { ...wishes.budget(), byKind, byPlayer, byProvider, estimatedUsd, calls: spend.length, workshop: store.settings.workshop ?? DEFAULT_WORKSHOP }), true;
   }
 
   if (route === 'budget' && method === 'PUT') {
@@ -315,7 +322,12 @@ export async function handleAdmin(
     if (!(monthlyUsd >= 0 && monthlyUsd <= 10_000) || !(warnUsd >= 0 && warnUsd <= monthlyUsd)) {
       return json(res, 400, { error: 'bad_budget', message: 'The warning must be between 0 and the ceiling.' }), true;
     }
-    store.updateSettings({ ...store.settings, budget: { monthlyUsd, warnUsd } });
+    // Workshop samples are paid painting, so their switch sits with the budget.
+    const sampleFavor = Number(body?.sampleFavor ?? DEFAULT_WORKSHOP.sampleFavor);
+    if (!(Number.isInteger(sampleFavor) && sampleFavor >= 0 && sampleFavor <= 10)) {
+      return json(res, 400, { error: 'bad_sample_favor', message: 'A sample costs 0 to 10 Favor.' }), true;
+    }
+    store.updateSettings({ ...store.settings, budget: { monthlyUsd, warnUsd }, workshop: { samples: body?.samples === true, sampleFavor } });
     return json(res, 200, { ok: true }), true;
   }
 

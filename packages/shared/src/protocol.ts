@@ -72,7 +72,7 @@ export interface WishAnswerMessage {
  */
 export interface DraftMessage {
   t: 'draft';
-  action: 'start' | 'edit' | 'ask' | 'fill' | 'shape' | 'send' | 'drop';
+  action: 'start' | 'edit' | 'ask' | 'fill' | 'shape' | 'sample' | 'send' | 'drop';
   category?: string;
   sub?: string;
   fields?: Record<string, unknown>;
@@ -431,7 +431,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   }
   if (m.t === 'wish') return typeof m.card === 'string' && m.card.length <= 64 && typeof m.confirm === 'boolean';
   if (m.t === 'draft') {
-    return ['start', 'edit', 'ask', 'fill', 'shape', 'send', 'drop'].includes(m.action as string) &&
+    return ['start', 'edit', 'ask', 'fill', 'shape', 'sample', 'send', 'drop'].includes(m.action as string) &&
       (m.category === undefined || isId(m.category)) && (m.sub === undefined || isId(m.sub)) &&
       (m.say === undefined || (typeof m.say === 'string' && m.say.length <= 400)) &&
       (m.carry === undefined || typeof m.carry === 'boolean') &&

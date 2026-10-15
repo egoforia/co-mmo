@@ -342,7 +342,7 @@ export const MAX_RECIPE_RESULT = 3;
 
 /** The tier a buildable wish costs: things for your bag are minor, the rest moderate. */
 export function contentTier(def: WishDefinition): 'minor' | 'moderate' {
-  return def.kind === 'item' || def.kind === 'recipe' ? 'minor' : 'moderate';
+  return def.kind === 'item' || def.kind === 'recipe' || def.kind === 'player' ? 'minor' : 'moderate';
 }
 
 /** Favor a buildable wish costs: its tier's price, more for a whole region. */
@@ -742,6 +742,19 @@ export function lookFromWords(name: string, raw: string): PlayerLookWish {
     description,
     look: { hook: first.slice(0, 120) || description.slice(0, 120), body: `An adventurer: ${description}`.slice(0, 200), color, mood: 'warm and adventurous' },
   };
+}
+
+/**
+ * Checks a new look a player shaped for themself in the Wish Workshop. Kept
+ * apart from validateDefinition so a prayer can never make anyone's look.
+ */
+export function validateLookWish(raw: unknown): PlayerLookWish {
+  const d = (raw ?? {}) as Record<string, unknown>;
+  const name = text(d.name, 40);
+  const description = text(d.description, MAX_LOOK_LENGTH);
+  if (!name) throw new WishError('It needs a name.');
+  if (description.length < 3) throw new WishError('Tell the God a little about how you look.');
+  return { kind: 'player', name, description, look: cleanLook(d.look) };
 }
 
 function cleanLook(raw: unknown): WishLook {

@@ -42,8 +42,13 @@ inside the Workshop: a draft-aware God turn (`workshopPrompt` in
 locks on every field the player wrote, "Ask the God to fill the rest", and
 "Shape this wish" under the God's latest reply in Talk. Workshop turns share
 the prayer limits and budget; the offline God fills drafts from its word
-rules. Next: structured briefs for big wishes, the optional paid sample, and
-changing your look.
+rules. Step 4 adds "Your look" under Living things (Minor, 2 Favor; the newest
+look wins, and rolling it back restores the one before), structured briefs
+that Stewards, the rule drafter and the coding agent's issue read before the
+conversation, an optional paid sample (off by default; switched on in God's
+View Budget, one per draft, paid in Favor, paused past the warning line, and
+used as the final art when the wish is sent unchanged), and rewording a
+picture's prompt before repainting, for Stewards and the Owner.
 
 ## Milestones
 

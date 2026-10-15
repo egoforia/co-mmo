@@ -13,6 +13,8 @@ export interface CompileRequest {
   summary: string;
   /** The God conversation that led to the wish. */
   conversation: ChatTurn[];
+  /** For a wish shaped in the Wish Workshop: the player's brief, one "Label: answer" line each. */
+  brief?: string[];
   /** A Steward's note, and the draft it is about, when asking for a revision. */
   revise?: { note: string; previous?: RuleWish; problems?: string[] };
 }
@@ -59,7 +61,8 @@ export function compilerPrompt(): string {
 
 function userMessage(req: CompileRequest): string {
   const talk = req.conversation.map((t) => `${t.role === 'user' ? 'Player' : 'God'}: ${t.content}`).join('\n');
-  const lines = [`Wish: ${req.title}`, `Summary: ${req.summary}`, '', 'The conversation:', talk || '(none)'];
+  const brief = req.brief?.length ? ['', "The player's brief, written in the Wish Workshop:", ...req.brief] : [];
+  const lines = [`Wish: ${req.title}`, `Summary: ${req.summary}`, ...brief, '', 'The conversation:', talk || '(none)'];
   if (req.revise) {
     lines.push('', 'A Steward asks for a revision of the draft below.', `Steward's note: ${req.revise.note || '(none)'}`);
     if (req.revise.problems?.length) lines.push(`Problems found in the test run: ${req.revise.problems.join(' | ')}`);

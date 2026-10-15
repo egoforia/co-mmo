@@ -37,6 +37,8 @@ interface Budget {
   /** The part of the spending that is still a guess (builds whose run has not reported its cost). */
   estimatedUsd?: number;
   calls?: number;
+  /** Wish Workshop samples: paid pictures before a wish is sent. */
+  workshop?: { samples: boolean; sampleFavor: number };
 }
 
 interface Entry {
@@ -61,6 +63,8 @@ interface Entry {
   kitArt?: Record<string, string>;
   itemArt?: Record<string, string>;
   conversation?: { role: string; content: string }[];
+  /** Shaped in the Wish Workshop: its subcategory and, for wishes people build, the player's brief. */
+  shaped?: { category: string; brief?: string[] };
   /** What was asked of the image model, by picture id. */
   artPrompts?: Record<string, { prompt: string; references: string[]; note?: string; provider: string; model: string; at: number; usd?: number }>;
   usd?: number;
@@ -304,6 +308,7 @@ async function wishes(): Promise<string> {
       <article class="wish pending">
         <header><span class="tier ${e.tier}">${e.tier}</span><b>${escapeHtml(e.title)}</b>${progress(e)}<small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
         <p>${escapeHtml(e.summary)}</p>
+        ${brief(e)}
         ${conversation(e)}
         ${e.tier === 'major' ? draft(e) : ''}
         ${e.build?.state === 'closed' ? `<p class="note warn">You closed its pull request${e.build.message ? `: ${escapeHtml(e.build.message)}` : '.'} Approve to build it again.</p>` : ''}
@@ -414,6 +419,13 @@ function progressLegend(): string {
   ].map(([state, text]) => `<span class="progress ${state}">${PROGRESS_ICON[state as keyof typeof PROGRESS_ICON]} ${text}</span>`).join(' ');
 }
 
+/** A Workshop wish's brief, read before the conversation. */
+function brief(e: Entry): string {
+  if (!e.shaped) return '';
+  const lines = e.shaped.brief?.length ? `<ul class="brief">${e.shaped.brief.map((l) => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : '';
+  return `<p class="note">Shaped in the Wish Workshop · ${escapeHtml(e.shaped.category)}</p>${lines}`;
+}
+
 function conversation(e: Entry): string {
   if (!e.conversation?.length) return '';
   const lines = e.conversation.map((t) => `<li class="${t.role}"><b>${t.role === 'user' ? escapeHtml(e.wisher.name) : 'God'}:</b> ${escapeHtml(t.content)}</li>`).join('');
@@ -428,7 +440,12 @@ function artPrompts(e: Entry): string {
   const body = prompts.map(([id, p]) => `
     ${several ? `<p><b>${escapeHtml(id)}</b></p>` : ''}
     <p><small>${escapeHtml(p.model)} (${escapeHtml(p.provider)}) · ${when(p.at)}${p.usd !== undefined ? ` · ${usd(p.usd)}` : ''} · references: ${p.references.length ? p.references.map(escapeHtml).join(', ') : 'none'}</small></p>
-    <pre>${p.note ? `${escapeHtml(p.note)}\n` : ''}${escapeHtml(p.prompt)}</pre>`).join('');
+    <pre>${p.note ? `${escapeHtml(p.note)}\n` : ''}${escapeHtml(p.prompt)}</pre>
+    ${e.status === 'granted' && e.definition?.kind !== 'region' ? `
+    <form class="form repaint" data-repaint="${e.id}" data-picture="${escapeHtml(id)}">
+      <label>Reword it, then paint again<span><textarea name="prompt" rows="6" maxlength="4000">${escapeHtml(p.prompt)}</textarea></span></label>
+      <button type="submit" class="quiet">Repaint with these words</button>
+    </form>` : ''}`).join('');
   return `<details><summary>${several ? `Image prompts (${prompts.length})` : 'Image prompt'}</summary>${body}</details>`;
 }
 
@@ -587,6 +604,8 @@ async function budget(): Promise<string> {
     <form id="budget-form" class="form">
       <label>Monthly ceiling (USD)<span><input name="monthlyUsd" type="number" min="0" step="1" value="${b.monthlyUsd}"></span></label>
       <label>Warn at (USD)<span><input name="warnUsd" type="number" min="0" step="1" value="${b.warnUsd}"></span></label>
+      <label class="check"><input type="checkbox" name="samples"${b.workshop?.samples ? ' checked' : ''}> Paint a sample in Wish Workshop previews (one per draft, paid by the player in Favor; paused past the warning line)</label>
+      <label>Favor a sample costs<span><input name="sampleFavor" type="number" min="0" max="10" step="1" value="${b.workshop?.sampleFavor ?? 1}"></span></label>
       <button type="submit">Save</button>
     </form>`;
 }
@@ -724,8 +743,11 @@ main.addEventListener('submit', async (e) => {
       const r = await api<{ provider: string; model: string; reply: unknown; usd: number }>('ai/test', 'POST', { prompt: f.prompt });
       out.textContent = `${label(r.provider)} · ${r.model} · ${usd(r.usd)}\n\n${JSON.stringify(r.reply, null, 2)}`;
       return;
+    } else if (form.dataset.repaint) {
+      await api(`content/${form.dataset.repaint}/paint`, 'POST', { picture: form.dataset.picture, prompt: f.prompt ?? '' });
+      toast('Painting with your words. The new art appears in a few seconds.');
     } else if (form.id === 'budget-form') {
-      await api('budget', 'PUT', { monthlyUsd: Number(f.monthlyUsd), warnUsd: Number(f.warnUsd) });
+      await api('budget', 'PUT', { monthlyUsd: Number(f.monthlyUsd), warnUsd: Number(f.warnUsd), samples: f.samples === 'on', sampleFavor: Number(f.sampleFavor) });
       toast('Budget saved.');
     }
     (document.activeElement as HTMLElement | null)?.blur();

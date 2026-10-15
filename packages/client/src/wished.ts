@@ -33,10 +33,12 @@ export function contentEntries(): ContentEntry[] {
 
 /** The art key of a player's own look, once they have described it. */
 export function lookArt(playerId: string): string | undefined {
+  // A newer look (changed in the Wish Workshop) replaces an older one.
+  let newest: ContentEntry | undefined;
   for (const e of entries.values()) {
-    if (e.status === 'granted' && e.definition?.kind === 'player' && e.wisher.id === playerId) return wishArtKey(e.id);
+    if (e.status === 'granted' && e.definition?.kind === 'player' && e.wisher.id === playerId && (!newest || e.at > newest.at)) newest = e;
   }
-  return undefined;
+  return newest ? wishArtKey(newest.id) : undefined;
 }
 
 /**

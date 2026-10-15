@@ -136,6 +136,8 @@ export async function paintKitAsset(
   provider: ImageProvider,
   anchorDir: string,
   outDir: string,
+  /** A repaint's own size, and the Owner's added words or whole reworded prompt. */
+  extra: { box?: { width: number; height: number }; note?: string; prompt?: string } = {},
 ): Promise<{ image: GeneratedImage; entry: ArtEntry; prompt: string; references: string[] }> {
   const references: GeneratedImage[] = [];
   const sent: string[] = [];
@@ -148,17 +150,17 @@ export async function paintKitAsset(
       break;
     }
   }
-  const prompt = buildPrompt(asset);
+  const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${buildPrompt(asset)}\nAlso: ${extra.note.trim()}` : buildPrompt(asset);
   const image = await provider.generate({ prompt, references });
   // The untouched picture is kept, so it can be processed again for free.
   await mkdir(resolve(outDir, 'raw'), { recursive: true });
   await writeFile(resolve(outDir, 'raw', `${asset.id}.png`), await sharp(image.data).png().toBuffer());
-  const entry = await processKitAsset(asset, image.data, outDir);
+  const entry = await processKitAsset(asset, image.data, outDir, extra.box);
   return { image, entry, prompt, references: sent };
 }
 
 /** Turns a provider image into the game copy of a kit piece. */
-export async function processKitAsset(asset: KitAsset, raw: Buffer, outDir: string): Promise<ArtEntry> {
+export async function processKitAsset(asset: KitAsset, raw: Buffer, outDir: string, fit = box(asset)): Promise<ArtEntry> {
   const png = await sharp(raw).png().toBuffer();
   let out: Buffer;
   let size: { width: number; height: number };
@@ -168,7 +170,7 @@ export async function processKitAsset(asset: KitAsset, raw: Buffer, outDir: stri
     size = { width: 128, height: 128 };
   } else {
     const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
-    size = box(asset);
+    size = fit;
     out = await fitToBox(keyed, size);
   }
   await mkdir(outDir, { recursive: true });

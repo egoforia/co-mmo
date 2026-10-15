@@ -18,6 +18,8 @@ import { Builds, type BuildOptions } from './builds.ts';
 import { BuildingPainter, type BuildingPainterOptions } from './building-painter.ts';
 import { WalkPainter } from './walk-painter.ts';
 import { GeminiVideoProvider, type VideoProvider } from './assets/video.ts';
+import { ArtJobs } from './art-jobs.ts';
+import { ArtStudio } from './art-studio.ts';
 
 export interface AppOptions {
   store: Store;
@@ -58,6 +60,8 @@ export interface App {
   reports: Reports;
   builds: Builds;
   auth: Auth;
+  /** God's View's Art tab: the painting log and repaint requests. */
+  art: ArtStudio;
   close(): Promise<void>;
 }
 
@@ -94,6 +98,8 @@ export function createApp(options: AppOptions): App {
   const wishes = new Wishes(store, world, rules, options.wishes);
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now });
   wishes.restore();
+  const artJobs = new ArtJobs();
+  wishes.artJobs = artJobs;
   const painterOptions: BuildingPainterOptions = {
     provider: () => wishes.imageProvider(),
     overBudget: () => wishes.budget().over,
@@ -101,17 +107,23 @@ export function createApp(options: AppOptions): App {
     anchorDir: options.wishes.anchorDir,
     artDir: options.wishes.artDir,
     shipped: async () => (options.shippedArt ? JSON.parse(await readFile(options.shippedArt, 'utf8')) : {}),
+    jobs: artJobs,
   };
   const buildingPainter = new BuildingPainter(painterOptions);
+  // Walks use Veo whenever the images come from Gemini, with the same key.
+  const video = options.videoProvider ?? (() => (wishes.imageProvider()?.id === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY) : undefined));
   const walkPainter = new WalkPainter({
     ...painterOptions,
-    // Walks use Veo whenever the images come from Gemini, with the same key.
-    video: options.videoProvider ?? (() => (wishes.imageProvider()?.id === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY) : undefined)),
+    video,
     spendVideo: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'video', provider: provider.id, model: provider.model, playerId: null }),
     ...(options.videoFrames ? { toFrames: options.videoFrames } : {}),
   });
   // Buildings first: a building without its picture matters more than a stiff walk.
   if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
+  const artStudio = new ArtStudio({
+    store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video,
+    anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped,
+  });
   const reports = new Reports(store, world);
   const builds = new Builds(store, {
     changed: (id) => wishes.changed(id),
@@ -234,11 +246,11 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env, json, readJson };
+    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
-    if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest() });
+    if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
     const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
@@ -249,6 +261,8 @@ export function createApp(options: AppOptions): App {
     if (sample && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'samples', `${sample[1]}.png`), res);
     const walk = path.match(/^\/wished-art\/walks\/([\w-]+\.png)$/);
     if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
+    const redone = path.match(/^\/wished-art\/redone\/([\w-]+\.png)$/);
+    if (redone && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'redone', redone[1]!), res);
     const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
     if (kit && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'biomes', kit[1]!), res);
 
@@ -392,6 +406,7 @@ export function createApp(options: AppOptions): App {
     reports,
     builds,
     auth,
+    art: artStudio,
     async close() {
       clearInterval(tickTimer);
       options.updater?.stop();
@@ -402,6 +417,7 @@ export function createApp(options: AppOptions): App {
       await Promise.allSettled([...wishes.drafts]);
       await buildingPainter.job;
       await walkPainter.job;
+      await artStudio.idle();
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();
       clearInterval(autosaveTimer);

@@ -36,7 +36,8 @@ import {
 import { createChatModel, type ChatModel, type ChatResult, type ChatTurn } from './ai/chat.ts';
 import { GeminiImageProvider, REFERENCE_NOTE } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
-import { artRequest, imageUsd, paintWish } from './assets/wish-art.ts';
+import { artRequest, estimateImageUsd, imageUsd, paintWish } from './assets/wish-art.ts';
+import type { ArtJobHandle, ArtJobs } from './art-jobs.ts';
 import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, askWorkshopGod, type GodReply, type PrayerContext, type WorkshopContext, type WorkshopReply } from './god.ts';
@@ -119,6 +120,8 @@ export class Wishes {
   private readonly now: () => number;
   /** Art being painted, so tests and shutdown can wait for it. */
   readonly painting = new Set<Promise<void>>();
+  /** The painting log God's View shows. */
+  artJobs?: ArtJobs;
   /** Told when a confirmed card became a wish (granted or sent for review), so its Workshop draft can go. */
   onCardUsed?: (playerId: string, cardId: string) => void;
 
@@ -721,28 +724,37 @@ export class Wishes {
    * Paints a granted wish's art when a provider is set and the budget allows:
    * one picture for an item, creature or person, one per item for a rule.
    */
-  paint(record: ContentRecord, force = false, prompts: Record<string, string> = {}): Promise<void> | undefined {
+  paint(record: ContentRecord, force = false, prompts: Record<string, string> = {}, only?: string): Promise<void> | undefined {
     if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe') return undefined;
     const provider = this.imageProvider();
     if (!provider) return undefined;
     if (!force && this.budget().over) return undefined;
     const def = record.definition;
-    if (def.kind === 'region') return this.track(this.paintRegion(record, def, provider, force));
+    if (def.kind === 'region') return this.track(this.paintRegion(record, def, provider, force, only, prompts));
     const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
     const pictures: { id: string; def: PicturedWish }[] = def.kind === 'rule'
       ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
       : [{ id: record.id, def }];
+    const chosen = pictures.filter((p) => !only || p.id === only);
+    const handles = chosen.map((p) => this.queueArt(p.id, p.def.name, force, provider));
     const job = (async () => {
-      for (const picture of pictures) {
-        if (!force && this.budget().over) break;
+      for (const [i, picture] of chosen.entries()) {
+        const handle = handles[i];
+        if (!force && this.budget().over) {
+          for (const left of handles.slice(i)) left?.skip("This month's budget is spent.");
+          break;
+        }
         let painted;
+        handle?.start();
         try {
           painted = await paintWish(picture.id, picture.def, biome, provider, this.options.anchorDir, this.options.artDir, prompts[picture.id]);
         } catch (err) {
           console.error(`Painting ${picture.id} failed:`, (err as Error).message);
+          handle?.fail((err as Error).message);
           continue;
         }
         const usd = imageUsd(provider.model, painted.image);
+        handle?.done(usd);
         this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
         const current = this.store.contentById(record.id);
         if (!current) return;
@@ -763,7 +775,7 @@ export class Wishes {
    * wished (ground, water, two trees and a rock, about five pictures, kept
    * for every later region of the biome), then its new creatures and person.
    */
-  private async paintRegion(record: ContentRecord, def: RegionWish, provider: ImageProvider, force: boolean): Promise<void> {
+  private async paintRegion(record: ContentRecord, def: RegionWish, provider: ImageProvider, force: boolean, only?: string, prompts: Record<string, string> = {}): Promise<void> {
     const dir = resolve(this.options.artDir, 'biomes');
     const kit = await readKitManifest(dir);
     const kitUrl = (id: string) => kit[id] && `/${KIT_ART_PATH}/${kit[id]!.file}`;
@@ -773,12 +785,20 @@ export class Wishes {
       return updated;
     };
     // The Owner's Repaint paints the biome's kit again too.
-    for (const asset of wildKit(def.biome)) {
-      if (kit[asset.id] && !force) continue;
-      if (!force && this.budget().over) return;
+    const kitAssets = wildKit(def.biome).filter((a) => (only ? a.id === only : !kit[a.id] || force));
+    const pictures = regionPictures(record.id, def).filter((p) => !only || p.id === only);
+    const kitJobs = kitAssets.map((a) => this.queueArt(a.id, a.name, force, provider));
+    const pictureJobs = pictures.map((p) => this.queueArt(p.id, p.def.name, force, provider));
+    const skipAll = () => {
+      for (const left of [...kitJobs, ...pictureJobs]) left?.skip("This month's budget is spent.");
+    };
+    for (const [i, asset] of kitAssets.entries()) {
+      if (!force && this.budget().over) return skipAll();
+      kitJobs[i]?.start();
       try {
-        const { image, entry, prompt, references } = await paintKitAsset(asset, provider, this.options.anchorDir, dir);
+        const { image, entry, prompt, references } = await paintKitAsset(asset, provider, this.options.anchorDir, dir, prompts[asset.id] ? { prompt: prompts[asset.id] } : {});
         const usd = imageUsd(provider.model, image);
+        kitJobs[i]?.done(usd);
         this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
         kit[asset.id] = { ...entry, file: `${entry.file}?v=${this.now().toString(36)}` };
         await mkdir(dir, { recursive: true });
@@ -787,28 +807,24 @@ export class Wishes {
         if (current) update({ usd: current.usd + usd, artPrompts: { ...current.artPrompts, [asset.id]: this.promptRecord(provider, prompt, references, usd) } });
       } catch (err) {
         console.error(`Painting ${asset.id} failed:`, (err as Error).message);
+        kitJobs[i]?.fail((err as Error).message);
       }
     }
     // Every region of this biome shows the kit, including ones wished before it was painted.
-    const kitArt = Object.fromEntries(wildKit(def.biome).flatMap((a) => (kitUrl(a.id) ? [[a.id, kitUrl(a.id)!]] : [])));
-    if (Object.keys(kitArt).length) {
-      for (const other of this.store.content) {
-        if (other.status === 'granted' && other.definition?.kind === 'region' && other.definition.biome === def.biome) {
-          const updated = this.store.updateContent(other.id, { kitArt });
-          if (updated) this.broadcast(updated);
-        }
-      }
-    }
-    for (const picture of regionPictures(record.id, def)) {
-      if (!force && this.budget().over) return;
+    this.showKit(def.biome, kitUrl);
+    for (const [i, picture] of pictures.entries()) {
+      if (!force && this.budget().over) return skipAll();
       let painted;
+      pictureJobs[i]?.start();
       try {
-        painted = await paintWish(picture.id, picture.def, def.biome, provider, this.options.anchorDir, this.options.artDir);
+        painted = await paintWish(picture.id, picture.def, def.biome, provider, this.options.anchorDir, this.options.artDir, prompts[picture.id]);
       } catch (err) {
         console.error(`Painting ${picture.id} failed:`, (err as Error).message);
+        pictureJobs[i]?.fail((err as Error).message);
         continue;
       }
       const usd = imageUsd(provider.model, painted.image);
+      pictureJobs[i]?.done(usd);
       this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
       const current = this.store.contentById(record.id);
       if (!current) return;
@@ -818,6 +834,23 @@ export class Wishes {
         artPrompts: { ...current.artPrompts, [picture.id]: this.promptRecord(provider, painted.request.prompt, painted.request.references, usd) },
       });
     }
+  }
+
+  /** Points every granted region of a biome at its painted kit. */
+  private showKit(biome: string, kitUrl: (id: string) => string | undefined): void {
+    const kitArt = Object.fromEntries(wildKit(biome as BiomeId).flatMap((a) => (kitUrl(a.id) ? [[a.id, kitUrl(a.id)!]] : [])));
+    if (!Object.keys(kitArt).length) return;
+    for (const other of this.store.content) {
+      if (other.status === 'granted' && other.definition?.kind === 'region' && other.definition.biome === biome) {
+        const updated = this.store.updateContent(other.id, { kitArt });
+        if (updated) this.broadcast(updated);
+      }
+    }
+  }
+
+  /** Adds a wished picture to the painting log as waiting its turn. */
+  private queueArt(id: string, name: string, force: boolean, provider: ImageProvider): ArtJobHandle | undefined {
+    return this.artJobs?.add(id, name, 'picture', force ? 'gods-view' : 'wish', estimateImageUsd(provider.model));
   }
 
   /** What one painting asked of the image model, as God's View shows it. */

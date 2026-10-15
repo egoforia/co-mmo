@@ -189,7 +189,7 @@ async function boot(): Promise<void> {
     ['rules', 'Rules'],
     ['reports', 'Reports'],
     ['players', 'Players'],
-    ...(owner ? [['ai', 'AI models'], ['budget', 'Budget'], ['updates', 'Updates']] : []),
+    ...(owner ? [['art', 'Art'], ['ai', 'AI models'], ['budget', 'Budget'], ['updates', 'Updates']] : []),
   ];
   main.innerHTML = `
     <nav>${tabs.map(([id, label]) => `<button type="button" data-tab="${id}">${label}</button>`).join('')}</nav>
@@ -202,6 +202,8 @@ async function boot(): Promise<void> {
   addEventListener('hashchange', () => show(location.hash.slice(1) || 'world'));
   // The world moves; keep the map fresh while it is open.
   setInterval(() => tab === 'world' && document.visibilityState === 'visible' && void render(), 3000);
+  // Painting moves on its own; keep the log fresh without touching the forms below it.
+  setInterval(() => tab === 'art' && document.visibilityState === 'visible' && void refreshArtJobs(), 3000);
 }
 
 function show(id: string): void {
@@ -215,7 +217,7 @@ async function render(): Promise<void> {
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
-    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, ai, budget, updates };
+    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, art, ai, budget, updates };
     const html = await (pages[current] ?? world)();
     if (tab !== current) return;
     // Keep what the Owner is typing when the panel refreshes.
@@ -639,6 +641,160 @@ async function updates(): Promise<string> {
     ${last}`;
 }
 
+// --- Art -----------------------------------------------------------------------
+
+interface ArtJob {
+  id: string;
+  asset: string;
+  label: string;
+  media: 'picture' | 'clip';
+  source: 'start-up' | 'gods-view' | 'wish';
+  status: 'queued' | 'painting' | 'done' | 'failed' | 'skipped';
+  estimateUsd: number;
+  usd?: number;
+  reason?: string;
+  queuedAt: number;
+  startedAt?: number;
+  endedAt?: number;
+}
+
+interface ArtItem {
+  id: string;
+  name: string;
+  url?: string;
+  source: 'shipped' | 'painted' | 'redone' | 'missing';
+  estimateUsd: number;
+  repaintable: boolean;
+  why?: string;
+  takesNote: boolean;
+}
+
+type WalkStrip = { url: string; frames: number; width: number; height: number; cycleSeconds: number };
+
+interface WalkerView {
+  id: string;
+  name: string;
+  kind: string;
+  url?: string;
+  walks: Partial<Record<'front' | 'right' | 'back' | 'left', WalkStrip>>;
+  estimateUsd: number;
+  clipUsd: number;
+  viewUsd: number;
+}
+
+interface ArtOverview {
+  imageModel: string | null;
+  videoModel: string | null;
+  budget: Budget;
+  jobs: ArtJob[];
+  groups: { id: string; title: string; note?: string; items: ArtItem[] }[];
+  walkers: WalkerView[];
+  bodies: { id: string; name: string }[];
+}
+
+const DIRECTIONS = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']] as const;
+const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
+const STATUS: Record<ArtJob['status'], string> = { queued: 'Waiting', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
+const ASKED: Record<ArtJob['source'], string> = { 'start-up': 'start-up', 'gods-view': "God's View", wish: 'a wish' };
+let artBudget: Budget | null = null;
+
+async function art(): Promise<string> {
+  const o = await api<ArtOverview>('art');
+  artBudget = o.budget;
+  return `
+    <p class="note">Every picture in the game, and everything being painted. Painting again replaces a picture for everyone; players see it after they reload. Each costs about what its button says, from this month's budget.</p>
+    <p>${o.imageModel ? `Pictures: <b>${escapeHtml(o.imageModel)}</b>` : '<b class="bad">No image model is set</b> (AI models tab)'} · ${o.videoModel ? `Walks: <b>${escapeHtml(o.videoModel)}</b>` : 'Walks need Google AI Studio as the image model'}</p>
+    <div id="art-jobs">${artJobsHtml(o.jobs, o.budget)}</div>
+    <h2>Walk animations</h2>
+    <p class="note">One short clip per direction, made from a standing picture of each view. Directions already made are kept, so painting one again only pays for that one.</p>
+    <div class="walkers">${o.walkers.map((w) => walkerHtml(w, o.bodies)).join('')}</div>
+    ${o.groups.map((g) => `
+      <h2>${escapeHtml(g.title)}</h2>
+      ${g.note ? `<p class="note">${escapeHtml(g.note)}</p>` : ''}
+      <div class="art-grid">${g.items.map(artItemHtml).join('')}</div>`).join('')}`;
+}
+
+function artJobsHtml(jobs: ArtJob[], b: Budget): string {
+  const open = jobs.filter((j) => j.status === 'queued' || j.status === 'painting');
+  const done = jobs.filter((j) => !open.includes(j)).slice(0, 30);
+  const waiting = open.reduce((n, j) => n + j.estimateUsd, 0);
+  const row = (j: ArtJob) => `
+    <tr class="${j.status}">
+      <td>${when(j.endedAt ?? j.startedAt ?? j.queuedAt)}</td>
+      <td><b>${escapeHtml(j.label)}</b><br><small>${j.media === 'clip' ? 'video clip' : 'picture'} · asked by ${ASKED[j.source]}</small></td>
+      <td><span class="job ${j.status}">${STATUS[j.status]}</span>${j.reason ? `<br><small>${escapeHtml(j.reason)}</small>` : ''}</td>
+      <td>${j.usd !== undefined ? usd(j.usd) : `about ${usd(j.estimateUsd)}`}</td>
+    </tr>`;
+  return `
+    <h2>Painting now</h2>
+    <p>${usd(b.spentUsd)} of ${usd(b.monthlyUsd)} spent this month${b.over ? ' · <b class="bad">The budget is spent: nothing more is painted.</b>' : b.warn ? ' · Past the warning line.' : ''}${open.length ? ` · ${open.length} waiting or painting, about ${usd(waiting)} more` : ''}</p>
+    ${open.length ? `<table class="log jobs">${open.map(row).join('')}</table>` : '<p class="note">Nothing is being painted right now.</p>'}
+    ${done.length ? `<details${open.length ? '' : ' open'}><summary>Painted lately (${done.length})</summary><table class="log jobs">${done.map(row).join('')}</table></details>` : '<p class="note">Nothing painted since the server started.</p>'}`;
+}
+
+async function refreshArtJobs(): Promise<void> {
+  const box = document.getElementById('art-jobs');
+  if (!box) return;
+  const { jobs, budget: b } = await api<{ jobs: ArtJob[]; budget: Budget }>('art/jobs').catch(() => ({ jobs: null, budget: null }));
+  if (!jobs || !b || tab !== 'art') return;
+  artBudget = b;
+  const open = box.querySelector('details')?.open;
+  box.innerHTML = artJobsHtml(jobs, b);
+  const details = box.querySelector('details');
+  if (details && open !== undefined) details.open = open;
+}
+
+function artItemHtml(item: ArtItem): string {
+  const picture = item.url ? `<img src="${escapeHtml(item.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>';
+  const form = item.repaintable ? `
+    <details><summary>Paint again · about ${usd(item.estimateUsd)}</summary>
+      <form class="form art-paint" data-asset="${escapeHtml(item.id)}" data-name="${escapeHtml(item.name)}" data-usd="${item.estimateUsd}">
+        ${item.takesNote ? '<label>Anything to change? (optional)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof"></textarea></span></label>' : ''}
+        <button type="submit">Paint again</button>
+      </form>
+    </details>` : item.why ? `<small>${escapeHtml(item.why)}</small>` : '';
+  return `<figure class="art-item ${item.source}">${picture}<figcaption><b>${escapeHtml(item.name)}</b><br><small>${SOURCE[item.source]}</small>${form}</figcaption></figure>`;
+}
+
+function walkStripHtml(strip: WalkStrip | undefined, label: string): string {
+  if (!strip) return `<div class="walk none" title="${label}: no walk yet"><span>${label}</span></div>`;
+  const frameWidth = strip.width / strip.frames;
+  const height = 72;
+  const width = Math.round((frameWidth * height) / strip.height);
+  return `<div class="walk" title="${label}"><i style="width:${width}px;height:${height}px;background-image:url('${escapeHtml(strip.url)}');background-size:${strip.frames * 100}% 100%;animation-duration:${strip.cycleSeconds}s;--steps:${strip.frames}"></i><span>${label}</span></div>`;
+}
+
+function walkerHtml(w: WalkerView, bodies: ArtOverview['bodies']): string {
+  const made = DIRECTIONS.filter(([d]) => w.walks[d]).length;
+  const bodyPick = `<label>Body<span><select name="body">${bodies.map((b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join('')}</select></span></label>`;
+  return `
+    <div class="walker">
+      <header>${w.url ? `<img src="${escapeHtml(w.url)}" alt="">` : ''}<div><b>${escapeHtml(w.name)}</b><br><small>${escapeHtml(w.kind)} · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks yet'}</small></div></header>
+      <div class="walks">${DIRECTIONS.map(([d, label]) => walkStripHtml(w.walks[d], label)).join('')}</div>
+      ${made < 4 ? `
+        <form class="form art-walk" data-walker="${escapeHtml(w.id)}" data-name="${escapeHtml(w.name)}" data-usd="${w.estimateUsd}">
+          ${bodyPick}
+          <button type="submit">Make ${made ? 'the missing walks' : 'walks'} · about ${usd(w.estimateUsd)}</button>
+        </form>` : ''}
+      ${made ? `
+        <details><summary>Paint some directions again</summary>
+          <form class="form art-walk" data-walker="${escapeHtml(w.id)}" data-name="${escapeHtml(w.name)}" data-clip="${w.clipUsd}" data-view="${w.viewUsd}">
+            <span class="dirs">${DIRECTIONS.map(([d, label]) => `<label class="check"><input type="checkbox" name="dir-${d}"> ${label}</label>`).join('')}</span>
+            <label class="check"><input type="checkbox" name="views"> Paint their standing pictures again too (about ${usd(w.viewUsd)} each)</label>
+            ${bodyPick}
+            <button type="submit">Paint again · about ${usd(w.clipUsd)} a direction</button>
+          </form>
+        </details>` : ''}
+    </div>`;
+}
+
+/** Asks before spending, with the cost and what is left of the month's budget. */
+function confirmSpend(what: string, cost: number): boolean {
+  const b = artBudget;
+  const left = b ? ` This month: ${usd(b.spentUsd)} of ${usd(b.monthlyUsd)} spent.` : '';
+  return confirm(`${what} for about ${usd(cost)}?${left} Retries after a bad result can cost up to twice that.`);
+}
+
 // --- Actions -------------------------------------------------------------------
 
 main.addEventListener('click', async (e) => {
@@ -743,6 +899,19 @@ main.addEventListener('submit', async (e) => {
       const r = await api<{ provider: string; model: string; reply: unknown; usd: number }>('ai/test', 'POST', { prompt: f.prompt });
       out.textContent = `${label(r.provider)} · ${r.model} · ${usd(r.usd)}\n\n${JSON.stringify(r.reply, null, 2)}`;
       return;
+    } else if (form.classList.contains('art-paint')) {
+      if (!confirmSpend(`Paint "${form.dataset.name}" again`, Number(form.dataset.usd))) return;
+      await api('art/paint', 'POST', { asset: form.dataset.asset, note: f.note ?? '' });
+      toast('Asked. Follow it under Painting now.');
+    } else if (form.classList.contains('art-walk')) {
+      const directions = ['front', 'right', 'back', 'left'].filter((d) => f[`dir-${d}`] === 'on');
+      const redo = form.dataset.clip !== undefined;
+      if (redo && !directions.length) return toast('Pick at least one direction.');
+      const views = f.views === 'on';
+      const cost = redo ? directions.length * (Number(form.dataset.clip) + (views ? Number(form.dataset.view) : 0)) : Number(form.dataset.usd);
+      if (!confirmSpend(redo ? `Paint ${form.dataset.name} walking ${directions.length === 1 ? 'one way' : `${directions.length} ways`} again` : `Make ${form.dataset.name} walk`, cost)) return;
+      await api('art/walk', 'POST', { walker: form.dataset.walker, body: f.body, directions, views });
+      toast('Asked. Clips take a minute or two each; follow them under Painting now.');
     } else if (form.dataset.repaint) {
       await api(`content/${form.dataset.repaint}/paint`, 'POST', { picture: form.dataset.picture, prompt: f.prompt ?? '' });
       toast('Painting with your words. The new art appears in a few seconds.');

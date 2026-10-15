@@ -104,7 +104,12 @@ function play(token: string): void {
     fetch(url)
       .then((r) => (r.ok ? (r.json() as Promise<ArtManifest>) : {}))
       .catch(() => ({}));
-  const art: Promise<ArtManifest> = Promise.all([manifest('/api/art'), manifest('/art/manifest.json')]).then(([painted, shipped]) => ({ ...painted, ...shipped }));
+  // Shipped art wins over painted art, except what the Owner had painted again in God's View.
+  const art: Promise<ArtManifest> = Promise.all([manifest('/api/art'), manifest('/art/manifest.json')]).then(([painted, shipped]) => ({
+    ...painted,
+    ...shipped,
+    ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)),
+  }));
 
   const connection = new GameConnection(token, onMessage, (reason, code) => {
     if (code === 4003) {

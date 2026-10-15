@@ -151,3 +151,35 @@ ol.setup { color: var(--muted); max-width: 640px; line-height: 1.5; }
 ul.brief { margin: 4px 0 8px; padding-left: 18px; }
 .form.repaint { margin: 6px 0 12px; }
 .form.repaint textarea { flex: 1; min-width: 0; background: var(--panel); color: var(--ink); border: 1px solid var(--edge); padding: 7px 9px; font: 12px/1.4 ui-monospace, monospace; }
+
+/* Art: the painting log, every picture, and walk animations. */
+.log.jobs td:first-child { white-space: nowrap; color: var(--muted); font-size: 12px; }
+.job { font-size: 12px; padding: 1px 7px; border: 1px solid var(--edge); border-radius: 10px; white-space: nowrap; }
+.job.painting { border-color: var(--accent); color: var(--accent); }
+.job.queued { color: var(--muted); }
+.job.done { border-color: var(--good); color: var(--good); }
+.job.failed { border-color: var(--bad); color: var(--bad); }
+.art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.art-item { margin: 0; background: var(--panel); border: 1px solid var(--edge); padding: 8px; }
+.art-item img, .art-item .ph { display: grid; place-items: center; width: 100%; height: 120px; object-fit: contain; border: 0; color: var(--gold); }
+.art-item.missing { border-style: dashed; }
+.art-item.redone { border-color: var(--gold); }
+.art-item figcaption { font-size: 13px; margin-top: 6px; }
+.art-item textarea, .walker textarea { width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); padding: 6px; font: inherit; font-size: 13px; }
+.walkers { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.walker { background: var(--panel); border: 1px solid var(--edge); padding: 10px 12px; }
+.walker > header { display: flex; gap: 10px; align-items: center; padding: 0; border: 0; }
+.walker > header img { width: 48px; height: 48px; object-fit: contain; }
+.walker .form { margin-top: 8px; }
+.walks { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.walk { display: grid; justify-items: center; gap: 2px; font-size: 11px; color: var(--muted); min-width: 52px; }
+.walk i { display: block; background-repeat: no-repeat; animation: walk-strip linear infinite; animation-timing-function: steps(var(--steps), jump-none); }
+.walk.none::before { content: ''; display: block; width: 48px; height: 72px; border: 1px dashed var(--edge); }
+.dirs { display: flex; gap: 12px; flex-wrap: wrap; }
+@keyframes walk-strip { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { .walk i { animation: none; } }
+@media (max-width: 700px) {
+  /* The painting log keeps its status column on a phone; the time goes instead. */
+  .log.jobs td:nth-child(3) { display: table-cell; }
+  .log.jobs td:first-child { display: none; }
+}

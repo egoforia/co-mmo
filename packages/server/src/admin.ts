@@ -1,11 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, wishProgress, type Role } from '@co-mmo/shared';
+import { ITEMS, WALK_DIRECTIONS, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
 import { DEFAULT_BUILDS, DEFAULT_WORKSHOP, type Account, type BuildSettings, type ModelChoice, type Settings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
+import { ArtRequestError, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
@@ -17,6 +18,8 @@ export interface AdminContext {
   rules: LiveRules;
   reports: Reports;
   builds: Builds;
+  /** The Art tab: painting log, repaints and walks (Owner). */
+  art?: ArtStudio;
   /** Disconnects a player now (after a suspension). */
   kick(id: string, reason: string): void;
   /** Pulls main and restarts the game; absent in tests. */
@@ -149,8 +152,7 @@ export async function handleAdmin(
     const picture = typeof body?.picture === 'string' ? body.picture : '';
     if (!prompt && ownerOnly()) return true;
     if (prompt && !record.artPrompts?.[picture]) return json(res, 409, { error: 'no_prompt', message: 'Only a picture that was painted before can be repainted with new words.' }), true;
-    if (prompt && record.definition?.kind === 'region') return json(res, 409, { error: 'region', message: 'A region\'s pictures are repainted together, with the Owner\'s Repaint.' }), true;
-    const job = wishes.paint(record, owner, prompt ? { [picture]: prompt } : {});
+    const job = wishes.paint(record, owner, prompt ? { [picture]: prompt } : {}, picture || undefined);
     return json(res, job ? 202 : 409, job ? { ok: true } : { error: 'no_image_provider', message: 'Nothing can be painted now: no image model is set, or this month\'s budget is spent.' }), true;
   }
 
@@ -294,6 +296,28 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     await builds.sync();
     return json(res, 200, { ok: true, connection: builds.connection() }), true;
+  }
+
+  // The Art tab: every picture, the painting log, and paid repaints, all the Owner's.
+  if (route.startsWith('art') && ctx.art) {
+    if (ownerOnly()) return true;
+    if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
+    if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: wishes.budget() }), true;
+    const body = method === 'POST' ? await ctx.readJson(req) : null;
+    try {
+      if (route === 'art/paint' && method === 'POST') {
+        const done = await ctx.art.repaint(String(body?.asset ?? ''), typeof body?.note === 'string' ? body.note : '');
+        return json(res, 202, { ok: true, ...done }), true;
+      }
+      if (route === 'art/walk' && method === 'POST') {
+        const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
+        const done = await ctx.art.walk(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), directions, body?.views === true);
+        return json(res, 202, { ok: true, ...done }), true;
+      }
+    } catch (err) {
+      if (err instanceof ArtRequestError) return json(res, 409, { error: 'art_refused', message: err.message }), true;
+      throw err;
+    }
   }
 
   if (route === 'budget' && method === 'GET') {

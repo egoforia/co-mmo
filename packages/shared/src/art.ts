@@ -9,6 +9,11 @@ export interface ArtEntry {
   frames?: number;
   /** Seconds a walk strip's cycle takes at the player's walking speed. */
   cycleSeconds?: number;
+  /**
+   * When the Owner had this painted again from God's View. Such art wins
+   * over the art shipped with the game; other painted art never does.
+   */
+  redone?: number;
 }
 
 export type ArtManifest = Record<string, ArtEntry>;

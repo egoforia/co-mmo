@@ -1,9 +1,10 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { BUILDING_STYLES, type ArtManifest } from '@co-mmo/shared';
-import { buildingArtJobs, paintBuildingArt } from './assets/building-art.ts';
+import { buildingArtJobs, paintBuildingArt, type BuildingArtJob } from './assets/building-art.ts';
 import type { ImageProvider } from './assets/provider.ts';
-import { imageUsd } from './assets/wish-art.ts';
+import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
+import { plain, type ArtJobHandle, type ArtJobSource, type ArtJobs } from './art-jobs.ts';
 
 /** Where painted building art is served from, under the wished-art directory. */
 export const BUILDING_ART_PATH = 'wished-art/buildings';
@@ -21,6 +22,13 @@ export interface BuildingPainterOptions {
   artDir: string;
   /** Art shipped with the game, already painted: never painted again. */
   shipped: () => Promise<ArtManifest>;
+  /** The painting log God's View shows. */
+  jobs?: ArtJobs;
+}
+
+/** Every picture any building needs, outside first for each building. */
+export function allBuildingArt(): BuildingArtJob[] {
+  return Object.values(BUILDING_STYLES).flatMap(buildingArtJobs);
 }
 
 /**
@@ -53,29 +61,82 @@ export class BuildingPainter {
   }
 
   private async run(): Promise<void> {
-    this.painted = JSON.parse(await readFile(resolve(this.dir, 'manifest.json'), 'utf8').catch(() => '{}')) as ArtManifest;
+    await this.load();
     const shipped = await this.options.shipped();
-    const missing = Object.values(BUILDING_STYLES)
-      .flatMap(buildingArtJobs)
-      .filter((job) => !shipped[job.id] && !this.painted[job.id]);
-    for (const job of missing) {
+    const missing = allBuildingArt().filter((job) => !shipped[job.id] && !this.painted[job.id]);
+    const model = this.options.provider()?.model ?? '';
+    const queued = missing.map((job) => this.options.jobs?.add(job.id, label(job), 'picture', 'start-up', estimateImageUsd(model)));
+    for (const [i, job] of missing.entries()) {
+      const handle = queued[i];
       const provider = this.options.provider();
-      if (!provider || this.options.overBudget()) return;
+      if (!provider || this.options.overBudget()) {
+        for (const left of queued.slice(i)) left?.skip(provider ? "This month's budget is spent." : 'No image model is set in God\'s View.');
+        return;
+      }
       try {
-        const { image, entry } = await paintBuildingArt(job, provider, {
-          anchorDir: this.options.anchorDir,
-          rawDir: resolve(this.dir, 'raw'),
-          outDir: this.dir,
-        });
-        this.options.spend(imageUsd(provider.model, image), provider);
-        this.painted[job.id] = { ...entry, file: entry.file.replace(/^art\//, `${BUILDING_ART_PATH}/`) };
-        await mkdir(this.dir, { recursive: true });
-        await writeFile(resolve(this.dir, 'manifest.json'), JSON.stringify(this.painted, null, 2));
+        await this.paint(job, provider, handle);
       } catch (err) {
         console.error(`Painting ${job.id} failed:`, (err as Error).message);
         // The outside is every other picture's reference; without it, stop.
-        if (job.kind === 'exterior') return;
+        if (job.kind === 'exterior') {
+          for (const left of queued.slice(i + 1)) left?.skip('The outside of this building failed, and the inside is painted to match it.');
+          return;
+        }
       }
     }
   }
+
+  /**
+   * Paints one building picture again at the Owner's request, even one that
+   * shipped with the game: the new one replaces it. `note` adds the Owner's
+   * own words to the prompt.
+   */
+  async repaint(id: string, note = '', handle?: ArtJobHandle): Promise<void> {
+    const job = allBuildingArt().find((j) => j.id === id);
+    if (!job) throw new Error('There is no building picture by that name.');
+    const provider = this.options.provider();
+    if (!provider) throw new Error("No image model is set in God's View.");
+    await this.load();
+    await this.paint(note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job, provider, handle, true);
+  }
+
+  /** Queues a job in the painting log for one building picture. */
+  queue(id: string, source: ArtJobSource): ArtJobHandle | undefined {
+    const job = allBuildingArt().find((j) => j.id === id);
+    return job && this.options.jobs?.add(id, label(job), 'picture', source, estimateImageUsd(this.options.provider()?.model ?? ''));
+  }
+
+  private async load(): Promise<void> {
+    this.painted = JSON.parse(await readFile(resolve(this.dir, 'manifest.json'), 'utf8').catch(() => '{}')) as ArtManifest;
+  }
+
+  private async paint(job: BuildingArtJob, provider: ImageProvider, handle?: ArtJobHandle, redone = false): Promise<void> {
+    handle?.start();
+    try {
+      const { image, entry } = await paintBuildingArt(job, provider, {
+        anchorDir: this.options.anchorDir,
+        rawDir: resolve(this.dir, 'raw'),
+        outDir: this.dir,
+      });
+      const usd = imageUsd(provider.model, image);
+      this.options.spend(usd, provider);
+      const file = entry.file.replace(/^art\//, `${BUILDING_ART_PATH}/`);
+      // A repaint keeps the same file name, so the address changes to make browsers fetch it again.
+      this.painted[job.id] = { ...entry, file: redone ? `${file}?v=${Date.now().toString(36)}` : file, ...(redone ? { redone: Date.now() } : {}) };
+      await mkdir(this.dir, { recursive: true });
+      await writeFile(resolve(this.dir, 'manifest.json'), JSON.stringify(this.painted, null, 2));
+      handle?.done(usd);
+    } catch (err) {
+      handle?.fail(plain(err));
+      throw err;
+    }
+  }
+}
+
+/** A building picture in words, for the painting log. */
+function label(job: BuildingArtJob): string {
+  const style = Object.values(BUILDING_STYLES).find((s) => job.id.startsWith(`${s.id}-`));
+  if (!style) return job.id;
+  const part = job.id.slice(style.id.length + 1).replace(/^furniture-/, '').replace(/-/g, ' ');
+  return `${style.name}: ${part === 'exterior' ? 'outside' : part}`;
 }

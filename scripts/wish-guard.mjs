@@ -50,12 +50,23 @@ const GAME_CODE = /^packages\/(client|shared)\/src\/(?!gods-view)[^/]+\.ts$/;
 /** Canvas and Phaser calls that draw shapes or colour pixels. */
 const DRAWING = /\b(getContext\s*\(|fillRect|strokeRect|beginPath|quadraticCurveTo|bezierCurveTo|roundRect|createLinearGradient|createRadialGradient|add\.graphics|generateTexture)\b|\.(arc|ellipse)\s*\(/;
 
+/** Server code, where SVG shapes would mean pictures made by code. */
+const SERVER_CODE = /^packages\/server\/src\/.+\.ts$/;
+const SVG_SHAPES = /<(circle|ellipse|rect|path|line|polygon|polyline)\b/;
+/**
+ * The only server files that may draw, because what they draw only steers
+ * the image model and players never see it: walk pose guides (the Owner's
+ * exception, 2026-10-15) and the doorway sketch sent with building art.
+ */
+const MAY_DRAW = [/^packages\/server\/src\/assets\/pose-guide\.ts$/, /^packages\/server\/src\/assets\/building-art\.ts$/];
+
 /**
  * Checks the lines a change adds ({ path, text }) for art drawn in code, and
  * returns the problems, in plain words; an empty list passes.
  */
 export function checkArt(additions) {
-  const drawn = [...new Set(additions.filter((a) => GAME_CODE.test(a.path) && DRAWING.test(a.text)).map((a) => a.path))];
+  const draws = (a) => (GAME_CODE.test(a.path) && DRAWING.test(a.text)) || (SERVER_CODE.test(a.path) && !MAY_DRAW.some((p) => p.test(a.path)) && SVG_SHAPES.test(a.text));
+  const drawn = [...new Set(additions.filter(draws).map((a) => a.path))];
   return drawn.map((path) => `${path} draws art in code. Describe the picture instead (BUILDING_STYLES in packages/shared/src/buildings.ts for buildings and furniture, the biome kit for scenery) and the game paints it with the image model chosen in God's View.`);
 }
 

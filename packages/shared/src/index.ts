@@ -13,3 +13,4 @@ export * from './rpg.ts';
 export * from './kit.ts';
 export * from './content.ts';
 export * from './workshop.ts';
+export * from './walk-rig.ts';

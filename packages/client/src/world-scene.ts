@@ -3,6 +3,7 @@ import {
   ABILITIES,
   Interpolator,
   Predictor,
+  type PendingInput,
   TICK_SECONDS,
   TILE_PIXELS,
   Tile,
@@ -93,6 +94,14 @@ export class WorldScene extends Phaser.Scene {
   /** Art ids of the biome kits drawn now: when one is painted, the land is drawn again. */
   private kitIds = new Set<string>();
   private redrawing = false;
+  /** Inputs predicted before the scene was rebuilt, still waiting for the server. */
+  private carried: PendingInput[] = [];
+  /** Movement keys held as we cross an edge; the restart forgets them, so we press them again. */
+  private held = new Set<string>();
+  /** The light of the region we came from, eased into the new one's. */
+  private previousTint?: number;
+  /** The newest position the server confirmed, and the input it had applied. */
+  private confirmed?: { ack: number; x: number; y: number };
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -115,8 +124,23 @@ export class WorldScene extends Phaser.Scene {
   enterRegion(welcome: WelcomeMessage): void {
     this.welcome = welcome;
     this.lastSeq = this.predictor?.lastSeq ?? this.lastSeq;
+    // Steps taken but not yet applied carry over: the server applies them in
+    // the new region, and replaying them here keeps us where we walked to.
+    this.carried = this.predictor?.unapplied ?? [];
+    this.previousTint = this.tint?.fillColor;
     this.predictor = undefined;
     this.crossing = true;
+    // Keep walking: the restart drops every key, so remember what is held
+    // and forget anything let go of before the new scene is up.
+    this.held = new Set(Object.entries(this.keys ?? {}).filter(([, k]) => k.isDown).map(([name]) => name));
+    if (this.held.size) {
+      const codes: Record<string, string> = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD' };
+      const release = (e: KeyboardEvent) => {
+        for (const name of this.held) if (codes[name] === e.code) this.held.delete(name);
+      };
+      window.addEventListener('keyup', release);
+      this.events.once(Phaser.Scenes.Events.CREATE, () => window.removeEventListener('keyup', release));
+    }
     this.scene.restart();
   }
 
@@ -148,8 +172,10 @@ export class WorldScene extends Phaser.Scene {
     }
     this.refreshWishes();
 
-    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
-    this.shown = { x: welcome.x, y: welcome.y };
+    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq, this.carried, welcome.ack);
+    this.carried = [];
+    this.confirmed = { ack: welcome.ack, x: welcome.x, y: welcome.y };
+    this.shown = { ...this.predictor.position };
     this.me = this.makeAvatar(this.playerTexture(welcome.you.id), welcome.you.name, true);
 
     const kb = this.input.keyboard!;
@@ -157,6 +183,12 @@ export class WorldScene extends Phaser.Scene {
     this.keys = kb.addKeys({
       up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', w: 'W', a: 'A', s: 'S', d: 'D',
     }, false) as typeof this.keys;
+    for (const name of this.held) {
+      const key = this.keys[name as keyof typeof this.keys];
+      key.isDown = true;
+      key.isUp = false;
+    }
+    this.held.clear();
 
     const cam = this.cameras.main;
     cam.setBounds(bounds.left * T, bounds.top * T, (bounds.right - bounds.left) * T, (bounds.bottom - bounds.top) * T);
@@ -170,6 +202,22 @@ export class WorldScene extends Phaser.Scene {
 
     // The biome's light grades everything under the labels.
     this.tint = this.add.rectangle(0, 0, 10, 10, lightTint(def.biome)).setOrigin(0.5).setScrollFactor(0);
+    // Walking into another biome, its light comes up gradually rather than switching at the edge.
+    const from = this.previousTint;
+    const to = lightTint(def.biome);
+    if (from !== undefined && from !== to) {
+      const a = Phaser.Display.Color.ValueToColor(from);
+      const b = Phaser.Display.Color.ValueToColor(to);
+      this.tint.setFillStyle(from);
+      this.tweens.addCounter({
+        from: 0, to: 100, duration: 1200,
+        onUpdate: (tween) => {
+          const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, tween.getValue() ?? 100);
+          this.tint?.setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
+        },
+      });
+    }
+    this.previousTint = undefined;
     this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
@@ -179,6 +227,7 @@ export class WorldScene extends Phaser.Scene {
   onSnapshot(snapshot: SnapshotMessage): void {
     if (!this.predictor || !this.sys.isActive()) return;
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y });
+    this.confirmed = { ack: snapshot.ack, x: snapshot.x, y: snapshot.y };
     const now = performance.now();
     this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
@@ -385,8 +434,9 @@ export class WorldScene extends Phaser.Scene {
     if (this.redrawing || !this.predictor) return;
     this.redrawing = true;
     this.time.delayedCall(500, () => {
-      const at = this.predictor?.position;
-      if (at) this.enterRegion({ ...this.welcome, x: at.x, y: at.y });
+      // From the server's latest word, so the steps still in flight replay on top.
+      const at = this.confirmed;
+      if (at) this.enterRegion({ ...this.welcome, ...at });
     });
   }
 

@@ -204,7 +204,7 @@ describe('step', () => {
     // Find a spot on the Woods' east edge, off the road, that is open ground.
     let y = 2;
     while (collides(woods, entry.x, y)) y++;
-    expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual({ x: entry.x, y });
+    expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual({ x: woods.width - 0.1, y });
     expect(neighbourOffset('west')).toEqual({ x: -sanctum.width, y: 0 });
   });
 
@@ -212,7 +212,7 @@ describe('step', () => {
     const woods = maps.find((m) => m.def.id === 'woods')!;
     const entry = woods.entries.east!;
     let y = 2;
-    while (!collides(woods, entry.x, y)) y++;
+    while (!collides(woods, woods.width - 0.1, y)) y++;
     expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual(entry);
     expect(arrivalPoint(woods, 'east', { x: 64.1, y: 30 })).toBeUndefined();
   });

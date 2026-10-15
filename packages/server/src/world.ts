@@ -356,7 +356,7 @@ export class World {
         const moving = region.remove(departure.id, `${name} set off for ${target.def.name}.`);
         if (!moving) continue;
         this.where.set(departure.id, target.def.id);
-        target.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`);
+        target.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`, moving.carry);
         this.onEvent?.('enter', departure.id, { region: target.def.id });
         // Walking into a wished region earns its wisher Creator XP.
         this.creatorCredit(target.def.id, departure.id, 'visit');

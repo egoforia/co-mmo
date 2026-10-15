@@ -167,6 +167,8 @@ export interface WelcomeMessage {
   region: RegionInfo;
   /** The regions beyond its open edges, drawn beside it. */
   neighbours: RegionDef[];
+  /** The last input the server applied; later ones the client predicted are replayed from here. */
+  ack: number;
   x: number;
   y: number;
   tickRate: number;

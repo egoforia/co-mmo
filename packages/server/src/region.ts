@@ -168,6 +168,21 @@ export interface Leaving {
   character: Character;
   x: number;
   y: number;
+  /** What carries over into the next region, so walking on feels like one more step. */
+  carry: Carry;
+}
+
+/**
+ * A player's movement and timers as they cross into the next region: the
+ * last input applied and those still waiting carry over, so no step the
+ * player took is lost or replayed and their own prediction stays in step.
+ */
+export interface Carry {
+  ack: number;
+  inputs: { seq: number; dx: number; dy: number }[];
+  lastAttack: number;
+  lastHurt: number;
+  readyAt: Map<string, number>;
 }
 
 /**
@@ -356,7 +371,7 @@ export class Region {
   }
 
   private welcome(p: PlayerState): void {
-    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, tickRate: TICK_RATE, character: p.character });
+    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character });
   }
 
   get online(): number {
@@ -416,7 +431,7 @@ export class Region {
    * Adds a player at the given position, or at the spawn point when it is
    * missing or no longer walkable (a wish may have changed the map).
    */
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string): void {
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry): void {
     const existing = this.players.get(info.id);
     if (existing) {
       existing.conn.close('Signed in from another window.');
@@ -428,7 +443,7 @@ export class Region {
       y = at.y;
     }
     const p: PlayerState = {
-      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false,
+      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, ...carry,
     };
     this.players.set(info.id, p);
     this.welcome(p);
@@ -446,7 +461,8 @@ export class Region {
     this.players.delete(id);
     for (const c of this.creatures) if (c.aggro === id) this.giveUp(c);
     this.broadcastSystem(announce ?? `${p.info.name} left.`);
-    return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y };
+    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt };
+    return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
   }
 
   handle(id: string, message: ClientMessage): void {

@@ -11,6 +11,7 @@ import { normalizeWalk } from './assets/walk-frames.ts';
 import { LOOK_GEAR, soleFigure, type Carried, startFrame, videoFrames, viewPrompt, walkFromFrames, walkVideoPrompt } from './assets/walk-video.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource } from './art-jobs.ts';
+import { watched } from './paint-queue.ts';
 import type { BuildingPainterOptions } from './building-painter.ts';
 
 /** Where painted walk strips are served from, under the wished-art directory. */
@@ -222,7 +223,7 @@ export class WalkPainter {
     for (let attempt = 0; !figure && attempt < 2; attempt++) {
       const provider = this.options.provider();
       if (!provider || this.options.overBudget()) return undefined;
-      const image = await provider.generate({ prompt: viewPrompt(walker.name, walker.gear, direction), references: [{ mimeType: 'image/png', data: reference }], aspectRatio: '3:4' });
+      const image = await watched(provider, handle).generate({ prompt: viewPrompt(walker.name, walker.gear, direction), references: [{ mimeType: 'image/png', data: reference }], aspectRatio: '3:4' });
       const cost = imageUsd(provider.model, image);
       usd += cost;
       this.options.spend(cost, provider as ImageProvider);
@@ -254,7 +255,7 @@ export class WalkPainter {
       if (!provider || this.options.overBudget()) return 'stop';
       try {
         // The same picture first and last makes the clip loop back to the standing pose.
-        const clip = await provider.generate({ prompt: walkVideoPrompt(walker.gear, direction, walker.body), first, last: first, seconds: CLIP_SECONDS });
+        const clip = await watched(provider, handle).generate({ prompt: walkVideoPrompt(walker.gear, direction, walker.body), first, last: first, seconds: CLIP_SECONDS });
         const cost = videoUsd(provider.model, clip);
         usd += cost;
         this.options.spendVideo(cost, provider);

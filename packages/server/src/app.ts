@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { TICK_SECONDS, WishError, isClientMessage, upgradeCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
 import { Auth, cleanEmail, type Mailer } from './auth.ts';
@@ -20,6 +20,8 @@ import { WalkPainter } from './walk-painter.ts';
 import { GeminiVideoProvider, type VideoProvider } from './assets/video.ts';
 import { ArtJobs } from './art-jobs.ts';
 import { ArtStudio } from './art-studio.ts';
+import { MemoryPaintQueue, queuedVideo, type PaintQueue } from './paint-queue.ts';
+import { FilePaintRequests } from './paint-requests.ts';
 
 export interface AppOptions {
   store: Store;
@@ -50,6 +52,8 @@ export interface AppOptions {
   videoProvider?: () => VideoProvider | undefined;
   /** Turns a clip into its frames; ffmpeg unless a test says otherwise. */
   videoFrames?: (mp4: Buffer) => Promise<Buffer[]>;
+  /** Turns at the image and video models; per-model rate limits unless a test says otherwise. */
+  paintQueue?: PaintQueue;
 }
 
 export interface App {
@@ -100,6 +104,11 @@ export function createApp(options: AppOptions): App {
   wishes.restore();
   const artJobs = new ArtJobs();
   wishes.artJobs = artJobs;
+  // Every picture and clip takes its turn here, within each model's rate limit.
+  const paintQueue = options.paintQueue ?? new MemoryPaintQueue();
+  const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
+  wishes.paintQueue = paintQueue;
+  wishes.paintRequests = paintRequests;
   const painterOptions: BuildingPainterOptions = {
     provider: () => wishes.imageProvider(),
     overBudget: () => wishes.budget().over,
@@ -111,7 +120,11 @@ export function createApp(options: AppOptions): App {
   };
   const buildingPainter = new BuildingPainter(painterOptions);
   // Walks use Veo whenever the images come from Gemini, with the same key.
-  const video = options.videoProvider ?? (() => (wishes.imageProvider()?.id === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY) : undefined));
+  const chosenVideo = options.videoProvider ?? (() => (wishes.imageProvider()?.id === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY) : undefined));
+  const video = () => {
+    const provider = chosenVideo();
+    return provider && queuedVideo(paintQueue, provider);
+  };
   const walkPainter = new WalkPainter({
     ...painterOptions,
     video,
@@ -122,7 +135,13 @@ export function createApp(options: AppOptions): App {
   if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
   const artStudio = new ArtStudio({
     store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video,
-    anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped,
+    anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests,
+  });
+  // Paintings a restart cut short are asked for again, behind start-up painting.
+  const resuming = paintRequests.resume({
+    wish: (request) => wishes.resumePaint(request),
+    repaint: (request) => artStudio.repaint(request.asset, request.note),
+    walk: (request) => artStudio.walk(request.walker, request.body, [], false),
   });
   const reports = new Reports(store, world);
   const builds = new Builds(store, {
@@ -413,6 +432,10 @@ export function createApp(options: AppOptions): App {
       clearInterval(heartbeatTimer);
       builds.stop();
       await restoring;
+      // Paintings still waiting their turn are kept for the next start rather than waited out.
+      await resuming;
+      await paintRequests.close();
+      paintQueue.close();
       await Promise.allSettled([...builds.jobs]);
       await Promise.allSettled([...wishes.drafts]);
       await buildingPainter.job;

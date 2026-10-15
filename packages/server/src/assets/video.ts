@@ -1,4 +1,4 @@
-import { ProviderError, type GeneratedImage } from './provider.ts';
+import { ProviderError, googleError, type GeneratedImage, type GoogleError } from './provider.ts';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -52,7 +52,7 @@ export const DEFAULT_VIDEO_MODEL = 'veo-3.1-lite-generate-preview';
 interface Operation {
   name?: string;
   done?: boolean;
-  error?: { message?: string };
+  error?: GoogleError;
   response?: { generateVideoResponse?: { generatedSamples?: { video?: { uri?: string } }[]; raiMediaFilteredReasons?: string[] } };
 }
 
@@ -85,14 +85,17 @@ export class GeminiVideoProvider implements VideoProvider {
       }),
     });
     let op = (await res.json().catch(() => ({}))) as Operation;
-    if (!res.ok || !op.name) throw new ProviderError(this.id, res.ok ? 502 : res.status, op.error?.message ?? 'the video could not be started');
+    if (!res.ok || !op.name) throw googleError(this.id, res.ok ? 502 : res.status, op.error, 'the video could not be started');
     // A clip is usually ready within two minutes; give up after ten.
     for (let i = 0; !op.done; i++) {
       if (i >= 60) throw new ProviderError(this.id, 504, 'the video took too long');
       await this.wait(10_000);
       const poll = await this.fetchImpl(`${API}/${op.name}`, { headers });
-      op = (await poll.json().catch(() => ({}))) as Operation;
-      if (!poll.ok) throw new ProviderError(this.id, poll.status, op.error?.message ?? 'checking on the video failed');
+      // Checking too often is refused too; the clip is already paid for, so keep checking rather than start again.
+      if (poll.status === 429) continue;
+      const checked = (await poll.json().catch(() => ({}))) as Operation;
+      if (!poll.ok) throw new ProviderError(this.id, poll.status, checked.error?.message ?? 'checking on the video failed');
+      op = checked;
     }
     if (op.error) throw new ProviderError(this.id, 502, op.error.message ?? 'the video failed');
     const result = op.response?.generateVideoResponse;

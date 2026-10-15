@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { BUILDING_STYLES, WALK_DIRECTIONS, buildingArtIds, walkArt } from '@co-mmo/shared';
 import type { ImageProvider } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
-import { account, api, app, start } from './helpers.ts';
+import { MemoryPaintQueue } from '../src/paint-queue.ts';
+import { account, api, app, start, stop } from './helpers.ts';
 
 const repo = resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const anchorDir = join(repo, 'assets/anchors');
@@ -141,7 +142,39 @@ describe('the Art tab', () => {
     expect(refused.status).toBe(409);
     expect(refused.body.message).toMatch(/budget is spent/);
   });
+
+  it('shows a request held back by the model\'s rate limit as waiting, and paints it after a restart', async () => {
+    const shippedArt = await shippedManifest(await tmp());
+    const once = () => new MemoryPaintQueue({ limit: () => ({ perMinute: 1, atOnce: 1 }) });
+    const first = await start({ shippedArt, anchorDir, paintQueue: once() });
+    const owner = account(first.store, 'Ego', 'owner');
+    await api(first.base, '/api/admin/art/paint', owner.token, 'POST', { asset: 'sanctum-rock' });
+    await api(first.base, '/api/admin/art/paint', owner.token, 'POST', { asset: 'bramble-cottage-furniture-bed' });
+    const waiting = await until(async () => {
+      const { body } = await api(first.base, '/api/admin/art/jobs', owner.token);
+      return body.jobs.find((j: any) => j.status === 'waiting');
+    });
+    expect(waiting).toMatchObject({ asset: 'bramble-cottage-furniture-bed', reason: expect.stringMatching(/takes 1 a minute/) });
+
+    // Shutting down does not wait out the limit; the request is kept and asked for again.
+    await stop();
+    const kept = JSON.parse(await readFile(join(first.artDir, 'paint-requests.json'), 'utf8'));
+    expect(kept).toEqual([{ kind: 'repaint', asset: 'bramble-cottage-furniture-bed', note: '' }]);
+    const again = await start({ shippedArt, anchorDir, store: first.store, artDir: first.artDir, paintQueue: once() });
+    await until(async () => (await api(again.base, '/api/art', owner.token)).body['bramble-cottage-furniture-bed']?.redone);
+    await app!.art.idle();
+  });
 });
+
+/** Asks until the answer is truthy, for up to five seconds. */
+async function until<T>(ask: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 100; i++) {
+    const answer = await ask();
+    if (answer) return answer;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('It never happened.');
+}
 
 function tmp(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'co-mmo-shipped-'));

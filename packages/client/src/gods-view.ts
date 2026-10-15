@@ -649,7 +649,7 @@ interface ArtJob {
   label: string;
   media: 'picture' | 'clip';
   source: 'start-up' | 'gods-view' | 'wish';
-  status: 'queued' | 'painting' | 'done' | 'failed' | 'skipped';
+  status: 'queued' | 'waiting' | 'painting' | 'done' | 'failed' | 'skipped';
   estimateUsd: number;
   usd?: number;
   reason?: string;
@@ -694,7 +694,7 @@ interface ArtOverview {
 
 const DIRECTIONS = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']] as const;
 const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
-const STATUS: Record<ArtJob['status'], string> = { queued: 'Waiting', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
+const STATUS: Record<ArtJob['status'], string> = { queued: 'In line', waiting: 'Waiting for a turn', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
 const ASKED: Record<ArtJob['source'], string> = { 'start-up': 'start-up', 'gods-view': "God's View", wish: 'a wish' };
 let artBudget: Budget | null = null;
 
@@ -715,7 +715,7 @@ async function art(): Promise<string> {
 }
 
 function artJobsHtml(jobs: ArtJob[], b: Budget): string {
-  const open = jobs.filter((j) => j.status === 'queued' || j.status === 'painting');
+  const open = jobs.filter((j) => j.status === 'queued' || j.status === 'waiting' || j.status === 'painting');
   const done = jobs.filter((j) => !open.includes(j)).slice(0, 30);
   const waiting = open.reduce((n, j) => n + j.estimateUsd, 0);
   const row = (j: ArtJob) => `
@@ -727,6 +727,7 @@ function artJobsHtml(jobs: ArtJob[], b: Budget): string {
     </tr>`;
   return `
     <h2>Painting now</h2>
+    <p class="note">Each model is asked only as often as Google allows (video: 2 clips a minute, one at a time), so some requests wait their turn. Requests still waiting when the server restarts are painted after it starts again.</p>
     <p>${usd(b.spentUsd)} of ${usd(b.monthlyUsd)} spent this month${b.over ? ' · <b class="bad">The budget is spent: nothing more is painted.</b>' : b.warn ? ' · Past the warning line.' : ''}${open.length ? ` · ${open.length} waiting or painting, about ${usd(waiting)} more` : ''}</p>
     ${open.length ? `<table class="log jobs">${open.map(row).join('')}</table>` : '<p class="note">Nothing is being painted right now.</p>'}
     ${done.length ? `<details${open.length ? '' : ' open'}><summary>Painted lately (${done.length})</summary><table class="log jobs">${done.map(row).join('')}</table></details>` : '<p class="note">Nothing painted since the server started.</p>'}`;

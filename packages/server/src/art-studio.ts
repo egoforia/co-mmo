@@ -22,6 +22,8 @@ import { paintKitAsset, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJob, type ArtJobHandle, type ArtJobs } from './art-jobs.ts';
 import type { BuildingPainter } from './building-painter.ts';
+import { watched } from './paint-queue.ts';
+import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { ContentRecord, Store } from './store.ts';
 import { estimateClipUsd, type WalkPainter, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
@@ -87,6 +89,8 @@ export interface ArtStudioOptions {
   anchorDir: string;
   artDir: string;
   shipped: () => Promise<ArtManifest>;
+  /** Requests kept across a restart until they are painted. */
+  requests?: PaintRequests;
 }
 
 /** A refusal the Owner reads as it is. */
@@ -275,7 +279,7 @@ export class ArtStudio {
     if (Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`))) {
       const handle = this.options.buildings.queue(asset, 'gods-view');
       if (!handle) throw new ArtRequestError('There is no building picture by that name.');
-      this.enqueue(() => this.options.buildings.repaint(asset, note, handle), handle);
+      this.enqueue(() => this.options.buildings.repaint(asset, note, handle), handle, { kind: 'repaint', asset, note });
       return { estimateUsd };
     }
     const kit = [...BIOME_KIT.filter(repaintableKit), ...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
@@ -283,7 +287,7 @@ export class ArtStudio {
     const shipped = (await this.options.shipped())[asset];
     if (!shipped) throw new ArtRequestError('That picture is not part of the game yet.');
     const handle = this.options.jobs.add(asset, kit.name ?? asset, 'picture', 'gods-view', estimateUsd);
-    this.enqueue(() => this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle), handle);
+    this.enqueue(() => this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle), handle, { kind: 'repaint', asset, note });
     return { estimateUsd };
   }
 
@@ -309,7 +313,7 @@ export class ArtStudio {
     if (!plan.views.size && !plan.clips.size) throw new ArtRequestError(`${walker.name} already walks every way. Pick a direction to paint again.`);
     this.enqueue(async () => {
       await this.options.walks.paintWalker(walker, 'gods-view', true, plan);
-    });
+    }, undefined, { kind: 'walk', walker: walkerId, body });
     return { estimateUsd };
   }
 
@@ -327,8 +331,8 @@ export class ArtStudio {
     if (this.options.wishes.budget().over) throw new ArtRequestError("This month's budget is spent, so nothing more can be painted until next month or until the ceiling is raised on the Budget tab.");
   }
 
-  /** Runs a request after the ones before it and after any start-up painting. */
-  private enqueue(task: () => Promise<unknown>, handle?: ArtJobHandle): void {
+  /** Runs a request after the ones before it and after any start-up painting; `request` keeps it across a restart. */
+  private enqueue(task: () => Promise<unknown>, handle?: ArtJobHandle, request?: PaintRequest): void {
     const run = this.queue.then(async () => {
       await Promise.all([this.options.buildings.job, this.options.walks.job]);
       if (this.options.wishes.budget().over) return handle?.skip("This month's budget is spent.");
@@ -339,6 +343,7 @@ export class ArtStudio {
       handle?.fail(plain(err));
     });
     this.hold(this.queue);
+    if (request) this.options.requests?.hold(request, this.queue);
   }
 
   private hold(job: Promise<unknown>): void {
@@ -371,7 +376,7 @@ export class ArtStudio {
     handle.start();
     // Its own approved picture goes along too, so the new one keeps its character.
     const withSelf: KitAsset = { ...asset, references: [...(asset.references ?? []), asset.id] };
-    const { image, entry } = await paintKitAsset(withSelf, provider, this.options.anchorDir, this.redoneDir, { box, note });
+    const { image, entry } = await paintKitAsset(withSelf, watched(provider, handle), this.options.anchorDir, this.redoneDir, { box, note });
     const usd = imageUsd(provider.model, image);
     this.options.store.recordSpend({ at: Date.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: null });
     await this.load();

@@ -26,8 +26,36 @@ export interface ImageProvider {
   generate(request: ImageRequest): Promise<GeneratedImage>;
 }
 
+/** What a service said about a refusal for asking too often, when it said anything. */
+export interface Throttle {
+  /** The quotas it named, such as `GenerateRequestsPerDayPerProjectPerModel`. */
+  quotas: string[];
+  /** How long it asked us to wait before asking again. */
+  retryAfterMs?: number;
+}
+
 export class ProviderError extends Error {
-  constructor(readonly provider: string, readonly status: number, message: string) {
+  constructor(readonly provider: string, readonly status: number, message: string, readonly throttle?: Throttle) {
     super(`${provider}: ${message}`);
   }
+}
+
+/** A Google API error body, as the Gemini API sends it. */
+export interface GoogleError {
+  message?: string;
+  details?: { '@type'?: string; violations?: { quotaId?: string }[]; retryDelay?: string }[];
+}
+
+/** A Google API error as a ProviderError, keeping which quota it hit and how long to wait. */
+export function googleError(provider: string, status: number, error: GoogleError | undefined, fallback: string): ProviderError {
+  let throttle: Throttle | undefined;
+  if (status === 429) {
+    throttle = { quotas: [] };
+    for (const detail of error?.details ?? []) {
+      for (const v of detail.violations ?? []) if (v.quotaId) throttle.quotas.push(v.quotaId);
+      const seconds = Number.parseFloat(detail.retryDelay ?? '');
+      if (Number.isFinite(seconds)) throttle.retryAfterMs = Math.ceil(seconds * 1000);
+    }
+  }
+  return new ProviderError(provider, status, error?.message?.trim() || fallback, throttle);
 }

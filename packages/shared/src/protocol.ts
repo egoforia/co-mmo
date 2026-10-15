@@ -3,6 +3,7 @@
 
 import type { ContentEntry, WishCard } from './content.ts';
 import type { TradeOffer } from './kit.ts';
+import type { RegionDef } from './world.ts';
 import { EQUIP_SLOTS, type Character, type EquipSlot } from './rpg.ts';
 
 /**
@@ -152,12 +153,22 @@ export type Role = 'player' | 'steward' | 'owner';
 export interface RegionInfo {
   id: string;
   name: string;
+  /** How to lay it out: the same on both sides, and it may be a wished region. */
+  def: RegionDef;
 }
 
+/**
+ * Sent on joining or entering a region, and again when the region changes
+ * around the player (a new region was wished beyond one of its edges).
+ */
 export interface WelcomeMessage {
   t: 'welcome';
   you: PlayerInfo;
   region: RegionInfo;
+  /** The regions beyond its open edges, drawn beside it. */
+  neighbours: RegionDef[];
+  /** The last input the server applied; later ones the client predicted are replayed from here. */
+  ack: number;
   x: number;
   y: number;
   tickRate: number;

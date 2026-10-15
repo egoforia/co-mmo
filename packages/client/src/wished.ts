@@ -1,4 +1,4 @@
-import { applyContent, placeholderArt, ruleItemId, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
+import { applyContent, placeholderArt, regionPictures, ruleItemId, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until the image model paints a wish's own
@@ -39,6 +39,30 @@ export function lookArt(playerId: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Art the world scene draws for granted wishes, as [texture key, URL]: each
+ * wished thing, the creatures and person a region brings, and a wished
+ * biome's painted kit.
+ */
+export function sceneArt(): [string, string][] {
+  const art: [string, string][] = [];
+  for (const e of entries.values()) {
+    const def = e.definition;
+    if (e.status !== 'granted' || !def) continue;
+    if (def.kind === 'region') {
+      for (const p of regionPictures(e.id, def)) {
+        const key = wishArtKey(p.id);
+        if (urls.has(key)) art.push([key, urls.get(key)!]);
+      }
+      for (const [id, url] of Object.entries(e.kitArt ?? {})) art.push([id, url]);
+    } else if (def.kind !== 'recipe') {
+      const key = wishArtKey(e.id);
+      art.push([key, artSrc(key)]);
+    }
+  }
+  return art;
+}
+
 /** Picture for an asset key, wished or built-in. */
 export function artSrc(asset: string, icon = false): string {
   if (asset.startsWith('wished-')) return urls.get(asset) ?? 'art/item-goat-horn-icon.png';
@@ -54,6 +78,10 @@ async function prepareArt(entry: ContentEntry): Promise<void> {
       const id = ruleItemId(entry.id, key);
       return picture(wishArtKey(id), entry.itemArt?.[id], item);
     }));
+    return;
+  }
+  if (def.kind === 'region') {
+    await Promise.all(regionPictures(entry.id, def).map((p) => picture(wishArtKey(p.id), entry.itemArt?.[p.id], p.def)));
     return;
   }
   if (def.kind !== 'recipe') await picture(wishArtKey(entry.id), entry.art, def);

@@ -37,15 +37,19 @@ export function collides(map: RegionMap, x: number, y: number): boolean {
 
 /**
  * Where a player who walked off an edge through `side`, at `at`, lands in the
- * neighbour `to`: at the same point along the edge, just inside it, so the two
- * regions read as one stretch of ground. Falls back to the road's entry when
- * that spot is blocked; undefined when `to` has no way back.
+ * neighbour `to`: exactly where that step took them, counted from the
+ * neighbour's corner, so the two regions read as one stretch of ground and
+ * nobody jumps. Falls back to the road's entry when that spot is blocked;
+ * undefined when `to` has no way back.
  */
 export function arrivalPoint(to: RegionMap, side: Side, at: Vec2): Vec2 | undefined {
   const entry = to.entries[OPPOSITE[side]];
   if (!entry) return undefined;
-  const spot = side === 'east' || side === 'west'
-    ? { x: entry.x, y: Math.max(1, Math.min(to.height - 1, at.y)) }
-    : { x: Math.max(1, Math.min(to.width - 1, at.x)), y: entry.y };
+  // Regions are the same size; keep the spot just inside the edge it came through.
+  const inside = (v: number, size: number) => Math.max(0.001, Math.min(size - 0.001, v));
+  const spot = {
+    x: inside(side === 'west' ? at.x + to.width : side === 'east' ? at.x - to.width : at.x, to.width),
+    y: inside(side === 'north' ? at.y + to.height : side === 'south' ? at.y - to.height : at.y, to.height),
+  };
   return collides(to, spot.x, spot.y) ? { ...entry } : spot;
 }

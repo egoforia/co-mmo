@@ -40,3 +40,19 @@ describe('Interpolator', () => {
     expect(i.sample(5000)).toEqual({ x: 10, y: 0 });
   });
 });
+
+describe('crossing into another region', () => {
+  it('replays steps the server has not applied yet from where it says we arrived', () => {
+    const map = generateRegion(WORLD_REGIONS[0]!);
+    const old = new Predictor(map, map.spawn);
+    for (let i = 0; i < 4; i++) old.apply(1, 0);
+    // The server applied the first two steps before moving us; two remain.
+    const start = { x: map.spawn.x + 0.5, y: map.spawn.y };
+    const next = new Predictor(map, start, old.lastSeq, old.unapplied, 2);
+    let expected = start;
+    for (let i = 0; i < 2; i++) expected = step(map, expected, 1, 0);
+    expect(next.position).toEqual(expected);
+    expect(next.unacknowledged).toBe(2);
+    expect(next.lastSeq).toBe(4);
+  });
+});

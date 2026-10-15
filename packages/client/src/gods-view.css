@@ -41,6 +41,16 @@ button.quiet:hover { border-color: var(--gold); }
 .region.woods canvas { background: #2f4d2e; }
 .region.shore canvas { background: #2e6f7a; }
 .region.desert canvas { background: #8c6a3c; }
+/* Wished regions, by biome. */
+.region.verdant-meadows canvas { background: #5c7a3a; }
+.region.whispering-woods canvas { background: #2f4d2e; }
+.region.mushroom-hollow canvas { background: #4a3a66; }
+.region.sunlit-shore canvas { background: #2e6f7a; }
+.region.frostpeak canvas { background: #6f8fa8; }
+.region.ember-wastes canvas { background: #3d2f45; }
+.region.mirage-desert canvas { background: #8c6a3c; }
+.region.murkmire-swamp canvas { background: #4a4e2a; }
+.region.sky-ruins canvas { background: #7a80a8; }
 .region figcaption { padding: 4px 8px; font-size: 12px; color: var(--muted); }
 .region figcaption b { color: var(--ink); }
 .legend { color: var(--muted); font-size: 12px; }

@@ -3,7 +3,10 @@
 // the engine already understands (design doc, "How wishes become
 // mechanics", layer 1), never code.
 
+import { BIOMES, type BiomeId } from './biomes.ts';
 import { RECIPES } from './kit.ts';
+import { WISHED_REGIONS, type RegionDef } from './world.ts';
+import { hashString } from './random.ts';
 import {
   ABILITIES,
   CREATURES,
@@ -105,10 +108,36 @@ export interface PlayerLookWish {
   look: WishLook;
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | RecipeWish | AbilityWish;
+/** A creature a wished region brings: one that already exists, or a new one. */
+export type RegionCreature =
+  | { existing: string; count: number }
+  | (Omit<CreatureWish, 'kind' | 'level'> & { existing?: undefined });
 
-/** Wished things that have a picture (everything but recipes). */
-export type PicturedWish = Exclude<WishDefinition, RecipeWish>;
+/**
+ * A new region beyond the world's edge (design doc, World structure: new
+ * regions are added at the world's edges when players wish for them). Its
+ * biome, danger, how wild it is, its creatures and its one person are data;
+ * the layout is generated from them, the same on server and client.
+ */
+export interface RegionWish {
+  kind: 'region';
+  name: string;
+  description: string;
+  biome: BiomeId;
+  /** 1 to 6: wished creatures there are this level. */
+  danger: number;
+  /** How thick each grows, 0 (none) to 3. */
+  trees: number;
+  rocks: number;
+  water: number;
+  creatures: RegionCreature[];
+  npc?: Omit<NpcWish, 'kind'>;
+}
+
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | RecipeWish | AbilityWish | RegionWish;
+
+/** Wished things that have one picture of their own (not recipes or regions). */
+export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish>;
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
 export type RuleItem = Omit<ItemWish, 'kind'>;
@@ -149,10 +178,14 @@ export interface ContentEntry {
   definition?: Definition;
   /** Where creatures and NPCs were placed. */
   placements?: { x: number; y: number }[];
+  /** A wished region's square on the world grid. */
+  cell?: { x: number; y: number };
   /** Painted art, once generated: a URL path. Until then a tinted placeholder is drawn. */
   art?: string;
-  /** Painted art for a rule's items, by item id. */
+  /** Painted art for the things a rule or region brings (items, creatures, its person), by id. */
   itemArt?: Record<string, string>;
+  /** A wished region's biome kit (ground, water, trees, rocks), by art id, once painted. */
+  kitArt?: Record<string, string>;
   /** Where the wish stands now, worked out by the server from its status, draft, test run and rule. */
   progress?: WishProgress;
 }
@@ -300,11 +333,74 @@ export const MAX_SCRIPT_LENGTH = 8000;
 /** Wished equipment is at most this rare; Epic and Legendary things are earned, not wished. */
 export const MAX_WISHED_RARITY: Rarity = 'rare';
 export const MAX_RECIPE_MATERIALS = 4;
+/** A region is the biggest wish the God grants at once, and costs more than one creature. */
+export const REGION_WISH_COST = 12;
+/** Kinds of creature a wished region may bring, and how many of each at most. */
+export const MAX_REGION_CREATURE_KINDS = 2;
+export const MAX_REGION_CREATURES = 6;
 export const MAX_RECIPE_RESULT = 3;
 
 /** The tier a buildable wish costs: things for your bag are minor, the rest moderate. */
 export function contentTier(def: WishDefinition): 'minor' | 'moderate' {
   return def.kind === 'item' || def.kind === 'recipe' ? 'minor' : 'moderate';
+}
+
+/** Favor a buildable wish costs: its tier's price, more for a whole region. */
+export function wishCost(def: WishDefinition): number {
+  return def.kind === 'region' ? REGION_WISH_COST : WISH_COSTS[contentTier(def)];
+}
+
+/** The id of the i-th new creature a wished region brings. */
+export function regionCreatureId(entryId: string, i: number): string {
+  return `${entryId}-c${i}`;
+}
+
+/** The id of the person a wished region brings. */
+export function regionNpcId(entryId: string): string {
+  return `${entryId}-npc`;
+}
+
+/** Things a region wish brings that each have a picture, by id. */
+export function regionPictures(entryId: string, def: RegionWish): { id: string; def: CreatureWish | NpcWish }[] {
+  const pictures: { id: string; def: CreatureWish | NpcWish }[] = [];
+  def.creatures.forEach((c, i) => {
+    if (c.existing === undefined) pictures.push({ id: regionCreatureId(entryId, i), def: { kind: 'creature', ...c, level: def.danger } });
+  });
+  if (def.npc) pictures.push({ id: regionNpcId(entryId), def: { kind: 'npc', ...def.npc } });
+  return pictures;
+}
+
+/**
+ * The region a granted region wish adds, laid out from its definition. Its
+ * exits are worked out by the world from where it sits.
+ */
+export function regionFromWish(entry: Pick<ContentEntry, 'id' | 'wisher' | 'cell' | 'definition'>): RegionDef | undefined {
+  const d = entry.definition;
+  if (d?.kind !== 'region' || !entry.cell) return undefined;
+  return {
+    id: entry.id,
+    name: d.name,
+    biome: d.biome,
+    seed: hashString(entry.id) % 100_000,
+    at: { ...entry.cell },
+    exits: {},
+    wild: {
+      danger: d.danger,
+      trees: d.trees,
+      rocks: d.rocks,
+      water: d.water,
+      creatures: d.creatures.map((c, i) => {
+        if (c.existing !== undefined) {
+          const known = CREATURES[c.existing];
+          return { kind: c.existing, name: known?.name ?? c.existing, asset: known?.art ?? c.existing, count: c.count };
+        }
+        const id = regionCreatureId(entry.id, i);
+        return { kind: id, name: c.name, asset: wishArtKey(id), count: c.count };
+      }),
+      ...(d.npc ? { npc: { id: regionNpcId(entry.id), name: d.npc.name, asset: wishArtKey(regionNpcId(entry.id)) } } : {}),
+      wisher: entry.wisher.name,
+    },
+  };
 }
 
 /** The built-in picture each equipment slot is drawn with until its own is painted. */
@@ -328,6 +424,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   if (def.kind === 'ability' || def.kind === 'recipe') return 'item-scroll';
   if (def.kind === 'npc') return 'sanctum-pilgrim';
   if (def.kind === 'player') return 'player-mara';
+  if (def.kind === 'region') return 'sanctum-shrine';
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';
 }
 
@@ -376,7 +473,58 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const greeting = text(d.greeting, 280) || `Hello, traveller. I am ${name}.`;
     return { kind: 'npc', name, description, greeting, look };
   }
-  throw new WishError('The God can only make items, creatures, people, recipes and abilities so far.');
+  if (d.kind === 'region') return validateRegion(name, description, d);
+  throw new WishError('The God can only make items, creatures, people, recipes, abilities and new regions so far.');
+}
+
+/**
+ * A region needs a biome (there is only one Sanctum), a danger level and at
+ * least one kind of creature; a person is optional. New creatures are as
+ * strong as the region is dangerous.
+ */
+function validateRegion(name: string, description: string, d: Record<string, unknown>): RegionWish {
+  const biome = (Object.keys(BIOMES) as BiomeId[]).find((b) => b === d.biome && b !== 'sanctum');
+  if (!biome) throw new WishError('A new region needs a land to be: meadows, woods, mushrooms, shore, snow, embers, desert, swamp or sky ruins.');
+  const danger = clamp(Math.round(Number(d.danger) || 1), 1, MAX_WISHED_LEVEL);
+  const level = (v: unknown, fallback: number) => clamp(Math.round(Number(v ?? fallback)), 0, 3);
+  const creatures: RegionCreature[] = [];
+  for (const raw of Array.isArray(d.creatures) ? d.creatures : []) {
+    const c = (raw ?? {}) as Record<string, unknown>;
+    const count = clamp(Math.round(Number(c.count) || 4), 1, MAX_REGION_CREATURES);
+    if (typeof c.existing === 'string') {
+      if (CREATURES[c.existing] && !creatures.some((x) => x.existing === c.existing)) creatures.push({ existing: c.existing, count });
+    } else {
+      try {
+        const { kind: _k, level: _l, ...made } = validateDefinition({ ...c, kind: 'creature', level: danger }) as CreatureWish;
+        creatures.push({ ...made, count });
+      } catch (err) {
+        if (!(err instanceof WishError)) throw err;
+      }
+    }
+    if (creatures.length >= MAX_REGION_CREATURE_KINDS) break;
+  }
+  if (!creatures.length) throw new WishError('A new region needs at least one kind of creature to live there.');
+  let npc: RegionWish['npc'];
+  if (d.npc && typeof d.npc === 'object') {
+    try {
+      const { kind: _k, ...person } = validateDefinition({ ...(d.npc as object), kind: 'npc' }) as NpcWish;
+      npc = person;
+    } catch (err) {
+      if (!(err instanceof WishError)) throw err;
+    }
+  }
+  return {
+    kind: 'region',
+    name,
+    description,
+    biome,
+    danger,
+    trees: level(d.trees, 2),
+    rocks: level(d.rocks, 1),
+    water: level(d.water, 1),
+    creatures,
+    ...(npc ? { npc } : {}),
+  };
 }
 
 /** A recipe must use things that exist, and give back no more than it takes. */
@@ -526,6 +674,14 @@ export function applyContent(entry: ContentEntry): void {
   else if (d.kind === 'ability') {
     ABILITIES[entry.id] = abilityFromWish(d);
     ITEMS[entry.id] = scrollFromWish(entry.id, d);
+  } else if (d.kind === 'region') {
+    for (const picture of regionPictures(entry.id, d)) {
+      if (picture.def.kind === 'creature') CREATURES[picture.id] = creatureFromWish(picture.id, picture.def);
+      else NPC_GREETINGS[picture.id] = picture.def.greeting;
+      WISHERS.set(picture.id, entry.wisher.id);
+    }
+    const region = regionFromWish(entry);
+    if (region) WISHED_REGIONS.set(entry.id, region);
   }
 }
 
@@ -535,6 +691,14 @@ export function removeContent(entry: ContentEntry): void {
       delete ITEMS[ruleItemId(entry.id, key)];
       WISHERS.delete(ruleItemId(entry.id, key));
     }
+  }
+  if (entry.definition?.kind === 'region') {
+    for (const picture of regionPictures(entry.id, entry.definition)) {
+      delete CREATURES[picture.id];
+      delete NPC_GREETINGS[picture.id];
+      WISHERS.delete(picture.id);
+    }
+    WISHED_REGIONS.delete(entry.id);
   }
   delete ITEMS[entry.id];
   delete CREATURES[entry.id];

@@ -57,6 +57,8 @@ export async function handleAdmin(
       id: r.def.id,
       name: r.def.name,
       biome: r.def.biome,
+      at: r.def.at,
+      ...(r.def.wild ? { wisher: r.def.wild.wisher, danger: r.def.wild.danger } : {}),
       width: r.map.width,
       height: r.map.height,
       players: r.playerIds().map((id) => ({ id, name: r.nameOf(id), ...r.position(id), level: r.character(id)?.level })),

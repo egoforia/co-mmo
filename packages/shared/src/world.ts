@@ -37,18 +37,88 @@ export interface RegionDef {
   seed: number;
   /** Which region lies beyond each edge; edges without one are closed. */
   exits: Partial<Record<Side, string>>;
+  /** Its square on the world grid: the Sanctum is (0, 0), east is +x, south is +y. */
+  at: { x: number; y: number };
+  /** A region wished into being: how wild it is and what lives there. */
+  wild?: WildLand;
+}
+
+/**
+ * How a wished region is laid out (design doc, World structure): its danger,
+ * how thick its trees, rocks and water are, its creatures and its one
+ * person, and who wished it.
+ */
+export interface WildLand {
+  /** 1 (gentle) to 6 (deadly): the level of the creatures wished for it. */
+  danger: number;
+  /** 0 (none) to 3 (thick). */
+  trees: number;
+  rocks: number;
+  water: number;
+  creatures: { kind: string; name: string; asset: string; count: number }[];
+  npc?: { id: string; name: string; asset: string };
+  /** The credit line: who wished it. */
+  wisher: string;
 }
 
 /** The launch world: the Sanctum in the middle, a biome on three sides. */
 export const WORLD_REGIONS: RegionDef[] = [
-  { id: 'sanctum', name: 'the Sanctum', biome: 'sanctum', seed: 1337, exits: { west: 'woods', east: 'shore', south: 'desert' } },
-  { id: 'woods', name: 'Whispering Woods', biome: 'whispering-woods', seed: 2001, exits: { east: 'sanctum' } },
-  { id: 'shore', name: 'Sunlit Shore', biome: 'sunlit-shore', seed: 3001, exits: { west: 'sanctum' } },
-  { id: 'desert', name: 'Mirage Desert', biome: 'mirage-desert', seed: 4001, exits: { north: 'sanctum' } },
+  { id: 'sanctum', name: 'the Sanctum', biome: 'sanctum', seed: 1337, at: { x: 0, y: 0 }, exits: { west: 'woods', east: 'shore', south: 'desert' } },
+  { id: 'woods', name: 'Whispering Woods', biome: 'whispering-woods', seed: 2001, at: { x: -1, y: 0 }, exits: { east: 'sanctum' } },
+  { id: 'shore', name: 'Sunlit Shore', biome: 'sunlit-shore', seed: 3001, at: { x: 1, y: 0 }, exits: { west: 'sanctum' } },
+  { id: 'desert', name: 'Mirage Desert', biome: 'mirage-desert', seed: 4001, at: { x: 0, y: 1 }, exits: { north: 'sanctum' } },
 ];
 
+/** Regions players wished into being, by id (filled in by applyContent). */
+export const WISHED_REGIONS = new Map<string, RegionDef>();
+
+/** A launch region or a wished one, by id. */
 export function regionDef(id: string): RegionDef | undefined {
-  return WORLD_REGIONS.find((r) => r.id === id);
+  return WORLD_REGIONS.find((r) => r.id === id) ?? WISHED_REGIONS.get(id);
+}
+
+export const SIDES: Side[] = ['north', 'east', 'south', 'west'];
+
+/** One step across the world grid toward a side. */
+export const SIDE_STEP: Record<Side, { x: number; y: number }> = { north: { x: 0, y: -1 }, south: { x: 0, y: 1 }, east: { x: 1, y: 0 }, west: { x: -1, y: 0 } };
+
+/** The grid square beyond a region's edge. */
+export function cellBeyond(def: RegionDef, side: Side): { x: number; y: number } {
+  return { x: def.at.x + SIDE_STEP[side].x, y: def.at.y + SIDE_STEP[side].y };
+}
+
+/**
+ * Exits for every region from where it sits: neighbours on the grid are
+ * joined by a road, so a region wished beside two others reaches both.
+ */
+export function linkRegions(defs: RegionDef[]): Map<string, Partial<Record<Side, string>>> {
+  const byCell = new Map(defs.map((d) => [`${d.at.x},${d.at.y}`, d.id]));
+  const links = new Map<string, Partial<Record<Side, string>>>();
+  for (const def of defs) {
+    const exits: Partial<Record<Side, string>> = {};
+    for (const side of SIDES) {
+      const cell = cellBeyond(def, side);
+      const other = byCell.get(`${cell.x},${cell.y}`);
+      if (other) exits[side] = other;
+    }
+    links.set(def.id, exits);
+  }
+  return links;
+}
+
+/** The edges of a region with no region beyond them yet: where the world can grow. */
+export function openSides(defs: RegionDef[], def: RegionDef): Side[] {
+  const taken = new Set(defs.map((d) => `${d.at.x},${d.at.y}`));
+  return SIDES.filter((side) => {
+    const cell = cellBeyond(def, side);
+    return !taken.has(`${cell.x},${cell.y}`);
+  });
+}
+
+/** The open edge nearest a spot in the region, or undefined when every edge has a neighbour. */
+export function nearestOpenSide(defs: RegionDef[], def: RegionDef, x: number, y: number, size = REGION_SIZE): Side | undefined {
+  const distance: Record<Side, number> = { north: y, south: size - y, west: x, east: size - x };
+  return openSides(defs, def).sort((a, b) => distance[a] - distance[b])[0];
 }
 
 /** A large painted set piece; its footprint tiles are blocked. */
@@ -147,7 +217,8 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
     creatures: [],
   };
   const c = Math.floor(size / 2);
-  (BIOME_LAYOUTS[def.biome] ?? sanctumLayout)(map, c);
+  const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? sanctumLayout;
+  layout(map, c);
 
   // Roads from every open edge to the middle, then entry points just inside.
   for (const side of Object.keys(def.exits) as Side[]) {
@@ -248,6 +319,34 @@ const desertLayout: Layout = (map, c) => {
   creatures(map, 'sun-scarab', 'Sun Scarab', 'desert-scarab', 5);
   map.spawn = { x: c, y: c + 1 };
 };
+
+/** How likely each tile is to hold a tree, rock or water, from 0 (none) to 3 (thick). */
+const TREE_CHANCE = [0, 0.03, 0.08, 0.16];
+const ROCK_CHANCE = [0, 0.008, 0.02, 0.04];
+const WATER_LEVEL = [0, 0.12, 0.2, 0.28];
+
+/**
+ * A wished region: the biome's ground with trees, rocks and water as thick
+ * as the wish asked, a clearing in the middle where its person stands, and
+ * its creatures roaming the rest.
+ */
+function wildLayout(wild: WildLand): Layout {
+  const level = (n: number) => Math.max(0, Math.min(3, Math.round(n)));
+  return (map, c) => {
+    scatter(map, (x, y) => {
+      if (valueNoise(x, y, map.seed, 9) < WATER_LEVEL[level(wild.water)]!) return Tile.Water;
+      if (rand2(x, y, map.seed + 1) < ROCK_CHANCE[level(wild.rocks)]!) return Tile.Rock;
+      // Trees grow in groves, thinning out between them.
+      const grove = valueNoise(x, y, map.seed + 2, 6);
+      if (rand2(x, y, map.seed + 3) < TREE_CHANCE[level(wild.trees)]! * (0.4 + grove * 1.2)) return Tile.Tree;
+      return Tile.Ground;
+    });
+    disc(map, c, c, 5, Tile.Ground);
+    if (wild.npc) map.npcs.push({ ...wild.npc, x: c - 2.5, y: c + 3.5 });
+    for (const kind of wild.creatures) creatures(map, kind.kind, kind.name, kind.asset, kind.count);
+    map.spawn = { x: c, y: c + 1 };
+  };
+}
 
 const BIOME_LAYOUTS: Partial<Record<BiomeId, Layout>> = {
   sanctum: sanctumLayout,

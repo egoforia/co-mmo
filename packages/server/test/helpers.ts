@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import sharp from 'sharp';
 import { WebSocket } from 'ws';
-import { ABILITIES, CREATURES, ITEMS, NPC_GREETINGS, RECIPES, type GodMessage, type ServerMessage, type WishCard } from '@co-mmo/shared';
+import { ABILITIES, CREATURES, ITEMS, NPC_GREETINGS, RECIPES, WISHED_REGIONS, type GodMessage, type ServerMessage, type WishCard } from '@co-mmo/shared';
 import { createApp, type App } from '../src/app.ts';
 import type { ChatModel } from '../src/ai/chat.ts';
 import { OfflineGod } from '../src/god.ts';
@@ -33,6 +33,7 @@ afterEach(async () => {
   app = null;
   // Forget wished things; built-in ones (the Walking Mushroom, the Wooden Sword) stay.
   for (const [registry, keep] of BUILT_IN) for (const id of Object.keys(registry)) if (!keep.has(id)) delete registry[id];
+  WISHED_REGIONS.clear();
 });
 
 const BUILT_IN: [Record<string, unknown>, Set<string>][] = [ITEMS, CREATURES, NPC_GREETINGS, RECIPES, ABILITIES].map((r) => [r, new Set(Object.keys(r))]);

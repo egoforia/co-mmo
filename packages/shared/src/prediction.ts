@@ -1,7 +1,7 @@
 import { step, type Vec2 } from './movement.ts';
 import type { RegionMap } from './world.ts';
 
-interface PendingInput {
+export interface PendingInput {
   seq: number;
   dx: number;
   dy: number;
@@ -20,14 +20,26 @@ export class Predictor {
   /**
    * `lastSeq` carries numbering over when the player changes region, since
    * the server ignores any input numbered at or below one it has applied.
+   * `carried` are inputs predicted before the change; the server carries
+   * those after `start` over too, so they are replayed here and the player
+   * walks on without a jump.
    */
-  constructor(private readonly map: RegionMap, start: Vec2, lastSeq = 0) {
+  constructor(private readonly map: RegionMap, start: Vec2, lastSeq = 0, carried: PendingInput[] = [], ack = 0) {
     this.position = { ...start };
     this.seq = lastSeq;
+    if (carried.length) {
+      this.pending = carried.slice();
+      this.reconcile(ack, start);
+    }
   }
 
   get lastSeq(): number {
     return this.seq;
+  }
+
+  /** Inputs sent but not yet applied by the server, oldest first. */
+  get unapplied(): PendingInput[] {
+    return this.pending.slice();
   }
 
   /** Applies one tick of input locally; returns the message to send. */

@@ -55,7 +55,7 @@ export interface SoundMakerOptions {
   effects: () => SoundProvider | undefined;
   /** The music service chosen in God's View, or undefined when there is none. */
   music: () => SoundProvider | undefined;
-  /** True once this month's budget is spent. */
+  /** True while spending is paused: this month's budget is spent or today's cap is reached. */
   overBudget: () => boolean;
   /** Records what a sound cost. */
   spend: (usd: number, provider: SoundProvider) => void;
@@ -157,7 +157,7 @@ export class SoundMaker {
     for (const [i, job] of jobs.entries()) {
       const provider = this.providerFor(job);
       if (!provider || this.options.overBudget()) {
-        for (const left of queued.slice(i)) left?.skip(provider ? "This month's budget is spent." : missing(job.kind));
+        for (const left of queued.slice(i)) left?.skip(provider ? "Spending is paused: this month's budget or today's cap is used up." : missing(job.kind));
         return;
       }
       await this.make(job, provider, queued[i]).catch((err) => console.error(`Making ${job.id} failed:`, (err as Error).message));

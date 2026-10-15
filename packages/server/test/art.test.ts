@@ -93,6 +93,45 @@ describe('the Art tab', () => {
     expect(store.spendThisMonth(Date.now()).length).toBe(1);
   });
 
+  it('keeps every earlier version, puts any of them back, and can go back to the shipped picture', async () => {
+    const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+    const paint = async () => {
+      expect((await api(base, '/api/admin/art/paint', owner.token, 'POST', { asset: 'sanctum-rock' })).status).toBe(202);
+      await app!.art.idle();
+    };
+    await paint();
+    const first = await readFile(join(artDir, 'redone', 'sanctum-rock.png'));
+    await paint();
+    const item = async () => (await api(base, '/api/admin/art', owner.token)).body.groups.find((g: any) => g.id === 'scenery').items.find((i: any) => i.id === 'sanctum-rock');
+    const after = await item();
+    expect(after).toMatchObject({ source: 'redone', shippedBack: true, versions: [{ id: expect.any(String), url: expect.stringMatching(/^\/wished-art\/history\/sanctum-rock\//) }] });
+    expect((await fetch(`${base}${after.versions[0].url}`)).status).toBe(200);
+
+    // Putting the first back keeps the second as an earlier version too.
+    expect((await api(base, '/api/admin/art/restore', owner.token, 'POST', { asset: 'sanctum-rock', version: after.versions[0].id })).status).toBe(200);
+    expect(Buffer.compare(await readFile(join(artDir, 'redone', 'sanctum-rock.png')), first)).toBe(0);
+    expect((await item()).versions).toHaveLength(2);
+    expect((await api(base, '/api/admin/art/restore', owner.token, 'POST', { asset: 'sanctum-rock', version: 'nope' })).body.message).toMatch(/not there/);
+
+    expect((await api(base, '/api/admin/art/restore', owner.token, 'POST', { asset: 'sanctum-rock', version: 'shipped' })).status).toBe(200);
+    expect(await item()).toMatchObject({ source: 'shipped' });
+    const { body: art } = await api(base, '/api/art', owner.token);
+    expect(art['sanctum-rock']).toBeUndefined();
+  });
+
+  it('paints a whole group again, one request per picture', async () => {
+    const { base, store, painter } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+    const asked = await api(base, '/api/admin/art/paint-group', owner.token, 'POST', { group: 'building-bramble-cottage' });
+    expect(asked.status).toBe(202);
+    expect(asked.body.count).toBeGreaterThan(3);
+    expect(asked.body.estimateUsd).toBeGreaterThan(0);
+    await app!.art.idle();
+    expect((painter as any).calls).toBe(asked.body.count);
+    expect((await api(base, '/api/admin/art/paint-group', owner.token, 'POST', { group: 'nothing' })).body.message).toMatch(/no group/);
+  });
+
   it('paints shipped scenery again at its shipped size, served from the redone folder', async () => {
     const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
     const owner = account(store, 'Ego', 'owner');

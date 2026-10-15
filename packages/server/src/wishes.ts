@@ -45,7 +45,7 @@ import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, askWorkshopGod, type GodReply, type PrayerContext, type WorkshopContext, type WorkshopReply } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import { testRule } from './rule-test.ts';
-import type { ArtPromptRecord, ContentRecord, Settings, Store } from './store.ts';
+import { DEFAULT_DAILY_USD, type ArtUse, type ArtPromptRecord, type ContentRecord, type Settings, type Store } from './store.ts';
 import type { World } from './world.ts';
 
 /** Turns of conversation the God remembers per player. */
@@ -73,6 +73,24 @@ interface OpenCard {
 }
 
 /** A sample picture painted for a Workshop draft, and how it was asked for. */
+/** Spending against the monthly budget and the daily cap. */
+export interface Budget {
+  spentUsd: number;
+  monthlyUsd: number;
+  warnUsd: number;
+  /** This month's budget is spent: wishes use the offline God and nothing is painted. */
+  over: boolean;
+  warn: boolean;
+  todayUsd: number;
+  dailyUsd: number;
+  /** Today's cap is reached: painting and sound wait for tomorrow (UTC). */
+  overToday: boolean;
+  /** Nothing new is painted or made: over the month or today's cap. */
+  paused: boolean;
+  /** Why it is paused, in plain words. */
+  why?: string;
+}
+
 export interface PaintedSample {
   /** The player whose sample it is (the file is samples/<player id>.png in the art directory). */
   playerId: string;
@@ -99,7 +117,7 @@ export interface WishOptions {
   /** Overrides the rule compiler's models (tests); the offline compiler is always last. */
   compilerModel?: (settings: Settings) => ChatModel[];
   /** Overrides image provider creation (tests). */
-  imageProvider?: (settings: Settings) => ImageProvider | undefined;
+  imageProvider?: (settings: Settings, use?: ArtUse) => ImageProvider | undefined;
 }
 
 /**
@@ -433,7 +451,7 @@ export class Wishes {
    * sample spend. The Workshop checks the switch, the budget and the Favor.
    */
   async paintSample(playerId: string, def: PicturedWish, biome: BiomeId): Promise<PaintedSample | undefined> {
-    const provider = this.imageProvider();
+    const provider = this.imageProvider('wishes');
     if (!provider) return undefined;
     const painted = await paintWish(playerId, def, biome, provider, this.options.anchorDir, resolve(this.options.artDir, 'samples'));
     const usd = imageUsd(provider.model, painted.image);
@@ -732,9 +750,9 @@ export class Wishes {
    */
   paint(record: ContentRecord, force = false, prompts: Record<string, string> = {}, only?: string): Promise<void> | undefined {
     if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe') return undefined;
-    const provider = this.imageProvider();
+    const provider = this.imageProvider('wishes');
     if (!provider) return undefined;
-    if (!force && this.budget().over) return undefined;
+    if (!force && this.budget().paused) return undefined;
     const def = record.definition;
     if (def.kind === 'region') return this.keep({ record, force, only, prompts }, this.track(this.paintRegion(record, def, provider, force, only, prompts)));
     const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
@@ -746,8 +764,8 @@ export class Wishes {
     const job = (async () => {
       for (const [i, picture] of chosen.entries()) {
         const handle = handles[i];
-        if (!force && this.budget().over) {
-          for (const left of handles.slice(i)) left?.skip("This month's budget is spent.");
+        if (!force && this.budget().paused) {
+          for (const left of handles.slice(i)) left?.skip(this.budget().why ?? "The budget is spent.");
           break;
         }
         let painted;
@@ -774,6 +792,19 @@ export class Wishes {
     })().finally(() => this.painting.delete(job));
     this.painting.add(job);
     return this.keep({ record, force, only, prompts }, job);
+  }
+
+  /**
+   * Tells players a wish's picture file changed on disk (an earlier version
+   * was put back), so browsers load it afresh. False when it has no such picture.
+   */
+  touchArt(recordId: string, pictureId: string): boolean {
+    const record = this.store.contentById(recordId);
+    if (!record || !hasArt(record, pictureId)) return false;
+    const url = `/wished-art/${pictureId}.png?v=${this.now().toString(36)}`;
+    const updated = this.store.updateContent(record.id, pictureId === record.id ? { art: url } : { itemArt: { ...record.itemArt, [pictureId]: url } });
+    if (updated) this.broadcast(updated);
+    return true;
   }
 
   /** Paints a wish's pictures again after a restart cut their painting short. */
@@ -806,24 +837,26 @@ export class Wishes {
     // The Owner's Repaint paints the biome's kit again too.
     const kitAssets = wildKit(def.biome).filter((a) => (only ? a.id === only : !kit[a.id] || force));
     const pictures = regionPictures(record.id, def).filter((p) => (only ? p.id === only : force || !hasArt(record, p.id)));
-    const kitJobs = kitAssets.map((a) => this.queueArt(a.id, a.name, force, provider));
+    // Scenery can have its own image model (AI models tab).
+    const scenery = this.imageProvider('scenery') ?? provider;
+    const kitJobs = kitAssets.map((a) => this.queueArt(a.id, a.name, force, scenery));
     const pictureJobs = pictures.map((p) => this.queueArt(p.id, p.def.name, force, provider));
     const skipAll = () => {
-      for (const left of [...kitJobs, ...pictureJobs]) left?.skip("This month's budget is spent.");
+      for (const left of [...kitJobs, ...pictureJobs]) left?.skip(this.budget().why ?? "The budget is spent.");
     };
     for (const [i, asset] of kitAssets.entries()) {
-      if (!force && this.budget().over) return skipAll();
+      if (!force && this.budget().paused) return skipAll();
       kitJobs[i]?.start();
       try {
-        const { image, entry, prompt, references } = await paintKitAsset(asset, watched(provider, kitJobs[i]), this.options.anchorDir, dir, prompts[asset.id] ? { prompt: prompts[asset.id] } : {});
-        const usd = imageUsd(provider.model, image);
+        const { image, entry, prompt, references } = await paintKitAsset(asset, watched(scenery, kitJobs[i]), this.options.anchorDir, dir, prompts[asset.id] ? { prompt: prompts[asset.id] } : {});
+        const usd = imageUsd(scenery.model, image);
         kitJobs[i]?.done(usd);
-        this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
+        this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: scenery.id, model: scenery.model, playerId: record.wisher.id });
         kit[asset.id] = { ...entry, file: `${entry.file}?v=${this.now().toString(36)}` };
         await mkdir(dir, { recursive: true });
         await writeFile(resolve(dir, 'manifest.json'), JSON.stringify(kit, null, 2));
         const current = this.store.contentById(record.id);
-        if (current) update({ usd: current.usd + usd, artPrompts: { ...current.artPrompts, [asset.id]: this.promptRecord(provider, prompt, references, usd) } });
+        if (current) update({ usd: current.usd + usd, artPrompts: { ...current.artPrompts, [asset.id]: this.promptRecord(scenery, prompt, references, usd) } });
       } catch (err) {
         console.error(`Painting ${asset.id} failed:`, (err as Error).message);
         kitJobs[i]?.fail((err as Error).message);
@@ -832,7 +865,7 @@ export class Wishes {
     // Every region of this biome shows the kit, including ones wished before it was painted.
     this.showKit(def.biome, kitUrl);
     for (const [i, picture] of pictures.entries()) {
-      if (!force && this.budget().over) return skipAll();
+      if (!force && this.budget().paused) return skipAll();
       let painted;
       pictureJobs[i]?.start();
       try {
@@ -898,10 +931,28 @@ export class Wishes {
     return Object.fromEntries(Object.entries(kit).map(([id, e]) => [id, { ...e, file: `/${KIT_ART_PATH}/${e.file}` }]));
   }
 
-  budget(): { spentUsd: number; monthlyUsd: number; warnUsd: number; over: boolean; warn: boolean } {
-    const spentUsd = this.store.spendThisMonth(this.now()).reduce((sum, s) => sum + s.usd, 0);
-    const { monthlyUsd, warnUsd } = this.store.settings.budget;
-    return { spentUsd, monthlyUsd, warnUsd, over: spentUsd >= monthlyUsd, warn: spentUsd >= warnUsd };
+  budget(): Budget {
+    const now = this.now();
+    const spentUsd = this.store.spendThisMonth(now).reduce((sum, s) => sum + s.usd, 0);
+    const todayUsd = this.store.spendToday(now).reduce((sum, s) => sum + s.usd, 0);
+    const { monthlyUsd, warnUsd, dailyUsd = DEFAULT_DAILY_USD } = this.store.settings.budget;
+    const over = spentUsd >= monthlyUsd;
+    const overToday = todayUsd >= dailyUsd;
+    const why = over
+      ? "This month's budget is spent."
+      : overToday ? "Today's spending cap is reached; what is missing is painted after midnight UTC." : undefined;
+    return { spentUsd, monthlyUsd, warnUsd, over, warn: spentUsd >= warnUsd, todayUsd, dailyUsd, overToday, paused: over || overToday, ...(why ? { why } : {}) };
+  }
+
+  /**
+   * Paints whatever granted wishes still lack (say, what today's cap held
+   * back), now that the budget allows; pictures already painted are kept.
+   */
+  paintMissing(): void {
+    if (this.budget().paused) return;
+    for (const record of this.store.content) {
+      if (record.status === 'granted' && record.definition && record.definition.kind !== 'recipe') this.paint(record);
+    }
   }
 
   // --- Plumbing --------------------------------------------------------------
@@ -935,17 +986,22 @@ export class Wishes {
     return models;
   }
 
-  /** The image model chosen in God's View, when it has a key, taking turns in the paint queue. */
-  imageProvider(): ImageProvider | undefined {
-    const provider = this.chosenImageProvider();
+  /**
+   * The image model chosen in God's View for this kind of art (its own
+   * model when one is set, else the main one), when it has a key, taking
+   * turns in the paint queue.
+   */
+  imageProvider(use?: ArtUse): ImageProvider | undefined {
+    const provider = this.chosenImageProvider(use);
     return provider && this.paintQueue ? queuedImages(this.paintQueue, provider) : provider;
   }
 
-  private chosenImageProvider(): ImageProvider | undefined {
+  private chosenImageProvider(use?: ArtUse): ImageProvider | undefined {
     const settings = this.store.settings;
-    if (this.options.imageProvider) return this.options.imageProvider(settings);
+    if (this.options.imageProvider) return this.options.imageProvider(settings, use);
     if (settings.ai.image.provider !== 'gemini' || !this.env.GEMINI_API_KEY) return undefined;
-    return new GeminiImageProvider(this.env.GEMINI_API_KEY, settings.ai.image.model || undefined);
+    const model = (use && settings.ai.image.uses?.[use]) || settings.ai.image.model;
+    return new GeminiImageProvider(this.env.GEMINI_API_KEY, model || undefined);
   }
 
   private place(record: ContentEntry): void {

@@ -73,6 +73,8 @@ export async function start(opts: {
   shippedArt?: string; anchorDir?: string; video?: VideoProvider; frames?: (mp4: Buffer) => Promise<Buffer[]>;
   /** Paint turns: no rate limits unless a test gives some; `artDir` to start again on the same art. */
   paintQueue?: PaintQueue; artDir?: string;
+  /** Use the real image providers from the env and settings instead of the fake painter. */
+  realImages?: boolean;
   /** Sound services, how made sounds are finished, and whether to make them at start-up. */
   sound?: AppOptions['sound'];
 } = {}) {
@@ -87,7 +89,7 @@ export async function start(opts: {
     builds: opts.builds ?? { issues: null },
     auth: { mailer: opts.mailer ?? fakeMailer(), ...(opts.fetch ? { fetch: opts.fetch } : {}) },
     ...(opts.shippedArt ? { shippedArt: opts.shippedArt } : {}),
-    videoProvider: () => opts.video,
+    ...(opts.realImages && !opts.video ? {} : { videoProvider: () => opts.video }),
     ...(opts.frames ? { videoFrames: opts.frames } : {}),
     paintQueue: opts.paintQueue ?? new MemoryPaintQueue({ limit: () => undefined }),
     ...(opts.sound ? { sound: opts.sound } : {}),
@@ -98,7 +100,7 @@ export async function start(opts: {
       chatModel: opts.chat ?? (() => [new OfflineGod()]),
       ...(opts.compiler ? { compilerModel: opts.compiler } : {}),
       ...(opts.now ? { now: opts.now } : {}),
-      imageProvider: () => painter ?? undefined,
+      ...(opts.realImages ? {} : { imageProvider: () => painter ?? undefined }),
     },
   });
   await new Promise<void>((resolve) => app!.server.listen(0, resolve));

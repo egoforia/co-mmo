@@ -170,7 +170,24 @@ export interface WishDraft {
   at: number;
   /** The wish card it was sent as; the draft goes once that card is confirmed. */
   card?: string;
+  /** Fields the player wrote themselves; the God never changes them. */
+  locked?: string[];
+  /** The talk with the God about this draft, oldest first. */
+  chat?: WorkshopLine[];
+  /** Quick answers the God offered to its last question. */
+  choices?: string[];
 }
+
+/** One line of the Workshop talk. */
+export interface WorkshopLine {
+  who: 'you' | 'god';
+  text: string;
+}
+
+/** Lines of Workshop talk kept with a draft (and remembered by the God). */
+export const MAX_WORKSHOP_LINES = 12;
+/** Quick answers the God may offer at once. */
+export const MAX_CHOICES = 3;
 
 /** What a draft makes once its fields are read: a definition for the God to grant, or a brief for people to build. */
 export interface CheckedDraft {
@@ -308,6 +325,67 @@ function materials(v: unknown): { item: string; qty: number }[] {
     const slot = (m ?? {}) as Record<string, unknown>;
     return typeof slot.item === 'string' && slot.item && slot.item.length <= 64 ? [{ item: slot.item, qty: Math.min(10, Math.max(1, num(slot.qty) ?? 1)) }] : [];
   }).slice(0, 4);
+}
+
+/** Keeps only lock names that are fields of the subcategory. */
+export function cleanLocks(sub: WishSubcategory, raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const keys = new Set(sub.fields.map((f) => f.key));
+  return [...new Set(raw.filter((k): k is string => typeof k === 'string' && keys.has(k)))];
+}
+
+/**
+ * Applies fields the God suggested to a draft: cleaned like the player's own,
+ * and never touching a locked field. Returns the new fields and which changed.
+ */
+export function mergeGodFields(sub: WishSubcategory, fields: DraftFields, patch: unknown, locked: string[] = []): { fields: DraftFields; changed: string[] } {
+  const clean = cleanDraftFields(sub, patch);
+  const out = { ...fields };
+  const changed: string[] = [];
+  for (const [key, value] of Object.entries(clean)) {
+    if (locked.includes(key) || JSON.stringify(out[key]) === JSON.stringify(value)) continue;
+    out[key] = value;
+    changed.push(key);
+  }
+  return { fields: out, changed };
+}
+
+/** Whether a draft field is still empty. */
+export function fieldEmpty(value: unknown): boolean {
+  return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * The Workshop subcategory a finished wish belongs to, and its fields, so a
+ * wish offered in Talk can be shaped further in the Workshop.
+ */
+export function draftFromDefinition(def: WishDefinition): { category: string; sub: string; fields: DraftFields } | undefined {
+  const look = 'look' in def && def.look ? { hook: def.look.hook, body: def.look.body, color: def.look.color, mood: def.look.mood } : {};
+  const base = { name: def.name, description: def.description, ...look };
+  const pick = (category: string, subId: string, fields: Record<string, unknown>) => {
+    const sub = wishSubcategory(category, subId);
+    return sub ? { category, sub: subId, fields: cleanDraftFields(sub, { ...base, ...fields }) } : undefined;
+  };
+  switch (def.kind) {
+    case 'item': {
+      const kind = def.itemKind;
+      if (kind === 'consumable') return pick('carry', 'potion', { heal: def.heal });
+      if (kind === 'trinket') return pick('carry', 'keepsake', {});
+      if (kind === 'material') return pick('carry', 'material', {});
+      return pick('carry', 'gear', { itemKind: kind, rarity: def.rarity, focus: def.focus });
+    }
+    case 'recipe': return pick('know', 'recipe', { materials: def.materials, result: def.result.item, qty: def.result.qty });
+    case 'ability': return pick('know', 'ability', { effect: def.effect });
+    case 'creature': return pick('living', 'creature', { behavior: def.behavior, level: def.level, count: def.count, drops: def.drops });
+    case 'npc': return pick('living', 'person', { greeting: def.greeting });
+    case 'region': {
+      const first = def.creatures[0];
+      const creature = first?.existing !== undefined ? { creature: first.existing } : { creatureName: first?.name, creatureHook: first?.look?.hook };
+      const npc = def.npc ? { npcName: def.npc.name, npcGreeting: def.npc.greeting } : {};
+      return pick('places', 'region', { biome: def.biome, danger: def.danger, trees: def.trees, rocks: def.rocks, water: def.water, ...creature, ...npc });
+    }
+    default: return undefined;
+  }
 }
 
 // --- Previews ------------------------------------------------------------------

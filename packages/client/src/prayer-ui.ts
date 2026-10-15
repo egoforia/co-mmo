@@ -1,4 +1,4 @@
-import type { DraftMessage, DraftView, GodMessage, WishCard } from '@co-mmo/shared';
+import type { DraftMessage, DraftUpdateMessage, DraftView, GodMessage, WishCard } from '@co-mmo/shared';
 import { escapeHtml, isTyping } from './ui.ts';
 import { WorkshopUi } from './workshop-ui.ts';
 
@@ -69,6 +69,11 @@ export class PrayerUi {
       if (target.closest('[data-close]')) return this.toggle(false);
       const tab = target.closest<HTMLElement>('[data-tab]');
       if (tab) return this.showTab(tab.dataset.tab as 'talk' | 'shape');
+      if (target.closest('[data-shape]')) {
+        // The talk (and any card from it) carries over into the Workshop.
+        this.showTab('shape');
+        return actions.draft({ action: 'shape' });
+      }
       const button = target.closest<HTMLButtonElement>('[data-card]');
       if (!button) return;
       const confirm = button.dataset.confirm === 'yes';
@@ -100,8 +105,8 @@ export class PrayerUi {
   }
 
   /** The server sent the Workshop draft, or none. */
-  onDraft(view: DraftView | null): void {
-    this.workshop.update(view);
+  onDraft(view: DraftView | null, message: Pick<DraftUpdateMessage, 'god' | 'pick'> = {}): void {
+    this.workshop.update(view, message);
   }
 
   private send(text: string): void {
@@ -140,6 +145,14 @@ export class PrayerUi {
       // A card shaped in the Workshop is confirmed where every card is: in Talk.
       this.showTab('talk');
     }
+    // Only the latest reply offers to carry the talk into the Workshop.
+    this.log.querySelector('.shape')?.remove();
+    const shape = document.createElement('button');
+    shape.type = 'button';
+    shape.className = 'quiet shape';
+    shape.dataset.shape = '';
+    shape.textContent = 'Shape this wish';
+    li.append(shape);
     this.log.scrollTop = this.log.scrollHeight;
     if (!this.open) document.querySelector('[data-open="prayer"]')?.classList.add('calling');
   }

@@ -66,15 +66,22 @@ export interface WishAnswerMessage {
 }
 
 /**
- * The Wish Workshop: start a draft in a subcategory, change its fields, send
- * it to become a wish card, or drop it.
+ * The Wish Workshop: start a draft in a subcategory, change its fields, ask
+ * the God about it or have the God fill in the rest, carry a Talk wish into
+ * it (shape), send it to become a wish card, or drop it.
  */
 export interface DraftMessage {
   t: 'draft';
-  action: 'start' | 'edit' | 'send' | 'drop';
+  action: 'start' | 'edit' | 'ask' | 'fill' | 'shape' | 'send' | 'drop';
   category?: string;
   sub?: string;
   fields?: Record<string, unknown>;
+  /** Fields the player wrote themselves, which the God must not change. */
+  locked?: string[];
+  /** What the player says to the God (ask). */
+  say?: string;
+  /** Start from the talk in the Talk tab: the God fills the new draft in from it. */
+  carry?: boolean;
 }
 
 /** Tell the Stewards about a wished thing or a player that should not be here. */
@@ -354,6 +361,10 @@ export interface TradeRequestMessage {
 export interface DraftUpdateMessage {
   t: 'draft';
   view: DraftView | null;
+  /** The God changed the draft: the form shows its new values. */
+  god?: boolean;
+  /** "Shape this wish" needs a kind of wish picked first; the God then fills it in from the talk. */
+  pick?: boolean;
 }
 
 /** The God speaks, and may offer a wish card. */
@@ -420,8 +431,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   }
   if (m.t === 'wish') return typeof m.card === 'string' && m.card.length <= 64 && typeof m.confirm === 'boolean';
   if (m.t === 'draft') {
-    return ['start', 'edit', 'send', 'drop'].includes(m.action as string) &&
+    return ['start', 'edit', 'ask', 'fill', 'shape', 'send', 'drop'].includes(m.action as string) &&
       (m.category === undefined || isId(m.category)) && (m.sub === undefined || isId(m.sub)) &&
+      (m.say === undefined || (typeof m.say === 'string' && m.say.length <= 400)) &&
+      (m.carry === undefined || typeof m.carry === 'boolean') &&
+      (m.locked === undefined || (Array.isArray(m.locked) && m.locked.length <= 30 && m.locked.every(isId))) &&
       (m.fields === undefined || (typeof m.fields === 'object' && m.fields !== null && JSON.stringify(m.fields).length <= 8000));
   }
   if (m.t === 'equip') {

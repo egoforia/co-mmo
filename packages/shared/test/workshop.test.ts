@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WISH_CATEGORIES, checkDraft, cleanDraftFields, draftCost, wishSubcategory, worldLines } from '../src/index.ts';
+import { WISH_CATEGORIES, checkDraft, cleanDraftFields, cleanLocks, draftCost, draftFromDefinition, mergeGodFields, wishSubcategory, worldLines } from '../src/index.ts';
 
 const look = { hook: 'a glowing seal', body: 'small and round', color: '#e8c66a', mood: 'calm' };
 /** One filled-in draft per subcategory, as a player might write it. */
@@ -60,5 +60,27 @@ describe('the Wish Workshop categories', () => {
     expect(draftCost(checkDraft({ category: 'places', sub: 'region', fields: {} }))).toBe(12);
     expect(draftCost(checkDraft({ category: 'play', sub: 'gifts', fields: SAMPLES.gifts! }))).toBe(0);
     expect(worldLines(checkDraft({ category: 'carry', sub: 'gear', fields: SAMPLES.gear! }).definition!)[0]).toBe('Rare weapon: +4 damage, +2 Agility.');
+  });
+
+  it('never lets the God change a locked field, and cleans what it suggests', () => {
+    const sub = wishSubcategory('living', 'creature')!;
+    const fields = { name: 'Lantern Moth', level: 1 };
+    const locked = cleanLocks(sub, ['name', 'nonsense', 3]);
+    expect(locked).toEqual(['name']);
+    const merged = mergeGodFields(sub, fields, { name: 'Gloom Moth', level: 9, behavior: 'sneak', hook: 'a lantern', secret: 1 }, locked);
+    expect(merged.fields).toEqual({ name: 'Lantern Moth', level: 6, hook: 'a lantern' });
+    expect(merged.changed.sort()).toEqual(['hook', 'level']);
+  });
+
+  it('turns every finished wish back into the draft that makes it', () => {
+    for (const category of WISH_CATEGORIES) {
+      for (const sub of category.subs) {
+        const checked = checkDraft({ category: category.id, sub: sub.id, fields: cleanDraftFields(sub, SAMPLES[sub.id]) });
+        if (!checked.definition) continue;
+        const back = draftFromDefinition(checked.definition)!;
+        expect(back, sub.id).toMatchObject({ category: category.id, sub: sub.id });
+        expect(checkDraft(back).definition, sub.id).toEqual(checked.definition);
+      }
+    }
   });
 });

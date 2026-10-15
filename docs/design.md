@@ -30,10 +30,14 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
 Approved on 2026-10-15: a "Shape a wish" tab in the Prayer window where
 players pick a category, talk the details through with the God and preview
 the card, the numbers and the exact image prompt before sending. Design:
-https://claude.ai/code/artifact/ac5a156b-c297-464b-ac19-006f41e3d310. Step 1,
-prompts in the open, is done: painting goes through `artRequest`
-(`packages/server/src/assets/wish-art.ts`), and God's View shows each
-picture's prompt.
+https://claude.ai/code/artifact/ac5a156b-c297-464b-ac19-006f41e3d310. Done so
+far: prompts in the open (painting goes through `artRequest` in
+`packages/server/src/assets/wish-art.ts`, and God's View shows each
+picture's prompt) and the Workshop itself without the God's help: the
+category tree (`packages/shared/src/workshop.ts`), drafts kept on the server
+(`packages/server/src/workshop.ts`), the form and the free preview in the
+Prayer window (`packages/client/src/workshop-ui.ts`). Next: talking to the
+God inside the Workshop.
 
 ## Milestones
 

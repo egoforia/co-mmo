@@ -97,6 +97,8 @@ export class Wishes {
   private readonly now: () => number;
   /** Art being painted, so tests and shutdown can wait for it. */
   readonly painting = new Set<Promise<void>>();
+  /** Told when a confirmed card became a wish (granted or sent for review), so its Workshop draft can go. */
+  onCardUsed?: (playerId: string, cardId: string) => void;
 
   constructor(
     private readonly store: Store,
@@ -196,6 +198,25 @@ export class Wishes {
   ): { card?: WishCard; note?: string } | undefined {
     if (wish.tier === 'refused') return undefined;
     if (wish.appoint) return this.appointCard(playerId, wish.appoint, conversation);
+    const made = this.cardFor(playerId, wish, regionName);
+    if (!made || 'note' in made) return made;
+    for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
+    const card: WishCard = { id: randomBytes(6).toString('hex'), ...made.card };
+    this.cards.set(card.id, { card, playerId, definition: made.definition, conversation: [...conversation], usd, ...(made.edge ? { edge: made.edge } : {}) });
+    return { card };
+  }
+
+  /**
+   * The card a wish would make, without offering it: its tier, cost and
+   * where it appears, or why it cannot be made here. The Workshop's preview
+   * shows this before a wish is sent.
+   */
+  cardFor(
+    playerId: string,
+    wish: Pick<NonNullable<GodReply['wish']>, 'tier' | 'title' | 'summary' | 'definition'>,
+    regionName: string,
+  ): { card: Omit<WishCard, 'id'>; definition?: WishDefinition; edge?: OpenCard['edge'] } | { note: string } | undefined {
+    if (wish.tier === 'refused') return undefined;
     let definition: WishDefinition | undefined;
     let tier = wish.tier;
     if (tier === 'minor' || tier === 'moderate') {
@@ -216,10 +237,8 @@ export class Wishes {
       if (!open) return { note: `Every edge of ${regionName} already meets another land. New regions grow at the world's edge: travel outward and ask me there.` };
       edge = { side: open.side, cell: open.cell };
     }
-    for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
     const instant = tier === 'minor' || tier === 'moderate';
-    const card: WishCard = {
-      id: randomBytes(6).toString('hex'),
+    const card: Omit<WishCard, 'id'> = {
       tier,
       title: wish.title,
       summary: wish.summary || definition?.description || wish.title,
@@ -233,8 +252,24 @@ export class Wishes {
                 : `Beside you, in ${regionName}`,
       instant,
     };
-    this.cards.set(card.id, { card, playerId, definition, conversation: [...conversation], usd, ...(edge ? { edge } : {}) });
-    return { card };
+    return { card, ...(definition ? { definition } : {}), ...(edge ? { edge } : {}) };
+  }
+
+  /**
+   * Offers a wish shaped somewhere other than a prayer (the Workshop) as the
+   * usual card, in the Prayer window. Returns the card's id when one was made.
+   */
+  offer(
+    player: PlayerInfo,
+    wish: Pick<NonNullable<GodReply['wish']>, 'tier' | 'title' | 'summary' | 'definition'>,
+    conversation: ChatTurn[],
+    say: string,
+  ): string | undefined {
+    const region = this.world.regionOf(player.id);
+    if (!region) return undefined;
+    const made = this.makeCard(player.id, wish, region.def.name, conversation, 0);
+    this.world.sendTo(player.id, { t: 'god', say: made?.note ?? say, ...(made?.card ? { card: made.card } : {}) });
+    return made?.card?.id;
   }
 
   /** The player confirmed or turned down a wish card. */
@@ -307,6 +342,7 @@ export class Wishes {
     };
     this.store.addContent(record);
     if (status !== 'granted') this.broadcast(record);
+    this.onCardUsed?.(player.id, open.card.id);
     return record;
   }
 

@@ -265,6 +265,58 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #prayer-form input:focus { outline: none; border-color: #f2dc6b; }
 #prayer-form button { padding: 8px 14px; background: #f2dc6b; color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
 #prayer.waiting #prayer-form button { opacity: 0.5; cursor: wait; }
+#prayer.wide { width: max(420px, min(860px, calc(100vw - 470px))); height: min(680px, calc(100vh - 140px)); }
+#prayer-talk { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#prayer-talk[hidden], #workshop[hidden] { display: none; }
+#prayer .prayer-tabs { display: flex; gap: 4px; margin: 0 0 10px; border-bottom: 1px solid var(--edge); }
+#prayer .prayer-tabs button { margin: 0; width: auto; font: inherit; font-size: 13px; padding: 6px 12px; background: transparent; color: var(--muted); border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
+#prayer .prayer-tabs button[aria-selected="true"] { color: #f2dc6b; border-bottom-color: #f2dc6b; }
+
+/* The Wish Workshop (Shape a wish tab). */
+#workshop { flex: 1; min-height: 0; overflow-y: auto; font-size: 13px; color: var(--ink); }
+#workshop button { font: inherit; cursor: pointer; }
+#workshop button.quiet { background: transparent; color: var(--muted); border: 1px solid var(--edge); padding: 4px 10px; }
+#prayer .ws-intro { margin: 0 0 12px; color: #f3e6c8; font: 14px/1.45 Georgia, 'Times New Roman', serif; }
+#prayer .ws-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+#prayer .ws-cat { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; background: rgba(242, 220, 107, 0.06); color: var(--ink); border: 1px solid var(--edge); border-radius: 6px; text-align: center; }
+#prayer .ws-cat:hover, #prayer .ws-subs button:hover { border-color: #f2dc6b; }
+#prayer .ws-cat img { width: 64px; height: 64px; object-fit: contain; }
+#prayer .ws-cat small, #prayer .ws-subs small { color: var(--muted); }
+#prayer .ws-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; color: var(--muted); }
+#prayer .ws-head b { color: #f2dc6b; }
+#prayer .ws-subs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+#prayer .ws-subs button { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; text-align: left; padding: 8px 10px; background: rgba(242, 220, 107, 0.06); color: var(--ink); border: 1px solid var(--edge); border-radius: 6px; }
+#prayer .ws-subs small { grid-column: 1; }
+#prayer .ws-price { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #f2dc6b; font-size: 12px; }
+#prayer .ws-else { margin-top: 14px; display: grid; gap: 6px; }
+#prayer .ws-else small { color: var(--muted); }
+#prayer .ws-else textarea, #prayer .ws-form input, #prayer .ws-form select, #prayer .ws-form textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; }
+#prayer .ws-else button, #prayer .ws-send button { justify-self: start; padding: 6px 14px; background: #f2dc6b; color: var(--bg); border: 0; font-weight: 700; }
+#prayer .ws-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; }
+#prayer .ws-form p { margin: 0 0 8px; }
+#prayer .ws-form label, #prayer .ws-form legend, #prayer .ws-else label { display: block; margin: 0 0 3px; color: var(--muted); }
+#prayer .ws-form input[type="color"] { height: 30px; padding: 2px; }
+#prayer .ws-form fieldset { border: 0; padding: 0; margin: 0 0 8px; }
+#prayer .ws-row { display: grid; grid-template-columns: 1fr 64px; gap: 4px; margin-bottom: 4px; }
+#prayer .ws-form p > select + select { margin-top: 4px; }
+#prayer .ws-preview h3 { margin: 12px 0 4px; font-size: 13px; color: #f2dc6b; }
+#prayer .ws-preview ul, #prayer .ws-preview ol { margin: 0; padding-left: 18px; }
+#prayer .ws-card { margin-top: 0; }
+#prayer .ws-todo { margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--accent); background: rgba(254, 174, 52, 0.08); }
+#prayer .ws-todo ul { margin: 4px 0 0; }
+#prayer .ws-note { margin: 0 0 6px; color: var(--muted); }
+#prayer .ws-placeholder { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+#prayer .ws-placeholder img { width: 48px; height: 48px; object-fit: contain; }
+#prayer .ws-placeholder figcaption { color: var(--muted); }
+#prayer .ws-picture { margin-top: 8px; }
+#prayer .ws-picture summary { font-size: 13px; color: var(--ink); }
+#prayer .ws-refs { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+#prayer .ws-refs img { width: 40px; height: 40px; object-fit: contain; background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
+#prayer .ws-prompt { margin: 4px 0 0; padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; font-size: 11.5px; line-height: 1.45; color: var(--muted); background: var(--bg); border: 1px solid var(--edge); }
+#prayer .ws-prompt mark { background: rgba(242, 220, 107, 0.25); color: #f2dc6b; padding: 0 1px; }
+#prayer .ws-send { display: grid; gap: 4px; margin: 14px 0 4px; }
+#prayer .ws-send button:disabled { opacity: 0.45; cursor: default; }
+#prayer .ws-send small { color: var(--muted); }
 
 .card {
   margin-top: 10px; padding: 10px 12px; background: #f3e6c8; color: #3e2731;
@@ -293,6 +345,8 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 
 @media (max-width: 700px) {
   #prayer { inset: 52px 8px auto 8px; width: auto; }
+  #prayer.wide { width: auto; }
+  #prayer .ws-body { grid-template-columns: 1fr; }
   #bible { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   #bible nav { border-right: 0; border-bottom: 2px solid #c9ab76; }
   #bible nav ol { display: flex; flex-wrap: wrap; }

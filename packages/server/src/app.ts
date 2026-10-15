@@ -9,6 +9,7 @@ import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
 import { Store, StoreError, type Account } from './store.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
+import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
 import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
@@ -85,6 +86,7 @@ export function createApp(options: AppOptions): App {
   });
   world.onEvent = (type, playerId, data) => rules.fire(type, playerId, data);
   const wishes = new Wishes(store, world, rules, options.wishes);
+  const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now });
   wishes.restore();
   const buildingPainter = new BuildingPainter({
     provider: () => wishes.imageProvider(),
@@ -314,6 +316,7 @@ export function createApp(options: AppOptions): App {
         if (away) world.sendTo(account.id, away);
         rules.fire('join', account.id);
         builds.greet(account.id);
+        void workshop.greet(account.id);
         return;
       }
       if (!isClientMessage(parsed)) return;
@@ -326,6 +329,12 @@ export function createApp(options: AppOptions): App {
         world.sendTo(account.id, { t: 'god', say });
       } else if (parsed.t === 'wish') {
         wishes.answer(publicInfo(store.accountById(account.id) ?? account), parsed.card, parsed.confirm);
+      } else if (parsed.t === 'draft') {
+        const who = publicInfo(store.accountById(account.id) ?? account);
+        const done = parsed.action === 'start' ? workshop.start(who, parsed.category ?? '', parsed.sub ?? '', parsed.fields)
+          : parsed.action === 'edit' ? workshop.edit(who, parsed.fields)
+            : parsed.action === 'send' ? workshop.send(who) : workshop.drop(who);
+        done.catch((err) => console.error('Workshop failed:', err));
       } else {
         world.handle(account.id, parsed);
       }

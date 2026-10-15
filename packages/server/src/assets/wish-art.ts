@@ -28,6 +28,15 @@ export function imageUsd(model: string, image: GeneratedImage): number {
   return (image.outputTokens * rate) / 1e6;
 }
 
+/** Image tokens Gemini bills for a 1024 px picture, used to guess a price before painting. */
+const TOKENS_1K = 1290;
+
+/** About what one 1K picture from this model costs, before it is painted (for previews). */
+export function estimateImageUsd(model: string): number {
+  const rate = IMAGE_USD_PER_MILLION[model];
+  return rate ? (TOKENS_1K * rate) / 1e6 : IMAGE_USD;
+}
+
 /** Approved anchors sent as style references, per kind of wished thing. */
 const REFERENCES: Record<PicturedWish['kind'], string[]> = {
   item: ['item-tonic', 'item-goat-horn'],

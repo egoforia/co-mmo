@@ -1,11 +1,14 @@
-import type { GodMessage, WishCard } from '@co-mmo/shared';
+import type { DraftMessage, DraftView, GodMessage, WishCard } from '@co-mmo/shared';
 import { escapeHtml, isTyping } from './ui.ts';
+import { WorkshopUi } from './workshop-ui.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
 export interface PrayerActions {
   pray(text: string): void;
   answer(card: string, confirm: boolean): void;
+  /** A Wish Workshop draft message. */
+  draft(message: Omit<DraftMessage, 't'>): void;
 }
 
 const TIER_NAMES: Record<WishCard['tier'], string> = {
@@ -16,24 +19,42 @@ const TIER_NAMES: Record<WishCard['tier'], string> = {
   refused: 'Refused',
 };
 
-/** The prayer window: talk to the God from anywhere, and confirm wish cards. */
+/**
+ * The prayer window: talk to the God from anywhere and confirm wish cards
+ * (Talk), or shape a wish by category in the Wish Workshop (Shape a wish).
+ */
 export class PrayerUi {
   private readonly log: HTMLOListElement;
   private readonly input: HTMLInputElement;
   private waiting = false;
   private favor = 0;
+  private readonly workshop: WorkshopUi;
 
   constructor(private readonly actions: PrayerActions) {
     const el = $('prayer');
     el.innerHTML = `
       <h2><span>Prayer <small id="prayer-favor"></small></span><button type="button" class="close" data-close aria-label="Close">×</button></h2>
-      <ol id="prayer-log" aria-live="polite">
-        <li class="god">Speak, and I will listen. Ask me anything, or wish for something new: a thing to carry, a creature to meet, someone to talk to.</li>
-      </ol>
-      <form id="prayer-form" autocomplete="off">
-        <input id="prayer-input" maxlength="400" placeholder="I wish for..." />
-        <button type="submit">Pray</button>
-      </form>`;
+      <nav class="prayer-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="talk" aria-selected="true">Talk</button>
+        <button type="button" role="tab" data-tab="shape" aria-selected="false">Shape a wish</button>
+      </nav>
+      <div id="prayer-talk">
+        <ol id="prayer-log" aria-live="polite">
+          <li class="god">Speak, and I will listen. Ask me anything, or wish for something new: a thing to carry, a creature to meet, someone to talk to.</li>
+        </ol>
+        <form id="prayer-form" autocomplete="off">
+          <input id="prayer-input" maxlength="400" placeholder="I wish for..." />
+          <button type="submit">Pray</button>
+        </form>
+      </div>
+      <div id="workshop" hidden></div>`;
+    this.workshop = new WorkshopUi($('workshop'), {
+      draft: (m) => actions.draft(m),
+      pray: (text) => {
+        this.showTab('talk');
+        this.send(text);
+      },
+    });
     this.log = $('prayer-log') as HTMLOListElement;
     this.input = $('prayer-input') as HTMLInputElement;
     $('prayer-form').addEventListener('submit', (e) => {
@@ -41,13 +62,13 @@ export class PrayerUi {
       const text = this.input.value.trim();
       if (!text || this.waiting) return;
       this.input.value = '';
-      this.add('you', text);
-      this.setWaiting(true);
-      actions.pray(text);
+      this.send(text);
     });
     el.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       if (target.closest('[data-close]')) return this.toggle(false);
+      const tab = target.closest<HTMLElement>('[data-tab]');
+      if (tab) return this.showTab(tab.dataset.tab as 'talk' | 'shape');
       const button = target.closest<HTMLButtonElement>('[data-card]');
       if (!button) return;
       const confirm = button.dataset.confirm === 'yes';
@@ -66,6 +87,28 @@ export class PrayerUi {
         this.toggle();
       }
     });
+  }
+
+  /** Switches between talking to the God and the Wish Workshop. */
+  showTab(tab: 'talk' | 'shape'): void {
+    const el = $('prayer');
+    el.classList.toggle('wide', tab === 'shape');
+    $('prayer-talk').hidden = tab !== 'talk';
+    $('workshop').hidden = tab !== 'shape';
+    for (const b of el.querySelectorAll<HTMLElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    if (tab === 'talk') this.log.scrollTop = this.log.scrollHeight;
+  }
+
+  /** The server sent the Workshop draft, or none. */
+  onDraft(view: DraftView | null): void {
+    this.workshop.update(view);
+  }
+
+  private send(text: string): void {
+    if (this.waiting) return;
+    this.add('you', text);
+    this.setWaiting(true);
+    this.actions.pray(text);
   }
 
   get open(): boolean {
@@ -92,7 +135,11 @@ export class PrayerUi {
   onGod(message: GodMessage): void {
     this.setWaiting(false);
     const li = this.add('god', message.say);
-    if (message.card) li.append(this.card(message.card));
+    if (message.card) {
+      li.append(this.card(message.card));
+      // A card shaped in the Workshop is confirmed where every card is: in Talk.
+      this.showTab('talk');
+    }
     this.log.scrollTop = this.log.scrollHeight;
     if (!this.open) document.querySelector('[data-open="prayer"]')?.classList.add('calling');
   }

@@ -3,6 +3,7 @@
 
 import type { ContentEntry, WishCard } from './content.ts';
 import type { TradeOffer } from './kit.ts';
+import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
 import { EQUIP_SLOTS, type Character, type EquipSlot } from './rpg.ts';
 
@@ -62,6 +63,18 @@ export interface WishAnswerMessage {
   t: 'wish';
   card: string;
   confirm: boolean;
+}
+
+/**
+ * The Wish Workshop: start a draft in a subcategory, change its fields, send
+ * it to become a wish card, or drop it.
+ */
+export interface DraftMessage {
+  t: 'draft';
+  action: 'start' | 'edit' | 'send' | 'drop';
+  category?: string;
+  sub?: string;
+  fields?: Record<string, unknown>;
 }
 
 /** Tell the Stewards about a wished thing or a player that should not be here. */
@@ -124,6 +137,7 @@ export interface PartyActionMessage {
 }
 
 export type ClientMessage =
+  | DraftMessage
   | EquipMessage
   | AbilityMessage
   | CraftMessage
@@ -336,6 +350,12 @@ export interface TradeRequestMessage {
   from: { id: string; name: string };
 }
 
+/** The player's Workshop draft and its preview, or null when there is none. */
+export interface DraftUpdateMessage {
+  t: 'draft';
+  view: DraftView | null;
+}
+
 /** The God speaks, and may offer a wish card. */
 export interface GodMessage {
   t: 'god';
@@ -354,6 +374,7 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | DraftUpdateMessage
   | CooldownMessage
   | TradeMessage
   | TradeRequestMessage
@@ -398,6 +419,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     return (m.kind === 'content' || m.kind === 'player') && typeof m.target === 'string' && m.target.length <= 64 && typeof m.reason === 'string';
   }
   if (m.t === 'wish') return typeof m.card === 'string' && m.card.length <= 64 && typeof m.confirm === 'boolean';
+  if (m.t === 'draft') {
+    return ['start', 'edit', 'send', 'drop'].includes(m.action as string) &&
+      (m.category === undefined || isId(m.category)) && (m.sub === undefined || isId(m.sub)) &&
+      (m.fields === undefined || (typeof m.fields === 'object' && m.fields !== null && JSON.stringify(m.fields).length <= 8000));
+  }
   if (m.t === 'equip') {
     return (typeof m.item === 'string' && m.item.length <= 64) || EQUIP_SLOTS.includes(m.slot as EquipSlot);
   }

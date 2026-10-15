@@ -136,22 +136,25 @@ export async function paintKitAsset(
   provider: ImageProvider,
   anchorDir: string,
   outDir: string,
-): Promise<{ image: GeneratedImage; entry: ArtEntry }> {
+): Promise<{ image: GeneratedImage; entry: ArtEntry; prompt: string; references: string[] }> {
   const references: GeneratedImage[] = [];
+  const sent: string[] = [];
   for (const ref of asset.references ?? []) {
     for (const path of [resolve(anchorDir, 'raw', `${ref}.png`), resolve(anchorDir, `${ref}.png`)]) {
       const data = await readFile(path).catch(() => undefined);
       if (!data) continue;
       references.push({ mimeType: 'image/png', data });
+      sent.push(ref);
       break;
     }
   }
-  const image = await provider.generate({ prompt: buildPrompt(asset), references });
+  const prompt = buildPrompt(asset);
+  const image = await provider.generate({ prompt, references });
   // The untouched picture is kept, so it can be processed again for free.
   await mkdir(resolve(outDir, 'raw'), { recursive: true });
   await writeFile(resolve(outDir, 'raw', `${asset.id}.png`), await sharp(image.data).png().toBuffer());
   const entry = await processKitAsset(asset, image.data, outDir);
-  return { image, entry };
+  return { image, entry, prompt, references: sent };
 }
 
 /** Turns a provider image into the game copy of a kit piece. */

@@ -86,6 +86,8 @@ export async function handleAdmin(
       ...r,
       progress: wishProgress(r),
       usd: owner ? r.usd : undefined,
+      // What each picture cost is the Owner's to see, like the wish's total.
+      ...(r.artPrompts && !owner ? { artPrompts: Object.fromEntries(Object.entries(r.artPrompts).map(([k, { usd: _u, ...p }]) => [k, p])) } : {}),
       live: r.status === 'granted' && r.definition?.kind === 'rule' ? rules.status(r.id) ?? null : undefined,
     }));
     return json(res, 200, { content: records }), true;

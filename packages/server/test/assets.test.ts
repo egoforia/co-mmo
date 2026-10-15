@@ -3,6 +3,7 @@ import { ANCHORS } from '../src/assets/anchors.ts';
 import { GeminiImageProvider } from '../src/assets/gemini.ts';
 import { ProviderError } from '../src/assets/provider.ts';
 import { BASE_PROMPT, buildPrompt } from '../src/assets/style.ts';
+import { artRequest, referencesFor } from '../src/assets/wish-art.ts';
 
 describe('buildPrompt', () => {
   it('starts with the Style Bible base prompt and ends with what to avoid', () => {
@@ -11,6 +12,12 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('Biome: Whispering Woods');
     expect(prompt).toContain('Most recognisable feature: big floppy red-brown cap');
     expect(prompt.split('\n').at(-1)).toMatch(/^Avoid: photorealistic/);
+  });
+
+  it('keeps one full stop after details written as sentences', () => {
+    const prompt = buildPrompt({ ...ANCHORS.find((a) => a.id === 'woods-mushroom')!, details: ['It glows at dusk.', 'Smells of rain!'] });
+    expect(prompt).toContain('Details: It glows at dusk; Smells of rain.');
+    expect(prompt).not.toContain('..');
   });
 
   it('asks tiles to be seamless', () => {
@@ -60,5 +67,25 @@ describe('GeminiImageProvider', () => {
 
   it('refuses to start without a key', () => {
     expect(() => new GeminiImageProvider('')).toThrow(/GEMINI_API_KEY/);
+  });
+});
+
+describe('wished art requests', () => {
+  const look = { hook: 'a paper lantern', body: 'a round moth', color: '#e8c66a', mood: 'sleepy' };
+
+  it("sends a creature's or person's own biome anchor first", () => {
+    expect(referencesFor('creature', 'mirage-desert')).toEqual(['desert-scarab', 'woods-mushroom']);
+    expect(referencesFor('creature', 'whispering-woods')).toEqual(['woods-mushroom', 'shore-crab-knight']);
+    expect(referencesFor('npc', 'sunlit-shore')).toEqual(['shore-trader', 'sanctum-pilgrim']);
+    expect(referencesFor('creature', 'frostpeak')).toEqual(['woods-mushroom', 'shore-crab-knight']);
+    expect(referencesFor('item', 'mirage-desert')).toEqual(['item-tonic', 'item-goat-horn']);
+  });
+
+  it('builds the prompt from the Style Bible and the wish, with the biome for living things', () => {
+    const req = artRequest({ kind: 'creature', name: 'Lantern Moth', description: 'It carries a lantern.', behavior: 'wander', level: 1, count: 3, look }, 'whispering-woods');
+    expect(req.prompt.startsWith(BASE_PROMPT)).toBe(true);
+    expect(req.prompt).toContain('Biome: Whispering Woods');
+    expect(req.prompt).toContain('Subject: Lantern Moth (monster). Most recognisable feature: a paper lantern.');
+    expect(req.box).toEqual({ width: 128, height: 128 });
   });
 });

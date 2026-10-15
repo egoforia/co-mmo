@@ -39,12 +39,14 @@ afterEach(async () => {
 const BUILT_IN: [Record<string, unknown>, Set<string>][] = [ITEMS, CREATURES, NPC_GREETINGS, RECIPES, ABILITIES].map((r) => [r, new Set(Object.keys(r))]);
 
 /** Paints a small magenta-backed square, like the image service would. */
-export const fakePainter = (): ImageProvider & { calls: number } => ({
+export const fakePainter = (): ImageProvider & { calls: number; prompts: string[] } => ({
   id: 'fake',
   model: 'fake-image',
   calls: 0,
-  async generate() {
+  prompts: [],
+  async generate(request) {
     this.calls++;
+    this.prompts.push(request.prompt);
     const data = await sharp({ create: { width: 256, height: 256, channels: 3, background: { r: 255, g: 0, b: 255 } } })
       .composite([{ input: await sharp({ create: { width: 100, height: 120, channels: 3, background: { r: 40, g: 90, b: 160 } } }).png().toBuffer(), left: 78, top: 70 }])
       .png()

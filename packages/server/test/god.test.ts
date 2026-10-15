@@ -44,6 +44,13 @@ describe('the God', () => {
     expect([png.width, png.height]).toEqual([128, 128]);
     expect(store.contentById(record.id)!.art).toMatch(new RegExp(`^/wished-art/${record.id}\\.png`));
     expect(store.spendThisMonth(Date.now()).filter((s) => s.kind === 'image')).toHaveLength(1);
+
+    // God's View keeps exactly what was sent to the image model; players never receive it.
+    const sent = store.contentById(record.id)!.artPrompts![record.id]!;
+    expect(sent).toMatchObject({ provider: 'fake', model: 'fake-image', prompt: (painter as any).prompts[0], references: [] });
+    expect(sent.prompt).toContain('Subject: Glowing Blue Hat (item).');
+    const { publicEntry } = await import('../src/wishes.ts');
+    expect(publicEntry(store.contentById(record.id)!)).not.toHaveProperty('artPrompts');
   });
 
   it('spawns wished creatures near the player, and pays the wisher Favor when others defeat them', async () => {

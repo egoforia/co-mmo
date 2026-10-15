@@ -69,6 +69,21 @@ export interface ContentRecord extends ContentEntry {
   rule?: { paused: boolean; reason?: string };
   /** An Engine wish being built as a code change by a coding agent. */
   build?: BuildTrack;
+  /** What was asked of the image model for each picture painted, by picture id (latest painting). */
+  artPrompts?: Record<string, ArtPromptRecord>;
+}
+
+/** One picture's request to the image model, kept so Stewards can see exactly what was sent. */
+export interface ArtPromptRecord {
+  prompt: string;
+  /** Anchor ids sent as style references (the ones that were found). */
+  references: string[];
+  /** Text the provider sends between the references and the prompt, when it adds any. */
+  note?: string;
+  provider: string;
+  model: string;
+  at: number;
+  usd: number;
 }
 
 /** A player telling the Stewards about a wished thing or another player. */

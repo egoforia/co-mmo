@@ -79,7 +79,8 @@ export function buildPrompt(d: AssetDescription): string {
     `Body and shape: ${d.body}.`,
     d.materials?.length ? `Materials: ${d.materials.join(', ')}.` : '',
     `Colours: main ${d.colors.main}${d.colors.secondary ? `, secondary ${d.colors.secondary}` : ''}${d.colors.accent ? `, small accent of ${d.colors.accent}` : ''}.`,
-    d.details?.length ? `Details: ${d.details.slice(0, 3).join('; ')}.` : '',
+    // Details are often whole sentences; their own full stops would double the one that ends the list.
+    d.details?.length ? `Details: ${d.details.slice(0, 3).map((x) => x.trim().replace(/[.!?]+$/, '')).join('; ')}.` : '',
     d.extra ? Object.entries(d.extra).map(([k, v]) => `${k}: ${v}.`).join(' ') : '',
     `Mood: ${d.mood}.`,
   ].filter(Boolean);

@@ -64,8 +64,14 @@ The God (milestone 4, first version):
 - God's View (`/gods-view.html`, linked in the top bar for Stewards and the
   Owner): world map, review queue, content log with rollback and repaint,
   players (the Owner appoints Stewards), the God's model and fallback, the
-  image model, and the monthly budget. Over the ceiling, the offline God
-  answers and nothing is painted.
+  image model (with its own model for buildings, scenery, wished things or
+  walks if wanted), the video and sound models, and the monthly budget. Over
+  the ceiling, the offline God answers and nothing is painted. A daily cap
+  (default $10) pauses painting, walks and sound for the rest of the day
+  (UTC); what it held back is painted after midnight or as soon as the cap is
+  raised. The Art tab can paint a whole group again with today's model and
+  keeps every replaced picture, so any earlier version (or the shipped one)
+  can be put back.
 
 Stewards and scripted rules (milestone 5, first version):
 

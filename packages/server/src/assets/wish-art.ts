@@ -28,6 +28,11 @@ export function imageUsd(model: string, image: GeneratedImage): number {
   return (image.outputTokens * rate) / 1e6;
 }
 
+/** Image models with a known price, for God's View to offer. */
+export function knownImageModels(): string[] {
+  return Object.keys(IMAGE_USD_PER_MILLION).filter((m) => !m.endsWith('-preview'));
+}
+
 /** Image tokens Gemini bills for a 1024 px picture, used to guess a price before painting. */
 const TOKENS_1K = 1290;
 

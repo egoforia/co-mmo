@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import {
   BODY_TYPES,
   BUILDING_STYLES,
@@ -20,12 +20,13 @@ import { BIOME_KIT, type KitAsset } from './assets/kit.ts';
 import type { VideoProvider } from './assets/video.ts';
 import { paintKitAsset, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd, imageUsd } from './assets/wish-art.ts';
+import { ArtHistory, type ArtVersion } from './art-history.ts';
 import { plain, type ArtJob, type ArtJobHandle, type ArtJobs } from './art-jobs.ts';
 import type { BuildingPainter } from './building-painter.ts';
 import { watched } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { SoundItem, SoundMaker } from './sound-maker.ts';
-import type { ContentRecord, Store } from './store.ts';
+import type { ArtUse, ContentRecord, Store } from './store.ts';
 import { estimateClipUsd, type WalkPainter, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
 
@@ -54,6 +55,10 @@ export interface ArtItem {
   why?: string;
   /** Whether the Owner's added words reach the painter. */
   takesNote: boolean;
+  /** Earlier versions that can be put back, newest first. */
+  versions?: ArtVersion[];
+  /** Painted again over a shipped picture, which can be put back. */
+  shippedBack?: boolean;
 }
 
 /** A group of pictures in the Art tab. */
@@ -102,13 +107,16 @@ export class ArtRequestError extends Error {}
 /** The Art tab's server side. */
 export class ArtStudio {
   private redone: ArtManifest = {};
+  private readonly history: ArtHistory;
   private loaded = false;
   /** Owner requests, one after another, behind any start-up painting. */
   private queue: Promise<void> = Promise.resolve();
   /** Requests waiting or painting, so tests and shutdown can wait for them. */
   readonly pending = new Set<Promise<void>>();
 
-  constructor(private readonly options: ArtStudioOptions) {}
+  constructor(private readonly options: ArtStudioOptions) {
+    this.history = new ArtHistory(options.artDir);
+  }
 
   private get redoneDir(): string {
     return resolve(this.options.artDir, 'redone');
@@ -137,7 +145,7 @@ export class ArtStudio {
     await this.options.walks.load();
     const imageModel = this.options.wishes.imageProvider()?.model ?? null;
     const videoModel = this.options.video()?.model ?? null;
-    const picture = estimateImageUsd(imageModel ?? '');
+    const picture = this.pictureUsd('wishes');
     const shipped = await this.options.shipped();
     const painted: ArtManifest = { ...(await this.options.wishes.kitManifest()), ...this.options.buildings.manifest(), ...this.options.walks.manifest() };
     const url = (id: string): { url?: string; source: ArtSource } => {
@@ -157,7 +165,7 @@ export class ArtStudio {
           id: job.id,
           name: job.id.slice(style.id.length + 1).replace(/^furniture-/, '').replace(/-/g, ' ').replace(/^exterior$/, 'outside'),
           ...url(job.id),
-          estimateUsd: picture,
+          estimateUsd: this.pictureUsd('buildings'),
           repaintable: true,
           takesNote: true,
         })),
@@ -167,23 +175,28 @@ export class ArtStudio {
       id: 'scenery',
       title: 'Scenery',
       note: 'Ground, water, trees and rocks of the launch lands.',
-      items: BIOME_KIT.filter(repaintableKit).map((a) => ({ id: a.id, name: a.name, ...url(a.id), estimateUsd: picture, repaintable: true, takesNote: true })),
+      items: BIOME_KIT.filter(repaintableKit).map((a) => ({ id: a.id, name: a.name, ...url(a.id), estimateUsd: this.pictureUsd('scenery'), repaintable: true, takesNote: true })),
     });
     groups.push({
       id: 'anchors',
       title: 'Characters, items and landmarks',
       note: 'These shipped pictures also set the style for every new painting. Painting one again changes how it looks in the game; new paintings keep following the approved original.',
-      items: ANCHORS.map((a) => ({ id: a.id, name: a.name, ...url(a.id), estimateUsd: picture, repaintable: Boolean(shipped[a.id]) && a.kind !== 'effect', takesNote: true, ...(shipped[a.id] ? {} : { why: 'Not part of the game yet.' }) })),
+      items: ANCHORS.map((a) => ({ id: a.id, name: a.name, ...url(a.id), estimateUsd: this.pictureUsd(useOf(a)), repaintable: Boolean(shipped[a.id]) && a.kind !== 'effect', takesNote: true, ...(shipped[a.id] ? {} : { why: 'Not part of the game yet.' }) })),
     });
     const wished = this.wishedGroups(picture);
     groups.push(...wished);
+    for (const item of groups.flatMap((g) => g.items)) {
+      const versions = await this.history.versions(item.id);
+      if (versions.length) item.versions = versions;
+      if (item.source === 'redone' && shipped[item.id]) item.shippedBack = true;
+    }
     return {
       imageModel,
       videoModel,
       budget: this.options.wishes.budget(),
       jobs: this.options.jobs.list(),
       groups,
-      walkers: await this.walkerViews(shipped, painted, picture),
+      walkers: await this.walkerViews(shipped, painted, this.pictureUsd('walks')),
       bodies: Object.values(BODY_TYPES).map((b) => ({ id: b.id, name: b.name })),
       sounds: (await this.options.sounds?.list()) ?? [],
       effectsModel: this.options.sounds?.models().effects ?? null,
@@ -212,7 +225,7 @@ export class ArtStudio {
     for (const [biome, record] of kits) {
       for (const asset of wildKit(biome)) {
         const art = record.kitArt?.[asset.id];
-        scenery.push({ id: `${record.id}:${asset.id}`, name: asset.name ?? asset.id, ...(art ? { url: art } : {}), source: art ? 'painted' : 'missing', estimateUsd: picture, repaintable: true, takesNote: false });
+        scenery.push({ id: `${record.id}:${asset.id}`, name: asset.name ?? asset.id, ...(art ? { url: art } : {}), source: art ? 'painted' : 'missing', estimateUsd: this.pictureUsd('scenery'), repaintable: true, takesNote: false });
       }
     }
     return [
@@ -271,32 +284,41 @@ export class ArtStudio {
    */
   async repaint(asset: string, note = ''): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
-    const provider = this.options.wishes.imageProvider();
-    if (!provider) throw new ArtRequestError("No image model is set. Choose one on the AI models tab first.");
-    const estimateUsd = estimateImageUsd(provider.model);
     note = note.trim().slice(0, 1000);
     const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
+    const building = Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`));
+    const kit = [...BIOME_KIT.filter(repaintableKit), ...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
+    const use: ArtUse = wishId ? 'wishes' : building ? 'buildings' : kit ? useOf(kit) : 'wishes';
+    const provider = this.options.wishes.imageProvider(use);
+    if (!provider) throw new ArtRequestError("No image model is set. Choose one on the AI models tab first.");
+    const estimateUsd = estimateImageUsd(provider.model);
     if (wishId && pictureId) {
       const record = this.options.store.contentById(wishId);
       if (!record || record.status !== 'granted') throw new ArtRequestError('That wish is not granted, so it has no picture to paint again.');
       const prompts = note ? { [pictureId]: `${this.promptOf(record, pictureId)}\nAlso: ${note}` } : {};
+      await this.keepCurrent(asset);
       const job = this.options.wishes.paint(record, true, prompts, pictureId);
       if (!job) throw new ArtRequestError('That picture cannot be painted now.');
       this.hold(job);
       return { estimateUsd };
     }
-    if (Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`))) {
+    if (building) {
       const handle = this.options.buildings.queue(asset, 'gods-view');
       if (!handle) throw new ArtRequestError('There is no building picture by that name.');
-      this.enqueue(() => this.options.buildings.repaint(asset, note, handle), handle, { kind: 'repaint', asset, note });
+      this.enqueue(async () => {
+        await this.keepCurrent(asset);
+        await this.options.buildings.repaint(asset, note, handle);
+      }, handle, { kind: 'repaint', asset, note });
       return { estimateUsd };
     }
-    const kit = [...BIOME_KIT.filter(repaintableKit), ...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
     const shipped = (await this.options.shipped())[asset];
     if (!shipped) throw new ArtRequestError('That picture is not part of the game yet.');
     const handle = this.options.jobs.add(asset, kit.name ?? asset, 'picture', 'gods-view', estimateUsd);
-    this.enqueue(() => this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle), handle, { kind: 'repaint', asset, note });
+    this.enqueue(async () => {
+      await this.keepCurrent(asset);
+      await this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle);
+    }, handle, { kind: 'repaint', asset, note });
     return { estimateUsd };
   }
 
@@ -310,7 +332,7 @@ export class ArtStudio {
     const found = this.walkerList().find((w) => w.id === walkerId);
     if (!found) throw new ArtRequestError('There is nothing by that name to make walk.');
     if (!BODY_TYPES[body]) throw new ArtRequestError('That body type is unknown.');
-    const image = this.options.wishes.imageProvider();
+    const image = this.options.wishes.imageProvider('walks');
     const video = this.options.video();
     if (!image) throw new ArtRequestError("No image model is set. Choose one on the AI models tab first.");
     if (!video) throw new ArtRequestError('Walks are made with Google\'s video model, which needs Google AI Studio as the image model and its key.');
@@ -342,6 +364,79 @@ export class ArtStudio {
     return { estimateUsd: item.estimateUsd };
   }
 
+  /**
+   * Paints every picture in one Art tab group again (say, after choosing a
+   * better model for buildings), each as its own request. Returns about
+   * what it all costs; painting stops if the budget runs out on the way.
+   */
+  async repaintGroup(groupId: string): Promise<{ estimateUsd: number; count: number }> {
+    this.refuseWhenSpent();
+    const group = (await this.overview()).groups.find((g) => g.id === groupId);
+    if (!group) throw new ArtRequestError('There is no group of pictures by that name.');
+    const items = group.items.filter((i) => i.repaintable && i.source !== 'missing');
+    if (!items.length) throw new ArtRequestError('Nothing in that group can be painted again.');
+    let estimateUsd = 0;
+    for (const item of items) estimateUsd += (await this.repaint(item.id)).estimateUsd;
+    return { estimateUsd, count: items.length };
+  }
+
+  /**
+   * Puts an earlier version of a picture back, or with `version` "shipped"
+   * the picture that shipped with the game. The one it replaces is kept.
+   */
+  async restore(asset: string, version: string): Promise<void> {
+    if (version === 'shipped') {
+      if (!(await this.options.shipped())[asset]) throw new ArtRequestError('That picture did not ship with the game.');
+      await this.load();
+      const file = await this.currentFile(asset);
+      if (file) await this.history.keep(asset, file);
+      if (this.redone[asset]) {
+        delete this.redone[asset];
+        await this.saveRedone();
+      } else {
+        await this.options.buildings.forget(asset);
+      }
+      return;
+    }
+    const file = await this.currentFile(asset);
+    if (!file || !(await this.history.restore(asset, version, file))) throw new ArtRequestError('That earlier version is not there any more.');
+    const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
+    if (wishId && pictureId) this.options.wishes.touchArt(wishId, pictureId);
+    else if (this.redone[asset]) {
+      this.redone[asset] = { ...this.redone[asset]!, file: `${this.redone[asset]!.file.split('?')[0]}?v=${Date.now().toString(36)}`, redone: Date.now() };
+      await this.saveRedone();
+    } else await this.options.buildings.touch(asset);
+  }
+
+  /** Puts a picture's current file aside before it is painted again, when it was painted here. */
+  private async keepCurrent(asset: string): Promise<void> {
+    const file = await this.currentFile(asset);
+    if (file) await this.history.keep(asset, file);
+  }
+
+  /**
+   * The file on disk a picture is shown from, when it was painted here:
+   * a wish's picture, a building picture, or shipped art painted again.
+   * Wished lands' scenery is shared by every region of the land and has no history.
+   */
+  private async currentFile(asset: string): Promise<string | undefined> {
+    const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
+    if (wishId && pictureId) {
+      const record = this.options.store.contentById(wishId);
+      const def = record?.definition;
+      if (def?.kind === 'region' && wildKit(def.biome).some((a) => a.id === pictureId)) return undefined;
+      return resolve(this.options.artDir, `${pictureId}.png`);
+    }
+    await this.load();
+    if (this.redone[asset]) return resolve(this.redoneDir, basename(this.redone[asset]!.file.split('?')[0]!));
+    return this.options.buildings.fileOf(asset);
+  }
+
+  private async saveRedone(): Promise<void> {
+    await mkdir(this.redoneDir, { recursive: true });
+    await writeFile(resolve(this.redoneDir, 'manifest.json'), JSON.stringify(this.redone, null, 2));
+  }
+
   /** The painting log, newest first. */
   jobs(): ArtJob[] {
     return this.options.jobs.list();
@@ -352,15 +447,23 @@ export class ArtStudio {
     while (this.pending.size) await Promise.all([...this.pending]);
   }
 
+  /** About what one picture of this kind costs with its model. */
+  private pictureUsd(use: ArtUse): number {
+    return estimateImageUsd(this.options.wishes.imageProvider(use)?.model ?? '');
+  }
+
   private refuseWhenSpent(): void {
-    if (this.options.wishes.budget().over) throw new ArtRequestError("This month's budget is spent, so nothing more can be painted until next month or until the ceiling is raised on the Budget tab.");
+    const budget = this.options.wishes.budget();
+    if (budget.over) throw new ArtRequestError("This month's budget is spent, so nothing more can be painted until next month or until the ceiling is raised on the Budget tab.");
+    if (budget.overToday) throw new ArtRequestError("Today's spending cap is reached, so nothing more can be painted until midnight UTC or until the cap is raised on the Budget tab.");
   }
 
   /** Runs a request after the ones before it and after any start-up painting; `request` keeps it across a restart. */
   private enqueue(task: () => Promise<unknown>, handle?: ArtJobHandle, request?: PaintRequest): void {
     const run = this.queue.then(async () => {
       await Promise.all([this.options.buildings.job, this.options.walks.job]);
-      if (this.options.wishes.budget().over) return handle?.skip("This month's budget is spent.");
+      const budget = this.options.wishes.budget();
+      if (budget.paused) return handle?.skip(budget.why ?? 'The budget is spent.');
       await task();
     });
     this.queue = run.catch((err) => {
@@ -396,7 +499,7 @@ export class ArtStudio {
 
   /** Paints a shipped scenery piece, character or item again, at its shipped size. */
   private async repaintShipped(asset: KitAsset, box: { width: number; height: number }, note: string, handle: ArtJobHandle): Promise<void> {
-    const provider = this.options.wishes.imageProvider();
+    const provider = this.options.wishes.imageProvider(useOf(asset));
     if (!provider) return handle.skip("No image model is set in God's View.");
     handle.start();
     // Its own approved picture goes along too, so the new one keeps its character.
@@ -417,6 +520,11 @@ export class ArtStudio {
     this.redone = JSON.parse(await readFile(resolve(this.redoneDir, 'manifest.json'), 'utf8').catch(() => '{}')) as ArtManifest;
     this.loaded = true;
   }
+}
+
+/** Which image model paints a shipped picture: scenery's for tiles, props and landmarks, wished things' for characters and items. */
+function useOf(asset: { kind: string }): ArtUse {
+  return asset.kind === 'tile' || asset.kind === 'prop' || asset.kind === 'set-piece' ? 'scenery' : 'wishes';
 }
 
 /** Scenery that can be painted from here: tiles and props, not effects. */

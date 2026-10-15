@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { BUILDING_STYLES, type ArtManifest } from '@co-mmo/shared';
 import { buildingArtJobs, paintBuildingArt, type BuildingArtJob } from './assets/building-art.ts';
 import type { ImageProvider } from './assets/provider.ts';
@@ -13,7 +13,7 @@ export const BUILDING_ART_PATH = 'wished-art/buildings';
 export interface BuildingPainterOptions {
   /** The image model chosen in God's View, or undefined when there is none. */
   provider: () => ImageProvider | undefined;
-  /** True once this month's budget is spent. */
+  /** True while spending is paused: this month's budget is spent or today's cap is reached. */
   overBudget: () => boolean;
   /** Records what a picture cost. */
   spend: (usd: number, provider: ImageProvider) => void;
@@ -71,7 +71,7 @@ export class BuildingPainter {
       const handle = queued[i];
       const provider = this.options.provider();
       if (!provider || this.options.overBudget()) {
-        for (const left of queued.slice(i)) left?.skip(provider ? "This month's budget is spent." : 'No image model is set in God\'s View.');
+        for (const left of queued.slice(i)) left?.skip(provider ? "Spending is paused: this month's budget or today's cap is used up." : 'No image model is set in God\'s View.');
         return;
       }
       try {
@@ -99,6 +99,34 @@ export class BuildingPainter {
     if (!provider) throw new Error("No image model is set in God's View.");
     await this.load();
     await this.paint(note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job, provider, handle, true);
+  }
+
+  /** The file of a building picture painted here, if there is one. */
+  async fileOf(id: string): Promise<string | undefined> {
+    await this.load();
+    const entry = this.painted[id];
+    return entry && resolve(this.dir, basename(entry.file.split('?')[0]!));
+  }
+
+  /** Makes browsers load a picture afresh after its file was replaced on disk (an earlier version put back). */
+  async touch(id: string): Promise<void> {
+    await this.load();
+    const entry = this.painted[id];
+    if (!entry) return;
+    this.painted[id] = { ...entry, file: `${entry.file.split('?')[0]}?v=${Date.now().toString(36)}`, redone: Date.now() };
+    await this.save();
+  }
+
+  /** Drops what was painted here for a shipped building picture, so the shipped one shows again. */
+  async forget(id: string): Promise<void> {
+    await this.load();
+    delete this.painted[id];
+    await this.save();
+  }
+
+  private async save(): Promise<void> {
+    await mkdir(this.dir, { recursive: true });
+    await writeFile(resolve(this.dir, 'manifest.json'), JSON.stringify(this.painted, null, 2));
   }
 
   /** Queues a job in the painting log for one building picture. */

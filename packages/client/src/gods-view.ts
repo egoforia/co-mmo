@@ -31,6 +31,11 @@ interface Budget {
   warnUsd: number;
   over: boolean;
   warn: boolean;
+  todayUsd?: number;
+  dailyUsd?: number;
+  overToday?: boolean;
+  paused?: boolean;
+  why?: string;
   byKind?: Record<string, number>;
   byPlayer?: Record<string, number>;
   byProvider?: Record<string, number>;
@@ -122,13 +127,19 @@ interface AiSettings {
     god: { provider: string; model: string };
     fallback: { provider: string; model: string } | null;
     compiler?: { provider: string; model: string } | null;
-    image: { provider: string; model: string };
+    image: { provider: string; model: string; uses?: Partial<Record<ArtUse, string>> };
+    video: { provider: string; model: string };
     sound: { effects: { provider: string; model: string }; music: { provider: string; model: string } };
   };
   providers: { id: string; keySet: boolean; keyName: string | null; defaultModel: string }[];
   imageKeySet: boolean;
   effectsKeySet: boolean;
+  keys: { name: string; set: boolean; for: string }[];
+  catalog: Record<'image' | 'video' | 'music' | 'effects', { model: string; usd: number; per: string }[]>;
 }
+
+type ArtUse = 'wishes' | 'buildings' | 'scenery' | 'walks';
+const ART_USES: [ArtUse, string][] = [['buildings', 'Buildings and furniture'], ['scenery', 'Scenery and landmarks'], ['wishes', 'Wished things and characters'], ['walks', 'Standing views for walks']];
 
 interface UpdateStatus {
   available: boolean;
@@ -559,19 +570,24 @@ async function ai(): Promise<string> {
     (none ? ['<option value="">None</option>'] : [])
       .concat(s.providers.map((p) => `<option value="${p.id}"${p.id === selected ? ' selected' : ''}>${label(p.id)}${p.keySet ? '' : ' (no key)'}</option>`))
       .join('');
-  const keys = s.providers.filter((p) => p.keyName).map((p) => `<li><span class="${p.keySet ? 'ok' : 'missing'}">${p.keySet ? 'set' : 'not set'}</span> ${p.keyName}</li>`).join('');
+  const keys = s.keys.map((k) => `<li><span class="${k.set ? 'ok' : 'missing'}">${k.set ? 'set' : 'not set'}</span> ${escapeHtml(k.name)} <small>${escapeHtml(k.for)}</small></li>`).join('');
   return `
     <h2>The God's language model</h2>
     <form id="ai-form" class="form">
       <label>Model<span><select name="godProvider">${options(s.ai.god.provider)}</select><input name="godModel" value="${escapeHtml(s.ai.god.model)}"></span></label>
       <label>Fallback, if it fails<span><select name="fallbackProvider">${options(s.ai.fallback?.provider ?? '', true)}</select><input name="fallbackModel" value="${escapeHtml(s.ai.fallback?.model ?? '')}" placeholder="default model"></span></label>
       <label>Rule compiler<span><select name="compilerProvider">${options(s.ai.compiler?.provider ?? '', true).replace('>None<', '>Same as the God<')}</select><input name="compilerModel" value="${escapeHtml(s.ai.compiler?.model ?? '')}" placeholder="drafts scripts for Major wishes"></span></label>
-      <label>Images for wishes<span><select name="imageProvider"><option value="gemini"${s.ai.image.provider === 'gemini' ? ' selected' : ''}>Google AI Studio${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.image.provider === 'none' ? ' selected' : ''}>None (placeholder art only)</option></select><input name="imageModel" value="${escapeHtml(s.ai.image.model)}"></span></label>
-      <label>Sound effects<span><select name="effectsProvider"><option value="elevenlabs"${s.ai.sound.effects.provider === 'elevenlabs' ? ' selected' : ''}>ElevenLabs${s.effectsKeySet ? '' : ' (no key: ELEVENLABS_API_KEY)'}</option><option value="none"${s.ai.sound.effects.provider === 'none' ? ' selected' : ''}>None (no sound effects)</option></select><input name="effectsModel" value="${escapeHtml(s.ai.sound.effects.model)}" placeholder="eleven_text_to_sound_v2"></span></label>
-      <label>Music<span><select name="musicProvider"><option value="gemini"${s.ai.sound.music.provider === 'gemini' ? ' selected' : ''}>Google Lyria${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.music.provider === 'none' ? ' selected' : ''}>None (no music)</option></select><input name="musicModel" value="${escapeHtml(s.ai.sound.music.model)}" placeholder="lyria-3-clip-preview"></span></label>
+      <h3>Pictures, video and sound</h3>
+      <label>Pictures<span><select name="imageProvider"><option value="gemini"${s.ai.image.provider === 'gemini' ? ' selected' : ''}>Google AI Studio${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.image.provider === 'none' ? ' selected' : ''}>None (placeholder art only)</option></select><input name="imageModel" list="image-models" value="${escapeHtml(s.ai.image.model)}"></span></label>
+      ${ART_USES.map(([use, name]) => `<label class="sub">${name}<span><input name="use-${use}" list="image-models" value="${escapeHtml(s.ai.image.uses?.[use] ?? '')}" placeholder="same as Pictures"></span></label>`).join('')}
+      <label>Walk videos<span><select name="videoProvider"><option value="gemini"${s.ai.video.provider === 'gemini' ? ' selected' : ''}>Google Veo${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.video.provider === 'none' ? ' selected' : ''}>None (no new walks)</option></select><input name="videoModel" list="video-models" value="${escapeHtml(s.ai.video.model)}" placeholder="veo-3.1-lite-generate-preview"></span></label>
+      <label>Sound effects<span><select name="effectsProvider"><option value="elevenlabs"${s.ai.sound.effects.provider === 'elevenlabs' ? ' selected' : ''}>ElevenLabs${s.effectsKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.effects.provider === 'none' ? ' selected' : ''}>None (no sound effects)</option></select><input name="effectsModel" list="effects-models" value="${escapeHtml(s.ai.sound.effects.model)}" placeholder="eleven_text_to_sound_v2"></span></label>
+      <label>Music<span><select name="musicProvider"><option value="gemini"${s.ai.sound.music.provider === 'gemini' ? ' selected' : ''}>Google Lyria${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.music.provider === 'none' ? ' selected' : ''}>None (no music)</option></select><input name="musicModel" list="music-models" value="${escapeHtml(s.ai.sound.music.model)}" placeholder="lyria-3-clip-preview"></span></label>
+      ${(['image', 'video', 'effects', 'music'] as const).map((kind) => `<datalist id="${kind}-models">${s.catalog[kind].map((m) => `<option value="${escapeHtml(m.model)}">about ${usd(m.usd)} a ${m.per}</option>`).join('')}</datalist>`).join('')}
+      <p class="note">Prices per model: ${(['image', 'video', 'effects', 'music'] as const).flatMap((kind) => s.catalog[kind].map((m) => `<code>${escapeHtml(m.model)}</code> about ${usd(m.usd)} a ${m.per}`)).join(' · ')}. A dearer picture model can be used only where it shows most, such as buildings.</p>
       <button type="submit">Save</button>
     </form>
-    <p class="note">The offline God needs no key: it understands simple wishes and is always the last fallback. Keys live in the server's environment, never here.</p>
+    <p class="note">The offline God needs no key: it understands simple wishes and is always the last fallback. Keys live in the server's environment (the .env file), never here; restart the game after adding one.</p>
     <ul class="keys">${keys}</ul>
     <h2>Try it</h2>
     <form id="ai-test" class="form">
@@ -624,6 +640,7 @@ async function budget(): Promise<string> {
       <p><b>${usd(b.spentUsd)}</b> of ${usd(b.monthlyUsd)} · ${b.calls ?? 0} paid calls${b.estimatedUsd ? ` · ${usd(b.estimatedUsd)} of it is a guess until those builds report their real cost` : ''}${b.over ? ' · <b>Over the ceiling: the offline God answers and no art is painted.</b>' : b.warn ? ' · Past the warning line.' : ''}</p>
     </div>
     <div class="cols">
+      <div><h3>Today</h3><ul class="spend"><li><span>Spent today (UTC)</span><b>${usd(b.todayUsd ?? 0)}</b></li><li><span>Daily cap</span><b>${usd(b.dailyUsd ?? 0)}</b></li></ul>${b.overToday ? '<p class="note bad">Today\'s cap is reached: painting and sound wait until midnight UTC, then whatever is missing is made.</p>' : ''}</div>
       <div><h3>By provider</h3><ul class="spend">${list(b.byProvider)}</ul></div>
       <div><h3>By kind</h3><ul class="spend">${list(b.byKind)}</ul></div>
       <div><h3>By player</h3><ul class="spend">${list(b.byPlayer)}</ul></div>
@@ -632,6 +649,7 @@ async function budget(): Promise<string> {
     <form id="budget-form" class="form">
       <label>Monthly ceiling (USD)<span><input name="monthlyUsd" type="number" min="0" step="1" value="${b.monthlyUsd}"></span></label>
       <label>Warn at (USD)<span><input name="warnUsd" type="number" min="0" step="1" value="${b.warnUsd}"></span></label>
+      <label>Daily cap (USD): painting, walks and sound pause for the day once spending reaches it<span><input name="dailyUsd" type="number" min="0" step="0.5" value="${b.dailyUsd ?? 10}"></span></label>
       <label class="check"><input type="checkbox" name="samples"${b.workshop?.samples ? ' checked' : ''}> Paint a sample in Wish Workshop previews (one per draft, paid by the player in Favor; paused past the warning line)</label>
       <label>Favor a sample costs<span><input name="sampleFavor" type="number" min="0" max="10" step="1" value="${b.workshop?.sampleFavor ?? 1}"></span></label>
       <button type="submit">Save</button>
@@ -693,6 +711,8 @@ interface ArtItem {
   repaintable: boolean;
   why?: string;
   takesNote: boolean;
+  versions?: { id: string; url: string }[];
+  shippedBack?: boolean;
 }
 
 type WalkStrip = { url: string; frames: number; width: number; height: number; cycleSeconds: number };
@@ -755,6 +775,7 @@ async function art(): Promise<string> {
     ${o.groups.map((g) => `
       <h2>${escapeHtml(g.title)}</h2>
       ${g.note ? `<p class="note">${escapeHtml(g.note)}</p>` : ''}
+      ${groupRepaintHtml(g)}
       <div class="art-grid">${g.items.map(artItemHtml).join('')}</div>`).join('')}`;
 }
 
@@ -772,7 +793,7 @@ function artJobsHtml(jobs: ArtJob[], b: Budget): string {
   return `
     <h2>Painting now</h2>
     <p class="note">Each model is asked only as often as Google allows (video: 2 clips a minute, one at a time), so some requests wait their turn. Requests still waiting when the server restarts are painted after it starts again.</p>
-    <p>${usd(b.spentUsd)} of ${usd(b.monthlyUsd)} spent this month${b.over ? ' · <b class="bad">The budget is spent: nothing more is painted.</b>' : b.warn ? ' · Past the warning line.' : ''}${open.length ? ` · ${open.length} waiting or painting, about ${usd(waiting)} more` : ''}</p>
+    <p>${usd(b.spentUsd)} of ${usd(b.monthlyUsd)} spent this month${b.paused ? ` · <b class="bad">${escapeHtml(b.why ?? 'Nothing more is painted for now.')}</b>` : b.warn ? ' · Past the warning line.' : ''}${open.length ? ` · ${open.length} waiting or painting, about ${usd(waiting)} more` : ''}</p>
     ${open.length ? `<table class="log jobs">${open.map(row).join('')}</table>` : '<p class="note">Nothing is being painted right now.</p>'}
     ${done.length ? `<details${open.length ? '' : ' open'}><summary>Painted lately (${done.length})</summary><table class="log jobs">${done.map(row).join('')}</table></details>` : '<p class="note">Nothing painted since the server started.</p>'}`;
 }
@@ -789,6 +810,27 @@ async function refreshArtJobs(): Promise<void> {
   if (details && open !== undefined) details.open = open;
 }
 
+/** Paints a whole group again, say after choosing a better model for it; each picture's old version is kept. */
+function groupRepaintHtml(g: { id: string; title: string; items: ArtItem[] }): string {
+  const items = g.items.filter((i) => i.repaintable && i.source !== 'missing');
+  if (items.length < 2) return '';
+  const total = items.reduce((n, i) => n + i.estimateUsd, 0);
+  return `<form class="form art-group" data-group="${escapeHtml(g.id)}" data-name="${escapeHtml(g.title)}" data-count="${items.length}" data-usd="${total}"><button type="submit" class="quiet">Paint all ${items.length} again with today's model · about ${usd(total)}</button></form>`;
+}
+
+/** Earlier versions of a picture, and the shipped one, each of which can be put back for free. */
+function versionsHtml(item: ArtItem): string {
+  const back = (version: string, label: string) => `<form class="art-restore" data-asset="${escapeHtml(item.id)}" data-version="${escapeHtml(version)}"><button type="submit" class="quiet">${label}</button></form>`;
+  if (!item.versions?.length && !item.shippedBack) return '';
+  return `
+    <details><summary>Earlier versions${item.versions?.length ? ` (${item.versions.length})` : ''}</summary>
+      <div class="versions">
+        ${(item.versions ?? []).map((v) => `<figure><img src="${escapeHtml(v.url)}" alt="" loading="lazy">${back(v.id, 'Use this one')}</figure>`).join('')}
+        ${item.shippedBack ? back('shipped', 'Back to the shipped picture') : ''}
+      </div>
+    </details>`;
+}
+
 function artItemHtml(item: ArtItem): string {
   const picture = item.url ? `<img src="${escapeHtml(item.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>';
   const form = item.repaintable ? `
@@ -798,7 +840,7 @@ function artItemHtml(item: ArtItem): string {
         <button type="submit">Paint again</button>
       </form>
     </details>` : item.why ? `<small>${escapeHtml(item.why)}</small>` : '';
-  return `<figure class="art-item ${item.source}">${picture}<figcaption><b>${escapeHtml(item.name)}</b><br><small>${SOURCE[item.source]}</small>${form}</figcaption></figure>`;
+  return `<figure class="art-item ${item.source}">${picture}<figcaption><b>${escapeHtml(item.name)}</b><br><small>${SOURCE[item.source]}</small>${form}${versionsHtml(item)}</figcaption></figure>`;
 }
 
 function soundHtml(s: SoundItem): string {
@@ -951,7 +993,8 @@ main.addEventListener('submit', async (e) => {
         god: { provider: f.godProvider, model: f.godModel },
         fallback: f.fallbackProvider ? { provider: f.fallbackProvider, model: f.fallbackModel } : null,
         compiler: f.compilerProvider ? { provider: f.compilerProvider, model: f.compilerModel } : null,
-        image: { provider: f.imageProvider, model: f.imageModel },
+        image: { provider: f.imageProvider, model: f.imageModel, uses: Object.fromEntries(ART_USES.map(([use]) => [use, f[`use-${use}`] ?? ''])) },
+        video: { provider: f.videoProvider, model: f.videoModel },
         sound: { effects: { provider: f.effectsProvider, model: f.effectsModel }, music: { provider: f.musicProvider, model: f.musicModel } },
       });
       toast('Saved. The next prayer uses these models.');
@@ -966,6 +1009,13 @@ main.addEventListener('submit', async (e) => {
       if (!confirmSpend(`Paint "${form.dataset.name}" again`, Number(form.dataset.usd))) return;
       await api('art/paint', 'POST', { asset: form.dataset.asset, note: f.note ?? '' });
       toast('Asked. Follow it under Painting now.');
+    } else if (form.classList.contains('art-group')) {
+      if (!confirmSpend(`Paint all ${form.dataset.count} pictures of "${form.dataset.name}" again`, Number(form.dataset.usd))) return;
+      const r = await api<{ count: number }>('art/paint-group', 'POST', { group: form.dataset.group });
+      toast(`Asked for ${r.count} pictures. The old ones are kept under Earlier versions; follow the painting under Painting now.`);
+    } else if (form.classList.contains('art-restore')) {
+      await api('art/restore', 'POST', { asset: form.dataset.asset, version: form.dataset.version });
+      toast('Put back. Players see it after they reload.');
     } else if (form.classList.contains('art-sound')) {
       if (!confirmSpend(`Make "${form.dataset.name}" again`, Number(form.dataset.usd))) return;
       await api('art/sound', 'POST', { sound: form.dataset.sound, note: f.note ?? '' });
@@ -983,7 +1033,7 @@ main.addEventListener('submit', async (e) => {
       await api(`content/${form.dataset.repaint}/paint`, 'POST', { picture: form.dataset.picture, prompt: f.prompt ?? '' });
       toast('Painting with your words. The new art appears in a few seconds.');
     } else if (form.id === 'budget-form') {
-      await api('budget', 'PUT', { monthlyUsd: Number(f.monthlyUsd), warnUsd: Number(f.warnUsd), samples: f.samples === 'on', sampleFavor: Number(f.sampleFavor) });
+      await api('budget', 'PUT', { monthlyUsd: Number(f.monthlyUsd), warnUsd: Number(f.warnUsd), dailyUsd: Number(f.dailyUsd), samples: f.samples === 'on', sampleFavor: Number(f.sampleFavor) });
       toast('Budget saved.');
     }
     (document.activeElement as HTMLElement | null)?.blur();
@@ -1013,7 +1063,7 @@ main.addEventListener('change', (e) => {
   const select = e.target as HTMLSelectElement;
   const input = select.parentElement?.querySelector<HTMLInputElement>('input');
   const provider = aiState?.providers.find((p) => p.id === select.value);
-  if (input && provider && /Provider$/.test(select.name) && !['imageProvider', 'effectsProvider', 'musicProvider'].includes(select.name)) input.value = provider.defaultModel;
+  if (input && provider && /Provider$/.test(select.name) && !['imageProvider', 'videoProvider', 'effectsProvider', 'musicProvider'].includes(select.name)) input.value = provider.defaultModel;
 });
 
 void boot();

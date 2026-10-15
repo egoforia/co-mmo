@@ -40,6 +40,11 @@ const MUSIC_USD: Record<string, number> = {
   'lyria-3.5': 0.08,
 };
 
+/** Music models with a known price, for God's View to offer. */
+export function knownMusicModels(): string[] {
+  return Object.keys(MUSIC_USD);
+}
+
 /** ElevenLabs' API list price for sound effects, $0.12 a minute. An ESTIMATE: plans with credits cost less. */
 const EFFECT_USD_PER_SECOND = 0.002;
 

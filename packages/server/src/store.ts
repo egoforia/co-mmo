@@ -117,8 +117,10 @@ export interface Settings {
     fallback: ModelChoice | null;
     /** Drafts scripted rules for Major wishes; null uses the God's model. */
     compiler?: ModelChoice | null;
-    /** Paints wished things; 'none' keeps tinted placeholders. */
-    image: { provider: 'gemini' | 'none'; model: string };
+    /** Paints wished things; 'none' keeps tinted placeholders. `uses` picks another model for some kinds of art. */
+    image: { provider: 'gemini' | 'none'; model: string; uses?: Partial<Record<ArtUse, string>> };
+    /** Makes walk clips (missing in older saves: Veo whenever the images come from Gemini). */
+    video?: { provider: 'gemini' | 'none'; model: string };
     /** Makes sound effects and music (missing in older saves: see soundSettings). */
     sound?: SoundSettings;
   };
@@ -127,11 +129,28 @@ export interface Settings {
     monthlyUsd: number;
     /** God's View warns from here. */
     warnUsd: number;
+    /** Painting and sound stop for the day (UTC) once this much is spent, and pick up the next day (missing in older saves). */
+    dailyUsd?: number;
   };
   /** Building Engine wishes as code changes (missing in older saves). */
   builds?: BuildSettings;
   /** The Wish Workshop (missing in older saves). */
   workshop?: WorkshopSettings;
+}
+
+/** The daily spending cap unless the Owner sets one: a busy day's painting, well under the month. */
+export const DEFAULT_DAILY_USD = 10;
+
+/**
+ * Kinds of art that can each have their own image model (design doc, asset
+ * tiers): a dearer model where it shows most, a cheap one elsewhere.
+ */
+export type ArtUse = 'wishes' | 'buildings' | 'scenery' | 'walks';
+export const ART_USES: ArtUse[] = ['wishes', 'buildings', 'scenery', 'walks'];
+
+/** The video model in use: the saved choice, or Veo Lite when the Gemini key is set (as walks worked before the choice existed). */
+export function videoSettings(settings: Settings, env: NodeJS.ProcessEnv): { provider: 'gemini' | 'none'; model: string } {
+  return settings.ai.video ?? (env.GEMINI_API_KEY ? { provider: 'gemini', model: 'veo-3.1-lite-generate-preview' } : { provider: 'none', model: '' });
 }
 
 export interface SoundSettings {
@@ -207,7 +226,7 @@ export function defaultSettings(env: Record<string, string | undefined> = proces
       compiler: null,
       image: gemini ? { provider: 'gemini', model: 'gemini-2.5-flash-image' } : { provider: 'none', model: '' },
     },
-    budget: { monthlyUsd: 70, warnUsd: 50 },
+    budget: { monthlyUsd: 70, warnUsd: 50, dailyUsd: DEFAULT_DAILY_USD },
     builds: { ...DEFAULT_BUILDS },
   };
 }
@@ -520,6 +539,13 @@ export class Store {
     if (i >= 0) this.data.spend.splice(i, 1);
     if (record.usd > 0) this.data.spend.push(record);
     this.persist();
+  }
+
+  /** Spending on the day (UTC) containing `now`. */
+  spendToday(now: number): SpendRecord[] {
+    const d = new Date(now);
+    const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    return this.data.spend.filter((s) => s.at >= start && s.at <= now);
   }
 
   /** Spending in the calendar month (UTC) containing `now`. */

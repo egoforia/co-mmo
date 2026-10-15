@@ -2,9 +2,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ITEMS, WALK_DIRECTIONS, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
+import { knownMusicModels, soundUsd } from './assets/sound.ts';
+import { knownVideoModels, videoUsd } from './assets/video.ts';
+import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import { DEFAULT_BUILDS, DEFAULT_WORKSHOP, soundSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type Store } from './store.ts';
+import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, DEFAULT_WORKSHOP, soundSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
 import { ArtRequestError, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
@@ -20,6 +23,8 @@ export interface AdminContext {
   builds: Builds;
   /** The Art tab: painting log, repaints and walks (Owner). */
   art?: ArtStudio;
+  /** Paints and makes what is missing, now that a limit was raised. */
+  resumeArt?(): void;
   /** Disconnects a player now (after a suspension). */
   kick(id: string, reason: string): void;
   /** Pulls main and restarts the game; absent in tests. */
@@ -229,7 +234,7 @@ export async function handleAdmin(
   if (route === 'ai' && method === 'GET') {
     if (ownerOnly()) return true;
     return json(res, 200, {
-      ai: { ...store.settings.ai, sound: soundSettings(store.settings, ctx.env) },
+      ai: { ...store.settings.ai, video: videoSettings(store.settings, ctx.env), sound: soundSettings(store.settings, ctx.env) },
       providers: PROVIDERS.map((id) => ({
         id,
         keySet: id === 'offline' || Boolean(ctx.env[KEY_ENV[id as Exclude<ProviderId, 'offline'>]]),
@@ -238,6 +243,20 @@ export async function handleAdmin(
       })),
       imageKeySet: Boolean(ctx.env.GEMINI_API_KEY),
       effectsKeySet: Boolean(ctx.env.ELEVENLABS_API_KEY),
+      // Every key the game can use, whether it is set, and what it is for; never the key itself.
+      keys: [
+        { name: 'GEMINI_API_KEY', set: Boolean(ctx.env.GEMINI_API_KEY), for: 'Google: the God, pictures, walk videos (Veo) and music (Lyria)' },
+        { name: 'ANTHROPIC_API_KEY', set: Boolean(ctx.env.ANTHROPIC_API_KEY), for: 'Anthropic Claude for the God' },
+        { name: 'OPENAI_API_KEY', set: Boolean(ctx.env.OPENAI_API_KEY), for: 'OpenAI or a compatible service for the God' },
+        { name: 'ELEVENLABS_API_KEY', set: Boolean(ctx.env.ELEVENLABS_API_KEY), for: 'ElevenLabs sound effects' },
+      ],
+      // Models with a known price, offered in each picker; any other name can still be typed.
+      catalog: {
+        image: knownImageModels().map((model) => ({ model, usd: estimateImageUsd(model), per: 'picture' })),
+        video: knownVideoModels().map((model) => ({ model, usd: videoUsd(model, { mimeType: 'video/mp4', data: Buffer.alloc(0), seconds: 8 }), per: '8-second clip' })),
+        music: knownMusicModels().map((model) => ({ model, usd: soundUsd(model, { seconds: 30 }), per: 'track' })),
+        effects: [{ model: 'eleven_text_to_sound_v2', usd: soundUsd('eleven_text_to_sound_v2', { seconds: 1 }), per: 'second of sound' }],
+      },
     }), true;
   }
 
@@ -252,8 +271,16 @@ export async function handleAdmin(
     const image: Settings['ai']['image'] = img?.provider === 'gemini'
       ? { provider: 'gemini', model: typeof img.model === 'string' && img.model ? img.model.slice(0, 80) : 'gemini-2.5-flash-image' }
       : { provider: 'none', model: '' };
+    // Each kind of art may name its own image model; blank uses the main one.
+    const uses = (img?.uses ?? {}) as Record<string, unknown>;
+    const chosen = Object.fromEntries(ART_USES.flatMap((u) => (typeof uses[u] === 'string' && (uses[u] as string).trim() ? [[u, (uses[u] as string).trim().slice(0, 80)]] : [])));
+    if (image.provider === 'gemini' && Object.keys(chosen).length) image.uses = chosen;
+    const vid = body?.video as Record<string, unknown> | undefined;
+    const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings, ctx.env)
+      : vid.provider === 'gemini' ? { provider: 'gemini', model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
+      : { provider: 'none', model: '' };
     const sound = soundChoice(body?.sound, soundSettings(store.settings, ctx.env));
-    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image, sound } });
+    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image, video, sound } });
     return json(res, 200, { ok: true }), true;
   }
 
@@ -311,6 +338,14 @@ export async function handleAdmin(
         const done = await ctx.art.repaint(String(body?.asset ?? ''), typeof body?.note === 'string' ? body.note : '');
         return json(res, 202, { ok: true, ...done }), true;
       }
+      if (route === 'art/paint-group' && method === 'POST') {
+        const done = await ctx.art.repaintGroup(String(body?.group ?? ''));
+        return json(res, 202, { ok: true, ...done }), true;
+      }
+      if (route === 'art/restore' && method === 'POST') {
+        await ctx.art.restore(String(body?.asset ?? ''), String(body?.version ?? ''));
+        return json(res, 200, { ok: true }), true;
+      }
       if (route === 'art/sound' && method === 'POST') {
         const done = await ctx.art.sound(String(body?.sound ?? ''), typeof body?.note === 'string' ? body.note : '');
         return json(res, 202, { ok: true, ...done }), true;
@@ -352,12 +387,18 @@ export async function handleAdmin(
     if (!(monthlyUsd >= 0 && monthlyUsd <= 10_000) || !(warnUsd >= 0 && warnUsd <= monthlyUsd)) {
       return json(res, 400, { error: 'bad_budget', message: 'The warning must be between 0 and the ceiling.' }), true;
     }
+    const dailyUsd = body?.dailyUsd === undefined ? store.settings.budget.dailyUsd ?? DEFAULT_DAILY_USD : Number(body.dailyUsd);
+    if (!(dailyUsd >= 0 && dailyUsd <= monthlyUsd)) {
+      return json(res, 400, { error: 'bad_daily', message: 'The daily cap must be between 0 and the monthly ceiling.' }), true;
+    }
     // Workshop samples are paid painting, so their switch sits with the budget.
     const sampleFavor = Number(body?.sampleFavor ?? DEFAULT_WORKSHOP.sampleFavor);
     if (!(Number.isInteger(sampleFavor) && sampleFavor >= 0 && sampleFavor <= 10)) {
       return json(res, 400, { error: 'bad_sample_favor', message: 'A sample costs 0 to 10 Favor.' }), true;
     }
-    store.updateSettings({ ...store.settings, budget: { monthlyUsd, warnUsd }, workshop: { samples: body?.samples === true, sampleFavor } });
+    store.updateSettings({ ...store.settings, budget: { monthlyUsd, warnUsd, dailyUsd }, workshop: { samples: body?.samples === true, sampleFavor } });
+    // A raised limit lets what was held back be painted now.
+    ctx.resumeArt?.();
     return json(res, 200, { ok: true }), true;
   }
 

@@ -7,7 +7,7 @@ import { TICK_SECONDS, WishError, isClientMessage, upgradeCharacter, validateNam
 import { Auth, cleanEmail, type Mailer } from './auth.ts';
 import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
-import { Store, StoreError, soundSettings, type Account } from './store.ts';
+import { Store, StoreError, soundSettings, videoSettings, type Account } from './store.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
 import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
@@ -122,8 +122,8 @@ export function createApp(options: AppOptions): App {
   wishes.paintQueue = paintQueue;
   wishes.paintRequests = paintRequests;
   const painterOptions: BuildingPainterOptions = {
-    provider: () => wishes.imageProvider(),
-    overBudget: () => wishes.budget().over,
+    provider: () => wishes.imageProvider('buildings'),
+    overBudget: () => wishes.budget().paused,
     spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: null }),
     anchorDir: options.wishes.anchorDir,
     artDir: options.wishes.artDir,
@@ -131,14 +131,18 @@ export function createApp(options: AppOptions): App {
     jobs: artJobs,
   };
   const buildingPainter = new BuildingPainter(painterOptions);
-  // Walks use Veo whenever the images come from Gemini, with the same key.
-  const chosenVideo = options.videoProvider ?? (() => (wishes.imageProvider()?.id === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY) : undefined));
+  // Walks use Google's Veo on the Gemini key, with the model chosen on the AI models tab.
+  const chosenVideo = options.videoProvider ?? (() => {
+    const v = videoSettings(store.settings, env);
+    return v.provider === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
+  });
   const video = () => {
     const provider = chosenVideo();
     return provider && queuedVideo(paintQueue, provider);
   };
   const walkPainter = new WalkPainter({
     ...painterOptions,
+    provider: () => wishes.imageProvider('walks'),
     video,
     spendVideo: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'video', provider: provider.id, model: provider.model, playerId: null }),
     ...(options.videoFrames ? { toFrames: options.videoFrames } : {}),
@@ -160,7 +164,7 @@ export function createApp(options: AppOptions): App {
   const sounds = new SoundMaker({
     effects: queued(effects),
     music: queued(music),
-    overBudget: () => wishes.budget().over,
+    overBudget: () => wishes.budget().paused,
     spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'sound', provider: provider.id, model: provider.model, playerId: null }),
     artDir: options.wishes.artDir,
     jobs: artJobs,
@@ -169,7 +173,28 @@ export function createApp(options: AppOptions): App {
   // Buildings first: a building without its picture matters more than a stiff walk.
   if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
   // Sounds use other services, so they are made alongside.
-  if (options.sound?.start ?? Boolean(options.shippedArt)) void sounds.start();
+  const makeSounds = options.sound?.start ?? Boolean(options.shippedArt);
+  if (makeSounds) void sounds.start();
+  /** Paints and makes whatever is still missing, once the budget allows: after today's cap held it back, or the Owner raised a limit. */
+  const resumeArt = (): void => {
+    if (wishes.budget().paused) return;
+    wishes.paintMissing();
+    if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
+    if (makeSounds) void sounds.start();
+  };
+  // A new day (UTC) frees the daily cap.
+  let dayTimer: ReturnType<typeof setTimeout> | undefined;
+  const nextDay = (): void => {
+    const now = Date.now();
+    const midnight = new Date(now);
+    midnight.setUTCHours(24, 1, 0, 0);
+    dayTimer = setTimeout(() => {
+      resumeArt();
+      nextDay();
+    }, midnight.getTime() - now);
+    dayTimer.unref?.();
+  };
+  nextDay();
   const artStudio = new ArtStudio({
     store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests,
@@ -302,7 +327,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, kick, updater: options.updater, restarting, env, json, readJson };
+    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
@@ -321,6 +346,8 @@ export function createApp(options: AppOptions): App {
     if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
     const redone = path.match(/^\/wished-art\/redone\/([\w-]+\.png)$/);
     if (redone && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'redone', redone[1]!), res);
+    const old = path.match(/^\/wished-art\/history\/([\w~-]+)\/([0-9a-z]+\.(?:png|webp))$/);
+    if (old && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'history', old[1]!, old[2]!), res);
     const soundFile = path.match(/^\/wished-art\/sounds\/([\w-]+\.mp3)$/);
     if (soundFile && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'sounds', soundFile[1]!), res);
     const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
@@ -469,6 +496,7 @@ export function createApp(options: AppOptions): App {
     art: artStudio,
     async close() {
       clearInterval(tickTimer);
+      clearTimeout(dayTimer);
       options.updater?.stop();
       clearInterval(heartbeatTimer);
       builds.stop();

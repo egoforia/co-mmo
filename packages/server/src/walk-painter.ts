@@ -295,7 +295,7 @@ function facingWords(direction: WalkDirection): string {
 
 /** Why painting stopped before the end, in plain words. */
 function stopReason(options: WalkPainterOptions): string {
-  if (options.overBudget()) return "This month's budget is spent.";
+  if (options.overBudget()) return "Spending is paused: this month's budget or today's cap is used up.";
   if (!options.provider()) return "No image model is set in God's View.";
   if (!options.video()) return 'No video model: walks need the Google AI Studio key.';
   return 'Painting stopped.';

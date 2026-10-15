@@ -40,6 +40,11 @@ const USD_PER_SECOND: Record<string, [number, number]> = {
   'veo-3.1-generate-preview': [0.4, 0.4],
 };
 
+/** Video models with a known price, for God's View to offer. */
+export function knownVideoModels(): string[] {
+  return Object.keys(USD_PER_SECOND);
+}
+
 /** What a clip cost; an unknown model is priced like the dearest one, so budgets err safe. */
 export function videoUsd(model: string, video: GeneratedVideo): number {
   const [hd, fullHd] = USD_PER_SECOND[model] ?? [0.4, 0.4];

@@ -2,7 +2,7 @@
 // Plain DOM over the /api/admin endpoints; the session token is the one the
 // game saved in this browser.
 
-import { loadToken, reloadWhenBack } from './api.ts';
+import { loadToken, rejoinWhenBack, reloadWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 
 const token = loadToken();
@@ -149,15 +149,33 @@ interface UpdateStatus {
 let owner = false;
 let tab = 'world';
 
+/** The game server is not answering: it is restarting, or stopped. */
+class GameDown extends Error {
+  constructor() {
+    super('The game is starting up. Try again in a moment.');
+  }
+}
+
 async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const res = await fetch(`/api/admin/${path}`, {
     method,
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }).catch(() => null);
+  // No answer, or the dev proxy saying the server behind it is down.
+  if (!res || res.status === 502 || res.status === 503 || res.status === 504) throw new GameDown();
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message ?? data.error ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(data.message ?? data.error ?? 'Something went wrong. Try again.');
   return data as T;
+}
+
+/** Says the game is starting, and opens God's View again once it answers. */
+let waiting = false;
+function waitForGame(): void {
+  if (waiting) return;
+  waiting = true;
+  main.innerHTML = '<p class="note">The game is starting up. This page opens by itself when it is ready…</p>';
+  void rejoinWhenBack();
 }
 
 function toast(text: string): void {
@@ -180,6 +198,8 @@ async function boot(): Promise<void> {
     owner = overview.you.role === 'owner';
     document.getElementById('you')!.textContent = `${overview.you.name} · ${overview.you.role === 'owner' ? 'Owner' : 'Steward'}`;
   } catch (err) {
+    // Opened (or reloaded by Vite) while the game restarts after an update.
+    if (err instanceof GameDown) return waitForGame();
     main.innerHTML = `<p class="note">${escapeHtml((err as Error).message)}</p>`;
     return;
   }
@@ -214,6 +234,7 @@ function show(id: string): void {
 }
 
 async function render(): Promise<void> {
+  if (waiting) return;
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
@@ -225,6 +246,7 @@ async function render(): Promise<void> {
     panel.innerHTML = html;
     if (current === 'world') drawMaps();
   } catch (err) {
+    if (err instanceof GameDown) return waitForGame();
     panel.innerHTML = `<p class="note">${escapeHtml((err as Error).message)}</p>`;
   }
 }

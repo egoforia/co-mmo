@@ -224,7 +224,7 @@ function play(token: string): void {
       else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
       else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or searches a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     party.start(myId);
     const account = new AccountWindow(token);

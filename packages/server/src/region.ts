@@ -1,6 +1,7 @@
 import {
   ABILITIES,
   ATTACK_RANGE,
+  BODY_SECONDS,
   CREATURES,
   ITEMS,
   RECIPES,
@@ -14,6 +15,8 @@ import {
   gearBonus,
   maxEnergy,
   readScroll,
+  rollDrops,
+  SEARCH_RANGE,
   sell,
   train,
   unequip,
@@ -47,6 +50,7 @@ import {
   takeItem,
   tileAt,
   Tile,
+  type BodyState,
   type Character,
   type CreatorCredit,
   type EquipSlot,
@@ -56,6 +60,7 @@ import {
   type ChatMessage,
   type CreatureState,
   type EntityState,
+  type InventorySlot,
   type NpcPlacement,
   type NpcState,
   type PlayerInfo,
@@ -144,6 +149,20 @@ interface Walker {
   rest: number;
 }
 
+/** A defeated creature's body: what it dropped waits there for those who won it. */
+interface Body {
+  id: string;
+  kind: string;
+  def: CreatureDef;
+  x: number;
+  y: number;
+  /** Epoch ms when it fades away. */
+  until: number;
+  /** Who may search it: the one who struck the last blow and party members who shared the fight. */
+  finders: string[];
+  loot: InventorySlot[];
+}
+
 /** An NPC, where they stand now. */
 type Townsperson = NpcPlacement & Walker;
 
@@ -194,6 +213,9 @@ export class Region {
   readonly map: RegionMap;
   private readonly players = new Map<string, PlayerState>();
   private creatures: Creature[];
+  /** Bodies of defeated creatures, until they fade. */
+  private bodies: Body[] = [];
+  private bodyCount = 0;
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   private townsfolk: Townsperson[];
   private tickCount = 0;
@@ -274,6 +296,7 @@ export class Region {
       if (this.creatures.some((c) => c.kind === id && c.aggro === p.info.id)) p.lastHurt = this.now();
     }
     this.creatures = this.creatures.filter((c) => c.kind !== id);
+    this.bodies = this.bodies.filter((b) => b.kind !== id);
     this.townsfolk = this.townsfolk.filter((n) => n.id !== id);
   }
 
@@ -407,6 +430,11 @@ export class Region {
   /** Live creature ids, for tests and tools. */
   creatureIds(): string[] {
     return this.creatures.filter((c) => c.respawnAt === null).map((c) => c.id);
+  }
+
+  /** Bodies lying here now, for tests and tools. */
+  bodyList(): { id: string; kind: string; x: number; y: number; finders: string[]; loot: InventorySlot[] }[] {
+    return this.bodies.map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, finders: [...b.finders], loot: b.loot.map((s) => ({ ...s })) }));
   }
 
   /** Where an NPC stands now, for tests and tools. */
@@ -546,6 +574,7 @@ export class Region {
       }
     }
     for (const c of this.creatures) this.think(c, now);
+    this.bodies = this.bodies.filter((b) => now < b.until);
     for (const n of this.townsfolk) this.stroll(n);
     for (const p of this.players.values()) {
       if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id)) departures.push({ id: p.info.id, died: true });
@@ -570,12 +599,17 @@ export class Region {
           id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp),
         });
       }
+      const bodies: BodyState[] = [];
+      for (const b of this.bodies) {
+        if (!near(b.x, b.y)) continue;
+        bodies.push({ id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot: this.lootFor(b, p) });
+      }
       const npcs: NpcState[] = [];
       for (const n of this.townsfolk) {
         if (near(n.x, n.y)) npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
       }
       p.conn.send({
-        t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, npcs, online,
+        t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, bodies, npcs, online,
       });
       this.flush(p);
     }
@@ -720,16 +754,15 @@ export class Region {
       ch.gold += gold;
       gained.push(`${gold} gold`);
     }
-    for (const drop of c.def.drops) {
-      if (this.random() < drop.chance) {
-        addItem(ch, drop.item, drop.qty ?? 1);
-        gained.push(ITEMS[drop.item]?.name ?? drop.item);
-      }
-    }
+    // What it carried stays on its body for its finders to search (E).
+    this.bodies.push({
+      id: `body-${++this.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y,
+      until: this.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: rollDrops(c.def.drops, this.random),
+    });
     discover(ch, c.kind);
     this.hooks.event?.('defeat', p.info.id, { creature: c.kind });
     this.credit(c.kind, p, 'defeat');
-    this.notice(p, `Defeated ${c.def.name}: ${gained.join(', ')}.`);
+    this.notice(p, `Defeated ${c.def.name}: ${gained.join(', ')}. Press E beside its body to search it.`);
     for (const m of sharers) {
       if (m !== p) {
         discover(m.character, c.kind);
@@ -878,6 +911,7 @@ export class Region {
       }
     }
     if (npc) this.credit(npc.id, p, 'talk');
+    if (!npc && this.search(p)) return;
     if (!npc) {
       // Nobody to talk to: the player is acting on the land (fishing at water, say).
       const spot = this.nearestTile(p.x, p.y, [Tile.Water, Tile.Tree, Tile.Rock], 1.6);
@@ -914,6 +948,43 @@ export class Region {
     if (offer) message.offer = { quest: offer, title: QUESTS[offer]!.title, reward: rewardText(offer) };
     if (SHOPS[npc.id]) message.shop = true;
     p.conn.send(message);
+  }
+
+  /**
+   * Searches the nearest body in reach with something on it for this player,
+   * taking it all; false when there is none. A body that is empty or someone
+   * else's only gets a word, so E still acts on the land beside it (fishing).
+   */
+  private search(p: PlayerState): boolean {
+    const inReach = this.bodies
+      .map((b) => ({ b, d: Math.hypot(b.x - p.x, b.y - p.y) }))
+      .filter((o) => o.d <= SEARCH_RANGE)
+      .sort((a, c) => a.d - c.d)
+      .map((o) => o.b);
+    const body = inReach.find((b) => this.lootFor(b, p));
+    if (!body) {
+      const near = inReach[0];
+      if (near) {
+        this.notice(p, near.finders.includes(p.info.id)
+          ? `You search the ${near.def.name}, but there is nothing more to find.`
+          : `Someone else defeated this ${near.def.name}. What it carried is theirs to find.`);
+      }
+      return false;
+    }
+    const found = body.loot.splice(0);
+    for (const s of found) addItem(p.character, s.item, s.qty);
+    p.dirty = true;
+    const names = found.map((s) => `${s.qty > 1 ? `${s.qty} × ` : 'a '}${ITEMS[s.item]?.name ?? s.item}`).join(', ');
+    this.notice(p, `You search the ${body.def.name} and find ${names}.`);
+    for (const id of body.finders) {
+      if (id !== p.info.id) this.tell(id, `${p.info.name} searched the ${body.def.name} and found ${names}.`);
+    }
+    return true;
+  }
+
+  /** True when this body still holds something this player may take. */
+  private lootFor(b: Body, p: PlayerState): boolean {
+    return b.loot.length > 0 && b.finders.includes(p.info.id);
   }
 
   private accept(p: PlayerState, questId: string): void {

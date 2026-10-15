@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BODY_SECONDS,
   CREATURES,
   QUESTS,
   itemCount,
@@ -53,6 +54,52 @@ describe('combat', () => {
     clock.now += CREATURES['walking-mushroom']!.respawnSeconds * 1000;
     region.tick();
     expect(region.creature(id)!.alive).toBe(true);
+  });
+
+  it('a defeated creature leaves its body, which its finder searches with E before it fades', () => {
+    const { region, clock } = setup('woods');
+    const conn = fakeConn();
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, newCharacter());
+    const other = fakeConn();
+    region.join(info('b', 'Ilya'), other, { x: null, y: null }, newCharacter());
+    const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
+    const me = region.position('a')!;
+    region.placeCreature(id, me.x + 1, me.y);
+    while (region.creature(id)!.alive) {
+      region.handle('a', { t: 'attack' });
+      clock.now += 1000;
+    }
+    // The dice roll the middle: the cap (60%) drops, the Tonic (25%) does not, and nothing goes straight to the bag.
+    expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(0);
+    const [body] = region.bodyList();
+    expect(body).toMatchObject({ kind: 'walking-mushroom', finders: ['a'], loot: [{ item: 'mushroom-cap', qty: 1 }] });
+    region.tick();
+    const snap = of(conn, 'snapshot').at(-1)!;
+    expect(snap.bodies).toEqual([expect.objectContaining({ id: body!.id, name: 'Walking Mushroom', loot: true })]);
+    expect(of(other, 'snapshot').at(-1)!.bodies[0]).toMatchObject({ loot: false });
+
+    // Someone who did not fight for it finds nothing.
+    region.placePlayer('b', body!.x, body!.y + 0.5);
+    region.handle('b', { t: 'interact' });
+    expect(itemCount(region.character('b')!, 'mushroom-cap')).toBe(0);
+    expect(of(other, 'notice').at(-1)!.text).toContain('Someone else defeated');
+
+    region.placePlayer('a', body!.x + 0.5, body!.y);
+    region.handle('a', { t: 'interact' });
+    expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(1);
+    expect(of(conn, 'notice').at(-1)!.text).toBe('You search the Walking Mushroom and find a Mushroom Cap.');
+    region.handle('a', { t: 'interact' });
+    expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(1);
+    expect(of(conn, 'notice').at(-1)!.text).toContain('nothing more to find');
+
+    // The body stays for five minutes, even after the mushroom comes back.
+    clock.now += BODY_SECONDS * 1000 - 10_000;
+    region.tick();
+    expect(region.creature(id)!.alive).toBe(true);
+    expect(region.bodyList()).toHaveLength(1);
+    clock.now += 10_000;
+    region.tick();
+    expect(region.bodyList()).toHaveLength(0);
   });
 
   it('respects the attack cooldown', () => {

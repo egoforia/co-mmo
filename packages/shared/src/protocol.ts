@@ -37,7 +37,7 @@ export interface AttackMessage {
   t: 'attack';
 }
 
-/** Talk to the nearest NPC in reach. */
+/** Talk to the nearest NPC in reach, or search the nearest body, or act on the land. */
 export interface InteractMessage {
   t: 'interact';
 }
@@ -216,6 +216,18 @@ export interface CreatureState {
   health: number;
 }
 
+/** A defeated creature's body, lying where it fell until it fades. */
+export interface BodyState {
+  id: string;
+  kind: string;
+  asset: string;
+  name: string;
+  x: number;
+  y: number;
+  /** Something is still on it that this player may take. */
+  loot: boolean;
+}
+
 /** A person of the town (an NPC), where they are strolling now. */
 export interface NpcState {
   id: string;
@@ -238,6 +250,8 @@ export interface SnapshotMessage {
   players: EntityState[];
   /** Creatures inside the view radius. */
   creatures: CreatureState[];
+  /** Bodies of defeated creatures inside the view radius. */
+  bodies: BodyState[];
   /** NPCs inside the view radius. */
   npcs: NpcState[];
   online: number;

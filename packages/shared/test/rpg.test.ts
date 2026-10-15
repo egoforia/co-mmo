@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { addItem, gainXp, maxHp, newCharacter, questOffered, takeItem, upgradeCharacter, xpToNext } from '../src/index.ts';
+import { CREATURES, addItem, gainXp, maxHp, newCharacter, questOffered, rollDrops, takeItem, upgradeCharacter, xpToNext } from '../src/index.ts';
+
+describe('drops', () => {
+  it('roll each item on a creature’s list against its own chance', () => {
+    const drops = CREATURES['sun-scarab']!.drops;
+    expect(rollDrops(drops, () => 0.99)).toEqual([]);
+    expect(rollDrops(drops, () => 0)).toEqual([{ item: 'scarab-shell', qty: 1 }, { item: 'goat-horn', qty: 1 }, { item: 'tonic', qty: 1 }]);
+    expect(rollDrops(drops, () => 0.3)).toEqual([{ item: 'scarab-shell', qty: 1 }]);
+    expect(rollDrops([{ item: 'gone', chance: 1 }, { item: 'tonic', chance: 1, qty: 2 }], () => 0)).toEqual([{ item: 'tonic', qty: 2 }]);
+  });
+});
 
 describe('characters', () => {
   it('start at level 1 with full health and the Bible', () => {

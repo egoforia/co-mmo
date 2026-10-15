@@ -2,14 +2,23 @@ import {
   BIOMES,
   CREATURES,
   ITEMS,
+  MAX_CHOICES,
   MAX_RECIPE_RESULT,
   MAX_REGION_CREATURES,
   MAX_WISHED_COUNT,
   MAX_WISHED_HEAL,
   MAX_WISHED_LEVEL,
   REGION_WISH_COST,
+  checkDraft,
+  draftFromDefinition,
+  fieldEmpty,
+  validateDefinition,
   type BiomeId,
+  type DraftFields,
+  type WishCategory,
+  type WishSubcategory,
   type WishTier,
+  type WorkshopField,
 } from '@co-mmo/shared';
 import { parseJsonObject, type ChatModel, type ChatRequest, type ChatResult, type ChatTurn } from './ai/chat.ts';
 
@@ -42,7 +51,9 @@ export interface GodReply {
   };
 }
 
-const PERSONA = `You are the God of co-MMO, a young world that grows from what its players wish for. You speak in character: warm, a little grand, playful, never long-winded (two to four sentences). The world is hand-painted 2D in the style of Legend of Mana. The game is for adults (18+) and has no content-rating limits; refuse only what is illegal, griefing (changing or deleting another player's things without consent) or breaking the economy, and decline in character.
+const VOICE = `You are the God of co-MMO, a young world that grows from what its players wish for. You speak in character: warm, a little grand, playful, never long-winded (two to four sentences). The world is hand-painted 2D in the style of Legend of Mana. The game is for adults (18+) and has no content-rating limits; refuse only what is illegal, griefing (changing or deleting another player's things without consent) or breaking the economy, and decline in character.`;
+
+const PERSONA = `${VOICE}
 
 Players talk to you from anywhere. Chat, answer questions about the world, and help shape vague ideas into concrete wishes by asking one short question at a time. Only offer a wish when the player clearly wants something made and you know enough to build it.
 
@@ -72,18 +83,136 @@ The world decides how strong gear and abilities are from their rarity and kind. 
 wander creatures only fight back; guard creatures attack anyone near their spot; chase creatures hunt anyone they see. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).
 A new region is a whole square of land next to the one the player is in; the world places it beyond the edge named below, and joins it with roads to every land beside it.`;
 
-export function systemPrompt(ctx: PrayerContext): string {
-  const items = Object.entries(ITEMS).filter(([, d]) => !d.bound).map(([id]) => id).join(', ');
+function tradableItems(): string {
+  return Object.entries(ITEMS).filter(([, d]) => !d.bound).map(([id]) => id).join(', ');
+}
+
+/** Where and who the player is, as the God is told it. */
+function nowLines(ctx: PrayerContext): string[] {
   return [
-    PERSONA.replaceAll('%ITEMS%', items)
-      .replaceAll('%BIOMES%', (Object.keys(BIOMES) as BiomeId[]).filter((b) => b !== 'sanctum').join('|'))
-      .replaceAll('%CREATURES%', Object.keys(CREATURES).join(', ')),
-    '',
     `Now: ${ctx.playerName} (${ctx.role}, ${ctx.favor} Favor) prays in ${ctx.regionName} (${ctx.biome}).`,
     ...(ctx.edge ? [ctx.edge] : []),
     ctx.nearby.length ? `Nearby: ${ctx.nearby.join('; ')}.` : 'Nobody else is nearby.',
     ctx.recentWishes.length ? `Recent wishes in the world: ${ctx.recentWishes.join('; ')}.` : 'No wishes have been granted yet.',
+  ];
+}
+
+export function systemPrompt(ctx: PrayerContext): string {
+  return [
+    PERSONA.replaceAll('%ITEMS%', tradableItems())
+      .replaceAll('%BIOMES%', (Object.keys(BIOMES) as BiomeId[]).filter((b) => b !== 'sanctum').join('|'))
+      .replaceAll('%CREATURES%', Object.keys(CREATURES).join(', ')),
+    '',
+    ...nowLines(ctx),
   ].join('\n');
+}
+
+// --- The Wish Workshop -------------------------------------------------------
+
+/** What the God knows about a draft being shaped in the Workshop. */
+export interface WorkshopContext {
+  category: WishCategory;
+  sub: WishSubcategory;
+  fields: DraftFields;
+  /** Fields the player wrote; the God must leave them alone. */
+  locked: string[];
+  /** The player asked the God to fill every empty field. */
+  fill: boolean;
+}
+
+/** The God's Workshop answer: words, fields to set, and quick answers to tap. */
+export interface WorkshopReply {
+  say: string;
+  /** Field values to set (cleaned and lock-checked by the Workshop before use). */
+  fields: Record<string, unknown>;
+  choices: string[];
+}
+
+/** What a player taps or types to have the God fill every empty field. */
+export const FILL_REQUEST = 'Fill in the rest for me.';
+
+/** How one form field is described to the God. */
+function fieldLine(field: WorkshopField, value: unknown, locked: boolean): string {
+  const kind = field.kind === 'choice' ? `one of: ${field.options!.map((o) => `"${o.value}" (${o.label})`).join(', ')}`
+    : field.kind === 'number' ? `a whole number ${field.min} to ${field.max}`
+      : field.kind === 'color' ? 'a colour as "#rrggbb"'
+        : field.kind === 'item' ? 'one item id from the list below'
+          : field.kind === 'items' ? 'a list of up to 3 item ids from the list below'
+            : field.kind === 'materials' ? 'a list of up to 4 {"item": "<item id>", "qty": 1-10}'
+              : field.kind === 'creature' ? `one creature id from: ${Object.keys(CREATURES).join(', ')}`
+                : `text, up to ${field.length ?? 64} characters`;
+  const now = fieldEmpty(value) ? 'empty' : JSON.stringify(value);
+  return `- ${field.key}: ${field.label}${field.optional ? ' (optional)' : ''}; ${kind}. Now: ${now}${locked ? '. LOCKED: the player wrote this; never change it' : ''}.`;
+}
+
+/** The God's instructions for one Workshop turn: the draft, its fields and its locks. */
+export function workshopPrompt(ctx: PrayerContext, w: WorkshopContext): string {
+  const checked = checkDraft({ category: w.category.id, sub: w.sub.id, fields: w.fields });
+  const built = w.sub.makes === 'rule' ? 'a Steward reviews it and it becomes a scripted rule'
+    : w.sub.makes === 'engine' ? 'the Owner reviews it and a coding agent builds it'
+      : 'you grant it at once when the player confirms the card';
+  return [
+    VOICE,
+    '',
+    `The player is shaping a wish in the Wish Workshop, field by field: ${w.category.name}, ${w.sub.name} (${w.sub.blurb}). It is a ${w.sub.tier} wish: ${built}.`,
+    'Help them finish it. Answer in character in one to three sentences. Fill in or improve fields when they ask, or when it clearly helps; ask one short question at a time when something is unclear, and offer up to three short answers they can tap.',
+    'Keep it fair: Rare gear at most, creature levels near the land\'s danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert), and recipes that make no more things than they use.',
+    '',
+    'Fields:',
+    ...w.sub.fields.map((f) => fieldLine(f, w.fields[f.key], w.locked.includes(f.key))),
+    `Item ids: ${tradableItems()}.`,
+    checked.problems.length ? `Still missing: ${checked.problems.join(' ')}` : 'Every field the wish needs is filled in.',
+    ...(w.fill ? ['The player asked you to fill in the rest: give every empty field that is not LOCKED a value that fits what is already there.'] : []),
+    '',
+    'Always reply with one JSON object:',
+    '{"say": "<what you say>", "fields": {"<key>": <value>}, "choices": ["<a short answer>"]}',
+    'Put in "fields" only the fields you change, never a LOCKED one. Use [] for "choices" when you ask nothing.',
+    '',
+    ...nowLines(ctx),
+  ].join('\n');
+}
+
+/** Reads the model's Workshop JSON; a reply that is not JSON is taken as plain speech. */
+export function parseWorkshopReply(text: string): WorkshopReply {
+  const json = parseJsonObject(text);
+  if (!json) return { say: text.trim().slice(0, 600) || '...', fields: {}, choices: [] };
+  const say = typeof json.say === 'string' && json.say.trim() ? json.say.trim().slice(0, 600) : '...';
+  const fields = json.fields && typeof json.fields === 'object' && !Array.isArray(json.fields) ? (json.fields as Record<string, unknown>) : {};
+  const choices = Array.isArray(json.choices)
+    ? json.choices.filter((c): c is string => typeof c === 'string' && !!c.trim()).map((c) => c.trim().slice(0, 80)).slice(0, MAX_CHOICES)
+    : [];
+  return { say, fields, choices };
+}
+
+/**
+ * One Workshop turn: the configured model, its fallback, and the offline God
+ * last, exactly as prayers are answered.
+ */
+export async function askWorkshopGod(
+  models: ChatModel[],
+  ctx: PrayerContext,
+  w: WorkshopContext,
+  history: ChatTurn[],
+  onCost: (result: ChatResult, model: ChatModel) => void,
+): Promise<WorkshopReply> {
+  const request: ChatRequest = { system: workshopPrompt(ctx, w), messages: history, json: true, maxTokens: 1200 };
+  let lastError: unknown;
+  for (const model of models) {
+    // The offline God shapes drafts with its word rules; it needs the draft, not the prompt.
+    if (model instanceof OfflineGod) {
+      const said = history.filter((m) => m.role === 'user').map((m) => m.content);
+      return model.shapeDraft(w, said.pop() ?? '', said);
+    }
+    try {
+      const result = await model.complete(request);
+      onCost(result, model);
+      return parseWorkshopReply(result.text);
+    } catch (err) {
+      lastError = err;
+      console.warn(`God model ${model.provider}/${model.model} failed: ${(err as Error).message}`);
+    }
+  }
+  throw lastError ?? new Error('No God model is configured.');
 }
 
 /** Reads the model's JSON; a reply that is not JSON is taken as plain speech. */
@@ -143,6 +272,63 @@ export class OfflineGod implements ChatModel {
   async complete(req: ChatRequest): Promise<ChatResult> {
     const last = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? '';
     return { text: JSON.stringify(this.answer(last)), inputTokens: 0, outputTokens: 0, usd: 0 };
+  }
+
+  /**
+   * Shapes a Workshop draft without any AI service: picks choices and colours
+   * from the player's words, takes a plain wish ("a glowing hat") as the
+   * draft's fields, and fills every empty field when asked.
+   */
+  shapeDraft(w: WorkshopContext, said: string, earlier: string[] = []): WorkshopReply {
+    const text = said.toLowerCase();
+    const asksFill = (line: string) => /\b(fill|finish|complete|rest)\b/i.test(line);
+    const fill = w.fill || asksFill(said);
+    // Asked to fill in, the player's earlier words say what the wish is.
+    const wished = asksFill(said) ? [...earlier].reverse().find((l) => !asksFill(l) && /\b(an?|some)\s/i.test(l)) ?? '' : said;
+    const open = (key: string) => !w.locked.includes(key);
+    const patch: Record<string, unknown> = {};
+    // A plain wish for this kind of thing gives its fields.
+    const wish = (this.answer(wished).wish ?? null) as { definition?: unknown } | null;
+    if (wish?.definition && /\b(an?|some)\s/i.test(wished)) {
+      try {
+        const shaped = draftFromDefinition(validateDefinition(wish.definition));
+        if (shaped && shaped.category === w.category.id && shaped.sub === w.sub.id) {
+          for (const [key, value] of Object.entries(shaped.fields)) if (open(key) && fieldEmpty(w.fields[key])) patch[key] = value;
+        }
+      } catch {
+        // Not a thing this draft can be; the rules below still apply.
+      }
+    }
+    const named = said.match(/\b(?:call(?:ed)? it|name(?:d)? it|named)\s+["']?([\p{L}\p{N}' -]{2,40}?)["']?\s*[.!?]*$/iu);
+    if (named && open('name')) patch.name = cap(named[1]!.trim());
+    if (open('color') && w.sub.fields.some((f) => f.key === 'color') && Object.keys(COLORS).some((c) => new RegExp(`\\b${c}\\b`).test(text))) patch.color = colorFrom(text);
+    for (const field of w.sub.fields) {
+      if (field.kind !== 'choice' || !open(field.key)) continue;
+      const hit = field.options!.find((o) => new RegExp(`\\b${o.value}\\b`).test(text) || text.includes(o.label.toLowerCase()));
+      if (hit) patch[field.key] = hit.value;
+    }
+    // For a wish people build, a plain answer goes into the first empty part of the brief.
+    const brief = w.sub.makes === 'rule' || w.sub.makes === 'engine';
+    if (brief && !fill && !Object.keys(patch).length && said.trim()) {
+      const blank = w.sub.fields.find((f) => f.kind === 'long' && open(f.key) && fieldEmpty(w.fields[f.key]));
+      if (blank) patch[blank.key] = said.trim().slice(0, blank.length ?? 64);
+    }
+    if (fill) {
+      const name = String(patch.name ?? w.fields.name ?? '') || cap(nameFrom(wished));
+      for (const field of w.sub.fields) {
+        if (!open(field.key) || !fieldEmpty(w.fields[field.key]) || patch[field.key] !== undefined) continue;
+        const value = offlineValue(field, name, `${text} ${wished.toLowerCase()}`);
+        if (value !== undefined) patch[field.key] = value;
+      }
+    }
+    const after = { ...w.fields, ...patch };
+    const missing = w.sub.fields.find((f) => !f.optional && fieldEmpty(after[f.key]));
+    const fillable = missing && offlineValue(missing, 'it', '') !== undefined;
+    const choices = missing?.kind === 'choice' ? missing.options!.slice(0, MAX_CHOICES).map((o) => o.label) : fillable ? [FILL_REQUEST] : [];
+    const say = Object.keys(patch).length
+      ? fill ? 'There. I have filled in what was empty; change anything you like.' : 'Done, as you asked. Look it over.'
+      : missing ? `Tell me plainly: ${missing.label.toLowerCase()}? Or ask me to fill in the rest.` : 'It looks ready to me. Make the card when you are happy with it.';
+    return { say, fields: patch, choices };
   }
 
   answer(said: string): { say: string; wish: unknown } {
@@ -236,6 +422,32 @@ export class OfflineGod implements ChatModel {
         definition: { kind: 'item', name: cap(thing), description: `A ${thing}, made by a wish.`, itemKind: drink ? 'consumable' : 'trinket', heal: drink ? 25 : undefined, look },
       },
     };
+  }
+}
+
+/** Values the offline God gives empty number fields, by key; any other starts at its lowest. */
+const NUMBER_DEFAULTS: Record<string, number> = { heal: 25, level: 1, count: 3, danger: 2, trees: 2, rocks: 1, water: 1, qty: 1 };
+
+/** The offline God's guess for one empty field, from the draft's name and the player's words. */
+function offlineValue(field: WorkshopField, name: string, text: string): unknown {
+  const lower = name.toLowerCase();
+  switch (field.key) {
+    case 'name': return name;
+    case 'description': return `${cap(name)}, shaped by a wish.`;
+    case 'hook': return `the look of ${lower}`;
+    case 'body': return `a ${lower}`;
+    case 'mood': return 'whimsical';
+    case 'greeting': return `Well met! I am ${cap(name)}.`;
+  }
+  switch (field.kind) {
+    case 'color': return colorFrom(text);
+    case 'number': return NUMBER_DEFAULTS[field.key] ?? field.min;
+    case 'choice': return field.optional ? undefined : field.options![0]!.value;
+    case 'item': return 'tonic';
+    case 'items': return ['tonic'];
+    case 'materials': return [{ item: 'mushroom-cap', qty: 2 }];
+    case 'creature': return Object.keys(CREATURES)[0];
+    default: return undefined;
   }
 }
 

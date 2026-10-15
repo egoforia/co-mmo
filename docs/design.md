@@ -36,8 +36,14 @@ far: prompts in the open (painting goes through `artRequest` in
 picture's prompt) and the Workshop itself without the God's help: the
 category tree (`packages/shared/src/workshop.ts`), drafts kept on the server
 (`packages/server/src/workshop.ts`), the form and the free preview in the
-Prayer window (`packages/client/src/workshop-ui.ts`). Next: talking to the
-God inside the Workshop.
+Prayer window (`packages/client/src/workshop-ui.ts`), and talking to the God
+inside the Workshop: a draft-aware God turn (`workshopPrompt` in
+`packages/server/src/god.ts`) that changes fields and offers quick answers,
+locks on every field the player wrote, "Ask the God to fill the rest", and
+"Shape this wish" under the God's latest reply in Talk. Workshop turns share
+the prayer limits and budget; the offline God fills drafts from its word
+rules. Next: structured briefs for big wishes, the optional paid sample, and
+changing your look.
 
 ## Milestones
 

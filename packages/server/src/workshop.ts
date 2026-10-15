@@ -1,9 +1,14 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  MAX_WORKSHOP_LINES,
+  WISH_CATEGORIES,
   checkDraft,
+  cleanLocks,
   draftCost,
+  draftFromDefinition,
   cleanDraftFields,
+  mergeGodFields,
   placeholderArt,
   regionPictures,
   reviewPlan,
@@ -16,8 +21,11 @@ import {
   type PlayerInfo,
   type WishDefinition,
   type WishDraft,
+  type WorkshopLine,
 } from '@co-mmo/shared';
+import type { ChatTurn } from './ai/chat.ts';
 import { REFERENCE_NOTE } from './assets/gemini.ts';
+import { FILL_REQUEST } from './god.ts';
 import { buildPrompt } from './assets/style.ts';
 import { readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd } from './assets/wish-art.ts';
@@ -56,28 +64,111 @@ export class Workshop {
     };
   }
 
-  /** Sends a player their draft, if they have one (on joining, and after it changes). */
-  async greet(playerId: string): Promise<void> {
+  /** Sends a player their draft, if they have one (on joining, and after it changes); `god` when the God changed it. */
+  async greet(playerId: string, god = false): Promise<void> {
     const draft = this.store.draftOf(playerId, this.now());
-    this.world.sendTo(playerId, { t: 'draft', view: draft ? await this.view(playerId, draft) : null });
+    this.world.sendTo(playerId, { t: 'draft', view: draft ? await this.view(playerId, draft) : null, ...(god ? { god } : {}) });
   }
 
-  /** Starts a new draft in a subcategory, replacing any old one. */
-  async start(player: PlayerInfo, category: string, sub: string, fields?: unknown): Promise<void> {
+  /**
+   * Starts a new draft in a subcategory, replacing any old one. With `carry`,
+   * the talk from the Talk tab comes along and the God fills the draft in from it.
+   */
+  async start(player: PlayerInfo, category: string, sub: string, fields?: unknown, carry = false): Promise<void> {
     const kind = wishSubcategory(category, sub);
     if (!kind) return;
-    this.store.saveDraft(player.id, { category, sub, fields: cleanDraftFields(kind, fields), at: this.now() });
+    const chat = carry ? talkLines(this.wishes.talkOf(player.id).conversation) : [];
+    this.store.saveDraft(player.id, { category, sub, fields: cleanDraftFields(kind, fields), at: this.now(), ...(chat.length ? { chat } : {}) });
+    if (carry && chat.length) return this.turn(player, 'Fill this in from what we talked about.', true);
+    await this.greet(player.id, carry);
+  }
+
+  /**
+   * "Shape this wish" in Talk: the wish on the player's open card becomes a
+   * draft at once (no God turn needed). Without one, the player is asked to
+   * pick a kind of wish, and the God fills it in from the talk.
+   */
+  async shape(player: PlayerInfo): Promise<void> {
+    const talk = this.wishes.talkOf(player.id);
+    const shaped = talk.wish?.definition && draftFromDefinition(talk.wish.definition);
+    if (!shaped) {
+      this.world.sendTo(player.id, { t: 'draft', view: null, pick: true });
+      return;
+    }
+    const chat = [...talkLines(talk.conversation), { who: 'god' as const, text: 'Here is the wish as we spoke of it. Change anything you like, or ask me.' }];
+    this.store.saveDraft(player.id, { ...shaped, at: this.now(), chat: chat.slice(-MAX_WORKSHOP_LINES) });
+    await this.greet(player.id, true);
+  }
+
+  /** Replaces the draft's fields (and locks) with what the player has written. */
+  async edit(player: PlayerInfo, fields: unknown, locked?: unknown): Promise<void> {
+    if (!this.write(player.id, fields, locked)) return;
     await this.greet(player.id);
   }
 
-  /** Replaces the draft's fields with what the player has written. */
-  async edit(player: PlayerInfo, fields: unknown): Promise<void> {
-    const draft = this.store.draftOf(player.id, this.now());
+  /** The player says something to the God about the draft. */
+  async ask(player: PlayerInfo, said: string, fields?: unknown, locked?: unknown): Promise<void> {
+    const text = said.replace(/\s+/g, ' ').trim().slice(0, 400);
+    if (fields !== undefined) this.write(player.id, fields, locked);
+    if (text) await this.turn(player, text, false);
+  }
+
+  /** "Ask the God to fill the rest": every empty field the player has not locked, in one turn. */
+  async fill(player: PlayerInfo, fields?: unknown, locked?: unknown): Promise<void> {
+    if (fields !== undefined) this.write(player.id, fields, locked);
+    await this.turn(player, FILL_REQUEST, true);
+  }
+
+  /** Saves what the player typed; false when there is no draft. */
+  private write(playerId: string, fields: unknown, locked: unknown): boolean {
+    const draft = this.store.draftOf(playerId, this.now());
     const kind = draft && wishSubcategory(draft.category, draft.sub);
-    if (!draft || !kind) return;
+    if (!draft || !kind) return false;
     const { card: _c, ...rest } = draft;
-    this.store.saveDraft(player.id, { ...rest, fields: cleanDraftFields(kind, fields), at: this.now() });
-    await this.greet(player.id);
+    this.store.saveDraft(playerId, {
+      ...rest,
+      fields: fields === undefined ? draft.fields : cleanDraftFields(kind, fields),
+      ...(locked === undefined ? {} : { locked: cleanLocks(kind, locked) }),
+      at: this.now(),
+    });
+    return true;
+  }
+
+  /**
+   * One God turn about the draft: the player's line shows at once, then the
+   * God's answer, its field changes (never to locked fields) and quick answers.
+   */
+  private async turn(player: PlayerInfo, said: string, fill: boolean): Promise<void> {
+    const id = player.id;
+    const draft = this.store.draftOf(id, this.now());
+    const category = draft && WISH_CATEGORIES.find((c) => c.id === draft.category);
+    const sub = draft && wishSubcategory(draft.category, draft.sub);
+    if (!draft || !category || !sub) return;
+    const chat = addLine(draft.chat, { who: 'you', text: said });
+    const { choices: _old, ...asked } = draft;
+    this.store.saveDraft(id, { ...asked, chat, at: this.now() });
+    await this.greet(id);
+
+    const history: ChatTurn[] = chat.map((l) => ({ role: l.who === 'you' ? 'user' : 'assistant', content: l.text }));
+    const locked = draft.locked ?? [];
+    const result = await this.wishes.consult(player, { category, sub, fields: draft.fields, locked, fill }, history);
+
+    // The player may have typed, dropped or restarted the draft while the God thought.
+    const latest = this.store.draftOf(id, this.now());
+    if (!latest || latest.category !== draft.category || latest.sub !== draft.sub) return;
+    const reply = 'reply' in result ? result.reply : { say: result.refused, fields: {}, choices: [] };
+    const merged = mergeGodFields(sub, latest.fields, reply.fields, latest.locked ?? []);
+    const { card, choices: _c, ...rest } = latest;
+    this.store.saveDraft(id, {
+      ...rest,
+      // A card made before the God changed the draft no longer matches it.
+      ...(card && !merged.changed.length ? { card } : {}),
+      fields: merged.fields,
+      chat: addLine(latest.chat, { who: 'god', text: reply.say }),
+      ...(reply.choices.length ? { choices: reply.choices } : {}),
+      at: this.now(),
+    });
+    await this.greet(id, true);
   }
 
   /** Turns the draft into the usual wish card, offered in the Prayer window. */
@@ -168,6 +259,16 @@ export class Workshop {
       mine: playerWords(draft),
     };
   }
+}
+
+/** Adds a line to a draft's talk, keeping the latest few. */
+function addLine(chat: WorkshopLine[] | undefined, line: WorkshopLine): WorkshopLine[] {
+  return [...(chat ?? []), { ...line, text: line.text.slice(0, 600) }].slice(-MAX_WORKSHOP_LINES);
+}
+
+/** The latest Talk turns as Workshop talk. */
+function talkLines(conversation: ChatTurn[]): WorkshopLine[] {
+  return conversation.slice(-6).map((t) => ({ who: t.role === 'user' ? 'you' : 'god', text: t.content.slice(0, 600) }));
 }
 
 /** The player's own words in a draft, longest first, so the client can mark them in the prompt. */

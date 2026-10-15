@@ -184,8 +184,8 @@ function play(token: string): void {
         break;
       case 'draft':
         // It can arrive while the art is still loading, before the prayer window exists.
-        draft = message.view;
-        prayer?.onDraft(draft);
+        if (!message.pick) draft = message.view;
+        prayer?.onDraft(message.view, message);
         break;
       case 'notice':
         chat?.add({ kind: 'system', text: message.text });

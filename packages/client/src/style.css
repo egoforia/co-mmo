@@ -317,6 +317,25 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #prayer .ws-send { display: grid; gap: 4px; margin: 14px 0 4px; }
 #prayer .ws-send button:disabled { opacity: 0.45; cursor: default; }
 #prayer .ws-send small { color: var(--muted); }
+#prayer .ws-left { min-width: 0; }
+#prayer .ws-talk { margin: 0 0 12px; padding: 8px; border: 1px solid var(--edge); border-radius: 6px; background: rgba(242, 220, 107, 0.04); }
+#prayer .ws-log { list-style: none; margin: 0 0 6px; padding: 0; max-height: 150px; overflow-y: auto; font: 13px/1.4 Georgia, 'Times New Roman', serif; }
+#prayer .ws-log li { margin: 0 0 6px; padding: 5px 8px; border-radius: 4px; max-width: 92%; }
+#prayer .ws-log .you { margin-left: auto; background: #262b44; }
+#prayer .ws-log .god { background: rgba(242, 220, 107, 0.08); border-left: 3px solid #f2dc6b; color: #f3e6c8; }
+#prayer .ws-log .listening { color: var(--muted); font-style: italic; animation: breathe 1.6s ease-in-out infinite; }
+#prayer .ws-choices { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+#prayer .ws-choices:empty { display: none; }
+#prayer .ws-choices button { margin: 0; width: auto; color: #f2dc6b; border-color: #f2dc6b; border-radius: 12px; padding: 3px 10px; }
+#prayer .ws-ask { display: flex; gap: 6px; }
+#prayer .ws-ask input { flex: 1; min-width: 0; padding: 6px 8px; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; }
+#prayer .ws-ask button { margin: 0; width: auto; padding: 6px 12px; background: #f2dc6b; color: var(--bg); border: 0; font-weight: 700; }
+#prayer .ws-talk button:disabled { opacity: 0.45; cursor: wait; }
+#prayer .ws-fill { margin: 6px 0 0; width: auto; }
+#prayer .ws-lock { margin: 0 0 0 6px; width: auto; padding: 0 2px; background: transparent; border: 0; font-size: 11px; line-height: 1; vertical-align: middle; }
+#prayer .ws-carry { margin: 0 0 12px; padding: 8px 10px; border-left: 3px solid #f2dc6b; background: rgba(242, 220, 107, 0.08); color: #f3e6c8; }
+#prayer .ws-carry button { margin: 0 0 0 6px; width: auto; }
+#prayer-log .shape { display: block; margin: 6px 0 0; width: auto; padding: 2px 8px; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--edge); cursor: pointer; }
 
 .card {
   margin-top: 10px; padding: 10px 12px; background: #f3e6c8; color: #3e2731;

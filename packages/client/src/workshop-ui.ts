@@ -6,6 +6,7 @@ import {
   WISH_COSTS,
   wishSubcategory,
   type DraftMessage,
+  type DraftUpdateMessage,
   type DraftView,
   type PicturePreview,
   type WishSubcategory,
@@ -24,8 +25,9 @@ const EDIT_DELAY_MS = 350;
 
 /**
  * The Shape a wish tab (Wish Workshop design doc): pick a category and a
- * subcategory, fill in a short form, and watch the server's preview of the
- * card, the numbers and the exact image prompt. Nothing here is painted.
+ * subcategory, fill in a short form or talk it over with the God, and watch
+ * the server's preview of the card, the numbers and the exact image prompt.
+ * Nothing here is painted.
  */
 export class WorkshopUi {
   private view: DraftView | null = null;
@@ -33,20 +35,63 @@ export class WorkshopUi {
   /** The draft the form was drawn for; the form is kept while typing so focus is never lost. */
   private formFor = '';
   private timer: number | undefined;
+  /** Fields the player wrote; the God leaves them alone. */
+  private locked = new Set<string>();
+  /** Waiting for the God's answer. */
+  private waiting = false;
+  /** Picking a kind of wish for "Shape this wish": the God then fills it in from the talk. */
+  private carry = false;
 
   constructor(private readonly el: HTMLElement, private readonly actions: WorkshopActions) {
     el.addEventListener('click', (e) => this.click(e));
     el.addEventListener('input', (e) => {
-      if (!(e.target as HTMLElement).closest('.ws-form')) return;
+      const target = e.target as HTMLInputElement;
+      if (!target.closest('.ws-form')) return;
+      // What the player writes is theirs: the God will not change it.
+      const key = target.name.replace(/-qty$/, '');
+      if (key && !this.locked.has(key)) {
+        this.locked.add(key);
+        this.showLocks();
+      }
       window.clearTimeout(this.timer);
-      this.timer = window.setTimeout(() => this.actions.draft({ action: 'edit', fields: this.collect() }), EDIT_DELAY_MS);
+      this.timer = window.setTimeout(() => this.actions.draft({ action: 'edit', ...this.current() }), EDIT_DELAY_MS);
+    });
+    el.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!(e.target as HTMLElement).classList.contains('ws-ask')) return;
+      const box = this.el.querySelector<HTMLInputElement>('#ws-ask');
+      if (box?.value.trim()) {
+        this.ask(box.value.trim());
+        box.value = '';
+      }
     });
     this.render();
   }
 
-  /** The server sent the draft (or none). */
-  update(view: DraftView | null): void {
+  /** The server sent the draft (or none), maybe changed by the God, or asked for a kind of wish to carry the talk into. */
+  update(view: DraftView | null, message: Pick<DraftUpdateMessage, 'god' | 'pick'> = {}): void {
+    if (message.pick) {
+      if (this.view && !confirm('Shape the wish from your talk? Your current draft will be replaced.')) return;
+      this.carry = true;
+      this.category = null;
+      return this.render();
+    }
+    // The God has answered, or the draft it was thinking about is gone.
+    if (message.god || !view || (this.formFor && `${view.draft.category}/${view.draft.sub}` !== this.formFor)) this.waiting = false;
     this.view = view;
+    this.render(message.god);
+  }
+
+  /** The draft's fields and locks as they are on screen. */
+  private current(): { fields: Record<string, unknown>; locked: string[] } {
+    return { fields: this.collect(), locked: [...this.locked] };
+  }
+
+  private ask(text: string): void {
+    if (this.waiting || !this.view) return;
+    window.clearTimeout(this.timer);
+    this.waiting = true;
+    this.actions.draft({ action: 'ask', say: text, ...this.current() });
     this.render();
   }
 
@@ -62,7 +107,27 @@ export class WorkshopUi {
       return this.render();
     }
     const sub = target.closest<HTMLElement>('[data-sub]');
-    if (sub) return this.actions.draft({ action: 'start', category: this.category!, sub: sub.dataset.sub! });
+    if (sub) {
+      const carry = this.carry;
+      this.carry = false;
+      this.waiting = carry;
+      return this.actions.draft({ action: 'start', category: this.category!, sub: sub.dataset.sub!, ...(carry ? { carry } : {}) });
+    }
+    const unlock = target.closest<HTMLElement>('[data-unlock]');
+    if (unlock) {
+      this.locked.delete(unlock.dataset.unlock!);
+      this.showLocks();
+      return this.actions.draft({ action: 'edit', ...this.current() });
+    }
+    const choice = target.closest<HTMLElement>('[data-choice]');
+    if (choice) return this.ask(choice.dataset.choice!);
+    if (target.closest('[data-fill]')) {
+      if (this.waiting || !this.view) return;
+      window.clearTimeout(this.timer);
+      this.waiting = true;
+      this.actions.draft({ action: 'fill', ...this.current() });
+      return this.render();
+    }
     if (target.closest('[data-else]')) {
       const box = this.el.querySelector<HTMLTextAreaElement>('#ws-else')!;
       const text = box.value.trim();
@@ -76,17 +141,21 @@ export class WorkshopUi {
       if (confirm('Start over? This draft will be thrown away.')) this.actions.draft({ action: 'drop' });
       return;
     }
+    if (target.closest('[data-cancel-carry]')) {
+      this.carry = false;
+      return this.render();
+    }
     if (target.closest('[data-send]')) {
       window.clearTimeout(this.timer);
       // Any edit still waiting goes first, so the card is made from what is on screen.
-      this.actions.draft({ action: 'edit', fields: this.collect() });
+      this.actions.draft({ action: 'edit', ...this.current() });
       this.actions.draft({ action: 'send' });
     }
   }
 
-  private render(): void {
+  private render(god = false): void {
     const view = this.view;
-    if (!view) {
+    if (!view || this.carry) {
       this.formFor = '';
       this.el.innerHTML = this.category ? this.subsHtml(this.category) : this.categoriesHtml();
       return;
@@ -96,29 +165,106 @@ export class WorkshopUi {
     const key = `${view.draft.category}/${view.draft.sub}`;
     if (this.formFor !== key || !this.el.querySelector('.ws-form')) {
       this.formFor = key;
+      this.locked = new Set(view.draft.locked ?? []);
       const category = WISH_CATEGORIES.find((c) => c.id === view.draft.category)!;
       this.el.innerHTML = `
         <header class="ws-head"><span>${escapeHtml(category.name)} › <b>${escapeHtml(sub.name)}</b></span><button type="button" class="quiet" data-drop>Start over</button></header>
         <div class="ws-body">
-          <form class="ws-form" autocomplete="off">${sub.fields.map((f) => fieldHtml(f, view.draft.fields[f.key])).join('')}</form>
+          <div class="ws-left">
+            <section class="ws-talk" aria-label="Talk it over with the God">
+              <ol class="ws-log" aria-live="polite"></ol>
+              <div class="ws-choices"></div>
+              <form class="ws-ask" autocomplete="off">
+                <input id="ws-ask" maxlength="400" placeholder="Ask the God: make it spookier…">
+                <button type="submit">Ask</button>
+              </form>
+              <button type="button" class="quiet ws-fill" data-fill>Ask the God to fill the rest</button>
+            </section>
+            <form class="ws-form" autocomplete="off">${sub.fields.map((f) => fieldHtml(f, view.draft.fields[f.key])).join('')}</form>
+          </div>
           <section class="ws-preview" aria-live="polite"></section>
         </div>`;
+    } else if (god) {
+      this.fillForm(sub, view.draft.fields);
     }
+    this.showLocks();
+    this.showTalk(view);
     this.el.querySelector('.ws-preview')!.innerHTML = previewHtml(view);
   }
 
+  /** Shows the God's changes in the form, leaving the field being typed in alone. */
+  private fillForm(sub: WishSubcategory, values: Record<string, unknown>): void {
+    const form = this.el.querySelector<HTMLFormElement>('.ws-form');
+    if (!form) return;
+    for (const field of sub.fields) {
+      if (this.locked.has(field.key)) continue;
+      const value = values[field.key];
+      const inputs = [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[name="${field.key}"]`)];
+      if (inputs.some((i) => i === document.activeElement)) continue;
+      if (field.kind === 'materials') {
+        const rows = Array.isArray(value) ? (value as { item: string; qty: number }[]) : [];
+        const qty = [...form.querySelectorAll<HTMLInputElement>(`[name="${field.key}-qty"]`)];
+        inputs.forEach((i, n) => { i.value = rows[n]?.item ?? ''; });
+        qty.forEach((i, n) => { i.value = String(rows[n]?.qty ?? 1); });
+      } else if (field.kind === 'items') {
+        const list = Array.isArray(value) ? value : [];
+        inputs.forEach((i, n) => { i.value = typeof list[n] === 'string' ? list[n] : ''; });
+      } else if (inputs[0]) {
+        inputs[0].value = typeof value === 'string' || typeof value === 'number' ? String(value) : field.kind === 'color' ? '#c8a2c8' : '';
+      }
+    }
+  }
+
+  /** A lock beside each field the player wrote; clicking it lets the God change the field again. */
+  private showLocks(): void {
+    for (const label of this.el.querySelectorAll<HTMLElement>('.ws-form [data-field]')) {
+      const key = label.dataset.field!;
+      label.querySelector('.ws-lock')?.remove();
+      if (!this.locked.has(key)) continue;
+      const lock = document.createElement('button');
+      lock.type = 'button';
+      lock.className = 'ws-lock';
+      lock.dataset.unlock = key;
+      lock.title = 'You wrote this, so the God will not change it. Click to let the God change it.';
+      lock.textContent = '🔒';
+      label.append(lock);
+    }
+  }
+
+  /** The talk with the God, its quick answers, and whether it is still thinking. */
+  private showTalk(view: DraftView): void {
+    const log = this.el.querySelector<HTMLOListElement>('.ws-log');
+    const choices = this.el.querySelector<HTMLElement>('.ws-choices');
+    if (!log || !choices) return;
+    const lines = view.draft.chat ?? [];
+    log.innerHTML = (lines.length ? lines : [{ who: 'god', text: 'Fill in what you know, or tell me your idea and I will help shape it.' }])
+      .map((l) => `<li class="${l.who}">${escapeHtml(l.text)}</li>`).join('') +
+      (this.waiting ? '<li class="god listening">The God is listening…</li>' : '');
+    log.scrollTop = log.scrollHeight;
+    const quick = this.waiting ? [] : view.draft.choices ?? [];
+    choices.innerHTML = quick.map((c) => `<button type="button" class="quiet" data-choice="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
+    for (const b of this.el.querySelectorAll<HTMLButtonElement>('.ws-ask button, .ws-fill')) b.disabled = this.waiting;
+  }
+
   private categoriesHtml(): string {
-    return `
+    return `${this.carryHtml()}
       <p class="ws-intro">What would you like to wish for? Pick a kind of wish, fill in what you know, and see exactly what will be made before you spend any Favor.</p>
       <div class="ws-cats">${WISH_CATEGORIES.map((c) => `
         <button type="button" class="ws-cat" data-cat="${c.id}"><img src="art/${c.picture}.png" alt=""><b>${escapeHtml(c.name)}</b><small>${escapeHtml(c.blurb)}</small></button>`).join('')}
       </div>`;
   }
 
+  /** While carrying a talk into the Workshop: what picking a kind of wish will do. */
+  private carryHtml(): string {
+    return this.carry
+      ? '<p class="ws-carry">Pick what kind of wish this is, and the God will fill it in from what you talked about. <button type="button" class="quiet" data-cancel-carry>Never mind</button></p>'
+      : '';
+  }
+
   private subsHtml(categoryId: string): string {
     const category = WISH_CATEGORIES.find((c) => c.id === categoryId);
     if (!category) return this.categoriesHtml();
-    return `
+    return `${this.carryHtml()}
       <header class="ws-head"><button type="button" class="quiet" data-back>‹ All wishes</button><b>${escapeHtml(category.name)}</b></header>
       <ul class="ws-subs">${category.subs.map((s) => `
         <li><button type="button" data-sub="${s.id}"><b>${escapeHtml(s.name)}</b><small>${escapeHtml(s.blurb)}</small><span class="ws-price">${escapeHtml(priceLabel(s))}</span></button></li>`).join('')}
@@ -158,7 +304,7 @@ function priceLabel(sub: WishSubcategory): string {
 
 function fieldHtml(field: WorkshopField, value: unknown): string {
   const id = `ws-${field.key}`;
-  const label = `<label for="${id}">${escapeHtml(field.label)}${field.optional ? ' <small>(optional)</small>' : ''}</label>`;
+  const label = `<label for="${id}" data-field="${field.key}">${escapeHtml(field.label)}${field.optional ? ' <small>(optional)</small>' : ''}</label>`;
   const v = typeof value === 'string' || typeof value === 'number' ? escapeHtml(String(value)) : '';
   const hint = field.hint ? ` placeholder="${escapeHtml(field.hint)}"` : '';
   switch (field.kind) {
@@ -180,7 +326,7 @@ function fieldHtml(field: WorkshopField, value: unknown): string {
     }
     case 'materials': {
       const rows = Array.isArray(value) ? (value as { item: string; qty: number }[]) : [];
-      return `<fieldset><legend>${escapeHtml(field.label)}</legend>${[0, 1, 2, 3].map((i) => `
+      return `<fieldset><legend data-field="${field.key}">${escapeHtml(field.label)}</legend>${[0, 1, 2, 3].map((i) => `
         <span class="ws-row"><select name="${field.key}" aria-label="Material ${i + 1}">${options('Nothing', itemChoices(), rows[i]?.item)}</select><input name="${field.key}-qty" type="number" min="1" max="10" value="${rows[i]?.qty ?? 1}" aria-label="How many"></span>`).join('')}</fieldset>`;
     }
     default:

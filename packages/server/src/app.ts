@@ -331,9 +331,12 @@ export function createApp(options: AppOptions): App {
         wishes.answer(publicInfo(store.accountById(account.id) ?? account), parsed.card, parsed.confirm);
       } else if (parsed.t === 'draft') {
         const who = publicInfo(store.accountById(account.id) ?? account);
-        const done = parsed.action === 'start' ? workshop.start(who, parsed.category ?? '', parsed.sub ?? '', parsed.fields)
-          : parsed.action === 'edit' ? workshop.edit(who, parsed.fields)
-            : parsed.action === 'send' ? workshop.send(who) : workshop.drop(who);
+        const done = parsed.action === 'start' ? workshop.start(who, parsed.category ?? '', parsed.sub ?? '', parsed.fields, parsed.carry)
+          : parsed.action === 'edit' ? workshop.edit(who, parsed.fields, parsed.locked)
+            : parsed.action === 'ask' ? workshop.ask(who, parsed.say ?? '', parsed.fields, parsed.locked)
+              : parsed.action === 'fill' ? workshop.fill(who, parsed.fields, parsed.locked)
+                : parsed.action === 'shape' ? workshop.shape(who)
+                  : parsed.action === 'send' ? workshop.send(who) : workshop.drop(who);
         done.catch((err) => console.error('Workshop failed:', err));
       } else {
         world.handle(account.id, parsed);

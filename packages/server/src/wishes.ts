@@ -32,13 +32,13 @@ import {
   type WishDefinition,
   type WishTier,
 } from '@co-mmo/shared';
-import { createChatModel, type ChatModel, type ChatTurn } from './ai/chat.ts';
+import { createChatModel, type ChatModel, type ChatResult, type ChatTurn } from './ai/chat.ts';
 import { GeminiImageProvider, REFERENCE_NOTE } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
 import { imageUsd, paintWish } from './assets/wish-art.ts';
 import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { OfflineCompiler, compileRule } from './compiler.ts';
-import { OfflineGod, askGod, type GodReply } from './god.ts';
+import { OfflineGod, askGod, askWorkshopGod, type GodReply, type PrayerContext, type WorkshopContext, type WorkshopReply } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import { testRule } from './rule-test.ts';
 import type { ArtPromptRecord, ContentRecord, Settings, Store } from './store.ts';
@@ -49,6 +49,8 @@ const MEMORY_TURNS = 12;
 /** Prayers a player may send per minute. */
 const PRAYERS_PER_MINUTE = 6;
 const MAX_PRAYER_LENGTH = 400;
+/** What the God says when no model answered. */
+const CLOUDED = 'The heavens are clouded; I cannot hear you clearly. Try again soon.';
 
 interface OpenCard {
   card: WishCard;
@@ -138,44 +140,19 @@ export class Wishes {
     const text = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_PRAYER_LENGTH);
     if (!text) return;
     const region = this.world.regionOf(id);
-    const character = region?.character(id);
-    if (!region || !character) return;
-    if (this.busy.has(id)) return this.say(id, 'Patience. I am still listening to your last prayer.');
-    const now = this.now();
-    const times = (this.prayerTimes.get(id) ?? []).filter((t) => now - t < 60_000);
-    if (times.length >= PRAYERS_PER_MINUTE) return this.say(id, 'Breathe, child. Speak again in a moment.');
-    times.push(now);
-    this.prayerTimes.set(id, times);
+    const ctx = this.prayerContext(player);
+    if (!region || !ctx) return;
+    const refused = this.admit(id);
+    if (refused) return this.say(id, refused);
 
     const history = [...(this.conversations.get(id) ?? []), { role: 'user' as const, content: text }].slice(-MEMORY_TURNS);
     this.busy.add(id);
-    let usd = 0;
+    const spent = { usd: 0 };
     try {
-      const { reply } = await askGod(
-        this.models(),
-        {
-          playerName: player.name,
-          role: player.role,
-          favor: character.favor,
-          regionName: region.def.name,
-          biome: BIOMES[region.def.biome as BiomeId]?.name ?? region.def.biome,
-          nearby: region.nearby(id),
-          edge: this.edgeLine(id),
-          recentWishes: this.store.content
-            .filter((c) => c.status === 'granted')
-            .slice(-8)
-            .reverse()
-            .map((c) => `${c.title} (wished by ${c.wisher.name})`),
-        },
-        history,
-        (result, model) => {
-          usd += result.usd;
-          this.store.recordSpend({ at: this.now(), usd: result.usd, kind: 'chat', provider: model.provider, model: model.model, playerId: id });
-        },
-      );
+      const { reply } = await askGod(this.models(), ctx, history, this.chatSpend(id, spent));
       history.push({ role: 'assistant', content: reply.say });
       this.conversations.set(id, history.slice(-MEMORY_TURNS));
-      const card = reply.wish && this.makeCard(id, reply.wish, region.def.name, history, usd);
+      const card = reply.wish && this.makeCard(id, reply.wish, region.def.name, history, spent.usd);
       if (card?.note) {
         history.push({ role: 'assistant', content: card.note });
         this.conversations.set(id, history.slice(-MEMORY_TURNS));
@@ -183,10 +160,80 @@ export class Wishes {
       this.world.sendTo(id, { t: 'god', say: card?.note ?? reply.say, ...(card?.card ? { card: card.card } : {}) });
     } catch (err) {
       console.error('Prayer failed:', err);
-      this.say(id, 'The heavens are clouded; I cannot hear you clearly. Try again soon.');
+      this.say(id, CLOUDED);
     } finally {
       this.busy.delete(id);
     }
+  }
+
+  /**
+   * One God turn about a Workshop draft, under the same limits and budget as
+   * prayers. Returns the God's answer, or what to tell the player instead.
+   */
+  async consult(player: PlayerInfo, w: WorkshopContext, history: ChatTurn[]): Promise<{ reply: WorkshopReply } | { refused: string }> {
+    const id = player.id;
+    const ctx = this.prayerContext(player);
+    if (!ctx) return { refused: CLOUDED };
+    const refused = this.admit(id);
+    if (refused) return { refused };
+    this.busy.add(id);
+    try {
+      return { reply: await askWorkshopGod(this.models(), ctx, w, history.slice(-MEMORY_TURNS), this.chatSpend(id, { usd: 0 })) };
+    } catch (err) {
+      console.error('Workshop turn failed:', err);
+      return { refused: CLOUDED };
+    } finally {
+      this.busy.delete(id);
+    }
+  }
+
+  /** The player's open wish card from Talk and the talk that led to it, for the Workshop to carry on with. */
+  talkOf(playerId: string): { wish?: { tier: WishTier; definition?: WishDefinition }; conversation: ChatTurn[] } {
+    const open = [...this.cards.values()].find((c) => c.playerId === playerId && !c.appoint);
+    return {
+      ...(open ? { wish: { tier: open.card.tier, ...(open.definition ? { definition: open.definition } : {}) } } : {}),
+      conversation: [...(this.conversations.get(playerId) ?? [])],
+    };
+  }
+
+  /** What the God is told about where and who the player is, or undefined when they are not in the world. */
+  private prayerContext(player: PlayerInfo): PrayerContext | undefined {
+    const region = this.world.regionOf(player.id);
+    const character = region?.character(player.id);
+    if (!region || !character) return undefined;
+    return {
+      playerName: player.name,
+      role: player.role,
+      favor: character.favor,
+      regionName: region.def.name,
+      biome: BIOMES[region.def.biome as BiomeId]?.name ?? region.def.biome,
+      nearby: region.nearby(player.id),
+      edge: this.edgeLine(player.id),
+      recentWishes: this.store.content
+        .filter((c) => c.status === 'granted')
+        .slice(-8)
+        .reverse()
+        .map((c) => `${c.title} (wished by ${c.wisher.name})`),
+    };
+  }
+
+  /** Lets a God turn start, or says why not: one at a time, a few a minute (prayers and Workshop turns alike). */
+  private admit(id: string): string | undefined {
+    if (this.busy.has(id)) return 'Patience. I am still listening to your last prayer.';
+    const now = this.now();
+    const times = (this.prayerTimes.get(id) ?? []).filter((t) => now - t < 60_000);
+    if (times.length >= PRAYERS_PER_MINUTE) return 'Breathe, child. Speak again in a moment.';
+    times.push(now);
+    this.prayerTimes.set(id, times);
+    return undefined;
+  }
+
+  /** Records what a God turn cost, as chat spend for this player. */
+  private chatSpend(playerId: string, spent: { usd: number }): (result: ChatResult, model: ChatModel) => void {
+    return (result, model) => {
+      spent.usd += result.usd;
+      this.store.recordSpend({ at: this.now(), usd: result.usd, kind: 'chat', provider: model.provider, model: model.model, playerId });
+    };
   }
 
   private makeCard(

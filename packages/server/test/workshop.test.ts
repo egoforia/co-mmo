@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { DraftUpdateMessage, GodMessage } from '@co-mmo/shared';
+import type { ChatModel, ChatRequest } from '../src/ai/chat.ts';
 import { artRequest } from '../src/assets/wish-art.ts';
-import { account, app, joined, start, stop } from './helpers.ts';
+import { FILL_REQUEST } from '../src/god.ts';
+import { account, app, joined, pray, start, stop } from './helpers.ts';
 
 afterEach(stop);
 
@@ -101,5 +103,83 @@ describe('the Wish Workshop', () => {
     await again.send({ t: 'draft', action: 'drop' });
     await draftView(again, (m) => m.view === null);
     expect(store.draftOf(p.id)).toBeUndefined();
+  });
+
+  it('lets the offline God fill in the rest, leaving what the player wrote', async () => {
+    const { store, ws } = await start();
+    const p = account(store, 'Mara');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+    await c.send({ t: 'draft', action: 'start', category: 'living', sub: 'creature' });
+    await draftView(c);
+
+    await c.send({ t: 'draft', action: 'fill', fields: { name: 'Lantern Moth', level: 2 }, locked: ['name', 'level'] });
+    const view = (await draftView(c, (m) => Boolean(m.god))).view!;
+    expect(view.problems).toEqual([]);
+    expect(view.draft.fields).toMatchObject({ name: 'Lantern Moth', level: 2, behavior: 'wander', count: 3 });
+    expect(view.draft.fields.hook).toBe('the look of lantern moth');
+    expect(view.draft.locked).toEqual(['name', 'level']);
+    expect(view.draft.chat?.map((l) => l.who)).toEqual(['you', 'god']);
+    expect(view.draft.chat?.[0]!.text).toBe(FILL_REQUEST);
+    expect(store.spendThisMonth(Date.now())).toHaveLength(0);
+  });
+
+  it('tells the God the draft and its locks, applies its changes but never to a locked field, and offers its quick answers', async () => {
+    const asked: ChatRequest[] = [];
+    const god: ChatModel = {
+      provider: 'gemini',
+      model: 'fake-chat',
+      async complete(request) {
+        asked.push(request);
+        return {
+          text: JSON.stringify({ say: 'Spookier it is. How many should haunt you?', fields: { name: 'Gloom Moth', mood: 'eerie', level: 3 }, choices: ['One', 'Three', 'Five', 'Six'] }),
+          inputTokens: 100, outputTokens: 20, usd: 0.002,
+        };
+      },
+    };
+    const { store, ws } = await start({ chat: () => [god] });
+    const p = account(store, 'Mara');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+    await c.send({ t: 'draft', action: 'start', category: 'living', sub: 'creature', fields: { name: 'Lantern Moth' } });
+    await draftView(c);
+
+    await c.send({ t: 'draft', action: 'ask', say: 'make it spookier', fields: { name: 'Lantern Moth', mood: 'gentle' }, locked: ['name'] });
+    const view = (await draftView(c, (m) => Boolean(m.god))).view!;
+    expect(view.draft.fields).toMatchObject({ name: 'Lantern Moth', mood: 'eerie', level: 3 });
+    expect(view.draft.choices).toEqual(['One', 'Three', 'Five']);
+    expect(view.draft.chat?.at(-1)).toEqual({ who: 'god', text: 'Spookier it is. How many should haunt you?' });
+
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.system).toContain('Living things, Creature');
+    expect(asked[0]!.system).toMatch(/- name: Name; .*Now: "Lantern Moth"\. LOCKED/);
+    expect(asked[0]!.messages.at(-1)).toEqual({ role: 'user', content: 'make it spookier' });
+    expect(store.spendThisMonth(Date.now())).toMatchObject([{ kind: 'chat', usd: 0.002, playerId: p.id }]);
+  });
+
+  it('carries a wish from Talk into the Workshop, with or without a card', async () => {
+    const { store, ws } = await start();
+    const p = account(store, 'Mara');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+
+    // A card with a finished wish becomes a draft at once.
+    const hat = await pray(c, 'I wish for a glowing blue hat');
+    expect(hat.card).toBeDefined();
+    await c.send({ t: 'draft', action: 'shape' });
+    const shaped = (await draftView(c, (m) => Boolean(m.god))).view!;
+    expect(shaped.draft).toMatchObject({ category: 'carry', sub: 'gear', fields: { name: 'Glowing Blue Hat', itemKind: 'head' } });
+    expect(shaped.draft.chat?.[0]).toEqual({ who: 'you', text: 'I wish for a glowing blue hat' });
+    expect(shaped.problems).toEqual([]);
+
+    // A wish people build has no fields yet: the player picks its kind and the God fills it in from the talk.
+    await pray(c, 'I wish for fishing in the pond');
+    await c.send({ t: 'draft', action: 'shape' });
+    await draftView(c, (m) => Boolean(m.pick));
+    await c.send({ t: 'draft', action: 'start', category: 'play', sub: 'gathering', carry: true });
+    const carried = (await draftView(c, (m) => Boolean(m.god))).view!;
+    expect(carried.draft.sub).toBe('gathering');
+    expect(carried.draft.chat?.some((l) => l.text === 'I wish for fishing in the pond')).toBe(true);
+    expect(carried.draft.chat?.at(-1)?.who).toBe('god');
   });
 });

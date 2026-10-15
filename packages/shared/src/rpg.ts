@@ -526,6 +526,20 @@ export interface CreatureDef {
   respawnSeconds: number;
 }
 
+/** A defeated creature's body stays this long, in seconds, for its finders to search. */
+export const BODY_SECONDS = 300;
+/** A player must be this close to a body to search it, in tiles. */
+export const SEARCH_RANGE = 1.6;
+
+/** What a creature leaves on its body: each drop on its list is rolled against its own chance. */
+export function rollDrops(drops: Drop[], random: () => number): InventorySlot[] {
+  const found: InventorySlot[] = [];
+  for (const drop of drops) {
+    if (ITEMS[drop.item] && random() < drop.chance) found.push({ item: drop.item, qty: drop.qty ?? 1 });
+  }
+  return found;
+}
+
 export const CREATURES: Record<string, CreatureDef> = {
   'walking-mushroom': {
     name: 'Walking Mushroom',

@@ -13,6 +13,7 @@ import {
   rand2,
   biomeLook,
   type ArtManifest,
+  type BodyState,
   type Building,
   type ClientMessage,
   type CreatureState,
@@ -86,6 +87,8 @@ export class WorldScene extends Phaser.Scene {
   private me!: Avatar;
   private remotes = new Map<string, Remote>();
   private creatures = new Map<string, Remote>();
+  /** Bodies of defeated creatures, lying where they fell until they fade. */
+  private bodies = new Map<string, Remote>();
   /** NPCs, the map's own and those called by wishes, strolling where the server says. */
   private npcs = new Map<string, Remote>();
   /** Wished art already turned into textures, by key: the URL it came from. */
@@ -145,7 +148,7 @@ export class WorldScene extends Phaser.Scene {
     if (before !== welcome.region.id) {
       // Who and what we saw were counted from the old corner, and belong to the
       // region we left; the next snapshot shows the ones here.
-      for (const group of [this.remotes, this.creatures, this.npcs]) {
+      for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
         for (const a of group.values()) destroyAvatar(a);
         group.clear();
       }
@@ -163,6 +166,7 @@ export class WorldScene extends Phaser.Scene {
     const welcome = this.welcome;
     this.remotes = new Map();
     this.creatures = new Map();
+    this.bodies = new Map();
     this.npcs = new Map();
     this.drawn = new Map();
     this.accumulator = 0;
@@ -252,6 +256,9 @@ export class WorldScene extends Phaser.Scene {
     this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
     this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
+    const bodies = snapshot.bodies ?? [];
+    this.sync(this.bodies, bodies, now, (b) => this.makeBody(b));
+    for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
   }
 
   update(_time: number, deltaMs: number): void {
@@ -283,7 +290,7 @@ export class WorldScene extends Phaser.Scene {
     this.revealBuildings(false);
 
     const now = performance.now();
-    for (const group of [this.remotes, this.creatures, this.npcs]) {
+    for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
       for (const remote of group.values()) {
         const pos = remote.interp.sample(now);
         if (!pos) continue;
@@ -291,7 +298,7 @@ export class WorldScene extends Phaser.Scene {
         this.placeAvatar(remote, pos.x, pos.y);
         if (Math.abs(remote.body.x - before) > 0.5) remote.body.setFlipX(remote.body.x < before);
         // People indoors stay out of sight until we come close enough to see in.
-        if (group !== this.creatures) {
+        if (group === this.remotes || group === this.npcs) {
           const seen = !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }
@@ -338,7 +345,7 @@ export class WorldScene extends Phaser.Scene {
     this.textures.addImage(key, img);
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
     if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
-    for (const a of [...this.creatures.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
+    for (const a of [...this.creatures.values(), ...this.bodies.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
       if (a?.art === key) a.body.setTexture(key);
     }
   }
@@ -588,6 +595,14 @@ export class WorldScene extends Phaser.Scene {
     return a;
   }
 
+  /** A body is the creature's own painted picture, laid on its side and faded a little. */
+  private makeBody(b: BodyState): Avatar {
+    const a = this.makeAvatar(b.asset, bodyLabel(b), false, 'woods-mushroom');
+    a.label.setColor('#c0cbdc').setFontSize(Math.round(T * 0.18));
+    a.body.setScale(0.8).setOrigin(0.5, 0.5).setAngle(90).setAlpha(0.75);
+    return a;
+  }
+
   private makeNpc(n: NpcState): Avatar {
     const a = this.makeAvatar(n.asset, n.name, false, 'sanctum-pilgrim');
     a.label.setColor('#bfe0f2');
@@ -636,6 +651,11 @@ export class WorldScene extends Phaser.Scene {
 /** True when tile (x, y) lies within a building's walls. */
 function within(b: Building, x: number, y: number): boolean {
   return x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height;
+}
+
+/** A body's name tag says when there is something on it for us. */
+function bodyLabel(b: BodyState): string {
+  return b.loot ? `${b.name} (E to search)` : b.name;
 }
 
 function destroyAvatar(a: Avatar): void {

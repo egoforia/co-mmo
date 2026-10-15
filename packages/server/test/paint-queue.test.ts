@@ -6,6 +6,14 @@ import { GeminiVideoProvider } from '../src/assets/video.ts';
 import { googleError, ProviderError } from '../src/assets/provider.ts';
 import { DailyClips, MemoryPaintQueue, PaintStopped, limitFor, nextDailyReset, queuedVideo, refusal, type PaintTurnWatcher } from '../src/paint-queue.ts';
 import { FilePaintRequests, type PaintRequest } from '../src/paint-requests.ts';
+import { MemoryTurnLedger, SharedPaintQueue } from '../src/shared-paint-queue.ts';
+
+type QueueOptions = ConstructorParameters<typeof MemoryPaintQueue>[0];
+/** Both queues keep the same promises: the one for a single server, and the shared one (here on its in-memory ledger). */
+const queues: [string, (options?: QueueOptions) => MemoryPaintQueue | SharedPaintQueue][] = [
+  ['in memory', (options) => new MemoryPaintQueue(options)],
+  ['shared', (options) => new SharedPaintQueue(new MemoryTurnLedger(), options)],
+];
 
 const veo = 'veo-3.1-lite-generate-preview';
 const tooMany = (quotaId?: string, retryDelay?: string) => googleError('gemini', 429, {
@@ -23,7 +31,7 @@ const watcher = (): PaintTurnWatcher & { said: string[] } => ({
   start() { this.said.push('start'); },
 });
 
-describe('the paint queue', () => {
+describe.each(queues)('the paint queue (%s)', (_name, makeQueue) => {
   beforeEach(() => vi.useFakeTimers({ now: Date.UTC(2026, 9, 15, 12) }));
   afterEach(() => vi.useRealTimers());
 
@@ -34,7 +42,7 @@ describe('the paint queue', () => {
   });
 
   it('starts no more than a model allows a minute, and says why the rest wait', async () => {
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     const started: number[] = [];
     const watchers = [watcher(), watcher(), watcher()];
     const done = watchers.map((w, i) => queue.turn(veo, async () => started.push(i), w));
@@ -51,7 +59,7 @@ describe('the paint queue', () => {
   });
 
   it('keeps at most `atOnce` requests going', async () => {
-    const queue = new MemoryPaintQueue({ limit: () => ({ perMinute: 100, atOnce: 2 }) });
+    const queue = makeQueue({ limit: () => ({ perMinute: 100, atOnce: 2 }) });
     let going = 0;
     let most = 0;
     const call = async () => {
@@ -66,7 +74,7 @@ describe('the paint queue', () => {
   });
 
   it('asks again after a per-minute refusal, waiting as long as Google says', async () => {
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     let calls = 0;
     const w = watcher();
     const result = queue.turn(veo, async () => {
@@ -82,7 +90,7 @@ describe('the paint queue', () => {
   });
 
   it('stops a model until the daily reset when its daily cap is used up', async () => {
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     let calls = 0;
     const first = queue.turn(veo, async () => {
       calls++;
@@ -96,7 +104,7 @@ describe('the paint queue', () => {
   });
 
   it('gives up after backing off when Google keeps refusing an image model without saying why', async () => {
-    const queue = new MemoryPaintQueue({ backoffMs: [1000, 2000] });
+    const queue = makeQueue({ backoffMs: [1000, 2000] });
     let calls = 0;
     const result = queue.turn('gemini-3.1-flash-image', async () => {
       calls++;
@@ -110,7 +118,7 @@ describe('the paint queue', () => {
 
   it("takes a Veo refusal that names no quota as the day's cap, and logs what Google said once", async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     let calls = 0;
     const err = await queue.turn(veo, async () => {
       calls++;
@@ -126,7 +134,7 @@ describe('the paint queue', () => {
 
   it("shows Google's words while a request waits out a refusal", async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     let calls = 0;
     const w = watcher();
     const result = queue.turn(veo, async () => {
@@ -145,7 +153,7 @@ describe('the paint queue', () => {
   });
 
   it('passes other errors straight through', async () => {
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     await expect(queue.turn(veo, async () => {
       throw new ProviderError('gemini', 400, 'bad request');
     })).rejects.toThrow(/bad request/);
@@ -155,7 +163,7 @@ describe('the paint queue', () => {
   });
 
   it('refuses waiting requests when closed, so shutting down does not wait out the limits', async () => {
-    const queue = new MemoryPaintQueue();
+    const queue = makeQueue();
     const first = queue.turn(veo, async () => 'a');
     const second = queue.turn(veo, async () => 'b');
     const third = queue.turn(veo, async () => 'c');

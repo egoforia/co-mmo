@@ -243,9 +243,41 @@ const sanctumLayout: Layout = (map, c) => {
   });
   disc(map, c, c, 7, Tile.Path);
   map.landmarks.push({ asset: 'sanctum-shrine', x: c + 1, y: c + 1, footprint: { width: 2, height: 1 } });
+  // The Sanctum Arcanum stands under the weeping trees north-east of the
+  // clearing, between the two ponds, with a lane from its door to the clearing.
+  const left = c + 8;
+  const top = c - 16;
+  const shop = building(map, left, top, ARCANUM_SIZE.width, ARCANUM_SIZE.height, 'sanctum-arcanum');
+  map.buildings.push(shop);
+  const lane = shop.y + shop.height + 1;
+  road(map, c, lane, shop.door.x, shop.door.y + 1);
+  furnishArcanum(map, left + 1, top + 1);
   map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
   map.spawn = { x: c + 1, y: c + 4 };
 };
+
+/** The Sanctum Arcanum's floor, in tiles, inside the walls. */
+export const ARCANUM_SIZE = { width: 10, height: 8 };
+
+/** The Arcanum's furniture, placed as landmarks from the floor's top-left tile, leaving a way in from the door. */
+function furnishArcanum(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-arcanum', fx, fy);
+  put('shelf', 1, 1, 2, 1);
+  put('herb-rack', 4, 1, 2, 1);
+  put('shelf', 7, 1, 2, 1);
+  put('scrying-basin', 9.5, 3, 1, 1);
+  put('counter', 5, 4, 3, 1);
+  put('stool', 2.5, 5, 1, 1);
+  put('stool', 7.5, 5, 1, 1);
+  put('display-case', 1, 7, 2, 1);
+  put('display-case', 9, 7, 2, 1);
+}
+
+/** Places a building style's furniture as landmarks, from its floor's top-left tile. */
+function placer(map: RegionMap, style: string, fx: number, fy: number) {
+  return (key: string, x: number, y: number, width: number, height: number) =>
+    map.landmarks.push({ asset: furnitureArt(style, key), x: fx + x, y: fy + y, footprint: { width, height } });
+}
 
 /** Old Bramble's cottage: its floor is this many tiles square, inside the walls. */
 export const COTTAGE_SIZE = 16;
@@ -257,7 +289,7 @@ const woodsLayout: Layout = (map, c) => {
   // tree's door is painted, so the door you see is the door you walk through.
   const left = 3;
   const top = c - 10;
-  const home = cottage(map, left, top, COTTAGE_SIZE);
+  const home = building(map, left, top, COTTAGE_SIZE, COTTAGE_SIZE, 'bramble-cottage');
   map.buildings.push(home);
   disc(map, c, c, 4, Tile.Ground);
   // The road leaves the doorstep southward, turns east, then runs up to the middle.
@@ -272,8 +304,7 @@ const woodsLayout: Layout = (map, c) => {
 
 /** Old Bramble's furniture, placed as landmarks from the floor's top-left tile. */
 function furnish(map: RegionMap, fx: number, fy: number): void {
-  const put = (key: string, x: number, y: number, width: number, height: number) =>
-    map.landmarks.push({ asset: furnitureArt('bramble-cottage', key), x: fx + x, y: fy + y, footprint: { width, height } });
+  const put = placer(map, 'bramble-cottage', fx, fy);
   put('bed', 1, 3, 2, 2);
   put('bookshelf', 4, 1, 2, 1);
   put('hearth', 8.5, 1, 3, 1);
@@ -370,13 +401,13 @@ function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void 
 }
 
 /**
- * A walled building whose floor is `size` tiles square, its wall's top-left
- * corner at (left, top), in a clearing a tile wide, with a two-tile doorway
- * in the south wall. Its outside is Old Bramble's hollow tree.
+ * A walled building whose floor is `width` by `height` tiles, its wall's
+ * top-left corner at (left, top), in a clearing a tile wide, with a two-tile
+ * doorway in the south wall. Its look is a key of BUILDING_STYLES.
  */
-function cottage(map: RegionMap, left: number, top: number, size: number): Building {
-  const right = left + size + 1;
-  const bottom = top + size + 1;
+function building(map: RegionMap, left: number, top: number, width: number, height: number, style: string): Building {
+  const right = left + width + 1;
+  const bottom = top + height + 1;
   for (let y = top - 1; y <= bottom + 1; y++) {
     for (let x = left - 1; x <= right + 1; x++) {
       const inside = x > left && x < right && y > top && y < bottom;
@@ -387,18 +418,18 @@ function cottage(map: RegionMap, left: number, top: number, size: number): Build
     }
   }
   // The doorway is in the middle of the south wall, so the outside art,
-  // centred on it, covers the cottage evenly on both sides.
-  const door = { x: left + Math.floor(size / 2), y: bottom };
+  // centred on it, covers the building evenly on both sides.
+  const door = { x: left + Math.floor(width / 2), y: bottom };
   set(map, door.x, door.y, Tile.Door);
   set(map, door.x + 1, door.y, Tile.Door);
   return {
     x: left,
     y: top,
-    width: size + 2,
-    height: size + 2,
+    width: width + 2,
+    height: height + 2,
     door,
-    style: 'bramble-cottage',
-    exteriorWidth: size + 4,
+    style,
+    exteriorWidth: width + 4,
   };
 }
 

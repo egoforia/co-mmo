@@ -85,7 +85,8 @@ describe('BuildingPainter', () => {
   it('paints only the building art that did not ship, and serves it', async () => {
     const artDir = await mkdtemp(join(tmpdir(), 'painter-'));
     const provider = new FakeProvider();
-    const shipped: ArtManifest = Object.fromEntries(buildingArtIds(cottage).slice(0, -2).map((id) => [id, { file: `art/${id}.png`, kind: 'x', width: 1, height: 1 }]));
+    const others = Object.values(BUILDING_STYLES).filter((s) => s !== cottage).flatMap(buildingArtIds);
+    const shipped: ArtManifest = Object.fromEntries([...buildingArtIds(cottage).slice(0, -2), ...others].map((id) => [id, { file: `art/${id}.png`, kind: 'x', width: 1, height: 1 }]));
     const spent: number[] = [];
     const painter = new BuildingPainter({
       provider: () => provider, overBudget: () => false, spend: (usd) => spent.push(usd),
@@ -115,13 +116,15 @@ describe('BuildingPainter', () => {
 });
 
 describe('the shipped art', () => {
-  it('has a painted picture for every building, piece of furniture and landmark in the world', async () => {
+  it('has a painted picture for every landmark in the world, or the server paints it as building art', async () => {
     const manifest = JSON.parse(await readFile(new URL('../../client/public/art/manifest.json', import.meta.url), 'utf8')) as ArtManifest;
-    for (const style of Object.values(BUILDING_STYLES)) for (const id of buildingArtIds(style)) expect(manifest).toHaveProperty([id]);
+    // A building a wish added ships only its description; BuildingPainter paints it at start-up.
+    for (const id of buildingArtIds(cottage)) expect(manifest).toHaveProperty([id]);
+    const painted = new Set(Object.values(BUILDING_STYLES).flatMap(buildingArtIds));
     for (const def of WORLD_REGIONS) {
       const map = generateRegion(def);
       for (const b of map.buildings) expect(BUILDING_STYLES).toHaveProperty([b.style]);
-      for (const l of map.landmarks) expect(manifest).toHaveProperty([l.asset]);
+      for (const l of map.landmarks) expect(l.asset in manifest || painted.has(l.asset)).toBe(true);
     }
     expect(manifest).toHaveProperty(['fx-slash']);
   });

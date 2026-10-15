@@ -25,6 +25,8 @@ export interface WalkPainterOptions extends BuildingPainterOptions {
   spendVideo: (usd: number, provider: VideoProvider) => void;
   /** Turns a clip into its frames; ffmpeg unless a test says otherwise. */
   toFrames?: (mp4: Buffer) => Promise<Buffer[]>;
+  /** Told which walk strips were just finished or painted again, so open games load them. */
+  onPainted?: (ids: string[]) => void;
 }
 
 /** Something that can walk: a player look, a creature or a person, and how to paint it. */
@@ -205,6 +207,7 @@ export class WalkPainter {
       this.painted[id] = { file: redone ? `${file}?v=${now.toString(36)}` : file, kind: 'walk', width: frameWidth * body.frames, height: frameHeight, frames: body.frames, cycleSeconds: body.cycleSeconds, ...(redone ? { redone: now } : {}) };
     }
     await writeFile(resolve(this.dir, 'manifest.json'), JSON.stringify(this.painted, null, 2));
+    this.options.onPainted?.(WALK_DIRECTIONS.map((d) => walkArt(walker.id, d)));
     return true;
   }
 

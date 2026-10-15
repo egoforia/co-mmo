@@ -16,6 +16,7 @@ import {
   nearBuilding,
   rand2,
   biomeLook,
+  type ArtEntry,
   type ArtManifest,
   type ArtPoint,
   type ArtPointsManifest,
@@ -154,8 +155,52 @@ export class WorldScene extends Phaser.Scene {
   private makeWalks(): void {
     for (const [id, entry] of Object.entries(this.options.art)) {
       if (entry.kind !== 'walk' || !this.textures.exists(id) || this.anims.exists(id)) continue;
-      const frames = entry.frames ?? WALK_FRAMES;
-      this.anims.create({ key: id, frames: this.anims.generateFrameNumbers(id, { start: 0, end: frames - 1 }), frameRate: walkFrameRate(frames, PLAYER_SPEED, entry.cycleSeconds), repeat: -1 });
+      this.makeWalk(id, entry);
+    }
+  }
+
+  private makeWalk(id: string, entry: ArtEntry): void {
+    const frames = entry.frames ?? WALK_FRAMES;
+    this.anims.create({ key: id, frames: this.anims.generateFrameNumbers(id, { start: 0, end: frames - 1 }), frameRate: walkFrameRate(frames, PLAYER_SPEED, entry.cycleSeconds), repeat: -1 });
+  }
+
+  /**
+   * Walks were painted, or painted again, after the page loaded: load the
+   * changed strips and swap their walks in. Walkers standing still take the
+   * new walk at their next step; those mid-stride carry on in it.
+   */
+  updateWalks(art: ArtManifest, ids: string[]): void {
+    for (const id of ids) {
+      const entry = art[id];
+      if (entry?.kind !== 'walk') continue;
+      this.options.art[id] = entry;
+      void this.loadWalk(id, entry);
+    }
+  }
+
+  private async loadWalk(id: string, entry: ArtEntry): Promise<void> {
+    if (this.loadedArt.get(id) === entry.file && this.anims.exists(id)) return;
+    this.loadedArt.set(id, entry.file);
+    const img = new Image();
+    img.src = entry.file;
+    try {
+      await img.decode();
+    } catch {
+      return;
+    }
+    // A newer repaint arrived while this one loaded.
+    if (this.loadedArt.get(id) !== entry.file) return;
+    const avatars = [...this.creatures.values(), ...this.bodies.values(), ...this.npcs.values(), ...this.remotes.values(), this.me].filter((a) => a?.body.texture.key === id);
+    const striding = new Set(avatars.filter((a) => a.body.anims.isPlaying));
+    // The old walk goes first, so the new one can take its name.
+    for (const a of avatars) a.body.stop();
+    if (this.anims.exists(id)) this.anims.remove(id);
+    if (this.textures.exists(id)) this.textures.remove(id);
+    this.textures.addSpriteSheet(id, img, { frameWidth: entry.width / (entry.frames ?? WALK_FRAMES), frameHeight: entry.height });
+    this.makeWalk(id, entry);
+    for (const a of avatars) {
+      if (striding.has(a)) a.body.play(id);
+      else a.body.setTexture(id, 0);
     }
   }
 

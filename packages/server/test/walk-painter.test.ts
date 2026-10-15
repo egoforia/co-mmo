@@ -51,12 +51,16 @@ describe('walk painter', () => {
       },
     };
     const spent: number[] = [];
+    const told: string[][] = [];
     const painter = new WalkPainter({
       provider: () => images, video: () => video, overBudget: () => false,
       spend: (usd) => spent.push(usd), spendVideo: (usd) => spent.push(usd),
       anchorDir, artDir, shipped: async () => ({}), toFrames: frames,
+      onPainted: (ids) => told.push(ids),
     });
     await painter.start();
+    // Open games are told about each look's walks once they are all on disk.
+    expect(told).toEqual(['player-mara', 'player-ilya'].map((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d))));
 
     const manifest = painter.manifest();
     expect(Object.keys(manifest)).toHaveLength(8);

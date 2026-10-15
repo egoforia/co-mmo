@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ArtManifest, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
+import type { ArtManifest, DraftView, ServerMessage, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
@@ -87,6 +87,7 @@ function play(token: string): void {
   let rpg: RpgUi | null = null;
   let kit: KitUi | null = null;
   let prayer: PrayerUi | null = null;
+  let draft: DraftView | null = null;
   let party: PartyUi | null = null;
   let myId = '';
   onContent(() => {
@@ -181,6 +182,11 @@ function play(token: string): void {
       case 'content':
         updateContent(message.entries, message.replace);
         break;
+      case 'draft':
+        // It can arrive while the art is still loading, before the prayer window exists.
+        draft = message.view;
+        prayer?.onDraft(draft);
+        break;
       case 'notice':
         chat?.add({ kind: 'system', text: message.text });
         break;
@@ -224,8 +230,10 @@ function play(token: string): void {
     prayer = new PrayerUi({
       pray: (text) => connection.send({ t: 'pray', text }),
       answer: (card, confirm) => connection.send({ t: 'wish', card, confirm }),
+      draft: (m) => connection.send({ t: 'draft', ...m }),
     });
     prayer.setFavor(welcome.character.favor);
+    prayer.onDraft(draft);
     if (welcome.you.role !== 'player') {
       const link = document.getElementById('gods-view-link')!;
       link.hidden = false;

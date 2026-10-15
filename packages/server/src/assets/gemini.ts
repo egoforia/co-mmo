@@ -2,6 +2,9 @@ import { ProviderError, type GeneratedImage, type ImageProvider, type ImageReque
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+/** Sent to Gemini after the reference images, before the prompt; previews show it too. */
+export const REFERENCE_NOTE = 'Match the art style of the reference images exactly; do not copy their subjects.';
+
 interface GeminiPart {
   text?: string;
   inlineData?: { mimeType: string; data: string };
@@ -29,7 +32,7 @@ export class GeminiImageProvider implements ImageProvider {
       parts.push({ inline_data: { mime_type: ref.mimeType, data: ref.data.toString('base64') } });
     }
     if (request.references?.length) {
-      parts.push({ text: 'Match the art style of the reference images exactly; do not copy their subjects.' });
+      parts.push({ text: REFERENCE_NOTE });
     }
     parts.push({ text: request.prompt });
 

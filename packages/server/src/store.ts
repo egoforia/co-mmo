@@ -1,9 +1,12 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role } from '@co-mmo/shared';
+import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role, type WishDraft } from '@co-mmo/shared';
 import type { ChatTurn, ProviderId } from './ai/chat.ts';
 import type { RuleTestReport } from './rule-test.ts';
+
+/** Days a Workshop draft is kept after its last change. */
+const DRAFT_DAYS = 7;
 
 export interface Account {
   id: string;
@@ -69,6 +72,21 @@ export interface ContentRecord extends ContentEntry {
   rule?: { paused: boolean; reason?: string };
   /** An Engine wish being built as a code change by a coding agent. */
   build?: BuildTrack;
+  /** What was asked of the image model for each picture painted, by picture id (latest painting). */
+  artPrompts?: Record<string, ArtPromptRecord>;
+}
+
+/** One picture's request to the image model, kept so Stewards can see exactly what was sent. */
+export interface ArtPromptRecord {
+  prompt: string;
+  /** Anchor ids sent as style references (the ones that were found). */
+  references: string[];
+  /** Text the provider sends between the references and the prompt, when it adds any. */
+  note?: string;
+  provider: string;
+  model: string;
+  at: number;
+  usd: number;
 }
 
 /** A player telling the Stewards about a wished thing or another player. */
@@ -144,6 +162,8 @@ interface Data {
   /** Scripted rules' saved state: rule id → player id (or "_" for shared) → values. */
   ruleData: Record<string, Record<string, Record<string, unknown>>>;
   journal: JournalEntry[];
+  /** Wish Workshop drafts, by player id (missing in older saves). */
+  drafts?: Record<string, WishDraft>;
 }
 
 export function defaultSettings(env: Record<string, string | undefined> = process.env): Settings {
@@ -294,6 +314,26 @@ export class Store {
     const account = this.accountById(id);
     if (!account || other) return;
     account.logins = [...(account.logins ?? []).filter((l) => l.provider !== provider), { provider, subject }];
+    this.persist();
+  }
+
+  // --- Wish Workshop drafts --------------------------------------------------------
+
+  /** A player's Workshop draft; one left untouched for a week is dropped. */
+  draftOf(playerId: string, now = Date.now()): WishDraft | undefined {
+    const draft = this.data.drafts?.[playerId];
+    if (draft && now - draft.at > DRAFT_DAYS * 86_400_000) {
+      this.saveDraft(playerId, null);
+      return undefined;
+    }
+    return draft;
+  }
+
+  saveDraft(playerId: string, draft: WishDraft | null): void {
+    const drafts = { ...this.data.drafts };
+    if (draft) drafts[playerId] = draft;
+    else delete drafts[playerId];
+    this.data.drafts = drafts;
     this.persist();
   }
 

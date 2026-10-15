@@ -33,15 +33,15 @@ import {
   type WishTier,
 } from '@co-mmo/shared';
 import { createChatModel, type ChatModel, type ChatTurn } from './ai/chat.ts';
-import { GeminiImageProvider } from './assets/gemini.ts';
+import { GeminiImageProvider, REFERENCE_NOTE } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
-import { IMAGE_USD, imageUsd, paintWish } from './assets/wish-art.ts';
+import { imageUsd, paintWish } from './assets/wish-art.ts';
 import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, type GodReply } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import { testRule } from './rule-test.ts';
-import type { ContentRecord, Settings, Store } from './store.ts';
+import type { ArtPromptRecord, ContentRecord, Settings, Store } from './store.ts';
 import type { World } from './world.ts';
 
 /** Turns of conversation the God remembers per player. */
@@ -97,6 +97,8 @@ export class Wishes {
   private readonly now: () => number;
   /** Art being painted, so tests and shutdown can wait for it. */
   readonly painting = new Set<Promise<void>>();
+  /** Told when a confirmed card became a wish (granted or sent for review), so its Workshop draft can go. */
+  onCardUsed?: (playerId: string, cardId: string) => void;
 
   constructor(
     private readonly store: Store,
@@ -196,6 +198,25 @@ export class Wishes {
   ): { card?: WishCard; note?: string } | undefined {
     if (wish.tier === 'refused') return undefined;
     if (wish.appoint) return this.appointCard(playerId, wish.appoint, conversation);
+    const made = this.cardFor(playerId, wish, regionName);
+    if (!made || 'note' in made) return made;
+    for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
+    const card: WishCard = { id: randomBytes(6).toString('hex'), ...made.card };
+    this.cards.set(card.id, { card, playerId, definition: made.definition, conversation: [...conversation], usd, ...(made.edge ? { edge: made.edge } : {}) });
+    return { card };
+  }
+
+  /**
+   * The card a wish would make, without offering it: its tier, cost and
+   * where it appears, or why it cannot be made here. The Workshop's preview
+   * shows this before a wish is sent.
+   */
+  cardFor(
+    playerId: string,
+    wish: Pick<NonNullable<GodReply['wish']>, 'tier' | 'title' | 'summary' | 'definition'>,
+    regionName: string,
+  ): { card: Omit<WishCard, 'id'>; definition?: WishDefinition; edge?: OpenCard['edge'] } | { note: string } | undefined {
+    if (wish.tier === 'refused') return undefined;
     let definition: WishDefinition | undefined;
     let tier = wish.tier;
     if (tier === 'minor' || tier === 'moderate') {
@@ -216,10 +237,8 @@ export class Wishes {
       if (!open) return { note: `Every edge of ${regionName} already meets another land. New regions grow at the world's edge: travel outward and ask me there.` };
       edge = { side: open.side, cell: open.cell };
     }
-    for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
     const instant = tier === 'minor' || tier === 'moderate';
-    const card: WishCard = {
-      id: randomBytes(6).toString('hex'),
+    const card: Omit<WishCard, 'id'> = {
       tier,
       title: wish.title,
       summary: wish.summary || definition?.description || wish.title,
@@ -233,8 +252,24 @@ export class Wishes {
                 : `Beside you, in ${regionName}`,
       instant,
     };
-    this.cards.set(card.id, { card, playerId, definition, conversation: [...conversation], usd, ...(edge ? { edge } : {}) });
-    return { card };
+    return { card, ...(definition ? { definition } : {}), ...(edge ? { edge } : {}) };
+  }
+
+  /**
+   * Offers a wish shaped somewhere other than a prayer (the Workshop) as the
+   * usual card, in the Prayer window. Returns the card's id when one was made.
+   */
+  offer(
+    player: PlayerInfo,
+    wish: Pick<NonNullable<GodReply['wish']>, 'tier' | 'title' | 'summary' | 'definition'>,
+    conversation: ChatTurn[],
+    say: string,
+  ): string | undefined {
+    const region = this.world.regionOf(player.id);
+    if (!region) return undefined;
+    const made = this.makeCard(player.id, wish, region.def.name, conversation, 0);
+    this.world.sendTo(player.id, { t: 'god', say: made?.note ?? say, ...(made?.card ? { card: made.card } : {}) });
+    return made?.card?.id;
   }
 
   /** The player confirmed or turned down a wish card. */
@@ -307,6 +342,7 @@ export class Wishes {
     };
     this.store.addContent(record);
     if (status !== 'granted') this.broadcast(record);
+    this.onCardUsed?.(player.id, open.card.id);
     return record;
   }
 
@@ -581,19 +617,22 @@ export class Wishes {
     const job = (async () => {
       for (const picture of pictures) {
         if (!force && this.budget().over) break;
+        let painted;
         try {
-          await paintWish(picture.id, picture.def, biome, provider, this.options.anchorDir, this.options.artDir);
+          painted = await paintWish(picture.id, picture.def, biome, provider, this.options.anchorDir, this.options.artDir);
         } catch (err) {
           console.error(`Painting ${picture.id} failed:`, (err as Error).message);
           continue;
         }
-        this.store.recordSpend({ at: this.now(), usd: IMAGE_USD, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
+        const usd = imageUsd(provider.model, painted.image);
+        this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
         const current = this.store.contentById(record.id);
         if (!current) return;
         const url = `/wished-art/${picture.id}.png?v=${this.now().toString(36)}`;
+        const artPrompts = { ...current.artPrompts, [picture.id]: this.promptRecord(provider, painted.request.prompt, painted.request.references, usd) };
         const updated = this.store.updateContent(record.id, def.kind === 'rule'
-          ? { itemArt: { ...current.itemArt, [picture.id]: url }, usd: current.usd + IMAGE_USD }
-          : { art: url, usd: current.usd + IMAGE_USD });
+          ? { itemArt: { ...current.itemArt, [picture.id]: url }, usd: current.usd + usd, artPrompts }
+          : { art: url, usd: current.usd + usd, artPrompts });
         if (updated) this.broadcast(updated);
       }
     })().finally(() => this.painting.delete(job));
@@ -620,14 +659,14 @@ export class Wishes {
       if (kit[asset.id] && !force) continue;
       if (!force && this.budget().over) return;
       try {
-        const { image, entry } = await paintKitAsset(asset, provider, this.options.anchorDir, dir);
+        const { image, entry, prompt, references } = await paintKitAsset(asset, provider, this.options.anchorDir, dir);
         const usd = imageUsd(provider.model, image);
         this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
         kit[asset.id] = { ...entry, file: `${entry.file}?v=${this.now().toString(36)}` };
         await mkdir(dir, { recursive: true });
         await writeFile(resolve(dir, 'manifest.json'), JSON.stringify(kit, null, 2));
         const current = this.store.contentById(record.id);
-        if (current) update({ usd: current.usd + usd });
+        if (current) update({ usd: current.usd + usd, artPrompts: { ...current.artPrompts, [asset.id]: this.promptRecord(provider, prompt, references, usd) } });
       } catch (err) {
         console.error(`Painting ${asset.id} failed:`, (err as Error).message);
       }
@@ -644,17 +683,29 @@ export class Wishes {
     }
     for (const picture of regionPictures(record.id, def)) {
       if (!force && this.budget().over) return;
+      let painted;
       try {
-        await paintWish(picture.id, picture.def, def.biome, provider, this.options.anchorDir, this.options.artDir);
+        painted = await paintWish(picture.id, picture.def, def.biome, provider, this.options.anchorDir, this.options.artDir);
       } catch (err) {
         console.error(`Painting ${picture.id} failed:`, (err as Error).message);
         continue;
       }
-      this.store.recordSpend({ at: this.now(), usd: IMAGE_USD, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
+      const usd = imageUsd(provider.model, painted.image);
+      this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
       const current = this.store.contentById(record.id);
       if (!current) return;
-      update({ itemArt: { ...current.itemArt, [picture.id]: `/wished-art/${picture.id}.png?v=${this.now().toString(36)}` }, usd: current.usd + IMAGE_USD });
+      update({
+        itemArt: { ...current.itemArt, [picture.id]: `/wished-art/${picture.id}.png?v=${this.now().toString(36)}` },
+        usd: current.usd + usd,
+        artPrompts: { ...current.artPrompts, [picture.id]: this.promptRecord(provider, painted.request.prompt, painted.request.references, usd) },
+      });
     }
+  }
+
+  /** What one painting asked of the image model, as God's View shows it. */
+  private promptRecord(provider: ImageProvider, prompt: string, references: string[], usd: number): ArtPromptRecord {
+    const note = provider.id === 'gemini' && references.length ? REFERENCE_NOTE : undefined;
+    return { prompt, references, ...(note ? { note } : {}), provider: provider.id, model: provider.model, at: this.now(), usd };
   }
 
   /** Keeps a painting job where tests and shutdown can wait for it. */
@@ -758,9 +809,9 @@ export class Wishes {
   }
 }
 
-/** A content record without what only God's View sees (the conversation, cost, and a rule's script). */
+/** A content record without what only God's View sees (the conversation, cost, image prompts, and a rule's script). */
 export function publicEntry(record: ContentRecord): ContentEntry {
-  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, build: _b, ...rest } = record;
+  const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, build: _b, artPrompts: _p, ...rest } = record;
   const entry: ContentEntry = { ...rest, progress: wishProgress(record) };
   if (entry.definition?.kind === 'rule') {
     const { script: _s, ...definition } = entry.definition;

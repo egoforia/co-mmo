@@ -61,6 +61,8 @@ interface Entry {
   kitArt?: Record<string, string>;
   itemArt?: Record<string, string>;
   conversation?: { role: string; content: string }[];
+  /** What was asked of the image model, by picture id. */
+  artPrompts?: Record<string, { prompt: string; references: string[]; note?: string; provider: string; model: string; at: number; usd?: number }>;
   usd?: number;
   draft?: { state: 'drafting' | 'ready' | 'failed' | 'impossible'; at: number; message?: string; model?: string; note?: string };
   test?: { passed: boolean; at: number; summary: string[]; errors: string[]; sample: string[] };
@@ -315,7 +317,7 @@ async function wishes(): Promise<string> {
   const rows = content.map((e) => `
     <tr class="${e.status}">
       <td>${e.art ? `<img src="${escapeHtml(e.art)}" alt="">` : e.definition ? '<span class="ph" title="Placeholder art">✦</span>' : ''}</td>
-      <td><b>${escapeHtml(e.title)}</b><br><small>${escapeHtml(e.summary)}</small>${conversation(e)}</td>
+      <td><b>${escapeHtml(e.title)}</b><br><small>${escapeHtml(e.summary)}</small>${conversation(e)}${artPrompts(e)}</td>
       <td><span class="tier ${e.tier}">${e.tier}</span></td>
       <td>${progress(e)}${e.progress?.detail ? `<br><small>${escapeHtml(e.progress.detail)}</small>` : ''}</td>
       <td>${escapeHtml(e.wisher.name)}<br><small>${when(e.at)}</small></td>
@@ -416,6 +418,18 @@ function conversation(e: Entry): string {
   if (!e.conversation?.length) return '';
   const lines = e.conversation.map((t) => `<li class="${t.role}"><b>${t.role === 'user' ? escapeHtml(e.wisher.name) : 'God'}:</b> ${escapeHtml(t.content)}</li>`).join('');
   return `<details><summary>Conversation</summary><ol class="talk">${lines}</ol></details>`;
+}
+
+/** Exactly what each picture asked of the image model: references, the provider's note, then the prompt. */
+function artPrompts(e: Entry): string {
+  const prompts = Object.entries(e.artPrompts ?? {});
+  if (!prompts.length) return '';
+  const several = prompts.length > 1;
+  const body = prompts.map(([id, p]) => `
+    ${several ? `<p><b>${escapeHtml(id)}</b></p>` : ''}
+    <p><small>${escapeHtml(p.model)} (${escapeHtml(p.provider)}) · ${when(p.at)}${p.usd !== undefined ? ` · ${usd(p.usd)}` : ''} · references: ${p.references.length ? p.references.map(escapeHtml).join(', ') : 'none'}</small></p>
+    <pre>${p.note ? `${escapeHtml(p.note)}\n` : ''}${escapeHtml(p.prompt)}</pre>`).join('');
+  return `<details><summary>${several ? `Image prompts (${prompts.length})` : 'Image prompt'}</summary>${body}</details>`;
 }
 
 // --- Rules ---------------------------------------------------------------------

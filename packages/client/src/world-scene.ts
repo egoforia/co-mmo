@@ -3,7 +3,6 @@ import {
   ABILITIES,
   Interpolator,
   Predictor,
-  type PendingInput,
   TICK_SECONDS,
   TILE_PIXELS,
   Tile,
@@ -11,7 +10,6 @@ import {
   buildingArt,
   exteriorSpan,
   nearBuilding,
-  neighbourOffset,
   rand2,
   biomeLook,
   type ArtManifest,
@@ -48,7 +46,7 @@ interface Remote extends Avatar {
 /** A building drawn as its exterior art until we come close, then its inside. */
 interface BuildingView {
   building: Building;
-  /** The region's top-left corner, in tiles. */
+  /** The region's top-left corner in the world, in tiles. */
   ox: number;
   oy: number;
   /** Undefined until the building's outside is painted: then its inside always shows. */
@@ -56,6 +54,17 @@ interface BuildingView {
   /** Floor, walls and furniture: hidden while the exterior shows. */
   inside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[];
   open: boolean;
+}
+
+/** A region drawn into the world: its layout and everything that pictures it. */
+interface DrawnRegion {
+  /** The layout it was drawn from, to tell when it changed. */
+  layout: string;
+  objects: Phaser.GameObjects.GameObject[];
+  tilemaps: Phaser.Tilemaps.Tilemap[];
+  buildings: BuildingView[];
+  /** Art ids of its biome kit: when one is painted, it is drawn again. */
+  kit: Set<string>;
 }
 
 export interface WorldSceneOptions {
@@ -79,7 +88,6 @@ export class WorldScene extends Phaser.Scene {
   private creatures = new Map<string, Remote>();
   /** NPCs, the map's own and those called by wishes, strolling where the server says. */
   private npcs = new Map<string, Remote>();
-  private buildings: BuildingView[] = [];
   /** Wished art already turned into textures, by key: the URL it came from. */
   private loadedArt = new Map<string, string>();
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
@@ -89,19 +97,17 @@ export class WorldScene extends Phaser.Scene {
   private tint?: Phaser.GameObjects.Rectangle;
   /** Which way we face: 1 right, -1 left. */
   private facing = 1;
-  /** True while restarting for a walk into the next region, so there is no fade. */
-  private crossing = false;
-  /** Art ids of the biome kits drawn now: when one is painted, the land is drawn again. */
-  private kitIds = new Set<string>();
-  private redrawing = false;
-  /** Inputs predicted before the scene was rebuilt, still waiting for the server. */
-  private carried: PendingInput[] = [];
-  /** Movement keys held as we cross an edge; the restart forgets them, so we press them again. */
-  private held = new Set<string>();
-  /** The light of the region we came from, eased into the new one's. */
-  private previousTint?: number;
-  /** The newest position the server confirmed, and the input it had applied. */
-  private confirmed?: { ack: number; x: number; y: number };
+  /**
+   * The world is one map: every region is drawn at its square on the world
+   * grid, and walking between them only moves us along it. This is the
+   * current region's top-left corner in that map, in tiles; positions from
+   * the server are counted from it.
+   */
+  private origin = { x: 0, y: 0 };
+  /** The regions drawn around us, by id. */
+  private drawn = new Map<string, DrawnRegion>();
+  /** Kit art painted since the land was last drawn. */
+  private painted = new Set<string>();
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -117,117 +123,131 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * The server moved us to another region: rebuild the scene around it. The
-   * neighbours are already drawn beside us, so we restart without a fade and
-   * the ground carries on where it was.
+   * The server placed us in a region: our own after walking over an edge, the
+   * same one with new roads, or the shrine after a fall. Nothing is rebuilt:
+   * the regions around us are drawn where they lie in the world, and we carry
+   * on from the same spot on the same map.
    */
   enterRegion(welcome: WelcomeMessage): void {
+    const before = this.welcome.region.id;
     this.welcome = welcome;
-    this.lastSeq = this.predictor?.lastSeq ?? this.lastSeq;
-    // Steps taken but not yet applied carry over: the server applies them in
-    // the new region, and replaying them here keeps us where we walked to.
-    this.carried = this.predictor?.unapplied ?? [];
-    this.previousTint = this.tint?.fillColor;
-    this.predictor = undefined;
-    this.crossing = true;
-    // Keep walking: the restart drops every key, so remember what is held
-    // and forget anything let go of before the new scene is up.
-    this.held = new Set(Object.entries(this.keys ?? {}).filter(([, k]) => k.isDown).map(([name]) => name));
-    if (this.held.size) {
-      const codes: Record<string, string> = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD' };
-      const release = (e: KeyboardEvent) => {
-        for (const name of this.held) if (codes[name] === e.code) this.held.delete(name);
-      };
-      window.addEventListener('keyup', release);
-      this.events.once(Phaser.Scenes.Events.CREATE, () => window.removeEventListener('keyup', release));
+    if (!this.predictor) return;
+    const was = { ...this.origin };
+    this.showRegion(welcome);
+    // Count what we show from the new corner: on screen it stays put.
+    this.shown.x += was.x - this.origin.x;
+    this.shown.y += was.y - this.origin.y;
+    // Steps the server has not applied yet carry over with us and replay on its word.
+    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.predictor.lastSeq, this.predictor.unapplied, welcome.ack);
+    const far = Math.hypot(this.predictor.position.x - this.shown.x, this.predictor.position.y - this.shown.y) > 2;
+    if (far) this.shown = { ...this.predictor.position };
+    this.placeAvatar(this.me, this.shown.x, this.shown.y);
+    if (before !== welcome.region.id) {
+      // Who and what we saw were counted from the old corner, and belong to the
+      // region we left; the next snapshot shows the ones here.
+      for (const group of [this.remotes, this.creatures, this.npcs]) {
+        for (const a of group.values()) destroyAvatar(a);
+        group.clear();
+      }
+      this.easeLight(lightTint(welcome.region.def.biome));
     }
-    this.scene.restart();
+    if (far) {
+      // A fall carries us back to the shrine: arrive there, not slide across the world.
+      this.cameras.main.centerOn(this.me.body.x, this.me.body.y).fadeIn(250, 24, 20, 37);
+    }
+    this.revealBuildings(true);
+    this.refreshWishes();
   }
 
   create(): void {
     const welcome = this.welcome;
-    // The server sends the region's layout: it may be one a player wished for.
-    const def = welcome.region.def;
-    this.map = generateRegion(def);
     this.remotes = new Map();
     this.creatures = new Map();
     this.npcs = new Map();
-    this.buildings = [];
+    this.drawn = new Map();
     this.accumulator = 0;
-    this.redrawing = false;
-    this.kitIds = new Set();
+    this.painted = new Set();
+    this.showRegion(welcome);
 
-    // Our region, and every neighbour beside it, so the world reads as one.
-    this.drawRegion(this.map, 0, 0);
-    const bounds = { left: 0, top: 0, right: this.map.width, bottom: this.map.height };
-    for (const [side, id] of Object.entries(def.exits) as [Side, string][]) {
-      const next = welcome.neighbours.find((n) => n.id === id);
-      if (!next) continue;
-      const offset = neighbourOffset(side, this.map.width);
-      this.drawRegion(generateRegion(next), offset.x, offset.y);
-      if (side === 'west') bounds.left = offset.x;
-      if (side === 'north') bounds.top = offset.y;
-      if (side === 'east') bounds.right = offset.x + this.map.width;
-      if (side === 'south') bounds.bottom = offset.y + this.map.height;
-    }
-    this.refreshWishes();
-
-    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq, this.carried, welcome.ack);
-    this.carried = [];
-    this.confirmed = { ack: welcome.ack, x: welcome.x, y: welcome.y };
+    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
     this.shown = { ...this.predictor.position };
     this.me = this.makeAvatar(this.playerTexture(welcome.you.id), welcome.you.name, true);
+    this.refreshWishes();
 
     const kb = this.input.keyboard!;
     kb.disableGlobalCapture();
     this.keys = kb.addKeys({
       up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', w: 'W', a: 'A', s: 'S', d: 'D',
     }, false) as typeof this.keys;
-    for (const name of this.held) {
-      const key = this.keys[name as keyof typeof this.keys];
-      key.isDown = true;
-      key.isUp = false;
-    }
-    this.held.clear();
 
     const cam = this.cameras.main;
-    cam.setBounds(bounds.left * T, bounds.top * T, (bounds.right - bounds.left) * T, (bounds.bottom - bounds.top) * T);
     cam.setZoom(cameraZoom());
     cam.setRoundPixels(true);
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     this.revealBuildings(true);
     cam.startFollow(this.me.body, true, 0.2, 0.2);
-    if (!this.crossing) cam.fadeIn(250, 24, 20, 37);
-    this.crossing = false;
+    cam.fadeIn(250, 24, 20, 37);
 
     // The biome's light grades everything under the labels.
-    this.tint = this.add.rectangle(0, 0, 10, 10, lightTint(def.biome)).setOrigin(0.5).setScrollFactor(0);
-    // Walking into another biome, its light comes up gradually rather than switching at the edge.
-    const from = this.previousTint;
-    const to = lightTint(def.biome);
-    if (from !== undefined && from !== to) {
-      const a = Phaser.Display.Color.ValueToColor(from);
-      const b = Phaser.Display.Color.ValueToColor(to);
-      this.tint.setFillStyle(from);
-      this.tweens.addCounter({
-        from: 0, to: 100, duration: 1200,
-        onUpdate: (tween) => {
-          const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, tween.getValue() ?? 100);
-          this.tint?.setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
-        },
-      });
-    }
-    this.previousTint = undefined;
+    this.tint = this.add.rectangle(0, 0, 10, 10, lightTint(welcome.region.def.biome)).setOrigin(0.5).setScrollFactor(0);
     this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.fitTint, this));
   }
 
+  /**
+   * Draws our region and every one around it at their places in the world,
+   * keeping those already drawn, and lets the camera roam over our region
+   * and those we can walk into.
+   */
+  private showRegion(welcome: WelcomeMessage): void {
+    const def = welcome.region.def;
+    this.map = generateRegion(def);
+    const size = this.map.width;
+    this.origin = { x: def.at.x * size, y: def.at.y * size };
+    const around = [def, ...welcome.neighbours.filter((n) => Math.max(Math.abs(n.at.x - def.at.x), Math.abs(n.at.y - def.at.y)) === 1)];
+    const wanted = new Set(around.map((d) => d.id));
+    for (const [id, region] of this.drawn) {
+      if (!wanted.has(id)) this.undraw(id, region);
+    }
+    for (const d of around) {
+      const layout = JSON.stringify(d);
+      const region = this.drawn.get(d.id);
+      if (region?.layout === layout) continue;
+      if (region) this.undraw(d.id, region);
+      this.drawn.set(d.id, this.drawRegion(d.id === def.id ? this.map : generateRegion(d, size), layout));
+    }
+    // Roads lead only into the regions beside us, so the camera stops at the others.
+    const bounds = { left: this.origin.x, top: this.origin.y, right: this.origin.x + size, bottom: this.origin.y + size };
+    for (const side of Object.keys(def.exits) as Side[]) {
+      if (side === 'west') bounds.left -= size;
+      if (side === 'north') bounds.top -= size;
+      if (side === 'east') bounds.right += size;
+      if (side === 'south') bounds.bottom += size;
+    }
+    this.cameras.main.setBounds(bounds.left * T, bounds.top * T, (bounds.right - bounds.left) * T, (bounds.bottom - bounds.top) * T);
+  }
+
+  /** Eases the biome's light from what it is to `to`, so no edge switches it at once. */
+  private easeLight(to: number): void {
+    const tint = this.tint;
+    if (!tint || tint.fillColor === to) return;
+    const a = Phaser.Display.Color.ValueToColor(tint.fillColor);
+    const b = Phaser.Display.Color.ValueToColor(to);
+    this.tweens.killTweensOf(tint);
+    this.tweens.addCounter({
+      from: 0, to: 100, duration: 1200,
+      onUpdate: (tween) => {
+        const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, tween.getValue() ?? 100);
+        tint.setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
+      },
+    });
+  }
+
   onSnapshot(snapshot: SnapshotMessage): void {
     if (!this.predictor || !this.sys.isActive()) return;
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y });
-    this.confirmed = { ack: snapshot.ack, x: snapshot.x, y: snapshot.y };
     const now = performance.now();
     this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
@@ -272,7 +292,7 @@ export class WorldScene extends Phaser.Scene {
         if (Math.abs(remote.body.x - before) > 0.5) remote.body.setFlipX(remote.body.x < before);
         // People indoors stay out of sight until we come close enough to see in.
         if (group !== this.creatures) {
-          const seen = !this.buildings.some((v) => !v.open && within(v.building, Math.floor(pos.x - v.ox), Math.floor(pos.y - v.oy)));
+          const seen = !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }
       }
@@ -317,7 +337,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.textures.exists(key)) this.textures.remove(key);
     this.textures.addImage(key, img);
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
-    if (this.kitIds.has(key)) this.redraw();
+    if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
     for (const a of [...this.creatures.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
       if (a?.art === key) a.body.setTexture(key);
     }
@@ -428,21 +448,44 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Paints a region's ground and scenery with its top-left corner at (ox, oy), in tiles. */
-  /** Draws the land again where we stand, once the art that arrived together has loaded. */
-  private redraw(): void {
-    if (this.redrawing || !this.predictor) return;
-    this.redrawing = true;
+  /** Draws again, once the art that arrived together has loaded, every region whose biome kit was painted. */
+  private redraw(key: string): void {
+    const waiting = this.painted.size > 0;
+    this.painted.add(key);
+    if (waiting || !this.predictor) return;
     this.time.delayedCall(500, () => {
-      // From the server's latest word, so the steps still in flight replay on top.
-      const at = this.confirmed;
-      if (at) this.enterRegion({ ...this.welcome, ...at });
+      for (const [id, region] of this.drawn) {
+        if ([...region.kit].some((k) => this.painted.has(k))) this.undraw(id, region);
+      }
+      this.painted.clear();
+      this.showRegion(this.welcome);
+      this.revealBuildings(true);
     });
   }
 
-  private drawRegion(map: RegionMap, ox: number, oy: number): void {
+  /** Buildings of every region drawn, each knowing its region's corner. */
+  private buildings(): BuildingView[] {
+    return [...this.drawn.values()].flatMap((r) => r.buildings);
+  }
+
+  private undraw(id: string, region: DrawnRegion): void {
+    for (const o of region.objects) {
+      this.tweens.killTweensOf(o);
+      o.destroy();
+    }
+    for (const m of region.tilemaps) m.destroy();
+    this.drawn.delete(id);
+  }
+
+  /** Paints a region's ground and scenery at its square in the world. */
+  private drawRegion(map: RegionMap, layout: string): DrawnRegion {
+    const ox = map.def.at.x * map.width;
+    const oy = map.def.at.y * map.height;
+    const before = new Set(this.children.list);
+    const tilemaps: Phaser.Tilemaps.Tilemap[] = [];
+    const kit = new Set<string>();
     const look = biomeLook(map.def.biome);
-    for (const id of [look.ground, look.path, look.water, ...look.trees, ...look.rocks]) this.kitIds.add(id);
+    for (const id of [look.ground, look.path, look.water, ...look.trees, ...look.rocks]) kit.add(id);
     const tilesetKey = registerTileset(this, map.def);
     const data: number[][] = [];
     for (let y = 0; y < map.height; y++) {
@@ -458,6 +501,7 @@ export class WorldScene extends Phaser.Scene {
     }
     const layer = (tiles: number[][], depth: number, key = tilesetKey) => {
       const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
+      tilemaps.push(tilemap);
       const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
       return tilemap.createLayer(0, tileset, ox * T, oy * T)!.setDepth(depth);
     };
@@ -472,8 +516,9 @@ export class WorldScene extends Phaser.Scene {
       return view;
     });
     layer(data, -1);
-    this.buildings.push(...views);
     this.placeScenery(map, ox, oy, views);
+    const objects = this.children.list.filter((o) => !before.has(o));
+    return { layout, objects, tilemaps, buildings: views, kit };
   }
 
   /**
@@ -514,9 +559,9 @@ export class WorldScene extends Phaser.Scene {
 
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
-    for (const v of this.buildings) {
+    for (const v of this.buildings()) {
       if (!v.exterior) continue;
-      const open = nearBuilding(v.building, this.shown.x - v.ox, this.shown.y - v.oy);
+      const open = nearBuilding(v.building, this.origin.x + this.shown.x - v.ox, this.origin.y + this.shown.y - v.oy);
       if (open === v.open && !instant) continue;
       v.open = open;
       const fades = [{ target: v.exterior, alpha: open ? 0 : 1 }, ...v.inside.map((target) => ({ target, alpha: open ? 1 : 0 }))];
@@ -564,9 +609,10 @@ export class WorldScene extends Phaser.Scene {
     return { body, art: texture, shadow, label, nudge: { x: 0, y: 0 } };
   }
 
+  /** Places an avatar at (x, y) in our region, counted from its corner. */
   private placeAvatar(a: Avatar, x: number, y: number): void {
-    const px = x * T;
-    const py = y * T;
+    const px = (this.origin.x + x) * T;
+    const py = (this.origin.y + y) * T;
     a.shadow.setPosition(px, py + T / 16);
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
     const top = py + T / 10 - a.body.displayHeight;

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ArtPoints, ArtPointsManifest } from '@co-mmo/shared';
@@ -35,7 +36,7 @@ export interface HandFinderOptions {
 }
 
 interface Found extends ArtPoints {
-  /** The file the points were found in. */
+  /** The file the points were found in, and a fingerprint of its pixels. */
   from: string;
 }
 
@@ -89,11 +90,13 @@ export class HandFinder {
   private async run(): Promise<void> {
     await this.load();
     for (const source of await this.options.sources()) {
-      if (this.found[source.id]?.from === source.file) continue;
-      const model = this.options.model();
-      if (!model || this.options.paused()) return;
       const picture = await source.read().catch(() => undefined);
       if (!picture) continue;
+      // The same file name can hold a new picture (shipped art updated with the game), so its pixels count too.
+      const from = `${source.file}#${createHash('sha1').update(picture).digest('hex').slice(0, 12)}`;
+      if (this.found[source.id]?.from === from) continue;
+      const model = this.options.model();
+      if (!model || this.options.paused()) return;
       const pictures = source.frames > 1 ? await stripFrames(picture, source.frames) : [picture];
       const points = [];
       for (const frame of pictures) {
@@ -102,8 +105,8 @@ export class HandFinder {
         points.push(point ?? null);
       }
       this.found[source.id] = source.kind === 'hands'
-        ? { from: source.file, hands: points }
-        : { from: source.file, ...(points[0] ? { grip: points[0] } : {}) };
+        ? { from, hands: points }
+        : { from, ...(points[0] ? { grip: points[0] } : {}) };
       await mkdir(this.options.artDir, { recursive: true });
       await writeFile(this.file, JSON.stringify(this.found, null, 2));
     }

@@ -82,7 +82,20 @@ describe('walk painter', () => {
     expect(Object.keys(again.manifest())).toHaveLength(8);
     expect(spent).toHaveLength(15);
     expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))).toEqual(manifest);
-  }, 60_000);
+
+    // Mara's approved picture is painted again (say, with empty hands): she walks again from it, Ilya keeps his walks.
+    await writeFile(join(anchorDir, 'raw', 'player-mara.png'), await picture(300, 300, walker(150, 270)));
+    const changed = new WalkPainter({
+      provider: () => images, video: () => video, overBudget: () => false,
+      spend: (usd) => spent.push(usd), spendVideo: (usd) => spent.push(usd),
+      anchorDir, artDir, shipped: async () => ({}), toFrames: frames,
+    });
+    await changed.start();
+    expect(clips).toHaveLength(12);
+    expect(clips.slice(8).every((c) => !c.prompt.includes('Ilya'))).toBe(true);
+    expect(changed.manifest()[walkArt('player-mara', 'front')]!.file).toContain('?v=');
+    expect(changed.manifest()[walkArt('player-ilya', 'front')]!.file).not.toContain('?v=');
+  }, 180_000);
 
   it('paints nothing without a video model, and keeps the views it paid for', async () => {
     const root = await mkdtemp(join(tmpdir(), 'walks-'));

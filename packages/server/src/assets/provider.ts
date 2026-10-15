@@ -10,6 +10,8 @@ export interface ImageRequest {
   prompt: string;
   /** Reference images (anchors, a base pose) the result must match in style. */
   references?: GeneratedImage[];
+  /** The references show the subject itself, to be painted again with a change, not just the style. */
+  edit?: boolean;
   /** Width to height, such as "4:5"; square when left out. */
   aspectRatio?: string;
   /** Long side: "1K" (about 1024 px, the default), "2K" or "4K", for models that offer it. */

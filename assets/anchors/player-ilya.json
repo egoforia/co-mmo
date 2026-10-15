@@ -9,7 +9,7 @@
     "body": "small, 3 heads tall, sturdy build, confident stance, facing the viewer",
     "materials": [
       "leather",
-      "iron"
+      "cloth"
     ],
     "colors": {
       "main": "slate blue",
@@ -17,16 +17,20 @@
       "accent": "red scarf"
     },
     "details": [
-      "short sword at the hip",
       "messy dark hair",
-      "round shield on the back"
+      "empty hands and no weapon, shield or pack",
+      "leather belt with a small pouch"
     ],
     "mood": "brave, playful"
   },
-  "prompt": "Hand-painted 2D game sprite in the style of a 1999 storybook RPG.\nThree-quarter top-down view. Soft watercolour and gouache shading with visible brush texture\nand 3 to 5 value steps per colour. Warm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood.\nSoftened saturation, plain flat background, centred, no ground shadow.\nSubject: Ilya (player). Most recognisable feature: long red scarf trailing behind. Body and shape: small, 3 heads tall, sturdy build, confident stance, facing the viewer. Materials: leather, iron. Colours: main slate blue, secondary brown leather, small accent of red scarf. Details: short sword at the hip; messy dark hair; round shield on the back. Mood: brave, playful.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, gradients, lens flare, blur, noise, text, letters, watermark, signature, frame, border, background scenery, cast shadow.",
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nPaint the character in the reference picture again, exactly the same: face, hair, clothes, colours, proportions, pose, size and framing.\nChange only this: he carries nothing: remove the sword, the scabbard and the round shield completely, both hands empty and relaxed at his sides, fingers visible.",
+  "references": [
+    "player-ilya (before)"
+  ],
+  "edit": "he carries nothing: remove the sword, the scabbard and the round shield completely, both hands empty and relaxed at his sides, fingers visible",
   "provider": "gemini",
-  "model": "gemini-2.5-flash-image",
-  "styleVersion": 1,
-  "mimeType": "image/png",
-  "createdAt": "2026-10-14T17:35:59.279Z"
+  "model": "gemini-3.1-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/jpeg",
+  "createdAt": "2026-10-15T19:48:19.370Z"
 }

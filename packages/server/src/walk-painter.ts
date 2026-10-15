@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
@@ -97,9 +98,19 @@ export class WalkPainter {
     // Nothing can be painted without an image model; the Art tab says so, so the log stays quiet.
     if (!this.options.provider()) return;
     const shipped = await this.options.shipped();
+    const madeFrom = JSON.parse(await readFile(resolve(this.dir, 'looks.json'), 'utf8').catch(() => '{}')) as Record<string, string>;
     for (const look of WALKING_LOOKS) {
-      if (WALK_DIRECTIONS.every((d) => shipped[walkArt(look, d)] || this.painted[walkArt(look, d)])) continue;
-      if (!(await this.paintWalker(this.anchorWalker(look), 'start-up'))) return;
+      const walker = this.anchorWalker(look);
+      // A look whose approved picture changed (say, painted again with empty hands) walks again from the new one.
+      const stamp = createHash('sha1').update(await walker.reference()).digest('hex').slice(0, 12);
+      const painted = WALK_DIRECTIONS.some((d) => this.painted[walkArt(look, d)]);
+      const changed = painted && madeFrom[look] !== stamp;
+      if (changed) await this.forget(walker, WALK_DIRECTIONS, true);
+      else if (WALK_DIRECTIONS.every((d) => shipped[walkArt(look, d)] || this.painted[walkArt(look, d)])) continue;
+      if (!(await this.paintWalker(walker, 'start-up', changed))) return;
+      madeFrom[look] = stamp;
+      await mkdir(this.dir, { recursive: true });
+      await writeFile(resolve(this.dir, 'looks.json'), JSON.stringify(madeFrom, null, 2));
     }
   }
 

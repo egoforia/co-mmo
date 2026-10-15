@@ -46,7 +46,7 @@ describe('the hand finder', () => {
   it('finds a hand in every walk frame and an item\'s grip once, and looks again only at pictures painted again', async () => {
     const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
     const strip = await picture(256, 192);
-    const sword = await picture(128, 128);
+    let sword = await picture(128, 128);
     const eye = fakeEye(['{"point": [800, 600]}', '{"point": null}', '{"point": [700, 300]}', '{"point": [810, 610]}', '{"point": [820, 620]}']);
     let walkFile = 'wished-art/walks/player-mara-walk-front.png';
     const spent: number[] = [];
@@ -69,7 +69,7 @@ describe('the hand finder', () => {
     });
     expect(eye.asked[2]!.messages[0]!.content).toMatch(/handle/);
     expect(spent).toHaveLength(3);
-    expect(JSON.parse(await readFile(join(artDir, 'points.json'), 'utf8'))['item-wooden-sword'].from).toBe('art/item-wooden-sword.png');
+    expect(JSON.parse(await readFile(join(artDir, 'points.json'), 'utf8'))['item-wooden-sword'].from).toMatch(/^art\/item-wooden-sword\.png#[0-9a-f]{12}$/);
 
     // Nothing new: nothing asked. The walk painted again: its frames are looked at again.
     await finder.start();
@@ -78,6 +78,10 @@ describe('the hand finder', () => {
     await finder.start();
     expect(eye.asked).toHaveLength(5);
     expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.61, 0.81], [0.62, 0.82]] });
+    // A new picture under the same file name (shipped art updated with the game) is looked at again too.
+    sword = await picture(64, 128);
+    await finder.start();
+    expect(eye.asked).toHaveLength(6);
 
     // Kept on disk for the next start.
     const again = new HandFinder({ artDir, model: () => undefined, sources: async () => [], paused: () => false, spend: () => {} });

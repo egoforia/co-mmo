@@ -28,8 +28,7 @@ export interface Carried {
 
 /** What the walking looks carry; a wished look adds its own line. */
 export const LOOK_GEAR: Record<string, Carried[]> = {
-  'player-mara': [{ item: 'crooked wooden staff with a sprouting leaf', side: 'right' }],
-  'player-ilya': [{ item: 'short sword at the hip', side: 'left' }, { item: 'round shield', side: 'back' }],
+  // The walking looks carry nothing: their weapon or charm is drawn in hand by the game (held items).
 };
 
 const SEEN: Record<WalkDirection, string> = {

@@ -111,15 +111,16 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[] })
     id: 'player-mara', name: 'Mara', kind: 'player', biome: 'any',
     silhouetteHook: 'oversized floppy wizard hat with a drooping tip',
     body: 'small, 3 heads tall, round face, cheerful stance, facing the viewer',
-    materials: ['cloth', 'wood'], colors: { main: 'moss green', secondary: 'cream', accent: 'rose hat band' },
-    details: ['short russet bob', 'crooked wooden staff with a leaf sprouting at the top', 'brown boots'], mood: 'curious, warm',
+    materials: ['cloth'], colors: { main: 'moss green', secondary: 'cream', accent: 'rose hat band' },
+    // Empty hands: what a player wears and wields is shown in their hand by the game (held items).
+    details: ['short russet bob', 'empty hands, carrying nothing', 'brown boots'], mood: 'curious, warm',
   },
   {
     id: 'player-ilya', name: 'Ilya', kind: 'player', biome: 'any',
     silhouetteHook: 'long red scarf trailing behind',
     body: 'small, 3 heads tall, sturdy build, confident stance, facing the viewer',
-    materials: ['leather', 'iron'], colors: { main: 'slate blue', secondary: 'brown leather', accent: 'red scarf' },
-    details: ['short sword at the hip', 'messy dark hair', 'round shield on the back'], mood: 'brave, playful',
+    materials: ['leather', 'cloth'], colors: { main: 'slate blue', secondary: 'brown leather', accent: 'red scarf' },
+    details: ['messy dark hair', 'empty hands and no weapon, shield or pack', 'leather belt with a small pouch'], mood: 'brave, playful',
   },
   {
     id: 'item-bible', name: 'The Bible', kind: 'item', biome: 'any',

@@ -80,7 +80,7 @@
   "desert-cactus-folk": {
     "file": "art/desert-cactus-folk.png",
     "kind": "npc",
-    "width": 128,
+    "width": 142,
     "height": 192
   },
   "desert-dunes": {
@@ -212,7 +212,7 @@
   "player-mara": {
     "file": "art/player-mara.png",
     "kind": "player",
-    "width": 128,
+    "width": 136,
     "height": 192
   },
   "sanctum-blossom-tree-a": {

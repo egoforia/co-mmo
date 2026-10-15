@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import type { BiomeId, PicturedWish } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, type BiomeId, type PicturedWish } from '@co-mmo/shared';
 import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
 import { buildPrompt, type AssetDescription, type AssetKind } from './style.ts';
@@ -138,7 +138,8 @@ export async function paintWish(
   }
   const raw = await provider.generate({ prompt: request.prompt, references });
   const { png, clean } = await removeKeyBackground(await sharp(raw.data).png().toBuffer());
-  const fitted = await fitToBox(png, request.box);
+  // People stand the same height as everyone else; things fit their box.
+  const fitted = def.kind === 'player' || def.kind === 'npc' ? await fitCharacter(png, request.box) : await fitToBox(png, request.box);
   await mkdir(artDir, { recursive: true });
   await writeFile(resolve(artDir, `${id}.png`), fitted);
   return { request: { ...request, references: sent }, image: raw, cutOut: png, plainBackground: clean, fitted, referenceImages: references.map((r) => r.data) };
@@ -158,6 +159,23 @@ export interface PaintedWish {
   fitted: Buffer;
   /** The anchors that were sent. */
   referenceImages: Buffer[];
+}
+
+/**
+ * Trims the transparent margin and scales a person so the figure is
+ * CHARACTER_HEIGHT tall, feet on the bottom row of a box as tall as `box`;
+ * a figure wider than the box widens it rather than shrinking.
+ */
+export async function fitCharacter(png: Buffer, box: { width: number; height: number }): Promise<Buffer> {
+  const trimmed = await sharp(png).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
+  const scale = CHARACTER_HEIGHT / trimmed.info.height;
+  const w = Math.max(1, Math.round(trimmed.info.width * scale));
+  const width = Math.max(box.width, Math.ceil(w / 2) * 2);
+  const resized = await sharp(trimmed.data).resize(w, CHARACTER_HEIGHT, { kernel: 'lanczos3' }).png().toBuffer();
+  return sharp({ create: { width, height: box.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: resized, left: Math.floor((width - w) / 2), top: box.height - CHARACTER_HEIGHT }])
+    .png()
+    .toBuffer();
 }
 
 /** Trims the transparent margin, scales to fit and pads with the feet on the bottom row. */

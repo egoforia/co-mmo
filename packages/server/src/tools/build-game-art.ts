@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import type { ArtManifest, ArtEntry } from '@co-mmo/shared';
+import { fitCharacter } from '../assets/wish-art.ts';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const anchorDir = resolve(root, 'assets/anchors');
@@ -49,6 +50,14 @@ for (const file of (await readdir(anchorDir)).filter((f) => f.endsWith('.json'))
   }
 
   const box = SET_PIECE_BOX[id] ?? (kind === 'prop' && id.endsWith('-rock') ? ROCK_BOX : BOX[kind]) ?? BOX.item!;
+  // People all stand the same height, as they do when they walk.
+  if (kind === 'player' || kind === 'npc') {
+    const fitted = await fitCharacter(png, box);
+    await writeFile(resolve(outDir, `${id}.png`), fitted);
+    const { width } = await sharp(fitted).metadata();
+    manifest[id] = entry(id, kind, width!, box.height);
+    continue;
+  }
   // Trim the transparent margin so every sprite is scaled by its own size.
   const trimmed = await sharp(png).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
   const scale = Math.min(box.width / trimmed.info.width, box.height / trimmed.info.height);

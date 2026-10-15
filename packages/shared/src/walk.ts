@@ -5,6 +5,13 @@ import { WALK_VIEWS, type WalkView } from './walk-rig.ts';
 // the server keeps one cycle's frames as a strip and the client plays it at a
 // rate matched to how fast the walker moves, so feet keep pace with the ground.
 
+/**
+ * How tall a person's or player's figure is drawn, hat and hair included,
+ * standing or walking, so everyone stands the same size whatever sticks out
+ * sideways (a wide hat, a flying scarf): pictures grow wider instead.
+ */
+export const CHARACTER_HEIGHT = 168;
+
 /** Frames kept from one walk cycle when a body type does not say. */
 export const WALK_FRAMES = 12;
 

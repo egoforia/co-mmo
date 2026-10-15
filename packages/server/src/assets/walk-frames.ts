@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { CHARACTER_HEIGHT } from '@co-mmo/shared';
 
 // Cuts painted walk pictures into frames and lines the frames up. Pictures
 // arrive with the key colour already removed (removeKeyBackground). Figures
@@ -254,7 +255,7 @@ export interface NormalizedWalk {
  * one baseline `margin` pixels above the bottom. Frames are as wide and tall
  * as the widest and tallest figure needs, so nothing is cut off.
  */
-export async function normalizeWalk(directions: Buffer[][], { bodyHeight = 168, margin = 2 } = {}): Promise<NormalizedWalk> {
+export async function normalizeWalk(directions: Buffer[][], { bodyHeight = CHARACTER_HEIGHT, margin = 2 } = {}): Promise<NormalizedWalk> {
   const frames = await Promise.all(directions.map((frames) => Promise.all(frames.map(async (png) => {
     const meta = await sharp(png).metadata();
     return { png, width: meta.width!, height: meta.height!, feet: await feetCentre(png) };

@@ -7,7 +7,7 @@ import { ITEMS, TICK_SECONDS, WALKING_LOOKS, WALK_FRAMES, WishError, isClientMes
 import { Auth, cleanEmail, type Mailer } from './auth.ts';
 import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
-import { Store, StoreError, soundSettings, videoSettings, type Account } from './store.ts';
+import { Store, StoreError, dailyClips, soundSettings, videoSettings, type Account } from './store.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
 import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
@@ -20,7 +20,7 @@ import { WalkPainter } from './walk-painter.ts';
 import { GeminiVideoProvider, type VideoProvider } from './assets/video.ts';
 import { ArtJobs } from './art-jobs.ts';
 import { ArtStudio } from './art-studio.ts';
-import { MemoryPaintQueue, queuedSound, queuedVideo, type PaintQueue } from './paint-queue.ts';
+import { DailyClips, MemoryPaintQueue, nextDailyReset, queuedSound, queuedVideo, type PaintQueue } from './paint-queue.ts';
 import { SoundMaker } from './sound-maker.ts';
 import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from './assets/sound.ts';
 import type { FinishedSound } from './assets/sound-finish.ts';
@@ -139,9 +139,14 @@ export function createApp(options: AppOptions): App {
     const v = videoSettings(store.settings, env);
     return v.provider === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
   });
+  // Google caps Veo clips a day without saying so when it refuses, so the game counts its own.
+  const clips = new DailyClips({
+    cap: () => dailyClips(store.settings),
+    madeSince: (model, since) => store.spendSince(since).filter((s) => s.kind === 'video' && s.model === model).length,
+  });
   const video = () => {
     const provider = chosenVideo();
-    return provider && queuedVideo(paintQueue, provider);
+    return provider && queuedVideo(paintQueue, provider, clips);
   };
   const walkPainter = new WalkPainter({
     ...painterOptions,
@@ -185,16 +190,17 @@ export function createApp(options: AppOptions): App {
     if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
     if (makeSounds) void sounds.start();
   };
-  // A new day (UTC) frees the daily cap.
+  // A new day (UTC) frees the daily spending cap, and Google's reset (08:00 UTC) frees the day's clips.
   let dayTimer: ReturnType<typeof setTimeout> | undefined;
   const nextDay = (): void => {
     const now = Date.now();
     const midnight = new Date(now);
     midnight.setUTCHours(24, 1, 0, 0);
+    const wake = Math.min(midnight.getTime(), nextDailyReset(now) + 60_000);
     dayTimer = setTimeout(() => {
       resumeArt();
       nextDay();
-    }, midnight.getTime() - now);
+    }, wake - now);
     dayTimer.unref?.();
   };
   nextDay();
@@ -372,7 +378,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, kick, updater: options.updater, restarting, env, json, readJson };
+    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.

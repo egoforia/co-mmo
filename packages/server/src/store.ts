@@ -124,7 +124,7 @@ export interface Settings {
     /** Paints wished things; 'none' keeps tinted placeholders. `uses` picks another model for some kinds of art. */
     image: { provider: 'gemini' | 'none'; model: string; uses?: Partial<Record<ArtUse, string>> };
     /** Makes walk clips (missing in older saves: Veo whenever the images come from Gemini). */
-    video?: { provider: 'gemini' | 'none'; model: string };
+    video?: { provider: 'gemini' | 'none'; model: string; dailyClips?: number };
     /** Makes sound effects and music (missing in older saves: see soundSettings). */
     sound?: SoundSettings;
     /** Checks painted pictures and looks for one to reuse (missing in older saves: see styleCheckSettings). */
@@ -157,6 +157,18 @@ export const ART_USES: ArtUse[] = ['wishes', 'buildings', 'scenery', 'walks'];
 /** The video model in use: the saved choice, or Veo Lite when the Gemini key is set (as walks worked before the choice existed). */
 export function videoSettings(settings: Settings, env: NodeJS.ProcessEnv): { provider: 'gemini' | 'none'; model: string } {
   return settings.ai.video ?? (env.GEMINI_API_KEY ? { provider: 'gemini', model: 'veo-3.1-lite-generate-preview' } : { provider: 'none', model: '' });
+}
+
+/**
+ * Veo clips a day unless the Owner sets another number. Google refused the
+ * eighth clip of the day on this key (15 October 2026) without saying it was
+ * a daily limit, so the game counts its own and stops first.
+ */
+export const DEFAULT_DAILY_CLIPS = 7;
+
+/** How many clips the video model may make a day, as set on the AI models tab. */
+export function dailyClips(settings: Settings): number {
+  return settings.ai.video?.dailyClips ?? DEFAULT_DAILY_CLIPS;
 }
 
 /** The style check and reuse (design doc, Art style, step 5; Keeping costs down). */
@@ -560,6 +572,11 @@ export class Store {
     if (i >= 0) this.data.spend.splice(i, 1);
     if (record.usd > 0) this.data.spend.push(record);
     this.persist();
+  }
+
+  /** Spending from `since` on, such as since Google's last daily reset. */
+  spendSince(since: number): SpendRecord[] {
+    return this.data.spend.filter((s) => s.at >= since);
   }
 
   /** Spending on the day (UTC) containing `now`. */

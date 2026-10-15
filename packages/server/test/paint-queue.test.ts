@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GeminiVideoProvider } from '../src/assets/video.ts';
 import { googleError, ProviderError } from '../src/assets/provider.ts';
-import { MemoryPaintQueue, limitFor, nextDailyReset, refusal, type PaintTurnWatcher } from '../src/paint-queue.ts';
+import { DailyClips, MemoryPaintQueue, PaintStopped, limitFor, nextDailyReset, queuedVideo, refusal, type PaintTurnWatcher } from '../src/paint-queue.ts';
 import { FilePaintRequests, type PaintRequest } from '../src/paint-requests.ts';
 
 const veo = 'veo-3.1-lite-generate-preview';
@@ -95,10 +95,10 @@ describe('the paint queue', () => {
     expect(nextDailyReset(Date.UTC(2026, 9, 15, 12))).toBe(Date.UTC(2026, 9, 16, 8));
   });
 
-  it('gives up after backing off when Google keeps refusing without saying why', async () => {
+  it('gives up after backing off when Google keeps refusing an image model without saying why', async () => {
     const queue = new MemoryPaintQueue({ backoffMs: [1000, 2000] });
     let calls = 0;
-    const result = queue.turn(veo, async () => {
+    const result = queue.turn('gemini-3.1-flash-image', async () => {
       calls++;
       throw tooMany();
     });
@@ -106,6 +106,42 @@ describe('the paint queue', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(await caught).toMatch(/daily limit or the account's billing cap is likely used up/);
     expect(calls).toBe(3);
+  });
+
+  it("takes a Veo refusal that names no quota as the day's cap, and logs what Google said once", async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const queue = new MemoryPaintQueue();
+    let calls = 0;
+    const err = await queue.turn(veo, async () => {
+      calls++;
+      throw tooMany();
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(PaintStopped);
+    expect(err.message).toMatch(/daily limit for veo-3\.1-lite-generate-preview is used up.*08:00 UTC.*You exceeded your current quota/);
+    expect(calls).toBe(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toBe(`${veo} refused (429): "You exceeded your current quota, please check your plan and billing details." Quotas: none named. Retry after: none given.`);
+    warn.mockRestore();
+  });
+
+  it("shows Google's words while a request waits out a refusal", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const queue = new MemoryPaintQueue();
+    let calls = 0;
+    const w = watcher();
+    const result = queue.turn(veo, async () => {
+      if (++calls === 1) throw tooMany('GenerateRequestsPerMinutePerProjectPerModel', '42s');
+      return 'clip';
+    }, w);
+    const behind = watcher();
+    const second = queue.turn(veo, async () => 'second', behind);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(w.said.some((line) => /slow down \("You exceeded your current quota.*"\); asking again in 42 s/.test(line))).toBe(true);
+    expect(behind.said.at(-1)).toMatch(/slow down \("You exceeded your current quota.*"\); waiting until 12:00 UTC/);
+    await vi.advanceTimersByTimeAsync(120_000);
+    await expect(result).resolves.toBe('clip');
+    await expect(second).resolves.toBe('second');
+    vi.mocked(console.warn).mockRestore();
   });
 
   it('passes other errors straight through', async () => {
@@ -148,6 +184,67 @@ describe('Veo refusals', () => {
     expect(err).toBeInstanceOf(ProviderError);
     expect(err.throttle).toEqual({ quotas: ['GenerateRequestsPerMinutePerProjectPerModel'], retryAfterMs: 31_000 });
     expect(refusal(err)).toBe('minute');
+    // The same refusal with no quota named is Veo's daily cap, but only for Veo.
+    const bare = tooMany();
+    expect(refusal(bare, veo)).toBe('day');
+    expect(refusal(bare, 'gemini-3.1-flash-image')).toBe('minute');
+  });
+});
+
+describe("the day's Veo clips", () => {
+  const request = { prompt: 'walk', first: { mimeType: 'image/png', data: Buffer.alloc(1) }, seconds: 8 as const };
+  const saved: number[] = [];
+  let now = Date.UTC(2026, 9, 15, 20);
+  const clips = (cap = 7) => new DailyClips({ cap: () => cap, madeSince: (_model, since) => saved.filter((t) => t >= since).length, now: () => now });
+
+  beforeEach(() => {
+    saved.length = 0;
+    now = Date.UTC(2026, 9, 15, 20);
+  });
+
+  it("start from the saved clips made since Google's last reset", () => {
+    // Two clips before today's 08:00 UTC reset and three after it.
+    saved.push(Date.UTC(2026, 9, 15, 7), Date.UTC(2026, 9, 15, 7, 30), Date.UTC(2026, 9, 15, 9), Date.UTC(2026, 9, 15, 14), Date.UTC(2026, 9, 15, 14, 5));
+    expect(clips().used(veo)).toEqual({ count: 3, cap: 7, resetsAt: Date.UTC(2026, 9, 16, 8) });
+  });
+
+  it('stop the video model at the cap without asking Google, and free it after the reset', async () => {
+    const counter = clips(2);
+    let asked = 0;
+    const provider = queuedVideo(new MemoryPaintQueue({ limit: () => undefined }), {
+      id: 'gemini', model: veo,
+      generate: async () => {
+        asked++;
+        return { mimeType: 'video/mp4', data: Buffer.alloc(1), seconds: 8 };
+      },
+    }, counter);
+    await provider.generate(request);
+    await provider.generate(request);
+    const err = await provider.generate(request).catch((e) => e);
+    expect(err).toBeInstanceOf(PaintStopped);
+    expect(err.message).toBe("Today's 2 veo-3.1-lite-generate-preview clips are used up (the daily limit on the AI models tab), so walks pick up after 08:00 UTC.");
+    expect(asked).toBe(2);
+    now = Date.UTC(2026, 9, 16, 8, 1);
+    await provider.generate(request);
+    expect(asked).toBe(3);
+    expect(counter.used(veo).count).toBe(1);
+  });
+
+  it('count clips Google accepted even when they fail, but not a refused start', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const counter = clips();
+    await expect(counter.run(veo, async () => {
+      throw new ProviderError('gemini', 502, 'the video failed');
+    })).rejects.toThrow(/the video failed/);
+    await expect(counter.run(veo, async () => {
+      throw tooMany();
+    })).rejects.toThrow(/quota/);
+    expect(counter.used(veo).count).toBe(1);
+    vi.mocked(console.warn).mockRestore();
+  });
+
+  it('let a cap of 0 turn walks off', () => {
+    expect(() => clips(0).check(veo)).toThrow(PaintStopped);
   });
 });
 

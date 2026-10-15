@@ -37,8 +37,8 @@ export interface Throttle {
 }
 
 export class ProviderError extends Error {
-  constructor(readonly provider: string, readonly status: number, message: string, readonly throttle?: Throttle) {
-    super(`${provider}: ${message}`);
+  constructor(readonly provider: string, readonly status: number, readonly said: string, readonly throttle?: Throttle) {
+    super(`${provider}: ${said}`);
   }
 }
 

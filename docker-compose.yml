@@ -1,0 +1,24 @@
+# The game's databases for running on one machine (docs/scale.md):
+#   docker compose up -d
+# then add to .env:
+#   DATABASE_URL=postgres://co_mmo:co_mmo@localhost:5432/co_mmo
+# They start again by themselves after a reboot. Data lives in Docker volumes,
+# so `docker compose down` keeps it; `docker compose down -v` deletes it.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: co_mmo
+      POSTGRES_PASSWORD: co_mmo
+      POSTGRES_DB: co_mmo
+    # Only this machine can reach it.
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "co_mmo"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  postgres:

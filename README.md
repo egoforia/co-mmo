@@ -228,7 +228,8 @@ PUBLIC_URL=http://localhost:3001 npm start
 | --- | --- | --- |
 | `PORT` | `3001` | Server port |
 | `PUBLIC_URL` | `http://localhost:5173` | Base URL used in invite links |
-| `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored |
+| `DATABASE_URL` | none | Postgres for the saved world ([docs/scale.md](docs/scale.md)); without it the world is kept in `DATA_FILE` |
+| `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored without Postgres (and brought in from on Postgres's first run) |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
 | `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`), wish art, walks (Veo) and each land's music (Lyria) |
@@ -252,6 +253,8 @@ The `Dockerfile` builds one container that serves the game on port 8080.
 Mount a persistent volume at `/data` (accounts, invites and positions are
 stored there) and set `PUBLIC_URL` to the address players will use, so
 invite links point to it. On first start the logs print the Owner invite.
+Set `DATABASE_URL` to keep the world in Postgres instead ([docs/scale.md](docs/scale.md));
+the volume still holds painted art.
 
 ```sh
 docker build -t co-mmo .

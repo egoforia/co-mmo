@@ -83,7 +83,9 @@ export class RegionServer {
   }
 
   private tickRegions(): void {
+    const strain = this.meter.strain;
     for (const region of this.regions.values()) {
+      region.strain = strain;
       try {
         const departures = region.tick();
         if (departures.length) {

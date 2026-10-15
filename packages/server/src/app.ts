@@ -552,7 +552,7 @@ export function createApp(options: AppOptions): App {
   });
 
   const tickTimer = setInterval(() => meter.tick(() => {
-    world.tick();
+    world.tick(meter.strain);
     rules.tick();
   }), TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);

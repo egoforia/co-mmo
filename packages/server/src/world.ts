@@ -470,8 +470,9 @@ export class World {
   }
 
   /** Ticks every region here, then moves players who walked off an open edge or fell. Regions on region servers tick there. */
-  tick(): void {
+  tick(strain = 0): void {
     for (const region of this.regions.values()) {
+      if (region instanceof Region) region.strain = strain;
       for (const departure of region.tick()) this.depart(region, departure);
     }
   }

@@ -94,6 +94,23 @@ const LEASH = 8;
 const CREATURE_REACH = 1.2;
 /** Health starts coming back this long after the last hit taken. */
 const REGEN_DELAY_MS = 5000;
+/** Snapshots come every tick until this many people and creatures are in view, then less often (see snapshotEvery). */
+const CROWD_STEPS = [40, 80, 150];
+/** The slowest snapshots: every this many ticks. */
+const MAX_SNAPSHOT_EVERY = 4;
+
+/**
+ * How many ticks apart a player's snapshots go out (design doc, Scaling
+ * without a cap: update rates drop gracefully rather than refusing logins).
+ * A crowd in view makes each snapshot big; a busy process (strain 1 or 2)
+ * has less time to make them. Players' own steps are predicted on their
+ * screen and others are smoothed, so fewer snapshots look smoother, just a
+ * little less precise.
+ */
+export function snapshotEvery(crowd: number, strain = 0): number {
+  const forCrowd = 1 + CROWD_STEPS.filter((n) => crowd > n).length;
+  return Math.min(MAX_SNAPSHOT_EVERY, forCrowd + strain);
+}
 
 export interface Connection {
   send(message: ServerMessage): void;
@@ -138,6 +155,10 @@ interface PlayerState {
   readyAt: Map<string, number>;
   /** Character changed this tick; send it once the tick ends. */
   dirty: boolean;
+  /** People and creatures in view at the last snapshot. */
+  crowd: number;
+  /** Spreads players' snapshots over the ticks when they are not sent every tick. */
+  phase: number;
 }
 
 /** Anything that strolls about a home spot: creatures and NPCs. */
@@ -223,6 +244,8 @@ export class Region {
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   private townsfolk: Townsperson[];
   private tickCount = 0;
+  /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
+  strain = 0;
 
   private readonly hooks: RegionHooks;
   private readonly trades: TradeDesk;
@@ -480,7 +503,7 @@ export class Region {
       y = at.y;
     }
     const p: PlayerState = {
-      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, ...carry,
+      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), ...carry,
     };
     this.players.set(info.id, p);
     this.welcome(p);
@@ -588,6 +611,11 @@ export class Region {
     const all = [...this.players.values()];
     const online = this.hooks.online();
     for (const p of all) {
+      const every = snapshotEvery(p.crowd, this.strain);
+      if (every > 1 && (this.tickCount + p.phase) % every !== 0) {
+        this.flush(p);
+        continue;
+      }
       const near = (x: number, y: number) => Math.abs(x - p.x) <= VIEW_RADIUS && Math.abs(y - p.y) <= VIEW_RADIUS;
       const players: EntityState[] = [];
       for (const other of all) {
@@ -614,6 +642,7 @@ export class Region {
       for (const n of this.townsfolk) {
         if (near(n.x, n.y)) npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
       }
+      p.crowd = players.length + creatures.length;
       p.conn.send({
         t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, bodies, npcs, online,
       });

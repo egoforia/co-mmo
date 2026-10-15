@@ -1,4 +1,5 @@
 import { hostname } from 'node:os';
+import { TICK_SECONDS } from '@co-mmo/shared';
 import type { ServerLoad } from './region-link.ts';
 
 /** How many recent ticks the averages cover (5 s at 20 ticks a second). */
@@ -36,6 +37,18 @@ export class LoadMeter {
     this.errors++;
     this.lastError = (err as Error)?.message ?? String(err);
     console.error(`${label}:`, err);
+  }
+
+  /**
+   * How pressed this process is: 0 while ticks take under half the time
+   * between them, 1 past half, 2 past four fifths. Regions send snapshots
+   * less often to match (see snapshotEvery).
+   */
+  get strain(): number {
+    const times = this.times.slice(-20);
+    if (!times.length) return 0;
+    const share = times.reduce((a, b) => a + b, 0) / times.length / (TICK_SECONDS * 1000);
+    return share > 0.8 ? 2 : share > 0.5 ? 1 : 0;
   }
 
   load(): ServerLoad {

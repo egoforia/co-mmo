@@ -13,6 +13,7 @@ import { createApp, type App } from '../src/app.ts';
 import type { ChatModel } from '../src/ai/chat.ts';
 import { OfflineGod } from '../src/god.ts';
 import type { ImageProvider } from '../src/assets/provider.ts';
+import type { VideoProvider } from '../src/assets/video.ts';
 import { Store } from '../src/store.ts';
 import type { Updater } from '../src/updates.ts';
 import type { BuildOptions } from '../src/builds.ts';
@@ -67,6 +68,8 @@ export const fakeMailer = (): Mailer & { sent: Mail[] } => ({
 export async function start(opts: {
   store?: Store; chat?: () => ChatModel[]; compiler?: () => ChatModel[]; painter?: ImageProvider | null; now?: () => number;
   updater?: Updater; builds?: BuildOptions; env?: Record<string, string>; mailer?: Mailer; fetch?: typeof fetch;
+  /** Art: the shipped manifest, the anchors, and a video model with its frame cutter. */
+  shippedArt?: string; anchorDir?: string; video?: VideoProvider; frames?: (mp4: Buffer) => Promise<Buffer[]>;
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-art-'));
@@ -78,9 +81,12 @@ export async function start(opts: {
     commit: 'abc1234',
     builds: opts.builds ?? { issues: null },
     auth: { mailer: opts.mailer ?? fakeMailer(), ...(opts.fetch ? { fetch: opts.fetch } : {}) },
+    ...(opts.shippedArt ? { shippedArt: opts.shippedArt } : {}),
+    videoProvider: () => opts.video,
+    ...(opts.frames ? { videoFrames: opts.frames } : {}),
     wishes: {
       env: opts.env ?? {},
-      anchorDir: '/nonexistent',
+      anchorDir: opts.anchorDir ?? '/nonexistent',
       artDir,
       chatModel: opts.chat ?? (() => [new OfflineGod()]),
       ...(opts.compiler ? { compilerModel: opts.compiler } : {}),

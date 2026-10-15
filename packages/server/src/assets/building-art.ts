@@ -121,7 +121,9 @@ export async function paintBuildingArt(
   const references: GeneratedImage[] = [];
   if (job.kind === 'exterior') references.push({ mimeType: 'image/png', data: await layoutSketch() });
   for (const ref of job.references) {
-    for (const path of [resolve(dirs.rawDir, `${ref}.png`), resolve(dirs.anchorDir, 'raw', `${ref}.png`), resolve(dirs.anchorDir, `${ref}.png`)]) {
+    // The shipped buildings' untouched pictures sit beside the anchors, for repainting a shipped building's inside.
+    const shipped = resolve(dirs.anchorDir, '..', 'buildings', 'raw', `${ref}.png`);
+    for (const path of [resolve(dirs.rawDir, `${ref}.png`), shipped, resolve(dirs.anchorDir, 'raw', `${ref}.png`), resolve(dirs.anchorDir, `${ref}.png`)]) {
       const data = await readFile(path).catch(() => undefined);
       if (!data) continue;
       references.push({ mimeType: 'image/png', data });

@@ -329,6 +329,16 @@ export interface CharacterMessage {
   character: Character;
 }
 
+/**
+ * Walks were painted or painted again while you play: fetch the art list
+ * again and swap these walk strips in, so walkers on screen step with them.
+ */
+export interface ArtMessage {
+  t: 'art';
+  /** The walk strips that changed, by art key. */
+  walks: string[];
+}
+
 /** Something happened to you worth a line in the log ("+7 XP"). */
 export interface NoticeMessage {
   t: 'notice';
@@ -414,6 +424,7 @@ export type ServerMessage =
   | HitMessage
   | CharacterMessage
   | NoticeMessage
+  | ArtMessage
   | DialogueMessage
   | SnapshotMessage
   | ChatMessage

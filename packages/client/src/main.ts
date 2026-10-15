@@ -120,11 +120,12 @@ function play(token: string): void {
   // Hands and grips found since: a newly painted look or a new sword shows in hand without a reload.
   setInterval(() => void points().then((p) => scene?.setPoints(p)), 3 * 60_000);
   // Shipped art wins over painted art, except what the Owner had painted again in God's View.
-  const art: Promise<ArtManifest> = Promise.all([manifest('/api/art'), manifest('/art/manifest.json')]).then(([painted, shipped]) => ({
+  const allArt = (): Promise<ArtManifest> => Promise.all([manifest('/api/art'), manifest('/art/manifest.json')]).then(([painted, shipped]) => ({
     ...painted,
     ...shipped,
     ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)),
   }));
+  const art = allArt();
 
   const connection = new GameConnection(token, onMessage, (reason, code) => {
     if (code === 4003) {
@@ -223,6 +224,10 @@ function play(token: string): void {
         break;
       case 'notice':
         chat?.add({ kind: 'system', text: message.text });
+        break;
+      case 'art':
+        // New walks were painted: walkers on screen pick them up without a reload.
+        void allArt().then((m) => scene?.updateWalks(m, message.walks));
         break;
       case 'dialogue':
         sound.play('talk');

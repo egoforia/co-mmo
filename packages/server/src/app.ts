@@ -154,6 +154,8 @@ export function createApp(options: AppOptions): App {
     video,
     spendVideo: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'video', provider: provider.id, model: provider.model, playerId: null }),
     ...(options.videoFrames ? { toFrames: options.videoFrames } : {}),
+    // Pages already open load the new walks without a reload.
+    onPainted: (walks) => world.broadcast({ t: 'art', walks }),
   });
   // Sound effects from ElevenLabs and music from Google's Lyria, as chosen in God's View.
   const sound = () => soundSettings(store.settings, env);

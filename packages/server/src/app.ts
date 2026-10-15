@@ -133,7 +133,7 @@ export function createApp(options: AppOptions): App {
   const buildingPainter = new BuildingPainter(painterOptions);
   // Walks use Google's Veo on the Gemini key, with the model chosen on the AI models tab.
   const chosenVideo = options.videoProvider ?? (() => {
-    const v = videoSettings(store.settings);
+    const v = videoSettings(store.settings, env);
     return v.provider === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
   });
   const video = () => {

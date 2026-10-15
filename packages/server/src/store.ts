@@ -148,9 +148,9 @@ export const DEFAULT_DAILY_USD = 10;
 export type ArtUse = 'wishes' | 'buildings' | 'scenery' | 'walks';
 export const ART_USES: ArtUse[] = ['wishes', 'buildings', 'scenery', 'walks'];
 
-/** The video model in use: the saved choice, or Veo Lite when images come from Gemini. */
-export function videoSettings(settings: Settings): { provider: 'gemini' | 'none'; model: string } {
-  return settings.ai.video ?? (settings.ai.image.provider === 'gemini' ? { provider: 'gemini', model: 'veo-3.1-lite-generate-preview' } : { provider: 'none', model: '' });
+/** The video model in use: the saved choice, or Veo Lite when the Gemini key is set (as walks worked before the choice existed). */
+export function videoSettings(settings: Settings, env: NodeJS.ProcessEnv): { provider: 'gemini' | 'none'; model: string } {
+  return settings.ai.video ?? (env.GEMINI_API_KEY ? { provider: 'gemini', model: 'veo-3.1-lite-generate-preview' } : { provider: 'none', model: '' });
 }
 
 export interface SoundSettings {

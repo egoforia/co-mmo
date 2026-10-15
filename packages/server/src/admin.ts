@@ -234,7 +234,7 @@ export async function handleAdmin(
   if (route === 'ai' && method === 'GET') {
     if (ownerOnly()) return true;
     return json(res, 200, {
-      ai: { ...store.settings.ai, video: videoSettings(store.settings), sound: soundSettings(store.settings, ctx.env) },
+      ai: { ...store.settings.ai, video: videoSettings(store.settings, ctx.env), sound: soundSettings(store.settings, ctx.env) },
       providers: PROVIDERS.map((id) => ({
         id,
         keySet: id === 'offline' || Boolean(ctx.env[KEY_ENV[id as Exclude<ProviderId, 'offline'>]]),
@@ -276,7 +276,7 @@ export async function handleAdmin(
     const chosen = Object.fromEntries(ART_USES.flatMap((u) => (typeof uses[u] === 'string' && (uses[u] as string).trim() ? [[u, (uses[u] as string).trim().slice(0, 80)]] : [])));
     if (image.provider === 'gemini' && Object.keys(chosen).length) image.uses = chosen;
     const vid = body?.video as Record<string, unknown> | undefined;
-    const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings)
+    const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings, ctx.env)
       : vid.provider === 'gemini' ? { provider: 'gemini', model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
       : { provider: 'none', model: '' };
     const sound = soundChoice(body?.sound, soundSettings(store.settings, ctx.env));

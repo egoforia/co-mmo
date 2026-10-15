@@ -155,7 +155,7 @@ export const DEFAULT_BUILDS: BuildSettings = { agent: 'claude', dailyLimit: 3, u
 export interface SpendRecord {
   at: number;
   usd: number;
-  kind: 'chat' | 'image' | 'build';
+  kind: 'chat' | 'image' | 'video' | 'build';
   provider: string;
   model: string;
   playerId: string | null;

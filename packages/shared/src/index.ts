@@ -14,3 +14,4 @@ export * from './kit.ts';
 export * from './content.ts';
 export * from './workshop.ts';
 export * from './walk-rig.ts';
+export * from './walk.ts';

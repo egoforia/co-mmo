@@ -19,8 +19,8 @@ export interface ArtJob {
   asset: string;
   /** What it is, in words: "Mara walking left". */
   label: string;
-  /** A picture from the image model or a clip from the video model. */
-  media: 'picture' | 'clip';
+  /** A picture from the image model, a clip from the video model, or a sound effect or music. */
+  media: 'picture' | 'clip' | 'sound';
   source: ArtJobSource;
   status: ArtJobStatus;
   /** About what it will cost, before it is painted. */

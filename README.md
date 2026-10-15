@@ -215,7 +215,8 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
-| `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`) and wish art |
+| `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`), wish art, walks (Veo) and each land's music (Lyria) |
+| `ELEVENLABS_API_KEY` | none | ElevenLabs: the game's sound effects; without it the game plays music only |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none | Optional: OpenAI or any OpenAI-compatible service |
 | `GITHUB_ISSUES_TOKEN` | none | Fine-grained GitHub token with only Issues read and write on the game's repository; lets approved Engine wishes become issues for the coding agent |
@@ -269,6 +270,19 @@ model frames water as a pool with banks.
 creatures, 128×192 characters, 192×256 trees, larger set pieces) in
 `packages/client/public/art/`, with a `manifest.json` the client loads. It
 needs no API key; run it after adding or changing anchors.
+
+## Sound and music
+
+Sounds are made by AI services from descriptions, like pictures: nothing is
+synthesized in code. `packages/shared/src/sounds.ts` describes every sound
+effect (`SOUND_EFFECTS`) and each land's music (`MUSIC`). When the server
+starts it makes whatever is missing: effects with ElevenLabs (about $0.002 a
+second of sound) and one 30-second track per land with Google's Lyria 3 on
+the Gemini key ($0.04 a track). ffmpeg (already needed for walks) trims each
+sound, evens out how loud it is, and blends each track's end over its start
+so it loops without a seam. The services are chosen on God's View's AI models
+tab, and the Art tab plays every sound and can make any of them again.
+Players set effects and music volume with the Sound button.
 
 ## Develop
 

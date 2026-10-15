@@ -13,6 +13,7 @@
       <span id="hud-name"></span>
       <span id="hud-online"></span>
       <a id="gods-view-link" href="/gods-view.html" target="_blank" hidden>God's View</a>
+      <button id="sound-button" type="button" aria-expanded="false">Sound</button>
       <button id="invite-button" type="button">Invite a friend</button>
       <button id="account-button" type="button">Account</button>
     </div>
@@ -58,6 +59,11 @@
         <input id="chat-input" maxlength="280" placeholder="Press Enter to talk" />
       </form>
     </div>
+
+    <form id="sound-panel" hidden>
+      <label>Effects <input name="effects" type="range" min="0" max="1" step="0.05" /></label>
+      <label>Music <input name="music" type="range" min="0" max="1" step="0.05" /></label>
+    </form>
 
     <div id="panel" class="panel" hidden></div>
     <div id="toast" role="status" hidden></div>

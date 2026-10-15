@@ -4,7 +4,7 @@ import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import { DEFAULT_BUILDS, DEFAULT_WORKSHOP, type Account, type BuildSettings, type ModelChoice, type Settings, type Store } from './store.ts';
+import { DEFAULT_BUILDS, DEFAULT_WORKSHOP, soundSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
 import { ArtRequestError, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
@@ -229,7 +229,7 @@ export async function handleAdmin(
   if (route === 'ai' && method === 'GET') {
     if (ownerOnly()) return true;
     return json(res, 200, {
-      ai: store.settings.ai,
+      ai: { ...store.settings.ai, sound: soundSettings(store.settings, ctx.env) },
       providers: PROVIDERS.map((id) => ({
         id,
         keySet: id === 'offline' || Boolean(ctx.env[KEY_ENV[id as Exclude<ProviderId, 'offline'>]]),
@@ -237,6 +237,7 @@ export async function handleAdmin(
         defaultModel: DEFAULT_MODELS[id],
       })),
       imageKeySet: Boolean(ctx.env.GEMINI_API_KEY),
+      effectsKeySet: Boolean(ctx.env.ELEVENLABS_API_KEY),
     }), true;
   }
 
@@ -251,7 +252,8 @@ export async function handleAdmin(
     const image: Settings['ai']['image'] = img?.provider === 'gemini'
       ? { provider: 'gemini', model: typeof img.model === 'string' && img.model ? img.model.slice(0, 80) : 'gemini-2.5-flash-image' }
       : { provider: 'none', model: '' };
-    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image } });
+    const sound = soundChoice(body?.sound, soundSettings(store.settings, ctx.env));
+    store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image, sound } });
     return json(res, 200, { ok: true }), true;
   }
 
@@ -307,6 +309,10 @@ export async function handleAdmin(
     try {
       if (route === 'art/paint' && method === 'POST') {
         const done = await ctx.art.repaint(String(body?.asset ?? ''), typeof body?.note === 'string' ? body.note : '');
+        return json(res, 202, { ok: true, ...done }), true;
+      }
+      if (route === 'art/sound' && method === 'POST') {
+        const done = await ctx.art.sound(String(body?.sound ?? ''), typeof body?.note === 'string' ? body.note : '');
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/walk' && method === 'POST') {
@@ -415,5 +421,18 @@ function modelChoice(raw: unknown): ModelChoice | null {
 
 /** The company that bills each provider id, as the Owner sees it on their invoices. */
 function providerName(provider: string): string {
-  return ({ gemini: 'Google (Gemini)', anthropic: 'Anthropic (Claude)', 'claude-code': 'Anthropic (Claude)', openai: 'OpenAI' } as Record<string, string>)[provider] ?? provider;
+  return ({ gemini: 'Google (Gemini)', anthropic: 'Anthropic (Claude)', 'claude-code': 'Anthropic (Claude)', openai: 'OpenAI', elevenlabs: 'ElevenLabs' } as Record<string, string>)[provider] ?? provider;
+}
+
+/** The sound services God's View chose; anything missing or unknown keeps what was set. */
+function soundChoice(raw: unknown, current: SoundSettings): SoundSettings {
+  const r = (raw ?? {}) as { effects?: { provider?: unknown; model?: unknown }; music?: { provider?: unknown; model?: unknown } };
+  const model = (m: unknown, fallback: string) => (typeof m === 'string' && m.trim() ? m.trim().slice(0, 80) : fallback);
+  const effects: SoundSettings['effects'] = r.effects?.provider === 'elevenlabs'
+    ? { provider: 'elevenlabs', model: model(r.effects.model, 'eleven_text_to_sound_v2') }
+    : r.effects?.provider === 'none' ? { provider: 'none', model: '' } : current.effects;
+  const music: SoundSettings['music'] = r.music?.provider === 'gemini'
+    ? { provider: 'gemini', model: model(r.music.model, 'lyria-3-clip-preview') }
+    : r.music?.provider === 'none' ? { provider: 'none', model: '' } : current.music;
+  return { effects, music };
 }

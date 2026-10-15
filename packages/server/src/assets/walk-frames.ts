@@ -125,6 +125,8 @@ export interface CutOptions {
   reach?: number;
   /** Figures closer than this share of the picture's width count as crowded. Default 0.01. */
   minGap?: number;
+  /** Drop loose shapes that run off the picture's edge: bits of a neighbour cut off when the picture was cropped. */
+  dropEdgeBits?: boolean;
 }
 
 /**
@@ -152,7 +154,9 @@ export async function cutFigures(png: Buffer, options: CutOptions): Promise<CutF
   const reach = img.width * (options.reach ?? 0.04);
   const members = seeds.map((s) => [s]);
   const boxes = seeds.map((s) => s.box);
+  const onEdge = (b: Box) => b.left === 0 || b.top === 0 || b.right === img.width - 1 || b.bottom === img.height - 1;
   for (const loose of rest) {
+    if (options.dropEdgeBits && onEdge(loose.box)) continue;
     let best = -1, bestGap = Infinity;
     seeds.forEach((s, i) => {
       const g = gap(loose.box, s.box);
@@ -183,10 +187,17 @@ export async function cutFigures(png: Buffer, options: CutOptions): Promise<CutF
         if (nextToFigure(out, x - box.left, y - box.top)) img.data.copy(out.data, o, (y * img.width + x) * 4, (y * img.width + x) * 4 + 4);
       }
     }
-    const touchesEdge = box.left === 0 || box.top === 0 || box.right === img.width - 1 || box.bottom === img.height - 1;
+    const touchesEdge = onEdge(box);
     const crowded = boxes.some((b, j) => j !== i && gap(b, box) < minGap);
     return { png: await fromRaw(out), box, touchesEdge, crowded };
   }));
+}
+
+/** How many figures a transparent picture holds: shapes at least a fifth the size of the biggest. */
+export async function countFigures(png: Buffer): Promise<number> {
+  const all = shapes(await toRaw(png));
+  const biggest = Math.max(0, ...all.map((s) => s.pixels.length));
+  return all.filter((s) => s.pixels.length >= biggest * 0.2).length;
 }
 
 function nextToFigure(r: Raw, x: number, y: number): boolean {

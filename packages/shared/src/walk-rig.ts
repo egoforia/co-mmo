@@ -52,8 +52,10 @@ export interface BodyType {
   limbs: readonly RigLimb[];
   /** Body units one whole cycle carries the walker forward. */
   stride: number;
-  /** Frames a second at the game's normal walking speed. */
-  fps: number;
+  /** Frames kept from a painted walk cycle, the animation's smoothness. */
+  frames: number;
+  /** Seconds one whole cycle takes at the player's walking speed. */
+  cycleSeconds: number;
 }
 
 /** Shifts a per-step track by half a cycle: the other side's leg or arm. */
@@ -100,7 +102,8 @@ export const BODY_TYPES: Record<string, BodyType> = {
       { id: 'right-arm', anchor: [-6.5, 24, 0], lengths: [5, 5], radius: 1.8, swing: half(ARM_SWING), bend: ARM_BEND, bendForward: true },
     ],
     stride: 24,
-    fps: 10,
+    frames: 12,
+    cycleSeconds: 0.6,
   },
   'six-legged': {
     id: 'six-legged',
@@ -129,7 +132,8 @@ export const BODY_TYPES: Record<string, BodyType> = {
       { id: 'back-right', anchor: [-5, 6, -5], lengths: [5, 6], radius: 1.3, spread: 45, swing: half(TRIPOD_SWING), bend: half(TRIPOD_BEND) },
     ],
     stride: 12,
-    fps: 12,
+    frames: 12,
+    cycleSeconds: 0.5,
   },
 };
 

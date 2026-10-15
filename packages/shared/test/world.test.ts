@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARCANUM_SIZE,
   BUILDING_STYLES,
   COTTAGE_SIZE,
   OPPOSITE,
@@ -179,6 +180,61 @@ describe("Old Bramble's cottage", () => {
     expect(nearBuilding(home, home.door.x + 1, home.door.y + 1 + REVEAL_REACH - 0.5)).toBe(true);
     expect(nearBuilding(home, home.door.x + 1, home.door.y + 1 + REVEAL_REACH + 0.5)).toBe(false);
     expect(nearBuilding(home, woods.spawn.x, woods.spawn.y)).toBe(false);
+  });
+});
+
+describe('the Sanctum Arcanum', () => {
+  const shop = sanctum.buildings.find((b) => b.style === 'sanctum-arcanum')!;
+  const style = BUILDING_STYLES['sanctum-arcanum']!;
+
+  it('stands walled near the Sanctum clearing, with a pond beside it', () => {
+    expect(shop).toMatchObject({ width: ARCANUM_SIZE.width + 2, height: ARCANUM_SIZE.height + 2 });
+    expect(Math.hypot(shop.door.x - sanctum.spawn.x, shop.door.y - sanctum.spawn.y)).toBeLessThan(20);
+    for (let x = shop.x; x < shop.x + shop.width; x++) {
+      expect(tileAt(sanctum, x, shop.y)).toBe(Tile.Wall);
+      if (x !== shop.door.x && x !== shop.door.x + 1) expect(tileAt(sanctum, x, shop.y + shop.height - 1)).toBe(Tile.Wall);
+    }
+    for (let y = shop.y; y < shop.y + shop.height; y++) {
+      expect(tileAt(sanctum, shop.x, y)).toBe(Tile.Wall);
+      expect(tileAt(sanctum, shop.x + shop.width - 1, y)).toBe(Tile.Wall);
+    }
+    expect([tileAt(sanctum, shop.door.x, shop.door.y), tileAt(sanctum, shop.door.x + 1, shop.door.y)]).toEqual([Tile.Door, Tile.Door]);
+    let water = 0;
+    for (let y = shop.y - 6; y < shop.y + shop.height + 6; y++) for (let x = shop.x - 6; x < shop.x + shop.width + 6; x++) if (tileAt(sanctum, x, y) === Tile.Water) water++;
+    expect(water).toBeGreaterThan(10);
+    // The shrine is still the Sanctum's first landmark.
+    expect(sanctum.landmarks[0]!.asset).toBe('sanctum-shrine');
+  });
+
+  it('is reached by a lane from the clearing, and everywhere inside can be walked to', () => {
+    const doorstep = { x: shop.door.x + 1, y: shop.door.y + 1.5 };
+    expect(tileAt(sanctum, doorstep.x, doorstep.y)).toBe(Tile.Path);
+    const seen = reachable(sanctum, sanctum.spawn);
+    let open = 0;
+    for (let y = shop.y + 1; y < shop.y + shop.height - 1; y++) {
+      for (let x = shop.x + 1; x < shop.x + shop.width - 1; x++) {
+        if (tileAt(sanctum, x, y) !== Tile.Floor) continue;
+        open++;
+        expect(seen[y * sanctum.width + x]).toBe(1);
+      }
+    }
+    expect(open).toBeGreaterThan((ARCANUM_SIZE.width * ARCANUM_SIZE.height) / 2);
+  });
+
+  it('is furnished with the pieces its style paints, and its art covers it centred on the door', () => {
+    const furniture = sanctum.landmarks.filter((l) => l.asset.startsWith(`${style.id}-furniture-`));
+    expect(new Set(furniture.map((f) => f.asset))).toEqual(new Set(Object.keys(style.furniture).map((key) => furnitureArt(style.id, key))));
+    for (const f of furniture) {
+      expect(f.x).toBeGreaterThan(shop.x + 1);
+      expect(f.x).toBeLessThan(shop.x + shop.width - 1);
+      expect(f.y).toBeGreaterThan(shop.y + 1);
+      expect(f.y).toBeLessThan(shop.y + shop.height);
+      expect(tileAt(sanctum, f.x, f.y - 0.5)).toBe(Tile.Blocked);
+    }
+    const art = exteriorSpan(shop);
+    expect(art.left + art.width / 2).toBe(shop.door.x + 1);
+    expect(art.left).toBeLessThanOrEqual(shop.x);
+    expect(art.left + art.width).toBeGreaterThanOrEqual(shop.x + shop.width);
   });
 });
 

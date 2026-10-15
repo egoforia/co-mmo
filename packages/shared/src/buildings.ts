@@ -67,6 +67,28 @@ export const BUILDING_STYLES: Record<string, BuildingStyle> = {
     },
     references: ['woods-tree-house'],
   },
+  // Wished by egoforia (issue #42): an arcane shop by the Sanctum's pond.
+  'sanctum-arcanum': {
+    id: 'sanctum-arcanum',
+    name: 'The Sanctum Arcanum',
+    biome: 'sanctum',
+    exterior:
+      'The Sanctum Arcanum, a whimsical little arcane shop of dark timber beams and grey slate: a steep crooked slate roof with a crooked stone chimney, ' +
+      'a wooden front door whose doorframe is etched with softly glowing violet runes, a small round stone step before the door, ' +
+      'amethyst-purple lanterns hanging either side of the door, small leaded windows glowing warm gold, ' +
+      'weeping willow boughs draping over the roof, a few shimmering pale-blue motes of light drifting in the air',
+    floor: 'aged cedar floorboards in warm reddish-brown, running left to right, with faint grain and a few small knots',
+    wall: 'the top of a thick timber-framed wall: dark oak beams over grey stone, with a thin line of slate along it',
+    door: 'a worn cedar threshold running left to right, a little darker than the floorboards, with small faint violet runes carved along it',
+    furniture: {
+      counter: { name: 'counter', look: 'a heavy carved wooden shop counter with polished brass weighing scales and a few small glass vials on it', width: 3 },
+      shelf: { name: 'shelf', look: 'a tall wooden shelf crowded with glimmering crystal globes and swirling coloured tonic vials', width: 2 },
+      'display-case': { name: 'display case', look: 'a glass-topped wooden display case holding rolled scrolls and small curios', width: 2 },
+      'scrying-basin': { name: 'scrying basin', look: 'a round stone scrying basin on a short pedestal, filled with softly glowing blue water', width: 1.4 },
+      'herb-rack': { name: 'herb rack', look: 'a wooden rack hung with bundles of dried arcane herbs and a rolled star chart', width: 2 },
+      stool: { name: 'stool', look: 'a small round wooden stool with a plum velvet cushion', width: 1 },
+    },
+  },
 };
 
 /** The style whose inside tiles stand in for a building whose own are not painted yet. */

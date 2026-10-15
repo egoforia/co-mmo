@@ -3,7 +3,8 @@ import type { DraftUpdateMessage, GodMessage } from '@co-mmo/shared';
 import type { ChatModel, ChatRequest } from '../src/ai/chat.ts';
 import { artRequest } from '../src/assets/wish-art.ts';
 import { FILL_REQUEST } from '../src/god.ts';
-import { account, app, joined, pray, start, stop } from './helpers.ts';
+import { issueBody } from '../src/builds.ts';
+import { account, api, app, joined, pray, start, stop } from './helpers.ts';
 
 afterEach(stop);
 
@@ -81,7 +82,9 @@ describe('the Wish Workshop', () => {
     await draftView(c, (m) => m.view === null);
     const record = store.content.find((r) => r.title === 'Shore Fishing')!;
     expect(record).toMatchObject({ status: 'pending', tier: 'major' });
-    expect(record.conversation[0]!.content).toContain('What you get: small fish, sometimes a carp');
+    expect(record.shaped).toEqual({ category: 'Ways to play: Gathering', brief: ['Gathering: Shore Fishing', 'What you do: cast a line', 'Beside: water', 'What you get: small fish, sometimes a carp'] });
+    // Players never see the brief in the public log.
+    expect(app!.wishes.entries().find((e) => e.id === record.id)).not.toHaveProperty('shaped');
   });
 
   it('keeps a draft across a reconnect, and refuses to send one with something missing', async () => {
@@ -181,5 +184,127 @@ describe('the Wish Workshop', () => {
     expect(carried.draft.sub).toBe('gathering');
     expect(carried.draft.chat?.some((l) => l.text === 'I wish for fishing in the pond')).toBe(true);
     expect(carried.draft.chat?.at(-1)?.who).toBe('god');
+  });
+
+  it('lets a player change their look for 2 Favor; the newer look wins, and a prayer cannot make one', async () => {
+    const { store, ws } = await start();
+    const p = account(store, 'Mara');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+    const first = app!.wishes.grantLook({ id: p.id, name: 'Mara' }, 'a short wizard in a green hat');
+
+    await c.send({ t: 'draft', action: 'start', category: 'living', sub: 'look', fields: { description: 'a tall fox-eared ranger in a moss-green cloak', hook: 'fox ears poking through a hood', body: 'tall and lean', color: '#4f9a4e' } });
+    const view = (await draftView(c, (m) => m.view !== null)).view!;
+    expect(view.problems).toEqual([]);
+    expect(view.preview.card).toMatchObject({ tier: 'minor', cost: 2, title: 'Your new look', where: 'Your look, painted for everyone to see' });
+    expect(view.preview.art?.pictures[0]!.prompt).toContain('Mara');
+
+    await c.send({ t: 'draft', action: 'send' });
+    const offered = await c.waitFor<GodMessage>((m) => m.t === 'god' && Boolean((m as GodMessage).card));
+    await c.send({ t: 'wish', card: offered.card!.id, confirm: true });
+    await draftView(c, (m) => m.view === null);
+    const look = app!.wishes.lookOf(p.id)!;
+    expect(look.id).not.toBe(first.id);
+    expect(look).toMatchObject({ status: 'granted', favor: 2, definition: { kind: 'player', name: 'Mara' } });
+    // Rolling the new look back brings the old one back.
+    app!.wishes.rollback(look.id);
+    expect(app!.wishes.lookOf(p.id)!.id).toBe(first.id);
+
+    // The God's own cards go through validateDefinition, which never makes a look.
+    const made = app!.wishes.cardFor(p.id, { tier: 'minor', title: 'Their look', summary: '', definition: { kind: 'player', name: 'Ilya', description: 'a frog', look: {} } }, 'the Sanctum');
+    expect(made).toMatchObject({ card: { tier: 'major' } });
+  });
+
+  it('paints one paid sample only when the Owner allows it, and uses it as the art when the wish is sent unchanged', async () => {
+    const { store, ws, painter } = await start();
+    const p = account(store, 'Mara');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+    const pebble = { name: 'Lucky Pebble', description: 'A smooth pebble that hums.', hook: 'a tiny glowing rune', body: 'a smooth river pebble', color: '#2c7fa8' };
+    await c.send({ t: 'draft', action: 'start', category: 'carry', sub: 'keepsake', fields: pebble });
+    const off = (await draftView(c, (m) => m.view !== null)).view!;
+    // Switched off (the default): no sample is offered, and asking for one paints nothing.
+    expect(off.preview.art?.sample).toBeUndefined();
+    await c.send({ t: 'draft', action: 'sample' });
+    expect((await draftView(c, (m) => Boolean(m.god))).view!.draft.chat?.at(-1)?.text).toBe('Samples are switched off in this world.');
+    expect((painter as any).calls).toBe(0);
+
+    store.updateSettings({ ...store.settings, workshop: { samples: true, sampleFavor: 1 } });
+    await c.send({ t: 'draft', action: 'edit', fields: pebble });
+    const on = (await draftView(c, (m) => m.view !== null)).view!;
+    expect(on.preview.art?.sample).toEqual({ favor: 1 });
+    const favor = app!.world.regionOf(p.id)!.character(p.id)!.favor;
+
+    await c.send({ t: 'draft', action: 'sample' });
+    const sampled = (await draftView(c, (m) => Boolean(m.god))).view!;
+    expect((painter as any).calls).toBe(1);
+    expect(sampled.preview.art?.sample).toMatchObject({ current: true, blocked: 'Each draft gets one sample, and this one has had it.' });
+    expect(sampled.preview.art?.sample?.url).toMatch(new RegExp(`^/wished-art/samples/${p.id}\\.png`));
+    expect(app!.world.regionOf(p.id)!.character(p.id)!.favor).toBe(favor - 1);
+    expect(store.spendThisMonth(Date.now())).toMatchObject([{ kind: 'image', sample: true, playerId: p.id }]);
+
+    await c.send({ t: 'draft', action: 'send' });
+    const offered = await c.waitFor<GodMessage>((m) => m.t === 'god' && Boolean((m as GodMessage).card));
+    await c.send({ t: 'wish', card: offered.card!.id, confirm: true });
+    await draftView(c, (m) => m.view === null);
+    await Promise.all([...app!.wishes.painting]);
+    const record = store.content.find((r) => r.title === 'Lucky Pebble')!;
+    // The sample became the art: nothing was painted twice.
+    expect((painter as any).calls).toBe(1);
+    expect(record.art).toMatch(new RegExp(`^/wished-art/${record.id}\\.png`));
+    expect(record.artPrompts?.[record.id]?.prompt).toBe(sampled.preview.art!.pictures[0]!.prompt);
+  });
+
+  it('lets a Steward reword a picture\'s prompt and paint it again; a plain repaint stays the Owner\'s', async () => {
+    const { store, ws, base, painter } = await start();
+    const p = account(store, 'Mara');
+    const steward = account(store, 'Ilya', 'steward');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+    await c.send({ t: 'draft', action: 'start', category: 'carry', sub: 'keepsake', fields: { name: 'Lucky Pebble', description: 'A smooth pebble.', hook: 'a rune', body: 'a pebble', color: '#8a8aa0' } });
+    await draftView(c, (m) => m.view !== null);
+    await c.send({ t: 'draft', action: 'send' });
+    const offered = await c.waitFor<GodMessage>((m) => m.t === 'god' && Boolean((m as GodMessage).card));
+    await c.send({ t: 'wish', card: offered.card!.id, confirm: true });
+    await draftView(c, (m) => m.view === null);
+    await Promise.all([...app!.wishes.painting]);
+    const record = store.content.find((r) => r.title === 'Lucky Pebble')!;
+
+    expect((await api(base, `/api/admin/content/${record.id}/paint`, steward.token, 'POST')).status).toBe(403);
+    const words = 'A smooth grey river pebble with one glowing blue rune, on flat magenta.';
+    const res = await api(base, `/api/admin/content/${record.id}/paint`, steward.token, 'POST', { picture: record.id, prompt: words });
+    expect(res.status).toBe(202);
+    await Promise.all([...app!.wishes.painting]);
+    expect((painter as any).prompts.at(-1)).toBe(words);
+    expect(store.contentById(record.id)!.artPrompts?.[record.id]?.prompt).toBe(words);
+  });
+
+  it('gives a Workshop brief to the rule drafter and to the coding agent\'s issue', async () => {
+    const asked: ChatRequest[] = [];
+    const compiler: ChatModel = {
+      provider: 'gemini',
+      model: 'fake-compiler',
+      async complete(request) {
+        asked.push(request);
+        throw new Error('not today');
+      },
+    };
+    const { store, ws } = await start({ compiler: () => [compiler] });
+    const p = account(store, 'Ilya');
+    const c = await joined(ws, p.token);
+    await draftView(c, (m) => m.view === null);
+    await c.send({ t: 'draft', action: 'start', category: 'play', sub: 'gathering', fields: { name: 'Shore Fishing', what: 'cast a line', where: 'water', reward: 'small fish' } });
+    await draftView(c, (m) => m.view !== null);
+    await c.send({ t: 'draft', action: 'send' });
+    const offered = await c.waitFor<GodMessage>((m) => m.t === 'god' && Boolean((m as GodMessage).card));
+    await c.send({ t: 'wish', card: offered.card!.id, confirm: true });
+    await draftView(c, (m) => m.view === null);
+    await Promise.allSettled([...app!.wishes.drafts]);
+    expect(asked[0]!.messages[0]!.content).toContain("The player's brief, written in the Wish Workshop:\nGathering: Shore Fishing\nWhat you do: cast a line");
+
+    const record = store.content.find((r) => r.title === 'Shore Fishing')!;
+    const body = issueBody(record, { state: 'queued', at: 0 }, 'claude');
+    expect(body).toContain("## The player's brief");
+    expect(body).toContain('> What you get: small fish');
   });
 });

@@ -230,6 +230,8 @@ export function createApp(options: AppOptions): App {
     if (art && req.method === 'GET') return serveFile(join(options.wishes.artDir, `${art[1]}.png`), res);
     const building = path.match(/^\/wished-art\/buildings\/([\w-]+\.(?:png|webp))$/);
     if (building && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'buildings', building[1]!), res);
+    const sample = path.match(/^\/wished-art\/samples\/([\w-]+)\.png$/);
+    if (sample && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'samples', `${sample[1]}.png`), res);
     const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
     if (kit && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'biomes', kit[1]!), res);
 
@@ -336,6 +338,7 @@ export function createApp(options: AppOptions): App {
             : parsed.action === 'ask' ? workshop.ask(who, parsed.say ?? '', parsed.fields, parsed.locked)
               : parsed.action === 'fill' ? workshop.fill(who, parsed.fields, parsed.locked)
                 : parsed.action === 'shape' ? workshop.shape(who)
+                  : parsed.action === 'sample' ? workshop.sample(who)
                   : parsed.action === 'send' ? workshop.send(who) : workshop.drop(who);
         done.catch((err) => console.error('Workshop failed:', err));
       } else {

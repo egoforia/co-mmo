@@ -116,8 +116,11 @@ export async function paintWish(
   provider: ImageProvider,
   anchorDir: string,
   artDir: string,
+  /** A Steward's or the Owner's own wording, in place of the built prompt. */
+  prompt?: string,
 ): Promise<{ request: ArtRequest; image: GeneratedImage }> {
-  const request = artRequest(def, biome);
+  const built = artRequest(def, biome);
+  const request = prompt ? { ...built, prompt } : built;
   const references: GeneratedImage[] = [];
   const sent: string[] = [];
   for (const ref of request.references) {

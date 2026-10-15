@@ -12,6 +12,7 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
   ability: { name: 'Moonbolt', description: 'A bolt of moonlight.', effect: 'bolt', ...look },
   creature: { name: 'Lantern Moth', description: 'A moth.', behavior: 'chase', level: 2, count: 3, drops: ['tonic'], ...look },
   person: { name: 'Old Wren', description: 'A birdwatcher.', greeting: 'Shh, the wrens!', ...look },
+  look: { description: 'A tall fox-eared ranger in a moss-green cloak.', ...look },
   gathering: { name: 'Fishing', what: 'cast a line', where: 'water', reward: 'fish' },
   'item-magic': { name: 'Gull Whistle', item: 'a seashell', what: 'a gull brings a fish' },
   hunting: { name: 'Scarab Gems', which: 'sun scarabs', reward: 'a gem sometimes' },
@@ -41,7 +42,7 @@ describe('the Wish Workshop categories', () => {
 
   it('says plainly what is missing, and never throws', () => {
     expect(checkDraft({ category: 'carry', sub: 'potion', fields: {} }).problems).toEqual([
-      'Give it a name.', 'Fill in "What it is, in a sentence or two".', 'Describe the one feature you would know it by.', 'Describe its body and shape.',
+      'Give it a name.', 'Fill in "What it is, in a sentence or two".', 'Describe the one feature you would know it by.', 'Describe its body and shape.', 'Choose its main colour.',
     ]);
     expect(checkDraft({ category: 'nope', sub: 'nope', fields: {} }).problems).toEqual(['Pick what kind of wish this is.']);
     const recipe = checkDraft({ category: 'know', sub: 'recipe', fields: { ...SAMPLES.recipe, result: 'goat-horn' } });

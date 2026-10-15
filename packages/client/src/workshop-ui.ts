@@ -48,6 +48,7 @@ export class WorkshopUi {
       const target = e.target as HTMLInputElement;
       if (!target.closest('.ws-form')) return;
       // What the player writes is theirs: the God will not change it.
+      delete target.dataset.unset;
       const key = target.name.replace(/-qty$/, '');
       if (key && !this.locked.has(key)) {
         this.locked.add(key);
@@ -121,6 +122,16 @@ export class WorkshopUi {
     }
     const choice = target.closest<HTMLElement>('[data-choice]');
     if (choice) return this.ask(choice.dataset.choice!);
+    if (target.closest('[data-sample]')) {
+      if (this.waiting || !this.view) return;
+      const favor = this.view.preview.art?.sample?.favor ?? 0;
+      if (!confirm(`Paint one sample for ${favor} Favor? If you send the wish without changing how it looks, the sample becomes its picture.`)) return;
+      window.clearTimeout(this.timer);
+      this.actions.draft({ action: 'edit', ...this.current() });
+      this.waiting = true;
+      this.actions.draft({ action: 'sample' });
+      return this.render();
+    }
     if (target.closest('[data-fill]')) {
       if (this.waiting || !this.view) return;
       window.clearTimeout(this.timer);
@@ -210,7 +221,12 @@ export class WorkshopUi {
         const list = Array.isArray(value) ? value : [];
         inputs.forEach((i, n) => { i.value = typeof list[n] === 'string' ? list[n] : ''; });
       } else if (inputs[0]) {
-        inputs[0].value = typeof value === 'string' || typeof value === 'number' ? String(value) : field.kind === 'color' ? '#c8a2c8' : '';
+        const given = typeof value === 'string' || typeof value === 'number';
+        inputs[0].value = given ? String(value) : field.kind === 'color' ? '#c8a2c8' : '';
+        if (field.kind === 'color') {
+          if (given) delete inputs[0].dataset.unset;
+          else inputs[0].dataset.unset = '';
+        }
       }
     }
   }
@@ -288,7 +304,7 @@ export class WorkshopUi {
         const qty = [...form.querySelectorAll<HTMLInputElement>(`[name="${field.key}-qty"]`)];
         fields[field.key] = inputs.map((i, n) => ({ item: i.value, qty: Number(qty[n]?.value) || 1 })).filter((m) => m.item);
       } else if (field.kind === 'items') fields[field.key] = inputs.map((i) => i.value).filter(Boolean);
-      else if (inputs[0]?.value) fields[field.key] = field.kind === 'number' ? Number(inputs[0].value) : inputs[0].value;
+      else if (inputs[0]?.value && !inputs[0].dataset.unset) fields[field.key] = field.kind === 'number' ? Number(inputs[0].value) : inputs[0].value;
     }
     return fields;
   }
@@ -311,7 +327,8 @@ function fieldHtml(field: WorkshopField, value: unknown): string {
     case 'long':
       return `<p>${label}<textarea id="${id}" name="${field.key}" rows="2" maxlength="${field.length ?? 400}"${hint}>${v}</textarea></p>`;
     case 'color':
-      return `<p>${label}<input id="${id}" name="${field.key}" type="color" value="${v || '#c8a2c8'}"></p>`;
+      // A colour picker always holds a colour; an untouched one is not sent, so the player's words decide.
+      return `<p>${label}<input id="${id}" name="${field.key}" type="color" value="${v || '#c8a2c8'}"${v ? '' : ' data-unset'}></p>`;
     case 'number':
       return `<p>${label}<input id="${id}" name="${field.key}" type="number" min="${field.min}" max="${field.max}" value="${v}" placeholder="${field.min} to ${field.max}"></p>`;
     case 'choice':
@@ -377,7 +394,19 @@ function artHtml(art: NonNullable<DraftView['preview']['art']>): string {
     ${art.notice ? `<p class="ws-note">${escapeHtml(art.notice)}</p>` : ''}
     ${who ? `<p class="ws-note">${who} Your words are marked in the prompt; the rest comes from the Style Bible.</p>` : ''}
     <figure class="ws-placeholder"><img src="art/${escapeHtml(art.placeholder)}.png" alt=""><figcaption>Until it is painted, it looks like this.</figcaption></figure>
+    ${art.sample ? sampleHtml(art.sample) : ''}
     ${art.pictures.map((p) => pictureHtml(p, art.mine)).join('')}`;
+}
+
+/** A painted sample, or the button to paint one (only when the Owner has switched samples on). */
+function sampleHtml(sample: NonNullable<NonNullable<DraftView['preview']['art']>['sample']>): string {
+  if (sample.url) {
+    const caption = sample.current
+      ? 'Your sample. Send the wish as it is, and this becomes its picture.'
+      : 'Your sample, from before your last changes. The wish will be painted again when it is granted.';
+    return `<figure class="ws-sample"><img src="${escapeHtml(sample.url)}" alt="A painted sample"><figcaption>${caption}</figcaption></figure>`;
+  }
+  return `<p class="ws-sample-ask"><button type="button" class="quiet" data-sample${sample.blocked ? ' disabled' : ''}>Paint a sample · ${sample.favor} Favor</button>${sample.blocked ? `<small>${escapeHtml(sample.blocked)}</small>` : '<small>One per draft. Real painting costs real money, so this is the only paid part of a preview.</small>'}</p>`;
 }
 
 function pictureHtml(p: PicturePreview, mine: string[]): string {

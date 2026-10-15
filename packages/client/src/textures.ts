@@ -6,8 +6,10 @@ import {
   TILE_PIXELS,
   Tile,
   buildingArt,
+  biomeLook as sharedLook,
   hashString,
   type BiomeId,
+  type BiomeLook,
   type BuildingPart,
   type RegionDef,
 } from '@co-mmo/shared';
@@ -22,49 +24,12 @@ const T = TILE_PIXELS;
 export const TILE_MARGIN = 2;
 const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Floor, Tile.Wall, Tile.Door];
 
-interface BiomeLook {
-  ground: string;
-  path: string;
-  water: string;
-  /** The biome kit's tree (or palm, or cactus) and rock sprites. */
-  trees: string[];
-  rocks: string[];
-}
-
-const LOOKS: Record<string, BiomeLook> = {
-  sanctum: {
-    ground: 'sanctum-meadow',
-    path: 'sanctum-flagstones',
-    water: 'sanctum-pond',
-    trees: ['sanctum-blossom-tree-a', 'sanctum-blossom-tree-b'],
-    rocks: ['sanctum-rock'],
-  },
-  'whispering-woods': {
-    ground: 'woods-moss',
-    path: 'woods-path',
-    water: 'woods-pool',
-    trees: ['woods-tree-a', 'woods-tree-b'],
-    rocks: ['woods-rock'],
-  },
-  'sunlit-shore': {
-    ground: 'shore-sand',
-    path: 'shore-sand',
-    water: 'shore-sea',
-    trees: ['shore-palm-a', 'shore-palm-b'],
-    rocks: ['shore-rock'],
-  },
-  'mirage-desert': {
-    ground: 'desert-dunes',
-    path: 'desert-dunes',
-    water: 'desert-oasis',
-    trees: ['desert-cactus-a', 'desert-cactus-b'],
-    rocks: ['desert-rock'],
-  },
-};
-
+/** How a biome is drawn; a wished biome's kit is painted when its first region is wished. */
 export function biomeLook(biome: string): BiomeLook {
-  return LOOKS[biome] ?? LOOKS.sanctum!;
+  return sharedLook((BIOMES[biome as BiomeId] ? biome : 'sanctum') as BiomeId);
 }
+
+const SANCTUM = sharedLook('sanctum');
 
 export function lightTint(biome: string): number {
   return BIOMES[biome as BiomeId]?.lightTint ?? 0xffffff;
@@ -81,10 +46,11 @@ function loaded(scene: Phaser.Scene, ...ids: string[]): string | undefined {
  * they can overlap and depth-sort with players.
  */
 export function registerTileset(scene: Phaser.Scene, def: RegionDef): string {
-  const key = `tileset-${def.id}`;
-  if (scene.textures.exists(key)) return key;
   const look = biomeLook(def.biome);
-  const sanctum = LOOKS.sanctum!;
+  const sanctum = SANCTUM;
+  // Named by the art it uses, so a biome painted later gets a fresh strip.
+  const key = `tileset-${def.id}-${[look.ground, look.path, look.water].map((id) => (scene.textures.exists(id) ? 1 : 0)).join('')}`;
+  if (scene.textures.exists(key)) return key;
   const ground = loaded(scene, look.ground, sanctum.ground);
   return tileStrip(scene, key, {
     [Tile.Ground]: ground,
@@ -145,7 +111,7 @@ function tileStrip(scene: Phaser.Scene, key: string, sources: Partial<Record<Til
  * without one borrows the Sanctum's.
  */
 export function propTexture(scene: Phaser.Scene, biome: string, kind: 'tree' | 'rock', variant: number): string | undefined {
-  for (const look of [biomeLook(biome), LOOKS.sanctum!]) {
+  for (const look of [biomeLook(biome), SANCTUM]) {
     const art = (kind === 'rock' ? look.rocks : look.trees).filter((id) => scene.textures.exists(id));
     if (art.length) return art[variant % art.length]!;
   }

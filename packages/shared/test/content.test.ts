@@ -5,7 +5,14 @@ import {
   MAX_WISHED_COUNT,
   MAX_WISHED_HEAL,
   MAX_WISHED_LEVEL,
+  MAX_REGION_CREATURES,
+  MAX_REGION_CREATURE_KINDS,
+  REGION_WISH_COST,
   WishError,
+  regionCreatureId,
+  regionDef,
+  regionNpcId,
+  wishCost,
   applyContent,
   creatureFromWish,
   removeContent,
@@ -59,5 +66,52 @@ describe('wished content', () => {
     expect(CREATURES.wbug?.name).toBe('Bug');
     removeContent({ ...entry, id: 'wbug' });
     expect(CREATURES.wbug).toBeUndefined();
+  });
+});
+
+describe('wished regions', () => {
+  const raw = {
+    kind: 'region', name: 'Frostfang Vale', description: 'Snow and pines.', biome: 'frostpeak', danger: 40, trees: 9, rocks: -2,
+    creatures: [
+      { existing: 'walking-mushroom', count: 99 },
+      { existing: 'no-such-thing', count: 3 },
+      { name: 'Ice Wisp', description: 'A cold light.', behavior: 'chase', count: 3, look },
+      { name: 'Third', description: 'Too many.', behavior: 'wander', count: 3, look },
+    ],
+    npc: { name: 'Old Hermit', description: 'Lives in the snow.', greeting: 'Brr.', look },
+  };
+
+  it('keeps a region within the limits', () => {
+    const d = validateDefinition(raw);
+    expect(d).toMatchObject({ kind: 'region', biome: 'frostpeak', danger: MAX_WISHED_LEVEL, trees: 3, rocks: 0, water: 1 });
+    if (d.kind !== 'region') throw new Error('not a region');
+    expect(d.creatures).toHaveLength(MAX_REGION_CREATURE_KINDS);
+    expect(d.creatures[0]).toEqual({ existing: 'walking-mushroom', count: MAX_REGION_CREATURES });
+    expect(d.creatures[1]).toMatchObject({ name: 'Ice Wisp', behavior: 'chase', count: 3 });
+    expect(d.npc?.name).toBe('Old Hermit');
+    expect(wishCost(d)).toBe(REGION_WISH_COST);
+  });
+
+  it('refuses a second Sanctum, unknown lands and lands with nothing living there', () => {
+    expect(() => validateDefinition({ ...raw, biome: 'sanctum' })).toThrow(WishError);
+    expect(() => validateDefinition({ ...raw, biome: 'moon' })).toThrow(WishError);
+    expect(() => validateDefinition({ ...raw, creatures: [{ existing: 'dragon' }] })).toThrow(WishError);
+  });
+
+  it('registers the region, its creature and its person, and forgets them on rollback', () => {
+    const definition = validateDefinition(raw);
+    const entry: ContentEntry = {
+      id: 'wvale', wisher: { id: 'p1', name: 'Mara' }, regionId: 'woods', at: 0, tier: 'moderate', title: 'Frostfang Vale',
+      summary: '', status: 'granted', favor: 12, definition, cell: { x: -2, y: 0 },
+    };
+    applyContent(entry);
+    expect(regionDef('wvale')).toMatchObject({ name: 'Frostfang Vale', at: { x: -2, y: 0 }, wild: { wisher: 'Mara', danger: 6 } });
+    expect(CREATURES[regionCreatureId('wvale', 1)]).toMatchObject({ name: 'Ice Wisp', level: 6 });
+    expect(regionDef('wvale')!.wild!.creatures.map((c) => c.kind)).toEqual(['walking-mushroom', regionCreatureId('wvale', 1)]);
+    expect(regionDef('wvale')!.wild!.npc?.id).toBe(regionNpcId('wvale'));
+    removeContent(entry);
+    expect(regionDef('wvale')).toBeUndefined();
+    expect(CREATURES[regionCreatureId('wvale', 1)]).toBeUndefined();
+    expect(CREATURES['walking-mushroom']).toBeDefined();
   });
 });

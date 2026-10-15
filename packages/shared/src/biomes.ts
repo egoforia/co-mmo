@@ -103,3 +103,40 @@ export const BIOMES: Record<BiomeId, Biome> = {
 };
 
 export const LAUNCH_BIOMES = Object.values(BIOMES).filter((b) => b.launch);
+
+/** The art a biome's land is drawn with: its ground, path and water tiles, and its tree and rock sprites. */
+export interface BiomeLook {
+  ground: string;
+  path: string;
+  water: string;
+  /** Trees, palms or cacti. */
+  trees: string[];
+  rocks: string[];
+}
+
+/** The launch biomes' kits, painted with the approved anchors (packages/server/src/assets/kit.ts). */
+const LAUNCH_LOOKS: Partial<Record<BiomeId, BiomeLook>> = {
+  sanctum: { ground: 'sanctum-meadow', path: 'sanctum-flagstones', water: 'sanctum-pond', trees: ['sanctum-blossom-tree-a', 'sanctum-blossom-tree-b'], rocks: ['sanctum-rock'] },
+  'whispering-woods': { ground: 'woods-moss', path: 'woods-path', water: 'woods-pool', trees: ['woods-tree-a', 'woods-tree-b'], rocks: ['woods-rock'] },
+  'sunlit-shore': { ground: 'shore-sand', path: 'shore-sand', water: 'shore-sea', trees: ['shore-palm-a', 'shore-palm-b'], rocks: ['shore-rock'] },
+  'mirage-desert': { ground: 'desert-dunes', path: 'desert-dunes', water: 'desert-oasis', trees: ['desert-cactus-a', 'desert-cactus-b'], rocks: ['desert-rock'] },
+};
+
+/**
+ * The art a biome is drawn with. Biomes first reached by a wished region get
+ * their kit painted by the server when the region is granted, under these ids.
+ */
+export function biomeLook(biome: BiomeId): BiomeLook {
+  return LAUNCH_LOOKS[biome] ?? {
+    ground: `${biome}-ground`,
+    path: `${biome}-ground`,
+    water: `${biome}-water`,
+    trees: [`${biome}-tree-a`, `${biome}-tree-b`],
+    rocks: [`${biome}-rock`],
+  };
+}
+
+/** True when the biome's kit shipped with the game. */
+export function hasShippedKit(biome: BiomeId): boolean {
+  return Boolean(LAUNCH_LOOKS[biome]);
+}

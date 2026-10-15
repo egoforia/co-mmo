@@ -109,6 +109,8 @@ export interface RegionHooks {
   party?(playerId: string): string[];
   /** Something worth a line in the "While you were away" feed. */
   journal?(text: string, playerId: string): void;
+  /** The regions beyond this one's open edges, for players to see beside it. */
+  neighbours?(): RegionDef[];
 }
 
 /** Tile kinds scripted rules can ask about, by name. */
@@ -333,7 +335,28 @@ export class Region {
   }
 
   get info(): RegionInfo {
-    return { id: this.def.id, name: this.def.name };
+    return { id: this.def.id, name: this.def.name, def: this.def };
+  }
+
+  /**
+   * The world grew or shrank beside this region: re-lay its roads to the new
+   * exits (the rest of the land stays as it was, being generated from the
+   * same seed), and show everyone here the new neighbours.
+   */
+  setExits(exits: RegionDef['exits']): void {
+    this.def.exits = exits;
+    const fresh = generateRegion(this.def);
+    this.map.tiles.set(fresh.tiles);
+    this.map.entries = fresh.entries;
+    for (const p of this.players.values()) {
+      // A road may now run where someone stood; the new land never traps anyone.
+      if (collides(this.map, p.x, p.y)) Object.assign(p, this.map.spawn);
+      this.welcome(p);
+    }
+  }
+
+  private welcome(p: PlayerState): void {
+    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, tickRate: TICK_RATE, character: p.character });
   }
 
   get online(): number {
@@ -404,10 +427,14 @@ export class Region {
       x = at.x;
       y = at.y;
     }
-    this.players.set(info.id, {
+    const p: PlayerState = {
       info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false,
-    });
-    conn.send({ t: 'welcome', you: info, region: this.info, x, y, tickRate: TICK_RATE, character });
+    };
+    this.players.set(info.id, p);
+    this.welcome(p);
+    // Every wished region carries a credit line (design doc, World structure).
+    const wild = this.def.wild;
+    if (wild) this.notice(p, `✦ ${this.def.name} was wished into being by ${wild.wisher}. Danger ${wild.danger} of 6.`);
     this.broadcastSystem(announce ?? `${info.name} entered ${this.def.name}.`);
   }
 

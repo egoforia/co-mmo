@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import {
   BIOMES,
   ITEMS,
@@ -8,6 +10,9 @@ import {
   applyContent,
   contentTier,
   forgetVanished,
+  regionFromWish,
+  regionPictures,
+  wishCost,
   lookFromWords,
   regionDef,
   removeContent,
@@ -20,7 +25,9 @@ import {
   type ItemWish,
   type PicturedWish,
   type PlayerInfo,
+  type RegionWish,
   type Role,
+  type Side,
   type WishCard,
   type WishDefinition,
   type WishTier,
@@ -28,7 +35,8 @@ import {
 import { createChatModel, type ChatModel, type ChatTurn } from './ai/chat.ts';
 import { GeminiImageProvider } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
-import { IMAGE_USD, paintWish } from './assets/wish-art.ts';
+import { IMAGE_USD, imageUsd, paintWish } from './assets/wish-art.ts';
+import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, type GodReply } from './god.ts';
 import type { LiveRules } from './live-rules.ts';
@@ -48,6 +56,8 @@ interface OpenCard {
   definition?: WishDefinition;
   /** The Owner naming (or un-naming) a Steward. */
   appoint?: { id: string; name: string; role: Role };
+  /** A region wish: the grid square beyond the edge it grows from. */
+  edge?: { side: Side; cell: { x: number; y: number } };
   conversation: ChatTurn[];
   usd: number;
 }
@@ -148,6 +158,7 @@ export class Wishes {
           regionName: region.def.name,
           biome: BIOMES[region.def.biome as BiomeId]?.name ?? region.def.biome,
           nearby: region.nearby(id),
+          edge: this.edgeLine(id),
           recentWishes: this.store.content
             .filter((c) => c.status === 'granted')
             .slice(-8)
@@ -163,6 +174,10 @@ export class Wishes {
       history.push({ role: 'assistant', content: reply.say });
       this.conversations.set(id, history.slice(-MEMORY_TURNS));
       const card = reply.wish && this.makeCard(id, reply.wish, region.def.name, history, usd);
+      if (card?.note) {
+        history.push({ role: 'assistant', content: card.note });
+        this.conversations.set(id, history.slice(-MEMORY_TURNS));
+      }
       this.world.sendTo(id, { t: 'god', say: card?.note ?? reply.say, ...(card?.card ? { card: card.card } : {}) });
     } catch (err) {
       console.error('Prayer failed:', err);
@@ -194,6 +209,13 @@ export class Wishes {
       // Things for your bag are minor; creatures, people and abilities moderate, whatever the model said.
       if (definition) tier = contentTier(definition);
     }
+    // A new region grows beyond the open edge of this one nearest the player.
+    let edge: OpenCard['edge'];
+    if (definition?.kind === 'region') {
+      const open = this.world.openEdge(playerId);
+      if (!open) return { note: `Every edge of ${regionName} already meets another land. New regions grow at the world's edge: travel outward and ask me there.` };
+      edge = { side: open.side, cell: open.cell };
+    }
     for (const [cardId, open] of this.cards) if (open.playerId === playerId) this.cards.delete(cardId);
     const instant = tier === 'minor' || tier === 'moderate';
     const card: WishCard = {
@@ -201,16 +223,17 @@ export class Wishes {
       tier,
       title: wish.title,
       summary: wish.summary || definition?.description || wish.title,
-      cost: WISH_COSTS[tier],
+      cost: definition && instant ? wishCost(definition) : WISH_COSTS[tier],
       where: !instant
         ? tier === 'engine' ? 'Set before the Owner for the next game update' : 'Set before the Stewards for review'
         : definition?.kind === 'item' ? 'In your bag'
           : definition?.kind === 'ability' ? 'A scroll in your bag'
             : definition?.kind === 'recipe' ? 'Known to everyone, in the crafting book (C)'
-              : `Beside you, in ${regionName}`,
+              : edge ? `Beyond the ${edge.side} edge of ${regionName}`
+                : `Beside you, in ${regionName}`,
       instant,
     };
-    this.cards.set(card.id, { card, playerId, definition, conversation: [...conversation], usd });
+    this.cards.set(card.id, { card, playerId, definition, conversation: [...conversation], usd, ...(edge ? { edge } : {}) });
     return { card };
   }
 
@@ -238,8 +261,11 @@ export class Wishes {
     if (def.kind === 'creature') placements = region.findSpots(at.x, at.y, def.count);
     if (def.kind === 'npc') placements = region.findSpots(at.x, at.y, 1, 1.2, 2);
     if (placements && placements.length === 0) return this.say(player.id, 'There is no room here. Find open ground and ask again.');
+    if (def.kind === 'region' && (!open.edge || !this.world.cellFree(open.edge.cell))) {
+      return this.say(player.id, 'Another land has grown there since you asked. Find an open edge of the world and wish again.');
+    }
 
-    const record = this.record(player, open, 'granted', region.def.id, placements);
+    const record = this.record(player, open, 'granted', region.def.id, placements, open.edge?.cell);
     applyContent(record);
     this.place(record);
     region.updateCharacter(player.id, (c) => {
@@ -250,7 +276,8 @@ export class Wishes {
     this.world.broadcast({ t: 'system', text: `✦ The God granted ${player.name}'s wish: ${record.title}.`, at: this.now() });
     this.say(player.id, def.kind === 'item' || def.kind === 'ability' ? 'It is done. Look in your bag.'
       : def.kind === 'recipe' ? 'It is done. Anyone can make it now: press C to open the crafting book.'
-        : 'It is done. Look around you.');
+        : def.kind === 'region' ? `It is done. A road now leads ${open.edge!.side} to ${def.name}.`
+          : 'It is done. Look around you.');
     this.paint(record);
   }
 
@@ -260,6 +287,7 @@ export class Wishes {
     status: ContentRecord['status'],
     regionId = this.world.regionOf(player.id)?.def.id ?? this.world.home.def.id,
     placements?: { x: number; y: number }[],
+    cell?: { x: number; y: number },
   ): ContentRecord {
     const record: ContentRecord = {
       id: `w${this.now().toString(36)}${randomBytes(2).toString('hex')}`,
@@ -273,6 +301,7 @@ export class Wishes {
       favor: status === 'granted' ? open.card.cost : 0,
       ...(open.definition ? { definition: open.definition } : {}),
       ...(placements ? { placements } : {}),
+      ...(cell ? { cell } : {}),
       conversation: open.conversation,
       usd: open.usd,
     };
@@ -326,6 +355,7 @@ export class Wishes {
     this.store.updateContent(id, { status: 'rolled-back' });
     removeContent(record);
     this.rules.stop(id);
+    if (record.definition?.kind === 'region') this.world.removeRegion(id);
     for (const region of this.world.regions.values()) {
       region.removeWish(id);
       for (const playerId of region.playerIds()) {
@@ -543,6 +573,7 @@ export class Wishes {
     if (!provider) return undefined;
     if (!force && this.budget().over) return undefined;
     const def = record.definition;
+    if (def.kind === 'region') return this.track(this.paintRegion(record, def, provider, force));
     const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
     const pictures: { id: string; def: PicturedWish }[] = def.kind === 'rule'
       ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
@@ -568,6 +599,82 @@ export class Wishes {
     })().finally(() => this.painting.delete(job));
     this.painting.add(job);
     return job;
+  }
+
+  /**
+   * Paints a wished region: its biome's kit the first time that biome is
+   * wished (ground, water, two trees and a rock, about five pictures, kept
+   * for every later region of the biome), then its new creatures and person.
+   */
+  private async paintRegion(record: ContentRecord, def: RegionWish, provider: ImageProvider, force: boolean): Promise<void> {
+    const dir = resolve(this.options.artDir, 'biomes');
+    const kit = await readKitManifest(dir);
+    const kitUrl = (id: string) => kit[id] && `/${KIT_ART_PATH}/${kit[id]!.file}`;
+    const update = (patch: Partial<ContentRecord>) => {
+      const updated = this.store.updateContent(record.id, patch);
+      if (updated) this.broadcast(updated);
+      return updated;
+    };
+    // The Owner's Repaint paints the biome's kit again too.
+    for (const asset of wildKit(def.biome)) {
+      if (kit[asset.id] && !force) continue;
+      if (!force && this.budget().over) return;
+      try {
+        const { image, entry } = await paintKitAsset(asset, provider, this.options.anchorDir, dir);
+        const usd = imageUsd(provider.model, image);
+        this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
+        kit[asset.id] = { ...entry, file: `${entry.file}?v=${this.now().toString(36)}` };
+        await mkdir(dir, { recursive: true });
+        await writeFile(resolve(dir, 'manifest.json'), JSON.stringify(kit, null, 2));
+        const current = this.store.contentById(record.id);
+        if (current) update({ usd: current.usd + usd });
+      } catch (err) {
+        console.error(`Painting ${asset.id} failed:`, (err as Error).message);
+      }
+    }
+    // Every region of this biome shows the kit, including ones wished before it was painted.
+    const kitArt = Object.fromEntries(wildKit(def.biome).flatMap((a) => (kitUrl(a.id) ? [[a.id, kitUrl(a.id)!]] : [])));
+    if (Object.keys(kitArt).length) {
+      for (const other of this.store.content) {
+        if (other.status === 'granted' && other.definition?.kind === 'region' && other.definition.biome === def.biome) {
+          const updated = this.store.updateContent(other.id, { kitArt });
+          if (updated) this.broadcast(updated);
+        }
+      }
+    }
+    for (const picture of regionPictures(record.id, def)) {
+      if (!force && this.budget().over) return;
+      try {
+        await paintWish(picture.id, picture.def, def.biome, provider, this.options.anchorDir, this.options.artDir);
+      } catch (err) {
+        console.error(`Painting ${picture.id} failed:`, (err as Error).message);
+        continue;
+      }
+      this.store.recordSpend({ at: this.now(), usd: IMAGE_USD, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
+      const current = this.store.contentById(record.id);
+      if (!current) return;
+      update({ itemArt: { ...current.itemArt, [picture.id]: `/wished-art/${picture.id}.png?v=${this.now().toString(36)}` }, usd: current.usd + IMAGE_USD });
+    }
+  }
+
+  /** Keeps a painting job where tests and shutdown can wait for it. */
+  private track(work: Promise<void>): Promise<void> {
+    const job = work.catch((err) => console.error('Painting failed:', (err as Error).message)).finally(() => this.painting.delete(job));
+    this.painting.add(job);
+    return job;
+  }
+
+  /** A line for the God about where the world can grow from here. */
+  private edgeLine(playerId: string): string {
+    const open = this.world.openEdge(playerId);
+    if (!open) return "Every edge of this region meets another land; a new region can only be wished at the world's edge.";
+    return `This region is at the world's edge: a new region wished here would lie beyond its ${open.side} edge.`;
+  }
+
+  /** Painted kit art for every biome painted so far, for clients to load at start. */
+  async kitManifest(): Promise<Record<string, { file: string; kind: string; width: number; height: number }>> {
+    const kit = await readKitManifest(resolve(this.options.artDir, 'biomes'));
+    return Object.fromEntries(Object.entries(kit).map(([id, e]) => [id, { ...e, file: `/${KIT_ART_PATH}/${e.file}` }]));
   }
 
   budget(): { spentUsd: number; monthlyUsd: number; warnUsd: number; over: boolean; warn: boolean } {
@@ -617,6 +724,11 @@ export class Wishes {
 
   private place(record: ContentEntry): void {
     const def = record.definition;
+    if (def?.kind === 'region') {
+      const land = regionFromWish(record);
+      if (land && !this.world.addRegion(land)) console.error(`Region ${record.id} could not be placed: its square is taken.`);
+      return;
+    }
     const region = this.world.region(record.regionId);
     if (!def || !region || !record.placements) return;
     if (def.kind === 'creature') region.addCreatures(record.id, record.placements);

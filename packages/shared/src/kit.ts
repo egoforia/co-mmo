@@ -195,10 +195,10 @@ export function swap(a: Character, b: Character, fromA: TradeOffer, fromB: Trade
 // --- Creator XP --------------------------------------------------------------------
 
 /** How someone else enjoyed a thing you wished for. */
-export type CreatorCredit = 'defeat' | 'talk' | 'use' | 'craft' | 'learn' | 'equip';
+export type CreatorCredit = 'defeat' | 'talk' | 'use' | 'craft' | 'learn' | 'equip' | 'visit';
 
 /** Creator XP per kind of enjoyment (design doc, Characters and progression). */
-export const CREATOR_XP: Record<CreatorCredit, number> = { defeat: 2, talk: 3, use: 2, craft: 3, learn: 5, equip: 3 };
+export const CREATOR_XP: Record<CreatorCredit, number> = { defeat: 2, talk: 3, use: 2, craft: 3, learn: 5, equip: 3, visit: 4 };
 
 /** Favor for each Creator level gained: making things people love pays for more wishes. */
 export const CREATOR_LEVEL_FAVOR = 3;

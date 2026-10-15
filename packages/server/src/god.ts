@@ -1,4 +1,16 @@
-import { ITEMS, MAX_RECIPE_RESULT, MAX_WISHED_COUNT, MAX_WISHED_HEAL, MAX_WISHED_LEVEL, type WishTier } from '@co-mmo/shared';
+import {
+  BIOMES,
+  CREATURES,
+  ITEMS,
+  MAX_RECIPE_RESULT,
+  MAX_REGION_CREATURES,
+  MAX_WISHED_COUNT,
+  MAX_WISHED_HEAL,
+  MAX_WISHED_LEVEL,
+  REGION_WISH_COST,
+  type BiomeId,
+  type WishTier,
+} from '@co-mmo/shared';
 import { parseJsonObject, type ChatModel, type ChatRequest, type ChatResult, type ChatTurn } from './ai/chat.ts';
 
 /** What the God knows about the moment a player prays. */
@@ -10,6 +22,8 @@ export interface PrayerContext {
   biome: string;
   /** Short lines: who and what is nearby. */
   nearby: string[];
+  /** Whether a new region could be wished from here, and beyond which edge. */
+  edge?: string;
   /** Recent wishes in the world, newest first. */
   recentWishes: string[];
 }
@@ -34,8 +48,8 @@ Players talk to you from anywhere. Chat, answer questions about the world, and h
 
 Wish tiers:
 - minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a hat, armour, a charm), or a new crafting recipe that everyone can use. You can build these now.
-- moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, or a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold). You can build these now.
-- major: a new system or place (fishing, mounts, weather, a dungeon, a quest line, a new region). A Steward must review it; it is recorded, not built now.
+- moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold), or a new region of wild land beyond the world's edge (costs ${REGION_WISH_COST} Favor; only where the player stands at the world's edge). You can build these now.
+- major: a new system or place that is more than wild land (fishing, mounts, weather, a dungeon, a quest line, a town). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
 - refused: illegal, griefing, or economy-breaking.
 
@@ -52,16 +66,21 @@ recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"
 ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
 npc: {"kind":"npc","name":"...","description":"...","greeting":"<what they say when spoken to>","look":LOOK}
+region: {"kind":"region","name":"<the land's name>","description":"...","biome":"%BIOMES%","danger":<1-${MAX_WISHED_LEVEL}>,"trees":<0-3>,"rocks":<0-3>,"water":<0-3>,"creatures":[<one or two of: {"existing":"<id from: %CREATURES%>","count":<1-${MAX_REGION_CREATURES}>} or a new one {"name":"...","description":"...","behavior":"wander|guard|chase","count":<1-${MAX_REGION_CREATURES}>,"drops":[<item ids>],"look":LOOK}>],"npc":<null or {"name":"...","description":"...","greeting":"...","look":LOOK}>} (new creatures there are as strong as its danger; prefer existing creatures when they fit)
 LOOK: {"hook":"<the one feature you would recognise it by>","body":"<body and shape in a sentence>","color":"#rrggbb main colour","mood":"<a few words>"}
 The world decides how strong gear and abilities are from their rarity and kind. Epic and Legendary gear is earned, never wished; offer Rare at most. Wished things are for everyone's fun: refuse gear or recipes that would flood the world with gold.
-wander creatures only fight back; guard creatures attack anyone near their spot; chase creatures hunt anyone they see. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).`;
+wander creatures only fight back; guard creatures attack anyone near their spot; chase creatures hunt anyone they see. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).
+A new region is a whole square of land next to the one the player is in; the world places it beyond the edge named below, and joins it with roads to every land beside it.`;
 
 export function systemPrompt(ctx: PrayerContext): string {
   const items = Object.entries(ITEMS).filter(([, d]) => !d.bound).map(([id]) => id).join(', ');
   return [
-    PERSONA.replaceAll('%ITEMS%', items),
+    PERSONA.replaceAll('%ITEMS%', items)
+      .replaceAll('%BIOMES%', (Object.keys(BIOMES) as BiomeId[]).filter((b) => b !== 'sanctum').join('|'))
+      .replaceAll('%CREATURES%', Object.keys(CREATURES).join(', ')),
     '',
     `Now: ${ctx.playerName} (${ctx.role}, ${ctx.favor} Favor) prays in ${ctx.regionName} (${ctx.biome}).`,
+    ...(ctx.edge ? [ctx.edge] : []),
     ctx.nearby.length ? `Nearby: ${ctx.nearby.join('; ')}.` : 'Nobody else is nearby.',
     ctx.recentWishes.length ? `Recent wishes in the world: ${ctx.recentWishes.join('; ')}.` : 'No wishes have been granted yet.',
   ].join('\n');
@@ -146,7 +165,9 @@ export class OfflineGod implements ChatModel {
       return { say: 'I hear you, child of the young world. Tell me what you wish for: a thing to carry, a creature to meet, or someone to talk to.', wish: null };
     }
     const look = { hook: `the look of ${thing}`, body: `a ${thing}`, color: colorFrom(text), mood: 'whimsical' };
-    const big = text.match(/\b(fishing|weather|rain|mounts?|dungeons?|quests?|region|island|system|guilds?|house|housing)\b/);
+    const land = text.match(/\b(region|land|lands|realm|valley|wilds?|territory)\b/);
+    if (land) return regionWish(said, text);
+    const big = text.match(/\b(fishing|weather|rain|mounts?|dungeons?|quests?|island|system|guilds?|house|housing)\b/);
     if (big) {
       return {
         say: 'A great wish. Something this large must be shaped with care; I will set it before the Stewards.',
@@ -216,6 +237,41 @@ export class OfflineGod implements ChatModel {
       },
     };
   }
+}
+
+/** Biome words a player might use, first match wins. */
+const LAND_WORDS: [RegExp, BiomeId][] = [
+  [/\b(snow|snowy|ice|icy|frost|frozen|winter|mountain|peaks?)\b/, 'frostpeak'],
+  [/\b(lava|fire|fiery|ember|embers|ash|volcan\w*|burning)\b/, 'ember-wastes'],
+  [/\b(swamp|bog|marsh|mire|murky)\b/, 'murkmire-swamp'],
+  [/\b(mushroom|mushrooms|fungus|fungi|spore)\b/, 'mushroom-hollow'],
+  [/\b(sky|cloud|clouds|floating|ruins)\b/, 'sky-ruins'],
+  [/\b(forest|woods|wood|trees)\b/, 'whispering-woods'],
+  [/\b(beach|shore|sea|coast|ocean)\b/, 'sunlit-shore'],
+  [/\b(desert|sand|sandy|dunes?)\b/, 'mirage-desert'],
+];
+
+/** Creatures that already live in each launch-biome-like land, for an offline region. */
+const LAND_CREATURES: Partial<Record<BiomeId, string>> = { 'whispering-woods': 'walking-mushroom', 'sunlit-shore': 'crab-knight', 'mirage-desert': 'sun-scarab' };
+
+/** The offline God's region: biome from the player's words, gentle and sparsely wooded. */
+function regionWish(said: string, text: string): { say: string; wish: unknown } {
+  const biome = LAND_WORDS.find(([re]) => re.test(text))?.[1] ?? 'verdant-meadows';
+  const name = BIOMES[biome].name === 'Whispering Woods' ? 'Further Woods' : `New ${BIOMES[biome].name}`;
+  const danger = /\b(dangerous|deadly|fierce|wild)\b/.test(text) ? 4 : 2;
+  const existing = LAND_CREATURES[biome];
+  const creature = existing && CREATURES[existing]
+    ? { existing, count: 4 }
+    : { name: `${BIOMES[biome].name} Wanderer`, description: `A creature of ${BIOMES[biome].name}.`, behavior: danger > 2 ? 'chase' : 'wander', count: 4, drops: ['tonic'], look: { hook: `a creature of ${BIOMES[biome].ground}`, body: 'small and rounded', color: colorFrom(text), mood: 'curious' } };
+  return {
+    say: `New land, rising from the mist beyond the edge of the world? Say the word and I will raise ${name}.`,
+    wish: {
+      tier: 'moderate',
+      title: name,
+      summary: `A new region, ${name}, beyond the nearest edge of the world.`,
+      definition: { kind: 'region', name, description: said.trim().slice(0, 200) || `A new land of ${BIOMES[biome].name}.`, biome, danger, trees: 2, rocks: 1, water: 1, creatures: [creature] },
+    },
+  };
 }
 
 /** "I wish for a glowing blue hat please" → "glowing blue hat". */

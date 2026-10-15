@@ -1,4 +1,4 @@
-import { CREATURES, ITEMS, RARITIES, bonusText, regionDef, ruleItemId, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
+import { CREATURES, ITEMS, RARITIES, REGION_WISH_COST, bonusText, regionDef, ruleItemId, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
 
@@ -29,6 +29,8 @@ function progress(e: ContentEntry): string {
 function pictureKey(e: ContentEntry): string {
   const def = e.definition;
   if (def?.kind === 'recipe') return ITEMS[def.result.item]?.art ?? 'item-scroll';
+  // A region is shown by the first creature that lives there.
+  if (def?.kind === 'region') return regionDef(e.id)?.wild?.creatures[0]?.asset ?? 'sanctum-shrine';
   const first = def?.kind === 'rule' ? Object.keys(def.items)[0] : undefined;
   return wishArtKey(first ? ruleItemId(e.id, first) : e.id);
 }
@@ -70,7 +72,8 @@ export const CHAPTERS: Chapter[] = [
         <li><b>G</b> opens a prayer, anywhere in the world. Talk to the God, and ask for something new: a thing to carry, a creature to meet, someone to talk to.</li>
         <li>The God answers with a <b>wish card</b>: what will be made, where, and its cost in <b>Favor</b>. Grant it, or say not now.</li>
         <li>You can wish for gear to wear, a new crafting recipe, or a new ability (it comes as a scroll you can read, sell or give away).</li>
-        <li>Bigger wishes (a new system, a new place) go to the Stewards first. The Chronicle in this book lists every wish.</li>
+        <li>At the edge of the world, you can wish for a whole <b>new region</b> beyond it: snowy peaks, ember wastes, a mushroom hollow, a swamp, sky ruins, meadows or more of a land you know. Say how wild and dangerous it is and what lives there; a road leads into it at once, and everyone who walks in learns that you wished it.</li>
+        <li>Bigger wishes (a new system, a town, a dungeon) go to the Stewards first. The Chronicle in this book lists every wish.</li>
       </ul>
       <h3>Keeping the peace</h3>
       <ul>
@@ -106,9 +109,9 @@ export const CHAPTERS: Chapter[] = [
       <h3>New rules</h3>
       <p>A wish for a new thing to do (fishing, foraging, a blessing at a shrine) becomes a <b>scripted rule</b>. The God drafts it, tries it in a copy of the world, and a Steward reads it before it goes live. Rules can only act through the world's own building blocks (items, health, gold, XP, messages), with limits on how much they give, and a rule that misbehaves stops itself.</p>
       <h3>Favor</h3>
-      <p>Wishes cost Favor: 2 for an item or a recipe, 6 for a creature, a person or an ability. You begin with 10, earn 3 for each quest and 2 for each level.</p>
+      <p>Wishes cost Favor: 2 for an item or a recipe, 6 for a creature, a person or an ability, ${REGION_WISH_COST} for a new region. You begin with 10, earn 3 for each quest and 2 for each level.</p>
       <h3>Creator XP</h3>
-      <p>When other players fight what you wished for, talk to it, wear it, use it, craft with it or learn from it, you earn <b>Creator XP</b>. Each Creator level brings 3 Favor, so making things people love pays for more wishes.</p>
+      <p>When other players fight what you wished for, talk to it, wear it, use it, craft with it, learn from it or walk into the land you wished, you earn <b>Creator XP</b>. Each Creator level brings 3 Favor, so making things people love pays for more wishes.</p>
       <h3>Gear</h3>
       <p>Weapons, hats, coats and charms add to your stats, damage and armour. Rarity runs from Common through Uncommon, Rare and Epic to Legendary. The world sets how strong wished gear is from its rarity; wishes reach Rare at most, and the rest must be earned.</p>
       <h3>Roles</h3>

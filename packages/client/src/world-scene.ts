@@ -12,7 +12,7 @@ import {
   nearBuilding,
   neighbourOffset,
   rand2,
-  regionDef,
+  biomeLook,
   type ArtManifest,
   type Building,
   type ClientMessage,
@@ -26,7 +26,7 @@ import {
   wishArtKey,
 } from '@co-mmo/shared';
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
-import { artSrc, contentEntries, lookArt } from './wished.ts';
+import { lookArt, sceneArt } from './wished.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Image;
@@ -90,10 +90,15 @@ export class WorldScene extends Phaser.Scene {
   private facing = 1;
   /** True while restarting for a walk into the next region, so there is no fade. */
   private crossing = false;
+  /** Art ids of the biome kits drawn now: when one is painted, the land is drawn again. */
+  private kitIds = new Set<string>();
+  private redrawing = false;
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
     this.welcome = options.welcome;
+    // Art from the manifest is loaded in preload; wishes pointing at the same file need no second load.
+    for (const [id, entry] of Object.entries(options.art)) this.loadedArt.set(id, entry.file);
   }
 
   preload(): void {
@@ -117,19 +122,22 @@ export class WorldScene extends Phaser.Scene {
 
   create(): void {
     const welcome = this.welcome;
-    const def = regionDef(welcome.region.id) ?? regionDef('sanctum')!;
+    // The server sends the region's layout: it may be one a player wished for.
+    const def = welcome.region.def;
     this.map = generateRegion(def);
     this.remotes = new Map();
     this.creatures = new Map();
     this.npcs = new Map();
     this.buildings = [];
     this.accumulator = 0;
+    this.redrawing = false;
+    this.kitIds = new Set();
 
     // Our region, and every neighbour beside it, so the world reads as one.
     this.drawRegion(this.map, 0, 0);
     const bounds = { left: 0, top: 0, right: this.map.width, bottom: this.map.height };
     for (const [side, id] of Object.entries(def.exits) as [Side, string][]) {
-      const next = regionDef(id);
+      const next = welcome.neighbours.find((n) => n.id === id);
       if (!next) continue;
       const offset = neighbourOffset(side, this.map.width);
       this.drawRegion(generateRegion(next), offset.x, offset.y);
@@ -230,10 +238,7 @@ export class WorldScene extends Phaser.Scene {
     // Not isActive(): that is still false while create() runs, and art
     // that arrived before the scene existed is loaded from there.
     if (!this.map) return;
-    for (const entry of contentEntries()) {
-      const key = wishArtKey(entry.id);
-      if (entry.status === 'granted' && entry.definition) void this.loadArt(key, artSrc(key));
-    }
+    for (const [key, url] of sceneArt()) void this.loadArt(key, url);
     // A look described, painted or rolled back: players change clothes.
     const players: [string, Avatar][] = [[this.welcome.you.id, this.me], ...this.remotes];
     for (const [id, a] of players) {
@@ -262,6 +267,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.loadedArt.get(key) !== url) return;
     if (this.textures.exists(key)) this.textures.remove(key);
     this.textures.addImage(key, img);
+    // A wished biome's ground, water, trees or rocks were painted: draw the land again.
+    if (this.kitIds.has(key)) this.redraw();
     for (const a of [...this.creatures.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
       if (a?.art === key) a.body.setTexture(key);
     }
@@ -373,7 +380,19 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Paints a region's ground and scenery with its top-left corner at (ox, oy), in tiles. */
+  /** Draws the land again where we stand, once the art that arrived together has loaded. */
+  private redraw(): void {
+    if (this.redrawing || !this.predictor) return;
+    this.redrawing = true;
+    this.time.delayedCall(500, () => {
+      const at = this.predictor?.position;
+      if (at) this.enterRegion({ ...this.welcome, x: at.x, y: at.y });
+    });
+  }
+
   private drawRegion(map: RegionMap, ox: number, oy: number): void {
+    const look = biomeLook(map.def.biome);
+    for (const id of [look.ground, look.path, look.water, ...look.trees, ...look.rocks]) this.kitIds.add(id);
     const tilesetKey = registerTileset(this, map.def);
     const data: number[][] = [];
     for (let y = 0; y < map.height; y++) {

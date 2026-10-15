@@ -7,6 +7,11 @@ import {
   wisherOf,
   WORLD_REGIONS,
   arrivalPoint,
+  cellBeyond,
+  linkRegions,
+  nearestOpenSide,
+  type RegionDef,
+  type Side,
   maxHp,
   type Character,
   type ChatMessage,
@@ -50,19 +55,93 @@ export class World {
   /** When a player last earned someone Creator XP for a thing, per kind of enjoyment. */
   private readonly credited = new Map<string, number>();
 
-  constructor(private readonly now: () => number = Date.now, random: () => number = Math.random) {
+  constructor(private readonly now: () => number = Date.now, private readonly random: () => number = Math.random) {
     this.parties = new Parties(now);
-    for (const def of WORLD_REGIONS) {
-      this.regions.set(def.id, new Region(def, {
-        worldChat: (m) => this.broadcast(m),
-        online: () => this.where.size,
-        creator: (thing, playerId, credit) => this.creatorCredit(thing, playerId, credit),
-        event: (type, playerId, data) => this.onEvent?.(type, playerId, data),
-        route: (message, to) => this.route(message, to),
-        party: (playerId) => this.parties.members(playerId),
-        journal: (text, playerId) => this.onJournal?.(text, playerId),
-      }, now, random));
+    // Each world keeps its own copies: wished regions change the exits.
+    const launch = WORLD_REGIONS.map((def) => structuredClone(def));
+    const links = linkRegions(launch);
+    for (const def of launch) {
+      def.exits = links.get(def.id) ?? {};
+      this.regions.set(def.id, this.makeRegion(def));
     }
+  }
+
+  private makeRegion(def: RegionDef): Region {
+    const region: Region = new Region(def, {
+      worldChat: (m) => this.broadcast(m),
+      online: () => this.where.size,
+      creator: (thing, playerId, credit) => this.creatorCredit(thing, playerId, credit),
+      event: (type, playerId, data) => this.onEvent?.(type, playerId, data),
+      route: (message, to) => this.route(message, to),
+      party: (playerId) => this.parties.members(playerId),
+      journal: (text, playerId) => this.onJournal?.(text, playerId),
+      neighbours: () => Object.values(region.def.exits).flatMap((id) => this.regions.get(id)?.def ?? []),
+    }, this.now, this.random);
+    return region;
+  }
+
+  /** Every region's layout, launch and wished. */
+  defs(): RegionDef[] {
+    return [...this.regions.values()].map((r) => r.def);
+  }
+
+  /**
+   * Adds a region on its square of the world grid, joined by roads to every
+   * region beside it (design doc, World structure: the map grows outward).
+   * Returns false when the square is taken.
+   */
+  addRegion(def: RegionDef): boolean {
+    if (this.regions.has(def.id) || this.defs().some((d) => d.at.x === def.at.x && d.at.y === def.at.y)) return false;
+    def.exits = linkRegions([...this.defs(), def]).get(def.id) ?? {};
+    this.regions.set(def.id, this.makeRegion(def));
+    this.relink();
+    return true;
+  }
+
+  /**
+   * Takes a wished region out of the world (its wish was rolled back).
+   * Anyone inside wakes at the shrine; the roads that led there close.
+   */
+  removeRegion(id: string): void {
+    const region = this.regions.get(id);
+    if (!region || id === this.home.def.id) return;
+    const home = this.home;
+    for (const playerId of region.playerIds()) {
+      const leaving = region.remove(playerId);
+      if (!leaving) continue;
+      this.where.set(playerId, home.def.id);
+      home.join(leaving.info, leaving.conn, home.map.spawn, leaving.character, `${leaving.info.name} was carried back to ${home.def.name}.`);
+      leaving.conn.send({ t: 'notice', text: `${region.def.name} faded from the world, and the God carried you back to the shrine.` });
+      this.partyChanged(playerId);
+    }
+    this.regions.delete(id);
+    this.relink();
+  }
+
+  /** Gives every region whose neighbours changed its new roads. */
+  private relink(): void {
+    const links = linkRegions(this.defs());
+    for (const region of this.regions.values()) {
+      const exits = links.get(region.def.id) ?? {};
+      if (JSON.stringify(exits) !== JSON.stringify(region.def.exits)) region.setExits(exits);
+    }
+  }
+
+  /**
+   * Where a region wished by this player would go: beyond the open edge of
+   * their region nearest to them. Undefined when every edge has a neighbour.
+   */
+  openEdge(playerId: string): { region: Region; side: Side; cell: { x: number; y: number } } | undefined {
+    const region = this.regionOf(playerId);
+    const at = region?.position(playerId);
+    if (!region || !at) return undefined;
+    const side = nearestOpenSide(this.defs(), region.def, at.x, at.y, region.map.width);
+    return side && { region, side, cell: cellBeyond(region.def, side) };
+  }
+
+  /** True when no region stands on this grid square. */
+  cellFree(cell: { x: number; y: number }): boolean {
+    return !this.defs().some((d) => d.at.x === cell.x && d.at.y === cell.y);
   }
 
   /** Something worth a line in the "While you were away" feed (set by the app, which stores it). */
@@ -279,6 +358,8 @@ export class World {
         this.where.set(departure.id, target.def.id);
         target.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`);
         this.onEvent?.('enter', departure.id, { region: target.def.id });
+        // Walking into a wished region earns its wisher Creator XP.
+        this.creatorCredit(target.def.id, departure.id, 'visit');
         this.partyChanged(departure.id);
       }
     }

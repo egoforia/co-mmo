@@ -9,7 +9,11 @@ import {
   Tile,
   WORLD_REGIONS,
   arrivalPoint,
+  cellBeyond,
   collides,
+  linkRegions,
+  nearestOpenSide,
+  openSides,
   neighbourOffset,
   generateRegion,
   exteriorSpan,
@@ -21,6 +25,7 @@ import {
   tileAt,
   type RegionMap,
   type Side,
+  type WildLand,
 } from '../src/index.ts';
 
 const maps = WORLD_REGIONS.map((def) => generateRegion(def));
@@ -223,5 +228,50 @@ describe('step', () => {
     let south = desert.spawn;
     for (let i = 0; i < 2000; i++) south = step(desert, south, 0, 1);
     expect(south.y).toBeLessThan(desert.height);
+  });
+});
+
+describe('a growing world', () => {
+  const land = (id: string, at: { x: number; y: number }, wild?: Partial<WildLand>) => ({
+    id, name: id, biome: 'frostpeak' as const, seed: 77, at, exits: {},
+    wild: { danger: 2, trees: 2, rocks: 1, water: 1, creatures: [{ kind: 'walking-mushroom', name: 'Walking Mushroom', asset: 'woods-mushroom', count: 4 }], wisher: 'Mara', ...wild },
+  });
+
+  it('works out the launch roads from where each region sits', () => {
+    const links = linkRegions(WORLD_REGIONS);
+    for (const def of WORLD_REGIONS) expect(links.get(def.id)).toEqual(def.exits);
+  });
+
+  it('joins a new region to every region beside it, and finds the open edges', () => {
+    const corner = land('corner', { x: -1, y: 1 });
+    const links = linkRegions([...WORLD_REGIONS, corner]);
+    expect(links.get('corner')).toEqual({ north: 'woods', east: 'desert' });
+    expect(links.get('woods')).toMatchObject({ south: 'corner' });
+    expect(links.get('desert')).toMatchObject({ west: 'corner' });
+    const woods = WORLD_REGIONS.find((r) => r.id === 'woods')!;
+    expect(openSides(WORLD_REGIONS, woods)).toEqual(['north', 'south', 'west']);
+    expect(nearestOpenSide(WORLD_REGIONS, woods, 2, 30)).toBe('west');
+    expect(nearestOpenSide(WORLD_REGIONS, woods, 30, 62)).toBe('south');
+    expect(cellBeyond(woods, 'north')).toEqual({ x: -1, y: -1 });
+  });
+
+  it('lays out a wished region the same every time, with its creatures, person and roads reachable', () => {
+    const def = { ...land('frost', { x: -2, y: 0 }, { npc: { id: 'frost-npc', name: 'Hermit', asset: 'wished-frost-npc' } }), exits: { east: 'woods', north: 'up' } };
+    const map = generateRegion(def);
+    expect(generateRegion(def).tiles).toEqual(map.tiles);
+    expect(map.creatures).toHaveLength(4);
+    expect(map.npcs.map((n) => n.name)).toEqual(['Hermit']);
+    const seen = reachable(map, map.spawn);
+    for (const entry of Object.values(map.entries)) expect(seen[Math.floor(entry.y) * map.width + Math.floor(entry.x)]).toBe(1);
+    for (const n of map.npcs) expect(collides(map, n.x, n.y)).toBe(false);
+  });
+
+  it('grows trees, rocks and water as thick as the wish asked', () => {
+    const count = (map: RegionMap, tile: Tile) => map.tiles.filter((t) => t === tile).length;
+    const bare = generateRegion(land('bare', { x: 5, y: 5 }, { trees: 0, rocks: 0, water: 0 }));
+    const thick = generateRegion(land('thick', { x: 5, y: 5 }, { trees: 3, rocks: 3, water: 3 }));
+    expect(count(bare, Tile.Tree) + count(bare, Tile.Rock) + count(bare, Tile.Water)).toBe(0);
+    expect(count(thick, Tile.Tree)).toBeGreaterThan(100);
+    expect(count(thick, Tile.Water)).toBeGreaterThan(100);
   });
 });

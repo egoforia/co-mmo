@@ -12,6 +12,11 @@ interface Region {
   id: string;
   name: string;
   biome: string;
+  /** Its square on the world grid. */
+  at: { x: number; y: number };
+  /** Wished regions: who wished it, and how dangerous it is. */
+  wisher?: string;
+  danger?: number;
   width: number;
   height: number;
   players: { id: string; name: string; x: number; y: number; level?: number }[];
@@ -53,6 +58,7 @@ interface Entry {
     script?: string;
   };
   art?: string;
+  kitArt?: Record<string, string>;
   itemArt?: Record<string, string>;
   conversation?: { role: string; content: string }[];
   usd?: number;
@@ -222,14 +228,24 @@ let regions: Region[] = [];
 async function world(): Promise<string> {
   const o = await api<{ regions: Region[]; online: number; recent: Entry[]; queue: number; reports: number; rules: number; budget: Budget | null; update: { behind: number; blocked?: string } | null; building: number }>('overview');
   regions = o.regions;
-  const byId = new Map(regions.map((r) => [r.id, r]));
-  const cell = (id: string) => {
-    const r = byId.get(id);
+  // The world grid, one square per region; it grows as regions are wished.
+  const xs = regions.map((r) => r.at.x);
+  const ys = regions.map((r) => r.at.y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const columns = Math.max(...xs) + 1 - left;
+  const rows = Math.max(...ys) + 1 - top;
+  const byCell = new Map(regions.map((r) => [`${r.at.x},${r.at.y}`, r]));
+  const cell = (x: number, y: number) => {
+    const r = byCell.get(`${x},${y}`);
     if (!r) return '<div></div>';
     const alive = r.creatures.filter((c) => c.alive).length;
-    return `<figure class="region ${r.id}"><canvas data-region="${r.id}" width="${r.width * 4}" height="${r.height * 4}"></canvas>
-      <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures</figcaption></figure>`;
+    const credit = r.wisher ? `<br><small>wished by ${escapeHtml(r.wisher)} · danger ${r.danger}</small>` : '';
+    return `<figure class="region ${r.id} ${escapeHtml(r.biome)}"><canvas data-region="${r.id}" width="${r.width * 4}" height="${r.height * 4}"></canvas>
+      <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures${credit}</figcaption></figure>`;
   };
+  const grid: string[] = [];
+  for (let y = top; y < top + rows; y++) for (let x = left; x < left + columns; x++) grid.push(cell(x, y));
   const b = o.budget;
   const budgetCard = b
     ? `<div class="stat ${b.over ? 'bad' : b.warn ? 'warn' : ''}"><b>${usd(b.spentUsd)}</b><span>spent of ${usd(b.monthlyUsd)} this month</span></div>`
@@ -244,7 +260,7 @@ async function world(): Promise<string> {
       ${budgetCard}
       ${o.update?.behind ? `<a class="stat warn" href="#updates"><b>${o.update.behind}</b><span>new commit${o.update.behind === 1 ? '' : 's'} on main</span></a>` : ''}
     </div>
-    <div class="map">${['', '', '', 'woods', 'sanctum', 'shore', '', 'desert', ''].map((id) => (id ? cell(id) : '<div></div>')).join('')}</div>
+    <div class="map" style="grid-template-columns: repeat(${columns}, minmax(0, 1fr)); max-width: ${columns * 300}px">${grid.join('')}</div>
     <p class="legend"><i class="p"></i> players <i class="c"></i> creatures <i class="n"></i> people <i class="l"></i> landmarks</p>
     <h2>Latest wishes</h2>
     ${o.recent.length ? `<ul class="recent">${o.recent.map((e) => `<li><b>${escapeHtml(e.title)}</b> by ${escapeHtml(e.wisher.name)} · ${when(e.at)}</li>`).join('')}</ul>` : '<p class="note">No wishes granted yet.</p>'}`;
@@ -308,7 +324,7 @@ async function wishes(): Promise<string> {
         ${e.status === 'granted' && !e.build ? `<button type="button" class="quiet" data-rollback="${e.id}">Roll back</button>` : ''}
         ${owner && e.build?.state === 'failed' ? `<button type="button" class="quiet" data-build="${e.id}">Try again</button>` : ''}
         ${owner && e.status === 'approved' && !e.build ? `<button type="button" class="quiet" data-build="${e.id}">Build it</button>` : ''}
-        ${owner && e.status === 'granted' && e.definition ? `<button type="button" class="quiet" data-paint="${e.id}">${e.art ? 'Repaint' : 'Paint'}</button>` : ''}
+        ${owner && e.status === 'granted' && e.definition ? `<button type="button" class="quiet" data-paint="${e.id}">${e.art || e.kitArt || e.itemArt ? 'Repaint' : 'Paint'}</button>` : ''}
       </div></td>
     </tr>`).join('');
   const active = content.filter((e) => e.build && ['queued', 'building', 'review', 'merged', 'failed'].includes(e.build.state));

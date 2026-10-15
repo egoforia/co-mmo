@@ -220,14 +220,16 @@ export function createApp(options: AppOptions): App {
     const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
-    // Building art painted here, beyond what ships with the game.
-    if (path === '/api/art' && req.method === 'GET') return json(res, 200, buildingPainter.manifest());
+    // Building art and wished biomes' kits painted here, beyond what ships with the game.
+    if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest() });
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
     const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
     if (art && req.method === 'GET') return serveFile(join(options.wishes.artDir, `${art[1]}.png`), res);
     const building = path.match(/^\/wished-art\/buildings\/([\w-]+\.(?:png|webp))$/);
     if (building && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'buildings', building[1]!), res);
+    const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
+    if (kit && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'biomes', kit[1]!), res);
 
     if (options.clientDir && req.method === 'GET') return serveStatic(options.clientDir, path, res);
     json(res, 404, { error: 'not_found' });

@@ -16,3 +16,4 @@ export * from './workshop.ts';
 export * from './walk-rig.ts';
 export * from './walk.ts';
 export * from './sounds.ts';
+export * from './held.ts';

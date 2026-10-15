@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import {
   ABILITIES,
+  ITEMS,
   Interpolator,
+  heldItem,
   Predictor,
   TICK_SECONDS,
   TILE_PIXELS,
@@ -15,6 +17,8 @@ import {
   rand2,
   biomeLook,
   type ArtManifest,
+  type ArtPoint,
+  type ArtPointsManifest,
   type BodyState,
   type Building,
   type ClientMessage,
@@ -32,7 +36,7 @@ import {
   wishArtKey,
 } from '@co-mmo/shared';
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
-import { lookArt, sceneArt } from './wished.ts';
+import { artSrc, lookArt, sceneArt } from './wished.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Sprite;
@@ -46,6 +50,8 @@ interface Avatar {
   bar?: { bg: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle };
   /** Offset for lunges and recoils, in pixels; tweened. */
   nudge: { x: number; y: number };
+  /** The weapon or charm shown in its hand, drawn once its hand and the item's grip are known. */
+  held?: { item: string; image?: Phaser.GameObjects.Image };
 }
 
 interface Remote extends Avatar {
@@ -79,6 +85,8 @@ interface DrawnRegion {
 export interface WorldSceneOptions {
   welcome: WelcomeMessage;
   art: ArtManifest;
+  /** Where hands and grips are in painted pictures, for held items. */
+  points: ArtPointsManifest;
   send: (message: ClientMessage) => void;
   /** True while the player is typing, so keys go to the chat box. */
   typing: () => boolean;
@@ -86,6 +94,8 @@ export interface WorldSceneOptions {
 
 const T = TILE_PIXELS;
 const LABEL_DEPTH = 1_000_000;
+/** A held item's longest side, as a share of its holder's height. */
+const HELD_SIZE = 0.42;
 
 export class WorldScene extends Phaser.Scene {
   private welcome: WelcomeMessage;
@@ -201,6 +211,7 @@ export class WorldScene extends Phaser.Scene {
     this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
     this.shown = { ...this.predictor.position };
     this.me = this.makeAvatar(this.playerTexture(welcome.you.id), welcome.you.name, true);
+    this.setHeld(this.me, heldItem(welcome.character));
     this.refreshWishes();
 
     const kb = this.input.keyboard!;
@@ -279,6 +290,10 @@ export class WorldScene extends Phaser.Scene {
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y });
     const now = performance.now();
     this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
+    for (const p of snapshot.players) {
+      const remote = this.remotes.get(p.id);
+      if (remote) this.setHeld(remote, p.held);
+    }
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
     this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
     const bodies = snapshot.bodies ?? [];
@@ -685,6 +700,7 @@ export class WorldScene extends Phaser.Scene {
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
     const top = py + T / 10 - a.body.displayHeight;
     a.label.setPosition(px, top - 4);
+    this.placeHeld(a);
     if (a.bar) {
       a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
       a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
@@ -693,6 +709,67 @@ export class WorldScene extends Phaser.Scene {
     a.shadow.setDepth(py - 2);
     a.body.setDepth(py);
     a.label.setDepth(LABEL_DEPTH);
+  }
+
+  /** Our own weapon or charm changed. */
+  setMyHeld(item: string | undefined): void {
+    if (this.me) this.setHeld(this.me, item);
+  }
+
+  /** Newly found hands and grips. */
+  setPoints(points: ArtPointsManifest): void {
+    this.options.points = points;
+  }
+
+  /** Puts an item in an avatar's hand, or takes it away. */
+  private setHeld(a: Avatar, item: string | undefined): void {
+    if (a.held?.item === item) return;
+    a.held?.image?.destroy();
+    a.held = item ? { item } : undefined;
+    const key = item ? ITEMS[item]?.art : undefined;
+    if (key && !this.textures.exists(key)) void this.loadArt(key, artSrc(key));
+  }
+
+  /**
+   * Draws a held item with its grip on the holder's free hand in the frame
+   * showing now, in front of the body unless the holder walks away from us.
+   * Nothing shows until a vision model has found both points: no guessing.
+   */
+  private placeHeld(a: Avatar): void {
+    const held = a.held;
+    if (!held) return;
+    const key = ITEMS[held.item]?.art;
+    const b = a.body;
+    const hand = this.handOf(a);
+    const grip = key ? this.options.points[key]?.grip : undefined;
+    if (!key || !hand || !grip || !this.textures.exists(key)) {
+      held.image?.setVisible(false);
+      return;
+    }
+    if (!held.image || held.image.texture.key !== key) {
+      held.image?.destroy();
+      held.image = this.add.image(0, 0, key);
+    }
+    const mirrored = b.flipX;
+    const x = b.x + (mirrored ? b.originX - hand[0] : hand[0] - b.originX) * b.displayWidth;
+    const y = b.y + (hand[1] - b.originY) * b.displayHeight;
+    const flip = mirrored || a.facing === 'left';
+    const image = held.image;
+    image
+      .setFlipX(flip)
+      .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
+      .setScale((b.displayHeight * HELD_SIZE) / Math.max(image.width, image.height))
+      .setPosition(x, y)
+      .setDepth(b.depth + (a.facing === 'back' ? -1 : 1))
+      .setVisible(b.visible);
+  }
+
+  /** Where the avatar's free hand is in the picture or walk frame it shows now. */
+  private handOf(a: Avatar): ArtPoint | undefined {
+    const hands = this.options.points[a.body.texture.key]?.hands;
+    if (!hands?.length) return undefined;
+    const frame = hands.length > 1 ? Number(a.body.frame.name) : 0;
+    return hands[Number.isInteger(frame) ? frame : 0] ?? undefined;
   }
 
   private fitTint(): void {
@@ -712,6 +789,7 @@ function bodyLabel(b: BodyState): string {
 }
 
 function destroyAvatar(a: Avatar): void {
+  a.held?.image?.destroy();
   a.body.destroy();
   a.shadow.destroy();
   a.label.destroy();

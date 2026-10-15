@@ -1,9 +1,9 @@
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { extname, join, normalize, resolve } from 'node:path';
+import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { TICK_SECONDS, WishError, isClientMessage, upgradeCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
+import { ITEMS, TICK_SECONDS, WALKING_LOOKS, WALK_FRAMES, WishError, isClientMessage, ruleItemId, upgradeCharacter, validateName, wishArtKey, type ArtManifest, type PlayerInfo } from '@co-mmo/shared';
 import { Auth, cleanEmail, type Mailer } from './auth.ts';
 import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
@@ -25,6 +25,7 @@ import { SoundMaker } from './sound-maker.ts';
 import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from './assets/sound.ts';
 import type { FinishedSound } from './assets/sound-finish.ts';
 import { FilePaintRequests } from './paint-requests.ts';
+import { HandFinder, type PointSource } from './hand-finder.ts';
 
 export interface AppOptions {
   store: Store;
@@ -77,6 +78,8 @@ export interface App {
   auth: Auth;
   /** God's View's Art tab: the painting log and repaint requests. */
   art: ArtStudio;
+  /** Where hands and grips are, for held items. */
+  hands: HandFinder;
   close(): Promise<void>;
 }
 
@@ -199,6 +202,48 @@ export function createApp(options: AppOptions): App {
     store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests,
   });
+  // Held items: where each walker's free hand is and where each weapon or charm is gripped.
+  const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
+  const handFinder = new HandFinder({
+    artDir: options.wishes.artDir,
+    model: () => wishes.judgeModel(),
+    paused: () => wishes.budget().paused,
+    spend: (usd, model) => store.recordSpend({ at: Date.now(), usd, kind: 'chat', provider: model.provider, model: model.model, playerId: null }),
+    sources: async () => pointSources(await painterOptions.shipped(), await paintedArt()),
+  });
+  /** Reads a picture the client is served: painted here, or shipped with the game. */
+  const artFile = (file: string): Promise<Buffer> => {
+    const path = file.split('?')[0]!.replace(/^\//, '');
+    if (path.startsWith('wished-art/')) return readFile(resolve(options.wishes.artDir, path.slice('wished-art/'.length)));
+    if (!options.shippedArt) return Promise.reject(new Error('no shipped art'));
+    return readFile(resolve(dirname(dirname(options.shippedArt)), path));
+  };
+  /** Every walk strip, walking look and wished look (their hands), and every weapon and charm (their grips). */
+  const pointSources = (shipped: ArtManifest, painted: ArtManifest): PointSource[] => {
+    // As the client merges them: shipped art wins, except what the Owner had painted again.
+    const art: ArtManifest = { ...painted, ...shipped, ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)) };
+    const wished = new Map<string, string>();
+    for (const record of store.content) {
+      const def = record.definition;
+      if (record.status !== 'granted' || !def) continue;
+      if (record.art) wished.set(wishArtKey(record.id), record.art);
+      if (def.kind === 'rule') for (const key of Object.keys(def.items)) if (record.itemArt?.[ruleItemId(record.id, key)]) wished.set(wishArtKey(ruleItemId(record.id, key)), record.itemArt[ruleItemId(record.id, key)]!);
+    }
+    const source = (id: string, kind: PointSource['kind'], file: string | undefined, frames = 1): PointSource[] =>
+      file ? [{ id, kind, file, frames, read: () => artFile(file) }] : [];
+    const looks = store.content.filter((r) => r.status === 'granted' && r.definition?.kind === 'player').map((r) => wishArtKey(r.id));
+    return [
+      ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'walk' ? source(id, 'hands', e.file, e.frames ?? WALK_FRAMES) : [])),
+      ...WALKING_LOOKS.flatMap((id) => source(id, 'hands', art[id]?.file)),
+      ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),
+      ...Object.values(ITEMS).filter((item) => item.slot === 'weapon' || item.slot === 'charm')
+        .flatMap((item) => source(item.art, 'grip', item.art.startsWith('wished-') ? wished.get(item.art) : art[item.art]?.file)),
+    ];
+  };
+  // Looked for after start-up painting, then now and again for what was painted since.
+  if (options.shippedArt) void Promise.resolve(buildingPainter.job).then(() => walkPainter.job).then(() => handFinder.start());
+  const handTimer = setInterval(() => void handFinder.start(), 5 * 60_000);
+  handTimer.unref?.();
   // Paintings a restart cut short are asked for again, behind start-up painting.
   const resuming = paintRequests.resume({
     wish: (request) => wishes.resumePaint(request),
@@ -331,7 +376,9 @@ export function createApp(options: AppOptions): App {
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
-    if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
+    if (path === '/api/art' && req.method === 'GET') return json(res, 200, await paintedArt());
+    // Where hands and grips are in painted pictures, for held items.
+    if (path === '/api/art-points' && req.method === 'GET') return json(res, 200, await handFinder.manifest());
     // Sound effects and each land's music, made here.
     if (path === '/api/sounds' && req.method === 'GET') return json(res, 200, await sounds.manifest());
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
@@ -494,9 +541,11 @@ export function createApp(options: AppOptions): App {
     builds,
     auth,
     art: artStudio,
+    hands: handFinder,
     async close() {
       clearInterval(tickTimer);
       clearTimeout(dayTimer);
+      clearInterval(handTimer);
       options.updater?.stop();
       clearInterval(heartbeatTimer);
       builds.stop();
@@ -509,6 +558,7 @@ export function createApp(options: AppOptions): App {
       await Promise.allSettled([...wishes.drafts]);
       await buildingPainter.job;
       await walkPainter.job;
+      await handFinder.job;
       await sounds.job;
       await Promise.allSettled([...sounds.pending]);
       await artStudio.idle();

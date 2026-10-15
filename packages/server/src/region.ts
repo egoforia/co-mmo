@@ -52,6 +52,7 @@ import {
   Tile,
   type BodyState,
   type Character,
+  heldItem,
   type CreatorCredit,
   type EquipSlot,
   type ChatChannel,
@@ -590,6 +591,7 @@ export class Region {
         players.push({
           id: other.info.id, name: other.info.name, color: other.info.color, x: round(other.x), y: round(other.y),
           health: round(other.character.hp / maxHp(other.character)),
+          ...(heldItem(other.character) ? { held: heldItem(other.character) } : {}),
         });
       }
       const creatures: CreatureState[] = [];

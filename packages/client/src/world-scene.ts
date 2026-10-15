@@ -6,6 +6,8 @@ import {
   TICK_SECONDS,
   TILE_PIXELS,
   Tile,
+  WALK_FPS,
+  WALK_FRAMES,
   generateRegion,
   buildingArt,
   exteriorSpan,
@@ -21,16 +23,21 @@ import {
   type RegionMap,
   type Side,
   type SnapshotMessage,
+  type WalkDirection,
   type WelcomeMessage,
+  walkArt,
+  walkDirection,
   wishArtKey,
 } from '@co-mmo/shared';
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { lookArt, sceneArt } from './wished.ts';
 
 interface Avatar {
-  body: Phaser.GameObjects.Image;
+  body: Phaser.GameObjects.Sprite;
   /** The texture this avatar should wear, once it has loaded. */
   art: string;
+  /** The way it last walked, for looks with painted walk sheets. */
+  facing: WalkDirection;
   shadow: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
   /** Health bar, shown once hurt. */
@@ -118,7 +125,18 @@ export class WorldScene extends Phaser.Scene {
 
   preload(): void {
     for (const [id, entry] of Object.entries(this.options.art)) {
-      if (!this.textures.exists(id)) this.load.image(id, entry.file);
+      if (this.textures.exists(id)) continue;
+      // A walk sheet is one strip of frames, side by side.
+      if (entry.kind === 'walk') this.load.spritesheet(id, entry.file, { frameWidth: entry.width / WALK_FRAMES, frameHeight: entry.height });
+      else this.load.image(id, entry.file);
+    }
+  }
+
+  /** A looping walk for every walk sheet that loaded, named after its sheet. */
+  private makeWalks(): void {
+    for (const [id, entry] of Object.entries(this.options.art)) {
+      if (entry.kind !== 'walk' || !this.textures.exists(id) || this.anims.exists(id)) continue;
+      this.anims.create({ key: id, frames: this.anims.generateFrameNumbers(id, { start: 0, end: WALK_FRAMES - 1 }), frameRate: WALK_FPS, repeat: -1 });
     }
   }
 
@@ -168,6 +186,7 @@ export class WorldScene extends Phaser.Scene {
     this.accumulator = 0;
     this.painted = new Set();
     this.showRegion(welcome);
+    this.makeWalks();
 
     this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
     this.shown = { ...this.predictor.position };
@@ -265,12 +284,11 @@ export class WorldScene extends Phaser.Scene {
       if (dx !== 0 || dy !== 0) {
         const input = predictor.apply(dx, dy);
         this.options.send({ t: 'input', ...input });
-        if (dx !== 0) {
-          this.facing = dx;
-          this.me.body.setFlipX(dx < 0);
-        }
+        if (dx !== 0) this.facing = dx;
       }
     }
+    const held = this.readInput();
+    this.walk(this.me, held.dx, held.dy);
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);
@@ -287,9 +305,13 @@ export class WorldScene extends Phaser.Scene {
       for (const remote of group.values()) {
         const pos = remote.interp.sample(now);
         if (!pos) continue;
-        const before = remote.body.x;
+        // Measured without the lunge nudge, so a strike is not a step.
+        const before = { x: remote.body.x - remote.nudge.x, y: remote.body.y - remote.nudge.y };
         this.placeAvatar(remote, pos.x, pos.y);
-        if (Math.abs(remote.body.x - before) > 0.5) remote.body.setFlipX(remote.body.x < before);
+        const dx = remote.body.x - remote.nudge.x - before.x;
+        const dy = remote.body.y - remote.nudge.y - before.y;
+        // Under half a pixel is standing still, not a step.
+        this.walk(remote, Math.abs(dx) > 0.5 ? dx : 0, Math.abs(dy) > 0.5 ? dy : 0);
         // People indoors stay out of sight until we come close enough to see in.
         if (group !== this.creatures) {
           const seen = !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
@@ -314,8 +336,33 @@ export class WorldScene extends Phaser.Scene {
       const art = this.playerTexture(id);
       if (!a || a.art === art) continue;
       a.art = art;
+      a.body.stop();
       if (this.textures.exists(art)) a.body.setTexture(art);
     }
+  }
+
+  /**
+   * Plays an avatar's walk for the way it moves by (dx, dy), and stands it
+   * still facing that way when it stops. A look without painted walk sheets
+   * (a wished look, a creature) only turns to face left or right.
+   */
+  private walk(a: Avatar, dx: number, dy: number): void {
+    a.facing = walkDirection(dx, dy, a.facing);
+    const sheet = walkArt(a.art, a.facing);
+    if (!this.anims.exists(sheet)) {
+      if (dx !== 0) a.body.setFlipX(dx < 0);
+      return;
+    }
+    a.body.setFlipX(false);
+    if (dx !== 0 || dy !== 0) {
+      a.body.play(sheet, true);
+      return;
+    }
+    if (!a.body.anims.isPlaying) return;
+    a.body.stop();
+    // Facing us, the approved standing pose; any other way, the walk's first step.
+    if (a.facing === 'front' && this.textures.exists(a.art)) a.body.setTexture(a.art);
+    else a.body.setTexture(sheet, 0);
   }
 
   /** A player's own painted look, or one of the two approved player looks. */
@@ -596,7 +643,7 @@ export class WorldScene extends Phaser.Scene {
 
   private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = this.add.image(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97);
+    const body = this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97);
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -606,7 +653,7 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, art: texture, shadow, label, nudge: { x: 0, y: 0 } };
+    return { body, art: texture, facing: 'front', shadow, label, nudge: { x: 0, y: 0 } };
   }
 
   /** Places an avatar at (x, y) in our region, counted from its corner. */

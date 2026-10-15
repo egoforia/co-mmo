@@ -15,7 +15,8 @@ import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
 import type { Updater } from './updates.ts';
 import { Builds, type BuildOptions } from './builds.ts';
-import { BuildingPainter } from './building-painter.ts';
+import { BuildingPainter, type BuildingPainterOptions } from './building-painter.ts';
+import { WalkPainter } from './walk-painter.ts';
 
 export interface AppOptions {
   store: Store;
@@ -88,15 +89,18 @@ export function createApp(options: AppOptions): App {
   const wishes = new Wishes(store, world, rules, options.wishes);
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now });
   wishes.restore();
-  const buildingPainter = new BuildingPainter({
+  const painterOptions: BuildingPainterOptions = {
     provider: () => wishes.imageProvider(),
     overBudget: () => wishes.budget().over,
     spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: null }),
     anchorDir: options.wishes.anchorDir,
     artDir: options.wishes.artDir,
     shipped: async () => (options.shippedArt ? JSON.parse(await readFile(options.shippedArt, 'utf8')) : {}),
-  });
-  if (options.shippedArt) void buildingPainter.start();
+  };
+  const buildingPainter = new BuildingPainter(painterOptions);
+  const walkPainter = new WalkPainter(painterOptions);
+  // Buildings first: a building without its picture matters more than a stiff walk.
+  if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
   const reports = new Reports(store, world);
   const builds = new Builds(store, {
     changed: (id) => wishes.changed(id),
@@ -222,14 +226,16 @@ export function createApp(options: AppOptions): App {
     const admin = { store, world, wishes, rules, reports, builds, kick, updater: options.updater, restarting, env, json, readJson };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
-    // Building art and wished biomes' kits painted here, beyond what ships with the game.
-    if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest() });
+    // Building art, the hero's walk and wished biomes' kits painted here, beyond what ships with the game.
+    if (path === '/api/art' && req.method === 'GET') return json(res, 200, { ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest() });
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
     const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
     if (art && req.method === 'GET') return serveFile(join(options.wishes.artDir, `${art[1]}.png`), res);
     const building = path.match(/^\/wished-art\/buildings\/([\w-]+\.(?:png|webp))$/);
     if (building && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'buildings', building[1]!), res);
+    const walk = path.match(/^\/wished-art\/walks\/([\w-]+\.png)$/);
+    if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
     const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
     if (kit && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'biomes', kit[1]!), res);
 
@@ -378,6 +384,7 @@ export function createApp(options: AppOptions): App {
       await Promise.allSettled([...builds.jobs]);
       await Promise.allSettled([...wishes.drafts]);
       await buildingPainter.job;
+      await walkPainter.job;
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();
       clearInterval(autosaveTimer);

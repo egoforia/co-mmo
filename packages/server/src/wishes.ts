@@ -38,6 +38,8 @@ import { GeminiImageProvider, REFERENCE_NOTE } from './assets/gemini.ts';
 import type { ImageProvider } from './assets/provider.ts';
 import { artRequest, estimateImageUsd, imageUsd, paintWish } from './assets/wish-art.ts';
 import type { ArtJobHandle, ArtJobs } from './art-jobs.ts';
+import { queuedImages, watched, type PaintQueue } from './paint-queue.ts';
+import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { OfflineCompiler, compileRule } from './compiler.ts';
 import { OfflineGod, askGod, askWorkshopGod, type GodReply, type PrayerContext, type WorkshopContext, type WorkshopReply } from './god.ts';
@@ -122,6 +124,10 @@ export class Wishes {
   readonly painting = new Set<Promise<void>>();
   /** The painting log God's View shows. */
   artJobs?: ArtJobs;
+  /** Turns at the image model, so it is never asked faster than it allows. */
+  paintQueue?: PaintQueue;
+  /** Wish paintings kept across a restart until they are done. */
+  paintRequests?: PaintRequests;
   /** Told when a confirmed card became a wish (granted or sent for review), so its Workshop draft can go. */
   onCardUsed?: (playerId: string, cardId: string) => void;
 
@@ -730,12 +736,12 @@ export class Wishes {
     if (!provider) return undefined;
     if (!force && this.budget().over) return undefined;
     const def = record.definition;
-    if (def.kind === 'region') return this.track(this.paintRegion(record, def, provider, force, only, prompts));
+    if (def.kind === 'region') return this.keep({ record, force, only, prompts }, this.track(this.paintRegion(record, def, provider, force, only, prompts)));
     const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
     const pictures: { id: string; def: PicturedWish }[] = def.kind === 'rule'
       ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
       : [{ id: record.id, def }];
-    const chosen = pictures.filter((p) => !only || p.id === only);
+    const chosen = pictures.filter((p) => (only ? p.id === only : force || !hasArt(record, p.id)));
     const handles = chosen.map((p) => this.queueArt(p.id, p.def.name, force, provider));
     const job = (async () => {
       for (const [i, picture] of chosen.entries()) {
@@ -747,7 +753,7 @@ export class Wishes {
         let painted;
         handle?.start();
         try {
-          painted = await paintWish(picture.id, picture.def, biome, provider, this.options.anchorDir, this.options.artDir, prompts[picture.id]);
+          painted = await paintWish(picture.id, picture.def, biome, watched(provider, handle), this.options.anchorDir, this.options.artDir, prompts[picture.id]);
         } catch (err) {
           console.error(`Painting ${picture.id} failed:`, (err as Error).message);
           handle?.fail((err as Error).message);
@@ -767,6 +773,19 @@ export class Wishes {
       }
     })().finally(() => this.painting.delete(job));
     this.painting.add(job);
+    return this.keep({ record, force, only, prompts }, job);
+  }
+
+  /** Paints a wish's pictures again after a restart cut their painting short. */
+  resumePaint(request: Extract<PaintRequest, { kind: 'wish' }>): void {
+    const record = this.store.contentById(request.record);
+    if (record) this.paint(record, request.force, request.prompts, request.only);
+  }
+
+  /** Keeps a wish's painting until it is done, so a restart asks for it again. */
+  private keep(asked: { record: ContentRecord; force: boolean; only?: string; prompts: Record<string, string> }, job: Promise<void>): Promise<void> {
+    const prompts = Object.keys(asked.prompts).length ? { prompts: asked.prompts } : {};
+    this.paintRequests?.hold({ kind: 'wish', record: asked.record.id, force: asked.force, ...(asked.only ? { only: asked.only } : {}), ...prompts }, job);
     return job;
   }
 
@@ -786,7 +805,7 @@ export class Wishes {
     };
     // The Owner's Repaint paints the biome's kit again too.
     const kitAssets = wildKit(def.biome).filter((a) => (only ? a.id === only : !kit[a.id] || force));
-    const pictures = regionPictures(record.id, def).filter((p) => !only || p.id === only);
+    const pictures = regionPictures(record.id, def).filter((p) => (only ? p.id === only : force || !hasArt(record, p.id)));
     const kitJobs = kitAssets.map((a) => this.queueArt(a.id, a.name, force, provider));
     const pictureJobs = pictures.map((p) => this.queueArt(p.id, p.def.name, force, provider));
     const skipAll = () => {
@@ -796,7 +815,7 @@ export class Wishes {
       if (!force && this.budget().over) return skipAll();
       kitJobs[i]?.start();
       try {
-        const { image, entry, prompt, references } = await paintKitAsset(asset, provider, this.options.anchorDir, dir, prompts[asset.id] ? { prompt: prompts[asset.id] } : {});
+        const { image, entry, prompt, references } = await paintKitAsset(asset, watched(provider, kitJobs[i]), this.options.anchorDir, dir, prompts[asset.id] ? { prompt: prompts[asset.id] } : {});
         const usd = imageUsd(provider.model, image);
         kitJobs[i]?.done(usd);
         this.store.recordSpend({ at: this.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: record.wisher.id });
@@ -817,7 +836,7 @@ export class Wishes {
       let painted;
       pictureJobs[i]?.start();
       try {
-        painted = await paintWish(picture.id, picture.def, def.biome, provider, this.options.anchorDir, this.options.artDir, prompts[picture.id]);
+        painted = await paintWish(picture.id, picture.def, def.biome, watched(provider, pictureJobs[i]), this.options.anchorDir, this.options.artDir, prompts[picture.id]);
       } catch (err) {
         console.error(`Painting ${picture.id} failed:`, (err as Error).message);
         pictureJobs[i]?.fail((err as Error).message);
@@ -916,8 +935,13 @@ export class Wishes {
     return models;
   }
 
-  /** The image model chosen in God's View, when it has a key. */
+  /** The image model chosen in God's View, when it has a key, taking turns in the paint queue. */
   imageProvider(): ImageProvider | undefined {
+    const provider = this.chosenImageProvider();
+    return provider && this.paintQueue ? queuedImages(this.paintQueue, provider) : provider;
+  }
+
+  private chosenImageProvider(): ImageProvider | undefined {
     const settings = this.store.settings;
     if (this.options.imageProvider) return this.options.imageProvider(settings);
     if (settings.ai.image.provider !== 'gemini' || !this.env.GEMINI_API_KEY) return undefined;
@@ -969,4 +993,9 @@ export function publicEntry(record: ContentRecord): ContentEntry {
     return { ...entry, definition };
   }
   return entry;
+}
+
+/** True when a wish's picture was painted already. */
+function hasArt(record: ContentRecord, pictureId: string): boolean {
+  return pictureId === record.id ? Boolean(record.art) : Boolean(record.itemArt?.[pictureId]);
 }

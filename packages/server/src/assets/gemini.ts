@@ -1,4 +1,4 @@
-import { ProviderError, type GeneratedImage, type ImageProvider, type ImageRequest } from './provider.ts';
+import { ProviderError, googleError, type GoogleError, type GeneratedImage, type ImageProvider, type ImageRequest } from './provider.ts';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -45,12 +45,12 @@ export class GeminiImageProvider implements ImageProvider {
       }),
     });
     const body = (await res.json().catch(() => ({}))) as {
-      error?: { message?: string };
+      error?: GoogleError;
       usageMetadata?: { candidatesTokenCount?: number };
       promptFeedback?: { blockReason?: string };
       candidates?: { finishReason?: string; content?: { parts?: GeminiPart[] } }[];
     };
-    if (!res.ok) throw new ProviderError(this.id, res.status, body.error?.message ?? res.statusText);
+    if (!res.ok) throw googleError(this.id, res.status, body.error, res.statusText);
     if (body.promptFeedback?.blockReason) {
       throw new ProviderError(this.id, 422, `request blocked (${body.promptFeedback.blockReason})`);
     }

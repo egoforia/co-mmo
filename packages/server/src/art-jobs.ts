@@ -3,12 +3,14 @@ import { randomBytes } from 'node:crypto';
 // Every picture and clip the server paints passes through here, so God's View
 // can show what is waiting, what is being painted now, what came out and what
 // failed, with what each cost. The log lives in memory: after a restart it
-// starts again with whatever start-up painting there is.
+// starts again with whatever start-up painting there is, and the requests
+// kept in PaintRequests.
 
 /** Who asked for a painting. */
 export type ArtJobSource = 'start-up' | 'gods-view' | 'wish';
 
-export type ArtJobStatus = 'queued' | 'painting' | 'done' | 'failed' | 'skipped';
+/** Queued: in line behind other painting. Waiting: next, but held back by the model's rate limit. */
+export type ArtJobStatus = 'queued' | 'waiting' | 'painting' | 'done' | 'failed' | 'skipped';
 
 /** One picture or clip, from asking to done. */
 export interface ArtJob {
@@ -25,7 +27,7 @@ export interface ArtJob {
   estimateUsd: number;
   /** What it did cost, once painted. */
   usd?: number;
-  /** Why it failed or was skipped, in plain words. */
+  /** Why it waits, failed or was skipped, in plain words. */
   reason?: string;
   queuedAt: number;
   startedAt?: number;
@@ -36,6 +38,8 @@ export interface ArtJob {
 export interface ArtJobHandle {
   readonly job: ArtJob;
   start(): void;
+  /** Held back by the model's rate limit, with why. */
+  wait(reason: string): void;
   done(usd: number): void;
   fail(reason: string): void;
   skip(reason: string): void;
@@ -58,7 +62,7 @@ export class ArtJobs {
     this.jobs.push(job);
     this.trim();
     const end = (status: ArtJobStatus, patch: Partial<ArtJob>) => {
-      if (job.status === 'done' || job.status === 'failed' || job.status === 'skipped') return;
+      if (finished(job)) return;
       Object.assign(job, { status, endedAt: this.now(), ...patch });
       this.onChange?.();
     };
@@ -66,8 +70,16 @@ export class ArtJobs {
     return {
       job,
       start: () => {
+        if (finished(job)) return;
         job.status = 'painting';
         job.startedAt = this.now();
+        delete job.reason;
+        this.onChange?.();
+      },
+      wait: (reason) => {
+        if (finished(job) || (job.status === 'waiting' && job.reason === reason)) return;
+        job.status = 'waiting';
+        job.reason = reason;
         this.onChange?.();
       },
       done: (usd) => end('done', { usd }),
@@ -96,16 +108,20 @@ export class ArtJobs {
 
   /** Jobs not finished yet. */
   open(): ArtJob[] {
-    return this.jobs.filter((j) => j.status === 'queued' || j.status === 'painting');
+    return this.jobs.filter((j) => !finished(j));
   }
 
   private trim(): void {
     while (this.jobs.length > KEEP) {
-      const i = this.jobs.findIndex((j) => j.status !== 'queued' && j.status !== 'painting');
+      const i = this.jobs.findIndex(finished);
       if (i < 0) return;
       this.jobs.splice(i, 1);
     }
   }
+}
+
+function finished(job: ArtJob): boolean {
+  return job.status === 'done' || job.status === 'failed' || job.status === 'skipped';
 }
 
 /** An error as a sentence a person can read. */

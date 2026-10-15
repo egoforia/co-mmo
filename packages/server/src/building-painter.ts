@@ -5,6 +5,7 @@ import { buildingArtJobs, paintBuildingArt, type BuildingArtJob } from './assets
 import type { ImageProvider } from './assets/provider.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource, type ArtJobs } from './art-jobs.ts';
+import { watched } from './paint-queue.ts';
 
 /** Where painted building art is served from, under the wished-art directory. */
 export const BUILDING_ART_PATH = 'wished-art/buildings';
@@ -113,7 +114,7 @@ export class BuildingPainter {
   private async paint(job: BuildingArtJob, provider: ImageProvider, handle?: ArtJobHandle, redone = false): Promise<void> {
     handle?.start();
     try {
-      const { image, entry } = await paintBuildingArt(job, provider, {
+      const { image, entry } = await paintBuildingArt(job, watched(provider, handle), {
         anchorDir: this.options.anchorDir,
         rawDir: resolve(this.dir, 'raw'),
         outDir: this.dir,

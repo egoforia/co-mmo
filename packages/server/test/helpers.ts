@@ -18,6 +18,7 @@ import { Store } from '../src/store.ts';
 import type { Updater } from '../src/updates.ts';
 import type { BuildOptions } from '../src/builds.ts';
 import type { Mail, Mailer } from '../src/auth.ts';
+import { MemoryPaintQueue, type PaintQueue } from '../src/paint-queue.ts';
 
 export let app: App | null = null;
 const sockets: WebSocket[] = [];
@@ -70,9 +71,11 @@ export async function start(opts: {
   updater?: Updater; builds?: BuildOptions; env?: Record<string, string>; mailer?: Mailer; fetch?: typeof fetch;
   /** Art: the shipped manifest, the anchors, and a video model with its frame cutter. */
   shippedArt?: string; anchorDir?: string; video?: VideoProvider; frames?: (mp4: Buffer) => Promise<Buffer[]>;
+  /** Paint turns: no rate limits unless a test gives some; `artDir` to start again on the same art. */
+  paintQueue?: PaintQueue; artDir?: string;
 } = {}) {
   const store = opts.store ?? Store.memory();
-  const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-art-'));
+  const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
   const painter = opts.painter === undefined ? fakePainter() : opts.painter;
   app = createApp({
     store,
@@ -84,6 +87,7 @@ export async function start(opts: {
     ...(opts.shippedArt ? { shippedArt: opts.shippedArt } : {}),
     videoProvider: () => opts.video,
     ...(opts.frames ? { videoFrames: opts.frames } : {}),
+    paintQueue: opts.paintQueue ?? new MemoryPaintQueue({ limit: () => undefined }),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',

@@ -1,7 +1,7 @@
 import { ProviderError } from './assets/provider.ts';
 import type { ImageProvider } from './assets/provider.ts';
 import type { SoundProvider } from './assets/sound.ts';
-import type { VideoProvider } from './assets/video.ts';
+import type { VideoProvider, VideoRequest } from './assets/video.ts';
 
 // Every picture and clip the server asks for takes a turn here, so the image
 // and video services are never asked faster than they allow. Google refuses
@@ -63,10 +63,27 @@ export type Refusal = 'minute' | 'day';
  * Whether an error is the service refusing to start a request for asking too
  * much, and which limit. Only a refused start counts: asking again after a
  * clip was already made would pay for it twice.
+ *
+ * Google names the quota when it can. Veo's daily cap comes back with no
+ * quota at all, just "You exceeded your current quota", which the per-minute
+ * limit never does since the queue keeps Veo under it, so for Veo a refusal
+ * that names nothing is the day's cap.
  */
-export function refusal(err: unknown): Refusal | undefined {
+export function refusal(err: unknown, model = ''): Refusal | undefined {
   if (!(err instanceof ProviderError) || err.status !== 429 || !err.throttle) return undefined;
-  return err.throttle?.quotas.some((q) => /PerDay/i.test(q)) ? 'day' : 'minute';
+  const { quotas } = err.throttle;
+  if (quotas.some((q) => /PerDay/i.test(q))) return 'day';
+  return quotas.length === 0 && model.startsWith('veo-') ? 'day' : 'minute';
+}
+
+/** Painting stopped for a limit that waiting a little cannot fix: refused at once, and painting picks up later. */
+export class PaintStopped extends Error {}
+
+/** One line for the server log about a refusal: the model, Google's words, the quotas and the wait it asked for, never the key. */
+export function refusalLine(model: string, err: ProviderError): string {
+  const quotas = err.throttle?.quotas.length ? err.throttle.quotas.join(', ') : 'none named';
+  const wait = err.throttle?.retryAfterMs === undefined ? 'none given' : `${Math.ceil(err.throttle.retryAfterMs / 1000)} s`;
+  return `${model} refused (${err.status}): "${err.said}" Quotas: ${quotas}. Retry after: ${wait}.`;
 }
 
 /** The next time Google's daily quotas reset: midnight Pacific time, taken as 08:00 UTC so it is never early. */
@@ -87,6 +104,8 @@ interface ModelTurns {
   pausedUntil: number;
   /** Set when the model's cap is used up: requests fail at once with this, until `pausedUntil`. */
   closed?: string;
+  /** What Google said when it last refused, for the painting log. */
+  said?: string;
   timer?: ReturnType<typeof setTimeout>;
 }
 
@@ -111,24 +130,28 @@ export class MemoryPaintQueue implements PaintQueue {
       try {
         return await call();
       } catch (err) {
-        const kind = refusal(err);
+        const kind = refusal(err, model);
         if (!kind) throw err;
+        const refused = err as ProviderError;
+        // Each refusal is logged once, so the server's log shows what Google really said.
+        console.warn(refusalLine(model, refused));
         const turns = this.turns(model);
         const now = this.now();
+        turns.said = refused.said;
         if (kind === 'day') {
           turns.pausedUntil = nextDailyReset(now);
-          turns.closed = `Google's daily limit for ${model} is used up, so nothing more is sent to it until it resets after midnight Pacific time.`;
-          throw new Error(turns.closed);
+          turns.closed = `Google's daily limit for ${model} is used up, so nothing more is sent to it until it resets at ${clock(turns.pausedUntil)}. Google said: "${refused.said}"`;
+          throw new PaintStopped(turns.closed);
         }
         if (attempt >= this.backoff.length) {
           // Asking again for a quarter of an hour did not help, so this is not the per-minute limit.
           turns.pausedUntil = now + 60 * 60_000;
-          turns.closed = `Google kept refusing ${model} for ${minutes(this.backoff)} minutes, so its daily limit or the account's billing cap is likely used up. Nothing more is sent to it for an hour.`;
-          throw new Error(turns.closed);
+          turns.closed = `Google kept refusing ${model} for ${minutes(this.backoff)} minutes, so its daily limit or the account's billing cap is likely used up. Nothing more is sent to it for an hour. Google said: "${refused.said}"`;
+          throw new PaintStopped(turns.closed);
         }
-        const wait = (err as ProviderError).throttle?.retryAfterMs ?? this.backoff[attempt]!;
+        const wait = refused.throttle?.retryAfterMs ?? this.backoff[attempt]!;
         turns.pausedUntil = Math.max(turns.pausedUntil, now + wait);
-        watcher?.wait(`Google asked us to slow down; asking again in ${Math.ceil(wait / 1000)} s.`);
+        watcher?.wait(`Google asked us to slow down ("${refused.said}"); asking again in ${Math.ceil(wait / 1000)} s.`);
       } finally {
         this.release(model);
       }
@@ -160,7 +183,7 @@ export class MemoryPaintQueue implements PaintQueue {
     const turns = this.turns(model);
     return new Promise<void>((go, refuse) => {
       // A model closed while this request waited refuses it too.
-      turns.waiting.push({ watcher, go: () => (turns.closed ? refuse(new Error(turns.closed)) : go()) });
+      turns.waiting.push({ watcher, go: () => (turns.closed ? refuse(new PaintStopped(turns.closed)) : go()) });
       this.pump(model);
     });
   }
@@ -206,7 +229,8 @@ export class MemoryPaintQueue implements PaintQueue {
     const turns = this.turns(model);
     const limit = this.limit(model)!;
     const line = ahead > 0 ? ` ${ahead} ahead of it.` : '';
-    if (turns.pausedUntil > this.now()) return `Google asked us to slow down; waiting until ${clock(turns.pausedUntil)}.${line}`;
+    const said = turns.said ? ` ("${turns.said}")` : '';
+    if (turns.pausedUntil > this.now()) return `Google asked us to slow down${said}; waiting until ${clock(turns.pausedUntil)}.${line}`;
     return `${model} takes ${limit.perMinute} a minute, ${limit.atOnce} at a time.${line}`;
   }
 }
@@ -222,12 +246,20 @@ export function queuedImages(queue: PaintQueue, provider: ImageProvider): ImageP
   return wrap();
 }
 
-/** A video model whose requests take turns in the queue. */
-export function queuedVideo(queue: PaintQueue, provider: VideoProvider): VideoProvider & Watchable<VideoProvider> {
+/**
+ * A video model whose requests take turns in the queue and, given a daily
+ * count, stop once today's clips are used up: checked before joining the
+ * line, so nobody waits to be refused, and again at the turn.
+ */
+export function queuedVideo(queue: PaintQueue, provider: VideoProvider, clips?: DailyClips): VideoProvider & Watchable<VideoProvider> {
+  const make = (request: VideoRequest) => (clips ? clips.run(provider.model, () => provider.generate(request)) : provider.generate(request));
   const wrap = (watcher?: PaintTurnWatcher): VideoProvider & Watchable<VideoProvider> => ({
     id: provider.id,
     model: provider.model,
-    generate: (request) => queue.turn(provider.model, () => provider.generate(request), watcher),
+    generate: async (request) => {
+      clips?.check(provider.model);
+      return queue.turn(provider.model, () => make(request), watcher);
+    },
     watchedBy: (w) => wrap(w),
   });
   return wrap();
@@ -243,6 +275,63 @@ export function queuedSound(queue: PaintQueue, provider: SoundProvider): SoundPr
   });
   return wrap();
 }
+
+/**
+ * Counts each video model's clips since Google's daily reset and stops it at
+ * the day's cap, so the game never learns of the cap from Google refusing.
+ * A clip counts once Google accepts it, made or not; a refused start does not.
+ * The count starts from the saved spending, so a restart keeps it.
+ */
+export class DailyClips {
+  private readonly days = new Map<string, { since: number; count: number }>();
+  private readonly now: () => number;
+
+  constructor(private readonly options: {
+    /** Clips a model may make a day. */
+    cap: () => number;
+    /** Clips the saved spending shows for a model from `since` on. */
+    madeSince: (model: string, since: number) => number;
+    now?: () => number;
+  }) {
+    this.now = options.now ?? Date.now;
+  }
+
+  /** Clips a model has started since the last reset, and the cap. */
+  used(model: string): { count: number; cap: number; resetsAt: number } {
+    const day = this.day(model);
+    return { count: day.count, cap: this.options.cap(), resetsAt: day.since + DAY_MS };
+  }
+
+  /** Refuses at once when the model's clips for today are used up. */
+  check(model: string): void {
+    const { count, cap, resetsAt } = this.used(model);
+    if (count >= cap) {
+      throw new PaintStopped(`Today's ${cap} ${model} ${cap === 1 ? 'clip is' : 'clips are'} used up (the daily limit on the AI models tab), so walks pick up after ${clock(resetsAt)}.`);
+    }
+  }
+
+  /** Makes one clip if today's cap allows, counting it. */
+  async run<T>(model: string, call: () => Promise<T>): Promise<T> {
+    this.check(model);
+    const day = this.day(model);
+    day.count++;
+    try {
+      return await call();
+    } catch (err) {
+      if (refusal(err, model)) day.count--;
+      throw err;
+    }
+  }
+
+  private day(model: string): { since: number; count: number } {
+    const since = nextDailyReset(this.now()) - DAY_MS;
+    let day = this.days.get(model);
+    if (!day || day.since !== since) this.days.set(model, (day = { since, count: this.options.madeSince(model, since) }));
+    return day;
+  }
+}
+
+const DAY_MS = 24 * 60 * 60_000;
 
 interface Watchable<P> {
   watchedBy(watcher: PaintTurnWatcher): P;

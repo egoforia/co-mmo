@@ -7,8 +7,9 @@ import { knownVideoModels, videoUsd } from './assets/video.ts';
 import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings, type Store } from './store.ts';
+import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
+import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
@@ -25,6 +26,8 @@ export interface AdminContext {
   art?: ArtStudio;
   /** Paints and makes what is missing, now that a limit was raised. */
   resumeArt?(): void;
+  /** Video clips made since Google's daily reset, against the day's cap. */
+  clips?: DailyClips;
   /** Disconnects a player now (after a suspension). */
   kick(id: string, reason: string): void;
   /** Pulls main and restarts the game; absent in tests. */
@@ -233,8 +236,10 @@ export async function handleAdmin(
 
   if (route === 'ai' && method === 'GET') {
     if (ownerOnly()) return true;
+    const video = { ...videoSettings(store.settings, ctx.env), dailyClips: dailyClips(store.settings) };
+    const clips = video.provider === 'gemini' && ctx.clips ? ctx.clips.used(video.model) : undefined;
     return json(res, 200, {
-      ai: { ...store.settings.ai, video: videoSettings(store.settings, ctx.env), sound: soundSettings(store.settings, ctx.env), styleCheck: styleCheckSettings(store.settings) },
+      ai: { ...store.settings.ai, video, sound: soundSettings(store.settings, ctx.env), styleCheck: styleCheckSettings(store.settings) },
       providers: PROVIDERS.map((id) => ({
         id,
         keySet: id === 'offline' || Boolean(ctx.env[KEY_ENV[id as Exclude<ProviderId, 'offline'>]]),
@@ -242,6 +247,7 @@ export async function handleAdmin(
         defaultModel: DEFAULT_MODELS[id],
       })),
       imageKeySet: Boolean(ctx.env.GEMINI_API_KEY),
+      ...(clips ? { clipsToday: { count: clips.count, resetsAt: clips.resetsAt } } : {}),
       effectsKeySet: Boolean(ctx.env.ELEVENLABS_API_KEY),
       // Every key the game can use, whether it is set, and what it is for; never the key itself.
       keys: [
@@ -279,9 +285,17 @@ export async function handleAdmin(
     const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings, ctx.env)
       : vid.provider === 'gemini' ? { provider: 'gemini', model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
       : { provider: 'none', model: '' };
+    // Google's daily clip cap for the key, which the game stops at rather than finding out from refusals.
+    const clipsADay = vid?.dailyClips === undefined || vid.dailyClips === '' ? dailyClips(store.settings) : Number(vid.dailyClips);
+    if (!(Number.isInteger(clipsADay) && clipsADay >= 0 && clipsADay <= 1000)) {
+      return json(res, 400, { error: 'bad_daily_clips', message: 'Clips a day must be a whole number from 0 to 1000.' }), true;
+    }
+    if (video) video.dailyClips = clipsADay;
     const sound = soundChoice(body?.sound, soundSettings(store.settings, ctx.env));
     const styleCheck = styleCheckChoice(body?.styleCheck, styleCheckSettings(store.settings));
     store.updateSettings({ ...store.settings, ai: { god, fallback, compiler, image, video, sound, styleCheck } });
+    // A raised clip limit lets walks held back today be made now.
+    ctx.resumeArt?.();
     return json(res, 200, { ok: true }), true;
   }
 

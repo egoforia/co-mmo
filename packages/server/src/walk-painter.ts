@@ -12,7 +12,7 @@ import { normalizeWalk } from './assets/walk-frames.ts';
 import { LOOK_GEAR, soleFigure, type Carried, startFrame, videoFrames, viewPrompt, walkFromFrames, walkVideoPrompt } from './assets/walk-video.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource } from './art-jobs.ts';
-import { watched } from './paint-queue.ts';
+import { PaintStopped, watched } from './paint-queue.ts';
 import type { BuildingPainterOptions } from './building-painter.ts';
 
 /** Where painted walk strips are served from, under the wished-art directory. */
@@ -185,7 +185,7 @@ export class WalkPainter {
         const view = await this.view(walker, direction, viewJobs.get(direction));
         if (!view) return skipRest(stopReason(this.options)), false;
         const cut = await this.walk(walker, direction, view, body.frames, clipJobs.get(direction));
-        if (cut === 'stop') return skipRest(stopReason(this.options)), false;
+        if (cut && 'stop' in cut) return skipRest(cut.stop), false;
         if (!cut) return skipRest(`Another of ${walker.name}'s walks failed twice, so the rest wait.`), true;
         walks.push(cut);
       }
@@ -254,8 +254,8 @@ export class WalkPainter {
     return figure;
   }
 
-  /** One direction's walk cut from a clip, tried twice; 'stop' when painting has to stop. */
-  private async walk(walker: Walker, direction: WalkDirection, view: Buffer, count: number, handle?: ArtJobHandle): Promise<Buffer[] | 'stop' | undefined> {
+  /** One direction's walk cut from a clip, tried twice; `stop` says why when painting has to stop. */
+  private async walk(walker: Walker, direction: WalkDirection, view: Buffer, count: number, handle?: ArtJobHandle): Promise<Buffer[] | { stop: string } | undefined> {
     const id = walkArt(walker.id, direction);
     const first = { mimeType: 'image/png', data: await startFrame(view) };
     let usd = 0;
@@ -263,7 +263,7 @@ export class WalkPainter {
     handle?.start();
     for (let attempt = 0; attempt < 2; attempt++) {
       const provider = this.options.video();
-      if (!provider || this.options.overBudget()) return 'stop';
+      if (!provider || this.options.overBudget()) return { stop: stopReason(this.options) };
       try {
         // The same picture first and last makes the clip loop back to the standing pose.
         const clip = await watched(provider, handle).generate({ prompt: walkVideoPrompt(walker.gear, direction, walker.body), first, last: first, seconds: CLIP_SECONDS });
@@ -285,6 +285,8 @@ export class WalkPainter {
         handle?.done(usd);
         return figures;
       } catch (err) {
+        // A used-up daily limit is not this walk's fault: trying again cannot help until it resets.
+        if (err instanceof PaintStopped) return { stop: err.message };
         reason = plain(err);
         console.error(`Walk ${id} failed:`, reason);
       }

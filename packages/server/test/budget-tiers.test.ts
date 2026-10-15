@@ -37,19 +37,22 @@ describe('the AI models tab', () => {
     expect(body.keys.map((k: any) => [k.name, k.set])).toEqual([['GEMINI_API_KEY', true], ['ANTHROPIC_API_KEY', false], ['OPENAI_API_KEY', false], ['ELEVENLABS_API_KEY', false]]);
     expect(body.catalog.image.map((m: any) => m.model)).toContain('gemini-3.1-flash-image');
     expect(body.catalog.video.find((m: any) => m.model === 'veo-3.1-lite-generate-preview').usd).toBeCloseTo(0.4);
-    expect(body.ai.video).toEqual({ provider: 'gemini', model: 'veo-3.1-lite-generate-preview' });
+    expect(body.ai.video).toEqual({ provider: 'gemini', model: 'veo-3.1-lite-generate-preview', dailyClips: 7 });
+    expect(body.clipsToday.count).toBe(0);
 
     const saved = await api(base, '/api/admin/ai', owner.token, 'PUT', {
       ...body.ai,
       image: { provider: 'gemini', model: 'gemini-2.5-flash-image', uses: { buildings: 'gemini-3.1-flash-image', scenery: '', bogus: 'x' } },
-      video: { provider: 'gemini', model: 'veo-3.1-fast-generate-preview' },
+      video: { provider: 'gemini', model: 'veo-3.1-fast-generate-preview', dailyClips: '10' },
     });
     expect(saved.status).toBe(200);
     expect(store.settings.ai.image).toEqual({ provider: 'gemini', model: 'gemini-2.5-flash-image', uses: { buildings: 'gemini-3.1-flash-image' } });
     expect(app!.wishes.imageProvider('buildings')?.model).toBe('gemini-3.1-flash-image');
     expect(app!.wishes.imageProvider('scenery')?.model).toBe('gemini-2.5-flash-image');
     expect(app!.wishes.imageProvider()?.model).toBe('gemini-2.5-flash-image');
-    expect(store.settings.ai.video).toEqual({ provider: 'gemini', model: 'veo-3.1-fast-generate-preview' });
+    expect(store.settings.ai.video).toEqual({ provider: 'gemini', model: 'veo-3.1-fast-generate-preview', dailyClips: 10 });
+    const bad = await api(base, '/api/admin/ai', owner.token, 'PUT', { ...body.ai, video: { provider: 'gemini', model: 'veo-3.1-fast-generate-preview', dailyClips: -1 } });
+    expect(bad.status).toBe(400);
     const { body: art } = await api(base, '/api/admin/art', owner.token);
     expect(art.videoModel).toBe('veo-3.1-fast-generate-preview');
   });

@@ -75,7 +75,8 @@ export class World {
       route: (message, to) => this.route(message, to),
       party: (playerId) => this.parties.members(playerId),
       journal: (text, playerId) => this.onJournal?.(text, playerId),
-      neighbours: () => Object.values(region.def.exits).flatMap((id) => this.regions.get(id)?.def ?? []),
+      // Every region around this one, corners too, so the world is drawn as one map.
+      neighbours: () => this.defs().filter((d) => d !== region.def && Math.max(Math.abs(d.at.x - region.def.at.x), Math.abs(d.at.y - region.def.at.y)) === 1),
     }, this.now, this.random);
     return region;
   }
@@ -94,7 +95,7 @@ export class World {
     if (this.regions.has(def.id) || this.defs().some((d) => d.at.x === def.at.x && d.at.y === def.at.y)) return false;
     def.exits = linkRegions([...this.defs(), def]).get(def.id) ?? {};
     this.regions.set(def.id, this.makeRegion(def));
-    this.relink();
+    this.relink(def.at);
     return true;
   }
 
@@ -115,15 +116,19 @@ export class World {
       this.partyChanged(playerId);
     }
     this.regions.delete(id);
-    this.relink();
+    this.relink(region.def.at);
   }
 
-  /** Gives every region whose neighbours changed its new roads. */
-  private relink(): void {
+  /**
+   * Gives every region whose neighbours changed its new roads, and shows the
+   * change at `cell` to everyone in the regions around it, corners too.
+   */
+  private relink(cell: { x: number; y: number }): void {
     const links = linkRegions(this.defs());
     for (const region of this.regions.values()) {
       const exits = links.get(region.def.id) ?? {};
       if (JSON.stringify(exits) !== JSON.stringify(region.def.exits)) region.setExits(exits);
+      else if (Math.max(Math.abs(region.def.at.x - cell.x), Math.abs(region.def.at.y - cell.y)) === 1) region.welcomeAll();
     }
   }
 

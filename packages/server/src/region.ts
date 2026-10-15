@@ -370,6 +370,11 @@ export class Region {
     }
   }
 
+  /** Sends everyone here a fresh welcome: the land around changed. */
+  welcomeAll(): void {
+    for (const p of this.players.values()) this.welcome(p);
+  }
+
   private welcome(p: PlayerState): void {
     p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character });
   }

@@ -27,6 +27,15 @@ describe('World', () => {
     expect(world.regionOf('b')!.def.id).toBe('sanctum');
   });
 
+  it('shows every region around the one we stand in, corners too, as one map', () => {
+    const world = new World();
+    const a = fakeConn();
+    world.join(info('a'), a, { regionId: 'woods', x: null, y: null }, newCharacter());
+    const welcome = a.messages.find((m) => m.t === 'welcome');
+    // The Sanctum lies east of the Woods, and the Desert south of it: a corner.
+    expect(welcome?.t === 'welcome' && welcome.neighbours.map((n) => n.id).sort()).toEqual(['desert', 'sanctum']);
+  });
+
   it('moves a player who walks off the west edge of the Sanctum into the Woods', () => {
     const world = new World();
     const home = world.home;

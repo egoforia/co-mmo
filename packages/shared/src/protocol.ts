@@ -165,7 +165,7 @@ export interface WelcomeMessage {
   t: 'welcome';
   you: PlayerInfo;
   region: RegionInfo;
-  /** The regions beyond its open edges, drawn beside it. */
+  /** The regions around it on the world grid, corners too, drawn beside it as one map. */
   neighbours: RegionDef[];
   /** The last input the server applied; later ones the client predicted are replayed from here. */
   ack: number;

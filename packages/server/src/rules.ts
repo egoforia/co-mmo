@@ -9,6 +9,7 @@ import { getQuickJS, shouldInterruptAfterDeadline, type QuickJSContext, type Qui
 import { ITEMS, addItem, discover, itemCount, maxHp, ruleItemId, takeItem, type RuleWish } from '@co-mmo/shared';
 import { TILE_NAMES } from './region.ts';
 import type { World } from './world.ts';
+import type { CharacterOp } from './character-ops.ts';
 
 /** Events the engine sends to rules; scripts may also name their own, for timers. */
 export const ENGINE_EVENTS = ['join', 'enter', 'use', 'interact', 'defeat'] as const;
@@ -462,13 +463,15 @@ export class RuleRuntime {
   }
 }
 
-/** The live world as rules see it. */
+/**
+ * The live world as rules see it. Reads come from the player's region (or,
+ * on a region server, what it last sent); changes go to wherever the player is.
+ */
 export function worldHost(world: World): RuleHost {
   const at = (player: string) => world.regionOf(player);
-  const change = (player: string, fn: Parameters<NonNullable<ReturnType<typeof at>>['updateCharacter']>[1]) => {
-    const region = at(player);
-    if (!region) return false;
-    region.updateCharacter(player, fn);
+  const change = (player: string, op: CharacterOp): boolean => {
+    if (!at(player)) return false;
+    void world.change(player, op);
     return true;
   };
   return {
@@ -484,36 +487,20 @@ export function worldHost(world: World): RuleHost {
       const c = at(p)?.character(p);
       return c ? itemCount(c, item) : 0;
     },
-    give: (p, item, qty) => change(p, (c) => {
-      addItem(c, item, qty);
-      discover(c, item);
-    }),
+    give: (p, item, qty) => change(p, { op: 'give', item, qty, discover: true }),
     take: (p, item, qty) => {
       const c = at(p)?.character(p);
       if (!c || itemCount(c, item) < qty) return false;
-      return change(p, (ch) => {
-        takeItem(ch, item, qty);
-      });
+      return change(p, { op: 'take', item, qty });
     },
-    heal: (p, n) => change(p, (c) => {
-      c.hp = Math.min(maxHp(c), c.hp + n);
-    }),
-    hurt: (p, n) => change(p, (c) => {
-      c.hp = Math.max(1, c.hp - n);
-    }),
+    heal: (p, n) => change(p, { op: 'heal', amount: n }),
+    hurt: (p, n) => change(p, { op: 'hurt', amount: n }),
     gold: (p, n) => {
       const c = at(p)?.character(p);
       if (!c || c.gold + n < 0) return false;
-      return change(p, (ch) => {
-        ch.gold += n;
-      });
+      return change(p, { op: 'gold', amount: n });
     },
-    xp: (p, n) => {
-      const region = at(p);
-      if (!region) return false;
-      region.grantXp(p, n);
-      return true;
-    },
+    xp: (p, n) => change(p, { op: 'xp', amount: n }),
     tell: (p, text) => {
       const region = at(p);
       region?.tell(p, text);

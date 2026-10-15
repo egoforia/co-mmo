@@ -3,7 +3,6 @@ import {
   CREATOR_REPEAT_MS,
   CREATOR_XP,
   WEAKENED_MS,
-  gainCreatorXp,
   wisherOf,
   WORLD_REGIONS,
   arrivalPoint,
@@ -17,13 +16,30 @@ import {
   type ChatMessage,
   type CreatorCredit,
   type ClientMessage,
+  type ContentEntry,
+  type NpcPlacement,
   type PartyActionMessage,
   type PartyMessage,
   type PlayerInfo,
   type ServerMessage,
 } from '@co-mmo/shared';
 import { Parties } from './parties.ts';
-import { Region, type Connection } from './region.ts';
+import { Region, type Connection, type Departure, type Leaving } from './region.ts';
+import type { CharacterOp, OpResult } from './character-ops.ts';
+import type { Placement, RegionHandle, WorldState } from './region-link.ts';
+
+/**
+ * Where regions run. Without one every region runs in this process; the
+ * region servers' coordinator gives one that puts them on region servers.
+ */
+export interface Hosting {
+  /** Sets a region up on a host of the hosting's choosing, or undefined to run it here. */
+  host(def: RegionDef, placements: Placement[], world: World): RegionHandle | undefined;
+  /** The world changed in a way every region server must hear of (regions, who is online, parties). */
+  changed?(state: WorldState): void;
+  /** Wished things came into being or went away: region servers must know them before they are placed. */
+  content?(entries: ContentEntry[]): void;
+}
 
 export interface SavedPlace {
   regionId: string;
@@ -41,11 +57,20 @@ export interface Place {
 }
 
 /**
- * All regions, and the moves between them. Today every region runs in this
- * process; the world is the seam where regions move to separate processes.
+ * All regions, and the moves between them. Each region runs in this process
+ * or on a region server (design doc, Scaling without a cap); the world
+ * routes to it either way, and moves players between regions wherever they run.
  */
 export class World {
-  readonly regions = new Map<string, Region>();
+  readonly regions = new Map<string, RegionHandle>();
+  /** Wished things placed in each region, so a region set up again elsewhere gets them back. */
+  private readonly placements = new Map<string, Placement[]>();
+  /** Players on their way between regions (or regions between hosts); their inputs wait. */
+  private readonly moving = new Set<string>();
+  /** Moves still under way, so closing can wait for them. */
+  readonly pending = new Set<Promise<unknown>>();
+  /** Where new and moved regions run; unset, everything runs here. */
+  hosting?: Hosting;
   private readonly where = new Map<string, string>();
   readonly parties: Parties;
   /** Names of party members who are offline, so the party list can still show them. */
@@ -66,7 +91,14 @@ export class World {
     }
   }
 
-  private makeRegion(def: RegionDef): Region {
+  /** Sets a region up wherever the hosting says, with what was wished into it. */
+  private makeRegion(def: RegionDef): RegionHandle {
+    const placements = this.placements.get(def.id) ?? [];
+    return this.hosting?.host(def, placements, this) ?? this.runHere(def, placements);
+  }
+
+  /** A region run in this process. */
+  private runHere(def: RegionDef, placements: Placement[] = []): Region {
     const region: Region = new Region(def, {
       worldChat: (m) => this.broadcast(m),
       online: () => this.where.size,
@@ -76,9 +108,90 @@ export class World {
       party: (playerId) => this.parties.members(playerId),
       journal: (text, playerId) => this.onJournal?.(text, playerId),
       // Every region around this one, corners too, so the world is drawn as one map.
-      neighbours: () => this.defs().filter((d) => d !== region.def && Math.max(Math.abs(d.at.x - region.def.at.x), Math.abs(d.at.y - region.def.at.y)) === 1),
+      neighbours: () => this.neighbours(region.def),
     }, this.now, this.random);
+    for (const p of placements) {
+      if (p.kind === 'creatures') region.addCreatures(p.id, p.spots);
+      else region.addNpc(p.npc);
+    }
     return region;
+  }
+
+  /** The regions around one, corners too. */
+  neighbours(def: RegionDef): RegionDef[] {
+    return this.defs().filter((d) => d.id !== def.id && Math.max(Math.abs(d.at.x - def.at.x), Math.abs(d.at.y - def.at.y)) === 1);
+  }
+
+  /** What every region server must know about the world: its regions, who is online, and parties. */
+  state(): WorldState {
+    const parties: Record<string, string[]> = {};
+    for (const id of this.where.keys()) {
+      const members = this.parties.members(id);
+      if (members.length > 1) parties[id] = members;
+    }
+    return { defs: this.defs(), online: this.where.size, parties };
+  }
+
+  /** Wished things came into being or went away (wishes granted, restored or rolled back). */
+  contentChanged(entries: ContentEntry[]): void {
+    this.hosting?.content?.(entries);
+  }
+
+  private stateChanged(): void {
+    this.hosting?.changed?.(this.state());
+  }
+
+  // --- Wished things in regions ------------------------------------------------
+
+  /** Places a wished kind of creature in a region, here or on its region server. */
+  placeCreatures(regionId: string, kind: string, spots: { x: number; y: number }[]): void {
+    this.remember(regionId, { kind: 'creatures', id: kind, spots });
+    this.regions.get(regionId)?.addCreatures(kind, spots);
+  }
+
+  /** Places a wished person in a region. */
+  placeNpc(regionId: string, npc: NpcPlacement): void {
+    this.remember(regionId, { kind: 'npc', npc });
+    this.regions.get(regionId)?.addNpc(npc);
+  }
+
+  /** Takes a wish's things out of every region. */
+  unplace(id: string): void {
+    for (const [regionId, list] of this.placements) {
+      this.placements.set(regionId, list.filter((p) => (p.kind === 'creatures' ? p.id : p.npc.id) !== id));
+    }
+    for (const region of this.regions.values()) region.removeWish(id);
+  }
+
+  private remember(regionId: string, placement: Placement): void {
+    const list = this.placements.get(regionId) ?? [];
+    const key = placement.kind === 'creatures' ? placement.id : placement.npc.id;
+    this.placements.set(regionId, [...list.filter((p) => (p.kind === 'creatures' ? p.id : p.npc.id) !== key || p.kind !== placement.kind), placement]);
+  }
+
+  /**
+   * Sets a region up on another host (or this one again, as a restart):
+   * everyone inside is taken out, the region is made afresh with what was
+   * wished into it, and they are put back where they stood. `gone` says the
+   * old host cannot answer, so players are moved from what they were last sent.
+   */
+  async moveRegion(id: string, gone = false): Promise<void> {
+    const old = this.regions.get(id);
+    if (!old) return;
+    const players = old.playerIds();
+    for (const p of players) this.moving.add(p);
+    try {
+      const leaving = await takeAll(old, gone);
+      if (this.regions.get(id) !== old) return;
+      const fresh = this.makeRegion(old.def);
+      this.regions.set(id, fresh);
+      for (const l of leaving) {
+        fresh.join(l.info, l.conn, { x: l.x, y: l.y }, l.character, '', l.carry);
+        this.where.set(l.info.id, id);
+      }
+    } finally {
+      for (const p of players) this.moving.delete(p);
+    }
   }
 
   /** Every region's layout, launch and wished. */
@@ -96,6 +209,7 @@ export class World {
     def.exits = linkRegions([...this.defs(), def]).get(def.id) ?? {};
     this.regions.set(def.id, this.makeRegion(def));
     this.relink(def.at);
+    this.stateChanged();
     return true;
   }
 
@@ -107,16 +221,21 @@ export class World {
     const region = this.regions.get(id);
     if (!region || id === this.home.def.id) return;
     const home = this.home;
-    for (const playerId of region.playerIds()) {
-      const leaving = region.remove(playerId);
-      if (!leaving) continue;
-      this.where.set(playerId, home.def.id);
-      home.join(leaving.info, leaving.conn, home.map.spawn, leaving.character, `${leaving.info.name} was carried back to ${home.def.name}.`);
-      leaving.conn.send({ t: 'notice', text: `${region.def.name} faded from the world, and the God carried you back to the shrine.` });
-      this.partyChanged(playerId);
-    }
     this.regions.delete(id);
+    this.placements.delete(id);
+    for (const playerId of region.playerIds()) {
+      this.moving.add(playerId);
+      this.track(settle(region.remove(playerId), (leaving) => {
+        this.moving.delete(playerId);
+        if (!leaving) return;
+        this.where.set(playerId, home.def.id);
+        home.join(leaving.info, leaving.conn, home.map.spawn, leaving.character, `${leaving.info.name} was carried back to ${home.def.name}.`);
+        leaving.conn.send({ t: 'notice', text: `${region.def.name} faded from the world, and the God carried you back to the shrine.` });
+        this.partyChanged(playerId);
+      }));
+    }
     this.relink(region.def.at);
+    this.stateChanged();
   }
 
   /**
@@ -136,7 +255,7 @@ export class World {
    * Where a region wished by this player would go: beyond the open edge of
    * their region nearest to them. Undefined when every edge has a neighbour.
    */
-  openEdge(playerId: string): { region: Region; side: Side; cell: { x: number; y: number } } | undefined {
+  openEdge(playerId: string): { region: RegionHandle; side: Side; cell: { x: number; y: number } } | undefined {
     const region = this.regionOf(playerId);
     const at = region?.position(playerId);
     if (!region || !at) return undefined;
@@ -176,21 +295,18 @@ export class World {
     }
     const amount = CREATOR_XP[credit];
     const region = this.regionOf(wisher);
-    let levels = 0;
-    if (region) {
-      region.updateCharacter(wisher, (c) => {
-        levels = gainCreatorXp(c, amount);
-      });
-    } else {
-      levels = this.offlineCreatorXp?.(wisher, amount) ?? 0;
+    if (!region) {
+      this.offlineCreatorXp?.(wisher, amount);
+      return;
     }
-    if (!levels) return;
-    const name = this.names.get(wisher);
-    const level = region?.character(wisher)?.creatorLevel;
-    if (region && level) {
+    this.track(settle(region.change(wisher, { op: 'creatorXp', amount }), ({ levels }) => {
+      if (!levels) return;
+      const name = this.names.get(wisher);
+      const level = region.character(wisher)?.creatorLevel;
+      if (!level) return;
       region.tell(wisher, `✦ Others love what you wished into the world. You reached Creator level ${level} and earned ${levels * CREATOR_LEVEL_FAVOR} Favor.`);
-    }
-    if (name && level) this.onJournal?.(`${name}'s creations earned them Creator level ${level}.`, wisher);
+      if (name) this.onJournal?.(`${name}'s creations earned them Creator level ${level}.`, wisher);
+    }));
   }
 
   /** Sends one player a message, wherever they are. */
@@ -198,15 +314,21 @@ export class World {
     this.regionOf(playerId)?.send(playerId, message);
   }
 
-  get home(): Region {
+  get home(): RegionHandle {
     return this.regions.get(WORLD_REGIONS[0]!.id)!;
   }
 
-  region(id: string): Region | undefined {
+  region(id: string): RegionHandle | undefined {
     return this.regions.get(id);
   }
 
-  regionOf(playerId: string): Region | undefined {
+  /** A region running in this process, for tests and tools that reach into the simulation. */
+  local(id: string): Region | undefined {
+    const region = this.regions.get(id);
+    return region instanceof Region ? region : undefined;
+  }
+
+  regionOf(playerId: string): RegionHandle | undefined {
     const id = this.where.get(playerId);
     return id ? this.regions.get(id) : undefined;
   }
@@ -220,27 +342,38 @@ export class World {
     const previous = this.regionOf(info.id);
     character = previous?.character(info.id) ?? character;
     if (previous && previous.def.id !== saved.regionId) {
-      previous.remove(info.id, `${info.name} left.`)?.conn.close('Signed in from another window.');
+      void settle(previous.remove(info.id, `${info.name} left.`), (left) => left?.conn.close('Signed in from another window.'));
     }
     const region = this.regions.get(saved.regionId) ?? this.home;
     this.where.set(info.id, region.def.id);
     this.names.set(info.id, info.name);
     region.join(info, conn, saved, character);
     this.partyChanged(info.id);
+    this.stateChanged();
   }
 
-  leave(playerId: string): Place | undefined {
+  /** Takes a player out of the world; where they were comes back at once, or after their region server answers. */
+  leave(playerId: string): Place | undefined | Promise<Place | undefined> {
     const region = this.regionOf(playerId);
     if (!region) return undefined;
-    const left = region.remove(playerId);
     this.where.delete(playerId);
+    this.moving.delete(playerId);
+    const left = settle(region.remove(playerId), (l) => l && { id: playerId, regionId: region.def.id, x: l.x, y: l.y, character: l.character });
     this.partyChanged(playerId);
-    return left && { id: playerId, regionId: region.def.id, x: left.x, y: left.y, character: left.character };
+    this.stateChanged();
+    return left;
   }
 
   handle(playerId: string, message: ClientMessage): void {
     if (message.t === 'party') return this.partyAction(playerId, message);
+    // On the way to another region: the step is dropped, and the player's own screen catches up from the last one applied.
+    if (this.moving.has(playerId)) return;
     this.regionOf(playerId)?.handle(playerId, message);
+  }
+
+  /** A change to an online player's character, wherever they are; false when they are not online. */
+  change(playerId: string, op: CharacterOp): OpResult | Promise<OpResult> {
+    return this.regionOf(playerId)?.change(playerId, op) ?? { ok: false };
   }
 
   /** The online player with this name, if any. */
@@ -255,7 +388,7 @@ export class World {
   // --- Party and whisper chat ------------------------------------------------
 
   /** Delivers party and whisper lines, which cross regions; returns why it could not. */
-  private route(message: ChatMessage, to?: string): string | void {
+  route(message: ChatMessage, to?: string): string | void {
     const from = message.from.id;
     if (message.channel === 'party') {
       const members = this.parties.members(from);
@@ -333,41 +466,77 @@ export class World {
       },
     };
     for (const id of party.members) this.sendTo(id, message);
+    this.stateChanged();
   }
 
-  /** Ticks every region, then moves players who walked off an open edge or fell. */
+  /** Ticks every region here, then moves players who walked off an open edge or fell. Regions on region servers tick there. */
   tick(): void {
     for (const region of this.regions.values()) {
-      for (const departure of region.tick()) {
-        const name = region.nameOf(departure.id) ?? 'Someone';
-        if (departure.died) {
-          // Respawn at the shrine, Weakened for a while; nothing is lost.
-          const home = this.home;
-          const fallen = region.remove(departure.id, `${name} fell in ${region.def.name}.`);
-          if (!fallen) continue;
-          fallen.character.hp = maxHp(fallen.character);
-          fallen.character.weakenedUntil = this.now() + WEAKENED_MS;
-          this.where.set(departure.id, home.def.id);
-          home.join(fallen.info, fallen.conn, home.map.spawn, fallen.character, `${name} woke at the shrine of ${home.def.name}.`);
-          this.partyChanged(departure.id);
-          fallen.conn.send({ t: 'notice', text: `You fell, and woke at the shrine. You are Weakened for ${WEAKENED_MS / 1000} seconds.` });
-          continue;
-        }
-        const target = this.regions.get(region.def.exits[departure.side] ?? '');
-        // Keep the player's place along the edge, so crossing feels like one more step.
-        const at = region.position(departure.id);
-        const arrival = target && at && arrivalPoint(target.map, departure.side, at);
-        if (!target || !arrival) continue;
-        const moving = region.remove(departure.id, `${name} set off for ${target.def.name}.`);
-        if (!moving) continue;
-        this.where.set(departure.id, target.def.id);
-        target.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`, moving.carry);
-        this.onEvent?.('enter', departure.id, { region: target.def.id });
-        // Walking into a wished region earns its wisher Creator XP.
-        this.creatorCredit(target.def.id, departure.id, 'visit');
-        this.partyChanged(departure.id);
-      }
+      for (const departure of region.tick()) this.depart(region, departure);
     }
+  }
+
+  /** Players a region server let go of: they walked off an edge or fell there. */
+  departed(regionId: string, list: (Departure & { x: number; y: number })[]): void {
+    const region = this.regions.get(regionId);
+    if (!region) return;
+    for (const d of list) {
+      if (!region.has(d.id)) continue;
+      (region as { moved?: (id: string, x: number, y: number) => void }).moved?.(d.id, d.x, d.y);
+      this.depart(region, d);
+    }
+  }
+
+  /**
+   * Moves a player who fell to the shrine, or who walked off an edge into
+   * the region beyond. Between regions in this process it happens at once;
+   * a region server is asked to let the player go first.
+   */
+  private depart(region: RegionHandle, departure: Departure): void {
+    const id = departure.id;
+    if (this.moving.has(id) || this.where.get(id) !== region.def.id) return;
+    const name = region.nameOf(id) ?? 'Someone';
+    if (departure.died) {
+      // Respawn at the shrine, Weakened for a while; nothing is lost.
+      this.moving.add(id);
+      this.track(settle(region.remove(id, `${name} fell in ${region.def.name}.`), (fallen) => {
+        this.moving.delete(id);
+        if (!fallen || this.where.get(id) !== region.def.id) return;
+        const home = this.home;
+        fallen.character.hp = maxHp(fallen.character);
+        fallen.character.weakenedUntil = this.now() + WEAKENED_MS;
+        this.where.set(id, home.def.id);
+        home.join(fallen.info, fallen.conn, home.map.spawn, fallen.character, `${name} woke at the shrine of ${home.def.name}.`);
+        this.partyChanged(id);
+        fallen.conn.send({ t: 'notice', text: `You fell, and woke at the shrine. You are Weakened for ${WEAKENED_MS / 1000} seconds.` });
+      }));
+      return;
+    }
+    const target = this.regions.get(region.def.exits[departure.side] ?? '');
+    // Keep the player's place along the edge, so crossing feels like one more step.
+    const at = region.position(id);
+    const arrival = target && at && arrivalPoint(target.map, departure.side, at);
+    if (!target || !arrival) return;
+    this.moving.add(id);
+    this.track(settle(region.remove(id, `${name} set off for ${target.def.name}.`), (moving) => {
+      this.moving.delete(id);
+      if (!moving || this.where.get(id) !== region.def.id) return;
+      // The region beyond may itself have moved host meanwhile.
+      const beyond = this.regions.get(target.def.id) ?? this.home;
+      this.where.set(id, beyond.def.id);
+      beyond.join(moving.info, moving.conn, arrival, moving.character, `${name} arrived from ${region.def.name}.`, moving.carry);
+      this.onEvent?.('enter', id, { region: beyond.def.id });
+      // Walking into a wished region earns its wisher Creator XP.
+      this.creatorCredit(beyond.def.id, id, 'visit');
+      this.partyChanged(id);
+    }));
+  }
+
+  /** Keeps a move under way until it settles, so closing can wait for it. */
+  private track(value: unknown): void {
+    if (!(value instanceof Promise)) return;
+    const p = value.catch((err) => console.error('Moving a player failed:', err)).finally(() => this.pending.delete(p));
+    this.pending.add(p);
   }
 
   /** Where every online player is, for saving. */
@@ -385,5 +554,22 @@ export class World {
   broadcast(message: ServerMessage): void {
     for (const region of this.regions.values()) region.broadcast(message);
   }
+}
+
+/** Runs `then` on a value now, or once it arrives when a region server has to answer first. */
+export function settle<T, R>(value: T | Promise<T>, then: (value: T) => R): R | Promise<R> {
+  return value instanceof Promise ? value.then(then) : then(value);
+}
+
+/** Everyone in a region, taken out quietly to be put back elsewhere. */
+async function takeAll(region: RegionHandle, gone: boolean): Promise<Leaving[]> {
+  const remote = region as { drop?: (reachable: boolean) => Promise<Leaving[]> };
+  if (remote.drop) return remote.drop(!gone);
+  const leaving: Leaving[] = [];
+  for (const id of region.playerIds()) {
+    const left = await region.remove(id, '');
+    if (left) leaving.push(left);
+  }
+  return leaving;
 }
 

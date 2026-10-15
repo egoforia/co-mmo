@@ -6,6 +6,7 @@ import { Store } from './store.ts';
 import { connectPostgres } from './db.ts';
 import { connectRedis } from './redis.ts';
 import { RedisTurnLedger, SharedPaintQueue } from './shared-paint-queue.ts';
+import { RedisBus } from './bus.ts';
 import { Updater, currentCommit } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 3001);
@@ -37,6 +38,8 @@ const redis = redisUrl ? await connectRedis(redisUrl).catch((err: Error) => {
 }) : undefined;
 const ledger = redis && new RedisTurnLedger(redis);
 if (ledger) console.log('The paint queue is kept in Redis.');
+// Region servers (npm run region-server) reach this server through the same Redis.
+const regionBus = redis && new RedisBus(redis);
 // scripts/dev.mjs (npm run dev) watches the request file and does the pull
 // and restart; without it the Owner still sees what is new on GitHub.
 const updater = new Updater({
@@ -51,6 +54,7 @@ const app = createApp({
   updater,
   commit: currentCommit(repoRoot),
   ...(ledger ? { paintQueue: new SharedPaintQueue(ledger) } : {}),
+  ...(regionBus ? { regionBus } : {}),
   builds: { repoDir: repoRoot },
   shippedArt: resolve(repoRoot, 'packages/client/public/art/manifest.json'),
   wishes: {
@@ -75,6 +79,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     console.log('Saving and shutting down...');
     await app.close();
     await store.close();
+    await regionBus?.close();
     await ledger?.close();
     process.exit(0);
   });

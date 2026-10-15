@@ -88,7 +88,7 @@ describe('the God', () => {
     expect(refused.card).toBeUndefined();
     expect(store.content).toHaveLength(0);
 
-    app!.world.region('sanctum')!.updateCharacter(p.id, (ch) => (ch.favor = 1));
+    app!.world.local('sanctum')!.updateCharacter(p.id, (ch) => (ch.favor = 1));
     await wish(c, 'I wish for a red hat');
     const poor = await c.waitFor<GodMessage>((m) => m.t === 'god');
     expect(poor.say).toMatch(/needs 2 Favor/);

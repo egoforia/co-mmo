@@ -38,7 +38,7 @@ function party(world: World, leader: string, ...names: [string, string][]) {
 describe('chat channels', () => {
   it('Region reaches everyone in the region and nobody outside it', () => {
     const { world, mara, ilya, tom } = setup();
-    world.region('woods')!.placePlayer('i', 2, 2);
+    world.local('woods')!.placePlayer('i', 2, 2);
     world.handle('m', { t: 'chat', channel: 'region', text: 'anyone near the pool?' });
     expect(said(ilya, 'anyone near the pool?')).toBe(true);
     expect(said(mara, 'anyone near the pool?')).toBe(true);
@@ -107,7 +107,7 @@ describe('parties', () => {
   it('shares XP and defeat-quest progress with members nearby, not with members far away', () => {
     const { world, clock } = setup();
     party(world, 'm', ['i', 'Ilya'], ['t', 'Tom']);
-    const woods = world.region('woods')!;
+    const woods = world.local('woods')!;
     const id = woods.creatureIds().find((c) => c.includes('walking-mushroom'))!;
     const me = woods.position('m')!;
     woods.placeCreature(id, me.x + 1, me.y);

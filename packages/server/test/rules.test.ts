@@ -208,7 +208,7 @@ describe('scripted wishes in the game', () => {
     expect((await api(base, `/api/admin/content/${record.id}/review`, mara.token, 'POST', { approve: true })).body).toMatchObject({ ok: true, status: 'granted' });
     await c.waitFor((m) => m.t === 'system' && m.text.includes('Fishing'));
     const rod = `${record.id}-rod`;
-    const sanctum = app!.world.region('sanctum')!;
+    const sanctum = app!.world.local('sanctum')!;
     expect(sanctum.character(ilya.id)!.inventory.map((i) => i.item)).toContain(rod);
 
     // Cast at the pond, wait for a bite.

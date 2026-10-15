@@ -8,7 +8,8 @@
     "start": "tsx src/main.ts",
     "anchors": "tsx src/tools/generate-anchors.ts",
     "game-art": "tsx src/tools/build-game-art.ts",
-    "building-art": "tsx src/tools/paint-buildings.ts"
+    "building-art": "tsx src/tools/paint-buildings.ts",
+    "region-server": "tsx src/region-main.ts"
   },
   "dependencies": {
     "ioredis": "^5.11.1",

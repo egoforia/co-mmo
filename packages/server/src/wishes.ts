@@ -6,10 +6,8 @@ import {
   ITEMS,
   WISH_COSTS,
   WishError,
-  addItem,
   applyContent,
   contentTier,
-  forgetVanished,
   regionFromWish,
   regionPictures,
   wishCost,
@@ -166,7 +164,7 @@ export class Wishes {
   /** Puts every granted wish back into the world (at start-up). */
   restore(): void {
     for (const record of this.store.content) {
-      applyContent(record);
+      this.apply(record);
       if (record.status !== 'granted') continue;
       this.place(record);
       if (record.definition?.kind === 'rule') {
@@ -191,7 +189,7 @@ export class Wishes {
     const text = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_PRAYER_LENGTH);
     if (!text) return;
     const region = this.world.regionOf(id);
-    const ctx = this.prayerContext(player);
+    const ctx = await this.prayerContext(player);
     if (!region || !ctx) return;
     const refused = this.admit(id);
     if (refused) return this.say(id, refused);
@@ -223,7 +221,7 @@ export class Wishes {
    */
   async consult(player: PlayerInfo, w: WorkshopContext, history: ChatTurn[]): Promise<{ reply: WorkshopReply } | { refused: string }> {
     const id = player.id;
-    const ctx = this.prayerContext(player);
+    const ctx = await this.prayerContext(player);
     if (!ctx) return { refused: CLOUDED };
     const refused = this.admit(id);
     if (refused) return { refused };
@@ -248,17 +246,18 @@ export class Wishes {
   }
 
   /** What the God is told about where and who the player is, or undefined when they are not in the world. */
-  private prayerContext(player: PlayerInfo): PrayerContext | undefined {
+  private async prayerContext(player: PlayerInfo): Promise<PrayerContext | undefined> {
     const region = this.world.regionOf(player.id);
     const character = region?.character(player.id);
     if (!region || !character) return undefined;
+    const nearby = await region.nearby(player.id);
     return {
       playerName: player.name,
       role: player.role,
       favor: character.favor,
       regionName: region.def.name,
       biome: BIOMES[region.def.biome as BiomeId]?.name ?? region.def.biome,
-      nearby: region.nearby(player.id),
+      nearby,
       edge: this.edgeLine(player.id),
       recentWishes: this.store.content
         .filter((c) => c.status === 'granted')
@@ -408,12 +407,10 @@ export class Wishes {
     }
 
     const record = this.record(player, open, 'granted', region.def.id, placements, open.edge?.cell);
-    applyContent(record);
+    this.apply(record);
     this.place(record);
-    region.updateCharacter(player.id, (c) => {
-      c.favor -= open.card.cost;
-      if (def.kind === 'item' || def.kind === 'ability') addItem(c, record.id);
-    });
+    void this.world.change(player.id, { op: 'favor', amount: -open.card.cost });
+    if (def.kind === 'item' || def.kind === 'ability') void this.world.change(player.id, { op: 'give', item: record.id, qty: 1 });
     this.broadcast(record);
     this.world.broadcast({ t: 'system', text: `✦ The God granted ${player.name}'s wish: ${record.title}.`, at: this.now() });
     this.say(player.id, def.kind === 'item' || def.kind === 'ability' ? 'It is done. Look in your bag.'
@@ -538,15 +535,15 @@ export class Wishes {
     // A code change is undone by reverting its pull request, not from here.
     if (!record || record.status !== 'granted' || record.build) return undefined;
     this.store.updateContent(id, { status: 'rolled-back' });
-    removeContent(record);
+    this.unapply(record);
     this.rules.stop(id);
     if (record.definition?.kind === 'region') this.world.removeRegion(id);
+    this.world.unplace(id);
     for (const region of this.world.regions.values()) {
-      region.removeWish(id);
       for (const playerId of region.playerIds()) {
         const c = region.character(playerId);
         if (c && (c.inventory.some((s) => !ITEMS[s.item]) || Object.values(c.equipment).some((i) => i && !ITEMS[i]) || c.abilities.includes(id))) {
-          region.updateCharacter(playerId, forgetVanished);
+          void region.change(playerId, { op: 'forget' });
         }
       }
     }
@@ -611,12 +608,12 @@ export class Wishes {
     const summary = record.summary;
     // The Chronicle shows what was made, not the words of the wish.
     this.store.updateContent(record.id, { status: 'granted', summary: def.description || summary, rule: { paused: false } });
-    applyContent(record);
+    this.apply(record);
     try {
       await this.rules.start(record);
     } catch (err) {
       this.store.updateContent(record.id, { status: 'pending', summary, test: { ...record.test!, passed: false, errors: [(err as Error).message] } });
-      removeContent(record);
+      this.unapply(record);
       this.changed(record.id);
       return { error: 'load_failed', message: `The rule did not load: ${(err as Error).message}` };
     }
@@ -1097,6 +1094,17 @@ export class Wishes {
     return new GeminiImageProvider(this.env.GEMINI_API_KEY, model || undefined);
   }
 
+  /** Makes a wish's things exist here and on every region server, before anything is placed. */
+  private apply(record: ContentRecord): void {
+    applyContent(record);
+    this.world.contentChanged([publicEntry(record)]);
+  }
+
+  private unapply(record: ContentRecord): void {
+    removeContent(record);
+    this.world.contentChanged([publicEntry(record)]);
+  }
+
   private place(record: ContentEntry): void {
     const def = record.definition;
     if (def?.kind === 'region') {
@@ -1104,12 +1112,11 @@ export class Wishes {
       if (land && !this.world.addRegion(land)) console.error(`Region ${record.id} could not be placed: its square is taken.`);
       return;
     }
-    const region = this.world.region(record.regionId);
-    if (!def || !region || !record.placements) return;
-    if (def.kind === 'creature') region.addCreatures(record.id, record.placements);
+    if (!def || !record.placements) return;
+    if (def.kind === 'creature') this.world.placeCreatures(record.regionId, record.id, record.placements);
     if (def.kind === 'npc') {
       const at = record.placements[0]!;
-      region.addNpc({ id: record.id, name: def.name, asset: wishArtKey(record.id), x: at.x, y: at.y });
+      this.world.placeNpc(record.regionId, { id: record.id, name: def.name, asset: wishArtKey(record.id), x: at.x, y: at.y });
     }
   }
 

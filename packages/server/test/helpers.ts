@@ -77,6 +77,8 @@ export async function start(opts: {
   realImages?: boolean;
   /** Sound services, how made sounds are finished, and whether to make them at start-up. */
   sound?: AppOptions['sound'];
+  /** Messages to region servers, for tests that run regions on them. */
+  regionBus?: AppOptions['regionBus'];
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
@@ -93,6 +95,7 @@ export async function start(opts: {
     ...(opts.frames ? { videoFrames: opts.frames } : {}),
     paintQueue: opts.paintQueue ?? new MemoryPaintQueue({ limit: () => undefined }),
     ...(opts.sound ? { sound: opts.sound } : {}),
+    ...(opts.regionBus ? { regionBus: opts.regionBus } : {}),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',
@@ -104,6 +107,7 @@ export async function start(opts: {
       ...(opts.realImages ? {} : { imageProvider: () => painter ?? undefined }),
     },
   });
+  await app.ready;
   await new Promise<void>((resolve) => app!.server.listen(0, resolve));
   const port = (app.server.address() as AddressInfo).port;
   return { store, artDir, painter, base: `http://127.0.0.1:${port}`, ws: `ws://127.0.0.1:${port}/ws` };

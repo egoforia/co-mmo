@@ -4,6 +4,7 @@ import { applyContent, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
 import { answer, type Bus } from './bus.ts';
 import { Region, type Connection, type Leaving } from './region.ts';
 import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
+import { LoadMeter } from './load-meter.ts';
 
 /** How often a region server tells the gateway it is alive and how busy it is. */
 export const BEAT_MS = 2000;
@@ -36,20 +37,17 @@ export class RegionServer {
   private flushing = false;
   private readonly now: () => number;
   private readonly random: () => number;
-  private readonly startedAt: number;
   private tickTimer?: ReturnType<typeof setInterval>;
   private beatTimer?: ReturnType<typeof setInterval>;
   private unsubscribe?: () => Promise<void>;
-  private tickTimes: number[] = [];
-  private errors = 0;
-  private lastError?: string;
+  private readonly meter: LoadMeter;
 
   constructor(private readonly options: RegionServerOptions) {
     this.bus = options.bus;
     this.id = options.id ?? `${hostname()}-${process.pid}-${randomBytes(3).toString('hex')}`;
     this.now = options.now ?? Date.now;
     this.random = options.random ?? Math.random;
-    this.startedAt = this.now();
+    this.meter = new LoadMeter(this.now);
   }
 
   /** Starts listening, says hello, and starts ticking. */
@@ -80,7 +78,11 @@ export class RegionServer {
 
   /** One tick of every region here; departures and messages go to the gateway. */
   tick(): void {
-    const started = performance.now();
+    this.meter.tick(() => this.tickRegions());
+    this.flush();
+  }
+
+  private tickRegions(): void {
     for (const region of this.regions.values()) {
       try {
         const departures = region.tick();
@@ -94,9 +96,6 @@ export class RegionServer {
         this.failed(err);
       }
     }
-    this.tickTimes.push(performance.now() - started);
-    if (this.tickTimes.length > 100) this.tickTimes.shift();
-    this.flush();
   }
 
   private receive(m: ToServer): void {
@@ -249,23 +248,11 @@ export class RegionServer {
   }
 
   private load(): ServerLoad {
-    const times = this.tickTimes;
-    return {
-      tickMs: times.length ? Math.round((times.reduce((a, b) => a + b, 0) / times.length) * 100) / 100 : 0,
-      worstTickMs: Math.round(Math.max(0, ...times) * 100) / 100,
-      memoryMb: Math.round(process.memoryUsage().rss / 1_048_576),
-      errors: this.errors,
-      ...(this.lastError ? { lastError: this.lastError } : {}),
-      host: hostname(),
-      pid: process.pid,
-      startedAt: this.startedAt,
-    };
+    return this.meter.load();
   }
 
   private failed(err: unknown): void {
-    this.errors++;
-    this.lastError = (err as Error)?.message ?? String(err);
-    console.error('Region server error:', err);
+    this.meter.failed(err, 'Region server error');
   }
 
   private toGateway(message: ToGateway): void {

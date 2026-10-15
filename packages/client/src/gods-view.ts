@@ -4,6 +4,7 @@
 
 import { loadToken, rejoinWhenBack, reloadWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
+import { TICK_SECONDS } from '@co-mmo/shared';
 
 const token = loadToken();
 const main = document.getElementById('main')!;
@@ -225,7 +226,7 @@ async function boot(): Promise<void> {
     ['rules', 'Rules'],
     ['reports', 'Reports'],
     ['players', 'Players'],
-    ...(owner ? [['art', 'Art'], ['ai', 'AI models'], ['budget', 'Budget'], ['updates', 'Updates']] : []),
+    ...(owner ? [['art', 'Art'], ['ai', 'AI models'], ['budget', 'Budget'], ['servers', 'Server health'], ['updates', 'Updates']] : []),
   ];
   main.innerHTML = `
     <nav>${tabs.map(([id, label]) => `<button type="button" data-tab="${id}">${label}</button>`).join('')}</nav>
@@ -240,6 +241,8 @@ async function boot(): Promise<void> {
   setInterval(() => tab === 'world' && document.visibilityState === 'visible' && void render(), 3000);
   // Painting moves on its own; keep the log fresh without touching the forms below it.
   setInterval(() => tab === 'art' && document.visibilityState === 'visible' && void refreshArtJobs(), 3000);
+  // Region servers report every two seconds.
+  setInterval(() => tab === 'servers' && document.visibilityState === 'visible' && void render(), 3000);
 }
 
 function show(id: string): void {
@@ -254,7 +257,7 @@ async function render(): Promise<void> {
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
-    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, art, ai, budget, updates };
+    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, art, ai, budget, servers, updates };
     const html = await (pages[current] ?? world)();
     if (tab !== current) return;
     // Keep what the Owner is typing when the panel refreshes.
@@ -695,6 +698,70 @@ async function updates(): Promise<string> {
     ${last}`;
 }
 
+// --- Server health -------------------------------------------------------------
+
+interface ServerLoad {
+  tickMs: number;
+  worstTickMs: number;
+  memoryMb: number;
+  errors: number;
+  lastError?: string;
+  host: string;
+  pid: number;
+  startedAt: number;
+}
+
+interface Host {
+  id: string;
+  kind: 'gateway' | 'region-server';
+  regions: { id: string; name: string; players: number }[];
+  players: number;
+  load: ServerLoad;
+  seen: number;
+}
+
+/** A tick has this long before the next one is due. */
+const TICK_MS = TICK_SECONDS * 1000;
+
+const since = (ms: number) => (ms < 90_000 ? `${Math.max(0, Math.round(ms / 1000))} s` : ms < 5_400_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 3_600_000)} h`);
+
+async function servers(): Promise<string> {
+  const s = await api<{ hosts: Host[]; regionServers: boolean; store: string; now: number }>('servers');
+  const hostName = (h: Host) => (h.kind === 'gateway' ? 'Game server' : `Region server ${escapeHtml(h.id)}`);
+  const card = (h: Host) => {
+    const l = h.load;
+    // Half a tick is fine; a whole tick means players feel it.
+    const busy = l.worstTickMs >= TICK_MS ? 'bad' : l.tickMs >= TICK_MS / 2 ? 'warn' : '';
+    const quiet = s.now - h.seen;
+    const moveTo = () => s.hosts.filter((o) => o.id !== h.id).map((o) => `<option value="${escapeHtml(o.id)}">${o.kind === 'gateway' ? 'Game server' : escapeHtml(o.id)}</option>`).join('');
+    const rows = h.regions.map((r) => `<tr><td><b>${escapeHtml(r.name)}</b></td><td>${r.players} here</td><td class="actions">
+        <button type="button" data-region-restart="${escapeHtml(r.id)}" data-players="${r.players}">Restart</button>
+        ${s.hosts.length > 1 ? `<select data-move-for="${escapeHtml(r.id)}" aria-label="Move ${escapeHtml(r.name)} to">${moveTo()}</select><button type="button" data-region-move="${escapeHtml(r.id)}" data-players="${r.players}">Move</button>` : ''}
+      </td></tr>`).join('');
+    return `<div class="host">
+      <h3>${hostName(h)}</h3>
+      <div class="stats">
+        <div class="stat ${busy}"><b>${l.tickMs.toFixed(1)} ms</b><span>a tick on average (slowest ${l.worstTickMs.toFixed(1)} ms of ${TICK_MS} ms)</span></div>
+        <div class="stat"><b>${h.players}</b><span>player${h.players === 1 ? '' : 's'} in ${h.regions.length} region${h.regions.length === 1 ? '' : 's'}</span></div>
+        <div class="stat"><b>${l.memoryMb} MB</b><span>memory</span></div>
+        <div class="stat ${l.errors ? 'warn' : ''}"><b>${l.errors}</b><span>error${l.errors === 1 ? '' : 's'} since it started</span></div>
+      </div>
+      ${l.lastError ? `<p class="note warn">Last error: ${escapeHtml(l.lastError)}</p>` : ''}
+      <p class="note">On ${escapeHtml(l.host)} (process ${l.pid}), running for ${since(s.now - l.startedAt)}${h.kind === 'region-server' ? `, last heard from ${since(quiet)} ago` : ''}.</p>
+      ${rows ? `<table class="log">${rows}</table>` : '<p class="note">No regions run here right now.</p>'}
+    </div>`;
+  };
+  const how = s.regionServers
+    ? s.hosts.length > 1
+      ? 'Regions run on the region servers below. If one stops, its regions come back to the game server within a few seconds, with their players.'
+      : 'No region server is running, so every region runs in the game server. Start some with <code>npm run region-server</code> (or <code>REGION_SERVERS</code> with <code>npm run dev</code>).'
+    : 'Every region runs in the game server. Set <code>REDIS_URL</code> to let region servers share the work (see docs/scale.md).';
+  return `
+    <p>${how} The world is kept in ${escapeHtml(s.store)}.</p>
+    ${s.hosts.map(card).join('')}
+    <p class="note">Restarting a region sets it up again from scratch: creatures respawn, and players inside stay where they stood. Moving a region does the same on another server.</p>`;
+}
+
 // --- Art -----------------------------------------------------------------------
 
 interface ArtJob {
@@ -977,6 +1044,14 @@ main.addEventListener('click', async (e) => {
       main.innerHTML = '<p class="note">Pulling main and restarting. This page reloads when the game is back…</p>';
       void reloadWhenBack(r.from);
       return;
+    } else if (t.dataset.regionRestart || t.dataset.regionMove) {
+      const region = (t.dataset.regionRestart ?? t.dataset.regionMove)!;
+      const to = t.dataset.regionMove ? main.querySelector<HTMLSelectElement>(`select[data-move-for="${CSS.escape(region)}"]`)?.value : undefined;
+      const players = Number(t.dataset.players);
+      if (players && !confirm(`${players} player${players === 1 ? ' is' : 's are'} in this region. They stay where they stand but may notice a short pause. Go ahead?`)) return;
+      t.disabled = true;
+      const r = await api<{ message: string }>('servers/move', 'POST', { region, ...(to ? { to } : {}) });
+      toast(r.message);
     } else if (t.dataset.role) {
       await api(`players/${t.dataset.role}/role`, 'POST', { role: t.dataset.to });
       toast(t.dataset.to === 'steward' ? 'Appointed. The God has told them.' : 'Steward role removed.');

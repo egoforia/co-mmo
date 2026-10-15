@@ -11,6 +11,7 @@ import { Store, StoreError, dailyClips, soundSettings, videoSettings, type Accou
 import { Wishes, type WishOptions } from './wishes.ts';
 import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
+import { LoadMeter } from './load-meter.ts';
 import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
 import type { Updater } from './updates.ts';
@@ -131,6 +132,8 @@ export function createApp(options: AppOptions): App {
   const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries() }) : undefined;
   if (regionServers) world.hosting = regionServers;
   const ready = regionServers ? regionServers.start() : Promise.resolve();
+  // How hard this process works, for God's View's Server health tab.
+  const meter = new LoadMeter();
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now });
   wishes.restore();
   const artJobs = new ArtJobs();
@@ -396,7 +399,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson };
+    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
@@ -548,10 +551,10 @@ export function createApp(options: AppOptions): App {
     });
   });
 
-  const tickTimer = setInterval(() => {
+  const tickTimer = setInterval(() => meter.tick(() => {
     world.tick();
     rules.tick();
-  }, TICK_SECONDS * 1000);
+  }), TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 
   function saveAll(): void {

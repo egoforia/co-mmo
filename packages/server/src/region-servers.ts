@@ -21,8 +21,23 @@ export interface HostStatus {
   kind: 'gateway' | 'region-server';
   regions: { id: string; name: string; players: number }[];
   players: number;
-  load?: ServerLoad;
-  seen?: number;
+  load: ServerLoad;
+  /** When it was last heard from. */
+  seen: number;
+}
+
+/** Every host and the regions it runs: the gateway, then each region server. */
+export function hostStatus(world: World, gateway: ServerLoad, servers: ServerInfo[] = [], now = Date.now()): HostStatus[] {
+  const byHost = new Map<string, RegionHandle[]>();
+  for (const region of world.regions.values()) byHost.set(region.host, [...(byHost.get(region.host) ?? []), region]);
+  const describe = (id: string) => {
+    const regions = byHost.get(id) ?? [];
+    return { regions: regions.map((r) => ({ id: r.def.id, name: r.def.name, players: r.online })), players: regions.reduce((n, r) => n + r.online, 0) };
+  };
+  return [
+    { id: 'gateway', kind: 'gateway', ...describe('gateway'), load: gateway, seen: now },
+    ...servers.map((s): HostStatus => ({ id: s.id, kind: 'region-server', ...describe(s.id), load: s.load, seen: s.seen })),
+  ];
 }
 
 export interface RegionServersOptions {
@@ -72,18 +87,8 @@ export class RegionServers implements Hosting {
   }
 
   /** Every host and what it runs, for God's View's Server health tab. */
-  status(): HostStatus[] {
-    const byHost = new Map<string, RegionHandle[]>();
-    for (const region of this.world.regions.values()) byHost.set(region.host, [...(byHost.get(region.host) ?? []), region]);
-    const describe = (regions: RegionHandle[]) => regions.map((r) => ({ id: r.def.id, name: r.def.name, players: r.online }));
-    const gateway = byHost.get('gateway') ?? [];
-    return [
-      { id: 'gateway', kind: 'gateway', regions: describe(gateway), players: gateway.reduce((n, r) => n + r.online, 0) },
-      ...this.list().map((s): HostStatus => {
-        const regions = byHost.get(s.id) ?? [];
-        return { id: s.id, kind: 'region-server', regions: describe(regions), players: regions.reduce((n, r) => n + r.online, 0), load: s.load, seen: s.seen };
-      }),
-    ];
+  status(gateway: ServerLoad): HostStatus[] {
+    return hostStatus(this.world, gateway, this.list(), this.now());
   }
 
   /**

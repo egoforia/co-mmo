@@ -14,6 +14,8 @@ import { ArtRequestError, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
+import type { LoadMeter } from './load-meter.ts';
+import { hostStatus, type RegionServers } from './region-servers.ts';
 
 export interface AdminContext {
   store: Store;
@@ -35,6 +37,10 @@ export interface AdminContext {
   /** Disconnects everyone with a "the world is updating" notice and saves. */
   restarting(): Promise<void>;
   env: Record<string, string | undefined>;
+  /** How hard this process (the gateway) works. */
+  meter: LoadMeter;
+  /** The region servers, when REDIS_URL lets them join; absent when every region runs here. */
+  regionServers?: RegionServers;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
 }
@@ -415,6 +421,37 @@ export async function handleAdmin(
     // A raised limit lets what was held back be painted now.
     ctx.resumeArt?.();
     return json(res, 200, { ok: true }), true;
+  }
+
+  // Server health (Owner): where each region runs and how hard each host works.
+  if (route === 'servers' && method === 'GET') {
+    if (ownerOnly()) return true;
+    const servers = ctx.regionServers;
+    return json(res, 200, {
+      hosts: servers ? servers.status(ctx.meter.load()) : hostStatus(world, ctx.meter.load()),
+      regionServers: Boolean(servers),
+      store: store.label,
+      now: Date.now(),
+    }), true;
+  }
+
+  // Moves a region to another host, or sets it up again where it is (a restart).
+  if (route === 'servers/move' && method === 'POST') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const id = typeof body?.region === 'string' ? body.region : '';
+    const region = world.region(id);
+    if (!region) return json(res, 404, { error: 'not_found', message: 'There is no such region.' }), true;
+    const to = typeof body?.to === 'string' && body.to ? body.to : region.host;
+    try {
+      if (ctx.regionServers) await ctx.regionServers.move(id, to);
+      else if (to === 'gateway') await world.moveRegion(id);
+      else return json(res, 400, { error: 'no_server', message: 'That region server is not running.' }), true;
+    } catch (err) {
+      return json(res, 400, { error: 'cannot_move', message: (err as Error).message }), true;
+    }
+    const moved = world.region(id)!;
+    return json(res, 200, { region: id, host: moved.host, message: to === region.host ? `Restarted ${moved.def.name}.` : `Moved ${moved.def.name}.` }), true;
   }
 
   if (route === 'update' && method === 'GET') {

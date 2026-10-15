@@ -124,6 +124,20 @@ Each one says `Region server <name> joined.` in the game server's console.
 For a few friends on one laptop, region servers are not needed; they are
 how the world grows past what one process can run.
 
+## Server health
+
+God's View has an Owner-only **Server health** tab. It lists the game
+server and every region server with the regions each one runs, how many
+players are in them, how long a tick takes on average and at worst (a tick
+has 50 ms; a card turns red when the slowest one ran over), memory, the
+errors it caught and the last one, and the machine and process it runs as.
+It refreshes every few seconds.
+
+Each region has **Restart**, which sets it up again where it runs, and
+**Move** with a choice of host, which sets it up on another server. Players
+inside stay where they stood and see a short pause; creatures respawn.
+Without region servers, Restart still works on the game server.
+
 ## Hosting
 
 Any Postgres 14 or newer works (Fly.io, Neon, Supabase, a VPS). Set

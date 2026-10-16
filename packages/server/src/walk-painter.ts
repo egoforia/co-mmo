@@ -453,6 +453,8 @@ export class WalkPainter {
       prompt: prompt ?? viewPrompt(walker.name, walker.gear, direction),
       references: [{ mimeType: 'image/png', data: await this.onMagenta(walker) }],
       labels: [`${walker.name}'s approved picture, on magenta`],
+      // The picture is the walker to paint, not only a style to match, so the "do not copy their subjects" note would fight the prompt.
+      edit: true,
       aspectRatio: '3:4',
     };
   }

@@ -240,6 +240,9 @@ describe('the Art tab', () => {
     expect(view.status).toBe(200);
     expect(view.body.parts[0].recipe.steps).toHaveLength(1);
     expect(view.body.parts[0].recipe.steps[0]).toMatchObject({ media: 'picture', prompt: 'The scarab facing left, shell gleaming.', pictures: [{ name: "Sun Scarab's approved picture, on magenta" }] });
+    // The picture sent is the scarab itself, so the note against copying the pictures' subjects is left out.
+    expect(view.body.parts[0].recipe.steps[0].note).toBeUndefined();
+    expect(view.body.parts[0].recipe.steps[0].settings).toContain('the pictures show the subject itself, not only the style');
     const usual = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'left' });
     expect(usual.body.parts[0].recipe.steps[0].prompt).toContain('facing left');
     // The approval is for those words only.

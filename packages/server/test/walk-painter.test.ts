@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { WALK_DIRECTIONS, walkArt } from '@co-mmo/shared';
+import { WALK_DIRECTIONS, walkArt, walkStandArt } from '@co-mmo/shared';
 import type { ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
 import { WalkPainter } from '../src/walk-painter.ts';
@@ -91,8 +91,10 @@ describe('walk painter', () => {
       onPainted: (ids) => told.push(ids),
     });
     await painter.start();
-    // Open games are told about each look's walks once they are all on disk.
-    expect(told).toEqual(['player-mara', 'player-ilya'].map((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d))));
+    // Open games are told about each look's walks once they are on disk, and each standing picture as it is painted.
+    expect(told.filter((ids) => ids[0]!.includes('-walk-'))).toEqual(['player-mara', 'player-ilya'].map((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d))));
+    expect(told.filter((ids) => ids[0]!.includes('-stand-')).flat()).toEqual(['player-mara', 'player-ilya'].flatMap((look) => (['right', 'back', 'left'] as const).map((d) => walkStandArt(look, d))));
+    expect(Object.keys(await painter.standingManifest())).toEqual(expect.arrayContaining([walkStandArt('player-mara', 'left')]));
 
     const manifest = painter.manifest();
     expect(Object.keys(manifest)).toHaveLength(8);

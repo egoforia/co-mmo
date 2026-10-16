@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { BODY_TYPES, WALKING_LOOKS, WALK_DIRECTIONS, walkArt, type ArtManifest, type WalkDirection } from '@co-mmo/shared';
+import { BODY_TYPES, WALKING_LOOKS, WALK_DIRECTIONS, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type WalkDirection } from '@co-mmo/shared';
 import { ANCHORS } from './assets/anchors.ts';
 import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { KEY_COLOR } from './assets/style.ts';
@@ -117,6 +117,33 @@ export class WalkPainter {
     return this.painted;
   }
 
+  /** Standing pictures read so far, by file, with when they were written. */
+  private standingSeen = new Map<string, { at: number; entry: ArtEntry }>();
+
+  /**
+   * Every walker's standing pictures by direction, for clients: a walker
+   * stands in the one facing its way while it has no walk that way yet.
+   */
+  async standingManifest(): Promise<ArtManifest> {
+    const out: ArtManifest = {};
+    for (const name of await readdir(resolve(this.dir, 'views')).catch(() => [] as string[])) {
+      const m = /^(.+)-(front|right|back|left)\.png$/.exec(name);
+      if (!m) continue;
+      const path = resolve(this.dir, 'views', name);
+      const at = (await stat(path).catch(() => undefined))?.mtimeMs;
+      if (at === undefined) continue;
+      let seen = this.standingSeen.get(name);
+      if (seen?.at !== at) {
+        const { width = 0, height = 0 } = await sharp(path).metadata().catch(() => ({ width: 0, height: 0 }));
+        if (!width || !height) continue;
+        seen = { at, entry: { file: `${WALK_ART_PATH}/views/${name}?v=${Math.round(at).toString(36)}`, kind: 'stand', width, height } };
+        this.standingSeen.set(name, seen);
+      }
+      out[walkStandArt(m[1]!, m[2] as WalkDirection)] = seen.entry;
+    }
+    return out;
+  }
+
   /** Paints whatever walks are missing, one look at a time, while the budget allows. */
   start(): Promise<void> {
     this.job ??= this.run()
@@ -181,14 +208,9 @@ export class WalkPainter {
     await mkdir(this.dir, { recursive: true });
     await writeFile(path, JSON.stringify([...done], null, 2));
     for (const walkerId of walkers) {
-      const walks: Buffer[][] = [];
-      for (const d of WALK_DIRECTIONS) {
-        const frames = (await this.cached(`frames/${walkArt(walkerId, d)}.json`)) as string[] | undefined;
-        if (frames) walks.push(await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f)))));
-      }
-      const entry = this.painted[walkArt(walkerId, 'front')];
+      const entry = WALK_DIRECTIONS.map((d) => this.painted[walkArt(walkerId, d)]).find(Boolean);
       const body = Object.keys(BODY_TYPES).find((k) => BODY_TYPES[k]!.frames === entry?.frames && BODY_TYPES[k]!.cycleSeconds === entry?.cycleSeconds) ?? 'two-legged';
-      if (walks.length === WALK_DIRECTIONS.length) await this.writeStrips({ id: walkerId, name: walkerId, gear: [], body, reference: async () => Buffer.alloc(0) }, walks, true);
+      await this.writeKept({ id: walkerId, name: walkerId, gear: [], body, reference: async () => Buffer.alloc(0) }, true);
     }
   }
 
@@ -364,7 +386,7 @@ export class WalkPainter {
   /**
    * Makes one direction's walk clip from the standing picture there now, and
    * nothing else. The walk it replaces is kept; when it fails twice, the walk
-   * stays as it was. The walk strips are made again once all four ways walk.
+   * stays as it was. The walk strips of every way that walks are made again.
    */
   async makeClip(walker: Walker, direction: WalkDirection, prompt: string | undefined, handle?: ArtJobHandle): Promise<boolean> {
     const body = BODY_TYPES[walker.body] ?? BODY_TYPES['two-legged']!;
@@ -386,13 +408,7 @@ export class WalkPainter {
       return !cut || !('stop' in cut);
     }
     await this.load();
-    const walks: Buffer[][] = [];
-    for (const d of WALK_DIRECTIONS) {
-      const frames = (await this.cached(`frames/${walkArt(walker.id, d)}.json`)) as string[] | undefined;
-      if (!frames) return true;
-      walks.push(await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f)))));
-    }
-    await this.writeStrips(walker, walks, true);
+    await this.writeKept(walker, true);
     return true;
   }
 
@@ -409,7 +425,9 @@ export class WalkPainter {
     }
     if (await this.approvedCopy(walker, direction)) await rm(path, { force: true });
     await mkdir(resolve(this.dir, 'views'), { recursive: true });
-    return this.history.restore(key, version, path);
+    const restored = await this.history.restore(key, version, path);
+    if (restored) this.options.onPainted?.([walkStandArt(walker.id, direction)]);
+    return restored;
   }
 
   /** A walk direction's earlier versions, newest first. */
@@ -430,7 +448,7 @@ export class WalkPainter {
   /**
    * Puts an earlier walk back in one direction, for free: its frames and
    * standing picture return, and the walk strips are made again from the
-   * frames once every direction has some. The walk it replaces is kept.
+   * frames of every direction that has some. The walk it replaces is kept.
    */
   async restore(walker: Walker, direction: WalkDirection, version: string): Promise<boolean> {
     const id = walkArt(walker.id, direction);
@@ -447,13 +465,8 @@ export class WalkPainter {
     }
     await this.options.recipes?.bringBack(id, version);
     await this.load();
-    const walks: Buffer[][] = [];
-    for (const d of WALK_DIRECTIONS) {
-      const frames = (await this.cached(`frames/${walkArt(walker.id, d)}.json`)) as string[] | undefined;
-      if (!frames) return true;
-      walks.push(await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f)))));
-    }
-    await this.writeStrips(walker, walks, true);
+    await this.writeKept(walker, true);
+    this.options.onPainted?.([walkStandArt(walker.id, direction)]);
     return true;
   }
 
@@ -547,37 +560,48 @@ export class WalkPainter {
     const skipRest = (reason: string) => {
       for (const handle of [...viewJobs.values(), ...clipJobs.values()]) handle?.skip(reason);
     };
-    const walks: Buffer[][] = [];
+    // Each way that walks is used in the game as soon as it is made, even when another way fails.
+    let made = false;
     try {
       for (const direction of WALK_DIRECTIONS) {
-        const frames = (await this.cached(`frames/${walkArt(walker.id, direction)}.json`)) as string[] | undefined;
-        if (frames) {
-          walks.push(await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f)))));
-          continue;
-        }
+        if (await this.cached(`frames/${walkArt(walker.id, direction)}.json`)) continue;
         const view = await this.view(walker, direction, viewJobs.get(direction));
         if (!view) return skipRest(stopReason(this.options)), false;
         const cut = await this.walk(walker, direction, view, body.frames, clipJobs.get(direction));
         if (cut && 'stop' in cut) return skipRest(cut.stop), false;
         if (!cut) return skipRest(`Another of ${walker.name}'s walks failed twice, so the rest wait.`), true;
-        walks.push(cut);
+        made = true;
       }
     } catch (err) {
       skipRest(`Painting ${walker.name} stopped: ${plain(err)}`);
       throw err;
+    } finally {
+      if (made || redone) await this.writeKept(walker, redone).catch((err) => console.error(`Writing ${walker.name}'s walks failed:`, (err as Error).message));
     }
-    await this.writeStrips(walker, walks, redone);
     return true;
   }
 
-  /** Writes a walker's four walk strips from their frames, all at one scale. */
-  private async writeStrips(walker: Walker, walks: Buffer[][], redone: boolean): Promise<void> {
+  /** Writes the walk strips of every way a walker has frames for. */
+  private async writeKept(walker: Walker, redone: boolean): Promise<void> {
+    const walks: [WalkDirection, Buffer[]][] = [];
+    for (const d of WALK_DIRECTIONS) {
+      const frames = (await this.cached(`frames/${walkArt(walker.id, d)}.json`)) as string[] | undefined;
+      if (frames) walks.push([d, await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f))))]);
+    }
+    if (walks.length) await this.writeStrips(walker, walks, redone);
+  }
+
+  /**
+   * Writes a walker's walk strips from their frames, all at one scale: every
+   * way it walks so far, so a walker uses each walk as soon as it is made.
+   */
+  private async writeStrips(walker: Walker, walks: [WalkDirection, Buffer[]][], redone: boolean): Promise<void> {
     const body = BODY_TYPES[walker.body] ?? BODY_TYPES['two-legged']!;
     // One scale for the whole look, so it keeps its size when it turns.
-    const { strips, frameWidth, frameHeight } = await normalizeWalk(walks);
+    const { strips, frameWidth, frameHeight } = await normalizeWalk(walks.map(([, frames]) => frames));
     await mkdir(this.dir, { recursive: true });
     const now = Date.now();
-    for (const [i, direction] of WALK_DIRECTIONS.entries()) {
+    for (const [i, [direction]] of walks.entries()) {
       const id = walkArt(walker.id, direction);
       await writeFile(resolve(this.dir, `${id}.png`), strips[i]!);
       const file = `${WALK_ART_PATH}/${id}.png`;
@@ -585,7 +609,7 @@ export class WalkPainter {
       this.painted[id] = { file: redone ? `${file}?v=${now.toString(36)}` : file, kind: 'walk', width: frameWidth * body.frames, height: frameHeight, frames: body.frames, cycleSeconds: body.cycleSeconds, ...(redone ? { redone: now } : {}) };
     }
     await writeFile(resolve(this.dir, 'manifest.json'), JSON.stringify(this.painted, null, 2));
-    this.options.onPainted?.(WALK_DIRECTIONS.map((d) => walkArt(walker.id, d)));
+    this.options.onPainted?.(walks.map(([d]) => walkArt(walker.id, d)));
   }
 
   /** The walker's picture on magenta, the way the image and video models are given it. */
@@ -651,6 +675,7 @@ export class WalkPainter {
   private async keepView(walker: Walker, direction: WalkDirection, painted: { figure: Buffer; usd: number; request: ImageRequest; provider: ImageProvider }): Promise<void> {
     await mkdir(resolve(this.dir, 'views'), { recursive: true });
     await writeFile(this.viewPath(walker, direction), painted.figure);
+    this.options.onPainted?.([walkStandArt(walker.id, direction)]);
     await this.options.recipes?.record(viewKey(walker, direction), { at: Date.now(), steps: [await this.options.recipes.imageStep(`${walker.name} standing, facing ${facingWords(direction)}`, painted.provider, painted.request, painted.usd)] });
   }
 

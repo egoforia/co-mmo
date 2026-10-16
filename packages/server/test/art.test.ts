@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, WALK_DIRECTIONS, buildingArtIds, walkArt } from '@co-mmo/shared';
+import { BUILDING_STYLES, WALK_DIRECTIONS, buildingArtIds, walkArt, walkStandArt } from '@co-mmo/shared';
 import type { ImageProvider } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
 import { MemoryPaintQueue } from '../src/paint-queue.ts';
@@ -286,6 +286,32 @@ describe('the Art tab', () => {
     expect(restored.versions).toHaveLength(2);
     expect(restored.recipe.steps[0].prompt).toContain('facing left');
     expect(clips.asked).toHaveLength(5);
+  }, 60_000);
+
+  it('uses each way\'s walk as soon as it is made, and serves standing pictures for the ways that do not walk yet', async () => {
+    const clips = video();
+    const anchors = await tmp();
+    await mkdir(join(anchors, 'raw'), { recursive: true });
+    await writeFile(join(anchors, 'raw', 'desert-scarab.png'), await figure(300, 300, 150, 280));
+    const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter: figurePainter(), video: clips, frames });
+    const owner = account(store, 'Ego', 'owner');
+    const view = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'left' });
+    expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'left', approved: view.body.fingerprint })).status).toBe(202);
+    await app!.art.idle();
+    // Standing facing left, with no walk anywhere yet: the game is given the standing picture.
+    let art = (await api(base, '/api/art', owner.token)).body;
+    expect(art[walkStandArt('desert-scarab', 'left')]).toMatchObject({ kind: 'stand', file: expect.stringMatching(/^wished-art\/walks\/views\/desert-scarab-left\.png\?v=/) });
+    expect(art[walkArt('desert-scarab', 'left')]).toBeUndefined();
+    expect((await fetch(`${base}/${art[walkStandArt('desert-scarab', 'left')].file}`)).status).toBe(200);
+
+    // One clip, and that way walks at once; the others stand.
+    const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'left' });
+    expect((await api(base, '/api/admin/art/clip', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', direction: 'left', approved: clip.body.fingerprint })).status).toBe(202);
+    await app!.art.idle();
+    art = (await api(base, '/api/art', owner.token)).body;
+    expect(art[walkArt('desert-scarab', 'left')]).toMatchObject({ kind: 'walk', frames: expect.any(Number) });
+    expect(art[walkArt('desert-scarab', 'right')]).toBeUndefined();
+    expect(Object.keys(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8')))).toEqual([walkArt('desert-scarab', 'left')]);
   }, 60_000);
 
   it('keeps a walk stopped by the day\'s clip limit, and makes it once the Owner raises the limit', async () => {

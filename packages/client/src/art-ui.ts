@@ -129,6 +129,8 @@ const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monste
 type Subtab = (typeof SUBTABS)[number][0];
 const ITEM_ORDER = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
 const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']];
+/** The way a walker faces after turning round. */
+const TURNED: Record<Direction, Direction> = { front: 'back', back: 'front', left: 'right', right: 'left' };
 const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
 const STATUS: Record<ArtJob['status'], string> = { queued: 'In line', waiting: 'Waiting for a turn', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
 const MEDIA: Record<ArtJob['media'], string> = { picture: 'picture', clip: 'video clip', sound: 'sound' };
@@ -144,6 +146,8 @@ let points: ArtPointsManifest = {};
 /** The questions the hand finder asks, one per way of facing. */
 interface HandQuestion { facing: Direction; prompt: string; usual: string; own: boolean; system: string }
 let questions: HandQuestion[] = [];
+/** Walks whose hands were mirrored from another walk: the walk they came from, by art id. */
+let mirrored: Record<string, string> = {};
 let ctx: ArtContext;
 
 /** Where the Art tab is: its sub-tab and page, from the address (#art/<sub-tab>/<page>). */
@@ -160,13 +164,14 @@ function go(sub: Subtab, page?: string): string {
 /** The Art tab, as HTML. */
 export async function artPage(context: ArtContext): Promise<string> {
   ctx = context;
-  let asked: { questions: HandQuestion[] };
+  let asked: { questions: HandQuestion[]; mirrored?: Record<string, string> };
   [data, points, asked] = await Promise.all([
     ctx.api<ArtOverview>('art'),
     fetch('/api/art-points').then((r) => (r.ok ? r.json() : {}), () => ({})),
     ctx.api<{ questions: HandQuestion[] }>('art/hands').catch(() => ({ questions: [] })),
   ]);
   questions = asked.questions;
+  mirrored = asked.mirrored ?? {};
   const o = data;
   const { sub, page } = where();
   const pages: Record<Subtab, () => string> = { now: nowPage, characters: () => peoplePage('characters', page), monsters: () => peoplePage('monsters', page), items: () => itemsPage(page), biomes: () => biomesPage(page), sounds: soundsPage };
@@ -420,11 +425,16 @@ function handsHtml(w: WalkerView): string {
         </form>
       </details>` : '';
     const missing = !hands ? ' · not looked at yet' : !lefts ? ' · left hand not looked for yet: it is found by itself after Pull and restart, or use Find again' : '';
-    return [`<div class="hand-row"><div class="hand-head"><small>${label}${missing}</small>${find({ ids: [id] }, 'Find again for this walk')}</div><div class="frames">${frames}</div>${ask}</div>`];
+    // Turning round mirrors the picture, so the opposite walk's hands, mirrored, can stand in for this one's.
+    const [turned, turnedLabel] = DIRECTIONS.find(([o]) => o === TURNED[d])!;
+    const from = `${w.id}-walk-${turned}`;
+    const copied = mirrored[id] ? ` · mirrored from the ${DIRECTIONS.find(([o]) => mirrored[id] === `${w.id}-walk-${o}`)?.[1] ?? 'other'} walk` : '';
+    const mirror = w.walks[turned] && points[from]?.hands ? `<button type="button" class="quiet" data-hands-mirror="${esc(JSON.stringify({ from, to: id }))}" data-label="${esc(`${label} walk`)}" data-from-label="${esc(`${turnedLabel} walk`)}">Use the ${turnedLabel} walk's hands, mirrored</button>` : '';
+    return [`<div class="hand-row"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, 'Find again for this walk')}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`];
   });
   if (!rows.length) return '';
   return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: shields and off-hand items)</summary>
-    <p class="note">The hand finder looks at every frame once, after a walk is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call.</p>
+    <p class="note">The hand finder looks at every frame once, after a walk is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call. A walk can instead take the hands found in the walk facing the other way, mirrored, for free.</p>
     ${tryOnHtml()}
     <p class="note">Pick an item to see it in that hand on every frame, as the game draws it. Trying items is free and changes nothing for players.</p>
     ${find({ ids: [...ids, w.id] }, `Find again for every walk of ${esc(w.name)}`, '')}
@@ -675,6 +685,14 @@ export function artClick(target: HTMLElement): boolean {
     void ctx.api<{ looked: number }>('art/hands/find', 'POST', JSON.parse(t.dataset.handsFind)).then(
       (r) => { ctx.toast(`Looked again at ${r.looked} ${r.looked === 1 ? 'frame' : 'frames'}. Players see it after they reload.`); ctx.rerender(); },
       (err: Error) => { t.disabled = false; t.classList.remove('busy'); ctx.toast(err.message); },
+    );
+  } else if (t.dataset.handsMirror) {
+    if (!confirm(`Replace the hands of the ${t.dataset.label} with the ${t.dataset.fromLabel}'s, mirrored? This is free; "Find again" looks for them in this walk again.`)) return true;
+    const panel = t.closest<HTMLElement>('details.hands');
+    if (panel?.dataset.walker) openHands.add(panel.dataset.walker);
+    void ctx.api('art/hands/mirror', 'POST', JSON.parse(t.dataset.handsMirror)).then(
+      () => { ctx.toast('Mirrored. Players see it after they reload.'); ctx.rerender(); },
+      (err: Error) => ctx.toast(err.message),
     );
   } else if (t.dataset.handsUsual) {
     const panel = t.closest<HTMLElement>('details.hands');

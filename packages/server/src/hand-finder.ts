@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ArtPoints, ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
-import { GRIP, HAND_QUESTIONS, POINTS_VERSION, findHands, findPoint, handSystem, steadyHands, stripFrames, type BothHands, type Facing } from './assets/points.ts';
+import { GRIP, HAND_QUESTIONS, POINTS_VERSION, findHands, findPoint, handSystem, mirroredHands, steadyHands, stripFrames, type BothHands, type Facing } from './assets/points.ts';
 
 // Held items (milestone 10): finds, once per picture, where a walker's two
 // hands are in every frame and where each item is gripped, so the client can
@@ -42,6 +42,8 @@ interface Found extends ArtPoints {
   from: string;
   /** Both hands as answered, frame by frame, so one frame found again is set straight with the rest. */
   both?: BothHands[];
+  /** The walk these hands were mirrored from, when they were not looked for in this one. */
+  mirrored?: string;
 }
 
 /** One way of facing's hand question, as God's View shows and edits it. */
@@ -81,7 +83,33 @@ export class HandFinder {
   /** Points by art id, for clients. */
   async manifest(): Promise<ArtPointsManifest> {
     await this.load();
-    return Object.fromEntries(Object.entries(this.found).map(([id, { from: _from, both: _both, ...points }]) => [id, points]));
+    return Object.fromEntries(Object.entries(this.found).map(([id, { from: _from, both: _both, mirrored: _mirrored, ...points }]) => [id, points]));
+  }
+
+  /** Walks whose hands were mirrored from another walk, by art id: the walk they came from. */
+  async mirrored(): Promise<Record<string, string>> {
+    await this.load();
+    return Object.fromEntries(Object.entries(this.found).flatMap(([id, f]) => (f.mirrored ? [[id, f.mirrored]] : [])));
+  }
+
+  /**
+   * Gives one walk the hands found in another, mirrored: costs nothing, and
+   * is kept until that walk is painted again or its hands are looked for
+   * again. Refused, in plain words, when either walk or its hands are missing.
+   */
+  async mirror(fromId: string, toId: string): Promise<void> {
+    await this.load();
+    const found = this.found[fromId];
+    if (!found?.hands) throw new Error('No hands have been found in that walk yet, so there is nothing to mirror.');
+    const target = (await this.options.sources()).find((s) => s.id === toId && s.kind === 'hands');
+    const picture = await target?.read().catch(() => undefined);
+    if (!target || !picture) throw new Error('That walk has not been painted yet.');
+    const hands = mirroredHands(found.hands, target.frames);
+    const leftHands = mirroredHands(found.leftHands, target.frames);
+    const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));
+    this.found[toId] = { from: this.stamp(target, picture), hands, ...(found.leftHands ? { leftHands } : {}), both, mirrored: fromId };
+    await mkdir(this.options.artDir, { recursive: true });
+    await writeFile(this.file, JSON.stringify(this.found, null, 2));
   }
 
   /** Looks at every picture with no points yet, or painted again since. */

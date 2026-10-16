@@ -12,6 +12,7 @@ import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
 import type { HandFinder } from './hand-finder.ts';
+import { TURNED, type Facing } from './assets/points.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
@@ -359,7 +360,7 @@ export async function handleAdmin(
   if (route.startsWith('art') && ctx.art) {
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
-    if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [] }), true;
+    if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [], mirrored: (await ctx.hands?.mirrored()) ?? {} }), true;
     if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: wishes.budget() }), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;
     const note = typeof body?.note === 'string' ? body.note : '';
@@ -417,6 +418,19 @@ export async function handleAdmin(
         if (!ctx.hands || !(WALK_DIRECTIONS as readonly string[]).includes(facing)) return json(res, 400, { error: 'bad_request', message: 'There is no question like that.' }), true;
         await ctx.hands.setQuestion(facing as WalkDirection, typeof body?.prompt === 'string' ? body.prompt : '');
         return json(res, 200, { ok: true }), true;
+      }
+      if (route === 'art/hands/mirror' && method === 'POST') {
+        // Only between one walker's walks facing opposite ways.
+        const [from, to] = [String(body?.from ?? ''), String(body?.to ?? '')];
+        const walk = (id: string) => /^(.+)-walk-(front|back|left|right)$/.exec(id);
+        const [a, b] = [walk(from), walk(to)];
+        if (!ctx.hands || !a || !b || a[1] !== b[1] || TURNED[a[2] as Facing] !== b[2]) return json(res, 400, { error: 'bad_request', message: 'Hands can only be mirrored between the same character\'s walks facing opposite ways.' }), true;
+        try {
+          await ctx.hands.mirror(from, to);
+          return json(res, 200, { ok: true }), true;
+        } catch (err) {
+          return json(res, 409, { error: 'art_refused', message: (err as Error).message }), true;
+        }
       }
       if (route === 'art/hands/find' && method === 'POST') {
         const ids = Array.isArray(body?.ids) ? body.ids.filter((x): x is string => typeof x === 'string').slice(0, 20) : [];

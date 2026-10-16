@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { biomeLook, hasShippedKit, type ArtEntry, type ArtManifest, type BiomeId } from '@co-mmo/shared';
 import type { KitAsset } from './kit.ts';
+import { pictureName } from './names.ts';
 import { makeSeamless, removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
 import { buildPrompt } from './style.ts';
@@ -151,7 +152,7 @@ export async function paintKitAsset(
     }
   }
   const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${buildPrompt(asset)}\nAlso: ${extra.note.trim()}` : buildPrompt(asset);
-  const image = await provider.generate({ prompt, references });
+  const image = await provider.generate({ prompt, references, labels: sent.map(pictureName) });
   // The untouched picture is kept, so it can be processed again for free.
   await mkdir(resolve(outDir, 'raw'), { recursive: true });
   await writeFile(resolve(outDir, 'raw', `${asset.id}.png`), await sharp(image.data).png().toBuffer());

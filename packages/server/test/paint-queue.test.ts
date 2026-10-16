@@ -271,6 +271,8 @@ describe('paint requests kept across a restart', () => {
       },
       wish: () => undefined,
       walk: () => undefined,
+      view: () => undefined,
+      clip: () => undefined,
     });
     expect(resumed).toEqual([asked]);
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual([asked]);

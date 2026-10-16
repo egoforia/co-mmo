@@ -5,6 +5,7 @@ import { buildingArtJobs, paintBuildingArt, type BuildingArtJob } from './assets
 import type { ImageProvider } from './assets/provider.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource, type ArtJobs } from './art-jobs.ts';
+import { Previewed, dryImage, keepingImage, type Recipe, type RecipeBook } from './art-recipes.ts';
 import { watched } from './paint-queue.ts';
 
 /** Where painted building art is served from, under the wished-art directory. */
@@ -25,6 +26,8 @@ export interface BuildingPainterOptions {
   shipped: () => Promise<ArtManifest>;
   /** The painting log God's View shows. */
   jobs?: ArtJobs;
+  /** Keeps what was sent to make each picture, for God's View. */
+  recipes?: RecipeBook;
 }
 
 /** Every picture any building needs, outside first for each building. */
@@ -93,12 +96,28 @@ export class BuildingPainter {
    * own words to the prompt.
    */
   async repaint(id: string, note = '', handle?: ArtJobHandle): Promise<void> {
-    const job = allBuildingArt().find((j) => j.id === id);
-    if (!job) throw new Error('There is no building picture by that name.');
+    const job = withNote(id, note);
     const provider = this.options.provider();
     if (!provider) throw new Error("No image model is set in God's View.");
     await this.load();
-    await this.paint(note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job, provider, handle, true);
+    await this.paint(job, provider, handle, true);
+  }
+
+  /** Exactly what painting one building picture again would send, without painting it. */
+  async preview(id: string, note = ''): Promise<Recipe> {
+    const job = withNote(id, note);
+    const provider = this.options.provider();
+    if (!provider) throw new Error("No image model is set in God's View.");
+    const dry = dryImage(provider);
+    await paintBuildingArt(job, dry, this.dirs()).catch((err) => {
+      if (!(err instanceof Previewed)) throw err;
+    });
+    const step = await this.options.recipes!.imageStep(label(job), provider, dry.sent!, estimateImageUsd(provider.model));
+    return { at: Date.now(), steps: [step] };
+  }
+
+  private dirs() {
+    return { anchorDir: this.options.anchorDir, rawDir: resolve(this.dir, 'raw'), outDir: this.dir };
   }
 
   /** The file of a building picture painted here, if there is one. */
@@ -142,13 +161,12 @@ export class BuildingPainter {
   private async paint(job: BuildingArtJob, provider: ImageProvider, handle?: ArtJobHandle, redone = false): Promise<void> {
     handle?.start();
     try {
-      const { image, entry } = await paintBuildingArt(job, watched(provider, handle), {
-        anchorDir: this.options.anchorDir,
-        rawDir: resolve(this.dir, 'raw'),
-        outDir: this.dir,
-      });
+      // Kept outside the watcher, which only a queued provider offers.
+      const sent = keepingImage(watched(provider, handle));
+      const { image, entry } = await paintBuildingArt(job, sent, this.dirs());
       const usd = imageUsd(provider.model, image);
       this.options.spend(usd, provider);
+      if (this.options.recipes && sent.sent) await this.options.recipes.record(job.id, { at: Date.now(), steps: [await this.options.recipes.imageStep(label(job), provider, sent.sent, usd)] });
       const file = entry.file.replace(/^art\//, `${BUILDING_ART_PATH}/`);
       // A repaint keeps the same file name, so the address changes to make browsers fetch it again.
       this.painted[job.id] = { ...entry, file: redone ? `${file}?v=${Date.now().toString(36)}` : file, ...(redone ? { redone: Date.now() } : {}) };
@@ -160,6 +178,13 @@ export class BuildingPainter {
       throw err;
     }
   }
+}
+
+/** A building picture to paint, with the Owner's own words added to its prompt. */
+function withNote(id: string, note: string): BuildingArtJob {
+  const job = allBuildingArt().find((j) => j.id === id);
+  if (!job) throw new Error('There is no building picture by that name.');
+  return note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job;
 }
 
 /** A building picture in words, for the painting log. */

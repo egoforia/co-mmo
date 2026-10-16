@@ -244,7 +244,7 @@ export function createApp(options: AppOptions): App {
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests, recipes,
   });
   // Held items: where each walker's free hand is and where each weapon or charm is gripped.
-  const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
+  const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...(await walkPainter.standingManifest()), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
   const handFinder = new HandFinder({
     artDir: options.wishes.artDir,
     model: () => wishes.judgeModel(),

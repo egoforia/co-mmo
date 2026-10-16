@@ -30,6 +30,11 @@ export function walkArt(look: string, direction: WalkDirection): string {
   return `${look}-walk-${direction}`;
 }
 
+/** Art id of a look's standing picture facing one direction, shown while it has no walk that way. */
+export function walkStandArt(look: string, direction: WalkDirection): string {
+  return `${look}-stand-${direction}`;
+}
+
 /** Every walk strip the game needs, for every walking look. */
 export function walkArtIds(): string[] {
   return WALKING_LOOKS.flatMap((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d)));

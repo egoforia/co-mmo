@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   ABILITIES,
+  CREATURES,
   ITEMS,
   Interpolator,
   HELD_SIZE,
@@ -35,6 +36,7 @@ import {
   type WalkDirection,
   type WelcomeMessage,
   walkArt,
+  walkStandArt,
   walkDirection,
   walkFrameRate,
   wishArtKey,
@@ -48,6 +50,16 @@ interface Avatar {
   art: string;
   /** The way it last walked, for looks with painted walk sheets. */
   facing: WalkDirection;
+  /** Its size on screen when it wears its own picture. */
+  scale: number;
+  /**
+   * Walks and standing pictures are sized to the figure in its own picture
+   * (creatures, whose pictures are not all one height); otherwise only
+   * standing pictures are, and walks are drawn as painted.
+   */
+  fit?: boolean;
+  /** How fast it walks, as a share of a player's speed, so its feet keep up with the ground. */
+  pace?: number;
   shadow: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
   /** Health bar, shown once hurt. */
@@ -183,9 +195,11 @@ export class WorldScene extends Phaser.Scene {
   updateWalks(art: ArtManifest, ids: string[]): void {
     for (const id of ids) {
       const entry = art[id];
-      if (entry?.kind !== 'walk') continue;
+      if (!entry) continue;
       this.options.art[id] = entry;
-      void this.loadWalk(id, entry);
+      // A standing picture painted again: walkers facing that way wear it from their next step.
+      if (entry.kind === 'walk') void this.loadWalk(id, entry);
+      else void this.loadArt(id, entry.file);
     }
   }
 
@@ -208,6 +222,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.anims.exists(id)) this.anims.remove(id);
     if (this.textures.exists(id)) this.textures.remove(id);
     this.textures.addSpriteSheet(id, img, { frameWidth: entry.width / (entry.frames ?? WALK_FRAMES), frameHeight: entry.height });
+    this.figures.delete(id);
     this.makeWalk(id, entry);
     for (const a of avatars) {
       if (striding.has(a)) a.body.play(id);
@@ -430,26 +445,89 @@ export class WorldScene extends Phaser.Scene {
 
   /**
    * Plays an avatar's walk for the way it moves by (dx, dy), and stands it
-   * still facing that way when it stops. A look without painted walk sheets
-   * (a wished look, a creature) only turns to face left or right.
+   * still facing that way when it stops. Each way on its own: its walk when
+   * one is painted, else its standing picture facing that way, else its own
+   * picture, turned to face left or right.
    */
   private walk(a: Avatar, dx: number, dy: number): void {
     a.facing = walkDirection(dx, dy, a.facing);
     const sheet = walkArt(a.art, a.facing);
-    if (!this.anims.exists(sheet)) {
-      if (dx !== 0) a.body.setFlipX(dx < 0);
+    if (this.anims.exists(sheet)) {
+      a.body.setFlipX(false);
+      if (dx !== 0 || dy !== 0) {
+        if (a.body.anims.currentAnim?.key !== sheet || !a.body.anims.isPlaying) {
+          a.body.play(sheet, true);
+          this.fit(a, sheet, !!a.fit);
+        }
+        a.body.anims.timeScale = a.pace ?? 1;
+        return;
+      }
+      if (!a.body.anims.isPlaying) return;
+      a.body.stop();
+      // Facing us, the approved standing pose; any other way, the walk's first step.
+      if (a.facing === 'front' && this.textures.exists(a.art)) this.dress(a, a.art);
+      else {
+        a.body.setTexture(sheet, 0);
+        this.fit(a, sheet, !!a.fit);
+      }
       return;
     }
-    a.body.setFlipX(false);
-    if (dx !== 0 || dy !== 0) {
-      a.body.play(sheet, true);
+    // No walk painted this way: another way's walk stops.
+    if (a.body.anims.isPlaying) a.body.stop();
+    const stand = walkStandArt(a.art, a.facing);
+    if (this.textures.exists(stand)) {
+      a.body.setFlipX(false);
+      if (a.body.texture.key !== stand) this.dress(a, stand);
       return;
     }
-    if (!a.body.anims.isPlaying) return;
-    a.body.stop();
-    // Facing us, the approved standing pose; any other way, the walk's first step.
-    if (a.facing === 'front' && this.textures.exists(a.art)) a.body.setTexture(a.art);
-    else a.body.setTexture(sheet, 0);
+    if (this.textures.exists(a.art) && a.body.texture.key !== a.art) this.dress(a, a.art);
+    if (dx !== 0) a.body.setFlipX(dx < 0);
+  }
+
+  /** Puts a picture on an avatar, at the size its own picture is shown at. */
+  private dress(a: Avatar, key: string): void {
+    a.body.setTexture(key);
+    this.fit(a, key, true);
+  }
+
+  /**
+   * Sizes an avatar wearing `key` so its figure stands as tall as the figure
+   * in its own picture; with `fitting` false, at its usual size.
+   */
+  private fit(a: Avatar, key: string, fitting: boolean): void {
+    const own = fitting && key !== a.art && this.textures.exists(a.art) ? this.figureHeight(a.art) : undefined;
+    const worn = own ? this.figureHeight(key) : undefined;
+    a.body.setScale(own && worn ? (a.scale * own) / worn : a.scale);
+  }
+
+  /** Heights of the figures in textures (their first frame), see-through rows left out, by key. */
+  private figures = new Map<string, number>();
+
+  /** How tall the figure in a texture's first frame is, in pixels, from its see-through edges. */
+  private figureHeight(key: string): number | undefined {
+    const known = this.figures.get(key);
+    if (known !== undefined) return known;
+    const frame = this.textures.getFrame(key, 0) ?? this.textures.getFrame(key);
+    const image = frame?.source.image as CanvasImageSource | undefined;
+    if (!frame || !image) return undefined;
+    const canvas = document.createElement('canvas');
+    canvas.width = frame.cutWidth;
+    canvas.height = frame.cutHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return undefined;
+    ctx.drawImage(image, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight, 0, 0, frame.cutWidth, frame.cutHeight);
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const solid = (y: number) => {
+      for (let x = 0; x < width; x++) if (data[(y * width + x) * 4 + 3]! > 16) return true;
+      return false;
+    };
+    let top = 0;
+    let bottom = height - 1;
+    while (top < height && !solid(top)) top++;
+    while (bottom > top && !solid(bottom)) bottom--;
+    const figure = top < height ? bottom - top + 1 : height;
+    this.figures.set(key, figure);
+    return figure;
   }
 
   /** A player's own painted look, or one of the two approved player looks. */
@@ -472,8 +550,13 @@ export class WorldScene extends Phaser.Scene {
     this.textures.addImage(key, img);
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
     if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
+    this.figures.delete(key);
     for (const a of [...this.creatures.values(), ...this.bodies.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
-      if (a?.art === key) a.body.setTexture(key);
+      if (!a) continue;
+      // A walk or standing picture of this look stays on until the walker turns or stops.
+      const shown = a.body.texture.key;
+      if (a.art === key && (shown === key || !shown.startsWith(`${key}-`))) this.dress(a, key);
+      else if (shown === key) this.dress(a, key);
     }
   }
 
@@ -718,6 +801,11 @@ export class WorldScene extends Phaser.Scene {
   private makeCreature(c: CreatureState): Avatar {
     const a = this.makeAvatar(c.asset, c.name, false, 'woods-mushroom');
     a.label.setColor('#f6b48a').setFontSize(Math.round(T * 0.2));
+    a.scale = 0.8;
+    a.fit = true;
+    // Creatures walk slower than players: their walks play slower so their feet keep up.
+    const speed = CREATURES[c.kind]?.speed;
+    if (speed) a.pace = speed / PLAYER_SPEED;
     a.body.setScale(0.8);
     return a;
   }
@@ -748,7 +836,7 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, art: texture, facing: 'front', shadow, label, nudge: { x: 0, y: 0 } };
+    return { body, art: texture, facing: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
   }
 
   /** Places an avatar at (x, y) in our region, counted from its corner. */

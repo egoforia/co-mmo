@@ -117,6 +117,8 @@ export class ArtStudio {
   private queue: Promise<void> = Promise.resolve();
   /** Requests waiting or painting, so tests and shutdown can wait for them. */
   readonly pending = new Set<Promise<void>>();
+  /** Requests a limit stopped (the budget, today's clips), kept until resume() asks for them again. */
+  private stopped: { request: PaintRequest; release: () => void }[] = [];
 
   constructor(private readonly options: ArtStudioOptions) {
     this.history = new ArtHistory(options.artDir);
@@ -352,9 +354,7 @@ export class ArtStudio {
     const plan = await this.options.walks.plan(walker, 'gods-view');
     const estimateUsd = plan.views.size * estimateImageUsd(image.model) + plan.clips.size * estimateClipUsd(video.model);
     if (!plan.views.size && !plan.clips.size) throw new ArtRequestError(`${walker.name} already walks every way. Pick a direction to paint again.`);
-    this.enqueue(async () => {
-      await this.options.walks.paintWalker(walker, 'gods-view', true, plan);
-    }, undefined, { kind: 'walk', walker: walkerId, body });
+    this.enqueue(() => this.options.walks.paintWalker(walker, 'gods-view', true, plan), undefined, { kind: 'walk', walker: walkerId, body });
     return { estimateUsd };
   }
 
@@ -468,13 +468,49 @@ export class ArtStudio {
     if (budget.overToday) throw new ArtRequestError("Today's spending cap is reached, so nothing more can be painted until midnight UTC or until the cap is raised on the Budget tab.");
   }
 
-  /** Runs a request after the ones before it and after any start-up painting; `request` keeps it across a restart. */
+  /**
+   * Asks again for the requests a limit stopped, once painting is allowed
+   * again (a new day, or the Owner raised a limit). A walk paints only the
+   * directions still missing, so nothing finished is paid for twice.
+   */
+  resume(): void {
+    for (const { request, release } of this.stopped.splice(0)) {
+      void this.again(request)
+        .catch((err) => {
+          if (!(err instanceof ArtRequestError)) console.error(`A stopped ${request.kind} painting was not asked again:`, (err as Error).message);
+        })
+        .finally(release);
+    }
+  }
+
+  private async again(request: PaintRequest): Promise<unknown> {
+    if (request.kind === 'walk') return this.walk(request.walker, request.body, [], false);
+    if (request.kind === 'repaint') return this.repaint(request.asset, request.note);
+    return undefined;
+  }
+
+  /** Keeps a stopped request, across a restart too, until resume(). */
+  private stop(request: PaintRequest | undefined): void {
+    if (!request) return;
+    let release!: () => void;
+    this.options.requests?.hold(request, new Promise<void>((r) => (release = r)));
+    this.stopped.push({ request, release });
+  }
+
+  /**
+   * Runs a request after the ones before it and after any start-up painting;
+   * `request` keeps it across a restart, and while a limit holds it back
+   * (`task` gives false when a limit stopped it).
+   */
   private enqueue(task: () => Promise<unknown>, handle?: ArtJobHandle, request?: PaintRequest): void {
     const run = this.queue.then(async () => {
       await Promise.all([this.options.buildings.job, this.options.walks.job]);
       const budget = this.options.wishes.budget();
-      if (budget.paused) return handle?.skip(budget.why ?? 'The budget is spent.');
-      await task();
+      if (budget.paused) {
+        handle?.skip(budget.why ?? 'The budget is spent.');
+        return this.stop(request);
+      }
+      if ((await task()) === false) this.stop(request);
     });
     this.queue = run.catch((err) => {
       console.error('Painting from God\'s View failed:', (err as Error).message);

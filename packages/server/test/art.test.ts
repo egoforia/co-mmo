@@ -173,6 +173,32 @@ describe('the Art tab', () => {
     expect(done.body.message).toMatch(/already walks/);
   }, 60_000);
 
+  it('keeps a walk stopped by the day\'s clip limit, and makes it once the Owner raises the limit', async () => {
+    const clips = video();
+    const anchors = await tmp();
+    await mkdir(join(anchors, 'raw'), { recursive: true });
+    await writeFile(join(anchors, 'raw', 'desert-scarab.png'), await figure(300, 300, 150, 280));
+    const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter: figurePainter(), video: clips, frames });
+    const owner = account(store, 'Ego', 'owner');
+    store.updateSettings({ ...store.settings, ai: { ...store.settings.ai, video: { provider: 'gemini', model: clips.model, dailyClips: 0 } } });
+    expect((await api(base, '/api/admin/art/walk', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged' })).status).toBe(202);
+    await app!.art.idle();
+    expect(clips.asked).toHaveLength(0);
+    const { body: jobs } = await api(base, '/api/admin/art/jobs', owner.token);
+    expect(jobs.jobs.filter((j: any) => j.media === 'clip' && j.status === 'skipped')).toHaveLength(4);
+    // Kept, so a restart meanwhile still asks for it.
+    const kept = await until(async () => JSON.parse(await readFile(join(artDir, 'paint-requests.json'), 'utf8').catch(() => '[]')).length);
+    expect(kept).toBe(1);
+
+    const { body } = await api(base, '/api/admin/ai', owner.token);
+    expect((await api(base, '/api/admin/ai', owner.token, 'PUT', { ...body.ai, video: { ...body.ai.video, dailyClips: 7 } })).status).toBe(200);
+    await until(async () => app!.art.pending.size > 0);
+    await app!.art.idle();
+    expect(clips.asked).toHaveLength(4);
+    const { body: art } = await api(base, '/api/art', owner.token);
+    for (const d of WALK_DIRECTIONS) expect(art[walkArt('desert-scarab', d)]).toMatchObject({ kind: 'walk' });
+  }, 60_000);
+
   it('refuses to paint once the month\'s budget is spent', async () => {
     const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
     const owner = account(store, 'Ego', 'owner');

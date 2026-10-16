@@ -230,6 +230,7 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `PUBLIC_URL` | `http://localhost:5173` | Base URL used in invite links |
 | `DATABASE_URL` | none | Postgres for the saved world ([docs/scale.md](docs/scale.md)); without it the world is kept in `DATA_FILE` |
 | `REDIS_URL` | none | Redis for the paint queue, shared by servers and kept across restarts ([docs/scale.md](docs/scale.md)) |
+| `REGION_SERVERS` | none | How many region servers `npm run dev` starts beside the game (needs `REDIS_URL`; [docs/scale.md](docs/scale.md)) |
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored without Postgres (and brought in from on Postgres's first run) |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |

@@ -26,6 +26,9 @@ import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from 
 import type { FinishedSound } from './assets/sound-finish.ts';
 import { FilePaintRequests } from './paint-requests.ts';
 import { HandFinder, type PointSource } from './hand-finder.ts';
+import type { Bus } from './bus.ts';
+import { RegionServers } from './region-servers.ts';
+import { settle } from './world.ts';
 
 export interface AppOptions {
   store: Store;
@@ -66,6 +69,11 @@ export interface AppOptions {
     /** Make missing sounds at start-up (on whenever shipped art is given). */
     start?: boolean;
   };
+  /**
+   * Messages to and from region servers (Redis when REDIS_URL is set). With
+   * it, regions run on whichever region servers are up; without, all here.
+   */
+  regionBus?: Bus;
 }
 
 export interface App {
@@ -80,6 +88,10 @@ export interface App {
   art: ArtStudio;
   /** Where hands and grips are, for held items. */
   hands: HandFinder;
+  /** The region servers, when there is a bus to reach them. */
+  regionServers?: RegionServers;
+  /** Resolves once the app listens for region servers. */
+  ready: Promise<void>;
   close(): Promise<void>;
 }
 
@@ -115,6 +127,10 @@ export function createApp(options: AppOptions): App {
   });
   world.onEvent = (type, playerId, data) => rules.fire(type, playerId, data);
   const wishes = new Wishes(store, world, rules, options.wishes);
+  // Regions run on region servers when there are any (design doc, Scaling without a cap).
+  const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries() }) : undefined;
+  if (regionServers) world.hosting = regionServers;
+  const ready = regionServers ? regionServers.start() : Promise.resolve();
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now });
   wishes.restore();
   const artJobs = new ArtJobs();
@@ -525,8 +541,10 @@ export function createApp(options: AppOptions): App {
       // A replaced connection must not remove the newer session.
       if (sockets.get(account.id) !== socket) return;
       sockets.delete(account.id);
-      const place = world.leave(account.id);
-      if (place) store.savePosition(account.id, place.x, place.y, place.regionId, place.character);
+      const id = account.id;
+      void settle(world.leave(id), (place) => {
+        if (place) store.savePosition(id, place.x, place.y, place.regionId, place.character);
+      });
     });
   });
 
@@ -550,6 +568,8 @@ export function createApp(options: AppOptions): App {
     auth,
     art: artStudio,
     hands: handFinder,
+    ...(regionServers ? { regionServers } : {}),
+    ready,
     async close() {
       clearInterval(tickTimer);
       clearTimeout(dayTimer);
@@ -573,7 +593,9 @@ export function createApp(options: AppOptions): App {
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();
       clearInterval(autosaveTimer);
+      await Promise.allSettled([...world.pending]);
       saveAll();
+      await regionServers?.close();
       for (const client of wss.clients) client.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve) => server.close(() => resolve()));

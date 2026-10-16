@@ -146,7 +146,7 @@ describe('combat', () => {
     ch.hp = 1;
     ch.inventory.push({ item: 'tonic', qty: 3 });
     world.join(info('a', 'Mara'), conn, { regionId: 'desert', x: null, y: null }, ch);
-    const desert = world.region('desert')!;
+    const desert = world.local('desert')!;
     const scarab = desert.creatureIds()[0]!;
     const me = desert.position('a')!;
     desert.placeCreature(scarab, me.x + 1, me.y);
@@ -191,7 +191,7 @@ describe('quests', () => {
     const world = new World(() => now, () => 0.5);
     const conn = fakeConn();
     world.join(info('a', 'Mara'), conn, { regionId: 'sanctum', x: null, y: null }, newCharacter());
-    const sanctum = world.region('sanctum')!;
+    const sanctum = world.local('sanctum')!;
     const amala = sanctum.map.npcs[0]!;
     sanctum.join(info('a', 'Mara'), conn, { x: amala.x, y: amala.y + 1 }, sanctum.character('a')!);
     sanctum.handle('a', { t: 'interact' });
@@ -201,7 +201,7 @@ describe('quests', () => {
     const ch = sanctum.character('a')!;
     expect(ch.quests).toEqual([{ id: 'meet-bramble', count: 0, done: false }]);
 
-    const woods = world.region('woods')!;
+    const woods = world.local('woods')!;
     const left = sanctum.remove('a')!;
     const bramble = woods.map.npcs[0]!;
     woods.join(left.info, conn, { x: bramble.x, y: bramble.y + 1 }, left.character);

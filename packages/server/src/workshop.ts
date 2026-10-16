@@ -222,7 +222,7 @@ export class Workshop {
     if (blocked || !def || !region || !pictured(def)) return this.tell(id, blocked ?? 'There is nothing to paint yet.');
 
     this.sampling.add(id);
-    region.updateCharacter(id, (c) => { c.favor -= favor; });
+    void this.world.change(id, { op: 'favor', amount: -favor });
     let painted: PaintedSample | undefined;
     try {
       painted = await this.wishes.paintSample(id, def, biome);
@@ -232,7 +232,7 @@ export class Workshop {
       this.sampling.delete(id);
     }
     if (!painted) {
-      this.world.regionOf(id)?.updateCharacter(id, (c) => { c.favor += favor; });
+      void this.world.change(id, { op: 'favor', amount: favor });
       return this.tell(id, 'The paint would not take. Your Favor is returned; try again later.');
     }
     const latest = this.store.draftOf(id, this.now()) ?? draft;

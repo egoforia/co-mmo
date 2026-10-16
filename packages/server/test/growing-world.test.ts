@@ -37,7 +37,7 @@ describe('a growing world', () => {
     const region = app!.world.region(record.id)!;
     expect(region.def).toMatchObject({ biome: 'frostpeak', name: 'New Frostpeak', at: record.cell });
     expect(region.def.wild?.wisher).toBe('Mara');
-    const woods = app!.world.region('woods')!;
+    const woods = app!.world.local('woods')!;
     expect(woods.def.exits[side as 'north']).toBe(record.id);
     expect(Object.values(region.def.exits)).toContain('woods');
     expect(again.region.def.exits[side as 'north']).toBe(record.id);
@@ -62,7 +62,7 @@ describe('a growing world', () => {
     const ilya = account(store, 'Ilya');
     store.savePosition(ilya.id, 32, 33, 'woods', newCharacter());
     const other = await joined(ws, ilya.token);
-    const woods = app!.world.region('woods')!;
+    const woods = app!.world.local('woods')!;
     const entry = woods.map.entries[side]!;
     const out = { north: [entry.x, 0.2], south: [entry.x, 63.8], west: [0.2, entry.y] }[side];
     woods.placePlayer(ilya.id, out[0]!, out[1]!);
@@ -97,7 +97,7 @@ describe('a growing world', () => {
     expect(served.status).toBe(200);
 
     // A second region of the same biome reuses the kit: only its creature is painted.
-    app!.world.regionOf(p.id)!.placePlayer(p.id, 32, 33);
+    app!.world.local(app!.world.regionOf(p.id)!.def.id)!.placePlayer(p.id, 32, 33);
     const second = await pray(c, 'I wish for another land of fire and ash');
     await c.send({ t: 'wish', card: second.card!.id, confirm: true });
     await c.waitFor((m) => m.t === 'god' && m.say.includes('A road now leads'));

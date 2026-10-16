@@ -24,10 +24,27 @@ const env = { ...process.env, CO_MMO_UPDATE_REQUEST: requestFile, CO_MMO_UPDATE_
 let child = null;
 let stopping = false;
 
+/**
+ * What to run: the server and Vite (`npm run dev:raw`), plus REGION_SERVERS
+ * region servers when it is set and Redis is there to reach them (docs/scale.md).
+ */
+function gameCommand() {
+  const count = Math.max(0, Math.min(16, Number.parseInt(process.env.REGION_SERVERS ?? '0', 10) || 0));
+  if (!count) return ['npm', ['run', 'dev:raw']];
+  if (!process.env.REDIS_URL) {
+    console.warn('[dev] REGION_SERVERS is set but REDIS_URL is not; every region runs in the game server.');
+    return ['npm', ['run', 'dev:raw']];
+  }
+  const names = ['server', 'client', ...Array.from({ length: count }, (_, i) => `region${i + 1}`)];
+  const commands = ['npm run dev -w @co-mmo/server', 'npm run dev -w @co-mmo/client', ...Array.from({ length: count }, () => 'npm run region-server -w @co-mmo/server')];
+  return ['npx', ['concurrently', '-n', names.join(','), ...commands]];
+}
+
 function startGame() {
   rmSync(requestFile, { force: true });
-  // Its own process group, so one signal stops the server, Vite and tsx.
-  child = spawn('npm', ['run', 'dev:raw'], { cwd: root, env, stdio: ['ignore', 'inherit', 'inherit'], detached: true });
+  const [command, args] = gameCommand();
+  // Its own process group, so one signal stops the server, Vite, tsx and the region servers.
+  child = spawn(command, args, { cwd: root, env, stdio: ['ignore', 'inherit', 'inherit'], detached: true });
   child.on('exit', (code, signal) => {
     child = null;
     if (updating || stopping) return;

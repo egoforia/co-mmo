@@ -229,7 +229,7 @@ describe('Creator XP', () => {
     const hat = store.content[0]!.id;
     expect(ITEMS[hat]).toMatchObject({ slot: 'head' });
     const world = app!.world;
-    const region = world.regionOf(mara.id)!;
+    const region = world.local(world.regionOf(mara.id)!.def.id)!;
     region.handle(mara.id, { t: 'equip', item: hat });
     expect(world.regionOf(mara.id)!.character(mara.id)!.creatorXp).toBe(0);
 

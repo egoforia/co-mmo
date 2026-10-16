@@ -83,6 +83,47 @@ REDIS_URL=redis://localhost:6379
 
 The console says `The paint queue is kept in Redis.`
 
+## Region servers
+
+The world is a grid of regions, and each region is simulated by one host:
+the game server itself, or a region server (design doc, Scaling without a
+cap). Players always connect to the game server, which keeps the sockets,
+the saved world, the God and God's View; a region server runs the regions
+it is given and sends each player's updates back through the game server,
+over Redis.
+
+- While no region server is up, every region runs in the game server, as
+  before. Nothing changes for local play without `REDIS_URL`.
+- When a region server starts, the game server hands it the regions it is
+  running, and a second server takes its share of the regions nobody is in.
+- Walking from a region on one server into a region on another works like
+  any other road: the first server lets the player go, the second takes
+  them in where they stepped across.
+- A region server that stops (or stops answering for 7 seconds) loses its
+  regions to the others, or back to the game server; players inside are put
+  back where they were last seen, with what they carry. Nothing is lost
+  except the last moment of a fight.
+- Wished creatures and people come with their region wherever it moves.
+
+### Run some
+
+With Redis set up (above), either start them by hand, as many as you like,
+on this machine or any machine that reaches the same Redis:
+
+```sh
+REDIS_URL=redis://localhost:6379 npm run region-server
+```
+
+or let `npm run dev` start them with the game by adding to `.env`:
+
+```sh
+REGION_SERVERS=2
+```
+
+Each one says `Region server <name> joined.` in the game server's console.
+For a few friends on one laptop, region servers are not needed; they are
+how the world grows past what one process can run.
+
 ## Hosting
 
 Any Postgres 14 or newer works (Fly.io, Neon, Supabase, a VPS). Set

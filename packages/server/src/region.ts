@@ -73,6 +73,7 @@ import {
   type Side,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
+import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
 
 /** Inputs a player may queue; extra inputs are dropped (anti speed-hack). */
 const MAX_QUEUED_INPUTS = 10;
@@ -212,6 +213,8 @@ export interface Carry {
  */
 export class Region {
   readonly map: RegionMap;
+  /** Where it runs, as the world sees it (a Region object always runs in the process that holds it). */
+  readonly host = 'gateway';
   private readonly players = new Map<string, PlayerState>();
   private creatures: Creature[];
   /** Bodies of defeated creatures, until they fade. */
@@ -301,22 +304,9 @@ export class Region {
     this.townsfolk = this.townsfolk.filter((n) => n.id !== id);
   }
 
-  /**
-   * Up to `count` walkable spots around a point, nearest first, at least a
-   * tile apart, for placing wished things.
-   */
+  /** Walkable spots around a point, for placing wished things (see findSpots). */
   findSpots(x: number, y: number, count: number, min = 1.5, max = 4): { x: number; y: number }[] {
-    const spots: { x: number; y: number }[] = [];
-    for (let r = min; r <= max && spots.length < count; r += 0.75) {
-      for (let a = 0; a < 12 && spots.length < count; a++) {
-        const angle = (a / 12) * Math.PI * 2 + r;
-        const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
-        if (outsideSide(this.map, s.x, s.y) || collides(this.map, s.x, s.y)) continue;
-        if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
-        spots.push(s);
-      }
-    }
-    return spots;
+    return findSpots(this.map, x, y, count, min, max);
   }
 
   /** Short lines about what is near a player, for the God's context. */
@@ -340,6 +330,19 @@ export class Region {
     change(p.character);
     p.dirty = true;
     this.flush(p);
+  }
+
+  /** A change from outside the simulation, as data (see character-ops.ts); XP comes with its level-up messages. */
+  change(id: string, op: CharacterOp): OpResult {
+    const p = this.players.get(id);
+    if (!p) return { ok: false };
+    const result = applyOp(p.character, op);
+    if (op.op === 'xp') this.levelUps(p, result.levels ?? 0);
+    if (result.ok) {
+      p.dirty = true;
+      this.flush(p);
+    }
+    return result;
   }
 
   /** True when a tile of this kind lies within `radius` tiles of the player. */
@@ -484,7 +487,8 @@ export class Region {
     // Every wished region carries a credit line (design doc, World structure).
     const wild = this.def.wild;
     if (wild) this.notice(p, `✦ ${this.def.name} was wished into being by ${wild.wisher}. Danger ${wild.danger} of 6.`);
-    this.broadcastSystem(announce ?? `${info.name} entered ${this.def.name}.`);
+    // An empty announcement is a quiet arrival (the region moved to another server).
+    if (announce !== '') this.broadcastSystem(announce ?? `${info.name} entered ${this.def.name}.`);
   }
 
   /** Removes a player, announcing why; returns what the world needs to move them on. */
@@ -494,7 +498,7 @@ export class Region {
     this.trades.leave(id);
     this.players.delete(id);
     for (const c of this.creatures) if (c.aggro === id) this.giveUp(c);
-    this.broadcastSystem(announce ?? `${p.info.name} left.`);
+    if (announce !== '') this.broadcastSystem(announce ?? `${p.info.name} left.`);
     const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
   }
@@ -1029,25 +1033,8 @@ export class Region {
     p.dirty = true;
   }
 
-  /** The nearest tile of these kinds within a radius of a point (tile coordinates). */
   private nearestTile(x: number, y: number, kinds: Tile[], radius: number): { tile: Tile; x: number; y: number } | undefined {
-    let best: { tile: Tile; x: number; y: number } | undefined;
-    let bestD = Infinity;
-    const r = Math.ceil(radius);
-    for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
-      for (let tx = Math.floor(x) - r; tx <= Math.floor(x) + r; tx++) {
-        if (tx < 0 || ty < 0 || tx >= this.map.width || ty >= this.map.height) continue;
-        const tile = tileAt(this.map, tx, ty);
-        if (!kinds.includes(tile)) continue;
-        // Distance from the player to the closest point of the tile.
-        const d = Math.hypot(Math.max(tx - x, 0, x - (tx + 1)), Math.max(ty - y, 0, y - (ty + 1)));
-        if (d <= radius && d < bestD) {
-          bestD = d;
-          best = { tile, x: tx, y: ty };
-        }
-      }
-    }
-    return best;
+    return nearestTile(this.map, x, y, kinds, radius);
   }
 
   // --- Messages --------------------------------------------------------------
@@ -1097,6 +1084,45 @@ export class Region {
   private broadcastSystem(text: string): void {
     this.broadcast({ t: 'system', text, at: this.now() });
   }
+}
+
+/**
+ * Up to `count` walkable spots around a point, nearest first, at least a
+ * tile apart, for placing wished things.
+ */
+export function findSpots(map: RegionMap, x: number, y: number, count: number, min = 1.5, max = 4): { x: number; y: number }[] {
+  const spots: { x: number; y: number }[] = [];
+  for (let r = min; r <= max && spots.length < count; r += 0.75) {
+    for (let a = 0; a < 12 && spots.length < count; a++) {
+      const angle = (a / 12) * Math.PI * 2 + r;
+      const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
+      if (outsideSide(map, s.x, s.y) || collides(map, s.x, s.y)) continue;
+      if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
+      spots.push(s);
+    }
+  }
+  return spots;
+}
+
+/** The nearest tile of these kinds within a radius of a point (tile coordinates). */
+export function nearestTile(map: RegionMap, x: number, y: number, kinds: Tile[], radius: number): { tile: Tile; x: number; y: number } | undefined {
+  let best: { tile: Tile; x: number; y: number } | undefined;
+  let bestD = Infinity;
+  const r = Math.ceil(radius);
+  for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
+    for (let tx = Math.floor(x) - r; tx <= Math.floor(x) + r; tx++) {
+      if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) continue;
+      const tile = tileAt(map, tx, ty);
+      if (!kinds.includes(tile)) continue;
+      // Distance from the player to the closest point of the tile.
+      const d = Math.hypot(Math.max(tx - x, 0, x - (tx + 1)), Math.max(ty - y, 0, y - (ty + 1)));
+      if (d <= radius && d < bestD) {
+        bestD = d;
+        best = { tile, x: tx, y: ty };
+      }
+    }
+  }
+  return best;
 }
 
 function round(n: number): number {

@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp, inviteUrl } from './app.ts';
 import { Store } from './store.ts';
+import { connectPostgres } from './db.ts';
 import { Updater, currentCommit } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 3001);
@@ -16,7 +17,15 @@ const clientDir = process.env.CLIENT_DIR
   ? resolve(process.env.CLIENT_DIR)
   : existsSync(builtClient) ? builtClient : undefined;
 
-const store = await Store.open(dataFile);
+// Postgres when DATABASE_URL is set (docs/scale.md); otherwise one JSON file,
+// so the game starts with nothing installed. Postgres's first run brings in
+// whatever the file held.
+const databaseUrl = process.env.DATABASE_URL;
+const store = await (databaseUrl ? connectPostgres(databaseUrl).then((sql) => Store.postgres(sql, dataFile)) : Store.open(dataFile)).catch((err: Error) => {
+  console.error(err.message);
+  process.exit(1);
+});
+console.log(`The world is kept in ${store.label}.`);
 // scripts/dev.mjs (npm run dev) watches the request file and does the pull
 // and restart; without it the Owner still sees what is new on GitHub.
 const updater = new Updater({
@@ -53,6 +62,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, async () => {
     console.log('Saving and shutting down...');
     await app.close();
+    await store.close();
     process.exit(0);
   });
 }

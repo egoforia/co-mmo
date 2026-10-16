@@ -4,6 +4,8 @@ import { dirname } from 'node:path';
 import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role, type WishDraft } from '@co-mmo/shared';
 import type { ChatTurn, ProviderId } from './ai/chat.ts';
 import type { RuleTestReport } from './rule-test.ts';
+import type { Sql } from './db.ts';
+import { PostgresTables, migrate, type Row } from './store-postgres.ts';
 
 /** Days a Workshop draft is kept after its last change. */
 const DRAFT_DAYS = 7;
@@ -265,30 +267,71 @@ export function defaultSettings(env: Record<string, string | undefined> = proces
 }
 
 /**
- * Persistence for accounts and invites. This JSON-file version keeps local
- * development dependency-free; a Postgres implementation of the same methods
- * replaces it for hosting (see the design doc, Technical architecture).
+ * Where the store keeps the world between runs: Postgres when DATABASE_URL
+ * is set (design doc, Technical architecture), else one JSON file, so local
+ * development needs nothing installed.
+ */
+export interface StoreBackend {
+  /** What was saved before, or nothing on a first run. */
+  load(): Promise<Partial<Data> | null>;
+  /** Saves the whole store; a backend may write only what changed. */
+  save(data: Data): Promise<void>;
+  close(): Promise<void>;
+  /** Shown in the console at start-up: where the world is kept. */
+  readonly label: string;
+}
+
+/**
+ * The saved world: accounts, invites, wishes, reports, spending, the journal
+ * and settings. Everything is kept in memory and written behind, so the game
+ * never waits on a disk or a database; one game server owns the store.
  */
 export class Store {
   private data: Data = { accounts: [], invites: [], content: [], settings: defaultSettings(), spend: [], reports: [], ruleData: {}, journal: [] };
   private saving: Promise<void> = Promise.resolve();
+  /** A save is waiting its turn; later changes ride along with it. */
+  private queued = false;
 
-  private constructor(private readonly path: string | null) {}
+  private constructor(private readonly backend: StoreBackend | null) {}
 
   /** A store backed by a JSON file, created if missing. */
   static async open(path: string): Promise<Store> {
-    const store = new Store(path);
-    try {
-      store.data = { ...store.data, ...(JSON.parse(await readFile(path, 'utf8')) as Partial<Data>) };
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    return Store.withBackend(new FileBackend(path));
+  }
+
+  /**
+   * A store kept in Postgres. On its first run, while the database is still
+   * empty, the world in `importFrom` (the old JSON file) is brought in.
+   */
+  static async postgres(sql: Sql, importFrom?: string): Promise<Store> {
+    const backend = await PostgresBackend.open(sql);
+    const store = await Store.withBackend(backend);
+    if (importFrom && backend.wasEmpty) {
+      const old = await new FileBackend(importFrom).load();
+      if (old) {
+        store.data = { ...store.data, ...old };
+        await backend.save(store.data);
+        console.log(`Brought the world in ${importFrom} (${plural(store.data.accounts.length, 'player')}, ${plural(store.data.content.length, 'wish', 'wishes')}) into Postgres. The file is left as it was.`);
+      }
     }
+    return store;
+  }
+
+  private static async withBackend(backend: StoreBackend): Promise<Store> {
+    const store = new Store(backend);
+    const saved = await backend.load();
+    if (saved) store.data = { ...store.data, ...saved };
     return store;
   }
 
   /** A store that lives only in memory, for tests. */
   static memory(): Store {
     return new Store(null);
+  }
+
+  /** Where the world is kept, for the start-up message. */
+  get label(): string {
+    return this.backend?.label ?? 'memory only';
   }
 
   get accountCount(): number {
@@ -597,7 +640,7 @@ export class Store {
 
   /** Rule state can change many times a second; write it at most once a second. */
   private persistSoon(): void {
-    if (this.soon || !this.path) return;
+    if (this.soon || !this.backend) return;
     this.soon = setTimeout(() => {
       this.soon = null;
       this.persist();
@@ -605,7 +648,7 @@ export class Store {
     this.soon.unref();
   }
 
-  /** Resolves once every pending write has reached disk. */
+  /** Resolves once every pending write has been saved. */
   flush(): Promise<void> {
     if (this.soon) {
       clearTimeout(this.soon);
@@ -615,17 +658,122 @@ export class Store {
     return this.saving;
   }
 
+  /** Saves, then lets go of the database. */
+  async close(): Promise<void> {
+    await this.flush();
+    await this.backend?.close();
+  }
+
   private persist(): void {
-    if (!this.path) return;
-    const path = this.path;
-    // Writes are chained so they never interleave, and go through a temp
-    // file so a crash mid-write cannot corrupt the store.
+    const backend = this.backend;
+    if (!backend || this.queued) return;
+    // Saves are chained so they never interleave; changes made while one
+    // waits its turn are saved by it, so a burst of changes is one write.
+    this.queued = true;
     this.saving = this.saving.then(async () => {
-      await mkdir(dirname(path), { recursive: true });
-      const tmp = `${path}.tmp`;
-      await writeFile(tmp, JSON.stringify(this.data, null, 2));
-      await rename(tmp, path);
+      this.queued = false;
+      try {
+        await backend.save(this.data);
+      } catch (err) {
+        // The game keeps running from memory; the next change tries again.
+        console.error(`Could not save the world (${backend.label}):`, (err as Error).message);
+      }
     });
+  }
+}
+
+/** The whole world in one JSON file, written through a temp file so a crash mid-write cannot corrupt it. */
+class FileBackend implements StoreBackend {
+  constructor(private readonly path: string) {}
+
+  get label(): string {
+    return this.path;
+  }
+
+  async load(): Promise<Partial<Data> | null> {
+    try {
+      return JSON.parse(await readFile(this.path, 'utf8')) as Partial<Data>;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      return null;
+    }
+  }
+
+  async save(data: Data): Promise<void> {
+    await mkdir(dirname(this.path), { recursive: true });
+    const tmp = `${this.path}.tmp`;
+    await writeFile(tmp, JSON.stringify(data, null, 2));
+    await rename(tmp, this.path);
+  }
+
+  async close(): Promise<void> {}
+}
+
+/**
+ * The world in Postgres, one table per kind of thing. Spending and journal
+ * lines have no ids of their own, so each gets a number the first time it is
+ * saved, remembered beside it.
+ */
+class PostgresBackend implements StoreBackend {
+  readonly label = 'Postgres';
+  private readonly keys = new WeakMap<object, string>();
+  /** The database had nothing in it when the game started. */
+  wasEmpty = false;
+
+  private constructor(private readonly sql: Sql, private readonly tables: PostgresTables) {}
+
+  static async open(sql: Sql): Promise<PostgresBackend> {
+    await migrate(sql);
+    const backend = new PostgresBackend(sql, new PostgresTables(sql));
+    backend.wasEmpty = await backend.tables.empty();
+    return backend;
+  }
+
+  async load(): Promise<Partial<Data> | null> {
+    const t = await this.tables.load();
+    if (this.wasEmpty) return null;
+    const numbered = <T extends object>(rows: Row[]): T[] => rows.map((r) => {
+      this.keys.set(r.data as object, r.key);
+      return r.data as T;
+    });
+    const settings = t.settings.find((r) => r.key === 'settings')?.data as Settings | undefined;
+    return {
+      accounts: t.accounts.map((r) => r.data as Account),
+      invites: t.invites.map((r) => r.data as Invite),
+      content: t.content.map((r) => r.data as ContentRecord),
+      reports: t.reports.map((r) => r.data as Report),
+      spend: numbered<SpendRecord>(t.spend),
+      journal: numbered<JournalEntry>(t.journal),
+      drafts: Object.fromEntries(t.drafts.map((r) => [r.key, r.data as WishDraft])),
+      ruleData: Object.fromEntries(t.rule_data.map((r) => [r.key, r.data as Record<string, Record<string, unknown>>])),
+      ...(settings ? { settings } : {}),
+    };
+  }
+
+  async save(data: Data): Promise<void> {
+    const numbered = (items: object[]): Row[] => items.map((item) => {
+      let key = this.keys.get(item);
+      if (!key) {
+        key = String(this.tables.takeNumber());
+        this.keys.set(item, key);
+      }
+      return { key, data: item };
+    });
+    await this.tables.save({
+      accounts: data.accounts.map((a) => ({ key: a.id, data: a })),
+      invites: data.invites.map((i) => ({ key: i.code, data: i })),
+      content: data.content.map((c) => ({ key: c.id, data: c })),
+      reports: data.reports.map((r) => ({ key: r.id, data: r })),
+      spend: numbered(data.spend),
+      journal: numbered(data.journal),
+      drafts: Object.entries(data.drafts ?? {}).map(([key, d]) => ({ key, data: d })),
+      rule_data: Object.entries(data.ruleData).map(([key, d]) => ({ key, data: d })),
+      settings: [{ key: 'settings', data: data.settings }],
+    });
+  }
+
+  close(): Promise<void> {
+    return this.sql.close();
   }
 }
 
@@ -633,6 +781,10 @@ export class StoreError extends Error {
   constructor(readonly code: string, message: string) {
     super(message);
   }
+}
+
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 function hashToken(token: string): string {

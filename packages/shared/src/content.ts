@@ -8,6 +8,7 @@ import { RECIPES } from './kit.ts';
 import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
 import { applyLoot, removeLoot } from './loot.ts';
+import { cleanLight, type Light } from './light.ts';
 import {
   ABILITIES,
   CREATURES,
@@ -51,6 +52,8 @@ export interface ItemWish {
   /** Equipment: how rare it is (Common to Rare for wishes) and which stat it helps. */
   rarity?: Rarity;
   focus?: keyof Stats;
+  /** Gear that burns or glows: the light it casts while held. */
+  light?: Light;
   look: WishLook;
 }
 
@@ -480,7 +483,8 @@ export function validateDefinition(raw: unknown): WishDefinition {
     if (!slot) return { kind: 'item', name, description, itemKind, ...(heal ? { heal } : {}), look };
     const rarity = RARITIES.slice(0, RARITIES.indexOf(MAX_WISHED_RARITY) + 1).find((r) => r === d.rarity) ?? 'common';
     const focus = (['might', 'agility', 'wit', 'spirit'] as const).find((k) => k === d.focus);
-    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), look };
+    const light = cleanLight(d.light);
+    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(light ? { light } : {}), look };
   }
   if (d.kind === 'ability') {
     const effect: AbilityEffect = d.effect === 'bolt' || d.effect === 'heal' ? d.effect : 'strike';
@@ -682,6 +686,7 @@ export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
       rarity,
       bonus: equipmentBonus(slot, rarity, w.focus),
       value: 10 * (RARITIES.indexOf(rarity) + 1),
+      ...(w.light ? { light: w.light } : {}),
     };
   }
   return {

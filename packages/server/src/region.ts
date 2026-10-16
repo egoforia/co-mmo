@@ -53,8 +53,6 @@ import {
   Tile,
   type BodyState,
   type Character,
-  heldItem,
-  offHandItem,
   type CreatorCredit,
   type EquipSlot,
   type ChatChannel,
@@ -78,6 +76,7 @@ import {
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
+import { bodyView, creatureView, npcView, playerView } from './region-views.ts';
 
 /** Inputs a player may queue; extra inputs are dropped (anti speed-hack). */
 const MAX_QUEUED_INPUTS = 10;
@@ -687,28 +686,21 @@ export class Region {
       const players: EntityState[] = [];
       for (const other of all) {
         if (other === p || !near(other.x, other.y)) continue;
-        players.push({
-          id: other.info.id, name: other.info.name, color: other.info.color, x: round(other.x), y: round(other.y),
-          health: round(other.character.hp / maxHp(other.character)),
-          ...(heldItem(other.character) ? { held: heldItem(other.character) } : {}),
-          ...(offHandItem(other.character) ? { offHeld: offHandItem(other.character) } : {}),
-        });
+        players.push(playerView(other));
       }
       const creatures: CreatureState[] = [];
       for (const c of this.creatures) {
         if (c.respawnAt !== null || !near(c.x, c.y)) continue;
-        creatures.push({
-          id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp),
-        });
+        creatures.push(creatureView(c));
       }
       const bodies: BodyState[] = [];
       for (const b of this.bodies) {
         if (!near(b.x, b.y)) continue;
-        bodies.push({ id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot: b.loot.length > 0 });
+        bodies.push(bodyView(b, b.loot.length > 0));
       }
       const npcs: NpcState[] = [];
       for (const n of this.townsfolk) {
-        if (near(n.x, n.y)) npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
+        if (near(n.x, n.y)) npcs.push(npcView(n));
       }
       // What the cells beside this one show across the border.
       for (const g of this.ghosts.values()) {
@@ -734,18 +726,14 @@ export class Region {
     const seen = (x: number) => (cell.index > 0 && x < cell.x0 + VIEW_RADIUS) || (cell.index < cell.count - 1 && x >= cell.x1 - VIEW_RADIUS);
     for (const p of this.players.values()) {
       if (!seen(p.x)) continue;
-      g.players.push({
-        id: p.info.id, name: p.info.name, color: p.info.color, x: round(p.x), y: round(p.y), health: round(p.character.hp / maxHp(p.character)),
-        ...(heldItem(p.character) ? { held: heldItem(p.character) } : {}),
-        ...(offHandItem(p.character) ? { offHeld: offHandItem(p.character) } : {}),
-      });
+      g.players.push(playerView(p));
     }
     for (const c of this.creatures) {
-      if (c.respawnAt === null && seen(c.x)) g.creatures.push({ id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp) });
+      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c));
     }
     // Bodies are searched in their own cell; across the border they are only seen.
-    for (const b of this.bodies) if (seen(b.x)) g.bodies.push({ id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot: false });
-    for (const n of this.townsfolk) if (seen(n.x)) g.npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
+    for (const b of this.bodies) if (seen(b.x)) g.bodies.push(bodyView(b, false));
+    for (const n of this.townsfolk) if (seen(n.x)) g.npcs.push(npcView(n));
     return g;
   }
 
@@ -1295,10 +1283,6 @@ export function nearestTile(map: RegionMap, x: number, y: number, kinds: Tile[],
     }
   }
   return best;
-}
-
-function round(n: number): number {
-  return Math.round(n * 1000) / 1000;
 }
 
 /** What a body's loot window shows. */

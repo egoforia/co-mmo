@@ -1,0 +1,36 @@
+import { heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureState, type EntityState, type NpcState, type PlayerInfo } from '@co-mmo/shared';
+
+// What players see of each thing in a region, as sent in snapshots and
+// across a split region's cell borders. One builder per kind, so both
+// places always send the same shape.
+
+/** Positions and health shares are sent to a thousandth, which is plenty and keeps snapshots small. */
+export function round(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
+/** Another player as seen by those nearby. */
+export function playerView(p: { info: PlayerInfo; x: number; y: number; character: Character }): EntityState {
+  const held = heldItem(p.character);
+  const offHeld = offHandItem(p.character);
+  return {
+    id: p.info.id, name: p.info.name, color: p.info.color, x: round(p.x), y: round(p.y), health: round(p.character.hp / maxHp(p.character)),
+    ...(held ? { held } : {}),
+    ...(offHeld ? { offHeld } : {}),
+  };
+}
+
+/** A living creature. */
+export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; hp: number }): CreatureState {
+  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp) };
+}
+
+/** A defeated creature's body; `loot` says whether the viewer may search it here. */
+export function bodyView(b: { id: string; kind: string; def: CreatureDef; x: number; y: number }, loot: boolean): BodyState {
+  return { id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot };
+}
+
+/** A person of the region. */
+export function npcView(n: { id: string; name: string; asset: string; x: number; y: number }): NpcState {
+  return { id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) };
+}

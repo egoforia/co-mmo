@@ -361,7 +361,7 @@ function recipeHtml(recipe: Recipe | undefined, other?: Recipe, planned = false)
       <h4>${recipe.steps.length > 1 ? `${i + 1}. ` : ''}${esc(s.label)}</h4>
       <p class="meta"><b>${esc(s.model)}</b> <small>(${esc(s.provider === 'gemini' ? 'Google AI Studio' : s.provider)})</small> · ${MEDIA[s.media]}${s.settings.length ? ` · ${s.settings.map(esc).join(' · ')}` : ''} · ${planned || recipe.partial ? 'about' : 'cost'} ${usd(s.usd)}</p>
       ${s.pictures.length ? `<div class="sent">${s.pictures.map((p) => `<figure>${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>` : `<span class="ph">${p.later ? '↑' : '?'}</span>`}<figcaption>${esc(p.name)}${p.later ? '<br><small>painted in the step above</small>' : p.url ? '' : '<br><small>not kept</small>'}</figcaption></figure>`).join('')}</div>` : '<p class="note">No pictures sent along.</p>'}
-      ${s.note ? `<p class="note">Sent with the pictures: “${esc(s.note)}”</p>` : ''}
+      ${s.note ? `<p class="note">Sent with the pictures: “${esc(s.note)}”<br><small>The pictures here are only examples of the style, so this keeps the model from painting them again instead of what the prompt asks for. It is left out when a picture sent is the subject itself, such as a walk's standing picture.</small></p>` : ''}
       <pre class="prompt">${prompt(s.prompt)}</pre>
     </section>`;
   return `

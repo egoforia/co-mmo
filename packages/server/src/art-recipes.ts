@@ -139,7 +139,7 @@ export class RecipeBook {
   async imageStep(label: string, provider: { id: string; model: string }, request: ImageRequest, usd: number): Promise<RecipeStep> {
     const pictures = await Promise.all((request.references ?? []).map(async (r, i) => ({ name: request.labels?.[i] ?? `Picture ${i + 1}`, url: await this.picture(r.data) })));
     const settings = [request.aspectRatio ? `shape ${request.aspectRatio}` : 'square', `size ${request.size ?? '1K'}`];
-    if (request.edit) settings.push('the pictures show the subject itself, to be painted again with a change');
+    if (request.edit) settings.push('the pictures show the subject itself, not only the style');
     const note = provider.id === 'gemini' && pictures.length && !request.edit ? REFERENCE_NOTE : undefined;
     return { label, media: 'picture', provider: provider.id, model: provider.model, prompt: request.prompt, ...(note ? { note } : {}), pictures, settings, usd };
   }

@@ -211,6 +211,12 @@ nav.subtabs .count { display: inline-block; min-width: 18px; padding: 0 5px; mar
 .walker .walks { gap: 14px; }
 .direction { display: grid; gap: 4px; justify-items: center; }
 .direction button { font-size: 11px; padding: 2px 8px; }
+.direction { width: 170px; align-content: start; }
+.direction .standing { display: grid; justify-items: center; gap: 2px; }
+.direction .standing img, .direction .standing .ph { display: grid; place-items: center; width: 96px; height: 120px; object-fit: contain; background: var(--bg); }
+.direction .card-actions { justify-content: center; }
+.walker > header .walker-body { margin: 0 0 0 auto; }
+.review-prompt textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; }
 h2 + button.quiet, h3 + button.quiet { margin-bottom: 10px; }
 
 #art-dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; background: var(--bg); color: var(--ink); border: 1px solid var(--gold); display: none; }

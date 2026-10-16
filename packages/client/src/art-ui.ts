@@ -65,6 +65,7 @@ interface ArtItem {
 type Direction = 'front' | 'right' | 'back' | 'left';
 interface WalkVersion { id: string; url: string; frames: number; width: number; height: number; cycleSeconds: number; recipe?: Recipe }
 interface WalkStrip { url: string; frames: number; width: number; height: number; cycleSeconds: number; recipe?: Recipe; versions: WalkVersion[] }
+interface StandingView { url?: string; approved: boolean; recipe?: Recipe; versions: { id: string; url: string; recipe?: Recipe }[] }
 
 interface WalkerView {
   id: string;
@@ -74,6 +75,7 @@ interface WalkerView {
   place: Place;
   walks: Partial<Record<Direction, WalkStrip>>;
   lost: Partial<Record<Direction, WalkVersion[]>>;
+  standing: Record<Direction, StandingView>;
   estimateUsd: number;
   clipUsd: number;
   viewUsd: number;
@@ -107,7 +109,13 @@ interface ArtOverview {
 }
 
 /** A paid request, as the server's review and approval take it. */
-type Ask = { what: 'paint'; asset: string } | { what: 'paint-group'; group: string } | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean } | { what: 'sound'; sound: string };
+type Ask =
+  | { what: 'paint'; asset: string }
+  | { what: 'paint-group'; group: string }
+  | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean }
+  | { what: 'view'; walker: string; direction: Direction; prompt?: string }
+  | { what: 'clip'; walker: string; body: string; direction: Direction; prompt?: string }
+  | { what: 'sound'; sound: string };
 
 interface Review {
   title: string;
@@ -286,26 +294,38 @@ function walkerHtml(w: WalkerView): string {
   const bodyPick = `<label>Body<span><select name="body">${data!.bodies.map((b) => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')}</select></span></label>`;
   const direction = ([d, label]: [Direction, string]) => {
     const strip = w.walks[d];
+    const view = w.standing[d];
     const older = (strip?.versions.length ?? 0) || (w.lost[d]?.length ?? 0);
-    const show = strip || older ? `<button type="button" class="quiet" data-walk-versions="${esc(w.id)}" data-direction="${d}">${older ? `Versions (${older + (strip ? 1 : 0)})` : 'What made it'}</button>` : '';
-    return `<div class="direction">${stripHtml(strip, label, 110)}${show}</div>`;
+    const walkVersions = strip || older ? `<button type="button" class="quiet" data-walk-versions="${esc(w.id)}" data-direction="${d}">${older ? `Walk versions (${older + (strip ? 1 : 0)})` : 'What made the walk'}</button>` : '';
+    const viewVersions = (view.url && !view.approved) || view.versions.length ? `<button type="button" class="quiet" data-view-versions="${esc(w.id)}" data-direction="${d}">${view.versions.length ? `Picture versions (${view.versions.length + 1})` : 'What made the picture'}</button>` : '';
+    const paintView = `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'view', walker: w.id, direction: d }))}">${view.url && !view.approved ? 'Paint picture again' : 'Paint standing picture'} · about ${usd(w.viewUsd)}</button>`;
+    const clip = view.url
+      ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'clip', walker: w.id, body: 'two-legged', direction: d }))}" data-walker-body>${strip ? 'Make clip again' : 'Make walk clip'} · about ${usd(w.clipUsd)}</button>`
+      : '<small>Paint its standing picture first.</small>';
+    return `
+      <div class="direction">
+        <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${view.approved ? 'approved picture' : view.url ? 'standing picture' : 'no standing picture'}</small></div>
+        ${stripHtml(strip, label, 110)}
+        <div class="card-actions">${paintView}${viewVersions}${clip}${walkVersions}</div>
+      </div>`;
   };
   return `
     <div class="walker">
-      <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)} · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks yet'}</small></div></header>
+      <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)} · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks yet'}</small></div>
+        <form class="form walker-body">${bodyPick}</form></header>
+      <p class="note">Each direction has a standing picture, and a short clip that starts and ends on it. Paint the picture first and look at it (paint it again until you like it), then make the clip from it. Both prompts can be edited before anything is sent.</p>
       <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
-      <p class="note">One short clip per direction, made from a standing picture of each view. Directions already made are kept, so painting one again only pays for that one.</p>
       ${made < 4 ? `
-        <form class="form art-walk" data-walker="${esc(w.id)}">
-          ${bodyPick}
-          <button type="submit">Review ${made ? 'the missing walks' : 'making walks'} · about ${usd(w.estimateUsd)}</button>
-        </form>` : ''}
+        <details><summary>Or make all the missing walks in one go</summary>
+          <form class="form art-walk" data-walker="${esc(w.id)}">
+            <button type="submit">Review ${made ? 'the missing walks' : 'making walks'} · about ${usd(w.estimateUsd)}</button>
+          </form>
+        </details>` : ''}
       ${made ? `
-        <details><summary>Paint some directions again</summary>
+        <details><summary>Paint several directions again in one go</summary>
           <form class="form art-walk" data-walker="${esc(w.id)}" data-redo="yes">
             <span class="dirs">${DIRECTIONS.map(([d, label]) => `<label class="check"><input type="checkbox" name="dir-${d}"> ${label}</label>`).join('')}</span>
             <label class="check"><input type="checkbox" name="views"> Paint their standing pictures again too (about ${usd(w.viewUsd)} each)</label>
-            ${bodyPick}
             <button type="submit">Review · about ${usd(w.clipUsd)} a direction</button>
           </form>
         </details>` : ''}
@@ -371,6 +391,8 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
   d.innerHTML = '<p class="note">Working out exactly what will be sent…</p>';
   if (!d.open) d.showModal();
   let review: Review;
+  // A walk's standing picture or clip takes the Owner's own prompt in place of the usual one.
+  const editable = ask.what === 'view' || ask.what === 'clip' ? ask : undefined;
   try {
     review = await ctx.api<Review>('art/review', 'POST', { ...ask, ...(note ? { note } : {}) });
   } catch (err) {
@@ -383,6 +405,8 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
     <header><h2>${esc(review.title)}</h2><button type="button" class="quiet" data-close aria-label="Close">✕</button></header>
     <div class="dialog-body">
       <p class="note">This is everything that will be sent to the AI model${many ? 's' : ''}. Nothing is painted until you approve it.</p>
+      ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
+        <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button>${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
       ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><button type="submit" class="quiet">Show with these words</button></form>` : ''}
       ${review.parts.map((p) => `${many ? `<details><summary><b>${esc(p.name)}</b> · about ${usd(p.recipe.steps.reduce((n, s) => n + s.usd, 0))}</summary>${recipeHtml(p.recipe, undefined, true)}</details>` : recipeHtml(p.recipe, undefined, true)}`).join('')}
     </div>
@@ -392,6 +416,15 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
       <button type="button" data-approve>Approve and paint</button>
     </footer>`;
   for (const b of d.querySelectorAll('[data-close]')) b.addEventListener('click', () => d.close());
+  d.querySelector('form.review-prompt')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const words = String(new FormData(e.target as HTMLFormElement).get('prompt') ?? '').trim();
+    void openReview({ ...editable!, ...(words ? { prompt: words } : {}) }, false);
+  });
+  d.querySelector('[data-usual]')?.addEventListener('click', () => {
+    const { prompt: _, ...usual } = editable!;
+    void openReview(usual, false);
+  });
   d.querySelector('form.review-note')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const words = String(new FormData(e.target as HTMLFormElement).get('note') ?? '').trim();
@@ -403,7 +436,7 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
     try {
       await ctx.api(`art/${ask.what}`, 'POST', { ...ask, ...(note ? { note } : {}), approved: review.fingerprint });
       d.close();
-      ctx.toast(ask.what === 'walk' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : 'Approved. Follow it under Painting now.');
+      ctx.toast(ask.what === 'walk' || ask.what === 'clip' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : ask.what === 'view' ? 'Approved. The picture shows here once it is painted; then make the clip from it.' : 'Approved. Follow it under Painting now.');
       ctx.rerender();
     } catch (err) {
       button.disabled = false;
@@ -470,6 +503,14 @@ function walkVersions(w: WalkerView, direction: Direction): void {
   openVersions(`${w.name} walking ${label === 'towards us' ? 'towards us' : label === 'away' ? 'away' : label}`, now, earlier, (version) => ctx.api('art/restore-walk', 'POST', { walker: w.id, direction, version }));
 }
 
+function viewVersions(w: WalkerView, direction: Direction): void {
+  const label = DIRECTIONS.find(([d]) => d === direction)![1];
+  const view = w.standing[direction];
+  const earlier: Shown[] = view.versions.map((v) => ({ id: v.id, label: v.id === 'approved' ? 'The approved picture' : `Put aside ${putAside(v.id)}`, look: picture(v.url), recipe: v.recipe }));
+  const now: Shown = { id: 'now', label: view.approved ? 'the approved picture' : madeOn(view.recipe, 'painted here'), look: view.url ? picture(view.url) : '', recipe: view.recipe };
+  openVersions(`${w.name} standing, facing ${label}`, now, earlier, (version) => ctx.api('art/restore-view', 'POST', { walker: w.id, direction, version }));
+}
+
 function soundVersions(s: SoundItem): void {
   const audio = (url: string) => `<audio controls preload="none" src="${esc(url)}"></audio>`;
   const earlier: Shown[] = s.versions.map((v) => ({ id: v.id, label: `Made ${when(v.recipe.at)}`, look: audio(v.url), recipe: v.recipe }));
@@ -490,13 +531,20 @@ export function artClick(target: HTMLElement): boolean {
   const t = target.closest<HTMLButtonElement>('button');
   if (!t || !data) return false;
   if (t.dataset.artReview) {
-    void openReview(JSON.parse(t.dataset.artReview) as Ask, t.dataset.note === 'yes');
+    const ask = JSON.parse(t.dataset.artReview) as Ask;
+    // A walk clip moves the way the body picked on its card does.
+    const body = t.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value;
+    if (ask.what === 'clip' && t.dataset.walkerBody !== undefined && body) ask.body = body;
+    void openReview(ask, t.dataset.note === 'yes');
   } else if (t.dataset.artVersions) {
     const item = data.items.find((i) => i.id === t.dataset.artVersions);
     if (item) pictureVersions(item);
   } else if (t.dataset.walkVersions) {
     const w = data.walkers.find((x) => x.id === t.dataset.walkVersions);
     if (w) walkVersions(w, t.dataset.direction as Direction);
+  } else if (t.dataset.viewVersions) {
+    const w = data.walkers.find((x) => x.id === t.dataset.viewVersions);
+    if (w) viewVersions(w, t.dataset.direction as Direction);
   } else if (t.dataset.soundVersions) {
     const s = data.sounds.find((x) => x.id === t.dataset.soundVersions);
     if (s) soundVersions(s);
@@ -509,6 +557,7 @@ export function artClick(target: HTMLElement): boolean {
 export function artSubmit(form: HTMLFormElement): boolean {
   if (!form.classList.contains('art-walk')) return false;
   const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
+  f.body = form.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value ?? 'two-legged';
   const directions = DIRECTIONS.map(([d]) => d).filter((d) => f[`dir-${d}`] === 'on');
   if (form.dataset.redo && !directions.length) {
     ctx.toast('Pick at least one direction.');

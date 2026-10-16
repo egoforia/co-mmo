@@ -33,7 +33,7 @@ import { watched } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { SoundItem, SoundMaker } from './sound-maker.ts';
 import type { ArtUse, ContentRecord, Store } from './store.ts';
-import { estimateClipUsd, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
+import { estimateClipUsd, type StandingView, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
 
 // God's View's Art tab: every picture the game draws, where it came from,
@@ -102,6 +102,8 @@ export type ArtAsk =
   | { kind: 'paint'; asset: string; note?: string }
   | { kind: 'group'; group: string }
   | { kind: 'walk'; walker: string; body: string; directions?: WalkDirection[]; views?: boolean }
+  | { kind: 'view'; walker: string; direction: WalkDirection; prompt?: string }
+  | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string };
 
 /** Everything a request will send, for the Owner to approve. */
@@ -126,6 +128,8 @@ export interface WalkerView {
   walks: Partial<Record<WalkDirection, WalkStrip>>;
   /** Earlier walks of directions that have none now. */
   lost: Partial<Record<WalkDirection, WalkVersion[]>>;
+  /** Each direction's standing picture, which its walk clip starts and ends on. */
+  standing: Record<WalkDirection, StandingView>;
   /** About what making the missing walks costs. */
   estimateUsd: number;
   /** About what painting one direction again costs (one clip). */
@@ -335,7 +339,9 @@ export class ArtStudio {
         walks[d] = { url: slash(entry.file), frames: entry.frames ?? WALK_FRAMES, width: entry.width, height: entry.height, cycleSeconds: entry.cycleSeconds ?? WALK_CYCLE_SECONDS, ...(recipe ? { recipe } : {}), versions };
       }
       const needs = await this.options.walks.needs(w);
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, lost, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
+      const standing = {} as WalkerView['standing'];
+      for (const d of WALK_DIRECTIONS) standing[d] = await this.options.walks.standing(w, d, w.url);
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
     }
     return views;
   }
@@ -364,6 +370,16 @@ export class ArtStudio {
         const recipe = await this.options.walks.preview(walker, redo, ask.views === true);
         if (!recipe.steps.length) throw new ArtRequestError(`${walker.name} already walks every way. Pick a direction to paint again.`);
         parts.push({ name: walker.name, recipe });
+      } else if (ask.kind === 'view') {
+        const walker = this.walker(ask.walker, 'two-legged');
+        const direction = this.direction(ask.direction);
+        title = `Paint ${walker.name} standing, facing ${facingWords(direction)}`;
+        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt)) });
+      } else if (ask.kind === 'clip') {
+        const walker = this.walker(ask.walker, ask.body);
+        const direction = this.direction(ask.direction);
+        title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : `facing ${direction}`}`;
+        parts.push({ name: walker.name, recipe: await this.options.walks.previewClip(walker, direction, ownPrompt(ask.prompt)) });
       } else {
         const sounds = this.options.sounds;
         const item = (await sounds?.list())?.find((x) => x.id === ask.sound);
@@ -440,6 +456,11 @@ export class ArtStudio {
     if (!found) throw new ArtRequestError('There is nothing by that name to make walk.');
     if (!BODY_TYPES[body]) throw new ArtRequestError('That body type is unknown.');
     return { ...found, body };
+  }
+
+  private direction(direction: string): WalkDirection {
+    if (!WALK_DIRECTIONS.includes(direction as WalkDirection)) throw new ArtRequestError('That is not a direction.');
+    return direction as WalkDirection;
   }
 
   /** A shipped scenery piece, character or item that can be painted again. */
@@ -548,6 +569,37 @@ export class ArtStudio {
   }
 
   /**
+   * Paints a walker standing in one direction, and only that, so the Owner
+   * can look at it (and paint it again) before a walk clip is made from it.
+   */
+  async paintView(walkerId: string, direction: string, prompt?: string): Promise<{ estimateUsd: number }> {
+    this.refuseWhenSpent();
+    const walker = this.walker(walkerId, 'two-legged');
+    const d = this.direction(direction);
+    const image = this.options.wishes.imageProvider('walks');
+    if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
+    const estimateUsd = estimateImageUsd(image.model);
+    const own = ownPrompt(prompt);
+    const handle = this.options.jobs.add(`${walker.id}-${d}`, `${walker.name} standing, facing ${facingWords(d)}`, 'picture', 'gods-view', estimateUsd);
+    this.enqueue(() => this.options.walks.paintView(walker, d, own, handle), handle, { kind: 'view', walker: walkerId, direction: d, ...(own ? { prompt: own } : {}) });
+    return { estimateUsd };
+  }
+
+  /** Makes one direction's walk clip from the standing picture there now, and only that. */
+  async makeClip(walkerId: string, body: string, direction: string, prompt?: string): Promise<{ estimateUsd: number }> {
+    this.refuseWhenSpent();
+    const walker = this.walker(walkerId, body);
+    const d = this.direction(direction);
+    const video = this.options.video();
+    if (!video) throw new ArtRequestError("Walks are made with Google's video model, which needs Google AI Studio as the image model and its key.");
+    const estimateUsd = estimateClipUsd(video.model);
+    const own = ownPrompt(prompt);
+    const handle = this.options.jobs.add(walkArt(walker.id, d), `${walker.name} walking ${facingWords(d)}`, 'clip', 'gods-view', estimateUsd);
+    this.enqueue(() => this.options.walks.makeClip(walker, d, own, handle), handle, { kind: 'clip', walker: walkerId, body, direction: d, ...(own ? { prompt: own } : {}) });
+    return { estimateUsd };
+  }
+
+  /**
    * Makes a sound effect or a land's music again, with the Owner's `note`
    * added to its description. Sounds are quick, so they do not wait behind
    * start-up painting.
@@ -611,6 +663,13 @@ export class ArtStudio {
     if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
     if (!WALK_DIRECTIONS.includes(direction as WalkDirection)) throw new ArtRequestError('That is not a direction.');
     if (!(await this.options.walks.restore(found, direction as WalkDirection, version))) throw new ArtRequestError('That earlier walk is not there any more.');
+  }
+
+  /** Puts an earlier standing picture back in one direction, for free; its walk clip is not made again. */
+  async restoreView(walkerId: string, direction: string, version: string): Promise<void> {
+    const found = this.walkerList().find((w) => w.id === walkerId);
+    if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
+    if (!(await this.options.walks.restoreView(found, this.direction(direction), version))) throw new ArtRequestError('That earlier picture is not there any more.');
   }
 
   /** Puts an earlier version of a sound back, for free. */
@@ -685,6 +744,8 @@ export class ArtStudio {
 
   private async again(request: PaintRequest): Promise<unknown> {
     if (request.kind === 'walk') return this.walk(request.walker, request.body, [], false);
+    if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt);
+    if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
     if (request.kind === 'repaint') return this.repaint(request.asset, request.note);
     return undefined;
   }
@@ -805,4 +866,15 @@ function repaintableKit(a: KitAsset): boolean {
 /** A manifest path as a URL from the site root. */
 function slash(file: string): string {
   return file.startsWith('/') ? file : `/${file}`;
+}
+
+/** The Owner's own prompt, when they wrote one: undefined keeps the usual words. */
+function ownPrompt(prompt: string | undefined): string | undefined {
+  const text = prompt?.trim().slice(0, 4000);
+  return text || undefined;
+}
+
+/** Which way a direction faces, in words. */
+function facingWords(direction: WalkDirection): string {
+  return direction === 'front' ? 'towards us' : direction === 'back' ? 'away' : direction;
 }

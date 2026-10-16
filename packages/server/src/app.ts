@@ -282,6 +282,8 @@ export function createApp(options: AppOptions): App {
     wish: (request) => wishes.resumePaint(request),
     repaint: (request) => artStudio.repaint(request.asset, request.note),
     walk: (request) => artStudio.walk(request.walker, request.body, [], false),
+    view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt),
+    clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),
   });
   const reports = new Reports(store, world);
   const builds = new Builds(store, {
@@ -424,6 +426,8 @@ export function createApp(options: AppOptions): App {
     if (sample && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'samples', `${sample[1]}.png`), res);
     const walk = path.match(/^\/wished-art\/walks\/([\w-]+\.png)$/);
     if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
+    const standing = path.match(/^\/wished-art\/walks\/views\/([\w-]+\.png)$/);
+    if (standing && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', 'views', standing[1]!), res);
     const redone = path.match(/^\/wished-art\/redone\/([\w-]+\.png)$/);
     if (redone && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'redone', redone[1]!), res);
     const old = path.match(/^\/wished-art\/history\/([\w~-]+)\/([0-9a-z]+\.(?:png|webp))$/);

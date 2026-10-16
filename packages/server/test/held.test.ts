@@ -47,7 +47,7 @@ describe('the hand finder', () => {
     const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
     const strip = await picture(256, 192);
     let sword = await picture(128, 128);
-    // Hands come back as both hands; walking left, the right hand is the far one.
+    // Hands come back as both hands; walking left, the right hand is the far one and the left the near one.
     const eye = fakeEye(['{"near": [100, 100], "far": [800, 600]}', '{"near": [100, 100], "far": null}', '{"point": [700, 300]}', '{"far": [810, 610]}', '{"far": [820, 620]}']);
     let walkFile = 'wished-art/walks/player-mara-walk-front.png';
     const spent: number[] = [];
@@ -65,7 +65,7 @@ describe('the hand finder', () => {
     model = eye;
     await finder.start();
     expect(await finder.manifest()).toEqual({
-      'player-mara-walk-front': { hands: [[0.6, 0.8], null] },
+      'player-mara-walk-front': { hands: [[0.6, 0.8], null], leftHands: [[0.1, 0.1], [0.1, 0.1]] },
       'item-wooden-sword': { grip: [0.3, 0.7] },
     });
     expect(eye.asked[2]!.messages[0]!.content).toMatch(/handle/);
@@ -73,7 +73,7 @@ describe('the hand finder', () => {
     expect(eye.asked[0]!.messages[0]!.content).toMatch(/"near" is the hand/);
     expect(eye.asked[0]!.system).toMatch(/"far"/);
     expect(spent).toHaveLength(3);
-    expect(JSON.parse(await readFile(join(artDir, 'points.json'), 'utf8'))['item-wooden-sword'].from).toMatch(/^art\/item-wooden-sword\.png#[0-9a-f]{12}#v3$/);
+    expect(JSON.parse(await readFile(join(artDir, 'points.json'), 'utf8'))['item-wooden-sword'].from).toMatch(/^art\/item-wooden-sword\.png#[0-9a-f]{12}#v4$/);
 
     // Nothing new: nothing asked. The walk painted again: its frames are looked at again.
     await finder.start();
@@ -81,7 +81,7 @@ describe('the hand finder', () => {
     walkFile = `${walkFile}?v=2`;
     await finder.start();
     expect(eye.asked).toHaveLength(5);
-    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.61, 0.81], [0.62, 0.82]] });
+    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.61, 0.81], [0.62, 0.82]], leftHands: [null, null] });
     // A new picture under the same file name (shipped art updated with the game) is looked at again too.
     sword = await picture(64, 128);
     await finder.start();
@@ -92,12 +92,12 @@ describe('the hand finder', () => {
     expect(Object.keys(await again.manifest())).toEqual(['player-mara-walk-front', 'item-wooden-sword']);
   });
 
-  it('keeps the right hand on one side walking towards us, swapping a frame the model mixed up', () => {
+  it('keeps each hand on its side walking towards us, swapping a frame the model mixed up', () => {
     const r = (x: number) => [x, 0.5] as [number, number];
     // The right hand is on the picture's left in most frames; frame 3 came back the other way round.
-    expect(steadyHands('front', [{ point: r(0.3), other: r(0.7) }, { point: r(0.32), other: r(0.68) }, { point: r(0.7), other: r(0.31) }, {}])).toEqual([r(0.3), r(0.32), r(0.31), null]);
+    expect(steadyHands('front', [{ right: r(0.3), left: r(0.7) }, { right: r(0.32), left: r(0.68) }, { right: r(0.7), left: r(0.31) }, {}])).toEqual({ right: [r(0.3), r(0.32), r(0.31), null], left: [r(0.7), r(0.68), r(0.7), null] });
     // Side-on the hands cross, so nothing is swapped.
-    expect(steadyHands('left', [{ point: r(0.3), other: r(0.7) }, { point: r(0.7), other: r(0.3) }])).toEqual([r(0.3), r(0.7)]);
+    expect(steadyHands('left', [{ right: r(0.3), left: r(0.7) }, { right: r(0.7), left: r(0.3) }])).toEqual({ right: [r(0.3), r(0.7)], left: [r(0.7), r(0.3)] });
   });
 
   it('asks the Owner\'s own question, and looks again at one frame or a whole walk when asked', async () => {
@@ -106,7 +106,7 @@ describe('the hand finder', () => {
     const strip = await picture(256, 192);
     const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [{ id: 'player-mara-walk-front', kind: 'hands', file: 'w.png', frames: 2, facing: 'front', read: async () => strip }] });
     await finder.start();
-    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.3, 0.5], [0.31, 0.5]] });
+    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.3, 0.5], [0.31, 0.5]], leftHands: [[0.7, 0.5], [0.69, 0.5]] });
     expect((await finder.questions()).find((q) => q.facing === 'front')).toMatchObject({ own: false, system: expect.stringContaining('"left"') });
 
     await finder.setQuestion('front', 'Find the hands, follow the arms.');
@@ -116,7 +116,7 @@ describe('the hand finder', () => {
     expect(await finder.findAgain(['player-mara-walk-front'], 1)).toBe(1);
     expect(eye.asked).toHaveLength(3);
     expect(eye.asked[2]!.messages[0]!.content).toBe('Find the hands, follow the arms.');
-    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.3, 0.5], [0.32, 0.52]] });
+    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.3, 0.5], [0.32, 0.52]], leftHands: [[0.7, 0.5], [0.68, 0.52]] });
     await finder.setQuestion('front', '');
     expect((await finder.questions()).find((q) => q.facing === 'front')!.own).toBe(false);
   });
@@ -180,8 +180,8 @@ describe('the art points the game serves', () => {
     await app!.hands.job;
     const owner = account(store, 'Ego', 'owner');
     const { body } = await api(base, '/api/art-points', owner.token);
-    expect(body[walkArt('player-mara', 'front')]).toEqual({ hands: [[0.5, 0.5], [0.5, 0.5]] });
-    expect(body['player-mara']).toEqual({ hands: [[0.5, 0.5]] });
+    expect(body[walkArt('player-mara', 'front')]).toEqual({ hands: [[0.5, 0.5], [0.5, 0.5]], leftHands: [[0.5, 0.5], [0.5, 0.5]] });
+    expect(body['player-mara']).toEqual({ hands: [[0.5, 0.5]], leftHands: [[0.5, 0.5]] });
     expect(body['item-wooden-sword']).toEqual({ grip: [0.5, 0.5] });
     // God's View shows the questions and looks again at a walk when asked.
     expect((await api(base, '/api/admin/art/hands', owner.token)).body.questions).toHaveLength(4);

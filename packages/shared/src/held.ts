@@ -10,8 +10,10 @@ export type ArtPoint = readonly [x: number, y: number];
 
 /** Where things are in a painted picture, found by looking at it. */
 export interface ArtPoints {
-  /** A look's or walk strip's free hand, one per frame (a still picture has one); null where none shows. */
+  /** A look's or walk strip's right hand (where a weapon goes), one per frame (a still picture has one); null where none shows. */
   hands?: (ArtPoint | null)[];
+  /** The left hand (where a shield or charm goes), frame by frame like `hands`. */
+  leftHands?: (ArtPoint | null)[];
   /** Where an item is held: its handle, strap or chain. */
   grip?: ArtPoint;
 }

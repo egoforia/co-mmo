@@ -139,7 +139,7 @@ const esc = escapeHtml;
 
 let data: ArtOverview | null = null;
 /** Where the hand finder found each look's right hand, frame by frame, by art id. */
-let points: Record<string, { hands?: ([number, number] | null)[] }> = {};
+let points: Record<string, { hands?: ([number, number] | null)[]; leftHands?: ([number, number] | null)[] }> = {};
 /** The questions the hand finder asks, one per way of facing. */
 interface HandQuestion { facing: Direction; prompt: string; usual: string; own: boolean; system: string }
 let questions: HandQuestion[] = [];
@@ -356,13 +356,16 @@ function handsHtml(w: WalkerView): string {
     const strip = w.walks[d];
     const id = `${w.id}-walk-${d}`;
     const hands = points[id]?.hands;
+    const lefts = points[id]?.leftHands;
     if (!strip) return [];
     const height = 96;
     const width = Math.round((strip.width / strip.frames) * (height / strip.height));
     const frames = Array.from({ length: strip.frames }, (_, i) => {
-      const hand = hands?.[i];
-      const dot = hand ? `<b class="dot" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%"></b>` : '<small class="none">none</small>';
-      return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hand again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">${hands ? dot : ''}</button>`;
+      const at = (hand: [number, number], side: string) => `<b class="dot ${side}" title="${side} hand" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%">${side === 'right' ? 'R' : 'L'}</b>`;
+      const right = hands?.[i];
+      const left = lefts?.[i];
+      const dot = right || left ? `${right ? at(right, 'right') : ''}${left ? at(left, 'left') : ''}` : '<small class="none">none</small>';
+      return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hands again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">${hands ? dot : ''}</button>`;
     }).join('');
     const question = questions.find((q) => q.facing === d);
     const ask = question ? `
@@ -377,8 +380,8 @@ function handsHtml(w: WalkerView): string {
     return [`<div class="hand-row"><div class="hand-head"><small>${label}${hands ? '' : ' · not looked at yet'}</small>${find({ ids: [id] }, 'Find again for this walk')}</div><div class="frames">${frames}</div>${ask}</div>`];
   });
   if (!rows.length) return '';
-  return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the right hand was found (held weapons and charms go there)</summary>
-    <p class="note">The hand finder looks at every frame once, after a walk is painted. The dot is the right hand. Click a frame to look at just that frame again; each look is a small vision-model call.</p>
+  return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: kept for shields and off-hand items)</summary>
+    <p class="note">The hand finder looks at every frame once, after a walk is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call.</p>
     ${find({ ids: [...ids, w.id] }, `Find again for every walk of ${esc(w.name)}`, '')}
     ${rows.join('')}</details>`;
 }

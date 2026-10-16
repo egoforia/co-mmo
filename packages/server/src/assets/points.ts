@@ -12,15 +12,16 @@ const SYSTEM = [
 ].join('\n');
 
 /**
- * Finds the character's right hand in a walker's picture or walk frame, where
- * a held item goes. Models mix up the character's right with the picture's,
- * and asked for "the right hand" seen side-on they point at whichever hand is
- * in front; so both hands are asked for by where they are in the picture
- * (near and far side-on, picture left and right otherwise), and the right
- * hand is picked from those: the near hand facing right, the far hand facing
- * left, the picture's left facing us and the picture's right seen from behind.
+ * Finds both of the character's hands in a walker's picture or walk frame:
+ * the right hand holds a weapon, the left a shield or charm. Models mix up
+ * the character's right with the picture's, and asked for "the right hand"
+ * seen side-on they point at whichever hand is in front; so the hands are
+ * asked for by where they are in the picture (near and far side-on, picture
+ * left and right otherwise), and told apart from those: the right hand is
+ * the near hand facing right, the far hand facing left, the picture's left
+ * facing us and the picture's right seen from behind.
  */
-export async function findRightHand(model: ChatModel, picture: Buffer, facing: Facing, question = HAND_QUESTIONS[facing]): Promise<{ point?: ArtPoint; other?: ArtPoint; usd: number }> {
+export async function findHands(model: ChatModel, picture: Buffer, facing: Facing, question = HAND_QUESTIONS[facing]): Promise<BothHands & { usd: number }> {
   const result = await model.complete({
     system: handSystem(facing),
     purpose: 'Finding hands',
@@ -29,25 +30,30 @@ export async function findRightHand(model: ChatModel, picture: Buffer, facing: F
     maxTokens: 2000,
   });
   const answer = parseJsonObject(result.text);
-  const point = pointOf(answer?.[RIGHT_HAND_KEY[facing]]);
-  const other = pointOf(answer?.[OTHER_HAND_KEY[facing]]);
-  return { ...(point ? { point } : {}), ...(other ? { other } : {}), usd: result.usd };
+  const right = pointOf(answer?.[RIGHT_HAND_KEY[facing]]);
+  const left = pointOf(answer?.[LEFT_HAND_KEY[facing]]);
+  return { ...(right ? { right } : {}), ...(left ? { left } : {}), usd: result.usd };
+}
+
+/** The character's two hands in one picture, where they were found. */
+export interface BothHands {
+  right?: ArtPoint;
+  left?: ArtPoint;
 }
 
 /**
- * The right hand through a walk seen from the front or back, frame by frame.
- * The two hands are a body's width apart there, so a frame whose answer has
- * the hands the other way round from its neighbours (the model mixed them
- * up) is swapped back; side-on the hands cross, so nothing is swapped.
+ * Both hands through a walk, frame by frame. Seen from the front or back the
+ * hands are a body's width apart, so a frame whose answer has them the other
+ * way round from its neighbours (the model mixed them up) is swapped back;
+ * side-on the hands cross, so nothing is swapped.
  */
-export function steadyHands(facing: Facing, frames: { point?: ArtPoint; other?: ArtPoint }[]): (ArtPoint | null)[] {
-  const out = frames.map((f) => f.point ?? null);
-  if (facing === 'left' || facing === 'right') return out;
+export function steadyHands(facing: Facing, frames: BothHands[]): { right: (ArtPoint | null)[]; left: (ArtPoint | null)[] } {
+  const side = facing === 'left' || facing === 'right';
   // The side of the picture the right hand is on, by most frames' answers.
-  const xs = frames.filter((f) => f.point && f.other).map((f) => f.point![0] - f.other![0]);
-  const sign = Math.sign(xs.reduce((n, x) => n + Math.sign(x), 0));
-  if (!sign) return out;
-  return frames.map((f) => (f.point && f.other && Math.sign(f.point[0] - f.other[0]) === -sign ? f.other : (f.point ?? null)));
+  const xs = frames.filter((f) => f.right && f.left).map((f) => f.right![0] - f.left![0]);
+  const sign = side ? 0 : Math.sign(xs.reduce((n, x) => n + Math.sign(x), 0));
+  const steady = frames.map((f) => (sign && f.right && f.left && Math.sign(f.right[0] - f.left[0]) === -sign ? { right: f.left, left: f.right } : f));
+  return { right: steady.map((f) => f.right ?? null), left: steady.map((f) => f.left ?? null) };
 }
 
 /** Which way a walker faces in a picture: a still picture faces us. */
@@ -61,9 +67,9 @@ export const HAND_QUESTIONS: Record<Facing, string> = {
   left: 'Point to both of the character\'s hands. "near" is the hand on the side nearer to us, in front of the body; "far" is the hand on the far side, behind the body: if it is hidden, point to where it must be behind the body.',
 };
 
-/** The answer that is the character's own right hand, for each way it faces. */
+/** The answers that are the character's own right and left hands, for each way it faces. */
 export const RIGHT_HAND_KEY: Record<Facing, string> = { front: 'left', back: 'right', right: 'near', left: 'far' };
-const OTHER_HAND_KEY: Record<Facing, string> = { front: 'right', back: 'left', right: 'far', left: 'near' };
+export const LEFT_HAND_KEY: Record<Facing, string> = { front: 'right', back: 'left', right: 'far', left: 'near' };
 
 /** The fixed part of a hand question: the shape of the answer. */
 export function handSystem(facing: Facing): string {
@@ -75,7 +81,7 @@ export function handSystem(facing: Facing): string {
 }
 
 /** Bumped when the questions change, so every picture is looked at again. */
-export const POINTS_VERSION = 3;
+export const POINTS_VERSION = 4;
 /** What is asked for in an item's picture. */
 export const GRIP = 'where a hand would hold it: the middle of its handle, hilt, grip, strap or chain';
 

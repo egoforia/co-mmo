@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { ArtPoint, ArtPoints, ArtPointsManifest } from '@co-mmo/shared';
+import type { ArtPoints, ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
-import { GRIP, HAND_QUESTIONS, POINTS_VERSION, findPoint, findRightHand, handSystem, steadyHands, stripFrames, type Facing } from './assets/points.ts';
+import { GRIP, HAND_QUESTIONS, POINTS_VERSION, findHands, findPoint, handSystem, steadyHands, stripFrames, type BothHands, type Facing } from './assets/points.ts';
 
-// Held items (milestone 10): finds, once per picture, where a walker's free
-// hand is in every frame and where each item is gripped, so the client can
+// Held items (milestone 10): finds, once per picture, where a walker's two
+// hands are in every frame and where each item is gripped, so the client can
 // put a player's weapon or charm in their hand. A picture painted again is
 // looked at again; a picture with no model to look at it shows no held item.
 
@@ -41,7 +41,7 @@ interface Found extends ArtPoints {
   /** The file the points were found in, and a fingerprint of its pixels. */
   from: string;
   /** Both hands as answered, frame by frame, so one frame found again is set straight with the rest. */
-  both?: { point?: ArtPoint; other?: ArtPoint }[];
+  both?: BothHands[];
 }
 
 /** One way of facing's hand question, as God's View shows and edits it. */
@@ -136,11 +136,12 @@ export class HandFinder {
       const question = (await this.questions()).find((q) => q.facing === facing)!.prompt;
       for (const [i, frame] of pictures.entries()) {
         if (only !== undefined && only !== i && both[i]) continue;
-        const { point, other, usd } = await findRightHand(model, frame, facing, question);
+        const { usd, ...hands } = await findHands(model, frame, facing, question);
         this.options.spend(usd, model);
-        both[i] = { ...(point ? { point } : {}), ...(other ? { other } : {}) };
+        both[i] = hands;
       }
-      this.found[source.id] = { from, hands: steadyHands(facing, both), both };
+      const { right, left } = steadyHands(facing, both);
+      this.found[source.id] = { from, hands: right, leftHands: left, both };
     }
     await mkdir(this.options.artDir, { recursive: true });
     await writeFile(this.file, JSON.stringify(this.found, null, 2));

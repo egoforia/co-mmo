@@ -812,12 +812,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Where the avatar's right hand is in the picture or walk frame it shows
-   * now; in a frame where it was not found, the nearest frame's, so the item
-   * does not blink out for a step.
+   * Where the avatar's right (or left) hand is in the picture or walk frame
+   * it shows now; in a frame where it was not found, the nearest frame's, so
+   * the item does not blink out for a step.
    */
-  private handOf(a: Avatar): ArtPoint | undefined {
-    const hands = this.options.points[a.body.texture.key]?.hands;
+  private handOf(a: Avatar, side: 'right' | 'left' = 'right'): ArtPoint | undefined {
+    const points = this.options.points[a.body.texture.key];
+    const hands = side === 'right' ? points?.hands : points?.leftHands;
     if (!hands?.length) return undefined;
     const name = Number(a.body.frame.name);
     const frame = hands.length > 1 && Number.isInteger(name) ? name : 0;

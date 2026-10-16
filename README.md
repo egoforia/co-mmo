@@ -207,6 +207,12 @@ time; open it, pick a name, and you are in. Use "Invite a friend" in the
 top bar to make more invite links. To try multiplayer alone, open an invite
 link in a private window.
 
+Settings (the variables below, and keys such as `GEMINI_API_KEY`) go in a
+`.env` file in the checkout, one `NAME=value` per line. `npm run dev` reads it
+each time it starts the game, including after "Pull and restart"; anything
+already set in the terminal wins. `npm start` and `npm run dev:raw` don't read
+it.
+
 Updating from GitHub: God's View has an Updates tab (Owner only) that lists
 commits on GitHub `main` that this machine doesn't have yet; the server checks
 every ten minutes, and the World tab shows a card when something is new.

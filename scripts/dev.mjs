@@ -7,6 +7,10 @@
 // if package.json or package-lock.json changed, writes how it went to a
 // result file the server shows in God's View, and starts the game again.
 // Players' pages reload themselves when the server comes back.
+//
+// The settings in .env are read each time the game starts, so a line added
+// there takes effect on the next "Pull and restart". Anything already set in
+// the terminal wins over .env.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,7 +23,28 @@ const branch = 'main';
 const remote = 'origin';
 const requestFile = join(tmpdir(), `co-mmo-update-${process.pid}.json`);
 const resultFile = join(root, 'data', 'last-update.json');
-const env = { ...process.env, CO_MMO_UPDATE_REQUEST: requestFile, CO_MMO_UPDATE_RESULT: resultFile };
+const envFile = join(root, '.env');
+
+/** The KEY=value lines of .env (comments, blanks and `export ` allowed); none when there is no file. */
+function readEnvFile() {
+  if (!existsSync(envFile)) return {};
+  const vars = {};
+  for (const line of readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!m) continue;
+    let value = m[2];
+    const quoted = /^(['"])(.*)\1$/.exec(value);
+    if (quoted) value = quoted[2];
+    else value = value.replace(/\s+#.*$/, '');
+    vars[m[1]] = value;
+  }
+  return vars;
+}
+
+/** The game's environment: .env as it is now, then the terminal's own settings over it. */
+function gameEnv() {
+  return { ...readEnvFile(), ...process.env, CO_MMO_UPDATE_REQUEST: requestFile, CO_MMO_UPDATE_RESULT: resultFile };
+}
 
 let child = null;
 let stopping = false;
@@ -28,10 +53,10 @@ let stopping = false;
  * What to run: the server and Vite (`npm run dev:raw`), plus REGION_SERVERS
  * region servers when it is set and Redis is there to reach them (docs/scale.md).
  */
-function gameCommand() {
-  const count = Math.max(0, Math.min(16, Number.parseInt(process.env.REGION_SERVERS ?? '0', 10) || 0));
+function gameCommand(env) {
+  const count = Math.max(0, Math.min(16, Number.parseInt(env.REGION_SERVERS ?? '0', 10) || 0));
   if (!count) return ['npm', ['run', 'dev:raw']];
-  if (!process.env.REDIS_URL) {
+  if (!env.REDIS_URL) {
     console.warn('[dev] REGION_SERVERS is set but REDIS_URL is not; every region runs in the game server.');
     return ['npm', ['run', 'dev:raw']];
   }
@@ -42,7 +67,8 @@ function gameCommand() {
 
 function startGame() {
   rmSync(requestFile, { force: true });
-  const [command, args] = gameCommand();
+  const env = gameEnv();
+  const [command, args] = gameCommand(env);
   // Its own process group, so one signal stops the server, Vite, tsx and the region servers.
   child = spawn(command, args, { cwd: root, env, stdio: ['ignore', 'inherit', 'inherit'], detached: true });
   child.on('exit', (code, signal) => {

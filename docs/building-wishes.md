@@ -44,7 +44,7 @@ the coding agent is never given any other secret.
    GITHUB_ISSUES_TOKEN=github_pat_...
    ```
 
-5. Restart the game (`set -a; . ./.env; set +a; npm run dev`). God's View's
+5. Restart the game (`npm run dev`, or "Pull and restart" in God's View). God's View's
    AI models tab shows the coding agent as connected.
 
 The server can only open, read and close issues with it: it cannot touch

@@ -235,10 +235,12 @@ export interface WishProgress {
  * An Engine wish (or a Major wish the God could not script) being built as
  * a code change (design doc, Building Engine wishes automatically):
  * queued, being built on a GitHub issue, waiting for the Owner's review of
- * the pull request, merged and waiting for the Updates tab, then live. It
- * can fail, be closed by the Owner, or be split into smaller wishes.
+ * the pull request, merged and waiting for the Updates tab, then live. When
+ * the pull request's checks fail, the coding agent fixes it before it goes
+ * back to review. It can fail, be closed by the Owner, or be split into
+ * smaller wishes.
  */
-export type BuildState = 'queued' | 'building' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
+export type BuildState = 'queued' | 'building' | 'fixing' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
 
 export interface BuildTrack {
   state: BuildState;
@@ -325,6 +327,8 @@ function buildProgress(status: WishStatus, b: BuildTrack): WishProgress | undefi
         : { state: 'in-progress', label: 'Queued to be built', detail: b.message ?? 'It is built when the wishes before it are done.' };
     case 'building':
       return withLink({ state: 'in-progress', label: 'Being built', detail: 'A coding agent is writing the change and its tests.' });
+    case 'fixing':
+      return withLink({ state: 'in-progress', label: 'Fixing failed checks', detail: b.message ?? 'The checks on the change failed, so a coding agent is fixing it.' });
     case 'review':
       return withLink({ state: 'needs-input', label: "Waiting for the Owner's review", detail: 'The change passed its checks. The Owner merges it, asks for changes, or closes it.' });
     case 'merged':

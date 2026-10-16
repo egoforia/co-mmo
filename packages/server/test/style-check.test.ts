@@ -128,8 +128,9 @@ describe('painting a wish with the style check', () => {
     const owner = account(store, 'Ego', 'owner');
     const c = await joined(ws, owner.token);
     await wish(c, 'I wish for a red hat');
-    await Promise.all([...app!.wishes.painting]);
     await c.waitFor((m) => m.t === 'notice' && /style check was not happy with the picture of .* after 3 tries: flat vector art/.test((m as any).text));
+    // The Stewards hear before the picture is saved on the wish, so wait for the painting to finish.
+    await Promise.all([...app!.wishes.painting]);
     expect((painter as any).calls).toBe(3);
     const record = store.content.find((r) => r.definition?.kind === 'item')!;
     expect(record.art).toMatch(/^\/wished-art\//);

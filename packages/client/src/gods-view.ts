@@ -86,7 +86,7 @@ interface Entry {
 }
 
 interface Build {
-  state: 'queued' | 'building' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
+  state: 'queued' | 'building' | 'fixing' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
   at: number;
   note?: string;
   allowCore?: boolean;
@@ -395,7 +395,7 @@ async function wishes(): Promise<string> {
         ${owner && e.status === 'granted' && e.definition ? `<button type="button" class="quiet" data-paint="${e.id}">${e.art || e.kitArt || e.itemArt ? 'Repaint' : 'Paint'}</button>` : ''}
       </div></td>
     </tr>`).join('');
-  const active = content.filter((e) => e.build && ['queued', 'building', 'review', 'merged', 'failed'].includes(e.build.state));
+  const active = content.filter((e) => e.build && ['queued', 'building', 'fixing', 'review', 'merged', 'failed'].includes(e.build.state));
   const building = active.length
     ? active.map((e) => `
       <article class="wish">

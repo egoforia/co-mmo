@@ -25,6 +25,38 @@ async function frames(first: Buffer): Promise<Buffer[]> {
 }
 
 describe('walk painter', () => {
+  it('keeps walk frames where they stood in the clip, and cuts walks from before that again for free', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'walks-'));
+    const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');
+    await mkdir(join(anchorDir, 'raw'), { recursive: true });
+    for (const look of ['player-mara', 'player-ilya']) await writeFile(join(anchorDir, 'raw', `${look}.png`), await picture(300, 300, walker(150, 280)));
+    const images: ImageProvider = { id: 'gemini', model: 'gemini-3.1-flash-image', generate: async () => ({ mimeType: 'image/png', data: await picture(400, 300, walker(120, 280)) }) };
+    let clips = 0;
+    const video: VideoProvider = { id: 'gemini', model: 'veo-3.1-lite-generate-preview', generate: async (r) => (clips++, { mimeType: 'video/mp4', data: r.first.data, seconds: r.seconds }) };
+    const options = { provider: () => images, video: () => video, overBudget: () => false, spend: () => {}, spendVideo: () => {}, anchorDir, artDir, shipped: async () => ({}), toFrames: frames };
+    await new WalkPainter(options).start();
+    const id = walkArt('player-mara', 'left');
+    const names = JSON.parse(await readFile(join(artDir, 'walks', 'frames', `${id}.json`), 'utf8')) as string[];
+    const sizes = async () => Promise.all(names.map(async (n) => { const m = await sharp(join(artDir, 'walks', 'frames', n)).metadata(); return `${m.width}x${m.height}`; }));
+    // Every frame shares one canvas, so the striding legs keep their places instead of being centred one by one.
+    expect(new Set(await sizes()).size).toBe(1);
+
+    // A walk cut the old way (each frame trimmed on its own) is cut again from its clip at the next start, with no model asked.
+    for (const n of names) {
+      const path = join(artDir, 'walks', 'frames', n);
+      await writeFile(path, await sharp(await readFile(path)).trim().png().toBuffer());
+    }
+    expect(new Set(await sizes()).size).toBeGreaterThan(1);
+    const placed = JSON.parse(await readFile(join(artDir, 'walks', 'placed.json'), 'utf8')) as string[];
+    await writeFile(join(artDir, 'walks', 'placed.json'), JSON.stringify(placed.filter((p) => p !== id)));
+    const before = clips;
+    const again = new WalkPainter(options);
+    await again.start();
+    expect(clips).toBe(before);
+    expect(new Set(await sizes()).size).toBe(1);
+    expect(again.manifest()[id]).toMatchObject({ redone: expect.any(Number) });
+  }, 180_000);
+
   it('paints each look standing in every direction, walks it on video, and keeps one cycle of 12 frames per direction', async () => {
     const root = await mkdtemp(join(tmpdir(), 'walks-'));
     const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');

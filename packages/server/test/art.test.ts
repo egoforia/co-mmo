@@ -258,6 +258,14 @@ describe('the Art tab', () => {
     expect(after.versions).toHaveLength(1);
     expect((await fetch(`${base}${after.url}`)).status).toBe(200);
 
+    // Another direction can be painted from several pictures: the approved one and the new left one.
+    const two = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'back', from: ['approved', 'left'] });
+    expect(two.status).toBe(200);
+    expect(two.body.parts[0].recipe.steps[0].pictures.map((p: any) => p.name)).toEqual(["Sun Scarab's approved picture, on magenta", 'Sun Scarab standing, facing left, on magenta']);
+    expect(two.body.parts[0].recipe.steps[0].prompt).toContain('2 reference images');
+    expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'back', approved: two.body.fingerprint })).status).toBe(409);
+    expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'back', from: ['right'] })).status).toBe(200);
+
     // The clip starts and ends on that new picture, with its own edited words.
     const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'left', prompt: 'It scuttles left, slowly.' });
     expect(clip.status).toBe(200);

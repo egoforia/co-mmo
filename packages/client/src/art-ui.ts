@@ -113,7 +113,7 @@ type Ask =
   | { what: 'paint'; asset: string }
   | { what: 'paint-group'; group: string }
   | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean }
-  | { what: 'view'; walker: string; direction: Direction; prompt?: string }
+  | { what: 'view'; walker: string; direction: Direction; prompt?: string; from?: string[] }
   | { what: 'clip'; walker: string; body: string; direction: Direction; prompt?: string }
   | { what: 'sound'; sound: string };
 
@@ -138,6 +138,8 @@ const when = (at: number) => new Date(at).toLocaleString(undefined, { day: 'nume
 const esc = escapeHtml;
 
 let data: ArtOverview | null = null;
+/** Where the hand finder found each look's right hand, frame by frame, by art id. */
+let points: Record<string, { hands?: ([number, number] | null)[] }> = {};
 let ctx: ArtContext;
 
 /** Where the Art tab is: its sub-tab and page, from the address (#art/<sub-tab>/<page>). */
@@ -154,7 +156,10 @@ function go(sub: Subtab, page?: string): string {
 /** The Art tab, as HTML. */
 export async function artPage(context: ArtContext): Promise<string> {
   ctx = context;
-  data = await ctx.api<ArtOverview>('art');
+  [data, points] = await Promise.all([
+    ctx.api<ArtOverview>('art'),
+    fetch('/api/art-points').then((r) => (r.ok ? r.json() : {}), () => ({})),
+  ]);
   const o = data;
   const { sub, page } = where();
   const pages: Record<Subtab, () => string> = { now: nowPage, characters: () => peoplePage('characters', page), monsters: () => peoplePage('monsters', page), items: () => itemsPage(page), biomes: () => biomesPage(page), sounds: soundsPage };
@@ -315,6 +320,7 @@ function walkerHtml(w: WalkerView): string {
         <form class="form walker-body">${bodyPick}</form></header>
       <p class="note">Each direction has a standing picture, and a short clip that starts and ends on it. Paint the picture first and look at it (paint it again until you like it), then make the clip from it. Both prompts can be edited before anything is sent.</p>
       <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
+      ${handsHtml(w)}
       ${made < 4 ? `
         <details><summary>Or make all the missing walks in one go</summary>
           <form class="form art-walk" data-walker="${esc(w.id)}">
@@ -330,6 +336,31 @@ function walkerHtml(w: WalkerView): string {
           </form>
         </details>` : ''}
     </div>`;
+}
+
+/**
+ * Where the hand finder put the right hand, frame by frame: the dot is where
+ * a held weapon or charm is gripped. A frame where it found none borrows the
+ * nearest frame's hand in the game.
+ */
+function handsHtml(w: WalkerView): string {
+  const rows = DIRECTIONS.flatMap(([d, label]) => {
+    const strip = w.walks[d];
+    const hands = points[`${w.id}-walk-${d}`]?.hands;
+    if (!strip) return [];
+    const height = 96;
+    const width = Math.round((strip.width / strip.frames) * (height / strip.height));
+    const frames = Array.from({ length: strip.frames }, (_, i) => {
+      const hand = hands?.[i];
+      const dot = hand ? `<b class="dot" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%"></b>` : '<small class="none">none</small>';
+      return `<span class="frame" style="width:${width}px;height:${height}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">${hands ? dot : ''}</span>`;
+    }).join('');
+    return [`<div class="hand-row"><small>${label}${hands ? '' : ' · not looked at yet'}</small><div class="frames">${frames}</div></div>`];
+  });
+  if (!rows.length) return '';
+  return `<details class="hands"><summary>Where the right hand was found (held weapons and charms go there)</summary>
+    <p class="note">The hand finder looks at every frame once, after a walk is painted. The dot is the right hand. Wrong dots mean the item jumps around; painting the walk again looks again.</p>
+    ${rows.join('')}</details>`;
 }
 
 function soundsPage(): string {
@@ -405,6 +436,7 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
     <header><h2>${esc(review.title)}</h2><button type="button" class="quiet" data-close aria-label="Close">✕</button></header>
     <div class="dialog-body">
       <p class="note">This is everything that will be sent to the AI model${many ? 's' : ''}. Nothing is painted until you approve it.</p>
+      ${ask.what === 'view' ? sourcesHtml(ask) : ''}
       ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
         <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button>${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
       ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><button type="submit" class="quiet">Show with these words</button></form>` : ''}
@@ -416,6 +448,12 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
       <button type="button" data-approve>Approve and paint</button>
     </footer>`;
   for (const b of d.querySelectorAll('[data-close]')) b.addEventListener('click', () => d.close());
+  d.querySelector('form.review-sources')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const from = new FormData(e.target as HTMLFormElement).getAll('from').map(String);
+    if (!from.length) return ctx.toast('Pick at least one picture to paint from.');
+    void openReview({ ...(ask as Extract<Ask, { what: 'view' }>), from }, false);
+  });
   d.querySelector('form.review-prompt')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const words = String(new FormData(e.target as HTMLFormElement).get('prompt') ?? '').trim();
@@ -443,6 +481,22 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
       ctx.toast((err as Error).message);
     }
   });
+}
+
+/** Which pictures a standing picture is painted from: the approved picture and any standing pictures already kept. */
+function sourcesHtml(ask: Extract<Ask, { what: 'view' }>): string {
+  const w = data!.walkers.find((x) => x.id === ask.walker);
+  if (!w) return '';
+  const from = ask.from ?? ['approved'];
+  const options: [string, string, string | undefined][] = [['approved', 'The approved picture', w.url]];
+  for (const [d, label] of DIRECTIONS) {
+    const view = w.standing[d];
+    if (view.url && !view.approved) options.push([d, `Standing, ${label}`, view.url]);
+  }
+  if (options.length < 2) return '';
+  return `<form class="form review-sources"><p class="note">Paint it from these pictures (the approved one alone does not show everything, such as how a scarf hangs at the back):</p>
+    <div class="source-picks">${options.map(([id, label, url]) => `<label class="check">${url ? `<img src="${esc(url)}" alt="">` : ''}<span><input type="checkbox" name="from" value="${id}"${from.includes(id) ? ' checked' : ''}> ${esc(label)}</span></label>`).join('')}</div>
+    <button type="submit" class="quiet">Show with these pictures</button></form>`;
 }
 
 /** One version in a comparison: how it looks and what made it. */

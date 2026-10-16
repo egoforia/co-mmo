@@ -301,3 +301,12 @@ pre.prompt mark { background: rgba(254, 174, 52, 0.28); color: var(--ink); }
 .loot table.log { table-layout: fixed; }
 .loot table.log th:nth-child(1) { width: 28%; }
 .loot table.log th:nth-child(2), .loot table.log th:nth-child(3) { width: 12%; }
+.hands { margin-top: 8px; }
+.hand-row { display: grid; gap: 2px; margin: 6px 0; }
+.hand-row .frames { display: flex; gap: 4px; flex-wrap: wrap; }
+.hand-row .frame { position: relative; display: inline-block; background-color: var(--bg); background-repeat: no-repeat; border: 1px solid var(--edge); }
+.hand-row .dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #ffd23f; box-shadow: 0 0 0 2px #000; }
+.hand-row .none { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; color: var(--bad, #f66); }
+.source-picks { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.source-picks label { display: grid; justify-items: center; gap: 4px; }
+.source-picks img { width: 72px; height: 90px; object-fit: contain; background: var(--bg); }

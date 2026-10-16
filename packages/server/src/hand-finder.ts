@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ArtPoints, ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
-import { GRIP, HAND, findPoint, stripFrames } from './assets/points.ts';
+import { GRIP, POINTS_VERSION, findPoint, handQuestion, stripFrames } from './assets/points.ts';
 
 // Held items (milestone 10): finds, once per picture, where a walker's free
 // hand is in every frame and where each item is gripped, so the client can
@@ -16,6 +16,8 @@ export interface PointSource {
   id: string;
   /** A walker's picture or walk strip (its hand), or an item (its grip). */
   kind: 'hands' | 'grip';
+  /** Which way a walker faces in it; a still picture faces us. */
+  facing?: 'front' | 'back' | 'left' | 'right';
   /** The file it is served from, with any version; a new one means look again. */
   file: string;
   /** A walk strip's frames side by side; a still picture has one. */
@@ -93,14 +95,14 @@ export class HandFinder {
       const picture = await source.read().catch(() => undefined);
       if (!picture) continue;
       // The same file name can hold a new picture (shipped art updated with the game), so its pixels count too.
-      const from = `${source.file}#${createHash('sha1').update(picture).digest('hex').slice(0, 12)}`;
+      const from = `${source.file}#${createHash('sha1').update(picture).digest('hex').slice(0, 12)}#v${POINTS_VERSION}`;
       if (this.found[source.id]?.from === from) continue;
       const model = this.options.model();
       if (!model || this.options.paused()) return;
       const pictures = source.frames > 1 ? await stripFrames(picture, source.frames) : [picture];
       const points = [];
       for (const frame of pictures) {
-        const { point, usd } = await findPoint(model, frame, source.kind === 'hands' ? HAND : GRIP);
+        const { point, usd } = await findPoint(model, frame, source.kind === 'hands' ? handQuestion(source.facing ?? 'front') : GRIP);
         this.options.spend(usd, model);
         points.push(point ?? null);
       }

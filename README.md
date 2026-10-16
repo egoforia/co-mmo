@@ -240,6 +240,9 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored without Postgres (and brought in from on Postgres's first run) |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
+| `API_LOG_DIR` | `api-log/` next to `DATA_FILE` | Where God's View's API Log keeps every request sent to an outside service |
+| `API_LOG_DAYS` | `14` | Days the API Log keeps; older days are deleted |
+| `API_LOG_MAX_MB` | `200` | Megabytes the API Log may use; the oldest days go first |
 | `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`), wish art, walks (Veo) and each land's music (Lyria) |
 | `ELEVENLABS_API_KEY` | none | ElevenLabs: the game's sound effects; without it the game plays music only |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |

@@ -208,6 +208,7 @@ export function createApp(options: AppOptions): App {
   const resumeArt = (): void => {
     if (wishes.budget().paused) return;
     wishes.paintMissing();
+    artStudio.resume();
     if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
     if (makeSounds) void sounds.start();
   };

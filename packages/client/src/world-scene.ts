@@ -45,6 +45,7 @@ import {
 } from '@co-mmo/shared';
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
+import { PROJECTION } from './projection.ts';
 import { makeLight, placeLight, type LitPoint } from './lights.ts';
 
 interface Avatar {
@@ -345,7 +346,8 @@ export class WorldScene extends Phaser.Scene {
       if (side === 'east') bounds.right += size;
       if (side === 'south') bounds.bottom += size;
     }
-    this.cameras.main.setBounds(bounds.left * T, bounds.top * T, (bounds.right - bounds.left) * T, (bounds.bottom - bounds.top) * T);
+    const view = PROJECTION.bounds(bounds.left, bounds.top, bounds.right, bounds.bottom);
+    this.cameras.main.setBounds(view.x, view.y, view.width, view.height);
   }
 
   /** Eases the biome's light from what it is to `to`, so no edge switches it at once. */
@@ -391,7 +393,8 @@ export class WorldScene extends Phaser.Scene {
       this.accumulator -= TICK_SECONDS;
       const { dx, dy } = this.readInput();
       if (dx !== 0 || dy !== 0) {
-        const input = predictor.apply(dx, dy);
+        const step = PROJECTION.inputToWorld(dx, dy);
+        const input = predictor.apply(step.dx, step.dy);
         this.options.send({ t: 'input', ...input });
         if (dx !== 0) this.facing = dx;
       }
@@ -734,7 +737,8 @@ export class WorldScene extends Phaser.Scene {
       const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
       tilemaps.push(tilemap);
       const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-      return tilemap.createLayer(0, tileset, ox * T, oy * T)!.setDepth(depth);
+      const at = PROJECTION.toScreen(ox, oy);
+      return tilemap.createLayer(0, tileset, at.x, at.y)!.setDepth(depth);
     };
     // Each building keeps its floor and walls on a layer of its own, in its
     // own painted tiles, hidden behind its outside art until we come close;
@@ -758,10 +762,11 @@ export class WorldScene extends Phaser.Scene {
    */
   private exterior(b: Building, ox: number, oy: number): Phaser.GameObjects.Image {
     const span = exteriorSpan(b);
-    const img = this.add.image((ox + span.left) * T, (oy + span.bottom) * T, buildingArt(b.style, 'exterior')).setOrigin(0, 1);
+    const at = PROJECTION.toScreen(ox + span.left, oy + span.bottom);
+    const img = this.add.image(at.x, at.y, buildingArt(b.style, 'exterior')).setOrigin(0, 1);
     const w = span.width * T;
     img.setDisplaySize(w, (w * img.height) / img.width);
-    return img.setDepth((oy + b.y + b.height) * T);
+    return img.setDepth(PROJECTION.depth(ox + b.x, oy + b.y + b.height));
   }
 
   /** Landmarks, and the trees and rocks standing on blocking tiles. */
@@ -769,8 +774,9 @@ export class WorldScene extends Phaser.Scene {
     const biome = map.def.biome;
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
-      const img = this.add.image((ox + l.x) * T, (oy + l.y) * T, l.asset).setOrigin(0.5, 0.92);
-      img.setDepth((oy + l.y) * T);
+      const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
+      const img = this.add.image(at.x, at.y, l.asset).setOrigin(0.5, 0.92);
+      img.setDepth(PROJECTION.depth(ox + l.x, oy + l.y));
       views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
     }
     for (let y = 0; y < map.height; y++) {
@@ -781,9 +787,10 @@ export class WorldScene extends Phaser.Scene {
         const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
         if (!key) continue;
         const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
-        const img = this.add.image((ox + x + 0.5) * T + jitter, (oy + y + 1) * T, key).setOrigin(0.5, 0.97);
+        const at = PROJECTION.toScreen(ox + x + 0.5, oy + y + 1);
+        const img = this.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
         img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
-        img.setDepth((oy + y + 1) * T - 1);
+        img.setDepth(PROJECTION.depth(ox + x + 0.5, oy + y + 1) - 1);
       }
     }
   }
@@ -855,8 +862,8 @@ export class WorldScene extends Phaser.Scene {
 
   /** Places an avatar at (x, y) in our region, counted from its corner. */
   private placeAvatar(a: Avatar, x: number, y: number): void {
-    const px = (this.origin.x + x) * T;
-    const py = (this.origin.y + y) * T;
+    const { x: px, y: py } = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
+    const depth = PROJECTION.depth(this.origin.x + x, this.origin.y + y);
     a.shadow.setPosition(px, py + T / 16);
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
     const top = py + T / 10 - a.body.displayHeight;
@@ -866,8 +873,8 @@ export class WorldScene extends Phaser.Scene {
       a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
     }
     // Lower on screen draws in front.
-    a.shadow.setDepth(py - 2);
-    a.body.setDepth(py);
+    a.shadow.setDepth(depth - 2);
+    a.body.setDepth(depth);
     a.label.setDepth(LABEL_DEPTH);
     // After the body's depth is set, or the item lags a step behind it and slips behind the body while walking down.
     this.placeHeld(a, 'right');

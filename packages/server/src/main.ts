@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp, inviteUrl } from './app.ts';
+import { createApp } from './app.ts';
+import { inviteUrl } from './account-routes.ts';
 import { Store } from './store.ts';
 import { connectPostgres } from './db.ts';
 import { connectRedis } from './redis.ts';

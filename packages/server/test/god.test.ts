@@ -166,7 +166,7 @@ describe('the God', () => {
     const p = account(store, 'Mara', 'owner');
     const c = await joined(ws, p.token);
     expect((await pray(c, 'hello')).say).toBe('paid');
-    expect(app!.wishes.budget()).toMatchObject({ over: true, warn: true });
+    expect(app!.budget.state()).toMatchObject({ over: true, warn: true });
     await wish(c, 'I wish for a red hat');
     await c.waitFor((m) => m.t === 'god' && m.say.includes('bag'));
     expect(calls).toEqual(['paid']);

@@ -2,7 +2,8 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { Store, defaultSettings } from '../src/store.ts';
+import { Store } from '../src/store.ts';
+import { defaultSettings } from '../src/settings.ts';
 import type { Sql } from '../src/db.ts';
 import { testSql, type TestSql } from './sql.ts';
 

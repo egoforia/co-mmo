@@ -1,39 +1,18 @@
 import { BIOMES, type BiomeId } from '@co-mmo/shared';
 
-// The Style Bible's base prompt and negative prompt, versioned so every
-// asset's recipe records which rules it was made under.
-export const STYLE_VERSION = 2;
+import { STYLE } from './style-profile.ts';
 
-export const BASE_PROMPT = [
-  'Hand-painted 2D game art in the style of a 1999 storybook RPG.',
-  'Soft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.',
-  'Warm golden key light from the upper left, blue-violet shadows.',
-  'Selective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.',
-  'No writing anywhere: labels, signs and covers are blank or carry simple symbols.',
-].join('\n');
-
+// The active art style's words under the names the prompt builders and tools
+// use (style-profile.ts holds the words themselves).
+export const STYLE_VERSION = STYLE.version;
+export const BASE_PROMPT = STYLE.base;
 /** The flat colour sprites are painted on; the pipeline turns it transparent. */
-export const KEY_COLOR = { r: 255, g: 0, b: 255, hex: '#FF00FF' };
-
-export const SPRITE_FRAMING = [
-  'A single game sprite in three-quarter top-down view, centred, with empty margin all around it.',
-  `Background: one flat solid pure magenta (${KEY_COLOR.hex}) filling everything behind the subject,`,
-  'with no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.',
-].join('\n');
-
-export const TILE_FRAMING = [
-  'A ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.',
-  'Not a block, diamond, island or platform: no sides, thickness, border, frame or horizon.',
-  'Even lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.',
-].join('\n');
-
-export const NEGATIVE_PROMPT = [
-  'photorealistic', '3D render', 'anime cel shading', 'vector art', 'flat design', 'thick black outlines',
-  'pure black', 'pure white', 'harsh contrast', 'neon', 'lens flare', 'blur', 'noise',
-  'text', 'letters', 'words', 'labels with writing', 'watermark', 'signature', 'frame', 'border', 'vignette',
-];
-const SPRITE_NEGATIVE = ['background scenery', 'floor', 'ground shadow', 'cast shadow', 'gradient background'];
-const TILE_NEGATIVE = ['isometric block', 'diamond shape', 'floating island', 'tile sides', 'drop shadow', 'perspective horizon'];
+export const KEY_COLOR = STYLE.keyColor;
+export const SPRITE_FRAMING = STYLE.sprite.framing;
+export const TILE_FRAMING = STYLE.tile.framing;
+export const NEGATIVE_PROMPT = STYLE.negatives;
+const SPRITE_NEGATIVE = STYLE.sprite.negatives;
+const TILE_NEGATIVE = STYLE.tile.negatives;
 
 /** A prop is scenery the biome is built from: trees, palms, cacti, rocks. An effect is a flash of action, such as a sword slash. */
 export type AssetKind = 'player' | 'npc' | 'monster' | 'item' | 'set-piece' | 'prop' | 'tile' | 'effect';

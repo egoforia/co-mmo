@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { parseJsonObject, type ChatModel } from '../ai/chat.ts';
+import { STYLE } from './style-profile.ts';
 
 // The automated style check (design doc, Art style: "5. Automated style
 // check"). Free checks on the pixels run first; then, when a judge model is
@@ -80,11 +81,11 @@ export async function freeChecks(cutOut: Buffer, plainBackground: boolean): Prom
 
 /** What the judge is told: lenient on taste, strict on the things that break the game's look. */
 export const JUDGE_SYSTEM = [
-  'You check game art for a hand-painted 2D fantasy RPG.',
+  `You check game art for ${STYLE.judge.game}.`,
   'The first pictures are approved reference sprites that set the style. The last picture is a new sprite to check.',
   'Answer two questions about the new sprite:',
   '1. subject: does it show the thing described (its kind and its most recognisable feature)? Small differences in detail are fine.',
-  '2. style: does it look like it belongs with the references: hand-painted with soft brush shading, warm light, the same kind of view and outline?',
+  `2. style: does it look like it belongs with the references: ${STYLE.judge.look}?`,
   'Fail style only for clear problems: a photo or 3D render look, anime cel shading, flat vector art, writing or letters, several subjects or a sprite sheet, or scenery behind the subject.',
   'Reply with JSON: {"subject": true or false, "style": true or false, "problem": "one short plain sentence, empty when both are true"}.',
 ].join('\n');

@@ -8,6 +8,7 @@ import type { WalkDirection } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
 import { countFigures, cutFigures, type Box } from './walk-frames.ts';
 import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
+import { STYLE } from './style-profile.ts';
 
 // Walks painted as video: the image model paints a look standing in each
 // direction, a video model makes that picture walk in place and come back to
@@ -81,7 +82,7 @@ export function walkVideoPrompt(gear: Carried[], direction: WalkDirection, body 
   // A crawler has no arms to swing; its legs move in turns instead.
   const gait = body === 'two-legged' ? 'a brisk, cheerful walk with clear alternating steps and arms swinging' : 'a steady scuttle with its legs stepping in clear alternating sets';
   return [
-    `2D hand-painted storybook game character animation. The character from the image walks in place ${facing}, like on a treadmill: ${gait}.`,
+    `${STYLE.animation} The character from the image walks in place ${facing}, like on a treadmill: ${gait}.`,
     gear.length ? `Everything they carry stays in the same hand and on the same side of the body as in the image, held steady at the same angle. ${gearPlacement(gear, direction)}` : '',
     'The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns.',
     'The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image.',

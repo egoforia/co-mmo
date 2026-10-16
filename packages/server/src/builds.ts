@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import type { BuildTrack } from '@co-mmo/shared';
-import { DEFAULT_BUILDS, type BuildSettings, type ContentRecord, type Store } from './store.ts';
+import { type ContentRecord, type Store } from './store.ts';
+import { DEFAULT_BUILDS, type BuildSettings } from './settings.ts';
 
 /**
  * The only GitHub access the game server has: opening, reading and closing

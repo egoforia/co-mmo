@@ -18,7 +18,7 @@ export type PaintRequest =
   /** The Owner's "Make it walk"; the directions to redo were already cleared, so it paints what is missing. */
   | { kind: 'walk'; walker: string; body: string }
   /** The Owner's "Paint standing picture" for one walk direction, with the prompt they approved. */
-  | { kind: 'view'; walker: string; direction: string; prompt?: string }
+  | { kind: 'view'; walker: string; direction: string; prompt?: string; from?: string[] }
   /** The Owner's "Make walk clip" for one direction, from the standing picture there. */
   | { kind: 'clip'; walker: string; body: string; direction: string; prompt?: string };
 

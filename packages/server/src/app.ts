@@ -270,8 +270,10 @@ export function createApp(options: AppOptions): App {
       if (record.art) wished.set(wishArtKey(record.id), record.art);
       if (def.kind === 'rule') for (const key of Object.keys(def.items)) if (record.itemArt?.[ruleItemId(record.id, key)]) wished.set(wishArtKey(ruleItemId(record.id, key)), record.itemArt[ruleItemId(record.id, key)]!);
     }
-    const source = (id: string, kind: PointSource['kind'], file: string | undefined, frames = 1): PointSource[] =>
-      file ? [{ id, kind, file, frames, read: () => artFile(file) }] : [];
+    const source = (id: string, kind: PointSource['kind'], file: string | undefined, frames = 1): PointSource[] => {
+      const facing = /-walk-(front|back|left|right)$/.exec(id)?.[1] as PointSource['facing'];
+      return file ? [{ id, kind, file, frames, ...(facing ? { facing } : {}), read: () => artFile(file) }] : [];
+    };
     const looks = store.content.filter((r) => r.status === 'granted' && r.definition?.kind === 'player').map((r) => wishArtKey(r.id));
     return [
       ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'walk' ? source(id, 'hands', e.file, e.frames ?? WALK_FRAMES) : [])),
@@ -290,7 +292,7 @@ export function createApp(options: AppOptions): App {
     wish: (request) => wishes.resumePaint(request),
     repaint: (request) => artStudio.repaint(request.asset, request.note),
     walk: (request) => artStudio.walk(request.walker, request.body, [], false),
-    view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt),
+    view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt, request.from),
     clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),
   });
   const reports = new Reports(store, world);

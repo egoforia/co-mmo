@@ -11,8 +11,26 @@ const SYSTEM = [
   'Reply with JSON {"point": [y, x]}, y and x from 0 to 1000 across the picture (0,0 is the top left), or {"point": null} when it cannot be seen.',
 ].join('\n');
 
-/** What is asked for in a walker's picture: the hand an item can be put in. */
-export const HAND = "the centre of the character's free hand (the hand not holding anything); if both hands hold something or neither is free, the hand nearest the viewer";
+/**
+ * What is asked for in a walker's picture or walk frame: the centre of the
+ * character's own right hand, where a held item goes. Asking for "the free
+ * hand" let the model pick either hand frame by frame, so the item jumped
+ * between hands; so the question names the hand and says where it shows in
+ * this view, since a model easily mixes up the character's right with the
+ * picture's right.
+ */
+export function handQuestion(facing: 'front' | 'back' | 'left' | 'right'): string {
+  const where = {
+    front: "The character faces us, so their right hand is on the LEFT side of the picture.",
+    back: "We see the character from behind, so their right hand is on the RIGHT side of the picture.",
+    right: 'The character faces the right edge of the picture, so we see their right side: their right hand is the one nearer to us, in front of the body.',
+    left: 'The character faces the left edge of the picture, so we see their left side: their right hand is on the far side, partly or wholly behind the body. If it is hidden, point to where it must be behind the body.',
+  }[facing];
+  return `the centre of the character's own RIGHT hand (not the left hand). ${where}`;
+}
+
+/** Bumped when the questions change, so every picture is looked at again. */
+export const POINTS_VERSION = 2;
 /** What is asked for in an item's picture. */
 export const GRIP = 'where a hand would hold it: the middle of its handle, hilt, grip, strap or chain';
 

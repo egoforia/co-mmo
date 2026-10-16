@@ -51,7 +51,7 @@ describe('the hand finder', () => {
     let walkFile = 'wished-art/walks/player-mara-walk-front.png';
     const spent: number[] = [];
     const sources = (): PointSource[] => [
-      { id: 'player-mara-walk-front', kind: 'hands', file: walkFile, frames: 2, read: async () => strip },
+      { id: 'player-mara-walk-front', kind: 'hands', file: walkFile, frames: 2, facing: 'left', read: async () => strip },
       { id: 'item-wooden-sword', kind: 'grip', file: 'art/item-wooden-sword.png', frames: 1, read: async () => sword },
     ];
     let model: ChatModel | undefined;
@@ -68,8 +68,11 @@ describe('the hand finder', () => {
       'item-wooden-sword': { grip: [0.3, 0.7] },
     });
     expect(eye.asked[2]!.messages[0]!.content).toMatch(/handle/);
+    // Always the same hand, the right one, and where it shows in this view: it never jumps to the other hand.
+    expect(eye.asked[0]!.messages[0]!.content).toMatch(/own RIGHT hand/);
+    expect(eye.asked[0]!.messages[0]!.content).toMatch(/far side/);
     expect(spent).toHaveLength(3);
-    expect(JSON.parse(await readFile(join(artDir, 'points.json'), 'utf8'))['item-wooden-sword'].from).toMatch(/^art\/item-wooden-sword\.png#[0-9a-f]{12}$/);
+    expect(JSON.parse(await readFile(join(artDir, 'points.json'), 'utf8'))['item-wooden-sword'].from).toMatch(/^art\/item-wooden-sword\.png#[0-9a-f]{12}#v2$/);
 
     // Nothing new: nothing asked. The walk painted again: its frames are looked at again.
     await finder.start();

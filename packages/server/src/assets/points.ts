@@ -31,6 +31,7 @@ export async function findPoint(model: ChatModel, picture: Buffer, what: string)
     .toBuffer();
   const result = await model.complete({
     system: SYSTEM,
+    purpose: 'Finding hands',
     messages: [{ role: 'user', content: `Point to ${what}.`, images: [{ mimeType: 'image/png', data: shown }] }],
     json: true,
     // Room for thinking models, which spend output tokens before they answer.

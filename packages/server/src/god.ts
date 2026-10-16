@@ -195,7 +195,7 @@ export async function askWorkshopGod(
   history: ChatTurn[],
   onCost: (result: ChatResult, model: ChatModel) => void,
 ): Promise<WorkshopReply> {
-  const request: ChatRequest = { system: workshopPrompt(ctx, w), messages: history, json: true, maxTokens: 1200 };
+  const request: ChatRequest = { system: workshopPrompt(ctx, w), messages: history, json: true, maxTokens: 1200, purpose: 'Wish Workshop' };
   let lastError: unknown;
   for (const model of models) {
     // The offline God shapes drafts with its word rules; it needs the draft, not the prompt.
@@ -244,7 +244,7 @@ export async function askGod(
   history: ChatTurn[],
   onCost: (result: ChatResult, model: ChatModel) => void,
 ): Promise<{ reply: GodReply; model: ChatModel }> {
-  const request: ChatRequest = { system: systemPrompt(ctx), messages: history, json: true, maxTokens: 1200 };
+  const request: ChatRequest = { system: systemPrompt(ctx), messages: history, json: true, maxTokens: 1200, purpose: "God's reply" };
   let lastError: unknown;
   for (const model of models) {
     try {

@@ -74,6 +74,7 @@ export async function confirmReuse(model: ChatModel, def: PicturedWish, candidat
   try {
     const result = await model.complete({
       system: CONFIRM_SYSTEM,
+      purpose: 'Reuse check',
       messages: [{ role: 'user', content: `New wish: ${lookLine(def)}\n\nExisting pictures:\n${list}` }],
       json: true,
       maxTokens: 1000,

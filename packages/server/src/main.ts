@@ -8,6 +8,7 @@ import { connectRedis } from './redis.ts';
 import { RedisTurnLedger, SharedPaintQueue } from './shared-paint-queue.ts';
 import { RedisBus } from './bus.ts';
 import { Updater, currentCommit } from './updates.ts';
+import { ApiLog } from './api-log.ts';
 
 const port = Number(process.env.PORT ?? 3001);
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -47,8 +48,11 @@ const updater = new Updater({
   requestFile: process.env.CO_MMO_UPDATE_REQUEST,
   resultFile: process.env.CO_MMO_UPDATE_RESULT,
 });
+// Every request to an outside service, kept beside the world for God's View's API Log.
+const apiLog = await ApiLog.open({ dir: resolve(process.env.API_LOG_DIR ?? resolve(dirname(dataFile), 'api-log')) });
 const app = createApp({
   store,
+  apiLog,
   publicUrl,
   clientDir,
   updater,

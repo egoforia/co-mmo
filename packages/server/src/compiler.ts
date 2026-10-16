@@ -77,7 +77,7 @@ export async function compileRule(
   req: CompileRequest,
   onCost: (result: ChatResult, model: ChatModel) => void,
 ): Promise<CompileResult> {
-  const request: ChatRequest = { system: compilerPrompt(), messages: [{ role: 'user', content: userMessage(req) }], json: true, maxTokens: 6000 };
+  const request: ChatRequest = { system: compilerPrompt(), messages: [{ role: 'user', content: userMessage(req) }], json: true, maxTokens: 6000, purpose: 'Writing a rule' };
   let last: CompileResult = { ok: false, reason: 'No model could draft this rule.', impossible: false };
   for (const model of models) {
     let result: ChatResult;

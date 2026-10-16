@@ -30,6 +30,7 @@ import { HandFinder, type PointSource } from './hand-finder.ts';
 import type { Bus } from './bus.ts';
 import { RegionServers } from './region-servers.ts';
 import { settle } from './world.ts';
+import { ApiLog, watchFetch } from './api-log.ts';
 
 export interface AppOptions {
   store: Store;
@@ -75,6 +76,8 @@ export interface AppOptions {
    * it, regions run on whichever region servers are up; without, all here.
    */
   regionBus?: Bus;
+  /** Every request to an outside service, for God's View's API Log; kept in memory unless given. */
+  apiLog?: ApiLog;
 }
 
 export interface App {
@@ -91,6 +94,8 @@ export interface App {
   hands: HandFinder;
   /** The region servers, when there is a bus to reach them. */
   regionServers?: RegionServers;
+  /** Every request sent to an outside service, for God's View's API Log. */
+  apiLog: ApiLog;
   /** Resolves once the app listens for region servers. */
   ready: Promise<void>;
   close(): Promise<void>;
@@ -117,6 +122,9 @@ export function createApp(options: AppOptions): App {
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   const env = options.wishes.env ?? process.env;
+  // Before anything that sends requests is made, so every one of them is logged.
+  const apiLog = options.apiLog ?? ApiLog.memory({ env });
+  const unwatchFetch = watchFetch(apiLog);
   const auth = new Auth({ store, publicUrl: options.publicUrl, env, ...options.auth, ...(options.wishes.now ? { now: options.wishes.now } : {}) });
   const rules = new LiveRules(store, world, {
     now: options.wishes.now,
@@ -400,7 +408,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, ...(regionServers ? { regionServers } : {}) };
+    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
@@ -573,6 +581,7 @@ export function createApp(options: AppOptions): App {
     art: artStudio,
     hands: handFinder,
     ...(regionServers ? { regionServers } : {}),
+    apiLog,
     ready,
     async close() {
       clearInterval(tickTimer);
@@ -604,6 +613,8 @@ export function createApp(options: AppOptions): App {
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await store.flush();
+      unwatchFetch();
+      await apiLog.flush();
     },
   };
 }

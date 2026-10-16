@@ -4,6 +4,7 @@
 
 import { loadToken, rejoinWhenBack, reloadWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
+import { apiLogPage, wireApiLog } from './api-log-ui.ts';
 import { TICK_SECONDS } from '@co-mmo/shared';
 
 const token = loadToken();
@@ -226,7 +227,7 @@ async function boot(): Promise<void> {
     ['rules', 'Rules'],
     ['reports', 'Reports'],
     ['players', 'Players'],
-    ...(owner ? [['art', 'Art'], ['ai', 'AI models'], ['budget', 'Budget'], ['servers', 'Server health'], ['updates', 'Updates']] : []),
+    ...(owner ? [['art', 'Art'], ['ai', 'AI models'], ['budget', 'Budget'], ['servers', 'Server health'], ['api-log', 'API Log'], ['updates', 'Updates']] : []),
   ];
   main.innerHTML = `
     <nav>${tabs.map(([id, label]) => `<button type="button" data-tab="${id}">${label}</button>`).join('')}</nav>
@@ -235,6 +236,7 @@ async function boot(): Promise<void> {
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]')?.dataset.tab;
     if (id) show(id);
   });
+  wireApiLog(main, api, () => tab === 'api-log', (err) => (err instanceof GameDown ? waitForGame() : toast(err.message)));
   show(location.hash.slice(1) || 'world');
   addEventListener('hashchange', () => show(location.hash.slice(1) || 'world'));
   // The world moves; keep the map fresh while it is open.
@@ -257,7 +259,7 @@ async function render(): Promise<void> {
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
-    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, art, ai, budget, servers, updates };
+    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, art, ai, budget, servers, updates, 'api-log': () => apiLogPage(api) };
     const html = await (pages[current] ?? world)();
     if (tab !== current) return;
     // Keep what the Owner is typing when the panel refreshes.

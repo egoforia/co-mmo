@@ -106,6 +106,7 @@ export async function judgePicture(
   try {
     const result = await model.complete({
       system: JUDGE_SYSTEM,
+      purpose: 'Style check',
       messages: [{ role: 'user', content: `The new sprite should show: ${subject}`, images }],
       json: true,
       // Room for thinking models, which spend output tokens before they answer.

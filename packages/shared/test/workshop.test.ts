@@ -11,6 +11,7 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
   recipe: { name: 'Double Tonic', description: 'Two horns make a tonic.', materials: [{ item: 'goat-horn', qty: 2 }], result: 'tonic', qty: 1 },
   ability: { name: 'Moonbolt', description: 'A bolt of moonlight.', effect: 'bolt', ...look },
   creature: { name: 'Lantern Moth', description: 'A moth.', behavior: 'chase', level: 2, count: 3, drops: ['tonic'], ...look },
+  loot: { creature: 'crab-knight', drops: ['tonic'], chance: 30, qty: 1 },
   person: { name: 'Old Wren', description: 'A birdwatcher.', greeting: 'Shh, the wrens!', ...look },
   look: { description: 'A tall fox-eared ranger in a moss-green cloak.', ...look },
   gathering: { name: 'Fishing', what: 'cast a line', where: 'water', reward: 'fish' },

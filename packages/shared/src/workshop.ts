@@ -5,6 +5,7 @@
 
 import { BIOMES, type BiomeId } from './biomes.ts';
 import { CREATURES, ITEMS, bonusText } from './rpg.ts';
+import { chanceText, lootTable } from './loot.ts';
 import {
   REGION_WISH_COST,
   WISH_COSTS,
@@ -14,6 +15,8 @@ import {
   creatureFromWish,
   itemFromWish,
   MAX_LOOK_LENGTH,
+  MAX_WISHED_CHANCE,
+  MAX_WISHED_DROP_QTY,
   validateDefinition,
   validateLookWish,
   wishCost,
@@ -111,6 +114,10 @@ export const WISH_CATEGORIES: WishCategory[] = [
           choice('behavior', 'How it acts', [['wander', 'Wanders, fights back'], ['guard', 'Guards its spot'], ['chase', 'Hunts anyone it sees']]),
           level('level', 'Level', 1, 6), level('count', 'How many', 1, 5),
           { key: 'drops', label: 'What it may drop', kind: 'items', optional: true }, ...LOOK] },
+      { id: 'loot', name: 'Creature loot', blurb: 'Something a creature of the world may drop when it is defeated.', tier: 'moderate', makes: 'loot',
+        fields: [{ key: 'creature', label: 'Which creature', kind: 'creature' },
+          { key: 'drops', label: 'What it may drop', kind: 'items' },
+          level('chance', 'How often, in 100 defeats', 5, MAX_WISHED_CHANCE * 100), level('qty', 'How many at a time', 1, MAX_WISHED_DROP_QTY)] },
       { id: 'person', name: 'Person', blurb: 'Someone who stands beside you and talks.', tier: 'moderate', makes: 'npc',
         fields: [NAME, DESCRIPTION, { key: 'greeting', label: 'What they say when spoken to', kind: 'long', length: 280 }, ...LOOK] },
       { id: 'look', name: 'Your look', blurb: 'Change how you look. Your new picture replaces the old one.', tier: 'minor', makes: 'player',
@@ -284,6 +291,7 @@ function rawDefinition(sub: WishSubcategory, f: DraftFields): Record<string, unk
     case 'ability': return { ...base, effect: str(f.effect), look };
     case 'creature': return { ...base, behavior: str(f.behavior), level: num(f.level), count: num(f.count), drops: list(f.drops), look };
     case 'npc': return { ...base, greeting: str(f.greeting), look };
+    case 'loot': return { ...base, creature: str(f.creature), drops: list(f.drops).map((item) => ({ item, chance: (num(f.chance) ?? 25) / 100, qty: num(f.qty) ?? 1 })) };
     case 'player': return { ...base, look };
     case 'region': {
       const creature = str(f.creatureName)
@@ -404,6 +412,7 @@ export function draftFromDefinition(def: WishDefinition): { category: string; su
     case 'ability': return pick('know', 'ability', { effect: def.effect });
     case 'creature': return pick('living', 'creature', { behavior: def.behavior, level: def.level, count: def.count, drops: def.drops });
     case 'npc': return pick('living', 'person', { greeting: def.greeting });
+    case 'loot': return pick('living', 'loot', { creature: def.creature, drops: def.drops.map((d) => d.item), chance: Math.round((def.drops[0]?.chance ?? 0.25) * 100), qty: def.drops[0]?.qty ?? 1 });
     case 'player': return pick('living', 'look', {});
     case 'region': {
       const first = def.creatures[0];
@@ -522,6 +531,15 @@ export function worldLines(def: WishDefinition): string[] {
     }
     case 'player':
       return ['Your look, painted from your words.'];
+    case 'loot': {
+      const creature = CREATURES[def.creature]?.name ?? def.creature;
+      const now = lootTable(def.creature).filter((l) => !def.drops.some((d) => d.item === l.item));
+      return [
+        ...def.drops.map((d) => `Every ${creature} may drop ${(d.qty ?? 1) > 1 ? `${d.qty} × ` : ''}${named(d.item)} (${chanceText(d.chance)} of the time).`),
+        now.length ? `It keeps what it drops now: ${now.map((l) => named(l.item)).join(', ')}.` : 'It dropped nothing before.',
+        'Anyone can take what is left on its body.',
+      ];
+    }
   }
 }
 

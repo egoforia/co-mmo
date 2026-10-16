@@ -57,7 +57,7 @@ export function sceneArt(): [string, string][] {
         if (urls.has(key)) art.push([key, urls.get(key)!]);
       }
       for (const [id, url] of Object.entries(e.kitArt ?? {})) art.push([id, url]);
-    } else if (def.kind !== 'recipe') {
+    } else if (def.kind !== 'recipe' && def.kind !== 'loot') {
       const key = wishArtKey(e.id);
       art.push([key, artSrc(key)]);
     }
@@ -86,7 +86,7 @@ async function prepareArt(entry: ContentEntry): Promise<void> {
     await Promise.all(regionPictures(entry.id, def).map((p) => picture(wishArtKey(p.id), entry.itemArt?.[p.id], p.def)));
     return;
   }
-  if (def.kind !== 'recipe') await picture(wishArtKey(entry.id), entry.art, def);
+  if (def.kind !== 'recipe' && def.kind !== 'loot') await picture(wishArtKey(entry.id), entry.art, def);
 }
 
 async function picture(key: string, painted: string | undefined, def: PicturedWish | RuleItem): Promise<void> {

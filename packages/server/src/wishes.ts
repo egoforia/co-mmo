@@ -3,6 +3,8 @@ import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   BIOMES,
+  CREATURES,
+  isPictured,
   ITEMS,
   WISH_COSTS,
   WishError,
@@ -17,6 +19,7 @@ import {
   ruleItemId,
   validateDefinition,
   validateLookWish,
+  validateLoot,
   wishProgress,
   wishArtKey,
   type BiomeId,
@@ -357,6 +360,7 @@ export class Wishes {
         : definition?.kind === 'item' ? 'In your bag'
           : definition?.kind === 'ability' ? 'A scroll in your bag'
             : definition?.kind === 'recipe' ? 'Known to everyone, in the crafting book (C)'
+              : definition?.kind === 'loot' ? `On every ${CREATURES[definition.creature]?.name ?? 'creature of its kind'} that is defeated`
               : edge ? `Beyond the ${edge.side} edge of ${regionName}`
                 : `Beside you, in ${regionName}`,
       instant,
@@ -406,6 +410,7 @@ export class Wishes {
     if (def.kind === 'creature') placements = region.findSpots(at.x, at.y, def.count);
     if (def.kind === 'npc') placements = region.findSpots(at.x, at.y, 1, 1.2, 2);
     if (placements && placements.length === 0) return this.say(player.id, 'There is no room here. Find open ground and ask again.');
+    if (def.kind === 'loot' && !CREATURES[def.creature]) return this.say(player.id, 'That creature is no longer in the world. Choose another and ask again.');
     if (def.kind === 'region' && (!open.edge || !this.world.cellFree(open.edge.cell))) {
       return this.say(player.id, 'Another land has grown there since you asked. Find an open edge of the world and wish again.');
     }
@@ -421,6 +426,7 @@ export class Wishes {
       : def.kind === 'recipe' ? 'It is done. Anyone can make it now: press C to open the crafting book.'
         : def.kind === 'region' ? `It is done. A road now leads ${open.edge!.side} to ${def.name}.`
           : def.kind === 'player' ? 'It is done. Everyone will see your new look.'
+            : def.kind === 'loot' ? `It is done. Defeat a ${CREATURES[def.creature]?.name ?? 'creature'} and press E beside its body to see.`
             : 'It is done. Look around you.');
     if (!open.sample) this.paint(record);
     else void this.track(this.useSample(record, open.sample).then((used) => (used ? undefined : this.paint(record))));
@@ -432,7 +438,7 @@ export class Wishes {
    */
   private async useSample(record: ContentRecord, sample: PaintedSample): Promise<boolean> {
     const def = record.definition;
-    if (!def || def.kind === 'recipe' || def.kind === 'region' || def.kind === 'rule') return false;
+    if (!def || !isPictured(def)) return false;
     const biome = (regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
     if (artRequest(def, biome).prompt !== sample.record.prompt) return false;
     try {
@@ -528,6 +534,34 @@ export class Wishes {
     this.store.addContent(record);
     this.broadcast(record);
     this.paint(record);
+    return record;
+  }
+
+  /**
+   * Sets a creature's whole loot from God's View. It is kept as a content
+   * entry like a wish, made by `by`, so it is saved, reaches every region
+   * server and can be rolled back. Throws a WishError.
+   */
+  setLoot(by: { id: string; name: string }, raw: unknown): ContentRecord {
+    const definition = validateLoot(raw, true);
+    const record: ContentRecord = {
+      id: `w${this.now().toString(36)}${randomBytes(2).toString('hex')}`,
+      wisher: { id: by.id, name: by.name },
+      regionId: this.world.home.def.id,
+      at: this.now(),
+      tier: 'minor',
+      title: definition.name,
+      summary: definition.description,
+      status: 'granted',
+      favor: 0,
+      definition,
+      godsView: true,
+      conversation: [],
+      usd: 0,
+    };
+    this.store.addContent(record);
+    this.apply(record);
+    this.broadcast(record);
     return record;
   }
 
@@ -754,7 +788,7 @@ export class Wishes {
    * one picture for an item, creature or person, one per item for a rule.
    */
   paint(record: ContentRecord, force = false, prompts: Record<string, string> = {}, only?: string): Promise<void> | undefined {
-    if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe') return undefined;
+    if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe' || record.definition.kind === 'loot') return undefined;
     const provider = this.imageProvider('wishes');
     if (!provider) return undefined;
     if (!force && this.budget().paused) return undefined;
@@ -901,7 +935,7 @@ export class Wishes {
    */
   async preview(record: ContentRecord, pictureId: string, prompt?: string): Promise<Recipe> {
     const def = record.definition;
-    if (!def || record.status !== 'granted' || def.kind === 'recipe') throw new Error('That wish has no picture to paint.');
+    if (!def || record.status !== 'granted' || def.kind === 'recipe' || def.kind === 'loot') throw new Error('That wish has no picture to paint.');
     const recipes = this.recipes!;
     const kit = def.kind === 'region' ? wildKit(def.biome).find((a) => a.id === pictureId) : undefined;
     if (kit) {
@@ -1026,7 +1060,7 @@ export class Wishes {
     const pictures: LibraryPicture[] = [];
     for (const record of this.store.content) {
       const def = record.definition;
-      if (record.status !== 'granted' || !def || def.kind === 'recipe') continue;
+      if (record.status !== 'granted' || !def || def.kind === 'recipe' || def.kind === 'loot') continue;
       const all: LibraryPicture[] = def.kind === 'region' ? regionPictures(record.id, def)
         : def.kind === 'rule' ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
         : [{ id: record.id, def }];
@@ -1091,7 +1125,7 @@ export class Wishes {
   paintMissing(): void {
     if (this.budget().paused) return;
     for (const record of this.store.content) {
-      if (record.status === 'granted' && record.definition && record.definition.kind !== 'recipe') this.paint(record);
+      if (record.status === 'granted' && record.definition) this.paint(record);
     }
   }
 

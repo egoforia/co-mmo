@@ -7,6 +7,7 @@ import { BIOMES, type BiomeId } from './biomes.ts';
 import { RECIPES } from './kit.ts';
 import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
+import { applyLoot, removeLoot } from './loot.ts';
 import {
   ABILITIES,
   CREATURES,
@@ -19,6 +20,7 @@ import {
   type AbilityEffect,
   type Behavior,
   type CreatureDef,
+  type Drop,
   type EquipSlot,
   type InventorySlot,
   type ItemDef,
@@ -134,10 +136,30 @@ export interface RegionWish {
   npc?: Omit<NpcWish, 'kind'>;
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | RecipeWish | AbilityWish | RegionWish;
+/**
+ * Things a creature that already exists may drop when defeated. A wish adds
+ * them to what it drops; God's View sets its whole list (design: Loot tab).
+ */
+export interface LootWish {
+  kind: 'loot';
+  name: string;
+  description: string;
+  /** The creature's id. */
+  creature: string;
+  drops: Drop[];
+  /** add: joins what it drops already (wishes); set: becomes its whole list (God's View). */
+  mode: 'add' | 'set';
+}
 
-/** Wished things that have one picture of their own (not recipes or regions). */
-export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish>;
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | RecipeWish | AbilityWish | RegionWish | LootWish;
+
+/** Wished things that have one picture of their own (not recipes, regions or loot). */
+export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish>;
+
+/** Whether a wish paints a picture of its own (recipes and loot use pictures that exist; regions paint their parts). */
+export function isPictured(def: Definition): def is PicturedWish {
+  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'rule';
+}
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
 export type RuleItem = Omit<ItemWish, 'kind'>;
@@ -188,6 +210,8 @@ export interface ContentEntry {
   kitArt?: Record<string, string>;
   /** Where the wish stands now, worked out by the server from its status, draft, test run and rule. */
   progress?: WishProgress;
+  /** Made in God's View rather than wished (a creature's loot set there); `wisher` is who made it. */
+  godsView?: boolean;
 }
 
 /**
@@ -326,6 +350,12 @@ export interface WishCard {
 
 export const WISH_COSTS: Record<WishTier, number> = { minor: 2, moderate: 6, major: 0, engine: 0, refused: 0 };
 export const MAX_WISHED_LEVEL = 6;
+/** A wished drop comes at most this often, this many at a time, and a wish adds at most this many. */
+export const MAX_WISHED_CHANCE = 0.5;
+export const MAX_WISHED_DROP_QTY = 3;
+export const MAX_WISHED_DROPS = 4;
+/** The most lines a creature's loot may have when set in God's View. */
+export const MAX_LOOT_LINES = 12;
 export const MAX_WISHED_COUNT = 5;
 export const MAX_WISHED_HEAL = 50;
 export const MAX_RULE_ITEMS = 6;
@@ -342,6 +372,7 @@ export const MAX_RECIPE_RESULT = 3;
 
 /** The tier a buildable wish costs: things for your bag are minor, the rest moderate. */
 export function contentTier(def: WishDefinition): 'minor' | 'moderate' {
+  // A creature's loot changes what everyone finds, so it weighs like a creature.
   return def.kind === 'item' || def.kind === 'recipe' || def.kind === 'player' ? 'minor' : 'moderate';
 }
 
@@ -425,6 +456,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   if (def.kind === 'npc') return 'sanctum-pilgrim';
   if (def.kind === 'player') return 'player-mara';
   if (def.kind === 'region') return 'sanctum-shrine';
+  if (def.kind === 'loot') return CREATURES[def.creature]?.art ?? 'woods-mushroom';
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';
 }
 
@@ -435,6 +467,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
  */
 export function validateDefinition(raw: unknown): WishDefinition {
   const d = (raw ?? {}) as Record<string, unknown>;
+  if (d.kind === 'loot') return validateLoot(d, false);
   const name = text(d.name, 40);
   const description = text(d.description, 240);
   if (!name) throw new WishError('It needs a name.');
@@ -524,6 +557,43 @@ function validateRegion(name: string, description: string, d: Record<string, unk
     water: level(d.water, 1),
     creatures,
     ...(npc ? { npc } : {}),
+  };
+}
+
+/**
+ * Loot for a creature that exists. A wish adds up to four things that can be
+ * traded, each at most a 1 in 2 chance and three at a time; God's View
+ * (`gods`) sets the whole list, anything that exists, at any chance.
+ */
+export function validateLoot(raw: unknown, gods: boolean): LootWish {
+  const d = (raw ?? {}) as Record<string, unknown>;
+  const creature = typeof d.creature === 'string' ? d.creature : '';
+  const def = CREATURES[creature];
+  if (!def) throw new WishError('Loot is for a creature that lives in the world. Which one?');
+  const drops: Drop[] = [];
+  for (const raw of Array.isArray(d.drops) ? d.drops : []) {
+    const r = (typeof raw === 'string' ? { item: raw } : raw ?? {}) as Record<string, unknown>;
+    const item = typeof r.item === 'string' ? r.item : '';
+    if (!ITEMS[item] || (!gods && ITEMS[item]!.bound) || drops.some((x) => x.item === item)) continue;
+    const chance = Number(r.chance);
+    drops.push({
+      item,
+      chance: gods
+        ? clamp(Number.isFinite(chance) ? Math.round(chance * 100) / 100 : 0.25, 0.01, 1)
+        : clamp(Number.isFinite(chance) ? Math.round(chance * 100) / 100 : 0.25, 0.05, MAX_WISHED_CHANCE),
+      qty: clamp(Math.round(Number(r.qty) || 1), 1, gods ? 99 : MAX_WISHED_DROP_QTY),
+    });
+    if (drops.length >= (gods ? MAX_LOOT_LINES : MAX_WISHED_DROPS)) break;
+  }
+  if (!gods && !drops.length) throw new WishError(`Choose something that exists in the world for the ${def.name} to drop.`);
+  const names = drops.map((x) => ITEMS[x.item]!.name);
+  return {
+    kind: 'loot',
+    name: text(d.name, 40) || `${def.name} loot`,
+    description: text(d.description, 240) || (names.length ? `The ${def.name} may drop ${names.join(', ')}.` : `The ${def.name} drops nothing.`),
+    creature,
+    drops,
+    mode: gods ? 'set' : 'add',
   };
 }
 
@@ -670,6 +740,7 @@ export function applyContent(entry: ContentEntry): void {
   } else if (d.kind === 'item') ITEMS[entry.id] = itemFromWish(entry.id, d);
   else if (d.kind === 'creature') CREATURES[entry.id] = creatureFromWish(entry.id, d);
   else if (d.kind === 'npc') NPC_GREETINGS[entry.id] = d.greeting;
+  else if (d.kind === 'loot') applyLoot({ id: entry.id, at: entry.at, creature: d.creature, mode: d.mode, drops: d.drops });
   else if (d.kind === 'recipe') RECIPES[entry.id] = { name: d.name, materials: d.materials, result: d.result, wit: 0 };
   else if (d.kind === 'ability') {
     ABILITIES[entry.id] = abilityFromWish(d);
@@ -705,6 +776,7 @@ export function removeContent(entry: ContentEntry): void {
   delete NPC_GREETINGS[entry.id];
   delete RECIPES[entry.id];
   delete ABILITIES[entry.id];
+  removeLoot(entry.id);
   WISHERS.delete(entry.id);
 }
 

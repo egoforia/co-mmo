@@ -4,6 +4,7 @@ import {
   MAX_WORKSHOP_LINES,
   WISH_CATEGORIES,
   checkDraft,
+  isPictured,
   cleanLocks,
   draftCost,
   draftFromDefinition,
@@ -297,13 +298,13 @@ export class Workshop {
         card,
         world: checked.definition ? worldLines(checked.definition) : [],
         ...(checked.brief ? { plan: reviewPlan(checked.tier) } : {}),
-        ...(checked.definition && checked.definition.kind !== 'recipe' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
+        ...(checked.definition && checked.definition.kind !== 'recipe' && checked.definition.kind !== 'loot' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
       },
     };
   }
 
   /** What the image model would be asked for, built by the same code that paints. */
-  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
+  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' | 'loot' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
     const provider = this.wishes.imageProvider('wishes');
     const pictures: PicturePreview[] = [];
     const picture = (label: string, prompt: string, wanted: string[], withRaw = false): void => {
@@ -358,7 +359,7 @@ export class Workshop {
 
 /** Wishes with one picture of their own, which a sample can stand in for. */
 function pictured(def: WishDefinition): def is PicturedWish {
-  return def.kind !== 'recipe' && def.kind !== 'region';
+  return isPictured(def);
 }
 
 /** A draft's sample as the wish's record will keep it. */

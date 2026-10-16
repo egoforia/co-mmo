@@ -842,7 +842,7 @@ function within(b: Building, x: number, y: number): boolean {
 
 /** A body's name tag says when there is something on it for us. */
 function bodyLabel(b: BodyState): string {
-  return b.loot ? `${b.name} (E to search)` : b.name;
+  return b.loot ? `${b.name} (E for loot)` : b.name;
 }
 
 function destroyAvatar(a: Avatar): void {

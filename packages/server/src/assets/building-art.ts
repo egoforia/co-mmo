@@ -14,6 +14,7 @@ import { makeSeamless, pixelate, removeKeyBackground, removeKeySpill, trimRows }
 import { pictureName } from './names.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from './provider.ts';
 import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
+import { STYLE } from './style-profile.ts';
 
 // Paints every picture a building needs with the image model chosen in God's
 // View (see BUILDING_STYLES in packages/shared/src/buildings.ts for how the
@@ -38,23 +39,9 @@ const MAX_EXTERIOR_PIXELS = 2048;
 /** Art pixels across one tile. */
 const TILE_ART_PIXELS = TILE_PIXELS / PIXEL_ART_SCALE;
 
-const PIXEL_STYLE = [
-  'Pixel art game graphics in the style of a 16-bit SNES / PS1 Legend of Mana RPG interior.',
-  'Every art pixel is a crisp, hard-edged square block: no anti-aliasing, no smooth gradients, no blur.',
-  'A limited palette of about 16 colours taken from the reference painting, warm light from the upper left. No writing anywhere.',
-].join('\n');
-
-const TILE_FRAMING = [
-  'A texture tile seen from directly above, filling the entire square frame edge to edge, drawn as if 32 by 32 pixels scaled up.',
-  'Even lighting and low contrast, small details spread evenly with no single big feature, no moss clumps, mushrooms or objects,',
-  'so it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.',
-].join('\n');
-
-const SPRITE_FRAMING = [
-  'A single sprite in three-quarter top-down view, centred, with empty margin all around it, with a darker coloured outline.',
-  `Background: one flat solid pure magenta (${KEY_COLOR.hex}) filling everything behind the subject, with no floor, gradient, glow or shadow on it. No magenta anywhere in the subject.`,
-  'Fire and light have no glow or halo spilling outside the object.',
-].join('\n');
+const PIXEL_STYLE = STYLE.interior.style;
+const TILE_FRAMING = STYLE.interior.tileFraming;
+const SPRITE_FRAMING = STYLE.interior.spriteFraming;
 
 /** The pictures a building style needs, outside first: the inside is painted to match it. */
 export function buildingArtJobs(style: BuildingStyle): BuildingArtJob[] {
@@ -74,7 +61,7 @@ export function buildingArtJobs(style: BuildingStyle): BuildingArtJob[] {
       'with a few short steps or a threshold leading down from the door to the bottom edge. Nothing else stands in front of the door.',
       style.references?.length ? 'The other images show the approved art style and, where it is the same place, how it looked before: keep its character.' : '',
       biome,
-      `Subject: ${style.name}, the whole building seen from outside, three-quarter top-down view. ${style.exterior}.`,
+      `Subject: ${style.name}, the whole building seen from outside, ${STYLE.view}. ${style.exterior}.`,
       `Background: one flat solid pure magenta (${KEY_COLOR.hex}) filling everything behind the building, with no ground, scenery, gradient, glow or shadow on it. No magenta anywhere in the building. Lanterns and windows have no glow or halo spilling onto the background.`,
       `Avoid: ${[...NEGATIVE_PROMPT, 'background scenery', 'cast shadow on the background'].join(', ')}.`,
     ].filter(Boolean).join('\n'),

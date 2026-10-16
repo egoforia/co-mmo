@@ -1,0 +1,42 @@
+---
+name: co-mmo-art
+description: Use for any co-MMO change that paints, prompts for, cuts, places or shows art or sound: buildings, walks, held items, scenery, the Art tab, the style or the camera.
+---
+
+# Art in co-MMO
+
+Rules from the Owner, all binding:
+
+- **No art drawn in code.** No canvas shapes, Phaser graphics or tinted
+  stand-ins. Every picture comes from the image model chosen in God's View,
+  from a description. The only exceptions are the invisible pose guides
+  (`assets/pose-guide.ts`) and the building doorway sketch, which steer the
+  model and are never shown to players. The wish guard refuses drawing code.
+- **No left/right mirroring.** Each direction is painted on its own.
+- **Size consistency.** Things of a kind are the same size in game (all
+  people 168 px tall).
+- **Reviewable before paying.** Anything that costs money shows the exact
+  prompt and references in the Art tab and waits for approval; paid calls go
+  through the paint queue and `budget.ts`.
+- Character looks have empty hands; weapons and off-hand items are separate
+  held items placed by the hand finder.
+
+Where things are:
+
+- The style is one `StyleProfile` in
+  `packages/server/src/assets/style-profile.ts`, picked by `ART_STYLE`.
+  `assets/style.ts` gives prompt builders its words. Never write style or
+  framing sentences anywhere else; add a field to the profile instead.
+- Buildings: `BUILDING_STYLES` in `packages/shared/src/buildings.ts`, painted
+  by `building-art.ts`. Outside art is centred on the south-wall doorway and
+  covers the walls; the inside is seamless pixel-art tiles matching it.
+- Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
+- Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`.
+- Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.
+- The camera: every tile-to-screen sum goes through `PROJECTION` in
+  `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in
+  the scene.
+
+Changing a prompt changes what is paid for. Show that prompts you did not
+mean to change stay byte for byte the same (snapshot them before and after),
+and never make paid calls from tests: keep API keys unset.

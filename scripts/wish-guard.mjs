@@ -26,6 +26,7 @@ export const FORBIDDEN = [
   /^scripts\/dev\.mjs$/,
   /(^|\/)\.env/,
   /^CLAUDE\.md$/,
+  /^\.claude\//,
 ];
 
 /** Changed only when the Owner's approval allows core changes. */

@@ -34,10 +34,20 @@ describe('Interpolator', () => {
   it('renders between snapshots, delayed', () => {
     const i = new Interpolator(100);
     i.push(1000, 0, 0);
-    i.push(1100, 10, 0);
-    expect(i.sample(1150)).toEqual({ x: 5, y: 0 });
+    i.push(1050, 10, 0);
+    expect(i.sample(1125)).toEqual({ x: 5, y: 0 });
     expect(i.sample(500)).toEqual({ x: 0, y: 0 });
     expect(i.sample(5000)).toEqual({ x: 10, y: 0 });
+  });
+
+  it('looks further back when snapshots come less often, so it never runs out of path', () => {
+    const i = new Interpolator(100);
+    for (let n = 0; n <= 4; n++) i.push(1000 + n * 200, n * 10, 0);
+    expect(i.delay).toBe(250);
+    // Just before the next snapshot is due, it is still between two it has.
+    const at = i.sample(1800 + 199)!;
+    expect(at.x).toBeLessThan(40);
+    expect(at.x).toBeGreaterThan(30);
   });
 });
 

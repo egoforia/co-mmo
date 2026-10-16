@@ -1,6 +1,6 @@
 import type { Character, ClientMessage, NpcPlacement, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage } from '@co-mmo/shared';
 import type { CharacterOp, OpResult } from './character-ops.ts';
-import type { Carry, Connection, Departure, Leaving } from './region.ts';
+import type { Carry, Cell, Connection, Departure, Ghosts, Leaving } from './region.ts';
 import type { Tile } from '@co-mmo/shared';
 
 // What the game server (the gateway) and its region servers say to each
@@ -22,6 +22,8 @@ export const serverChannel = (id: string): string => `region-server:${id}`;
  */
 export interface RegionHandle {
   readonly def: RegionDef;
+  /** Its name between servers: the region's id, or a cell's key. */
+  readonly key: string;
   readonly map: RegionMap;
   readonly info: RegionInfo;
   /** Where it runs: 'gateway', or a region server's id. */
@@ -43,17 +45,24 @@ export interface RegionHandle {
   announce(text: string): void;
   send(id: string, message: ServerMessage): void;
   broadcast(message: ServerMessage): void;
-  addCreatures(kind: string, spots: { x: number; y: number }[]): void;
+  addCreatures(kind: string, spots: { x: number; y: number; n?: number }[]): void;
   addNpc(npc: NpcPlacement): void;
   removeWish(id: string): void;
   setExits(exits: RegionDef['exits']): void;
   welcomeAll(): void;
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry): void;
+  /** `handoff`: the player walked in from the next cell of the same land, so they are not welcomed again. */
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void;
   /** Takes a player out; a region on another server answers a moment later. */
   remove(id: string, announce?: string): Leaving | undefined | Promise<Leaving | undefined>;
   handle(id: string, message: ClientMessage): void;
   /** Runs one tick here; a region on another server ticks there and reports departures itself. */
   tick(): Departure[];
+  /** Set when this is one cell of a split region. */
+  readonly cell?: Cell;
+  /** A split region's cells, each running its own strip. */
+  readonly cells?: RegionHandle[];
+  /** A cell: what the cell at `from` shows near the border. */
+  seeAcross?(from: number, ghosts: Ghosts): void;
 }
 
 /** A Carry as it travels between servers (a Map does not survive JSON). */
@@ -119,9 +128,9 @@ export interface RegionBeat {
 
 /** Messages to a region server. Those with `ask` are answered. */
 export type ToServer =
-  | { t: 'host'; region: RegionDef; placements: Placement[] }
+  | { t: 'host'; region: RegionDef; placements: Placement[]; cell?: Cell }
   | { t: 'drop'; region: string; ask?: number; replyTo?: string }
-  | { t: 'join'; region: string; info: PlayerInfo; at: { x: number | null; y: number | null }; character: Character; announce?: string; carry?: CarryData }
+  | { t: 'join'; region: string; info: PlayerInfo; at: { x: number | null; y: number | null }; character: Character; announce?: string; carry?: CarryData; handoff?: boolean }
   | { t: 'remove'; region: string; id: string; announce?: string; ask?: number; replyTo?: string }
   | { t: 'input'; region: string; id: string; m: ClientMessage }
   | { t: 'change'; region: string; id: string; op: CharacterOp; ask?: number; replyTo?: string }
@@ -134,6 +143,7 @@ export type ToServer =
   | { t: 'unplace'; region: string; id: string }
   | { t: 'exits'; region: string; exits: RegionDef['exits'] }
   | { t: 'welcome-all'; region: string }
+  | { t: 'ghosts'; region: string; from: number; ghosts: Ghosts }
   | { t: 'world'; state: WorldState }
   | { t: 'content'; entries: import('@co-mmo/shared').ContentEntry[] }
   /** The gateway does not know this server (it restarted, or gave the server up for dead): drop everything and say hello again. */
@@ -154,5 +164,8 @@ export type ToGateway =
   | { t: 'hook'; server: string; region: string; hook: 'event'; type: 'use' | 'interact' | 'defeat'; player: string; data: Record<string, string | number> }
   | { t: 'hook'; server: string; region: string; hook: 'route'; m: import('@co-mmo/shared').ChatMessage; to?: string }
   | { t: 'hook'; server: string; region: string; hook: 'journal'; text: string; player: string }
+  | { t: 'hook'; server: string; region: string; hook: 'regionChat'; m: ServerMessage }
+  /** A cell's border, each tick, for the cells beside it. */
+  | { t: 'edge'; server: string; region: string; ghosts: Ghosts }
   | { t: 'bye'; server: string }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };

@@ -71,7 +71,9 @@ interface Sample {
 
 /**
  * Smooths other players' movement by rendering them slightly in the past,
- * between the two snapshots around that moment.
+ * between the two snapshots around that moment. When snapshots come further
+ * apart (a crowded region sends them less often), it looks further back, so
+ * movement stays smooth instead of stopping and jumping.
  */
 export class Interpolator {
   private samples: Sample[] = [];
@@ -83,9 +85,18 @@ export class Interpolator {
     if (this.samples.length > 20) this.samples.shift();
   }
 
+  /** How far in the past it renders: the usual delay, or a little more than the time between snapshots. */
+  get delay(): number {
+    const gaps: number[] = [];
+    for (let i = Math.max(1, this.samples.length - 5); i < this.samples.length; i++) gaps.push(this.samples[i]!.at - this.samples[i - 1]!.at);
+    if (!gaps.length) return this.delayMs;
+    gaps.sort((a, b) => a - b);
+    return Math.max(this.delayMs, gaps[Math.floor(gaps.length / 2)]! * 1.25);
+  }
+
   sample(now: number): Vec2 | null {
     if (this.samples.length === 0) return null;
-    const t = now - this.delayMs;
+    const t = now - this.delay;
     const first = this.samples[0]!;
     if (t <= first.at) return { x: first.x, y: first.y };
     for (let i = this.samples.length - 1; i > 0; i--) {

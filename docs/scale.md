@@ -124,7 +124,26 @@ Each one says `Region server <name> joined.` in the game server's console.
 For a few friends on one laptop, region servers are not needed; they are
 how the world grows past what one process can run.
 
-## Server health
+## Crowds
+
+Nobody is turned away from a crowded region (design doc, Scaling without a
+cap). Two things happen as it fills:
+
+- **Fewer snapshots.** A player's snapshots go out every tick until more
+  than 40 people and creatures are in view, then every 2, 3 and at most 4
+  ticks. A process whose ticks take more than half their time slows them
+  down the same way. Players' own steps are predicted on their screen and
+  others are drawn a little further in the past, so movement stays smooth,
+  just slightly less precise.
+- **Cells.** Past 50 players a region splits into strips side by side
+  (up to four, at least 16 tiles wide), each run on its own, spread over
+  the region servers when there are some. Players walk between cells
+  without noticing and see across the borders; fights, trades, searching
+  bodies and nearby talk stay within a cell, and the Region channel reaches
+  them all. A split region joins up again once it has stayed under three
+  quarters of that for half a minute. Splitting or joining sets the
+  creatures up afresh, like a restart.
+
 
 God's View has an Owner-only **Server health** tab. It lists the game
 server and every region server with the regions each one runs, how many

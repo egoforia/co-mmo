@@ -1,7 +1,7 @@
 import { generateRegion, type Character, type ClientMessage, type NpcPlacement, type PlayerInfo, type RegionDef, type RegionInfo, type RegionMap, type ServerMessage, type Tile } from '@co-mmo/shared';
 import type { Bus, Requests } from './bus.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
-import { findSpots, nearestTile, type Carry, type Connection, type Departure, type Leaving } from './region.ts';
+import { findSpots, nearestTile, type Carry, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
 import { carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type RegionBeat, type RegionHandle, type ToServer } from './region-link.ts';
 
 interface Mirror {
@@ -25,9 +25,13 @@ export class RemoteRegion implements RegionHandle {
   private readonly players = new Map<string, Mirror>();
   private creatures: RegionBeat['creatures'] = [];
 
-  constructor(readonly def: RegionDef, readonly host: string, private readonly bus: Bus, private readonly requests: Requests) {
+  constructor(readonly def: RegionDef, readonly host: string, private readonly bus: Bus, private readonly requests: Requests, readonly cell?: Cell) {
     // The land is made from the region's seed, the same here as there.
     this.map = generateRegion(def);
+  }
+
+  get key(): string {
+    return this.cell?.key ?? this.def.id;
   }
 
   get info(): RegionInfo {
@@ -78,19 +82,19 @@ export class RemoteRegion implements RegionHandle {
   }
 
   nearby(id: string): Promise<string[]> {
-    return this.requests.ask<string[]>(this.channel, { t: 'nearby', region: this.def.id, id }).catch(() => []);
+    return this.requests.ask<string[]>(this.channel, { t: 'nearby', region: this.key, id }).catch(() => []);
   }
 
   change(id: string, op: CharacterOp): Promise<OpResult> {
-    return this.requests.ask<OpResult>(this.channel, { t: 'change', region: this.def.id, id, op }).catch(() => ({ ok: false }));
+    return this.requests.ask<OpResult>(this.channel, { t: 'change', region: this.key, id, op }).catch(() => ({ ok: false }));
   }
 
   tell(id: string, text: string): void {
-    this.command({ t: 'tell', region: this.def.id, id, text });
+    this.command({ t: 'tell', region: this.key, id, text });
   }
 
   announce(text: string): void {
-    this.command({ t: 'announce', region: this.def.id, text });
+    this.command({ t: 'announce', region: this.key, text });
   }
 
   send(id: string, message: ServerMessage): void {
@@ -100,20 +104,20 @@ export class RemoteRegion implements RegionHandle {
 
   broadcast(message: ServerMessage): void {
     // Wish news also tells the region server what now exists.
-    if (message.t === 'content') this.command({ t: 'broadcast', region: this.def.id, m: message });
+    if (message.t === 'content') this.command({ t: 'broadcast', region: this.key, m: message });
     else for (const p of this.players.values()) p.conn.send(message);
   }
 
-  addCreatures(kind: string, spots: { x: number; y: number }[]): void {
-    this.command({ t: 'place', region: this.def.id, placement: { kind: 'creatures', id: kind, spots } });
+  addCreatures(kind: string, spots: { x: number; y: number; n?: number }[]): void {
+    this.command({ t: 'place', region: this.key, placement: { kind: 'creatures', id: kind, spots } });
   }
 
   addNpc(npc: NpcPlacement): void {
-    this.command({ t: 'place', region: this.def.id, placement: { kind: 'npc', npc } });
+    this.command({ t: 'place', region: this.key, placement: { kind: 'npc', npc } });
   }
 
   removeWish(id: string): void {
-    this.command({ t: 'unplace', region: this.def.id, id });
+    this.command({ t: 'unplace', region: this.key, id });
   }
 
   setExits(exits: RegionDef['exits']): void {
@@ -121,16 +125,16 @@ export class RemoteRegion implements RegionHandle {
     const fresh = generateRegion(this.def);
     this.map.tiles.set(fresh.tiles);
     this.map.entries = fresh.entries;
-    this.command({ t: 'exits', region: this.def.id, exits });
+    this.command({ t: 'exits', region: this.key, exits });
   }
 
   welcomeAll(): void {
-    this.command({ t: 'welcome-all', region: this.def.id });
+    this.command({ t: 'welcome-all', region: this.key });
   }
 
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry): void {
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void {
     this.players.set(info.id, { info, conn, x: at.x ?? this.map.spawn.x, y: at.y ?? this.map.spawn.y, character, ack: carry?.ack ?? 0 });
-    this.command({ t: 'join', region: this.def.id, info, at, character, ...(announce !== undefined ? { announce } : {}), ...(carry ? { carry: carryData(carry) } : {}) });
+    this.command({ t: 'join', region: this.key, info, at, character, ...(announce !== undefined ? { announce } : {}), ...(carry ? { carry: carryData(carry) } : {}), ...(handoff ? { handoff } : {}) });
   }
 
   async remove(id: string, announce?: string): Promise<Leaving | undefined> {
@@ -138,7 +142,7 @@ export class RemoteRegion implements RegionHandle {
     if (!mirror) return undefined;
     // Nothing more for this player passes through here, whatever the server says.
     this.players.delete(id);
-    const left = await this.requests.ask<LeavingData | null>(this.channel, { t: 'remove', region: this.def.id, id, ...(announce !== undefined ? { announce } : {}) })
+    const left = await this.requests.ask<LeavingData | null>(this.channel, { t: 'remove', region: this.key, id, ...(announce !== undefined ? { announce } : {}) })
       .catch(() => null);
     // A server that did not answer is taken to have lost the player where they were last seen.
     if (!left) return { info: mirror.info, conn: mirror.conn, character: mirror.character, x: mirror.x, y: mirror.y, carry: lostCarry(mirror) };
@@ -153,7 +157,7 @@ export class RemoteRegion implements RegionHandle {
   async drop(reachable: boolean): Promise<Leaving[]> {
     const mirrors = new Map(this.players);
     this.players.clear();
-    const left = reachable ? await this.requests.ask<LeavingData[]>(this.channel, { t: 'drop', region: this.def.id }).catch(() => null) : null;
+    const left = reachable ? await this.requests.ask<LeavingData[]>(this.channel, { t: 'drop', region: this.key }).catch(() => null) : null;
     if (!left) return [...mirrors.values()].map((m) => ({ info: m.info, conn: m.conn, character: m.character, x: m.x, y: m.y, carry: lostCarry(m) }));
     return left.flatMap((l) => {
       const mirror = mirrors.get(l.info.id);
@@ -162,11 +166,15 @@ export class RemoteRegion implements RegionHandle {
   }
 
   handle(id: string, message: ClientMessage): void {
-    if (this.players.has(id)) this.command({ t: 'input', region: this.def.id, id, m: message });
+    if (this.players.has(id)) this.command({ t: 'input', region: this.key, id, m: message });
   }
 
   tick(): Departure[] {
     return [];
+  }
+
+  seeAcross(from: number, ghosts: Ghosts): void {
+    this.command({ t: 'ghosts', region: this.key, from, ghosts });
   }
 
   /** Messages from the region server for players here: passed on, and remembered. */

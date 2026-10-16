@@ -94,6 +94,23 @@ const LEASH = 8;
 const CREATURE_REACH = 1.2;
 /** Health starts coming back this long after the last hit taken. */
 const REGEN_DELAY_MS = 5000;
+/** Snapshots come every tick until this many people and creatures are in view, then less often (see snapshotEvery). */
+const CROWD_STEPS = [40, 80, 150];
+/** The slowest snapshots: every this many ticks. */
+const MAX_SNAPSHOT_EVERY = 4;
+
+/**
+ * How many ticks apart a player's snapshots go out (design doc, Scaling
+ * without a cap: update rates drop gracefully rather than refusing logins).
+ * A crowd in view makes each snapshot big; a busy process (strain 1 or 2)
+ * has less time to make them. Players' own steps are predicted on their
+ * screen and others are smoothed, so fewer snapshots look smoother, just a
+ * little less precise.
+ */
+export function snapshotEvery(crowd: number, strain = 0): number {
+  const forCrowd = 1 + CROWD_STEPS.filter((n) => crowd > n).length;
+  return Math.min(MAX_SNAPSHOT_EVERY, forCrowd + strain);
+}
 
 export interface Connection {
   send(message: ServerMessage): void;
@@ -118,7 +135,36 @@ export interface RegionHooks {
   journal?(text: string, playerId: string): void;
   /** The regions beyond this one's open edges, for players to see beside it. */
   neighbours?(): RegionDef[];
+  /** Delivers a Region-channel line to every cell of a region that was split (see Cell). */
+  regionChat?(message: ServerMessage): void;
 }
+
+/**
+ * One cell of a crowded region split into strips side by side (design doc,
+ * Scaling without a cap). A cell runs the whole land but only the people,
+ * creatures and NPCs within its strip; players walk from cell to cell, and
+ * each sees across the border what the next cell shows it (see Ghosts).
+ */
+export interface Cell {
+  /** The cell's name between servers: the region's id, ~ and its index. */
+  key: string;
+  index: number;
+  count: number;
+  /** The strip it runs: x0 <= x < x1, in tiles. */
+  x0: number;
+  x1: number;
+}
+
+/** What a cell shows of itself near a border, for players in the cell beside it to see. */
+export interface Ghosts {
+  players: EntityState[];
+  creatures: CreatureState[];
+  bodies: BodyState[];
+  npcs: NpcState[];
+}
+
+/** How far past its border a player walks before the next cell takes them, so nobody flickers between two. */
+const CELL_MARGIN = 1;
 
 /** Tile kinds scripted rules can ask about, by name. */
 export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, floor: Tile.Floor, wall: Tile.Wall, door: Tile.Door };
@@ -138,6 +184,10 @@ interface PlayerState {
   readyAt: Map<string, number>;
   /** Character changed this tick; send it once the tick ends. */
   dirty: boolean;
+  /** People and creatures in view at the last snapshot. */
+  crowd: number;
+  /** Spreads players' snapshots over the ticks when they are not sent every tick. */
+  phase: number;
 }
 
 /** Anything that strolls about a home spot: creatures and NPCs. */
@@ -181,7 +231,11 @@ interface Creature extends Walker {
   respawnAt: number | null;
 }
 
-export type Departure = { id: string; side: Side; died?: undefined } | { id: string; died: true; side?: undefined };
+export type Departure =
+  | { id: string; side: Side; died?: undefined; cell?: undefined }
+  | { id: string; died: true; side?: undefined; cell?: undefined }
+  /** Walked over a border into the next cell of a split region. */
+  | { id: string; cell: number; side?: undefined; died?: undefined };
 
 export interface Leaving {
   info: PlayerInfo;
@@ -223,6 +277,10 @@ export class Region {
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   private townsfolk: Townsperson[];
   private tickCount = 0;
+  /** What the cells beside this one show near the border, by their index. */
+  private readonly ghosts = new Map<number, Ghosts>();
+  /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
+  strain = 0;
 
   private readonly hooks: RegionHooks;
   private readonly trades: TradeDesk;
@@ -232,12 +290,14 @@ export class Region {
     hooks?: RegionHooks,
     private readonly now: () => number = Date.now,
     private readonly random: () => number = Math.random,
+    /** Set when this is one cell of a split region. */
+    readonly cell?: Cell,
   ) {
     // A region on its own is a world of one.
     this.hooks = hooks ?? { worldChat: (m) => this.broadcast(m), online: () => this.players.size };
     this.map = generateRegion(def);
-    this.creatures = this.map.creatures.flatMap((c, i) => this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y));
-    this.townsfolk = this.map.npcs.map((n) => this.makeStroller(n));
+    this.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y) : []));
+    this.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => this.makeStroller(n));
     this.trades = new TradeDesk({
       character: (id) => this.players.get(id)?.character,
       nameOf: (id) => this.players.get(id)?.info.name,
@@ -254,6 +314,16 @@ export class Region {
       },
       now: this.now,
     });
+  }
+
+  /** Its name between servers: the region's id, or its cell's key. */
+  get key(): string {
+    return this.cell?.key ?? this.def.id;
+  }
+
+  /** True when x lies in this cell's strip (always, for a region that is not split). */
+  inCell(x: number): boolean {
+    return !this.cell || (x >= this.cell.x0 && x < this.cell.x1);
   }
 
   /** Lets an NPC stroll about where they were placed. */
@@ -283,9 +353,9 @@ export class Region {
 
   // --- Wished content ----------------------------------------------------------
 
-  /** Places a wished creature kind at these spots. */
-  addCreatures(kind: string, spots: { x: number; y: number }[]): void {
-    spots.forEach((s, i) => this.creatures.push(...this.makeCreature(`${kind}-${i}`, kind, s.x, s.y)));
+  /** Places a wished creature kind at these spots; `n` keeps a spot's number when a cell gets only some of them. */
+  addCreatures(kind: string, spots: { x: number; y: number; n?: number }[]): void {
+    spots.forEach((s, i) => this.creatures.push(...this.makeCreature(`${kind}-${s.n ?? i}`, kind, s.x, s.y)));
   }
 
   /** Places a wished NPC, who strolls about that spot. */
@@ -468,7 +538,7 @@ export class Region {
    * Adds a player at the given position, or at the spawn point when it is
    * missing or no longer walkable (a wish may have changed the map).
    */
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry): void {
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff = false): void {
     const existing = this.players.get(info.id);
     if (existing) {
       existing.conn.close('Signed in from another window.');
@@ -480,9 +550,11 @@ export class Region {
       y = at.y;
     }
     const p: PlayerState = {
-      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, ...carry,
+      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), ...carry,
     };
     this.players.set(info.id, p);
+    // Walking into the next cell of the same land: nothing changes on the player's screen.
+    if (handoff) return;
     this.welcome(p);
     // Every wished region carries a credit line (design doc, World structure).
     const wild = this.def.wild;
@@ -568,7 +640,10 @@ export class Region {
         p.ack = input.seq;
       }
       const side = outsideSide(this.map, p.x, p.y);
+      const cell = this.cell;
       if (side) departures.push({ id: p.info.id, side });
+      else if (cell && cell.index > 0 && p.x < cell.x0 - CELL_MARGIN) departures.push({ id: p.info.id, cell: cell.index - 1 });
+      else if (cell && cell.index < cell.count - 1 && p.x >= cell.x1 + CELL_MARGIN) departures.push({ id: p.info.id, cell: cell.index + 1 });
       const max = maxHp(p.character);
       if (p.character.hp > 0 && p.character.hp < max && now - p.lastHurt >= REGEN_DELAY_MS) {
         p.character.hp = Math.min(max, p.character.hp + regenPerSecond(p.character) * TICK_SECONDS);
@@ -582,12 +657,21 @@ export class Region {
     this.bodies = this.bodies.filter((b) => now < b.until);
     for (const n of this.townsfolk) this.stroll(n);
     for (const p of this.players.values()) {
-      if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id)) departures.push({ id: p.info.id, died: true });
+      if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id && d.cell === undefined)) {
+        const i = departures.findIndex((d) => d.id === p.info.id);
+        if (i >= 0) departures.splice(i, 1);
+        departures.push({ id: p.info.id, died: true });
+      }
     }
 
     const all = [...this.players.values()];
     const online = this.hooks.online();
     for (const p of all) {
+      const every = snapshotEvery(p.crowd, this.strain);
+      if (every > 1 && (this.tickCount + p.phase) % every !== 0) {
+        this.flush(p);
+        continue;
+      }
       const near = (x: number, y: number) => Math.abs(x - p.x) <= VIEW_RADIUS && Math.abs(y - p.y) <= VIEW_RADIUS;
       const players: EntityState[] = [];
       for (const other of all) {
@@ -614,12 +698,47 @@ export class Region {
       for (const n of this.townsfolk) {
         if (near(n.x, n.y)) npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
       }
+      // What the cells beside this one show across the border.
+      for (const g of this.ghosts.values()) {
+        for (const e of g.players) if (e.id !== p.info.id && near(e.x, e.y)) players.push(e);
+        for (const e of g.creatures) if (near(e.x, e.y)) creatures.push(e);
+        for (const e of g.bodies) if (near(e.x, e.y)) bodies.push(e);
+        for (const e of g.npcs) if (near(e.x, e.y)) npcs.push(e);
+      }
+      p.crowd = players.length + creatures.length;
       p.conn.send({
         t: 'snapshot', tick: this.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, bodies, npcs, online,
       });
       this.flush(p);
     }
     return departures;
+  }
+
+  /** What players in the cells beside this one may see of it: everything within view of a border. */
+  edge(): Ghosts {
+    const cell = this.cell;
+    const g: Ghosts = { players: [], creatures: [], bodies: [], npcs: [] };
+    if (!cell) return g;
+    const seen = (x: number) => (cell.index > 0 && x < cell.x0 + VIEW_RADIUS) || (cell.index < cell.count - 1 && x >= cell.x1 - VIEW_RADIUS);
+    for (const p of this.players.values()) {
+      if (!seen(p.x)) continue;
+      g.players.push({
+        id: p.info.id, name: p.info.name, color: p.info.color, x: round(p.x), y: round(p.y), health: round(p.character.hp / maxHp(p.character)),
+        ...(heldItem(p.character) ? { held: heldItem(p.character) } : {}),
+      });
+    }
+    for (const c of this.creatures) {
+      if (c.respawnAt === null && seen(c.x)) g.creatures.push({ id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp) });
+    }
+    // Bodies are searched in their own cell; across the border they are only seen.
+    for (const b of this.bodies) if (seen(b.x)) g.bodies.push({ id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot: false });
+    for (const n of this.townsfolk) if (seen(n.x)) g.npcs.push({ id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) });
+    return g;
+  }
+
+  /** What the cell at `from` shows near the border, until it next says. */
+  seeAcross(from: number, ghosts: Ghosts): void {
+    this.ghosts.set(from, ghosts);
   }
 
   // --- Combat ----------------------------------------------------------------
@@ -1070,7 +1189,7 @@ export class Region {
       this.hooks.worldChat(message);
       return;
     }
-    if (channel === 'region') return this.broadcast(message);
+    if (channel === 'region') return this.hooks.regionChat ? this.hooks.regionChat(message) : this.broadcast(message);
     if (channel === 'party' || channel === 'whisper') {
       const why = this.hooks.route ? this.hooks.route(message, to) : 'Nobody can hear that here.';
       if (why) from.conn.send({ t: 'error', code: 'chat_undelivered', message: why });

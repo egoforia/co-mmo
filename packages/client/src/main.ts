@@ -8,6 +8,7 @@ import { PartyUi, showAway } from './social-ui.ts';
 import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
 import { KitUi } from './kit-ui.ts';
+import { LootUi } from './loot-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
@@ -87,6 +88,7 @@ function play(token: string): void {
   let chat: ChatBox | null = null;
   let rpg: RpgUi | null = null;
   let kit: KitUi | null = null;
+  let loot: LootUi | null = null;
   let prayer: PrayerUi | null = null;
   let draft: DraftView | null = null;
   let party: PartyUi | null = null;
@@ -161,6 +163,8 @@ function play(token: string): void {
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
+        // A body's loot stays behind in the region you left.
+        loot?.show(null);
         if (scene) scene.enterRegion(message);
         else void Promise.all([art, artPoints]).then(([manifest, found]) => start(message, manifest, found));
         break;
@@ -229,6 +233,9 @@ function play(token: string): void {
         // New walks were painted: walkers on screen pick them up without a reload.
         void allArt().then((m) => scene?.updateWalks(m, message.walks));
         break;
+      case 'loot':
+        loot?.show(message.loot);
+        break;
       case 'dialogue':
         sound.play('talk');
         rpg?.showDialogue(message);
@@ -271,7 +278,7 @@ function play(token: string): void {
       else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
       else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or searches a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     party.start(myId);
     const account = new AccountWindow(token);
@@ -305,6 +312,7 @@ function play(token: string): void {
       typing: isTyping,
       prayer: () => prayer?.toggle(true),
     });
+    loot = new LootUi({ send: (m) => connection.send(m), typing: isTyping });
     kit = new KitUi(welcome.character, {
       ability: (ability) => {
         connection.send({ t: 'ability', ability });
@@ -320,7 +328,8 @@ function play(token: string): void {
       art: manifest,
       points: found,
       send: (m) => connection.send(m),
-      typing: isTyping,
+      // The arrow keys choose loot while its window is open, so the player stands still.
+      typing: () => isTyping() || !!loot?.open,
     });
     new Phaser.Game({
       type: Phaser.AUTO,

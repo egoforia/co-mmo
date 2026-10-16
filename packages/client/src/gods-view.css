@@ -291,6 +291,16 @@ pre.prompt mark { background: rgba(254, 174, 52, 0.28); color: var(--ink); }
   .sent figure, .sent img, .sent .ph { width: 96px; }
   .sent img, .sent .ph { height: 96px; }
 }
+/* Loot tab */
+.loot header img { width: 40px; height: 40px; object-fit: contain; align-self: center; }
+.loot table.log { margin: 8px 0; }
+.loot details { margin-top: 6px; }
+.loot-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.loot-row label { display: flex; align-items: center; gap: 6px; }
+.loot-row input { width: 70px; flex: none; }
+.loot table.log { table-layout: fixed; }
+.loot table.log th:nth-child(1) { width: 28%; }
+.loot table.log th:nth-child(2), .loot table.log th:nth-child(3) { width: 12%; }
 .hands { margin-top: 8px; }
 .hand-row { display: grid; gap: 2px; margin: 6px 0; }
 .hand-row .frames { display: flex; gap: 4px; flex-wrap: wrap; }

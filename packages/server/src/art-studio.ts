@@ -266,7 +266,7 @@ export class ArtStudio {
     const kits = new Map<BiomeId, ContentRecord>();
     for (const record of this.options.store.content) {
       const def = record.definition;
-      if (record.status !== 'granted' || !def || def.kind === 'recipe') continue;
+      if (record.status !== 'granted' || !def || def.kind === 'recipe' || def.kind === 'loot') continue;
       const item = (id: string, pictured: PicturedWish, art?: string): ArtItem => {
         const kept = record.artPrompts?.[id];
         return {
@@ -799,7 +799,7 @@ export class ArtStudio {
     } else if (def?.kind === 'rule') {
       const key = Object.keys(def.items).find((k) => ruleItemId(record.id, k) === pictureId);
       if (key) return artRequest({ kind: 'item', ...def.items[key]! } as Parameters<typeof artRequest>[0], 'sanctum').prompt;
-    } else if (def && def.kind !== 'recipe') {
+    } else if (def && def.kind !== 'recipe' && def.kind !== 'loot') {
       return artRequest(def, 'sanctum').prompt;
     }
     throw new ArtRequestError('That wish has no picture by that name.');

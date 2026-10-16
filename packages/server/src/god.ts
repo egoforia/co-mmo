@@ -5,7 +5,10 @@ import {
   MAX_CHOICES,
   MAX_RECIPE_RESULT,
   MAX_REGION_CREATURES,
+  MAX_WISHED_CHANCE,
   MAX_WISHED_COUNT,
+  MAX_WISHED_DROP_QTY,
+  MAX_WISHED_DROPS,
   MAX_WISHED_HEAL,
   MAX_WISHED_LEVEL,
   REGION_WISH_COST,
@@ -59,7 +62,7 @@ Players talk to you from anywhere. Chat, answer questions about the world, and h
 
 Wish tiers:
 - minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a hat, armour, a charm), or a new crafting recipe that everyone can use. You can build these now.
-- moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold), or a new region of wild land beyond the world's edge (costs ${REGION_WISH_COST} Favor; only where the player stands at the world's edge). You can build these now.
+- moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold), a new region of wild land beyond the world's edge (costs ${REGION_WISH_COST} Favor; only where the player stands at the world's edge), or new loot for a creature that already lives in the world (things it may drop when defeated, added to what it drops now). You can build these now.
 - major: a new system or place that is more than wild land (fishing, mounts, weather, a dungeon, a quest line, a town). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
 - refused: illegal, griefing, or economy-breaking.
@@ -76,6 +79,7 @@ item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKi
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
 ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
+loot: {"kind":"loot","creature":"<id from: %CREATURES%>","drops":[<up to ${MAX_WISHED_DROPS} of {"item":"<id from: %ITEMS%>","chance":<0.05-${MAX_WISHED_CHANCE}>,"qty":<1-${MAX_WISHED_DROP_QTY}>}>]} (a chance of 0.25 is one defeat in four; keep rare and valuable things rare)
 npc: {"kind":"npc","name":"...","description":"...","greeting":"<what they say when spoken to>","look":LOOK}
 region: {"kind":"region","name":"<the land's name>","description":"...","biome":"%BIOMES%","danger":<1-${MAX_WISHED_LEVEL}>,"trees":<0-3>,"rocks":<0-3>,"water":<0-3>,"creatures":[<one or two of: {"existing":"<id from: %CREATURES%>","count":<1-${MAX_REGION_CREATURES}>} or a new one {"name":"...","description":"...","behavior":"wander|guard|chase","count":<1-${MAX_REGION_CREATURES}>,"drops":[<item ids>],"look":LOOK}>],"npc":<null or {"name":"...","description":"...","greeting":"...","look":LOOK}>} (new creatures there are as strong as its danger; prefer existing creatures when they fit)
 LOOK: {"hook":"<the one feature you would recognise it by>","body":"<body and shape in a sentence>","color":"#rrggbb main colour","mood":"<a few words>"}
@@ -265,6 +269,26 @@ export async function askGod(
  * simple definitions. Used for tests, offline play, and when every provider
  * fails or the budget is spent.
  */
+/** "Walking mushrooms should drop tonics": loot for a creature and an item named in the words. */
+function lootWish(text: string): { say: string; wish: unknown } | undefined {
+  // A name matches with its last word in the plural too ("crab knights").
+  const said = (name: string) => new RegExp(`\\b${name.toLowerCase().replace(/[^a-z0-9 ]/g, '')}(e?s)?\\b`).test(text);
+  const creature = Object.entries(CREATURES).find(([, c]) => said(c.name));
+  const item = Object.entries(ITEMS).find(([, i]) => !i.bound && said(i.name));
+  if (!creature || !item) return undefined;
+  const [creatureId, c] = creature;
+  const [itemId, i] = item;
+  return {
+    say: `Every ${c.name} carrying a ${i.name}, now and then? It shall be so, if you wish it.`,
+    wish: {
+      tier: 'moderate',
+      title: `${i.name} from ${c.name}s`,
+      summary: `Defeated ${c.name}s may drop a ${i.name}.`,
+      definition: { kind: 'loot', creature: creatureId, drops: [{ item: itemId, chance: 0.25, qty: 1 }] },
+    },
+  };
+}
+
 export class OfflineGod implements ChatModel {
   readonly provider = 'offline';
   readonly model = 'scripted';
@@ -351,6 +375,10 @@ export class OfflineGod implements ChatModel {
       return { say: 'I hear you, child of the young world. Tell me what you wish for: a thing to carry, a creature to meet, or someone to talk to.', wish: null };
     }
     const look = { hook: `the look of ${thing}`, body: `a ${thing}`, color: colorFrom(text), mood: 'whimsical' };
+    if (/\b(drops?|dropping|loot)\b/.test(text)) {
+      const loot = lootWish(text);
+      if (loot) return loot;
+    }
     const land = text.match(/\b(region|land|lands|realm|valley|wilds?|territory)\b/);
     if (land) return regionWish(said, text);
     const big = text.match(/\b(fishing|weather|rain|mounts?|dungeons?|quests?|island|system|guilds?|house|housing)\b/);

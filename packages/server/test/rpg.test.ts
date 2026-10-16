@@ -56,7 +56,7 @@ describe('combat', () => {
     expect(region.creature(id)!.alive).toBe(true);
   });
 
-  it('a defeated creature leaves its body, which its finder searches with E before it fades', () => {
+  it('a defeated creature leaves its body, whose loot anyone opens with E before it fades', () => {
     const { region, clock } = setup('woods');
     const conn = fakeConn();
     region.join(info('a', 'Mara'), conn, { x: null, y: null }, newCharacter());
@@ -74,22 +74,30 @@ describe('combat', () => {
     const [body] = region.bodyList();
     expect(body).toMatchObject({ kind: 'walking-mushroom', finders: ['a'], loot: [{ item: 'mushroom-cap', qty: 1 }] });
     region.tick();
-    const snap = of(conn, 'snapshot').at(-1)!;
-    expect(snap.bodies).toEqual([expect.objectContaining({ id: body!.id, name: 'Walking Mushroom', loot: true })]);
-    expect(of(other, 'snapshot').at(-1)!.bodies[0]).toMatchObject({ loot: false });
+    expect(of(conn, 'snapshot').at(-1)!.bodies).toEqual([expect.objectContaining({ id: body!.id, name: 'Walking Mushroom', loot: true })]);
+    // Loot is shared: someone who did not fight for it sees it too.
+    expect(of(other, 'snapshot').at(-1)!.bodies[0]).toMatchObject({ loot: true });
 
-    // Someone who did not fight for it finds nothing.
+    // E opens the loot window; nothing moves to the bag until it is taken.
     region.placePlayer('b', body!.x, body!.y + 0.5);
     region.handle('b', { t: 'interact' });
+    expect(of(other, 'loot').at(-1)!.loot).toEqual({ id: body!.id, name: 'Walking Mushroom', asset: 'woods-mushroom', items: [{ item: 'mushroom-cap', qty: 1 }] });
     expect(itemCount(region.character('b')!, 'mushroom-cap')).toBe(0);
-    expect(of(other, 'notice').at(-1)!.text).toContain('Someone else defeated');
-
     region.placePlayer('a', body!.x + 0.5, body!.y);
     region.handle('a', { t: 'interact' });
-    expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(1);
-    expect(of(conn, 'notice').at(-1)!.text).toBe('You search the Walking Mushroom and find a Mushroom Cap.');
+    expect(of(conn, 'loot').at(-1)!.loot!.items).toHaveLength(1);
+
+    // Ilya takes the cap; Mara's open window empties and closes, and she hears who took it.
+    region.handle('b', { t: 'loot', action: 'take', body: body!.id, index: 0, item: 'mushroom-cap' });
+    expect(itemCount(region.character('b')!, 'mushroom-cap')).toBe(1);
+    expect(of(other, 'notice').at(-1)!.text).toBe('You take a Mushroom Cap from the Walking Mushroom.');
+    expect(of(conn, 'notice').at(-1)!.text).toBe('Ilya took a Mushroom Cap from the Walking Mushroom you defeated.');
+    expect(of(conn, 'loot').at(-1)!.loot).toBeNull();
+    expect(of(other, 'loot').at(-1)!.loot).toBeNull();
+    // Too late: it is gone.
+    region.handle('a', { t: 'loot', action: 'take', body: body!.id, index: 0, item: 'mushroom-cap' });
+    expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(0);
     region.handle('a', { t: 'interact' });
-    expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(1);
     expect(of(conn, 'notice').at(-1)!.text).toContain('nothing more to find');
 
     // The body stays for five minutes, even after the mushroom comes back.
@@ -100,6 +108,53 @@ describe('combat', () => {
     clock.now += 10_000;
     region.tick();
     expect(region.bodyList()).toHaveLength(0);
+  });
+
+  it('takes one thing at a time or everything, leaves the rest on the body, and closes when you walk away', () => {
+    const { region, clock } = setup('woods');
+    const conn = fakeConn();
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, newCharacter());
+    const saved = CREATURES['walking-mushroom']!.drops;
+    // Three things, all sure to drop.
+    CREATURES['walking-mushroom']!.drops = [{ item: 'mushroom-cap', chance: 1, qty: 2 }, { item: 'tonic', chance: 1 }, { item: 'goat-horn', chance: 1 }];
+    try {
+      const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
+      const me = region.position('a')!;
+      region.placeCreature(id, me.x + 1, me.y);
+      while (region.creature(id)!.alive) {
+        region.handle('a', { t: 'attack' });
+        clock.now += 1000;
+      }
+      const [body] = region.bodyList();
+      region.placePlayer('a', body!.x + 0.5, body!.y);
+      region.handle('a', { t: 'interact' });
+      expect(of(conn, 'loot').at(-1)!.loot!.items.map((s) => s.item)).toEqual(['mushroom-cap', 'tonic', 'goat-horn']);
+      // A stale index still takes the thing that was chosen.
+      region.handle('a', { t: 'loot', action: 'take', body: body!.id, index: 0, item: 'tonic' });
+      expect(itemCount(region.character('a')!, 'tonic')).toBe(1);
+      expect(of(conn, 'loot').at(-1)!.loot!.items.map((s) => s.item)).toEqual(['mushroom-cap', 'goat-horn']);
+      // Closing leaves the rest where it lies.
+      region.handle('a', { t: 'loot', action: 'close', body: body!.id });
+      expect(region.bodyList()[0]!.loot.map((s) => s.item)).toEqual(['mushroom-cap', 'goat-horn']);
+      region.handle('a', { t: 'interact' });
+      // Walking away closes the window.
+      const before = of(conn, 'loot').length;
+      region.placePlayer('a', body!.x + 5, body!.y);
+      region.tick();
+      expect(of(conn, 'loot').length).toBe(before + 1);
+      expect(of(conn, 'loot').at(-1)!.loot).toBeNull();
+      region.handle('a', { t: 'loot', action: 'all', body: body!.id });
+      expect(itemCount(region.character('a')!, 'goat-horn')).toBe(0);
+      expect(of(conn, 'notice').at(-1)!.text).toMatch(/too far/);
+      region.placePlayer('a', body!.x + 0.5, body!.y);
+      region.handle('a', { t: 'loot', action: 'all', body: body!.id });
+      expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(2);
+      expect(itemCount(region.character('a')!, 'goat-horn')).toBe(1);
+      expect(of(conn, 'notice').at(-1)!.text).toBe('You take 2 × Mushroom Cap, a Goat Horn from the Walking Mushroom.');
+      expect(region.bodyList()[0]!.loot).toEqual([]);
+    } finally {
+      CREATURES['walking-mushroom']!.drops = saved;
+    }
   });
 
   it('respects the attack cooldown', () => {

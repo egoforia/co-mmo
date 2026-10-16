@@ -6,6 +6,7 @@ import { loadToken, rejoinWhenBack, reloadWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 import { apiLogPage, wireApiLog } from './api-log-ui.ts';
 import { artClick, artPage, artSubmit, refreshArtJobs, type ArtContext } from './art-ui.ts';
+import { lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { TICK_SECONDS } from '@co-mmo/shared';
 
 const token = loadToken();
@@ -226,6 +227,7 @@ async function boot(): Promise<void> {
     ['world', 'World'],
     ['wishes', 'Wishes'],
     ['rules', 'Rules'],
+    ['loot', 'Loot'],
     ['reports', 'Reports'],
     ['players', 'Players'],
     ...(owner ? [['art', 'Art'], ['ai', 'AI models'], ['budget', 'Budget'], ['servers', 'Server health'], ['api-log', 'API Log'], ['updates', 'Updates']] : []),
@@ -266,13 +268,14 @@ const artContext: ArtContext = {
   },
 };
 const art = () => artPage(artContext);
+const loot = () => lootPage(artContext);
 
 async function render(): Promise<void> {
   if (waiting) return;
   const panel = document.getElementById('panel')!;
   const current = tab;
   try {
-    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, reports, players, art, ai, budget, servers, updates, 'api-log': () => apiLogPage(api) };
+    const pages: Record<string, () => Promise<string>> = { world, wishes, rules, loot, reports, players, art, ai, budget, servers, updates, 'api-log': () => apiLogPage(api) };
     const html = await (pages[current] ?? world)();
     if (tab !== current) return;
     // Keep what the Owner is typing when the panel refreshes.
@@ -783,6 +786,7 @@ async function servers(): Promise<string> {
 
 main.addEventListener('click', async (e) => {
   if (tab === 'art' && artClick(e.target as HTMLElement)) return;
+  if (tab === 'loot' && lootClick(e.target as HTMLElement, artContext)) return;
   const t = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!t) return;
   try {
@@ -865,7 +869,7 @@ main.addEventListener('click', async (e) => {
 main.addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target as HTMLFormElement;
-  if (artSubmit(form)) return;
+  if (artSubmit(form) || lootSubmit(form, artContext)) return;
   const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
   try {
     if (form.dataset.approveEngine) {

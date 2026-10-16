@@ -5,6 +5,7 @@
 // be sent to the AI model and approved it, and every version keeps that same
 // information so an old one can be compared with today's and put back.
 
+import { HELD_SIZE, heldBehind, type ArtPoint, type ArtPointsManifest } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 
 /** What the Art tab needs from God's View. */
@@ -138,8 +139,8 @@ const when = (at: number) => new Date(at).toLocaleString(undefined, { day: 'nume
 const esc = escapeHtml;
 
 let data: ArtOverview | null = null;
-/** Where the hand finder found each look's right hand, frame by frame, by art id. */
-let points: Record<string, { hands?: ([number, number] | null)[]; leftHands?: ([number, number] | null)[] }> = {};
+/** Where the hand finder found each look's hands, frame by frame, and each item's grip, by art id. */
+let points: ArtPointsManifest = {};
 /** The questions the hand finder asks, one per way of facing. */
 interface HandQuestion { facing: Direction; prompt: string; usual: string; own: boolean; system: string }
 let questions: HandQuestion[] = [];
@@ -344,10 +345,50 @@ function walkerHtml(w: WalkerView): string {
     </div>`;
 }
 
+/** Items tried in each hand in the hands preview, by art id; the same for every character while God's View is open. */
+const tryOn: { right?: string; left?: string } = {};
+/** Item pictures' sizes once loaded, by url, so a tried item is drawn at its game size. */
+const sizes = new Map<string, [number, number]>();
+/** Item pages whose items can be held. */
+const HOLDABLE = ['Weapons', 'Shields', 'Charms'];
+
+function holdable(): ArtItem[] {
+  return data!.items.filter((i) => i.url && i.place.tab === 'items' && HOLDABLE.includes(i.place.page));
+}
+
 /**
- * Where the hand finder put the right hand, frame by frame: the dot is where
- * a held weapon or charm is gripped. A frame where it found none borrows the
- * nearest frame's hand in the game.
+ * The item tried in one hand, drawn on a frame as the game draws it: its
+ * grip on the hand, its longest side a set share of the frame's height,
+ * turned the way the walker faces, and behind the body when that hand is.
+ */
+function triedHtml(direction: Direction, side: 'right' | 'left', hand: ArtPoint | null | undefined, height: number): string {
+  const item = holdable().find((i) => i.id === tryOn[side]);
+  const grip = item ? points[item.id]?.grip : undefined;
+  const size = item?.url ? sizes.get(item.url) : undefined;
+  if (!item?.url || !hand || !grip || !size) return '';
+  const scale = (height * HELD_SIZE) / Math.max(...size);
+  const [w, h] = [size[0] * scale, size[1] * scale];
+  const flip = direction === 'left';
+  const gx = flip ? 1 - grip[0] : grip[0];
+  return `<img class="held ${heldBehind(direction, side) ? 'behind' : 'front'}" src="${esc(item.url)}" alt="" style="width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;left:calc(${(hand[0] * 100).toFixed(1)}% - ${(gx * w).toFixed(1)}px);top:calc(${(hand[1] * 100).toFixed(1)}% - ${(grip[1] * h).toFixed(1)}px)${flip ? ';transform:scaleX(-1)' : ''}">`;
+}
+
+/** The pickers for the items tried in each hand. */
+function tryOnHtml(): string {
+  const items = holdable();
+  if (!items.length) return '';
+  const options = (side: 'right' | 'left') => `<option value="">Nothing</option>${HOLDABLE.map((page) => {
+    const here = items.filter((i) => i.place.page === page);
+    return here.length ? `<optgroup label="${page}">${here.map((i) => `<option value="${esc(i.id)}"${tryOn[side] === i.id ? ' selected' : ''}>${esc(i.name)}${points[i.id]?.grip ? '' : ' (grip not found yet)'}</option>`).join('')}</optgroup>` : '';
+  }).join('')}`;
+  return `<div class="try-on"><label>Try in the right hand <select data-try-on="right">${options('right')}</select></label>
+    <label>Try in the left hand <select data-try-on="left">${options('left')}</select></label></div>`;
+}
+
+/**
+ * Where the hand finder put both hands, frame by frame: R is where a held
+ * weapon or charm is gripped, L where a shield or other off-hand item is.
+ * A frame where it found none borrows the nearest frame's hand in the game.
  */
 function handsHtml(w: WalkerView): string {
   const ids = DIRECTIONS.filter(([d]) => w.walks[d]).map(([d]) => `${w.id}-walk-${d}`);
@@ -361,11 +402,12 @@ function handsHtml(w: WalkerView): string {
     const height = 96;
     const width = Math.round((strip.width / strip.frames) * (height / strip.height));
     const frames = Array.from({ length: strip.frames }, (_, i) => {
-      const at = (hand: [number, number], side: string) => `<b class="dot ${side}" title="${side} hand" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%">${side === 'right' ? 'R' : 'L'}</b>`;
+      const at = (hand: ArtPoint, side: string) => `<b class="dot ${side}" title="${side} hand" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%">${side === 'right' ? 'R' : 'L'}</b>`;
       const right = hands?.[i];
       const left = lefts?.[i];
       const dot = right || left ? `${right ? at(right, 'right') : ''}${left ? at(left, 'left') : ''}` : '<small class="none">none</small>';
-      return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hands again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">${hands ? dot : ''}</button>`;
+      const body = `<span class="body" style="background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0"></span>`;
+      return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hands again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px">${body}${triedHtml(d, 'right', right, height)}${triedHtml(d, 'left', left, height)}${hands || lefts ? dot : ''}</button>`;
     }).join('');
     const question = questions.find((q) => q.facing === d);
     const ask = question ? `
@@ -377,11 +419,14 @@ function handsHtml(w: WalkerView): string {
           <p class="note">The same question is asked for every character walking ${label}. Nothing is looked at again until you ask.</p>
         </form>
       </details>` : '';
-    return [`<div class="hand-row"><div class="hand-head"><small>${label}${hands ? '' : ' · not looked at yet'}</small>${find({ ids: [id] }, 'Find again for this walk')}</div><div class="frames">${frames}</div>${ask}</div>`];
+    const missing = !hands ? ' · not looked at yet' : !lefts ? ' · left hand not looked for yet: it is found by itself after Pull and restart, or use Find again' : '';
+    return [`<div class="hand-row"><div class="hand-head"><small>${label}${missing}</small>${find({ ids: [id] }, 'Find again for this walk')}</div><div class="frames">${frames}</div>${ask}</div>`];
   });
   if (!rows.length) return '';
   return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: shields and off-hand items)</summary>
     <p class="note">The hand finder looks at every frame once, after a walk is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call.</p>
+    ${tryOnHtml()}
+    <p class="note">Pick an item to see it in that hand on every frame, as the game draws it. Trying items is free and changes nothing for players.</p>
     ${find({ ids: [...ids, w.id] }, `Find again for every walk of ${esc(w.name)}`, '')}
     ${rows.join('')}</details>`;
 }
@@ -644,6 +689,31 @@ export function artClick(target: HTMLElement): boolean {
   } else return false;
   t.blur();
   return true;
+}
+
+/** Handles the Art tab's pickers; false when the change was not one of them. */
+export function artChange(target: HTMLElement): boolean {
+  const side = target.dataset.tryOn;
+  if (side !== 'right' && side !== 'left') return false;
+  tryOn[side] = (target as HTMLSelectElement).value || undefined;
+  const url = holdable().find((i) => i.id === tryOn[side])?.url;
+  if (url && !sizes.has(url)) {
+    const img = new Image();
+    img.onload = () => { sizes.set(url, [img.naturalWidth, img.naturalHeight]); redrawHands(); };
+    img.src = url;
+  } else redrawHands();
+  return true;
+}
+
+/** Draws the open hands panels again, for a newly tried item. */
+function redrawHands(): void {
+  for (const panel of document.querySelectorAll<HTMLElement>('details.hands')) {
+    const w = data?.walkers.find((x) => x.id === panel.dataset.walker);
+    if (!w) continue;
+    if (panel.hasAttribute('open')) openHands.add(w.id);
+    else openHands.delete(w.id);
+    panel.outerHTML = handsHtml(w);
+  }
 }
 
 /** Handles the walk forms; false when the form was not one of the Art tab's. */

@@ -5,7 +5,7 @@
 import { loadToken, rejoinWhenBack, reloadWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 import { apiLogPage, wireApiLog } from './api-log-ui.ts';
-import { artClick, artPage, artSubmit, refreshArtJobs, type ArtContext } from './art-ui.ts';
+import { artChange, artClick, artPage, artSubmit, refreshArtJobs, type ArtContext } from './art-ui.ts';
 import { lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { TICK_SECONDS } from '@co-mmo/shared';
 
@@ -931,6 +931,7 @@ function pollDrafting(): void {
 
 // A provider change suggests its default model.
 main.addEventListener('change', (e) => {
+  if (tab === 'art' && artChange(e.target as HTMLElement)) return;
   const select = e.target as HTMLSelectElement;
   const input = select.parentElement?.querySelector<HTMLInputElement>('input');
   const provider = aiState?.providers.find((p) => p.id === select.value);

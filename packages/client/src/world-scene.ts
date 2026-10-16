@@ -3,6 +3,8 @@ import {
   ABILITIES,
   ITEMS,
   Interpolator,
+  HELD_SIZE,
+  heldBehind,
   heldItem,
   offHandItem,
   Predictor,
@@ -106,8 +108,6 @@ export interface WorldSceneOptions {
 
 const T = TILE_PIXELS;
 const LABEL_DEPTH = 1_000_000;
-/** A held item's longest side, as a share of its holder's height. */
-const HELD_SIZE = 0.42;
 
 export class WorldScene extends Phaser.Scene {
   private welcome: WelcomeMessage;
@@ -826,7 +826,7 @@ export class WorldScene extends Phaser.Scene {
       .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
       .setScale((b.displayHeight * HELD_SIZE) / Math.max(image.width, image.height))
       .setPosition(x, y)
-      .setDepth(b.depth + (a.facing === 'back' || a.facing === (side === 'right' ? 'left' : 'right') ? -1 : 1))
+      .setDepth(b.depth + (heldBehind(a.facing, side) ? -1 : 1))
       .setVisible(b.visible);
   }
 

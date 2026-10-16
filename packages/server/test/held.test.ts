@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { BUILDING_STYLES, ITEMS, WALK_DIRECTIONS, addItem, buildingArtIds, equipmentBonus, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { BUILDING_STYLES, ITEMS, WALK_DIRECTIONS, addItem, buildingArtIds, equipmentBonus, heldBehind, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import type { ChatModel, ChatRequest } from '../src/ai/chat.ts';
 import { findPoint, steadyHands, stripFrames } from '../src/assets/points.ts';
 import { HandFinder, type PointSource } from '../src/hand-finder.ts';
@@ -159,6 +159,11 @@ describe('held items', () => {
     const seen = conns.b!.filter((m) => m.t === 'snapshot').at(-1) as Extract<ServerMessage, { t: 'snapshot' }>;
     expect(seen.players.find((p) => p.id === 'a')).toMatchObject({ held: 'wooden-sword' });
     expect(seen.players.find((p) => p.id === 'a')!.offHeld).toBeUndefined();
+  });
+
+  it('draws each hand\'s item behind the body only when that hand is on the far side', () => {
+    expect((['front', 'right', 'back', 'left'] as const).map((f) => heldBehind(f, 'right'))).toEqual([false, false, true, true]);
+    expect((['front', 'right', 'back', 'left'] as const).map((f) => heldBehind(f, 'left'))).toEqual([false, true, true, false]);
   });
 
   it('wears a wished shield in the off hand, shown in the left hand beside the weapon', () => {

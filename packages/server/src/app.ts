@@ -7,7 +7,12 @@ import { ITEMS, TICK_SECONDS, WALKING_LOOKS, WALK_FRAMES, WishError, isClientMes
 import { Auth, cleanEmail, type Mailer } from './auth.ts';
 import { awayFeed } from './feed.ts';
 import { World } from './world.ts';
-import { Store, StoreError, dailyClips, soundSettings, videoSettings, type Account } from './store.ts';
+import { Store, StoreError, type Account } from './store.ts';
+import { dailyClips } from './settings.ts';
+import { AiServices } from './ai/services.ts';
+import { Budget } from './budget.ts';
+import { OfflineGod } from './god.ts';
+import { OfflineCompiler } from './compiler.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
 import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
@@ -18,13 +23,13 @@ import type { Updater } from './updates.ts';
 import { Builds, type BuildOptions } from './builds.ts';
 import { BuildingPainter, type BuildingPainterOptions } from './building-painter.ts';
 import { WalkPainter } from './walk-painter.ts';
-import { GeminiVideoProvider, type VideoProvider } from './assets/video.ts';
+import type { VideoProvider } from './assets/video.ts';
 import { ArtJobs } from './art-jobs.ts';
 import { RecipeBook } from './art-recipes.ts';
 import { ArtStudio } from './art-studio.ts';
-import { DailyClips, MemoryPaintQueue, nextDailyReset, queuedSound, queuedVideo, type PaintQueue } from './paint-queue.ts';
+import { DailyClips, MemoryPaintQueue, nextDailyReset, type PaintQueue } from './paint-queue.ts';
 import { SoundMaker } from './sound-maker.ts';
-import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from './assets/sound.ts';
+import type { SoundProvider } from './assets/sound.ts';
 import type { FinishedSound } from './assets/sound-finish.ts';
 import { FilePaintRequests } from './paint-requests.ts';
 import { HandFinder, type PointSource } from './hand-finder.ts';
@@ -85,6 +90,10 @@ export interface App {
   server: Server;
   world: World;
   wishes: Wishes;
+  /** Every AI service, chosen from settings and keys. */
+  ai: AiServices;
+  /** Spending against the month's budget and today's cap. */
+  budget: Budget;
   rules: LiveRules;
   reports: Reports;
   builds: Builds;
@@ -136,29 +145,51 @@ export function createApp(options: AppOptions): App {
     },
   });
   world.onEvent = (type, playerId, data) => rules.fire(type, playerId, data);
-  const wishes = new Wishes(store, world, rules, options.wishes);
+  // Money first: every paid call below asks the budget and records its cost there.
+  const budget = new Budget(store, options.wishes.now);
+  // Every picture and clip takes its turn here, within each model's rate limit.
+  const paintQueue = options.paintQueue ?? new MemoryPaintQueue();
+  // Google caps Veo clips a day without saying so when it refuses, so the game counts its own.
+  const clips = new DailyClips({
+    cap: () => dailyClips(store.settings),
+    madeSince: (model, since) => store.spendSince(since).filter((s) => s.kind === 'video' && s.model === model).length,
+  });
+  // Every AI service the game uses, chosen from God's View settings and the server's keys.
+  const ai = new AiServices({
+    settings: () => store.settings,
+    env,
+    overBudget: () => budget.state().over,
+    offlineGod: new OfflineGod(),
+    offlineCompiler: new OfflineCompiler(),
+    paintQueue,
+    clips,
+    overrides: {
+      ...pick(options.wishes, ['chatModel', 'compilerModel', 'imageProvider', 'judgeModel']),
+      ...(options.videoProvider ? { videoProvider: options.videoProvider } : {}),
+      ...(options.sound?.effects ? { effects: options.sound.effects } : {}),
+      ...(options.sound?.music ? { music: options.sound.music } : {}),
+    },
+  });
+  const wishes = new Wishes(store, world, rules, options.wishes, { ai, budget });
   // Regions run on region servers when there are any (design doc, Scaling without a cap).
   const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries() }) : undefined;
   if (regionServers) world.hosting = regionServers;
   const ready = regionServers ? regionServers.start() : Promise.resolve();
   // How hard this process works, for God's View's Server health tab.
   const meter = new LoadMeter();
-  const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now });
+  const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now, ai, budget });
   wishes.restore();
   const artJobs = new ArtJobs();
   wishes.artJobs = artJobs;
-  // Every picture and clip takes its turn here, within each model's rate limit.
-  const paintQueue = options.paintQueue ?? new MemoryPaintQueue();
   const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
-  wishes.paintQueue = paintQueue;
   wishes.paintRequests = paintRequests;
   // What was sent to make each picture, clip and sound, for God's View to show with every version.
   const recipes = new RecipeBook(options.wishes.artDir);
   wishes.recipes = recipes;
   const painterOptions: BuildingPainterOptions = {
-    provider: () => wishes.imageProvider('buildings'),
-    overBudget: () => wishes.budget().paused,
-    spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: null }),
+    provider: () => ai.image('buildings'),
+    overBudget: () => budget.paused(),
+    spend: (usd, provider) => budget.spend('image', { provider: provider.id, model: provider.model }, usd),
     anchorDir: options.wishes.anchorDir,
     artDir: options.wishes.artDir,
     shipped: async () => (options.shippedArt ? JSON.parse(await readFile(options.shippedArt, 'utf8')) : {}),
@@ -166,48 +197,21 @@ export function createApp(options: AppOptions): App {
     recipes,
   };
   const buildingPainter = new BuildingPainter(painterOptions);
-  // Walks use Google's Veo on the Gemini key, with the model chosen on the AI models tab.
-  const chosenVideo = options.videoProvider ?? (() => {
-    const v = videoSettings(store.settings, env);
-    return v.provider === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
-  });
-  // Google caps Veo clips a day without saying so when it refuses, so the game counts its own.
-  const clips = new DailyClips({
-    cap: () => dailyClips(store.settings),
-    madeSince: (model, since) => store.spendSince(since).filter((s) => s.kind === 'video' && s.model === model).length,
-  });
-  const video = () => {
-    const provider = chosenVideo();
-    return provider && queuedVideo(paintQueue, provider, clips);
-  };
   const walkPainter = new WalkPainter({
     ...painterOptions,
-    provider: () => wishes.imageProvider('walks'),
-    video,
-    spendVideo: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'video', provider: provider.id, model: provider.model, playerId: null }),
+    provider: () => ai.image('walks'),
+    video: () => ai.video(),
+    spendVideo: (usd, provider) => budget.spend('video', { provider: provider.id, model: provider.model }, usd),
     ...(options.videoFrames ? { toFrames: options.videoFrames } : {}),
     // Pages already open load the new walks without a reload.
     onPainted: (walks) => world.broadcast({ t: 'art', walks }),
   });
   // Sound effects from ElevenLabs and music from Google's Lyria, as chosen in God's View.
-  const sound = () => soundSettings(store.settings, env);
-  const effects = options.sound?.effects ?? (() => {
-    const s = sound().effects;
-    return s.provider === 'elevenlabs' && env.ELEVENLABS_API_KEY ? new ElevenLabsSoundProvider(env.ELEVENLABS_API_KEY, s.model) : undefined;
-  });
-  const music = options.sound?.music ?? (() => {
-    const s = sound().music;
-    return s.provider === 'gemini' && env.GEMINI_API_KEY ? new LyriaMusicProvider(env.GEMINI_API_KEY, s.model) : undefined;
-  });
-  const queued = (make: () => SoundProvider | undefined) => () => {
-    const provider = make();
-    return provider && queuedSound(paintQueue, provider);
-  };
   const sounds = new SoundMaker({
-    effects: queued(effects),
-    music: queued(music),
-    overBudget: () => wishes.budget().paused,
-    spend: (usd, provider) => store.recordSpend({ at: Date.now(), usd, kind: 'sound', provider: provider.id, model: provider.model, playerId: null }),
+    effects: () => ai.effects(),
+    music: () => ai.music(),
+    overBudget: () => budget.paused(),
+    spend: (usd, provider) => budget.spend('sound', { provider: provider.id, model: provider.model }, usd),
     artDir: options.wishes.artDir,
     jobs: artJobs,
     ...(options.sound?.finish ? { finish: options.sound.finish } : {}),
@@ -219,7 +223,7 @@ export function createApp(options: AppOptions): App {
   if (makeSounds) void sounds.start();
   /** Paints and makes whatever is still missing, once the budget allows: after today's cap held it back, or the Owner raised a limit. */
   const resumeArt = (): void => {
-    if (wishes.budget().paused) return;
+    if (budget.paused()) return;
     wishes.paintMissing();
     artStudio.resume();
     if (options.shippedArt) void buildingPainter.start().then(() => walkPainter.start());
@@ -240,16 +244,16 @@ export function createApp(options: AppOptions): App {
   };
   nextDay();
   const artStudio = new ArtStudio({
-    store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video, sounds,
+    store, wishes, ai, budget, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests, recipes,
   });
   // Held items: where each walker's free hand is and where each weapon or charm is gripped.
   const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...(await walkPainter.standingManifest()), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
   const handFinder = new HandFinder({
     artDir: options.wishes.artDir,
-    model: () => wishes.judgeModel(),
-    paused: () => wishes.budget().paused,
-    spend: (usd, model) => store.recordSpend({ at: Date.now(), usd, kind: 'chat', provider: model.provider, model: model.model, playerId: null }),
+    model: () => ai.judgeModel(),
+    paused: () => budget.paused(),
+    spend: (usd, model) => budget.spend('chat', model, usd),
     sources: async () => pointSources(await painterOptions.shipped(), await paintedArt()),
   });
   /** Reads a picture the client is served: painted here, or shipped with the game. */
@@ -417,7 +421,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, hands: handFinder, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
+    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
@@ -589,6 +593,8 @@ export function createApp(options: AppOptions): App {
     server,
     world,
     wishes,
+    ai,
+    budget,
     rules,
     reports,
     builds,
@@ -688,4 +694,9 @@ async function serveFile(file: string, res: ServerResponse): Promise<void> {
   }
   res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
   createReadStream(file).pipe(res);
+}
+
+/** The keys of `from` that are set, as a new object. */
+function pick<T extends object, K extends keyof T>(from: T, keys: K[]): Partial<Pick<T, K>> {
+  return Object.fromEntries(keys.filter((k) => from[k] !== undefined).map((k) => [k, from[k]])) as Partial<Pick<T, K>>;
 }

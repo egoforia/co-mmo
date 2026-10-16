@@ -7,7 +7,8 @@ import { knownVideoModels, videoUsd } from './assets/video.ts';
 import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
-import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings, type Store } from './store.ts';
+import { type Account, type Store } from './store.ts';
+import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings } from './settings.ts';
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
@@ -15,6 +16,8 @@ import type { HandFinder } from './hand-finder.ts';
 import { TURNED, type Facing } from './assets/points.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
+import type { AiServices } from './ai/services.ts';
+import type { Budget } from './budget.ts';
 import type { World } from './world.ts';
 import type { LoadMeter } from './load-meter.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
@@ -25,6 +28,10 @@ export interface AdminContext {
   store: Store;
   world: World;
   wishes: Wishes;
+  /** The AI models chosen in God's View. */
+  ai: AiServices;
+  /** Spending against the month's budget and today's cap. */
+  budget: Budget;
   rules: LiveRules;
   reports: Reports;
   builds: Builds;
@@ -100,7 +107,7 @@ export async function handleAdmin(
       queue: content.filter((c) => c.status === 'pending').length,
       reports: reports.open().length,
       rules: content.filter((c) => c.status === 'granted' && c.definition?.kind === 'rule').length,
-      budget: owner ? wishes.budget() : null,
+      budget: owner ? ctx.budget.state() : null,
       update: owner ? updateSummary(ctx.updater) : null,
       building: store.content.filter((c) => c.build && ['queued', 'building', 'review', 'merged'].includes(c.build.state)).length,
     }), true;
@@ -321,12 +328,12 @@ export async function handleAdmin(
     try {
       let usd = 0;
       const { reply, model } = await askGod(
-        wishes.models(),
+        ctx.ai.godModels(),
         { playerName: account.name, role: account.role, favor: 0, regionName: 'the Sanctum', biome: 'Sanctum', nearby: [], recentWishes: [] },
         [{ role: 'user', content: prompt }],
         (r, m) => {
           usd += r.usd;
-          store.recordSpend({ at: Date.now(), usd: r.usd, kind: 'chat', provider: m.provider, model: m.model, playerId: account.id });
+          ctx.budget.spend('chat', m, r.usd, account.id);
         },
       );
       return json(res, 200, { provider: model.provider, model: model.model, reply, usd }), true;
@@ -361,7 +368,7 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
     if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [], mirrored: (await ctx.hands?.mirrored()) ?? {} }), true;
-    if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: wishes.budget() }), true;
+    if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: ctx.budget.state() }), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;
     const note = typeof body?.note === 'string' ? body.note : '';
     // The Owner's own words in place of a prompt, for a walk's standing picture or clip.
@@ -475,7 +482,7 @@ export async function handleAdmin(
       const name = s.playerId ? store.accountById(s.playerId)?.name ?? 'unknown' : 'system';
       byPlayer[name] = (byPlayer[name] ?? 0) + s.usd;
     }
-    return json(res, 200, { ...wishes.budget(), byKind, byPlayer, byProvider, estimatedUsd, calls: spend.length, workshop: store.settings.workshop ?? DEFAULT_WORKSHOP }), true;
+    return json(res, 200, { ...ctx.budget.state(), byKind, byPlayer, byProvider, estimatedUsd, calls: spend.length, workshop: store.settings.workshop ?? DEFAULT_WORKSHOP }), true;
   }
 
   if (route === 'budget' && method === 'PUT') {

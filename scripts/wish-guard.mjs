@@ -32,6 +32,8 @@ export const FORBIDDEN = [
 export const CORE = [
   { pattern: /^packages\/server\/src\/store\.ts$/, what: 'accounts, roles and saved settings' },
   { pattern: /^packages\/server\/src\/auth\.ts$/, what: 'sign-in by email, Google and GitHub' },
+  { pattern: /^packages\/server\/src\/settings\.ts$/, what: 'saved settings, AI model choices and budget limits' },
+  { pattern: /^packages\/server\/src\/budget\.ts$/, what: 'the budget' },
   { pattern: /^packages\/server\/src\/admin\.ts$/, what: "God's View permissions, keys and the budget" },
   { pattern: /^packages\/server\/src\/ai\//, what: 'AI providers and their keys' },
   { pattern: /^packages\/server\/src\/rules\.ts$/, what: 'the script sandbox' },

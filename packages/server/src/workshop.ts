@@ -33,7 +33,10 @@ import { FILL_REQUEST } from './god.ts';
 import { buildPrompt } from './assets/style.ts';
 import { readKitManifest, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd } from './assets/wish-art.ts';
-import { DEFAULT_WORKSHOP, type Store } from './store.ts';
+import { type Store } from './store.ts';
+import { DEFAULT_WORKSHOP } from './settings.ts';
+import type { AiServices } from './ai/services.ts';
+import type { Budget } from './budget.ts';
 import type { PaintedSample, Wishes } from './wishes.ts';
 import type { World } from './world.ts';
 
@@ -43,6 +46,10 @@ export interface WorkshopOptions {
   /** Where painted wish art is written (a biome kit painted once is not painted again). */
   artDir: string;
   now?: () => number;
+  /** The image model samples are painted with. */
+  ai: AiServices;
+  /** Samples pause once the month's budget nears its end. */
+  budget: Budget;
 }
 
 /**
@@ -253,8 +260,8 @@ export class Workshop {
     if (!settings.samples) return 'Samples are switched off in this world.';
     if (draft.sample) return 'Each draft gets one sample, and this one has had it.';
     if (checked.problems.length || !checked.definition) return 'Finish the wish first, then a sample can be painted.';
-    if (!this.wishes.imageProvider('wishes')) return 'No image model is chosen in God\'s View, so nothing can be painted.';
-    if (this.wishes.budget().warn) return 'This month\'s art budget is nearly spent, so samples are paused.';
+    if (!this.options.ai.image('wishes')) return 'No image model is chosen in God\'s View, so nothing can be painted.';
+    if (this.options.budget.state().warn) return 'This month\'s art budget is nearly spent, so samples are paused.';
     const favor = this.world.regionOf(playerId)?.character(playerId)?.favor ?? 0;
     if (favor < settings.sampleFavor) return `A sample costs ${settings.sampleFavor} Favor, and you hold ${favor}.`;
     return undefined;
@@ -305,7 +312,7 @@ export class Workshop {
 
   /** What the image model would be asked for, built by the same code that paints. */
   private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' | 'loot' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
-    const provider = this.wishes.imageProvider('wishes');
+    const provider = this.options.ai.image('wishes');
     const pictures: PicturePreview[] = [];
     const picture = (label: string, prompt: string, wanted: string[], withRaw = false): void => {
       const references = wanted.filter((ref) => existsSync(resolve(this.options.anchorDir, `${ref}.png`)) || (withRaw && existsSync(resolve(this.options.anchorDir, 'raw', `${ref}.png`))));
@@ -326,7 +333,7 @@ export class Workshop {
       const req = artRequest(def, biome);
       picture(def.kind === 'ability' ? `Scroll of ${def.name}` : def.name, req.prompt, req.references);
     }
-    const budget = this.wishes.budget();
+    const budget = this.options.budget.state();
     const notice = !provider
       ? 'No image model is chosen in God\'s View, so it keeps the picture below.'
       : budget.over ? 'This month\'s art budget is spent, so it keeps the picture below for now.'

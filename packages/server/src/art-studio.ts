@@ -20,7 +20,6 @@ import {
 import { ANCHORS } from './assets/anchors.ts';
 import { buildingArtJobs } from './assets/building-art.ts';
 import { BIOME_KIT, type KitAsset } from './assets/kit.ts';
-import type { VideoProvider } from './assets/video.ts';
 import { paintKitAsset, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { pictureName } from './assets/names.ts';
@@ -32,9 +31,12 @@ import type { BuildingPainter } from './building-painter.ts';
 import { watched } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { SoundItem, SoundMaker } from './sound-maker.ts';
-import type { ArtUse, ContentRecord, Store } from './store.ts';
+import type { ContentRecord, Store } from './store.ts';
+import type { ArtUse } from './settings.ts';
 import { estimateClipUsd, type StandingView, type ViewSource, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
+import type { AiServices } from './ai/services.ts';
+import type { Budget, BudgetState } from './budget.ts';
 
 // God's View's Art tab: every picture the game draws, where it came from,
 // and buttons to paint any of it again or to make something walk. Before
@@ -144,7 +146,10 @@ export interface ArtStudioOptions {
   buildings: BuildingPainter;
   walks: WalkPainter;
   jobs: ArtJobs;
-  video: () => VideoProvider | undefined;
+  /** The image and video models, as chosen in God's View. */
+  ai: AiServices;
+  /** Spending against the month's budget and today's cap. */
+  budget: Budget;
   anchorDir: string;
   artDir: string;
   shipped: () => Promise<ArtManifest>;
@@ -189,7 +194,7 @@ export class ArtStudio {
   async overview(): Promise<{
     imageModel: string | null;
     videoModel: string | null;
-    budget: ReturnType<Wishes['budget']>;
+    budget: BudgetState;
     jobs: ArtJob[];
     items: ArtItem[];
     groups: ArtGroup[];
@@ -201,15 +206,15 @@ export class ArtStudio {
   }> {
     await this.load();
     await this.options.walks.load();
-    const imageModel = this.options.wishes.imageProvider()?.model ?? null;
-    const videoModel = this.options.video()?.model ?? null;
+    const imageModel = this.options.ai.image()?.model ?? null;
+    const videoModel = this.options.ai.video()?.model ?? null;
     const shipped = await this.options.shipped();
     const painted: ArtManifest = { ...(await this.options.wishes.kitManifest()), ...this.options.buildings.manifest(), ...this.options.walks.manifest() };
     const items = await this.items(shipped, painted);
     return {
       imageModel,
       videoModel,
-      budget: this.options.wishes.budget(),
+      budget: this.options.budget.state(),
       jobs: this.options.jobs.list(),
       items,
       groups: groupsOf(items),
@@ -322,7 +327,7 @@ export class ArtStudio {
   }
 
   private async walkerViews(shipped: ArtManifest, painted: ArtManifest, picture: number): Promise<WalkerView[]> {
-    const clip = estimateClipUsd(this.options.video()?.model ?? '');
+    const clip = estimateClipUsd(this.options.ai.video()?.model ?? '');
     const views: WalkerView[] = [];
     for (const w of this.walkerList()) {
       const walks: WalkerView['walks'] = {};
@@ -417,7 +422,7 @@ export class ArtStudio {
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
     const box = (await this.options.shipped())[asset];
     if (!box) throw new ArtRequestError('That picture is not part of the game yet.');
-    const provider = this.options.wishes.imageProvider(useOf(kit));
+    const provider = this.options.ai.image(useOf(kit));
     if (!provider) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
     const dry = dryImage(provider);
     await paintKitAsset(withSelf(kit), dry, this.options.anchorDir, this.redoneDir, { box: { width: box.width, height: box.height }, note }).catch((err) => {
@@ -514,7 +519,7 @@ export class ArtStudio {
     const building = Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`));
     const kit = this.kitAsset(asset);
     const use: ArtUse = wishId ? 'wishes' : building ? 'buildings' : kit ? useOf(kit) : 'wishes';
-    const provider = this.options.wishes.imageProvider(use);
+    const provider = this.options.ai.image(use);
     if (!provider) throw new ArtRequestError("No image model is set. Choose one on the AI models tab first.");
     const estimateUsd = estimateImageUsd(provider.model);
     if (wishId && pictureId) {
@@ -555,8 +560,8 @@ export class ArtStudio {
   async walk(walkerId: string, body: string, directions: WalkDirection[], views: boolean): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, body);
-    const image = this.options.wishes.imageProvider('walks');
-    const video = this.options.video();
+    const image = this.options.ai.image('walks');
+    const video = this.options.ai.video();
     if (!image) throw new ArtRequestError("No image model is set. Choose one on the AI models tab first.");
     if (!video) throw new ArtRequestError('Walks are made with Google\'s video model, which needs Google AI Studio as the image model and its key.');
     const redo = directions.filter((d) => WALK_DIRECTIONS.includes(d));
@@ -576,7 +581,7 @@ export class ArtStudio {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, 'two-legged');
     const d = this.direction(direction);
-    const image = this.options.wishes.imageProvider('walks');
+    const image = this.options.ai.image('walks');
     if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
     const estimateUsd = estimateImageUsd(image.model);
     const own = ownPrompt(prompt);
@@ -591,7 +596,7 @@ export class ArtStudio {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, body);
     const d = this.direction(direction);
-    const video = this.options.video();
+    const video = this.options.ai.video();
     if (!video) throw new ArtRequestError("Walks are made with Google's video model, which needs Google AI Studio as the image model and its key.");
     const estimateUsd = estimateClipUsd(video.model);
     const own = ownPrompt(prompt);
@@ -719,11 +724,11 @@ export class ArtStudio {
 
   /** About what one picture of this kind costs with its model. */
   private pictureUsd(use: ArtUse): number {
-    return estimateImageUsd(this.options.wishes.imageProvider(use)?.model ?? '');
+    return estimateImageUsd(this.options.ai.image(use)?.model ?? '');
   }
 
   private refuseWhenSpent(): void {
-    const budget = this.options.wishes.budget();
+    const budget = this.options.budget.state();
     if (budget.over) throw new ArtRequestError("This month's budget is spent, so nothing more can be painted until next month or until the ceiling is raised on the Budget tab.");
     if (budget.overToday) throw new ArtRequestError("Today's spending cap is reached, so nothing more can be painted until midnight UTC or until the cap is raised on the Budget tab.");
   }
@@ -767,7 +772,7 @@ export class ArtStudio {
   private enqueue(task: () => Promise<unknown>, handle?: ArtJobHandle, request?: PaintRequest): void {
     const run = this.queue.then(async () => {
       await Promise.all([this.options.buildings.job, this.options.walks.job]);
-      const budget = this.options.wishes.budget();
+      const budget = this.options.budget.state();
       if (budget.paused) {
         handle?.skip(budget.why ?? 'The budget is spent.');
         return this.stop(request);
@@ -807,14 +812,14 @@ export class ArtStudio {
 
   /** Paints a shipped scenery piece, character or item again, at its shipped size. */
   private async repaintShipped(asset: KitAsset, box: { width: number; height: number }, note: string, handle: ArtJobHandle): Promise<void> {
-    const provider = this.options.wishes.imageProvider(useOf(asset));
+    const provider = this.options.ai.image(useOf(asset));
     if (!provider) return handle.skip("No image model is set in God's View.");
     handle.start();
     const sent = keepingImage(watched(provider, handle));
     const { image, entry } = await paintKitAsset(withSelf(asset), sent, this.options.anchorDir, this.redoneDir, { box, note });
     const usd = imageUsd(provider.model, image);
     if (sent.sent) await this.options.recipes.record(asset.id, { at: Date.now(), steps: [await this.options.recipes.imageStep(asset.name ?? asset.id, provider, sent.sent, usd)] });
-    this.options.store.recordSpend({ at: Date.now(), usd, kind: 'image', provider: provider.id, model: provider.model, playerId: null });
+    this.options.budget.spend('image', { provider: provider.id, model: provider.model }, usd);
     await this.load();
     const kind = asset.kind === 'tile' || asset.kind === 'prop' ? entry.kind : asset.kind;
     this.redone[asset.id] = { ...entry, kind, file: `${REDONE_ART_PATH}/${entry.file}?v=${Date.now().toString(36)}`, redone: Date.now() };

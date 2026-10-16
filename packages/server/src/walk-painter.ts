@@ -66,6 +66,9 @@ export interface WalkVersion {
 export const WALK_HISTORY_PATH = 'wished-art/history';
 
 /** A walker's standing picture in one direction, which its walk clip starts and ends on. */
+/** A picture a standing picture can be painted from: the approved picture, or the standing picture of a direction. */
+export type ViewSource = 'approved' | WalkDirection;
+
 export interface StandingView {
   /** Where the browser loads it; none when it has to be painted first. */
   url?: string;
@@ -129,6 +132,7 @@ export class WalkPainter {
 
   private async run(): Promise<void> {
     await this.load();
+    await this.recut();
     // Nothing can be painted without an image model; the Art tab says so, so the log stays quiet.
     if (!this.options.provider()) return;
     const shipped = await this.options.shipped();
@@ -146,6 +150,61 @@ export class WalkPainter {
       await mkdir(this.dir, { recursive: true });
       await writeFile(resolve(this.dir, 'looks.json'), JSON.stringify(madeFrom, null, 2));
     }
+  }
+
+  /**
+   * Walks cut before frames were kept where they stood in the clip are cut
+   * again from their clips, once and for free, so they stop sliding from
+   * frame to frame. A walk whose clip is not the one its frames came from
+   * (an earlier version put back) is left as it is.
+   */
+  async recut(): Promise<void> {
+    const path = resolve(this.dir, 'placed.json');
+    const done = new Set(JSON.parse(await readFile(path, 'utf8').catch(() => '[]')) as string[]);
+    const walkers = new Set<string>();
+    for (const [id, entry] of Object.entries(this.painted)) {
+      if (entry.kind !== 'walk' || done.has(id)) continue;
+      const names = (await this.cached(`frames/${id}.json`)) as string[] | undefined;
+      const clip = await this.lastClip(id);
+      done.add(id);
+      if (!names || !clip) continue;
+      try {
+        const old = await Promise.all(names.map((n) => readFile(resolve(this.dir, 'frames', n))));
+        const { figures, placed } = await walkFromFrames(await (this.options.toFrames ?? videoFrames)(clip), names.length);
+        if (!(await sameSizes(figures, old))) continue;
+        await Promise.all(placed.map((f, i) => writeFile(resolve(this.dir, 'frames', names[i]!), f)));
+        walkers.add(id.replace(/-walk-(front|right|back|left)$/, ''));
+      } catch (err) {
+        console.error(`Cutting ${id} again from its clip failed:`, (err as Error).message);
+      }
+    }
+    await mkdir(this.dir, { recursive: true });
+    await writeFile(path, JSON.stringify([...done], null, 2));
+    for (const walkerId of walkers) {
+      const walks: Buffer[][] = [];
+      for (const d of WALK_DIRECTIONS) {
+        const frames = (await this.cached(`frames/${walkArt(walkerId, d)}.json`)) as string[] | undefined;
+        if (frames) walks.push(await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f)))));
+      }
+      const entry = this.painted[walkArt(walkerId, 'front')];
+      const body = Object.keys(BODY_TYPES).find((k) => BODY_TYPES[k]!.frames === entry?.frames && BODY_TYPES[k]!.cycleSeconds === entry?.cycleSeconds) ?? 'two-legged';
+      if (walks.length === WALK_DIRECTIONS.length) await this.writeStrips({ id: walkerId, name: walkerId, gear: [], body, reference: async () => Buffer.alloc(0) }, walks, true);
+    }
+  }
+
+  /** Notes that a walk's frames are kept where they stood in its clip, so it is never cut again. */
+  private async markPlaced(id: string): Promise<void> {
+    const path = resolve(this.dir, 'placed.json');
+    const done = new Set(JSON.parse(await readFile(path, 'utf8').catch(() => '[]')) as string[]);
+    done.add(id);
+    await writeFile(path, JSON.stringify([...done], null, 2));
+  }
+
+  /** The clip a walk was last cut from: the later of its first try and its retry. */
+  private async lastClip(id: string): Promise<Buffer | undefined> {
+    const tries = await Promise.all([`${id}.mp4`, `${id}-retry.mp4`].map(async (n) => ({ n, at: (await stat(resolve(this.dir, 'raw', n)).catch(() => undefined))?.mtimeMs })));
+    const last = tries.filter((t) => t.at !== undefined).sort((a, b) => b.at! - a.at!)[0];
+    return last ? readFile(resolve(this.dir, 'raw', last.n)) : undefined;
   }
 
   /** A walker for one of the approved anchors: a player look, a creature or a person. */
@@ -251,10 +310,10 @@ export class WalkPainter {
    * its own so the Owner can look at the picture before any clip is made
    * from it; `prompt` replaces the usual words.
    */
-  async previewView(walker: Walker, direction: WalkDirection, prompt?: string): Promise<Recipe> {
+  async previewView(walker: Walker, direction: WalkDirection, prompt?: string, from?: readonly ViewSource[]): Promise<Recipe> {
     const image = this.options.provider();
     if (!image) throw new Error(stopReason(this.options));
-    const step = await this.options.recipes!.imageStep(`${walker.name} standing, facing ${facingWords(direction)}`, image, await this.viewRequest(walker, direction, prompt), estimateImageUsd(image.model));
+    const step = await this.options.recipes!.imageStep(`${walker.name} standing, facing ${facingWords(direction)}`, image, await this.viewRequest(walker, direction, prompt, from), estimateImageUsd(image.model));
     return { at: Date.now(), steps: [step], notes: ['A picture that shows more than one figure is painted once more, for about the same again.', 'Only the picture is painted. Its walk clip is made separately, when you ask for it, so you can look at the picture first.'] };
   }
 
@@ -292,9 +351,9 @@ export class WalkPainter {
    * Paints a walker standing in one direction, and nothing else: the clip is
    * made later from it, when the Owner asks. The picture it replaces is kept.
    */
-  async paintView(walker: Walker, direction: WalkDirection, prompt: string | undefined, handle?: ArtJobHandle): Promise<boolean> {
+  async paintView(walker: Walker, direction: WalkDirection, prompt: string | undefined, handle?: ArtJobHandle, from?: readonly ViewSource[]): Promise<boolean> {
     handle?.start();
-    const painted = await this.paintStanding(walker, direction, handle, prompt);
+    const painted = await this.paintStanding(walker, direction, handle, prompt, from);
     if (!painted) return handle?.skip(stopReason(this.options)), false;
     handle?.done(painted.usd);
     if (!(await this.approvedCopy(walker, direction))) await this.history.keep(viewKey(walker, direction), this.viewPath(walker, direction));
@@ -448,16 +507,38 @@ export class WalkPainter {
   }
 
   /** What painting a walker standing in one direction sends to the image model. */
-  private async viewRequest(walker: Walker, direction: WalkDirection, prompt?: string): Promise<ImageRequest> {
+  /**
+   * What painting a walker standing in one direction sends to the image
+   * model: painted from its approved picture, or from the pictures chosen in
+   * `from` (the approved picture and standing pictures already kept), since
+   * the front alone does not show everything, such as how a scarf hangs at
+   * the back. Refused when a chosen standing picture is not there.
+   */
+  private async viewRequest(walker: Walker, direction: WalkDirection, prompt?: string, from: readonly ViewSource[] = ['approved']): Promise<ImageRequest> {
+    const chosen = [...new Set(from.length ? from : ['approved' as const])];
+    const references: ImageRequest['references'] = [];
+    const labels: string[] = [];
+    for (const source of chosen) {
+      if (source === 'approved') {
+        references.push({ mimeType: 'image/png', data: await this.onMagenta(walker) });
+        labels.push(`${walker.name}'s approved picture, on magenta`);
+        continue;
+      }
+      const view = (await this.approvedCopy(walker, source)) ? undefined : await this.keptView(walker, source);
+      if (!view) throw new Error(`${walker.name} has no standing picture facing ${facingWords(source)} to paint from.`);
+      references.push({ mimeType: 'image/png', data: await sharp(view).flatten({ background: KEY_COLOR.hex }).png().toBuffer() });
+      labels.push(`${walker.name} standing, facing ${facingWords(source)}, on magenta`);
+    }
     return {
-      prompt: prompt ?? viewPrompt(walker.name, walker.gear, direction),
-      references: [{ mimeType: 'image/png', data: await this.onMagenta(walker) }],
-      labels: [`${walker.name}'s approved picture, on magenta`],
-      // The picture is the walker to paint, not only a style to match, so the "do not copy their subjects" note would fight the prompt.
+      prompt: prompt ?? viewPrompt(walker.name, walker.gear, direction, references.length),
+      references,
+      labels,
+      // The pictures are the walker to paint, not only a style to match, so the "do not copy their subjects" note would fight the prompt.
       edit: true,
       aspectRatio: '3:4',
     };
   }
+
 
   /** All four walks of one walker; false when painting has to stop (no model, no budget). */
   async paintWalker(walker: Walker, source: ArtJobSource, redone = false, planned?: WalkPlan): Promise<boolean> {
@@ -545,12 +626,12 @@ export class WalkPainter {
    * Paints the walker standing in one direction, tried twice when the
    * picture shows more than one figure; undefined when painting has to stop.
    */
-  private async paintStanding(walker: Walker, direction: WalkDirection, handle?: ArtJobHandle, prompt?: string): Promise<{ figure: Buffer; usd: number; request: ImageRequest; provider: ImageProvider } | undefined> {
+  private async paintStanding(walker: Walker, direction: WalkDirection, handle?: ArtJobHandle, prompt?: string, from?: readonly ViewSource[]): Promise<{ figure: Buffer; usd: number; request: ImageRequest; provider: ImageProvider } | undefined> {
     let usd = 0;
     for (let attempt = 0; attempt < 2; attempt++) {
       const provider = this.options.provider();
       if (!provider || this.options.overBudget()) return undefined;
-      const request = await this.viewRequest(walker, direction, prompt);
+      const request = await this.viewRequest(walker, direction, prompt, from);
       const image = await watched(provider, handle).generate(request);
       const cost = imageUsd(provider.model, image);
       usd += cost;
@@ -593,7 +674,7 @@ export class WalkPainter {
         this.options.spendVideo(cost, provider);
         await mkdir(resolve(this.dir, 'raw'), { recursive: true });
         await writeFile(resolve(this.dir, 'raw', `${id}${attempt ? '-retry' : ''}.mp4`), clip.data);
-        const { figures } = await walkFromFrames(await (this.options.toFrames ?? videoFrames)(clip.data), count);
+        const { figures, placed } = await walkFromFrames(await (this.options.toFrames ?? videoFrames)(clip.data), count);
         // Neighbouring frames of a smooth clip are meant to be close, so repeats only matter when most frames look alike.
         const check = await checkWalk(figures, view, { samePose: 0.02 });
         const problems = check.problems.filter((p) => !p.includes('repeats'));
@@ -601,11 +682,13 @@ export class WalkPainter {
         if (problems.length) throw new Error(problems.join(' '));
         await mkdir(resolve(this.dir, 'frames'), { recursive: true });
         const names = figures.map((_, i) => `${id}-${String(i + 1).padStart(2, '0')}.png`);
-        await Promise.all(figures.map((f, i) => writeFile(resolve(this.dir, 'frames', names[i]!), f)));
+        // Kept where they stood in the clip, so the strips line the cycle up as it was filmed.
+        await Promise.all(placed.map((f, i) => writeFile(resolve(this.dir, 'frames', names[i]!), f)));
         await writeFile(resolve(this.dir, 'frames', `${id}.json`), JSON.stringify(names));
+        await this.markPlaced(id);
         handle?.done(usd);
         await this.keepRecipe(walker, direction, sent, prompt, first, usd);
-        return figures;
+        return placed;
       } catch (err) {
         // A used-up daily limit is not this walk's fault: trying again cannot help until it resets.
         if (err instanceof PaintStopped) return { stop: err.message };
@@ -652,4 +735,14 @@ function stopReason(options: WalkPainterOptions): string {
   if (!options.provider()) return "No image model is set in God's View.";
   if (!options.video()) return 'No video model: walks need the Google AI Studio key.';
   return 'Painting stopped.';
+}
+
+/** True when two sets of pictures have the same sizes, picture by picture: cut from the same clip. */
+async function sameSizes(a: Buffer[], b: Buffer[]): Promise<boolean> {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const [x, y] = await Promise.all([sharp(a[i]!).metadata(), sharp(b[i]!).metadata()]);
+    if (x.width !== y.width || x.height !== y.height) return false;
+  }
+  return true;
 }

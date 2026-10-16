@@ -745,7 +745,6 @@ export class WorldScene extends Phaser.Scene {
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
     const top = py + T / 10 - a.body.displayHeight;
     a.label.setPosition(px, top - 4);
-    this.placeHeld(a);
     if (a.bar) {
       a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
       a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
@@ -754,6 +753,8 @@ export class WorldScene extends Phaser.Scene {
     a.shadow.setDepth(py - 2);
     a.body.setDepth(py);
     a.label.setDepth(LABEL_DEPTH);
+    // After the body's depth is set, or the item lags a step behind it and slips behind the body while walking down.
+    this.placeHeld(a);
   }
 
   /** Our own weapon or charm changed. */
@@ -776,8 +777,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Draws a held item with its grip on the holder's free hand in the frame
-   * showing now, in front of the body unless the holder walks away from us.
+   * Draws a held item with its grip on the holder's right hand in the frame
+   * showing now: in front of the body when that hand is nearer us (walking
+   * towards us or to the right), behind it when walking away or to the left.
    * Nothing shows until a vision model has found both points: no guessing.
    */
   private placeHeld(a: Avatar): void {
@@ -805,16 +807,25 @@ export class WorldScene extends Phaser.Scene {
       .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
       .setScale((b.displayHeight * HELD_SIZE) / Math.max(image.width, image.height))
       .setPosition(x, y)
-      .setDepth(b.depth + (a.facing === 'back' ? -1 : 1))
+      .setDepth(b.depth + (a.facing === 'back' || a.facing === 'left' ? -1 : 1))
       .setVisible(b.visible);
   }
 
-  /** Where the avatar's free hand is in the picture or walk frame it shows now. */
+  /**
+   * Where the avatar's right hand is in the picture or walk frame it shows
+   * now; in a frame where it was not found, the nearest frame's, so the item
+   * does not blink out for a step.
+   */
   private handOf(a: Avatar): ArtPoint | undefined {
     const hands = this.options.points[a.body.texture.key]?.hands;
     if (!hands?.length) return undefined;
-    const frame = hands.length > 1 ? Number(a.body.frame.name) : 0;
-    return hands[Number.isInteger(frame) ? frame : 0] ?? undefined;
+    const name = Number(a.body.frame.name);
+    const frame = hands.length > 1 && Number.isInteger(name) ? name : 0;
+    for (let k = 0; k < hands.length; k++) {
+      const hand = hands[(frame + k) % hands.length] ?? hands[(frame - k + hands.length) % hands.length];
+      if (hand) return hand;
+    }
+    return undefined;
   }
 
   private fitTint(): void {

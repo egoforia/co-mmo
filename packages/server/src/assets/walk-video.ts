@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import sharp from 'sharp';
 import type { WalkDirection } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
-import { countFigures, cutFigures } from './walk-frames.ts';
+import { countFigures, cutFigures, type Box } from './walk-frames.ts';
 import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
 
 // Walks painted as video: the image model paints a look standing in each
@@ -57,10 +57,13 @@ export function gearPlacement(gear: Carried[], direction: WalkDirection): string
 }
 
 /** The prompt for painting a look standing still in one direction, from its front-facing reference. */
-export function viewPrompt(name: string, gear: Carried[], direction: WalkDirection): string {
+export function viewPrompt(name: string, gear: Carried[], direction: WalkDirection, references = 1): string {
+  const from = references > 1
+    ? `from the ${references} reference images alone (all of them show ${name}: take every detail from them, such as how clothes hang seen from different sides)`
+    : 'from the reference image alone';
   return [
     BASE_PROMPT,
-    `Paint ${name} from the reference image alone, full body, standing in a relaxed pose, ${SEEN[direction]}. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.`,
+    `Paint ${name} ${from}, full body, standing in a relaxed pose, ${SEEN[direction]}. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.`,
     gearPlacement(gear, direction),
     `Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (${KEY_COLOR.hex}), with no floor or shadow. No magenta in the character.`,
     `Avoid: ${[...NEGATIVE_PROMPT, 'second figure', 'turnaround sheet', 'cast shadow'].join(', ')}.`,
@@ -69,7 +72,12 @@ export function viewPrompt(name: string, gear: Carried[], direction: WalkDirecti
 
 /** The prompt that makes a standing picture walk in place and come back to the same pose. */
 export function walkVideoPrompt(gear: Carried[], direction: WalkDirection, body = 'two-legged'): string {
-  const facing = direction === 'front' ? 'towards the viewer' : direction === 'back' ? 'away from the viewer' : `to the ${direction}, seen exactly side-on`;
+  // Clips walking away drifted into a diagonal three-quarter view, and side walks slid their feet, so each is spelled out.
+  const facing = direction === 'front'
+    ? 'towards the viewer, seen exactly from the front: the body stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways'
+    : direction === 'back'
+      ? 'away from the viewer, seen exactly from behind: the back stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways or diagonally'
+      : `to the ${direction}, seen exactly side-on: a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`;
   // A crawler has no arms to swing; its legs move in turns instead.
   const gait = body === 'two-legged' ? 'a brisk, cheerful walk with clear alternating steps and arms swinging' : 'a steady scuttle with its legs stepping in clear alternating sets';
   return [
@@ -86,12 +94,17 @@ export function walkVideoPrompt(gear: Carried[], direction: WalkDirection, body 
  * fails, in plain words, since a video would animate it too.
  */
 export async function soleFigure(painted: Buffer): Promise<Buffer> {
+  return (await soleFigureAt(painted)).png;
+}
+
+/** The same, with where the figure sat in the picture. */
+async function soleFigureAt(painted: Buffer): Promise<{ png: Buffer; box: Box }> {
   const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
   const clean = await removeKeySpill(png);
   const count = await countFigures(clean);
   if (count !== 1) throw new Error(`The picture shows ${count} figures instead of one.`);
   const [figure] = await cutFigures(clean, { count: 1, dropEdgeBits: true });
-  return figure!.png;
+  return { png: figure!.png, box: figure!.box };
 }
 
 /** The clip's first and last picture: the figure standing in the middle of a magenta frame. */
@@ -159,8 +172,14 @@ async function thumbs(frames: Buffer[]): Promise<Buffer[]> {
   }));
 }
 
-/** One cycle of `count` walk frames cut out of a clip's frames: transparent, trimmed figures. */
-export async function walkFromFrames(frames: Buffer[], count: number): Promise<{ figures: Buffer[]; cycle: Cycle }> {
+/**
+ * One cycle of `count` walk frames cut out of a clip's frames: transparent,
+ * trimmed figures, and the same figures `placed` where they stood in the
+ * clip, all on one shared canvas. The camera is still, so a placed frame
+ * keeps the feet where they really were; trimming each frame on its own and
+ * lining frames up by their feet made the walker slide as the legs moved.
+ */
+export async function walkFromFrames(frames: Buffer[], count: number): Promise<{ figures: Buffer[]; placed: Buffer[]; cycle: Cycle }> {
   const small = await thumbs(frames);
   const difference = (a: number, b: number) => {
     let sum = 0;
@@ -168,6 +187,13 @@ export async function walkFromFrames(frames: Buffer[], count: number): Promise<{
     return sum / small[a]!.length;
   };
   const cycle = findCycle(frames.length, difference, count);
-  const figures = await Promise.all(cycle.picks.map((i) => soleFigure(frames[i]!)));
-  return { figures, cycle };
+  const cut = await Promise.all(cycle.picks.map((i) => soleFigureAt(frames[i]!)));
+  const all = cut.reduce((u, c) => ({ left: Math.min(u.left, c.box.left), top: Math.min(u.top, c.box.top), right: Math.max(u.right, c.box.right), bottom: Math.max(u.bottom, c.box.bottom) }), cut[0]!.box);
+  // Each cut figure is exactly its box, so it goes back at the box's place.
+  const placed = await Promise.all(cut.map((c) =>
+    sharp({ create: { width: all.right - all.left + 1, height: all.bottom - all.top + 1, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: c.png, left: c.box.left - all.left, top: c.box.top - all.top }])
+      .png()
+      .toBuffer()));
+  return { figures: cut.map((c) => c.png), placed, cycle };
 }

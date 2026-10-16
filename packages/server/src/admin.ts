@@ -360,6 +360,8 @@ export async function handleAdmin(
     const note = typeof body?.note === 'string' ? body.note : '';
     // The Owner's own words in place of a prompt, for a walk's standing picture or clip.
     const prompt = typeof body?.prompt === 'string' && body.prompt.trim() ? body.prompt : undefined;
+    // The pictures a walk's standing picture is painted from: the approved picture and standing pictures by direction.
+    const from = Array.isArray(body?.from) ? body.from.filter((f): f is string => typeof f === 'string' && (f === 'approved' || (WALK_DIRECTIONS as readonly string[]).includes(f))) : undefined;
     const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
     // Each paid request is one of these; the Owner reviews it, then approves exactly that.
     const asks: Record<string, () => ArtAsk> = {
@@ -367,7 +369,7 @@ export async function handleAdmin(
       'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
       'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
       'art/walk': () => ({ kind: 'walk', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), directions, views: body?.views === true }),
-      'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}) }),
+      'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
       'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}) }),
     };
     try {
@@ -394,7 +396,7 @@ export async function handleAdmin(
         return json(res, 200, { ok: true }), true;
       }
       if (route === 'art/view' && method === 'POST') {
-        const done = await ctx.art.paintView(String(body?.walker ?? ''), String(body?.direction ?? ''), prompt);
+        const done = await ctx.art.paintView(String(body?.walker ?? ''), String(body?.direction ?? ''), prompt, from);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/clip' && method === 'POST') {

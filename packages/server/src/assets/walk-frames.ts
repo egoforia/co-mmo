@@ -252,15 +252,25 @@ export interface NormalizedWalk {
  * Lines up every frame of a look, across all its directions: one scale for
  * all (the median figure's height becomes `bodyHeight`, so the walker never
  * grows or shrinks when turning), feet centred in the frame and standing on
- * one baseline `margin` pixels above the bottom. Frames are as wide and tall
+ * one baseline `margin` pixels above the bottom. Frames placed on one shared
+ * canvas (as cut from a clip) keep their places within their direction. Frames are as wide and tall
  * as the widest and tallest figure needs, so nothing is cut off.
  */
 export async function normalizeWalk(directions: Buffer[][], { bodyHeight = CHARACTER_HEIGHT, margin = 2 } = {}): Promise<NormalizedWalk> {
-  const frames = await Promise.all(directions.map((frames) => Promise.all(frames.map(async (png) => {
-    const meta = await sharp(png).metadata();
-    return { png, width: meta.width!, height: meta.height!, feet: await feetCentre(png) };
-  }))));
-  const heights = frames.flat().map((f) => f.height).sort((a, b) => a - b);
+  const frames = await Promise.all(directions.map(async (frames) => {
+    const sized = await Promise.all(frames.map(async (png) => {
+      const meta = await sharp(png).metadata();
+      return { png, width: meta.width!, height: meta.height!, feet: await feetCentre(png) };
+    }));
+    // Frames placed where they stood in the clip share one canvas: they keep their places, lined up
+    // by the feet of the whole cycle, so the walker does not slide from frame to frame.
+    const placed = sized.length > 1 && sized.every((f) => f.width === sized[0]!.width && f.height === sized[0]!.height);
+    if (!placed) return sized.map((f) => ({ ...f, figure: f.height }));
+    const feet = [...sized.map((f) => f.feet)].sort((a, b) => a - b)[Math.floor(sized.length / 2)]!;
+    // The scale goes by the figure itself, not the canvas around the whole cycle, so every look keeps one size.
+    return Promise.all(sized.map(async (f) => ({ ...f, feet, figure: (await sharp(f.png).trim().toBuffer({ resolveWithObject: true })).info.height })));
+  }));
+  const heights = frames.flat().map((f) => f.figure).sort((a, b) => a - b);
   const scale = bodyHeight / (heights[Math.floor(heights.length / 2)] ?? 1);
   const sized = frames.map((dir) => dir.map((f) => ({ ...f, w: Math.max(1, Math.round(f.width * scale)), h: Math.max(1, Math.round(f.height * scale)), feet: f.feet * scale })));
   const half = Math.max(...sized.flat().map((f) => Math.max(f.feet, f.w - f.feet)));

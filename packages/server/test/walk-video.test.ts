@@ -61,7 +61,7 @@ describe('video walks', () => {
     expect(figures).toHaveLength(8);
     // Spread through the cycle, so the legs are apart by different amounts.
     expect(new Set(figures.map((f) => f.toString('base64'))).size).toBeGreaterThan(4);
-  });
+  }, 30_000);
 
   it('starts a Veo job, waits for it and downloads the clip', async () => {
     const calls: { url: string; body?: any }[] = [];

@@ -33,7 +33,7 @@ import { watched } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { SoundItem, SoundMaker } from './sound-maker.ts';
 import type { ArtUse, ContentRecord, Store } from './store.ts';
-import { estimateClipUsd, type StandingView, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
+import { estimateClipUsd, type StandingView, type ViewSource, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
 
 // God's View's Art tab: every picture the game draws, where it came from,
@@ -102,7 +102,7 @@ export type ArtAsk =
   | { kind: 'paint'; asset: string; note?: string }
   | { kind: 'group'; group: string }
   | { kind: 'walk'; walker: string; body: string; directions?: WalkDirection[]; views?: boolean }
-  | { kind: 'view'; walker: string; direction: WalkDirection; prompt?: string }
+  | { kind: 'view'; walker: string; direction: WalkDirection; prompt?: string; from?: string[] }
   | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string };
 
@@ -374,7 +374,7 @@ export class ArtStudio {
         const walker = this.walker(ask.walker, 'two-legged');
         const direction = this.direction(ask.direction);
         title = `Paint ${walker.name} standing, facing ${facingWords(direction)}`;
-        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt)) });
+        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), viewSources(ask.from)) });
       } else if (ask.kind === 'clip') {
         const walker = this.walker(ask.walker, ask.body);
         const direction = this.direction(ask.direction);
@@ -572,7 +572,7 @@ export class ArtStudio {
    * Paints a walker standing in one direction, and only that, so the Owner
    * can look at it (and paint it again) before a walk clip is made from it.
    */
-  async paintView(walkerId: string, direction: string, prompt?: string): Promise<{ estimateUsd: number }> {
+  async paintView(walkerId: string, direction: string, prompt?: string, from?: string[]): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, 'two-legged');
     const d = this.direction(direction);
@@ -581,7 +581,8 @@ export class ArtStudio {
     const estimateUsd = estimateImageUsd(image.model);
     const own = ownPrompt(prompt);
     const handle = this.options.jobs.add(`${walker.id}-${d}`, `${walker.name} standing, facing ${facingWords(d)}`, 'picture', 'gods-view', estimateUsd);
-    this.enqueue(() => this.options.walks.paintView(walker, d, own, handle), handle, { kind: 'view', walker: walkerId, direction: d, ...(own ? { prompt: own } : {}) });
+    const sources = viewSources(from);
+    this.enqueue(() => this.options.walks.paintView(walker, d, own, handle, sources), handle, { kind: 'view', walker: walkerId, direction: d, ...(own ? { prompt: own } : {}), ...(sources ? { from: [...sources] } : {}) });
     return { estimateUsd };
   }
 
@@ -744,7 +745,7 @@ export class ArtStudio {
 
   private async again(request: PaintRequest): Promise<unknown> {
     if (request.kind === 'walk') return this.walk(request.walker, request.body, [], false);
-    if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt);
+    if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
     if (request.kind === 'repaint') return this.repaint(request.asset, request.note);
     return undefined;
@@ -872,6 +873,12 @@ function slash(file: string): string {
 function ownPrompt(prompt: string | undefined): string | undefined {
   const text = prompt?.trim().slice(0, 4000);
   return text || undefined;
+}
+
+/** The pictures chosen to paint a standing picture from; undefined keeps the approved picture alone. */
+function viewSources(from: string[] | undefined): ViewSource[] | undefined {
+  const sources = (from ?? []).filter((f): f is ViewSource => f === 'approved' || WALK_DIRECTIONS.includes(f as WalkDirection));
+  return sources.length ? sources : undefined;
 }
 
 /** Which way a direction faces, in words. */

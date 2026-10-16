@@ -19,6 +19,18 @@ export interface ArtPoints {
   grip?: ArtPoint;
 }
 
+/** A held item's longest side, as a share of its holder's height. */
+export const HELD_SIZE = 0.42;
+
+/**
+ * Whether an item in this hand is drawn behind the body: walking away, or
+ * walking the way that puts the hand on the far side (the right hand
+ * walking left, the left hand walking right).
+ */
+export function heldBehind(facing: 'front' | 'back' | 'left' | 'right', hand: 'right' | 'left'): boolean {
+  return facing === 'back' || facing === (hand === 'right' ? 'left' : 'right');
+}
+
 /** Points by art id, as the server serves them. */
 export type ArtPointsManifest = Record<string, ArtPoints>;
 

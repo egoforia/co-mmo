@@ -2,7 +2,9 @@ import {
   CREATOR_LEVEL_FAVOR,
   CREATOR_REPEAT_MS,
   CREATOR_XP,
+  TICK_RATE,
   WEAKENED_MS,
+  generateRegion,
   wisherOf,
   WORLD_REGIONS,
   arrivalPoint,
@@ -24,7 +26,8 @@ import {
   type ServerMessage,
 } from '@co-mmo/shared';
 import { Parties } from './parties.ts';
-import { Region, type Connection, type Departure, type Leaving } from './region.ts';
+import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
+import { SplitRegion, cellsFor, placementsFor } from './split-region.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { Placement, RegionHandle, WorldState } from './region-link.ts';
 
@@ -34,12 +37,18 @@ import type { Placement, RegionHandle, WorldState } from './region-link.ts';
  */
 export interface Hosting {
   /** Sets a region up on a host of the hosting's choosing, or undefined to run it here. */
-  host(def: RegionDef, placements: Placement[], world: World): RegionHandle | undefined;
+  host(def: RegionDef, placements: Placement[], world: World, cell?: Cell): RegionHandle | undefined;
   /** The world changed in a way every region server must hear of (regions, who is online, parties). */
   changed?(state: WorldState): void;
   /** Wished things came into being or went away: region servers must know them before they are placed. */
   content?(entries: ContentEntry[]): void;
 }
+
+/** A region splits into cells once more than this many players are in it (design doc, Scaling without a cap). */
+export const CELL_PLAYERS = 50;
+/** A split region joins up again once it has stayed this much quieter for this long. */
+const MERGE_SHARE = 0.75;
+const MERGE_AFTER_MS = 30_000;
 
 export interface SavedPlace {
   regionId: string;
@@ -79,6 +88,13 @@ export class World {
   private readonly lastWhisper = new Map<string, string>();
   /** When a player last earned someone Creator XP for a thing, per kind of enjoyment. */
   private readonly credited = new Map<string, number>();
+  /** Players per cell before a region splits; a tuning value. */
+  cellPlayers = CELL_PLAYERS;
+  /** Regions being split or joined up right now. */
+  private readonly resizing = new Set<string>();
+  /** Since when each split region has been quiet enough to join up again. */
+  private readonly quietSince = new Map<string, number>();
+  private ticks = 0;
 
   constructor(private readonly now: () => number = Date.now, private readonly random: () => number = Math.random) {
     this.parties = new Parties(now);
@@ -91,15 +107,24 @@ export class World {
     }
   }
 
-  /** Sets a region up wherever the hosting says, with what was wished into it. */
-  private makeRegion(def: RegionDef): RegionHandle {
+  /** Sets a region up wherever the hosting says, with what was wished into it; split into cells when asked. */
+  private makeRegion(def: RegionDef, count = 1): RegionHandle {
     const placements = this.placements.get(def.id) ?? [];
-    return this.hosting?.host(def, placements, this) ?? this.runHere(def, placements);
+    const map = generateRegion(def);
+    const cells = count > 1 ? cellsFor(def, map.width, count) : [];
+    if (cells.length < 2) return this.hosting?.host(def, placements, this) ?? this.runHere(def, placements);
+    const handles = cells.map((cell) => {
+      const mine = placementsFor(placements, cell);
+      return this.hosting?.host(def, mine, this, cell) ?? this.runHere(def, mine, cell);
+    });
+    return new SplitRegion(def, map, handles, (p) => this.track(p));
   }
 
-  /** A region run in this process. */
-  private runHere(def: RegionDef, placements: Placement[] = []): Region {
+  /** A region (or one cell of one) run in this process. */
+  private runHere(def: RegionDef, placements: Placement[] = [], cell?: Cell): Region {
     const region: Region = new Region(def, {
+      // A cell's Region channel reaches every cell of its region.
+      ...(cell ? { regionChat: (m: ServerMessage) => this.regions.get(def.id)?.broadcast(m) } : {}),
       worldChat: (m) => this.broadcast(m),
       online: () => this.where.size,
       creator: (thing, playerId, credit) => this.creatorCredit(thing, playerId, credit),
@@ -109,7 +134,7 @@ export class World {
       journal: (text, playerId) => this.onJournal?.(text, playerId),
       // Every region around this one, corners too, so the world is drawn as one map.
       neighbours: () => this.neighbours(region.def),
-    }, this.now, this.random);
+    }, this.now, this.random, cell);
     for (const p of placements) {
       if (p.kind === 'creatures') region.addCreatures(p.id, p.spots);
       else region.addNpc(p.npc);
@@ -172,21 +197,24 @@ export class World {
   /**
    * Sets a region up on another host (or this one again, as a restart):
    * everyone inside is taken out, the region is made afresh with what was
-   * wished into it, and they are put back where they stood. `gone` says the
-   * old host cannot answer, so players are moved from what they were last sent.
+   * wished into it, and they are put back where they stood. `gone` names a
+   * host that stopped and cannot answer, so its players are moved from what
+   * they were last sent. `cells` splits it into that many cells, or joins it
+   * up again (1); players see no change but the people around them.
    */
-  async moveRegion(id: string, gone = false): Promise<void> {
+  async moveRegion(id: string, options: { gone?: string; cells?: number } = {}): Promise<void> {
     const old = this.regions.get(id);
     if (!old) return;
     const players = old.playerIds();
     for (const p of players) this.moving.add(p);
     try {
-      const leaving = await takeAll(old, gone);
+      const leaving = await takeAll(old, options.gone);
       if (this.regions.get(id) !== old) return;
-      const fresh = this.makeRegion(old.def);
+      const fresh = this.makeRegion(old.def, options.cells ?? old.cells?.length ?? 1);
       this.regions.set(id, fresh);
+      const handoff = options.cells !== undefined;
       for (const l of leaving) {
-        fresh.join(l.info, l.conn, { x: l.x, y: l.y }, l.character, '', l.carry);
+        fresh.join(l.info, l.conn, { x: l.x, y: l.y }, l.character, '', l.carry, handoff);
         this.where.set(l.info.id, id);
       }
     } finally {
@@ -320,6 +348,24 @@ export class World {
 
   region(id: string): RegionHandle | undefined {
     return this.regions.get(id);
+  }
+
+  /** A region, or one cell of a split region, by its name between servers. */
+  unit(key: string): RegionHandle | undefined {
+    const region = this.regions.get(key.split('~')[0]!);
+    return region?.cells ? region.cells.find((c) => c.key === key) : region?.key === key ? region : undefined;
+  }
+
+  /** Every region, with split regions as their cells: what actually runs somewhere. */
+  units(): RegionHandle[] {
+    return [...this.regions.values()].flatMap((r) => r.cells ?? [r]);
+  }
+
+  /** A cell on a region server showed its border: the cells beside it see it. */
+  edge(key: string, ghosts: Ghosts): void {
+    const region = this.regions.get(key.split('~')[0]!);
+    const index = region?.cells?.findIndex((c) => c.key === key) ?? -1;
+    if (region instanceof SplitRegion && index >= 0) region.edgeFrom(index, ghosts);
   }
 
   /** A region running in this process, for tests and tools that reach into the simulation. */
@@ -472,15 +518,58 @@ export class World {
   /** Ticks every region here, then moves players who walked off an open edge or fell. Regions on region servers tick there. */
   tick(strain = 0): void {
     for (const region of this.regions.values()) {
-      if (region instanceof Region) region.strain = strain;
+      for (const unit of region.cells ?? [region]) if (unit instanceof Region) unit.strain = strain;
       for (const departure of region.tick()) this.depart(region, departure);
+    }
+    if (++this.ticks % TICK_RATE === 0) this.checkCrowds();
+  }
+
+  /**
+   * Splits a region into cells when more players are in it than one cell
+   * should hold, more cells as it grows, and joins it up again once it has
+   * stayed quieter for a while (design doc, Scaling without a cap).
+   */
+  private checkCrowds(): void {
+    const now = this.now();
+    for (const region of this.regions.values()) {
+      const id = region.def.id;
+      if (this.resizing.has(id)) continue;
+      const have = region.cells?.length ?? 1;
+      const online = region.online;
+      const most = cellsFor(region.def, region.map.width, Infinity).length;
+      const grow = Math.min(most, Math.ceil(online / this.cellPlayers));
+      const shrink = Math.max(1, Math.ceil(online / (this.cellPlayers * MERGE_SHARE)));
+      if (grow > have) {
+        this.resize(region, grow);
+        continue;
+      }
+      if (shrink >= have) {
+        this.quietSince.delete(id);
+        continue;
+      }
+      const since = this.quietSince.get(id) ?? now;
+      this.quietSince.set(id, since);
+      if (now - since >= MERGE_AFTER_MS) this.resize(region, shrink);
     }
   }
 
-  /** Players a region server let go of: they walked off an edge or fell there. */
-  departed(regionId: string, list: (Departure & { x: number; y: number })[]): void {
+  private resize(region: RegionHandle, cells: number): void {
+    const id = region.def.id;
+    this.resizing.add(id);
+    this.quietSince.delete(id);
+    console.log(cells > 1
+      ? `${region.def.name} is crowded (${region.online} players): it now runs as ${cells} cells.`
+      : `${region.def.name} is quieter (${region.online} players): it runs whole again.`);
+    const done = this.moveRegion(id, { cells }).finally(() => this.resizing.delete(id));
+    this.track(done);
+  }
+
+  /** Players a region server let go of: they walked off an edge or fell there, or crossed into the next cell. */
+  departed(key: string, list: (Departure & { x: number; y: number })[]): void {
+    const regionId = key.split('~')[0]!;
     const region = this.regions.get(regionId);
-    if (!region) return;
+    if (region instanceof SplitRegion) return region.departed(key, list, (d) => this.depart(region, d));
+    if (!region || key !== regionId) return;
     for (const d of list) {
       if (!region.has(d.id)) continue;
       (region as { moved?: (id: string, x: number, y: number) => void }).moved?.(d.id, d.x, d.y);
@@ -513,6 +602,8 @@ export class World {
       }));
       return;
     }
+    // Crossing between cells is the split region's own business.
+    if (!departure.side) return;
     const target = this.regions.get(region.def.exits[departure.side] ?? '');
     // Keep the player's place along the edge, so crossing feels like one more step.
     const at = region.position(id);
@@ -563,9 +654,10 @@ export function settle<T, R>(value: T | Promise<T>, then: (value: T) => R): R | 
 }
 
 /** Everyone in a region, taken out quietly to be put back elsewhere. */
-async function takeAll(region: RegionHandle, gone: boolean): Promise<Leaving[]> {
+async function takeAll(region: RegionHandle, gone?: string): Promise<Leaving[]> {
+  if (region instanceof SplitRegion) return region.takeAll(gone);
   const remote = region as { drop?: (reachable: boolean) => Promise<Leaving[]> };
-  if (remote.drop) return remote.drop(!gone);
+  if (remote.drop) return remote.drop(region.host !== gone);
   const leaving: Leaving[] = [];
   for (const id of region.playerIds()) {
     const left = await region.remove(id, '');

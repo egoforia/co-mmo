@@ -714,7 +714,8 @@ interface ServerLoad {
 interface Host {
   id: string;
   kind: 'gateway' | 'region-server';
-  regions: { id: string; name: string; players: number }[];
+  /** Whole regions, or cells of a crowded region split into parts. */
+  regions: { id: string; region: string; name: string; players: number; part?: number; parts?: number }[];
   players: number;
   load: ServerLoad;
   seen: number;
@@ -734,9 +735,9 @@ async function servers(): Promise<string> {
     const busy = l.worstTickMs >= TICK_MS ? 'bad' : l.tickMs >= TICK_MS / 2 ? 'warn' : '';
     const quiet = s.now - h.seen;
     const moveTo = () => s.hosts.filter((o) => o.id !== h.id).map((o) => `<option value="${escapeHtml(o.id)}">${o.kind === 'gateway' ? 'Game server' : escapeHtml(o.id)}</option>`).join('');
-    const rows = h.regions.map((r) => `<tr><td><b>${escapeHtml(r.name)}</b></td><td>${r.players} here</td><td class="actions">
-        <button type="button" data-region-restart="${escapeHtml(r.id)}" data-players="${r.players}">Restart</button>
-        ${s.hosts.length > 1 ? `<select data-move-for="${escapeHtml(r.id)}" aria-label="Move ${escapeHtml(r.name)} to">${moveTo()}</select><button type="button" data-region-move="${escapeHtml(r.id)}" data-players="${r.players}">Move</button>` : ''}
+    const rows = h.regions.map((r) => `<tr><td><b>${escapeHtml(r.name)}</b>${r.parts ? ` <small>part ${r.part} of ${r.parts}</small>` : ''}</td><td>${r.players} here</td><td class="actions">
+        <button type="button" data-region-restart="${escapeHtml(r.region)}" data-players="${r.players}">Restart${r.parts ? ' all parts' : ''}</button>
+        ${s.hosts.length > 1 && !r.parts ? `<select data-move-for="${escapeHtml(r.id)}" aria-label="Move ${escapeHtml(r.name)} to">${moveTo()}</select><button type="button" data-region-move="${escapeHtml(r.id)}" data-players="${r.players}">Move</button>` : ''}
       </td></tr>`).join('');
     return `<div class="host">
       <h3>${hostName(h)}</h3>
@@ -759,7 +760,8 @@ async function servers(): Promise<string> {
   return `
     <p>${how} The world is kept in ${escapeHtml(s.store)}.</p>
     ${s.hosts.map(card).join('')}
-    <p class="note">Restarting a region sets it up again from scratch: creatures respawn, and players inside stay where they stood. Moving a region does the same on another server.</p>`;
+    <p class="note">Restarting a region sets it up again from scratch: creatures respawn, and players inside stay where they stood. Moving a region does the same on another server.
+      A region with more than 50 players splits into parts side by side, up to four, spread over the servers; players walk between parts without noticing, and it joins up again once it has been quieter for half a minute.</p>`;
 }
 
 // --- Art -----------------------------------------------------------------------

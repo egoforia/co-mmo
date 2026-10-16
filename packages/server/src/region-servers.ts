@@ -1,6 +1,7 @@
 import type { ContentEntry, RegionDef } from '@co-mmo/shared';
 import { Requests, type Bus } from './bus.ts';
 import { GATEWAY, serverChannel, type Placement, type RegionHandle, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
+import type { Cell, Ghosts } from './region.ts';
 import { RemoteRegion } from './remote-region.ts';
 import type { Hosting, World } from './world.ts';
 
@@ -19,7 +20,8 @@ export interface ServerInfo {
 export interface HostStatus {
   id: string;
   kind: 'gateway' | 'region-server';
-  regions: { id: string; name: string; players: number }[];
+  /** What runs there: whole regions, or cells of split ones (`part` of `parts`). */
+  regions: { id: string; region: string; name: string; players: number; part?: number; parts?: number }[];
   players: number;
   load: ServerLoad;
   /** When it was last heard from. */
@@ -29,10 +31,16 @@ export interface HostStatus {
 /** Every host and the regions it runs: the gateway, then each region server. */
 export function hostStatus(world: World, gateway: ServerLoad, servers: ServerInfo[] = [], now = Date.now()): HostStatus[] {
   const byHost = new Map<string, RegionHandle[]>();
-  for (const region of world.regions.values()) byHost.set(region.host, [...(byHost.get(region.host) ?? []), region]);
+  for (const unit of world.units()) byHost.set(unit.host, [...(byHost.get(unit.host) ?? []), unit]);
   const describe = (id: string) => {
-    const regions = byHost.get(id) ?? [];
-    return { regions: regions.map((r) => ({ id: r.def.id, name: r.def.name, players: r.online })), players: regions.reduce((n, r) => n + r.online, 0) };
+    const units = byHost.get(id) ?? [];
+    return {
+      regions: units.map((r) => ({
+        id: r.key, region: r.def.id, name: r.def.name, players: r.online,
+        ...(r.cell ? { part: r.cell.index + 1, parts: r.cell.count } : {}),
+      })),
+      players: units.reduce((n, r) => n + r.online, 0),
+    };
   };
   return [
     { id: 'gateway', kind: 'gateway', ...describe('gateway'), load: gateway, seen: now },
@@ -63,6 +71,8 @@ export class RegionServers implements Hosting {
   /** Where the next region set up should go, when the Owner asked for a particular host. */
   private wanted?: string;
   private stateQueued = false;
+  /** Cells just given to each server, not yet among the world's regions, so the cells of one region spread out. */
+  private readonly given = new Map<string, number>();
 
   constructor(private readonly bus: Bus, private readonly world: World, private readonly options: RegionServersOptions) {
     this.requests = new Requests(bus, GATEWAY);
@@ -109,11 +119,13 @@ export class RegionServers implements Hosting {
 
   // --- Hosting ------------------------------------------------------------------
 
-  host(def: RegionDef, placements: Placement[]): RegionHandle | undefined {
+  host(def: RegionDef, placements: Placement[], _world: World, cell?: Cell): RegionHandle | undefined {
     const server = this.pick();
     if (!server) return undefined;
-    this.command(server, { t: 'host', region: def, placements });
-    return new RemoteRegion(def, server, this.bus, this.requests);
+    if (!this.given.size) setImmediate(() => this.given.clear());
+    this.given.set(server, (this.given.get(server) ?? 0) + 1);
+    this.command(server, { t: 'host', region: def, placements, ...(cell ? { cell } : {}) });
+    return new RemoteRegion(def, server, this.bus, this.requests, cell);
   }
 
   changed(): void {
@@ -133,8 +145,8 @@ export class RegionServers implements Hosting {
   /** The host for a new region: the one the Owner asked for, else the region server running fewest, else here. */
   private pick(): string | undefined {
     if (this.wanted) return this.wanted === 'gateway' ? undefined : this.wanted;
-    const count = new Map<string, number>([...this.servers.keys()].map((id) => [id, 0]));
-    for (const region of this.world.regions.values()) if (count.has(region.host)) count.set(region.host, count.get(region.host)! + 1);
+    const count = new Map<string, number>([...this.servers.keys()].map((id) => [id, this.given.get(id) ?? 0]));
+    for (const unit of this.world.units()) if (count.has(unit.host)) count.set(unit.host, count.get(unit.host)! + 1);
     let best: string | undefined;
     for (const [id, n] of count) if (best === undefined || n < count.get(best)!) best = id;
     return best;
@@ -165,6 +177,7 @@ export class RegionServers implements Hosting {
     const region = this.remote(m.region, server);
     if (!region) return;
     if (m.t === 'out') return region.deliver(m.items);
+    if (m.t === 'edge') return this.world.edge(m.region, m.ghosts as Ghosts);
     if (m.t === 'departures') return this.world.departed(m.region, m.list);
     // Things a region asks of the whole world.
     switch (m.hook) {
@@ -181,12 +194,14 @@ export class RegionServers implements Hosting {
       }
       case 'journal':
         return this.world.onJournal?.(m.text, m.player);
+      case 'regionChat':
+        return this.world.region(region.def.id)?.broadcast(m.m);
     }
   }
 
-  /** A region run by this server, as long as it still runs there. */
-  private remote(regionId: string, server: string): RemoteRegion | undefined {
-    const region = this.world.region(regionId);
+  /** A region (or cell) run by this server, as long as it still runs there. */
+  private remote(key: string, server: string): RemoteRegion | undefined {
+    const region = this.world.unit(key);
     return region instanceof RemoteRegion && region.host === server ? region : undefined;
   }
 
@@ -200,7 +215,8 @@ export class RegionServers implements Hosting {
     this.command(id, { t: 'content', entries: this.options.content() });
     // Regions running here go out to the region servers.
     for (const region of [...this.world.regions.values()]) {
-      if (region.host === 'gateway' && this.servers.has(id)) await this.world.moveRegion(region.def.id);
+      const here = (region.cells ?? [region]).some((u) => u.host === 'gateway');
+      if (here && this.servers.has(id)) await this.world.moveRegion(region.def.id);
     }
     await this.balance(id);
   }
@@ -214,7 +230,7 @@ export class RegionServers implements Hosting {
     const fair = Math.floor(this.world.regions.size / Math.max(1, this.servers.size));
     for (const region of [...this.world.regions.values()]) {
       if (count(to) >= fair || !this.servers.has(to)) return;
-      if (region.host === to || region.host === 'gateway' || region.online > 0 || count(region.host) <= fair) continue;
+      if (region.cells || region.host === to || region.host === 'gateway' || region.online > 0 || count(region.host) <= fair) continue;
       await this.move(region.def.id, to);
     }
   }
@@ -224,7 +240,7 @@ export class RegionServers implements Hosting {
     if (!this.servers.delete(id)) return;
     console.warn(`Region server ${id} is gone (${why}); its regions move.`);
     for (const region of [...this.world.regions.values()]) {
-      if (region.host === id) await this.world.moveRegion(region.def.id, true);
+      if ((region.cells ?? [region]).some((u) => u.host === id)) await this.world.moveRegion(region.def.id, { gone: id });
     }
   }
 

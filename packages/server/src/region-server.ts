@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
 import { applyContent, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
 import { answer, type Bus } from './bus.ts';
-import { Region, type Connection, type Leaving } from './region.ts';
+import { Region, type Cell, type Connection, type Leaving } from './region.ts';
 import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
 import { LoadMeter } from './load-meter.ts';
 
@@ -90,10 +90,11 @@ export class RegionServer {
         const departures = region.tick();
         if (departures.length) {
           this.toGateway({
-            t: 'departures', server: this.id, region: region.def.id,
+            t: 'departures', server: this.id, region: region.key,
             list: departures.map((d) => ({ ...d, ...(region.position(d.id) ?? { x: 0, y: 0 }) })),
           });
         }
+        if (region.cell) this.toGateway({ t: 'edge', server: this.id, region: region.key, ghosts: region.edge() });
       } catch (err) {
         this.failed(err);
       }
@@ -126,9 +127,9 @@ export class RegionServer {
     }
     if (m.t === 'answer') return;
     if (m.t === 'host') {
-      const region = this.makeRegion(m.region);
+      const region = this.makeRegion(m.region, m.cell);
       for (const p of m.placements) place(region, p);
-      this.regions.set(m.region.id, region);
+      this.regions.set(region.key, region);
       return;
     }
     const region = this.regions.get(m.region);
@@ -144,7 +145,7 @@ export class RegionServer {
         return;
       }
       case 'join':
-        region.join(m.info, this.relay(m.region, m.info.id), m.at, m.character, m.announce, m.carry && carryFrom(m.carry));
+        region.join(m.info, this.relay(m.region, m.info.id), m.at, m.character, m.announce, m.carry && carryFrom(m.carry), m.handoff);
         return;
       case 'remove': {
         const left = region.remove(m.id, m.announce);
@@ -186,11 +187,14 @@ export class RegionServer {
       case 'welcome-all':
         region.welcomeAll();
         return;
+      case 'ghosts':
+        region.seeAcross(m.from, m.ghosts);
+        return;
     }
   }
 
-  private makeRegion(def: WorldState['defs'][number]): Region {
-    const id = def.id;
+  private makeRegion(def: WorldState['defs'][number], cell?: Cell): Region {
+    const id = cell?.key ?? def.id;
     const region: Region = new Region(def, {
       worldChat: (m) => this.hook(id, { hook: 'worldChat', m }),
       online: () => this.world.online,
@@ -200,8 +204,10 @@ export class RegionServer {
       route: (m, to) => this.hook(id, { hook: 'route', m, ...(to !== undefined ? { to } : {}) }),
       party: (player) => this.world.parties[player] ?? [player],
       journal: (text, player) => this.hook(id, { hook: 'journal', text, player }),
-      neighbours: () => this.world.defs.filter((d) => d.id !== id && Math.max(Math.abs(d.at.x - region.def.at.x), Math.abs(d.at.y - region.def.at.y)) === 1),
-    }, this.now, this.random);
+      // A cell's Region channel reaches the cells beside it through the gateway.
+      ...(cell ? { regionChat: (m: ServerMessage) => this.hook(id, { hook: 'regionChat', m }) } : {}),
+      neighbours: () => this.world.defs.filter((d) => d.id !== def.id && Math.max(Math.abs(d.at.x - region.def.at.x), Math.abs(d.at.y - region.def.at.y)) === 1),
+    }, this.now, this.random, cell);
     return region;
   }
 
@@ -242,7 +248,7 @@ export class RegionServer {
 
   private beat(): void {
     const regions: RegionBeat[] = [...this.regions.values()].map((r) => ({
-      id: r.def.id,
+      id: r.key,
       players: r.online,
       creatures: r.creatureIds().map((id) => ({ id, ...r.creature(id)! })),
     }));

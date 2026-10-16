@@ -444,7 +444,9 @@ export async function handleAdmin(
     if (!region) return json(res, 404, { error: 'not_found', message: 'There is no such region.' }), true;
     const to = typeof body?.to === 'string' && body.to ? body.to : region.host;
     try {
-      if (ctx.regionServers) await ctx.regionServers.move(id, to);
+      // A split region restarts as a whole; its cells go wherever there is room.
+      if (region.cells && to === region.host) await world.moveRegion(id);
+      else if (ctx.regionServers) await ctx.regionServers.move(id, to);
       else if (to === 'gateway') await world.moveRegion(id);
       else return json(res, 400, { error: 'no_server', message: 'That region server is not running.' }), true;
     } catch (err) {

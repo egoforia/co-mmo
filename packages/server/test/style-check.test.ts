@@ -134,8 +134,17 @@ describe('painting a wish with the style check', () => {
     const record = store.content.find((r) => r.definition?.kind === 'item')!;
     expect(record.art).toMatch(/^\/wished-art\//);
     const { body } = await api(base, '/api/admin/art', owner.token);
-    const item = body.groups.find((g: any) => g.id === 'wishes').items[0];
+    const item = body.items.find((i: any) => i.id === `${record.id}:${record.id}`);
     expect(item.check).toEqual({ pass: false, why: 'flat vector art', tries: 3 });
+    // What made the kept attempt is kept for God's View too, with how the style check went.
+    expect(item.recipe).toMatchObject({ steps: [{ media: 'picture', pictures: expect.any(Array) }], notes: [expect.stringMatching(/not happy after 3 tries/)] });
+
+    // Painting it again is reviewed first: the prompt with the Owner's words, the model, and the retries that may follow.
+    const review = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'paint', asset: item.id, note: 'a taller crown' });
+    expect(review.status).toBe(200);
+    expect(review.body.parts[0].recipe.steps[0]).toMatchObject({ model: 'fake-image', prompt: expect.stringMatching(/Also: a taller crown$/) });
+    expect(review.body.parts[0].recipe.notes.join(' ')).toMatch(/up to 2 more times/);
+    expect((painter as any).calls).toBe(3);
   });
 
   it('shows an existing picture that fits a new wish instead of painting one', async () => {
@@ -155,7 +164,7 @@ describe('painting a wish with the style check', () => {
     expect(second!.artPrompts![second!.id]).toMatchObject({ reused: { from: first!.id }, usd: 0.001 });
     expect(await readFile(join(artDir, `${second!.id}.png`))).toEqual(await readFile(join(artDir, `${first!.id}.png`)));
     const { body } = await api(base, '/api/admin/art', owner.token);
-    expect(body.groups.find((g: any) => g.id === 'wishes').items.find((i: any) => i.id.startsWith(second!.id)).reused).toBe(first!.definition!.name);
+    expect(body.items.find((i: any) => i.id.startsWith(second!.id)).reused).toBe(first!.definition!.name);
   });
 
   it('is set on the AI models tab', async () => {

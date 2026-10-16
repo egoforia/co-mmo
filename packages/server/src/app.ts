@@ -20,6 +20,7 @@ import { BuildingPainter, type BuildingPainterOptions } from './building-painter
 import { WalkPainter } from './walk-painter.ts';
 import { GeminiVideoProvider, type VideoProvider } from './assets/video.ts';
 import { ArtJobs } from './art-jobs.ts';
+import { RecipeBook } from './art-recipes.ts';
 import { ArtStudio } from './art-studio.ts';
 import { DailyClips, MemoryPaintQueue, nextDailyReset, queuedSound, queuedVideo, type PaintQueue } from './paint-queue.ts';
 import { SoundMaker } from './sound-maker.ts';
@@ -151,6 +152,9 @@ export function createApp(options: AppOptions): App {
   const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
   wishes.paintQueue = paintQueue;
   wishes.paintRequests = paintRequests;
+  // What was sent to make each picture, clip and sound, for God's View to show with every version.
+  const recipes = new RecipeBook(options.wishes.artDir);
+  wishes.recipes = recipes;
   const painterOptions: BuildingPainterOptions = {
     provider: () => wishes.imageProvider('buildings'),
     overBudget: () => wishes.budget().paused,
@@ -159,6 +163,7 @@ export function createApp(options: AppOptions): App {
     artDir: options.wishes.artDir,
     shipped: async () => (options.shippedArt ? JSON.parse(await readFile(options.shippedArt, 'utf8')) : {}),
     jobs: artJobs,
+    recipes,
   };
   const buildingPainter = new BuildingPainter(painterOptions);
   // Walks use Google's Veo on the Gemini key, with the model chosen on the AI models tab.
@@ -236,7 +241,7 @@ export function createApp(options: AppOptions): App {
   nextDay();
   const artStudio = new ArtStudio({
     store, wishes, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, video, sounds,
-    anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests,
+    anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests, recipes,
   });
   // Held items: where each walker's free hand is and where each weapon or charm is gripped.
   const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
@@ -285,6 +290,8 @@ export function createApp(options: AppOptions): App {
     wish: (request) => wishes.resumePaint(request),
     repaint: (request) => artStudio.repaint(request.asset, request.note),
     walk: (request) => artStudio.walk(request.walker, request.body, [], false),
+    view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt),
+    clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),
   });
   const reports = new Reports(store, world);
   const builds = new Builds(store, {
@@ -427,10 +434,16 @@ export function createApp(options: AppOptions): App {
     if (sample && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'samples', `${sample[1]}.png`), res);
     const walk = path.match(/^\/wished-art\/walks\/([\w-]+\.png)$/);
     if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
+    const standing = path.match(/^\/wished-art\/walks\/views\/([\w-]+\.png)$/);
+    if (standing && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', 'views', standing[1]!), res);
     const redone = path.match(/^\/wished-art\/redone\/([\w-]+\.png)$/);
     if (redone && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'redone', redone[1]!), res);
     const old = path.match(/^\/wished-art\/history\/([\w~-]+)\/([0-9a-z]+\.(?:png|webp))$/);
     if (old && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'history', old[1]!, old[2]!), res);
+    const walkOld = path.match(/^\/wished-art\/history\/([\w~-]+)\/([0-9a-z]+)\/strip\.png$/);
+    if (walkOld && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'history', walkOld[1]!, walkOld[2]!, 'strip.png'), res);
+    const sent = path.match(/^\/wished-art\/recipes\/pictures\/([0-9a-f]+\.webp)$/);
+    if (sent && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'recipes', 'pictures', sent[1]!), res);
     const soundFile = path.match(/^\/wished-art\/sounds\/([\w-]+\.mp3)$/);
     if (soundFile && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'sounds', soundFile[1]!), res);
     const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);

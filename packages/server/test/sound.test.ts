@@ -153,7 +153,11 @@ describe('the game\'s sounds', () => {
     const owner = account(store, 'Ego', 'owner');
     const before = (await made(base, 'coin')).file;
     await new Promise((r) => setTimeout(r, 5));
-    const asked = await api(base, '/api/admin/art/sound', owner.token, 'POST', { sound: 'coin', note: 'heavier coins' });
+    // The Owner sees exactly what is asked of the service, then approves it.
+    const review = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'sound', sound: 'coin', note: 'heavier coins' });
+    expect(review.body.parts[0].recipe.steps[0]).toMatchObject({ media: 'sound', model: 'eleven_text_to_sound_v2', prompt: expect.stringMatching(/Also: heavier coins$/) });
+    expect((await api(base, '/api/admin/art/sound', owner.token, 'POST', { sound: 'coin', note: 'heavier coins' })).body.message).toMatch(/Review/);
+    const asked = await api(base, '/api/admin/art/sound', owner.token, 'POST', { sound: 'coin', note: 'heavier coins', approved: review.body.fingerprint });
     expect(asked.status).toBe(202);
     expect(asked.body.estimateUsd).toBeGreaterThan(0);
     await app!.art.idle();
@@ -162,7 +166,17 @@ describe('the game\'s sounds', () => {
     expect(after.file).not.toBe(before);
     expect(after.redone).toEqual(expect.any(Number));
     expect((await fetch(`${base}/${before}`)).status).toBe(200);
-    expect((await api(base, '/api/admin/art/sound', owner.token, 'POST', { sound: 'kazoo' })).body.message).toMatch(/no sound/);
+
+    // The old one is an earlier version, with what made it, and can be put back.
+    const coin = async () => (await api(base, '/api/admin/art', owner.token)).body.sounds.find((x: any) => x.id === 'coin');
+    const listed = await coin();
+    expect(listed.recipe.steps[0].prompt).toMatch(/Also: heavier coins$/);
+    expect(listed.versions).toHaveLength(1);
+    expect(listed.versions[0]).toMatchObject({ url: `/${before}`, recipe: { steps: [{ media: 'sound' }] } });
+    expect((await api(base, '/api/admin/art/restore-sound', owner.token, 'POST', { sound: 'coin', version: listed.versions[0].id })).status).toBe(200);
+    expect((await (await fetch(`${base}/api/sounds`)).json()).coin.file).toBe(before);
+    expect((await coin()).versions[0].url).toBe(`/${after.file}`);
+    expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'sound', sound: 'kazoo' })).body.message).toMatch(/no sound/);
     const steward = account(store, 'Wren', 'steward');
     expect((await api(base, '/api/admin/art/sound', steward.token, 'POST', { sound: 'coin' })).status).toBe(403);
   });

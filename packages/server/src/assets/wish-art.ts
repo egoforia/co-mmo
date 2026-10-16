@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { CHARACTER_HEIGHT, type BiomeId, type PicturedWish } from '@co-mmo/shared';
+import { pictureName } from './names.ts';
 import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
 import { buildPrompt, type AssetDescription, type AssetKind } from './style.ts';
@@ -136,7 +137,7 @@ export async function paintWish(
       // A missing reference only weakens the style match.
     }
   }
-  const raw = await provider.generate({ prompt: request.prompt, references });
+  const raw = await provider.generate({ prompt: request.prompt, references, labels: sent.map(pictureName) });
   const { png, clean } = await removeKeyBackground(await sharp(raw.data).png().toBuffer());
   // People stand the same height as everyone else; things fit their box.
   const fitted = def.kind === 'player' || def.kind === 'npc' ? await fitCharacter(png, request.box) : await fitToBox(png, request.box);

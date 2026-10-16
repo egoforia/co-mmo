@@ -10,7 +10,9 @@ export interface ImageRequest {
   prompt: string;
   /** Reference images (anchors, a base pose) the result must match in style. */
   references?: GeneratedImage[];
-  /** The references show the subject itself, to be painted again with a change, not just the style. */
+  /** What each reference is, in order, for God's View; never sent to the service. */
+  labels?: string[];
+  /** The references show the subject itself (to paint again with a change, or in a new pose), not just the style. */
   edit?: boolean;
   /** Width to height, such as "4:5"; square when left out. */
   aspectRatio?: string;

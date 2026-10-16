@@ -5,7 +5,7 @@ import type { ContentEntry, WishCard } from './content.ts';
 import type { TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
-import { EQUIP_SLOTS, type Character, type EquipSlot } from './rpg.ts';
+import { EQUIP_SLOTS, type Character, type EquipSlot, type InventorySlot } from './rpg.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -40,6 +40,19 @@ export interface AttackMessage {
 /** Talk to the nearest NPC in reach, or search the nearest body, or act on the land. */
 export interface InteractMessage {
   t: 'interact';
+}
+
+/**
+ * The loot window of a fallen creature: take the thing at `index` (named by
+ * `item`, so a stale index never takes something else), take everything, or
+ * close the window. Whatever is left stays on the body for anyone to take.
+ */
+export interface LootActionMessage {
+  t: 'loot';
+  action: 'take' | 'all' | 'close';
+  body: string;
+  index?: number;
+  item?: string;
 }
 
 export interface UseItemMessage {
@@ -144,6 +157,7 @@ export interface PartyActionMessage {
 }
 
 export type ClientMessage =
+  | LootActionMessage
   | DraftMessage
   | EquipMessage
   | AbilityMessage
@@ -226,7 +240,7 @@ export interface BodyState {
   name: string;
   x: number;
   y: number;
-  /** Something is still on it that this player may take. */
+  /** Something is still on it to take (anyone may). */
   loot: boolean;
 }
 
@@ -355,6 +369,26 @@ export interface DialogueMessage {
   shop?: boolean;
 }
 
+/** A fallen creature's loot, as its window shows it. */
+export interface LootView {
+  /** The body's id. */
+  id: string;
+  /** The creature's name and picture. */
+  name: string;
+  asset: string;
+  /** What is still on it, in order. */
+  items: InventorySlot[];
+}
+
+/**
+ * Opens or refreshes the loot window (someone took something), or closes it
+ * (null: you walked away, or the body faded).
+ */
+export interface LootMessage {
+  t: 'loot';
+  loot: LootView | null;
+}
+
 /** A trade as one side sees it; null when it closed. */
 export interface TradeView {
   with: { id: string; name: string };
@@ -411,6 +445,7 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | LootMessage
   | DraftUpdateMessage
   | CooldownMessage
   | TradeMessage
@@ -450,6 +485,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64));
   }
   if (m.t === 'attack' || m.t === 'interact') return true;
+  if (m.t === 'loot') {
+    return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&
+      (m.index === undefined || (Number.isInteger(m.index) && (m.index as number) >= 0 && (m.index as number) < 100)) &&
+      (m.item === undefined || isId(m.item));
+  }
   if (m.t === 'use') return typeof m.item === 'string' && m.item.length <= 64;
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   if (m.t === 'pray') return typeof m.text === 'string';

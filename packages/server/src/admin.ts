@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, WALK_DIRECTIONS, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
+import { ITEMS, WALK_DIRECTIONS, WishError, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
@@ -17,6 +17,7 @@ import type { World } from './world.ts';
 import type { LoadMeter } from './load-meter.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
+import { lootOverview } from './loot-admin.ts';
 
 export interface AdminContext {
   store: Store;
@@ -527,6 +528,20 @@ export async function handleAdmin(
     const done = await ctx.updater.request(account.name, ctx.restarting);
     if (!done.ok) return json(res, 409, { error: 'blocked', message: done.message }), true;
     return json(res, 202, { ok: true, from: done.status.commit, to: done.status.upstream }), true;
+  }
+
+  // The Loot tab: what every creature drops, who wished it or changed it, and setting it anew.
+  if (route === 'loot' && method === 'GET') return json(res, 200, lootOverview(store)), true;
+  const setLoot = route.match(/^loot\/([\w-]+)$/);
+  if (setLoot && method === 'PUT') {
+    const body = await ctx.readJson(req);
+    try {
+      const record = wishes.setLoot({ id: account.id, name: account.name }, { creature: setLoot[1], drops: body?.drops });
+      return json(res, 200, { ok: true, id: record.id }), true;
+    } catch (err) {
+      if (!(err instanceof WishError)) throw err;
+      return json(res, 400, { error: 'invalid', message: err.message }), true;
+    }
   }
 
   if (route === 'items' && method === 'GET') {

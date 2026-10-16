@@ -456,3 +456,9 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #trade-request p { margin: 0 0 8px; }
 #trade-request button { padding: 6px 12px; background: var(--accent); color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
 #trade-request button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
+/* The loot window: a fallen creature's things, laid out like the bag. */
+#loot h2 span { display: flex; align-items: center; gap: 8px; }
+#loot h2 img.from { width: 36px; height: 36px; object-fit: contain; }
+#loot .slot.chosen { border-color: var(--accent); background: rgba(255, 255, 255, 0.1); outline: 1px solid var(--accent); }
+#loot .buttons { display: flex; gap: 8px; margin-top: 12px; }
+#loot .note kbd { border: 1px solid var(--edge); padding: 0 4px; margin-right: 2px; }

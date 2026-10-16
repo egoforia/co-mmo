@@ -15,6 +15,7 @@ import {
   gearBonus,
   maxEnergy,
   readScroll,
+  lootTable,
   rollDrops,
   SEARCH_RANGE,
   sell,
@@ -62,6 +63,8 @@ import {
   type CreatureState,
   type EntityState,
   type InventorySlot,
+  type LootActionMessage,
+  type LootView,
   type NpcPlacement,
   type NpcState,
   type PlayerInfo,
@@ -188,6 +191,8 @@ interface PlayerState {
   crowd: number;
   /** Spreads players' snapshots over the ticks when they are not sent every tick. */
   phase: number;
+  /** The body whose loot window is open, if any. */
+  looting?: string;
 }
 
 /** Anything that strolls about a home spot: creatures and NPCs. */
@@ -201,7 +206,7 @@ interface Walker {
   rest: number;
 }
 
-/** A defeated creature's body: what it dropped waits there for those who won it. */
+/** A defeated creature's body: what it dropped waits there for anyone to take. */
 interface Body {
   id: string;
   kind: string;
@@ -210,7 +215,7 @@ interface Body {
   y: number;
   /** Epoch ms when it fades away. */
   until: number;
-  /** Who may search it: the one who struck the last blow and party members who shared the fight. */
+  /** Who won it: the one who struck the last blow and party members who shared the fight. They hear what others take. */
   finders: string[];
   loot: InventorySlot[];
 }
@@ -593,6 +598,9 @@ export class Region {
       case 'interact':
         this.interact(p);
         break;
+      case 'loot':
+        this.loot(p, message);
+        break;
       case 'accept':
         this.accept(p, message.quest);
         break;
@@ -655,6 +663,8 @@ export class Region {
     }
     for (const c of this.creatures) this.think(c, now);
     this.bodies = this.bodies.filter((b) => now < b.until);
+    // A loot window closes when its body fades or its looter walks away.
+    for (const p of this.players.values()) if (p.looting && !this.lootable(p, p.looting)) this.closeLoot(p);
     for (const n of this.townsfolk) this.stroll(n);
     for (const p of this.players.values()) {
       if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id && d.cell === undefined)) {
@@ -692,7 +702,7 @@ export class Region {
       const bodies: BodyState[] = [];
       for (const b of this.bodies) {
         if (!near(b.x, b.y)) continue;
-        bodies.push({ id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot: this.lootFor(b, p) });
+        bodies.push({ id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), loot: b.loot.length > 0 });
       }
       const npcs: NpcState[] = [];
       for (const n of this.townsfolk) {
@@ -879,10 +889,10 @@ export class Region {
       ch.gold += gold;
       gained.push(`${gold} gold`);
     }
-    // What it carried stays on its body for its finders to search (E).
+    // What it carried stays on its body for anyone to take (E): its loot as set in God's View and by wishes.
     this.bodies.push({
       id: `body-${++this.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y,
-      until: this.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: rollDrops(c.def.drops, this.random),
+      until: this.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: rollDrops(lootTable(c.kind), this.random),
     });
     discover(ch, c.kind);
     this.hooks.event?.('defeat', p.info.id, { creature: c.kind });
@@ -1076,9 +1086,9 @@ export class Region {
   }
 
   /**
-   * Searches the nearest body in reach with something on it for this player,
-   * taking it all; false when there is none. A body that is empty or someone
-   * else's only gets a word, so E still acts on the land beside it (fishing).
+   * Opens the loot window of the nearest body in reach with something on it;
+   * false when there is none. An empty body only gets a word, so E still acts
+   * on the land beside it (fishing). Anyone may take what a body holds.
    */
   private search(p: PlayerState): boolean {
     const inReach = this.bodies
@@ -1086,30 +1096,70 @@ export class Region {
       .filter((o) => o.d <= SEARCH_RANGE)
       .sort((a, c) => a.d - c.d)
       .map((o) => o.b);
-    const body = inReach.find((b) => this.lootFor(b, p));
+    const body = inReach.find((b) => b.loot.length > 0);
     if (!body) {
       const near = inReach[0];
-      if (near) {
-        this.notice(p, near.finders.includes(p.info.id)
-          ? `You search the ${near.def.name}, but there is nothing more to find.`
-          : `Someone else defeated this ${near.def.name}. What it carried is theirs to find.`);
-      }
+      if (near) this.notice(p, `You search the ${near.def.name}, but there is nothing more to find.`);
       return false;
     }
-    const found = body.loot.splice(0);
-    for (const s of found) addItem(p.character, s.item, s.qty);
-    p.dirty = true;
-    const names = found.map((s) => `${s.qty > 1 ? `${s.qty} × ` : 'a '}${ITEMS[s.item]?.name ?? s.item}`).join(', ');
-    this.notice(p, `You search the ${body.def.name} and find ${names}.`);
-    for (const id of body.finders) {
-      if (id !== p.info.id) this.tell(id, `${p.info.name} searched the ${body.def.name} and found ${names}.`);
-    }
+    p.looting = body.id;
+    p.conn.send({ t: 'loot', loot: lootView(body) });
     return true;
   }
 
-  /** True when this body still holds something this player may take. */
-  private lootFor(b: Body, p: PlayerState): boolean {
-    return b.loot.length > 0 && b.finders.includes(p.info.id);
+  /** Takes one thing or everything from the body whose window is open, or closes it. */
+  private loot(p: PlayerState, m: LootActionMessage): void {
+    if (m.action === 'close') {
+      if (p.looting === m.body) p.looting = undefined;
+      return;
+    }
+    const body = this.bodies.find((b) => b.id === m.body);
+    if (!body || !this.lootable(p, m.body)) {
+      this.closeLoot(p);
+      return this.notice(p, body ? `You are too far from the ${body.def.name}. Step closer and press E.` : 'That body has faded away.');
+    }
+    if (p.character.hp <= 0) return;
+    p.looting = body.id;
+    let taken: InventorySlot[];
+    if (m.action === 'all') taken = body.loot.splice(0);
+    else {
+      // Someone may have taken something since this window was drawn: find the same thing again.
+      const at = m.index !== undefined && body.loot[m.index]?.item === m.item ? m.index : body.loot.findIndex((s) => s.item === m.item);
+      if (at < 0) {
+        this.notice(p, 'Someone else took that already.');
+        return this.showLoot(body);
+      }
+      taken = body.loot.splice(at, 1);
+    }
+    for (const s of taken) addItem(p.character, s.item, s.qty);
+    p.dirty = true;
+    const names = taken.map((s) => `${s.qty > 1 ? `${s.qty} × ` : 'a '}${ITEMS[s.item]?.name ?? s.item}`).join(', ');
+    this.notice(p, `You take ${names} from the ${body.def.name}.`);
+    for (const id of body.finders) {
+      if (id !== p.info.id) this.tell(id, `${p.info.name} took ${names} from the ${body.def.name} you defeated.`);
+    }
+    this.showLoot(body);
+  }
+
+  /** Shows a body's loot again to everyone who has its window open, closing it once nothing is left. */
+  private showLoot(body: Body): void {
+    for (const viewer of this.players.values()) {
+      if (viewer.looting !== body.id) continue;
+      if (body.loot.length) viewer.conn.send({ t: 'loot', loot: lootView(body) });
+      else this.closeLoot(viewer);
+    }
+  }
+
+  private closeLoot(p: PlayerState): void {
+    p.looting = undefined;
+    p.conn.send({ t: 'loot', loot: null });
+  }
+
+  /** True while this body lies here and the player is close enough to take from it. */
+  private lootable(p: PlayerState, bodyId: string): boolean {
+    const b = this.bodies.find((x) => x.id === bodyId);
+    // A little slack, so a step while choosing does not shut the window.
+    return !!b && p.character.hp > 0 && Math.hypot(b.x - p.x, b.y - p.y) <= SEARCH_RANGE + 1;
   }
 
   private accept(p: PlayerState, questId: string): void {
@@ -1246,4 +1296,9 @@ export function nearestTile(map: RegionMap, x: number, y: number, kinds: Tile[],
 
 function round(n: number): number {
   return Math.round(n * 1000) / 1000;
+}
+
+/** What a body's loot window shows. */
+function lootView(b: Body): LootView {
+  return { id: b.id, name: b.def.name, asset: b.def.art, items: b.loot.map((s) => ({ ...s })) };
 }

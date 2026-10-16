@@ -2,6 +2,8 @@
 // AI role are settings in God's View, never code (design doc, God's View:
 // "AI is provider-agnostic").
 
+import { withApiContext } from '../api-log.ts';
+
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
@@ -15,6 +17,8 @@ export interface ChatRequest {
   /** Ask for a single JSON object back. */
   json?: boolean;
   maxTokens?: number;
+  /** Why the game asks, shown in God's View's API Log: "God's reply", "Style check". */
+  purpose?: string;
 }
 
 export interface ChatResult {
@@ -82,7 +86,7 @@ export class GeminiChat implements ChatModel {
   constructor(private readonly apiKey: string, readonly model: string, private readonly fetchImpl: typeof fetch = fetch) {}
 
   async complete(req: ChatRequest): Promise<ChatResult> {
-    const res = await this.fetchImpl(
+    const res = await withApiContext({ purpose: req.purpose }, () => this.fetchImpl(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`,
       {
         method: 'POST',
@@ -99,7 +103,7 @@ export class GeminiChat implements ChatModel {
           },
         }),
       },
-    );
+    ));
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string };
       promptFeedback?: { blockReason?: string };
@@ -121,7 +125,7 @@ export class AnthropicChat implements ChatModel {
   constructor(private readonly apiKey: string, readonly model: string, private readonly fetchImpl: typeof fetch = fetch) {}
 
   async complete(req: ChatRequest): Promise<ChatResult> {
-    const res = await this.fetchImpl('https://api.anthropic.com/v1/messages', {
+    const res = await withApiContext({ purpose: req.purpose }, () => this.fetchImpl('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': this.apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
@@ -132,7 +136,7 @@ export class AnthropicChat implements ChatModel {
           ? { role: m.role, content: [...m.images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mimeType, data: i.data.toString('base64') } })), { type: 'text', text: m.content }] }
           : { role: m.role, content: m.content })),
       }),
-    });
+    }));
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string };
       content?: { type: string; text?: string }[];
@@ -156,7 +160,7 @@ export class OpenAiChat implements ChatModel {
   ) {}
 
   async complete(req: ChatRequest): Promise<ChatResult> {
-    const res = await this.fetchImpl(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    const res = await withApiContext({ purpose: req.purpose }, () => this.fetchImpl(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${this.apiKey}` },
       body: JSON.stringify({
@@ -167,7 +171,7 @@ export class OpenAiChat implements ChatModel {
           : { role: m.role, content: m.content }))],
         ...(req.json ? { response_format: { type: 'json_object' } } : {}),
       }),
-    });
+    }));
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string };
       choices?: { message?: { content?: string } }[];

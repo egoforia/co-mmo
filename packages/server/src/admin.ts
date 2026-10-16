@@ -16,6 +16,7 @@ import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
 import type { LoadMeter } from './load-meter.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
+import type { ApiLog, ApiLogFilter } from './api-log.ts';
 
 export interface AdminContext {
   store: Store;
@@ -41,6 +42,8 @@ export interface AdminContext {
   meter: LoadMeter;
   /** The region servers, when REDIS_URL lets them join; absent when every region runs here. */
   regionServers?: RegionServers;
+  /** Every request sent to an outside service (Owner). */
+  apiLog?: ApiLog;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
 }
@@ -461,6 +464,18 @@ export async function handleAdmin(
     return json(res, 200, { ok: true }), true;
   }
 
+  // API Log (Owner): every request sent to an outside service, filtered.
+  if (route === 'api-log' && method === 'GET' && ctx.apiLog) {
+    if (ownerOnly()) return true;
+    return json(res, 200, ctx.apiLog.query(apiLogFilter(new URL(req.url ?? '/', 'http://localhost').searchParams))), true;
+  }
+  const apiCall = route.match(/^api-log\/([0-9a-f]+)$/);
+  if (apiCall && method === 'GET' && ctx.apiLog) {
+    if (ownerOnly()) return true;
+    const call = await ctx.apiLog.get(apiCall[1]!);
+    return call ? json(res, 200, call) : json(res, 404, { error: 'not_found', message: 'That request is no longer in the log.' }), true;
+  }
+
   // Server health (Owner): where each region runs and how hard each host works.
   if (route === 'servers' && method === 'GET') {
     if (ownerOnly()) return true;
@@ -577,4 +592,19 @@ function soundChoice(raw: unknown, current: SoundSettings): SoundSettings {
     ? { provider: 'gemini', model: model(r.music.model, 'lyria-3-clip-preview') }
     : r.music?.provider === 'none' ? { provider: 'none', model: '' } : current.music;
   return { effects, music };
+}
+
+/** The API Log's filters from the tab's query string; anything missing or unreadable is left out. */
+function apiLogFilter(q: URLSearchParams): ApiLogFilter {
+  const num = (name: string) => {
+    const n = Number(q.get(name));
+    return q.get(name) && Number.isFinite(n) ? n : undefined;
+  };
+  const text = (name: string) => q.get(name)?.slice(0, 200) || undefined;
+  const filter: ApiLogFilter = {};
+  for (const [key, value] of Object.entries({
+    from: num('from'), to: num('to'), offset: num('offset'), limit: num('limit'), slowerThanMs: num('slowerThanMs'),
+    service: text('service'), kind: text('kind'), model: text('model'), purpose: text('purpose'), method: text('method'), status: text('status'), text: text('text'),
+  })) if (value !== undefined) (filter as Record<string, unknown>)[key] = value;
+  return filter;
 }

@@ -8,6 +8,7 @@ import { connectRedis } from './redis.ts';
 import { RedisTurnLedger, SharedPaintQueue } from './shared-paint-queue.ts';
 import { RedisBus } from './bus.ts';
 import { Updater, currentCommit } from './updates.ts';
+import { ApiLog, KEEP_DAYS, MAX_BYTES } from './api-log.ts';
 
 const port = Number(process.env.PORT ?? 3001);
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -47,8 +48,16 @@ const updater = new Updater({
   requestFile: process.env.CO_MMO_UPDATE_REQUEST,
   resultFile: process.env.CO_MMO_UPDATE_RESULT,
 });
+// Every request to an outside service, kept beside the world for God's View's API Log,
+// for API_LOG_DAYS days and API_LOG_MAX_MB megabytes at most.
+const apiLog = await ApiLog.open({
+  dir: resolve(process.env.API_LOG_DIR ?? resolve(dirname(dataFile), 'api-log')),
+  keepDays: positive('API_LOG_DAYS', KEEP_DAYS),
+  maxBytes: positive('API_LOG_MAX_MB', MAX_BYTES / 1024 / 1024) * 1024 * 1024,
+});
 const app = createApp({
   store,
+  apiLog,
   publicUrl,
   clientDir,
   updater,
@@ -83,4 +92,14 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     await ledger?.close();
     process.exit(0);
   });
+}
+
+/** A positive number from the environment, or `fallback` (with a warning) when it is missing or not one. */
+function positive(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  if (Number.isFinite(value) && value > 0) return value;
+  console.warn(`${name}=${raw} is not a positive number, so ${fallback} is used.`);
+  return fallback;
 }

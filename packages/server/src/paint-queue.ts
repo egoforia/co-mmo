@@ -1,3 +1,4 @@
+import { withApiContext } from './api-log.ts';
 import { ProviderError } from './assets/provider.ts';
 import type { ImageProvider } from './assets/provider.ts';
 import type { SoundProvider } from './assets/sound.ts';
@@ -43,6 +44,8 @@ export function limitFor(model: string): RateLimit | undefined {
 export interface PaintTurnWatcher {
   wait(reason: string): void;
   start(): void;
+  /** The painting log's job, whose label says in the API Log why a request was sent. */
+  readonly job?: { readonly label: string };
 }
 
 /** Turns at the image and video services; a shared (Redis) queue can replace the in-memory one. */
@@ -268,7 +271,7 @@ export function queuedImages(queue: PaintQueue, provider: ImageProvider): ImageP
   const wrap = (watcher?: PaintTurnWatcher): ImageProvider & Watchable<ImageProvider> => ({
     id: provider.id,
     model: provider.model,
-    generate: (request) => queue.turn(provider.model, () => provider.generate(request), watcher),
+    generate: (request) => queue.turn(provider.model, () => marked(provider.model, watcher, () => provider.generate(request)), watcher),
     watchedBy: (w) => wrap(w),
   });
   return wrap();
@@ -286,7 +289,7 @@ export function queuedVideo(queue: PaintQueue, provider: VideoProvider, clips?: 
     model: provider.model,
     generate: async (request) => {
       clips?.check(provider.model);
-      return queue.turn(provider.model, () => make(request), watcher);
+      return queue.turn(provider.model, () => marked(provider.model, watcher, () => make(request)), watcher);
     },
     watchedBy: (w) => wrap(w),
   });
@@ -298,7 +301,7 @@ export function queuedSound(queue: PaintQueue, provider: SoundProvider): SoundPr
   const wrap = (watcher?: PaintTurnWatcher): SoundProvider & Watchable<SoundProvider> => ({
     id: provider.id,
     model: provider.model,
-    generate: (request) => queue.turn(provider.model, () => provider.generate(request), watcher),
+    generate: (request) => queue.turn(provider.model, () => marked(provider.model, watcher, () => provider.generate(request)), watcher),
     watchedBy: (w) => wrap(w),
   });
   return wrap();
@@ -372,6 +375,11 @@ interface Watchable<P> {
 export function watched<P extends ImageProvider | VideoProvider | SoundProvider>(provider: P, watcher: PaintTurnWatcher | undefined): P {
   const watchable = provider as P & Partial<Watchable<P>>;
   return watcher && watchable.watchedBy ? watchable.watchedBy(watcher) : provider;
+}
+
+/** Runs a request marked, for the API Log, with its model and the painting it is for. */
+function marked<T>(model: string, watcher: PaintTurnWatcher | undefined, call: () => Promise<T>): Promise<T> {
+  return withApiContext({ model, purpose: watcher?.job?.label }, call);
 }
 
 function minutes(backoff: number[]): number {

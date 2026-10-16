@@ -200,6 +200,37 @@ ul.brief { margin: 4px 0 8px; padding-left: 18px; }
 .host { border-top: 1px solid var(--edge); margin-top: 14px; padding-top: 4px; }
 .host select { margin-left: 8px; }
 
+/* API Log */
+.form.filters { max-width: none; }
+.filters .ranges, .filters .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.filter-row .wide { grid-column: span 2; }
+.filters select, .filters input { width: 100%; }
+#api-log .stats { margin: 14px 0; }
+.log.calls tr.call { cursor: pointer; }
+.log.calls tr.call:hover, .log.calls tr.call[aria-expanded] { background: var(--panel); }
+.log.calls tr.failed td:first-child { box-shadow: inset 3px 0 var(--bad); }
+.log.calls td:first-child { white-space: nowrap; color: var(--muted); font-size: 12px; }
+.log.calls code { font-size: 12px; word-break: break-all; }
+.status { font-weight: 600; }
+.call-detail { display: grid; gap: 6px; min-width: 0; }
+.call-detail .url { word-break: break-all; }
+.call-detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0; font-size: 13px; }
+.call-detail dt { color: var(--muted); }
+.call-detail dd { margin: 0; }
+.call-detail .cols > div { flex: 1; min-width: 260px; }
+table.headers { border-collapse: collapse; font-size: 12px; width: 100%; }
+.headers th { text-align: left; color: var(--muted); font-weight: 400; padding: 2px 10px 2px 0; vertical-align: top; white-space: nowrap; }
+.headers td { padding: 2px 0; word-break: break-all; }
+.call-detail .body { position: relative; }
+.call-detail .body pre { max-width: none; max-height: 480px; overflow: auto; margin: 4px 0 8px; }
+.call-detail .copy { position: absolute; top: 6px; right: 6px; padding: 2px 8px; font-size: 12px; }
+.pages { display: flex; gap: 8px; align-items: center; }
+@media (max-width: 700px) {
+  .filter-row .wide { grid-column: auto; }
+  .log.calls td:nth-child(7), .log.calls th:nth-child(7) { display: none; }
+}
+
 /* Art tab v2: its own tabs and pages, reviewing a request before it is painted, and comparing versions. */
 nav.subtabs, nav.pages { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 14px; border: 0; }
 nav.subtabs a, nav.pages a { color: var(--muted); text-decoration: none; padding: 5px 12px; border: 1px solid var(--edge); border-radius: 14px; font-size: 13px; }

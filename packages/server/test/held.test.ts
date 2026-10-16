@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { BUILDING_STYLES, WALK_DIRECTIONS, addItem, buildingArtIds, heldItem, newCharacter, regionDef, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { BUILDING_STYLES, ITEMS, WALK_DIRECTIONS, addItem, buildingArtIds, equipmentBonus, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import type { ChatModel, ChatRequest } from '../src/ai/chat.ts';
 import { findPoint, steadyHands, stripFrames } from '../src/assets/points.ts';
 import { HandFinder, type PointSource } from '../src/hand-finder.ts';
@@ -158,6 +158,36 @@ describe('held items', () => {
     region.tick();
     const seen = conns.b!.filter((m) => m.t === 'snapshot').at(-1) as Extract<ServerMessage, { t: 'snapshot' }>;
     expect(seen.players.find((p) => p.id === 'a')).toMatchObject({ held: 'wooden-sword' });
+    expect(seen.players.find((p) => p.id === 'a')!.offHeld).toBeUndefined();
+  });
+
+  it('wears a wished shield in the off hand, shown in the left hand beside the weapon', () => {
+    const def = validateDefinition({ kind: 'item', name: 'Oak Buckler', description: 'A round oak shield.', itemKind: 'offhand', rarity: 'uncommon' });
+    expect(def).toMatchObject({ itemKind: 'offhand' });
+    ITEMS['w-buckler'] = itemFromWish('w-buckler', def as Parameters<typeof itemFromWish>[1]);
+    try {
+      expect(ITEMS['w-buckler']).toMatchObject({ slot: 'offhand', bonus: equipmentBonus('offhand', 'uncommon') });
+      expect(equipmentBonus('offhand', 'uncommon').armor).toBeGreaterThan(0);
+
+      const region = new Region(regionDef('sanctum')!, undefined, () => 1_000_000, () => 0.5);
+      const seen: ServerMessage[] = [];
+      const info = (id: string): PlayerInfo => ({ id, name: id, color: 0xffffff, role: 'player' });
+      const mara = newCharacter();
+      addItem(mara, 'wooden-sword');
+      addItem(mara, 'w-buckler');
+      region.join(info('a'), { send() {}, close() {} }, { x: null, y: null }, mara);
+      region.join(info('b'), { send: (m) => seen.push(m), close() {} }, { x: null, y: null }, newCharacter());
+      region.placePlayer('a', 10, 10);
+      region.placePlayer('b', 11, 10);
+      region.handle('a', { t: 'equip', item: 'wooden-sword' });
+      region.handle('a', { t: 'equip', item: 'w-buckler' });
+      region.tick();
+      const last = seen.filter((m) => m.t === 'snapshot').at(-1) as Extract<ServerMessage, { t: 'snapshot' }>;
+      expect(last.players.find((p) => p.id === 'a')).toMatchObject({ held: 'wooden-sword', offHeld: 'w-buckler' });
+      expect(offHandItem({ equipment: { offhand: 'w-buckler' } })).toBe('w-buckler');
+    } finally {
+      delete ITEMS['w-buckler'];
+    }
   });
 });
 

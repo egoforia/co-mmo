@@ -14,9 +14,9 @@ export interface Stats {
 }
 
 /** Where equipment is worn (design doc, Items: equipment slots). */
-export type EquipSlot = 'weapon' | 'head' | 'body' | 'charm';
-export const EQUIP_SLOTS: readonly EquipSlot[] = ['weapon', 'head', 'body', 'charm'];
-export const SLOT_NAMES: Record<EquipSlot, string> = { weapon: 'Weapon', head: 'Head', body: 'Body', charm: 'Charm' };
+export type EquipSlot = 'weapon' | 'offhand' | 'head' | 'body' | 'charm';
+export const EQUIP_SLOTS: readonly EquipSlot[] = ['weapon', 'offhand', 'head', 'body', 'charm'];
+export const SLOT_NAMES: Record<EquipSlot, string> = { weapon: 'Weapon', offhand: 'Off hand', head: 'Head', body: 'Body', charm: 'Charm' };
 
 /** Rarity from Common to Legendary (design doc, Items). */
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -484,6 +484,7 @@ export function bonusText(bonus: Bonus | undefined): string {
  */
 export function equipmentBonus(slot: EquipSlot, rarity: Rarity, focus?: keyof Stats): Bonus {
   const tier = RARITIES.indexOf(rarity) + 1;
+  // An off-hand item (a shield, a torch) guards like a hat does.
   const bonus: Bonus = slot === 'weapon' ? { attack: 1 + tier } : slot === 'charm' ? {} : { armor: tier + (slot === 'body' ? 1 : 0) };
   const stat = focus ?? (slot === 'weapon' ? 'might' : slot === 'charm' ? 'wit' : 'spirit');
   const extra = slot === 'charm' ? tier + 1 : tier - 1;

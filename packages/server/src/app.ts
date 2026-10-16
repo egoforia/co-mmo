@@ -259,7 +259,7 @@ export function createApp(options: AppOptions): App {
     if (!options.shippedArt) return Promise.reject(new Error('no shipped art'));
     return readFile(resolve(dirname(dirname(options.shippedArt)), path));
   };
-  /** Every walk strip, walking look and wished look (their hands), and every weapon and charm (their grips). */
+  /** Every walk strip, walking look and wished look (their hands), and every weapon, off-hand item and charm (their grips). */
   const pointSources = (shipped: ArtManifest, painted: ArtManifest): PointSource[] => {
     // As the client merges them: shipped art wins, except what the Owner had painted again.
     const art: ArtManifest = { ...painted, ...shipped, ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)) };
@@ -279,7 +279,7 @@ export function createApp(options: AppOptions): App {
       ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'walk' ? source(id, 'hands', e.file, e.frames ?? WALK_FRAMES) : [])),
       ...WALKING_LOOKS.flatMap((id) => source(id, 'hands', art[id]?.file)),
       ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),
-      ...Object.values(ITEMS).filter((item) => item.slot === 'weapon' || item.slot === 'charm')
+      ...Object.values(ITEMS).filter((item) => item.slot === 'weapon' || item.slot === 'offhand' || item.slot === 'charm')
         .flatMap((item) => source(item.art, 'grip', item.art.startsWith('wished-') ? wished.get(item.art) : art[item.art]?.file)),
     ];
   };

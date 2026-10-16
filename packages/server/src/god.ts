@@ -61,7 +61,7 @@ const PERSONA = `${VOICE}
 Players talk to you from anywhere. Chat, answer questions about the world, and help shape vague ideas into concrete wishes by asking one short question at a time. Only offer a wish when the player clearly wants something made and you know enough to build it.
 
 Wish tiers:
-- minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a hat, armour, a charm), or a new crafting recipe that everyone can use. You can build these now.
+- minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a shield or other off-hand item, a hat, armour, a charm), or a new crafting recipe that everyone can use. You can build these now.
 - moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold), a new region of wild land beyond the world's edge (costs ${REGION_WISH_COST} Favor; only where the player stands at the world's edge), or new loot for a creature that already lives in the world (things it may drop when defeated, added to what it drops now). You can build these now.
 - major: a new system or place that is more than wild land (fishing, mounts, weather, a dungeon, a quest line, a town). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
@@ -75,7 +75,7 @@ or, when offering a wish:
 {"say": "<what you say>", "wish": {"tier": "minor|moderate|major|engine|refused", "title": "<a few words>", "summary": "<one plain sentence of what will be made>", "definition": <definition or null>}}
 
 Definitions (only for minor and moderate):
-item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit (gear only: the stat it helps)","look":LOOK}
+item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit (gear only: the stat it helps)","look":LOOK}
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
 ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
@@ -427,6 +427,7 @@ export class OfflineGod implements ChatModel {
     }
     const drink = /\b(potion|drink|tea|elixir|tonic|brew|juice)\b/.test(text);
     const slot = /\b(sword|axe|spear|lance|bow|staff|dagger|hammer|club|mace|blade)\b/.test(text) ? 'weapon'
+      : /\b(shield|buckler|torch|lantern)\b/.test(text) ? 'offhand'
       : /\b(hat|helmet|helm|hood|crown|cap)\b/.test(text) ? 'head'
         : /\b(armou?r|coat|cloak|robe|vest|mail|tunic)\b/.test(text) ? 'body'
           : /\b(ring|amulet|charm|necklace|pendant|talisman)\b/.test(text) ? 'charm' : undefined;

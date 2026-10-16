@@ -1,7 +1,8 @@
 import type { Character } from './rpg.ts';
 
 // Held items (milestone 10): a player's painted look stays as it is, and the
-// weapon they wear, or else their charm, is shown in their hand. Where the
+// weapon they wear, or else their charm, is shown in their right hand, and
+// an off-hand item such as a shield in their left. Where the
 // hand is in each walk frame, and where each item is gripped, is found once
 // by a vision model from the painted pictures, never guessed in code.
 
@@ -21,7 +22,12 @@ export interface ArtPoints {
 /** Points by art id, as the server serves them. */
 export type ArtPointsManifest = Record<string, ArtPoints>;
 
-/** The item a player shows in their hand: their weapon, else their charm. */
+/** The item a player shows in their right hand: their weapon, else their charm. */
 export function heldItem(character: Pick<Character, 'equipment'>): string | undefined {
   return character.equipment.weapon ?? character.equipment.charm;
+}
+
+/** The item a player shows in their left hand: a shield, torch or other off-hand item. */
+export function offHandItem(character: Pick<Character, 'equipment'>): string | undefined {
+  return character.equipment.offhand;
 }

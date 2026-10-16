@@ -126,7 +126,7 @@ interface Review {
 
 const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monsters', 'Monsters'], ['items', 'Items'], ['biomes', 'Biomes'], ['sounds', 'Sounds and music']] as const;
 type Subtab = (typeof SUBTABS)[number][0];
-const ITEM_ORDER = ['Consumables', 'Weapons', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
+const ITEM_ORDER = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
 const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']];
 const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
 const STATUS: Record<ArtJob['status'], string> = { queued: 'In line', waiting: 'Waiting for a turn', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
@@ -380,7 +380,7 @@ function handsHtml(w: WalkerView): string {
     return [`<div class="hand-row"><div class="hand-head"><small>${label}${hands ? '' : ' · not looked at yet'}</small>${find({ ids: [id] }, 'Find again for this walk')}</div><div class="frames">${frames}</div>${ask}</div>`];
   });
   if (!rows.length) return '';
-  return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: kept for shields and off-hand items)</summary>
+  return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: shields and off-hand items)</summary>
     <p class="note">The hand finder looks at every frame once, after a walk is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call.</p>
     ${find({ ids: [...ids, w.id] }, `Find again for every walk of ${esc(w.name)}`, '')}
     ${rows.join('')}</details>`;

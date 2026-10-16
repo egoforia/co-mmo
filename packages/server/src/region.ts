@@ -54,6 +54,7 @@ import {
   type BodyState,
   type Character,
   heldItem,
+  offHandItem,
   type CreatorCredit,
   type EquipSlot,
   type ChatChannel,
@@ -690,6 +691,7 @@ export class Region {
           id: other.info.id, name: other.info.name, color: other.info.color, x: round(other.x), y: round(other.y),
           health: round(other.character.hp / maxHp(other.character)),
           ...(heldItem(other.character) ? { held: heldItem(other.character) } : {}),
+          ...(offHandItem(other.character) ? { offHeld: offHandItem(other.character) } : {}),
         });
       }
       const creatures: CreatureState[] = [];
@@ -735,6 +737,7 @@ export class Region {
       g.players.push({
         id: p.info.id, name: p.info.name, color: p.info.color, x: round(p.x), y: round(p.y), health: round(p.character.hp / maxHp(p.character)),
         ...(heldItem(p.character) ? { held: heldItem(p.character) } : {}),
+        ...(offHandItem(p.character) ? { offHeld: offHandItem(p.character) } : {}),
       });
     }
     for (const c of this.creatures) {

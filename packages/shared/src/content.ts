@@ -435,7 +435,7 @@ export function regionFromWish(entry: Pick<ContentEntry, 'id' | 'wisher' | 'cell
 }
 
 /** The built-in picture each equipment slot is drawn with until its own is painted. */
-const SLOT_ART: Record<EquipSlot, string> = { weapon: 'item-wooden-sword', head: 'item-mushroom-hat', body: 'item-traveller-coat', charm: 'item-scarab-charm' };
+const SLOT_ART: Partial<Record<EquipSlot, string>> = { weapon: 'item-wooden-sword', head: 'item-mushroom-hat', body: 'item-traveller-coat', charm: 'item-scarab-charm' };
 
 /** The art key a wished thing is drawn with. */
 export function wishArtKey(id: string): string {

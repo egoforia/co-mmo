@@ -17,7 +17,7 @@ export interface ArtPlace {
 }
 
 /** Kinds of item, in the order the Items tab shows them. */
-export const ITEM_PAGES = ['Consumables', 'Weapons', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'] as const;
+export const ITEM_PAGES = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'] as const;
 
 /** A land's name as a page title: "Sanctum" rather than "the Sanctum". */
 export function landName(biome: BiomeId | 'any'): string {
@@ -33,7 +33,7 @@ export function shippedItemPage(artId: string): (typeof ITEM_PAGES)[number] {
   if (item.kind === 'consumable') return 'Consumables';
   if (item.kind === 'material') return 'Materials';
   if (item.kind === 'book' || item.kind === 'scroll') return 'Books and scrolls';
-  return item.slot === 'weapon' ? 'Weapons' : item.slot === 'charm' ? 'Charms' : 'Armour';
+  return item.slot === 'weapon' ? 'Weapons' : item.slot === 'offhand' ? 'Shields' : item.slot === 'charm' ? 'Charms' : 'Armour';
 }
 
 /** A wished item's kind of item. */
@@ -41,6 +41,7 @@ export function wishedItemPage(kind: ItemWish['itemKind']): (typeof ITEM_PAGES)[
   if (kind === 'consumable') return 'Consumables';
   if (kind === 'material') return 'Materials';
   if (kind === 'weapon') return 'Weapons';
+  if (kind === 'offhand') return 'Shields';
   if (kind === 'head' || kind === 'body') return 'Armour';
   return 'Charms';
 }

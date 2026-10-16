@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem } from '@co-mmo/shared';
+import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { GameConnection } from './net.ts';
@@ -210,7 +210,7 @@ function play(token: string): void {
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
-        scene?.setMyHeld(heldItem(message.character));
+        scene?.setMyHeld(heldItem(message.character), offHandItem(message.character));
         break;
       case 'god':
         sound.play('god-speaks');

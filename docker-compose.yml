@@ -2,6 +2,7 @@
 #   docker compose up -d
 # then add to .env:
 #   DATABASE_URL=postgres://co_mmo:co_mmo@localhost:5432/co_mmo
+#   REDIS_URL=redis://localhost:6379
 # They start again by themselves after a reboot. Data lives in Docker volumes,
 # so `docker compose down` keeps it; `docker compose down -v` deletes it.
 services:
@@ -20,5 +21,14 @@ services:
       interval: 5s
       retries: 10
 
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    # Saved to disk every second, so a paused model stays paused after a reboot.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: [redis:/data]
+
 volumes:
   postgres:
+  redis:

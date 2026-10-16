@@ -9,9 +9,9 @@ import type { VideoProvider, VideoRequest } from './assets/video.ts';
 // for asking too often is waited out and asked again, while a daily cap stops
 // that model until Google resets it, since retrying cannot help.
 //
-// The queue lives in memory, which is enough for one server. Several servers
-// sharing one key would need the turns kept somewhere shared (Redis): a class
-// implementing PaintQueue can replace this one without touching the painters.
+// This queue lives in memory, which is enough for one server. With REDIS_URL
+// set the game uses SharedPaintQueue (shared-paint-queue.ts) instead: the same
+// promises, with turns and pauses kept in Redis for every server and restart.
 
 /** How often a model may be asked, and how many requests it may have going at once. */
 export interface RateLimit {
@@ -54,7 +54,7 @@ export interface PaintQueue {
 }
 
 /** How long to wait before asking again after each refusal that says nothing more; about 15 minutes in all. */
-const BACKOFF_MS = [30_000, 60_000, 120_000, 240_000, 480_000];
+export const BACKOFF_MS = [30_000, 60_000, 120_000, 240_000, 480_000];
 
 /** What kind of limit a refusal was. */
 export type Refusal = 'minute' | 'day';
@@ -84,6 +84,45 @@ export function refusalLine(model: string, err: ProviderError): string {
   const quotas = err.throttle?.quotas.length ? err.throttle.quotas.join(', ') : 'none named';
   const wait = err.throttle?.retryAfterMs === undefined ? 'none given' : `${Math.ceil(err.throttle.retryAfterMs / 1000)} s`;
   return `${model} refused (${err.status}): "${err.said}" Quotas: ${quotas}. Retry after: ${wait}.`;
+}
+
+/** What to do after the service refused to start a request: wait and ask again, or stop the model until `until`. */
+export type RefusalOutcome =
+  | { stop: false; until: number; said: string }
+  | { stop: true; until: number; closed: string; said: string };
+
+/**
+ * Decides what a refused start means, logging Google's words once. Undefined
+ * when `err` is not a refusal for asking too much, so it is passed on.
+ * `attempt` counts earlier refusals of this request; past the last backoff
+ * step the model is taken to be stopped for longer than a minute.
+ */
+export function afterRefusal(model: string, err: unknown, attempt: number, backoff: number[], now: number): RefusalOutcome | undefined {
+  const kind = refusal(err, model);
+  if (!kind) return undefined;
+  const refused = err as ProviderError;
+  // Each refusal is logged once, so the server's log shows what Google really said.
+  console.warn(refusalLine(model, refused));
+  const said = refused.said;
+  if (kind === 'day') {
+    const until = nextDailyReset(now);
+    return { stop: true, until, said, closed: `Google's daily limit for ${model} is used up, so nothing more is sent to it until it resets at ${clock(until)}. Google said: "${said}"` };
+  }
+  if (attempt >= backoff.length) {
+    // Asking again for a quarter of an hour did not help, so this is not the per-minute limit.
+    return {
+      stop: true,
+      until: now + 60 * 60_000,
+      said,
+      closed: `Google kept refusing ${model} for ${minutes(backoff)} minutes, so its daily limit or the account's billing cap is likely used up. Nothing more is sent to it for an hour. Google said: "${said}"`,
+    };
+  }
+  return { stop: false, until: now + (refused.throttle?.retryAfterMs ?? backoff[attempt]!), said };
+}
+
+/** What a request that was refused tells the painting log while it waits `ms` to ask again. */
+export function waitLine(said: string, ms: number): string {
+  return `Google asked us to slow down ("${said}"); asking again in ${Math.ceil(ms / 1000)} s.`;
 }
 
 /** The next time Google's daily quotas reset: midnight Pacific time, taken as 08:00 UTC so it is never early. */
@@ -130,28 +169,17 @@ export class MemoryPaintQueue implements PaintQueue {
       try {
         return await call();
       } catch (err) {
-        const kind = refusal(err, model);
-        if (!kind) throw err;
-        const refused = err as ProviderError;
-        // Each refusal is logged once, so the server's log shows what Google really said.
-        console.warn(refusalLine(model, refused));
+        const next = afterRefusal(model, err, attempt, this.backoff, this.now());
+        if (!next) throw err;
         const turns = this.turns(model);
-        const now = this.now();
-        turns.said = refused.said;
-        if (kind === 'day') {
-          turns.pausedUntil = nextDailyReset(now);
-          turns.closed = `Google's daily limit for ${model} is used up, so nothing more is sent to it until it resets at ${clock(turns.pausedUntil)}. Google said: "${refused.said}"`;
-          throw new PaintStopped(turns.closed);
+        turns.said = next.said;
+        if (next.stop) {
+          turns.pausedUntil = next.until;
+          turns.closed = next.closed;
+          throw new PaintStopped(next.closed);
         }
-        if (attempt >= this.backoff.length) {
-          // Asking again for a quarter of an hour did not help, so this is not the per-minute limit.
-          turns.pausedUntil = now + 60 * 60_000;
-          turns.closed = `Google kept refusing ${model} for ${minutes(this.backoff)} minutes, so its daily limit or the account's billing cap is likely used up. Nothing more is sent to it for an hour. Google said: "${refused.said}"`;
-          throw new PaintStopped(turns.closed);
-        }
-        const wait = refused.throttle?.retryAfterMs ?? this.backoff[attempt]!;
-        turns.pausedUntil = Math.max(turns.pausedUntil, now + wait);
-        watcher?.wait(`Google asked us to slow down ("${refused.said}"); asking again in ${Math.ceil(wait / 1000)} s.`);
+        turns.pausedUntil = Math.max(turns.pausedUntil, next.until);
+        watcher?.wait(waitLine(next.said, next.until - this.now()));
       } finally {
         this.release(model);
       }
@@ -351,6 +379,6 @@ function minutes(backoff: number[]): number {
 }
 
 /** A time of day, as the server's clock reads it. */
-function clock(at: number): string {
+export function clock(at: number): string {
   return new Date(at).toISOString().slice(11, 16) + ' UTC';
 }

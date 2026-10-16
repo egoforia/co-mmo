@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { createApp, inviteUrl } from './app.ts';
 import { Store } from './store.ts';
 import { connectPostgres } from './db.ts';
+import { connectRedis } from './redis.ts';
+import { RedisTurnLedger, SharedPaintQueue } from './shared-paint-queue.ts';
 import { Updater, currentCommit } from './updates.ts';
 
 const port = Number(process.env.PORT ?? 3001);
@@ -26,6 +28,15 @@ const store = await (databaseUrl ? connectPostgres(databaseUrl).then((sql) => St
   process.exit(1);
 });
 console.log(`The world is kept in ${store.label}.`);
+// Redis when REDIS_URL is set: the paint queue's turns and pauses are shared
+// by every server and outlive a restart. Without it they live in memory.
+const redisUrl = process.env.REDIS_URL;
+const redis = redisUrl ? await connectRedis(redisUrl).catch((err: Error) => {
+  console.error(err.message);
+  process.exit(1);
+}) : undefined;
+const ledger = redis && new RedisTurnLedger(redis);
+if (ledger) console.log('The paint queue is kept in Redis.');
 // scripts/dev.mjs (npm run dev) watches the request file and does the pull
 // and restart; without it the Owner still sees what is new on GitHub.
 const updater = new Updater({
@@ -39,6 +50,7 @@ const app = createApp({
   clientDir,
   updater,
   commit: currentCommit(repoRoot),
+  ...(ledger ? { paintQueue: new SharedPaintQueue(ledger) } : {}),
   builds: { repoDir: repoRoot },
   shippedArt: resolve(repoRoot, 'packages/client/public/art/manifest.json'),
   wishes: {
@@ -63,6 +75,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     console.log('Saving and shutting down...');
     await app.close();
     await store.close();
+    await ledger?.close();
     process.exit(0);
   });
 }

@@ -5,7 +5,7 @@ import type { Connection } from '../src/region.ts';
 import { RegionServer } from '../src/region-server.ts';
 import { RegionServers } from '../src/region-servers.ts';
 import { World } from '../src/world.ts';
-import { account, app, joined, start, wish } from './helpers.ts';
+import { account, api, app, joined, start, wish } from './helpers.ts';
 
 function fakeConn() {
   const messages: ServerMessage[] = [];
@@ -202,5 +202,55 @@ describe('the game on region servers', () => {
     await c.waitFor<any>((m) => m.t === 'snapshot' && m.creatures.some((cr: any) => cr.kind === record.id));
     await until(() => app!.world.home.character(p.id)!.favor === favor - card.cost);
     expect(regionServer.region('sanctum')!.character(p.id)!.favor).toBe(favor - card.cost);
+  });
+});
+
+describe("God's View Server health", () => {
+  it('shows every host and its regions to the Owner, and moves and restarts regions', async () => {
+    const bus = new MemoryBus();
+    const regionServer = new RegionServer({ bus, id: 'r1' });
+    const { store, ws, base } = await start({ regionBus: bus });
+    await regionServer.start();
+    running.push(regionServer);
+    await until(() => app!.world.home.host === 'r1');
+    const owner = account(store, 'egoforia', 'owner');
+    const steward = account(store, 'Mara', 'steward');
+    const c = await joined(ws, owner.token);
+    expect((await api(base, '/api/admin/servers', steward.token)).status).toBe(403);
+
+    const health = await api(base, '/api/admin/servers', owner.token);
+    expect(health.body).toMatchObject({ regionServers: true, store: expect.any(String) });
+    const [gateway, r1] = health.body.hosts;
+    expect(gateway).toMatchObject({ id: 'gateway', kind: 'gateway', regions: [] });
+    expect(gateway.load).toMatchObject({ tickMs: expect.any(Number), memoryMb: expect.any(Number), errors: 0, pid: process.pid });
+    expect(r1).toMatchObject({ id: 'r1', kind: 'region-server', players: 1 });
+    expect(r1.regions.map((r: any) => r.id).sort()).toEqual(['desert', 'sanctum', 'shore', 'woods']);
+
+    // Restart where it runs: the player is welcomed again where they stood.
+    const before = app!.world.home.position(owner.id)!;
+    const restart = await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum' });
+    expect(restart.body).toMatchObject({ host: 'r1', message: 'Restarted the Sanctum.' });
+    await c.waitFor((m) => m.t === 'welcome');
+    expect(app!.world.home.position(owner.id)).toEqual(before);
+
+    // Move to the game server, then refuse a server that is not running.
+    expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum', to: 'gateway' })).body).toMatchObject({ host: 'gateway' });
+    expect(app!.world.home.host).toBe('gateway');
+    expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum', to: 'nowhere' })).status).toBe(400);
+    expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'atlantis' })).status).toBe(404);
+  });
+
+  it('restarts a region when every region runs in the game server', async () => {
+    const { store, ws, base } = await start();
+    const owner = account(store, 'egoforia', 'owner');
+    await joined(ws, owner.token);
+    const health = await api(base, '/api/admin/servers', owner.token);
+    expect(health.body.regionServers).toBe(false);
+    expect(health.body.hosts).toHaveLength(1);
+    const old = app!.world.home;
+    expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum' })).status).toBe(200);
+    expect(app!.world.home).not.toBe(old);
+    expect(app!.world.home.has(owner.id)).toBe(true);
+    expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum', to: 'r1' })).status).toBe(400);
   });
 });

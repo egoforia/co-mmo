@@ -417,7 +417,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
+    const admin = { store, world, wishes, rules, reports, builds, art: artStudio, hands: handFinder, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.

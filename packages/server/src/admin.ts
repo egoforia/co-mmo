@@ -11,6 +11,7 @@ import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSH
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
+import type { HandFinder } from './hand-finder.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
@@ -27,6 +28,8 @@ export interface AdminContext {
   builds: Builds;
   /** The Art tab: painting log, repaints and walks (Owner). */
   art?: ArtStudio;
+  /** Where hands and grips are found in pictures, for held items (Owner). */
+  hands?: HandFinder;
   /** Paints and makes what is missing, now that a limit was raised. */
   resumeArt?(): void;
   /** Video clips made since Google's daily reset, against the day's cap. */
@@ -355,6 +358,7 @@ export async function handleAdmin(
   if (route.startsWith('art') && ctx.art) {
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
+    if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [] }), true;
     if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: wishes.budget() }), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;
     const note = typeof body?.note === 'string' ? body.note : '';
@@ -406,6 +410,22 @@ export async function handleAdmin(
       if (route === 'art/restore-view' && method === 'POST') {
         await ctx.art.restoreView(String(body?.walker ?? ''), String(body?.direction ?? ''), String(body?.version ?? ''));
         return json(res, 200, { ok: true }), true;
+      }
+      if (route === 'art/hands/question' && method === 'POST') {
+        const facing = String(body?.facing ?? '');
+        if (!ctx.hands || !(WALK_DIRECTIONS as readonly string[]).includes(facing)) return json(res, 400, { error: 'bad_request', message: 'There is no question like that.' }), true;
+        await ctx.hands.setQuestion(facing as WalkDirection, typeof body?.prompt === 'string' ? body.prompt : '');
+        return json(res, 200, { ok: true }), true;
+      }
+      if (route === 'art/hands/find' && method === 'POST') {
+        const ids = Array.isArray(body?.ids) ? body.ids.filter((x): x is string => typeof x === 'string').slice(0, 20) : [];
+        const frame = Number.isInteger(body?.frame) ? (body!.frame as number) : undefined;
+        if (!ctx.hands || !ids.length) return json(res, 400, { error: 'bad_request', message: 'Pick a walk or a frame to look at again.' }), true;
+        try {
+          return json(res, 200, { ok: true, looked: await ctx.hands.findAgain(ids, frame) }), true;
+        } catch (err) {
+          return json(res, 409, { error: 'art_refused', message: (err as Error).message }), true;
+        }
       }
       if (route === 'art/restore-sound' && method === 'POST') {
         await ctx.art.restoreSound(String(body?.sound ?? ''), String(body?.version ?? ''));

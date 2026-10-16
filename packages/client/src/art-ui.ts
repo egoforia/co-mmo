@@ -140,6 +140,9 @@ const esc = escapeHtml;
 let data: ArtOverview | null = null;
 /** Where the hand finder found each look's right hand, frame by frame, by art id. */
 let points: Record<string, { hands?: ([number, number] | null)[] }> = {};
+/** The questions the hand finder asks, one per way of facing. */
+interface HandQuestion { facing: Direction; prompt: string; usual: string; own: boolean; system: string }
+let questions: HandQuestion[] = [];
 let ctx: ArtContext;
 
 /** Where the Art tab is: its sub-tab and page, from the address (#art/<sub-tab>/<page>). */
@@ -156,10 +159,13 @@ function go(sub: Subtab, page?: string): string {
 /** The Art tab, as HTML. */
 export async function artPage(context: ArtContext): Promise<string> {
   ctx = context;
-  [data, points] = await Promise.all([
+  let asked: { questions: HandQuestion[] };
+  [data, points, asked] = await Promise.all([
     ctx.api<ArtOverview>('art'),
     fetch('/api/art-points').then((r) => (r.ok ? r.json() : {}), () => ({})),
+    ctx.api<{ questions: HandQuestion[] }>('art/hands').catch(() => ({ questions: [] })),
   ]);
+  questions = asked.questions;
   const o = data;
   const { sub, page } = where();
   const pages: Record<Subtab, () => string> = { now: nowPage, characters: () => peoplePage('characters', page), monsters: () => peoplePage('monsters', page), items: () => itemsPage(page), biomes: () => biomesPage(page), sounds: soundsPage };
@@ -344,24 +350,41 @@ function walkerHtml(w: WalkerView): string {
  * nearest frame's hand in the game.
  */
 function handsHtml(w: WalkerView): string {
+  const ids = DIRECTIONS.filter(([d]) => w.walks[d]).map(([d]) => `${w.id}-walk-${d}`);
+  const find = (body: { ids: string[]; frame?: number }, label: string, cls = 'quiet') => `<button type="button" class="${cls}" data-hands-find="${esc(JSON.stringify(body))}">${label}</button>`;
   const rows = DIRECTIONS.flatMap(([d, label]) => {
     const strip = w.walks[d];
-    const hands = points[`${w.id}-walk-${d}`]?.hands;
+    const id = `${w.id}-walk-${d}`;
+    const hands = points[id]?.hands;
     if (!strip) return [];
     const height = 96;
     const width = Math.round((strip.width / strip.frames) * (height / strip.height));
     const frames = Array.from({ length: strip.frames }, (_, i) => {
       const hand = hands?.[i];
       const dot = hand ? `<b class="dot" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%"></b>` : '<small class="none">none</small>';
-      return `<span class="frame" style="width:${width}px;height:${height}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">${hands ? dot : ''}</span>`;
+      return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hand again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">${hands ? dot : ''}</button>`;
     }).join('');
-    return [`<div class="hand-row"><small>${label}${hands ? '' : ' · not looked at yet'}</small><div class="frames">${frames}</div></div>`];
+    const question = questions.find((q) => q.facing === d);
+    const ask = question ? `
+      <details class="hand-question"><summary>The question asked${question.own ? ' (your words)' : ''}</summary>
+        <form class="form hand-question" data-facing="${d}">
+          <textarea name="prompt" rows="3" maxlength="2000">${esc(question.prompt)}</textarea>
+          <p class="note">Always sent with it: “${esc(question.system)}”</p>
+          <div class="card-actions"><button type="submit" class="quiet">Keep these words</button>${question.own ? `<button type="button" class="quiet" data-hands-usual="${d}">Back to the usual words</button>` : ''}</div>
+          <p class="note">The same question is asked for every character walking ${label}. Nothing is looked at again until you ask.</p>
+        </form>
+      </details>` : '';
+    return [`<div class="hand-row"><div class="hand-head"><small>${label}${hands ? '' : ' · not looked at yet'}</small>${find({ ids: [id] }, 'Find again for this walk')}</div><div class="frames">${frames}</div>${ask}</div>`];
   });
   if (!rows.length) return '';
-  return `<details class="hands"><summary>Where the right hand was found (held weapons and charms go there)</summary>
-    <p class="note">The hand finder looks at every frame once, after a walk is painted. The dot is the right hand. Wrong dots mean the item jumps around; painting the walk again looks again.</p>
+  return `<details class="hands"${openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the right hand was found (held weapons and charms go there)</summary>
+    <p class="note">The hand finder looks at every frame once, after a walk is painted. The dot is the right hand. Click a frame to look at just that frame again; each look is a small vision-model call.</p>
+    ${find({ ids: [...ids, w.id] }, `Find again for every walk of ${esc(w.name)}`, '')}
     ${rows.join('')}</details>`;
 }
+
+/** Hand panels left open, so they stay open when the page is drawn again after a look. */
+const openHands = new Set<string>();
 
 function soundsPage(): string {
   const o = data!;
@@ -596,6 +619,19 @@ export function artClick(target: HTMLElement): boolean {
   } else if (t.dataset.walkVersions) {
     const w = data.walkers.find((x) => x.id === t.dataset.walkVersions);
     if (w) walkVersions(w, t.dataset.direction as Direction);
+  } else if (t.dataset.handsFind) {
+    const panel = t.closest<HTMLElement>('details.hands');
+    if (panel?.dataset.walker) openHands.add(panel.dataset.walker);
+    t.disabled = true;
+    t.classList.add('busy');
+    void ctx.api<{ looked: number }>('art/hands/find', 'POST', JSON.parse(t.dataset.handsFind)).then(
+      (r) => { ctx.toast(`Looked again at ${r.looked} ${r.looked === 1 ? 'frame' : 'frames'}. Players see it after they reload.`); ctx.rerender(); },
+      (err: Error) => { t.disabled = false; t.classList.remove('busy'); ctx.toast(err.message); },
+    );
+  } else if (t.dataset.handsUsual) {
+    const panel = t.closest<HTMLElement>('details.hands');
+    if (panel?.dataset.walker) openHands.add(panel.dataset.walker);
+    void ctx.api('art/hands/question', 'POST', { facing: t.dataset.handsUsual, prompt: '' }).then(() => { ctx.toast('Back to the usual words.'); ctx.rerender(); }, (err: Error) => ctx.toast(err.message));
   } else if (t.dataset.viewVersions) {
     const w = data.walkers.find((x) => x.id === t.dataset.viewVersions);
     if (w) viewVersions(w, t.dataset.direction as Direction);
@@ -609,6 +645,13 @@ export function artClick(target: HTMLElement): boolean {
 
 /** Handles the walk forms; false when the form was not one of the Art tab's. */
 export function artSubmit(form: HTMLFormElement): boolean {
+  if (form.classList.contains('hand-question')) {
+    const panel = form.closest<HTMLElement>('details.hands');
+    if (panel?.dataset.walker) openHands.add(panel.dataset.walker);
+    const prompt = String(new FormData(form).get('prompt') ?? '');
+    void ctx.api('art/hands/question', 'POST', { facing: form.dataset.facing, prompt }).then(() => { ctx.toast('Kept. Use "Find again" to look with these words.'); ctx.rerender(); }, (err: Error) => ctx.toast(err.message));
+    return true;
+  }
   if (!form.classList.contains('art-walk')) return false;
   const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
   f.body = form.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value ?? 'two-legged';

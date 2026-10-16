@@ -56,6 +56,23 @@ export function steadyHands(facing: Facing, frames: BothHands[]): { right: (ArtP
   return { right: steady.map((f) => f.right ?? null), left: steady.map((f) => f.left ?? null) };
 }
 
+/**
+ * Hands found in one walk, as they would be in the walk facing the other
+ * way (left and right, or towards us and away): turning round is a mirror
+ * across the picture, and each hand stays the same hand. Frames are matched
+ * by their place in the step, so walks of different lengths still line up.
+ */
+export function mirroredHands(hands: readonly (ArtPoint | null)[] | undefined, frames: number): (ArtPoint | null)[] {
+  if (!hands?.length) return Array.from({ length: frames }, () => null);
+  return Array.from({ length: frames }, (_, i) => {
+    const hand = hands[Math.floor((i * hands.length) / frames)];
+    return hand ? [round(1 - hand[0]), hand[1]] : null;
+  });
+}
+
+/** The way a walker faces after turning round. */
+export const TURNED: Record<Facing, Facing> = { front: 'back', back: 'front', left: 'right', right: 'left' };
+
 /** Which way a walker faces in a picture: a still picture faces us. */
 export type Facing = 'front' | 'back' | 'left' | 'right';
 

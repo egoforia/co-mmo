@@ -10,7 +10,7 @@ import type { Reports } from './reports.ts';
 import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type Account, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings, type Store } from './store.ts';
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
-import { ArtRequestError, type ArtStudio } from './art-studio.ts';
+import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { World } from './world.ts';
@@ -354,9 +354,24 @@ export async function handleAdmin(
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
     if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: wishes.budget() }), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;
+    const note = typeof body?.note === 'string' ? body.note : '';
+    const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
+    // Each paid request is one of these; the Owner reviews it, then approves exactly that.
+    const asks: Record<string, () => ArtAsk> = {
+      'art/paint': () => ({ kind: 'paint', asset: String(body?.asset ?? ''), note }),
+      'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
+      'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
+      'art/walk': () => ({ kind: 'walk', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), directions, views: body?.views === true }),
+    };
     try {
+      if (route === 'art/review' && method === 'POST') {
+        const ask = asks[`art/${String(body?.what ?? '')}`];
+        if (!ask) return json(res, 400, { error: 'bad_request', message: 'There is nothing like that to review.' }), true;
+        return json(res, 200, await ctx.art.review(ask())), true;
+      }
+      if (asks[route] && method === 'POST') await ctx.art.approved(asks[route]!(), body?.approved);
       if (route === 'art/paint' && method === 'POST') {
-        const done = await ctx.art.repaint(String(body?.asset ?? ''), typeof body?.note === 'string' ? body.note : '');
+        const done = await ctx.art.repaint(String(body?.asset ?? ''), note);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/paint-group' && method === 'POST') {
@@ -367,12 +382,19 @@ export async function handleAdmin(
         await ctx.art.restore(String(body?.asset ?? ''), String(body?.version ?? ''));
         return json(res, 200, { ok: true }), true;
       }
+      if (route === 'art/restore-walk' && method === 'POST') {
+        await ctx.art.restoreWalk(String(body?.walker ?? ''), String(body?.direction ?? ''), String(body?.version ?? ''));
+        return json(res, 200, { ok: true }), true;
+      }
+      if (route === 'art/restore-sound' && method === 'POST') {
+        await ctx.art.restoreSound(String(body?.sound ?? ''), String(body?.version ?? ''));
+        return json(res, 200, { ok: true }), true;
+      }
       if (route === 'art/sound' && method === 'POST') {
-        const done = await ctx.art.sound(String(body?.sound ?? ''), typeof body?.note === 'string' ? body.note : '');
+        const done = await ctx.art.sound(String(body?.sound ?? ''), note);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/walk' && method === 'POST') {
-        const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
         const done = await ctx.art.walk(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), directions, body?.views === true);
         return json(res, 202, { ok: true, ...done }), true;
       }

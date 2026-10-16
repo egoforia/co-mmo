@@ -38,6 +38,8 @@ import { artRequest, estimateImageUsd, imageUsd, paintWish, type PaintedWish } f
 import { confirmReuse, lookLine, reuseCandidates, type LibraryPicture } from './assets/reuse.ts';
 import { freeChecks, judgePicture, retryNote } from './assets/style-check.ts';
 import type { ArtJobHandle, ArtJobs } from './art-jobs.ts';
+import { Previewed, dryImage, type Recipe, type RecipeBook } from './art-recipes.ts';
+import { pictureName } from './assets/names.ts';
 import { queuedImages, watched, type PaintQueue } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import { KIT_ART_PATH, paintKitAsset, readKitManifest, wildKit } from './assets/wild-kit.ts';
@@ -148,6 +150,8 @@ export class Wishes {
   paintQueue?: PaintQueue;
   /** Wish paintings kept across a restart until they are done. */
   paintRequests?: PaintRequests;
+  /** Keeps what was sent to make each picture, for God's View. */
+  recipes?: RecipeBook;
   /** Told when a confirmed card became a wish (granted or sent for review), so its Workshop draft can go. */
   onCardUsed?: (playerId: string, cardId: string) => void;
 
@@ -771,7 +775,7 @@ export class Wishes {
         }
         let painted;
         try {
-          painted = await this.paintPicture(picture, biome, provider, handle, record.wisher.id, { prompt: prompts[picture.id], reuse: !force });
+          painted = await this.paintPicture(picture, biome, provider, handle, record, { prompt: prompts[picture.id], reuse: !force });
         } catch {
           continue;
         }
@@ -864,7 +868,7 @@ export class Wishes {
       if (!force && this.budget().paused) return skipAll();
       let painted;
       try {
-        painted = await this.paintPicture(picture, def.biome, provider, pictureJobs[i], record.wisher.id, { prompt: prompts[picture.id], reuse: !force });
+        painted = await this.paintPicture(picture, def.biome, provider, pictureJobs[i], record, { prompt: prompts[picture.id], reuse: !force });
       } catch {
         continue;
       }
@@ -890,6 +894,42 @@ export class Wishes {
     }
   }
 
+  /**
+   * Exactly what painting one of a granted wish's pictures again would send,
+   * without painting it; `prompt` is the Owner's wording in place of the
+   * built one. As the Owner's repaint, it borrows no existing picture.
+   */
+  async preview(record: ContentRecord, pictureId: string, prompt?: string): Promise<Recipe> {
+    const def = record.definition;
+    if (!def || record.status !== 'granted' || def.kind === 'recipe') throw new Error('That wish has no picture to paint.');
+    const recipes = this.recipes!;
+    const kit = def.kind === 'region' ? wildKit(def.biome).find((a) => a.id === pictureId) : undefined;
+    if (kit) {
+      const scenery = this.imageProvider('scenery') ?? this.imageProvider('wishes');
+      if (!scenery) throw new Error('No image model is set. Choose one on the AI models tab first.');
+      const dry = dryImage(scenery);
+      await paintKitAsset(kit, dry, this.options.anchorDir, resolve(this.options.artDir, 'biomes'), prompt ? { prompt } : {}).catch(onlyPreviewed);
+      return { at: this.now(), steps: [await recipes.imageStep(kit.name ?? kit.id, scenery, dry.sent!, estimateImageUsd(scenery.model))] };
+    }
+    const provider = this.imageProvider('wishes');
+    if (!provider) throw new Error('No image model is set. Choose one on the AI models tab first.');
+    const biome = (def.kind === 'region' ? def.biome : regionDef(record.regionId)?.biome ?? 'sanctum') as BiomeId;
+    const pictures: { id: string; def: PicturedWish }[] = def.kind === 'region' ? regionPictures(record.id, def)
+      : def.kind === 'rule' ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
+      : [{ id: record.id, def }];
+    const picture = pictures.find((p) => p.id === pictureId);
+    if (!picture) throw new Error('That wish has no picture by that name.');
+    const dry = dryImage(provider);
+    await paintWish(picture.id, picture.def, biome, dry, this.options.anchorDir, this.options.artDir, prompt).catch(onlyPreviewed);
+    const each = estimateImageUsd(provider.model);
+    const { retries } = styleCheckSettings(this.store.settings);
+    const notes = [
+      this.judgeModel() ? 'The style check looks at the result for well under a cent.' : 'The free style checks look at the result.',
+      ...(retries ? [`If it is not happy, the picture is painted again with what went wrong added to the prompt, up to ${retries} more ${retries === 1 ? 'time' : 'times'} for about $${each.toFixed(3)} each.`] : []),
+    ];
+    return { at: this.now(), steps: [await recipes.imageStep(picture.def.name, provider, dry.sent!, each)], notes };
+  }
+
   /** Adds a wished picture to the painting log as waiting its turn. */
   private queueArt(id: string, name: string, force: boolean, provider: ImageProvider): ArtJobHandle | undefined {
     return this.artJobs?.add(id, name, 'picture', force ? 'gods-view' : 'wish', estimateImageUsd(provider.model));
@@ -908,9 +948,11 @@ export class Wishes {
     biome: BiomeId,
     provider: ImageProvider,
     handle: ArtJobHandle | undefined,
-    wisherId: string,
+    wish: ContentRecord,
     { prompt, reuse }: { prompt?: string; reuse: boolean },
   ): Promise<{ record: ArtPromptRecord; usd: number }> {
+    const wisherId = wish.wisher.id;
+    const key = `${wish.id}:${picture.id}`;
     const settings = styleCheckSettings(this.store.settings);
     const judge = this.judgeModel();
     const file = resolve(this.options.artDir, `${picture.id}.png`);
@@ -927,6 +969,7 @@ export class Wishes {
         const copied = await mkdir(this.options.artDir, { recursive: true }).then(() => copyFile(resolve(this.options.artDir, `${found.picture!.id}.png`), file)).then(() => true, () => false);
         if (copied) {
           handle?.done(usd);
+          await this.recipes?.forget(key);
           const base = this.promptRecord(provider, artRequest(picture.def, biome).prompt, [], usd);
           return { record: { ...base, provider: judge.provider, model: judge.model, reused: { from: found.picture.id, name: found.picture.def.name } }, usd };
         }
@@ -968,6 +1011,13 @@ export class Wishes {
     const pass = kept.rank === 2 || (kept.rank === 1 && !judge);
     if (!pass) this.notifyStewards(`The style check was not happy with the picture of ${picture.def.name} after ${tries} tries: ${kept.why}. It is shown for now; the Art tab in God's View can paint it again.`);
     const record = this.promptRecord(provider, asked, kept.painted.request.references, usd);
+    if (this.recipes) {
+      const request = { prompt: kept.painted.request.prompt, references: kept.painted.referenceImages.map((data) => ({ mimeType: 'image/png', data })), labels: kept.painted.request.references.map(pictureName) };
+      const step = await this.recipes.imageStep(picture.def.name, provider, request, usd);
+      const checked = pass ? `The style check passed${tries > 1 ? ` on try ${tries}` : ''}.` : `The style check was not happy after ${tries} ${tries === 1 ? 'try' : 'tries'}: ${kept.why}`;
+      // Every try is paid for; the cost shown is all of them, the prompt the kept one's.
+      await this.recipes.record(key, { at: this.now(), steps: [step], notes: [checked] });
+    }
     return { record: { ...record, check: { pass, ...(pass ? {} : { why: kept.why }), tries } }, usd };
   }
 
@@ -1154,4 +1204,9 @@ export function publicEntry(record: ContentRecord): ContentEntry {
 /** True when a wish's picture was painted already. */
 function hasArt(record: ContentRecord, pictureId: string): boolean {
   return pictureId === record.id ? Boolean(record.art) : Boolean(record.itemArt?.[pictureId]);
+}
+
+/** A dry run stops at the request; anything else is a real failure. */
+function onlyPreviewed(err: unknown): void {
+  if (!(err instanceof Previewed)) throw err;
 }

@@ -11,6 +11,7 @@ import {
   type BuildingStyle,
 } from '@co-mmo/shared';
 import { makeSeamless, pixelate, removeKeyBackground, removeKeySpill, trimRows } from './postprocess.ts';
+import { pictureName } from './names.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from './provider.ts';
 import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
 
@@ -119,7 +120,11 @@ export async function paintBuildingArt(
   dirs: BuildingArtDirs,
 ): Promise<{ image: GeneratedImage; entry: ArtEntry }> {
   const references: GeneratedImage[] = [];
-  if (job.kind === 'exterior') references.push({ mimeType: 'image/png', data: await layoutSketch() });
+  const labels: string[] = [];
+  if (job.kind === 'exterior') {
+    references.push({ mimeType: 'image/png', data: await layoutSketch() });
+    labels.push('Layout sketch: where the door goes');
+  }
   for (const ref of job.references) {
     // The shipped buildings' untouched pictures sit beside the anchors, for repainting a shipped building's inside.
     const shipped = resolve(dirs.anchorDir, '..', 'buildings', 'raw', `${ref}.png`);
@@ -127,10 +132,11 @@ export async function paintBuildingArt(
       const data = await readFile(path).catch(() => undefined);
       if (!data) continue;
       references.push({ mimeType: 'image/png', data });
+      labels.push(pictureName(ref));
       break;
     }
   }
-  const image = await provider.generate({ prompt: job.prompt, references, aspectRatio: job.aspectRatio, size: job.size });
+  const image = await provider.generate({ prompt: job.prompt, references, labels, aspectRatio: job.aspectRatio, size: job.size });
   await mkdir(dirs.rawDir, { recursive: true });
   await writeFile(resolve(dirs.rawDir, `${job.id}.png`), await sharp(image.data).png().toBuffer());
   return { image, entry: await processBuildingArt(job, image.data, dirs.outDir) };

@@ -15,6 +15,7 @@ import {
 import { finishEffect, finishMusic, type FinishedSound } from './assets/sound-finish.ts';
 import { soundUsd, type SoundProvider } from './assets/sound.ts';
 import { plain, type ArtJobHandle, type ArtJobSource, type ArtJobs } from './art-jobs.ts';
+import type { Recipe } from './art-recipes.ts';
 import { watched } from './paint-queue.ts';
 
 // Sound effects and music are made by AI sound services from descriptions
@@ -33,6 +34,16 @@ export interface MadeSound extends SoundEntry {
   model: string;
   usd: number;
   at: number;
+  /** The versions it replaced, newest first, so one can be put back. */
+  earlier?: MadeSound[];
+}
+
+/** An earlier version of a sound, as the Art tab shows it. */
+export interface SoundVersion {
+  /** When it was made, base 36. */
+  id: string;
+  url: string;
+  recipe: Recipe;
 }
 
 /** One sound as the Art tab shows it. */
@@ -43,6 +54,10 @@ export interface SoundItem {
   url?: string;
   /** What the service is asked for. */
   prompt: string;
+  /** What made the current version, when it was made here. */
+  recipe?: Recipe;
+  /** Earlier versions that can be put back, newest first. */
+  versions: SoundVersion[];
   /** About what making it again costs. */
   estimateUsd: number;
   /** False when nothing can make it now, with why. */
@@ -118,6 +133,8 @@ export class SoundMaker {
         kind: job.kind,
         ...(made ? { url: `/${made.file}` } : {}),
         prompt: made?.prompt ?? job.prompt,
+        ...(made ? { recipe: recipeOf(job, made) } : {}),
+        versions: (made?.earlier ?? []).map((e) => ({ id: e.at.toString(36), url: `/${e.file}`, recipe: recipeOf(job, e) })),
         estimateUsd: soundUsd(provider?.model ?? '', job),
         makeable: Boolean(provider),
         ...(provider ? {} : { why: missing(job.kind) }),
@@ -175,16 +192,39 @@ export class SoundMaker {
    * words to the description. The old version stays on disk.
    */
   async remake(id: string, note = '', handle?: ArtJobHandle): Promise<void> {
-    const job = allSounds().find((j) => j.id === id);
-    if (!job) throw new Error('There is no sound by that name.');
+    const job = withNote(id, note);
     const provider = this.providerFor(job);
     if (!provider) throw new Error(missing(job.kind));
     await this.load();
-    const run = this.make(note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job, provider, handle, true);
+    const run = this.make(job, provider, handle, true);
     const held = run.catch(() => undefined);
     this.pending.add(held);
     void held.finally(() => this.pending.delete(held));
     await run;
+  }
+
+  /** Exactly what making one sound again would send, without making it. */
+  preview(id: string, note = ''): Recipe {
+    const job = withNote(id, note);
+    const provider = this.providerFor(job);
+    if (!provider) throw new Error(missing(job.kind));
+    return {
+      at: Date.now(),
+      steps: [{ label: job.name, media: 'sound', provider: provider.id, model: provider.model, prompt: job.prompt, pictures: [], settings: settingsOf(job), usd: soundUsd(provider.model, job) }],
+      notes: [job.kind === 'music' ? 'The track is trimmed and levelled so it loops.' : 'The effect is trimmed and levelled.'],
+    };
+  }
+
+  /** Puts an earlier version of a sound back; the one it replaces is kept. */
+  async restore(id: string, version: string): Promise<boolean> {
+    await this.load();
+    const made = this.made[id];
+    const back = made?.earlier?.find((e) => e.at.toString(36) === version);
+    if (!made || !back) return false;
+    const { earlier = [], ...current } = made;
+    this.made[id] = { ...back, earlier: [current, ...earlier.filter((e) => e !== back)], redone: Date.now() };
+    await this.save();
+    return true;
   }
 
   private queueJob(job: SoundJob, source: ArtJobSource): ArtJobHandle | undefined {
@@ -209,10 +249,14 @@ export class SoundMaker {
       const done = await finish[job.kind](raw.data);
       const name = `${job.id}-${version}.mp3`;
       await writeFile(resolve(this.dir, name), done.data);
+      // The one it replaces stays on disk and in the list, so it can be put back.
+      const { earlier = [], ...before } = this.made[job.id] ?? ({} as Partial<MadeSound>);
+      const kept = before.file ? [before as MadeSound, ...earlier] : earlier;
       this.made[job.id] = {
         file: `${SOUND_PATH}/${name}`, kind: job.kind, seconds: done.seconds,
         prompt: job.prompt, provider: provider.id, model: provider.model, usd, at: Date.now(),
         ...(redone ? { redone: Date.now() } : {}),
+        ...(kept.length ? { earlier: kept } : {}),
       };
       await this.save();
       handle?.done(usd);
@@ -233,6 +277,23 @@ export class SoundMaker {
     this.made = JSON.parse(await readFile(resolve(this.dir, 'manifest.json'), 'utf8').catch(() => '{}')) as Record<string, MadeSound>;
     this.loaded = true;
   }
+}
+
+/** One sound to make, with the Owner's own words added to its description. */
+function withNote(id: string, note: string): SoundJob {
+  const job = allSounds().find((j) => j.id === id);
+  if (!job) throw new Error('There is no sound by that name.');
+  return note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job;
+}
+
+/** What else is sent with a sound's description. */
+function settingsOf(job: SoundJob): string[] {
+  return [`${job.seconds} seconds`, job.kind === 'music' ? 'music' : 'sound effect'];
+}
+
+/** What made one version of a sound, as the Art tab shows it. */
+function recipeOf(job: SoundJob, made: MadeSound): Recipe {
+  return { at: made.at, steps: [{ label: job.name, media: 'sound', provider: made.provider, model: made.model, prompt: made.prompt, pictures: [], settings: settingsOf(job), usd: made.usd }] };
 }
 
 /** Why a kind of sound cannot be made, in plain words. */

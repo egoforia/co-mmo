@@ -1,13 +1,10 @@
-import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { dirname, extname, join, normalize, resolve } from 'node:path';
-import { WebSocketServer, type WebSocket } from 'ws';
-import { ITEMS, TICK_SECONDS, WALKING_LOOKS, WALK_FRAMES, WishError, isClientMessage, ruleItemId, upgradeCharacter, validateName, wishArtKey, type ArtManifest, type PlayerInfo } from '@co-mmo/shared';
-import { Auth, cleanEmail, type Mailer } from './auth.ts';
-import { awayFeed } from './feed.ts';
+import { resolve } from 'node:path';
+import { TICK_SECONDS, type ArtManifest } from '@co-mmo/shared';
+import { Auth, type Mailer } from './auth.ts';
 import { World } from './world.ts';
-import { Store, StoreError, type Account } from './store.ts';
+import type { Account, Store } from './store.ts';
 import { dailyClips } from './settings.ts';
 import { AiServices } from './ai/services.ts';
 import { Budget } from './budget.ts';
@@ -32,11 +29,15 @@ import { SoundMaker } from './sound-maker.ts';
 import type { SoundProvider } from './assets/sound.ts';
 import type { FinishedSound } from './assets/sound-finish.ts';
 import { FilePaintRequests } from './paint-requests.ts';
-import { HandFinder, type PointSource } from './hand-finder.ts';
+import { HandFinder } from './hand-finder.ts';
 import type { Bus } from './bus.ts';
 import { RegionServers } from './region-servers.ts';
-import { settle } from './world.ts';
 import { ApiLog, watchFetch } from './api-log.ts';
+import { bearer, json, readJson, serveStatic } from './http.ts';
+import { handleAccount } from './account-routes.ts';
+import { serveArtFile } from './art-files.ts';
+import { openGameSocket } from './game-socket.ts';
+import { artFileReader, pointSources } from './hand-sources.ts';
 
 export interface AppOptions {
   store: Store;
@@ -111,20 +112,6 @@ export interface App {
   close(): Promise<void>;
 }
 
-const MAX_BODY_BYTES = 4096;
-
-const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.mp3': 'audio/mpeg',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-};
-
 /** HTTP API, static client, and game WebSocket on one server. */
 export function createApp(options: AppOptions): App {
   const { store } = options;
@@ -170,7 +157,11 @@ export function createApp(options: AppOptions): App {
       ...(options.sound?.music ? { music: options.sound.music } : {}),
     },
   });
-  const wishes = new Wishes(store, world, rules, options.wishes, { ai, budget });
+  // The painting log God's View shows, paintings kept across a restart, and what was sent to make each picture.
+  const artJobs = new ArtJobs();
+  const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
+  const recipes = new RecipeBook(options.wishes.artDir);
+  const wishes = new Wishes(store, world, rules, options.wishes, { ai, budget, artJobs, paintRequests, recipes });
   // Regions run on region servers when there are any (design doc, Scaling without a cap).
   const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries() }) : undefined;
   if (regionServers) world.hosting = regionServers;
@@ -179,13 +170,6 @@ export function createApp(options: AppOptions): App {
   const meter = new LoadMeter();
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now, ai, budget });
   wishes.restore();
-  const artJobs = new ArtJobs();
-  wishes.artJobs = artJobs;
-  const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
-  wishes.paintRequests = paintRequests;
-  // What was sent to make each picture, clip and sound, for God's View to show with every version.
-  const recipes = new RecipeBook(options.wishes.artDir);
-  wishes.recipes = recipes;
   const painterOptions: BuildingPainterOptions = {
     provider: () => ai.image('buildings'),
     overBudget: () => budget.paused(),
@@ -254,39 +238,8 @@ export function createApp(options: AppOptions): App {
     model: () => ai.judgeModel(),
     paused: () => budget.paused(),
     spend: (usd, model) => budget.spend('chat', model, usd),
-    sources: async () => pointSources(await painterOptions.shipped(), await paintedArt()),
+    sources: async () => pointSources(store, await painterOptions.shipped(), await paintedArt(), artFileReader(options.wishes.artDir, options.shippedArt)),
   });
-  /** Reads a picture the client is served: painted here, or shipped with the game. */
-  const artFile = (file: string): Promise<Buffer> => {
-    const path = file.split('?')[0]!.replace(/^\//, '');
-    if (path.startsWith('wished-art/')) return readFile(resolve(options.wishes.artDir, path.slice('wished-art/'.length)));
-    if (!options.shippedArt) return Promise.reject(new Error('no shipped art'));
-    return readFile(resolve(dirname(dirname(options.shippedArt)), path));
-  };
-  /** Every walk strip, walking look and wished look (their hands), and every weapon, off-hand item and charm (their grips). */
-  const pointSources = (shipped: ArtManifest, painted: ArtManifest): PointSource[] => {
-    // As the client merges them: shipped art wins, except what the Owner had painted again.
-    const art: ArtManifest = { ...painted, ...shipped, ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)) };
-    const wished = new Map<string, string>();
-    for (const record of store.content) {
-      const def = record.definition;
-      if (record.status !== 'granted' || !def) continue;
-      if (record.art) wished.set(wishArtKey(record.id), record.art);
-      if (def.kind === 'rule') for (const key of Object.keys(def.items)) if (record.itemArt?.[ruleItemId(record.id, key)]) wished.set(wishArtKey(ruleItemId(record.id, key)), record.itemArt[ruleItemId(record.id, key)]!);
-    }
-    const source = (id: string, kind: PointSource['kind'], file: string | undefined, frames = 1): PointSource[] => {
-      const facing = /-walk-(front|back|left|right)$/.exec(id)?.[1] as PointSource['facing'];
-      return file ? [{ id, kind, file, frames, ...(facing ? { facing } : {}), read: () => artFile(file) }] : [];
-    };
-    const looks = store.content.filter((r) => r.status === 'granted' && r.definition?.kind === 'player').map((r) => wishArtKey(r.id));
-    return [
-      ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'walk' ? source(id, 'hands', e.file, e.frames ?? WALK_FRAMES) : [])),
-      ...WALKING_LOOKS.flatMap((id) => source(id, 'hands', art[id]?.file)),
-      ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),
-      ...Object.values(ITEMS).filter((item) => item.slot === 'weapon' || item.slot === 'offhand' || item.slot === 'charm')
-        .flatMap((item) => source(item.art, 'grip', item.art.startsWith('wished-') ? wished.get(item.art) : art[item.art]?.file)),
-    ];
-  };
   // Looked for after start-up painting, then now and again for what was painted since.
   if (options.shippedArt) void Promise.resolve(buildingPainter.job).then(() => walkPainter.job).then(() => handFinder.start());
   const handTimer = setInterval(() => void handFinder.start(), 5 * 60_000);
@@ -326,98 +279,7 @@ export function createApp(options: AppOptions): App {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const path = url.pathname;
 
-    if (path.startsWith('/api/invites/') && req.method === 'GET') {
-      const invite = store.findInvite(decodeURIComponent(path.slice('/api/invites/'.length)));
-      if (!invite || invite.usedBy) return json(res, 404, { valid: false });
-      const inviter = invite.createdBy ? store.accountById(invite.createdBy)?.name ?? null : null;
-      return json(res, 200, { valid: true, invitedBy: inviter, role: invite.role });
-    }
-
-    if (path === '/api/accept' && req.method === 'POST') {
-      const body = await readJson(req);
-      const code = typeof body?.code === 'string' ? body.code : '';
-      const name = typeof body?.name === 'string' ? body.name.trim() : '';
-      if (body?.adult !== true) {
-        return json(res, 400, { error: 'adult_required', message: 'co-MMO is for players aged 18 and over.' });
-      }
-      const nameError = validateName(name);
-      if (nameError) return json(res, 400, { error: 'name_invalid', message: nameError });
-      // An email and a look are optional; both can be added later from Account.
-      const rawEmail = typeof body?.email === 'string' ? body.email.trim() : '';
-      const email = rawEmail ? cleanEmail(rawEmail) : '';
-      if (rawEmail && !email) return json(res, 400, { error: 'email_invalid', message: 'That does not look like an email address.' });
-      if (email && store.accountByEmail(email)) return json(res, 400, { error: 'email_taken', message: 'Another player already signs in with that email.' });
-      const look = typeof body?.look === 'string' ? body.look.trim() : '';
-      let created: ReturnType<Store['acceptInvite']>;
-      try {
-        created = store.acceptInvite(code, name, world.home.def.id);
-      } catch (err) {
-        if (err instanceof StoreError) return json(res, 400, { error: err.code, message: err.message });
-        throw err;
-      }
-      const { account, token } = created;
-      const inviter = account.invitedBy ? store.accountById(account.invitedBy)?.name : undefined;
-      store.addJournal(`${account.name} joined the world${inviter ? `, invited by ${inviter}` : ''}.`, account.id);
-      const notes: string[] = [];
-      if (look) {
-        try {
-          wishes.grantLook(account, look);
-        } catch (err) {
-          if (!(err instanceof WishError)) throw err;
-          notes.push(err.message);
-        }
-      }
-      if (email) {
-        notes.push(await auth.confirmEmail(account, email, req.socket.remoteAddress ?? '').catch((err: Error) => `We could not send the email: ${err.message}`));
-      }
-      return json(res, 200, { token, player: publicInfo(account), notes });
-    }
-
-    if (path === '/api/version' && req.method === 'GET') {
-      return json(res, 200, { commit: options.commit ?? null, updating: options.updater?.requested ?? false });
-    }
-
-    if (path === '/api/me' && req.method === 'GET') {
-      const account = authenticate(req);
-      if (!account) return json(res, 401, { error: 'unauthorized' });
-      if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) });
-      return json(res, 200, { player: publicInfo(account) });
-    }
-
-    if (path === '/api/invites' && req.method === 'POST') {
-      const account = authenticate(req);
-      if (!account) return json(res, 401, { error: 'unauthorized' });
-      if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) });
-      const invite = store.createInvite(account.id);
-      return json(res, 200, { code: invite.code, url: inviteUrl(options.publicUrl, invite.code) });
-    }
-
-    if (path === '/api/account' && req.method === 'GET') {
-      const account = authenticate(req);
-      if (!account) return json(res, 401, { error: 'unauthorized' });
-      const look = wishes.lookOf(account.id);
-      return json(res, 200, {
-        name: account.name,
-        email: account.email ?? null,
-        logins: (account.logins ?? []).map((l) => l.provider),
-        providers: auth.providers(),
-        look: look ? { description: look.summary, ...(look.art ? { art: look.art } : {}) } : null,
-      });
-    }
-
-    if (path === '/api/account/look' && req.method === 'POST') {
-      const account = authenticate(req);
-      if (!account) return json(res, 401, { error: 'unauthorized' });
-      if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) });
-      const body = await readJson(req);
-      try {
-        wishes.grantLook(account, typeof body?.look === 'string' ? body.look : '');
-      } catch (err) {
-        if (err instanceof WishError) return json(res, 400, { error: 'look_invalid', message: err.message });
-        throw err;
-      }
-      return json(res, 200, { message: 'The God has heard how you look. Your picture is being painted.' });
-    }
+    if (await handleAccount(req, res, path, { store, auth, wishes, homeRegion: () => world.home.def.id, publicUrl: options.publicUrl, commit: options.commit, updater: options.updater, authenticate })) return;
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
@@ -432,152 +294,30 @@ export function createApp(options: AppOptions): App {
     if (path === '/api/sounds' && req.method === 'GET') return json(res, 200, await sounds.manifest());
     if (path.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
-    const art = path.match(/^\/wished-art\/([\w-]+)\.png$/);
-    if (art && req.method === 'GET') return serveFile(join(options.wishes.artDir, `${art[1]}.png`), res);
-    const building = path.match(/^\/wished-art\/buildings\/([\w-]+\.(?:png|webp))$/);
-    if (building && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'buildings', building[1]!), res);
-    const sample = path.match(/^\/wished-art\/samples\/([\w-]+)\.png$/);
-    if (sample && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'samples', `${sample[1]}.png`), res);
-    const walk = path.match(/^\/wished-art\/walks\/([\w-]+\.png)$/);
-    if (walk && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', walk[1]!), res);
-    const standing = path.match(/^\/wished-art\/walks\/views\/([\w-]+\.png)$/);
-    if (standing && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'walks', 'views', standing[1]!), res);
-    const redone = path.match(/^\/wished-art\/redone\/([\w-]+\.png)$/);
-    if (redone && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'redone', redone[1]!), res);
-    const old = path.match(/^\/wished-art\/history\/([\w~-]+)\/([0-9a-z]+\.(?:png|webp))$/);
-    if (old && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'history', old[1]!, old[2]!), res);
-    const walkOld = path.match(/^\/wished-art\/history\/([\w~-]+)\/([0-9a-z]+)\/strip\.png$/);
-    if (walkOld && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'history', walkOld[1]!, walkOld[2]!, 'strip.png'), res);
-    const sent = path.match(/^\/wished-art\/recipes\/pictures\/([0-9a-f]+\.webp)$/);
-    if (sent && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'recipes', 'pictures', sent[1]!), res);
-    const soundFile = path.match(/^\/wished-art\/sounds\/([\w-]+\.mp3)$/);
-    if (soundFile && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'sounds', soundFile[1]!), res);
-    const kit = path.match(/^\/wished-art\/biomes\/([\w-]+\.png)$/);
-    if (kit && req.method === 'GET') return serveFile(join(options.wishes.artDir, 'biomes', kit[1]!), res);
+    if (await serveArtFile(options.wishes.artDir, path, req.method, res)) return;
 
     if (options.clientDir && req.method === 'GET') return serveStatic(options.clientDir, path, res);
     json(res, 404, { error: 'not_found' });
   }
 
   function authenticate(req: IncomingMessage): Account | undefined {
-    const header = req.headers.authorization ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+    const token = bearer(req);
     return token ? store.accountByToken(token) : undefined;
   }
 
   /** Disconnects a player who was just suspended. */
   function kick(id: string, reason: string): void {
-    const socket = sockets.get(id);
-    if (!socket) return;
-    socket.send(JSON.stringify({ t: 'error', code: 'suspended', message: reason }));
-    socket.close(4003, reason.slice(0, 120));
+    socket.kick(id, reason);
   }
 
   /** Tells every player the world is restarting for an update, and saves. */
   async function restarting(): Promise<void> {
-    for (const socket of sockets.values()) socket.close(4010, 'The world is updating. Back in a moment.');
+    socket.closeAll(4010, 'The world is updating. Back in a moment.');
     saveAll();
     await store.flush();
   }
 
-  // Game connections. The session token arrives as the first message rather
-  // than in the URL, so it never shows up in proxy or server logs.
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
-  const sockets = new Map<string, WebSocket>();
-  // Heartbeat: ping every client so idle connections stay open through proxies,
-  // and drop any that stopped answering (a sleeping laptop, a dead network).
-  const alive = new WeakSet<WebSocket>();
-  const heartbeatTimer = setInterval(() => {
-    for (const client of wss.clients) {
-      if (!alive.has(client)) {
-        client.terminate();
-        continue;
-      }
-      alive.delete(client);
-      client.ping();
-    }
-  }, options.heartbeatMs ?? 25_000);
-  wss.on('connection', (socket: WebSocket) => {
-    let account: Account | undefined;
-    alive.add(socket);
-    socket.on('pong', () => alive.add(socket));
-    const authTimer = setTimeout(() => socket.close(4001, 'Sign-in timed out.'), 5000);
-
-    socket.on('message', (raw) => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw.toString());
-      } catch {
-        return;
-      }
-      if (!account) {
-        const token = (parsed as { t?: string; token?: unknown })?.t === 'hello' ? (parsed as { token?: unknown }).token : undefined;
-        account = typeof token === 'string' ? store.accountByToken(token) : undefined;
-        clearTimeout(authTimer);
-        if (!account) {
-          socket.send(JSON.stringify({ t: 'error', code: 'unauthorized', message: 'Please sign in again.' }));
-          socket.close(4001, 'Unauthorized');
-          return;
-        }
-        if (account.suspended) {
-          const message = suspendedText(account);
-          socket.send(JSON.stringify({ t: 'error', code: 'suspended', message }));
-          socket.close(4003, message.slice(0, 120));
-          account = undefined;
-          return;
-        }
-        sockets.set(account.id, socket);
-        const away = awayFeed(store, account);
-        world.join(publicInfo(account), {
-          send: (m) => {
-            if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
-          },
-          close: (reason) => socket.close(4000, reason),
-        }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
-        world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
-        if (away) world.sendTo(account.id, away);
-        rules.fire('join', account.id);
-        builds.greet(account.id);
-        void workshop.greet(account.id);
-        return;
-      }
-      if (!isClientMessage(parsed)) return;
-      if (parsed.t === 'pray') {
-        // The role may have changed since sign-in (a Steward was appointed).
-        const current = store.accountById(account.id) ?? account;
-        void wishes.pray(publicInfo(current), parsed.text);
-      } else if (parsed.t === 'report') {
-        const say = reports.file(publicInfo(account), parsed.kind, parsed.target, parsed.reason);
-        world.sendTo(account.id, { t: 'god', say });
-      } else if (parsed.t === 'wish') {
-        wishes.answer(publicInfo(store.accountById(account.id) ?? account), parsed.card, parsed.confirm);
-      } else if (parsed.t === 'draft') {
-        const who = publicInfo(store.accountById(account.id) ?? account);
-        const done = parsed.action === 'start' ? workshop.start(who, parsed.category ?? '', parsed.sub ?? '', parsed.fields, parsed.carry)
-          : parsed.action === 'edit' ? workshop.edit(who, parsed.fields, parsed.locked)
-            : parsed.action === 'ask' ? workshop.ask(who, parsed.say ?? '', parsed.fields, parsed.locked)
-              : parsed.action === 'fill' ? workshop.fill(who, parsed.fields, parsed.locked)
-                : parsed.action === 'shape' ? workshop.shape(who)
-                  : parsed.action === 'sample' ? workshop.sample(who)
-                  : parsed.action === 'send' ? workshop.send(who) : workshop.drop(who);
-        done.catch((err) => console.error('Workshop failed:', err));
-      } else {
-        world.handle(account.id, parsed);
-      }
-    });
-
-    socket.on('close', () => {
-      clearTimeout(authTimer);
-      if (!account) return;
-      // A replaced connection must not remove the newer session.
-      if (sockets.get(account.id) !== socket) return;
-      sockets.delete(account.id);
-      const id = account.id;
-      void settle(world.leave(id), (place) => {
-        if (place) store.savePosition(id, place.x, place.y, place.regionId, place.character);
-      });
-    });
-  });
+  const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, heartbeatMs: options.heartbeatMs });
 
   const tickTimer = setInterval(() => meter.tick(() => {
     world.tick(meter.strain);
@@ -609,7 +349,6 @@ export function createApp(options: AppOptions): App {
       clearTimeout(dayTimer);
       clearInterval(handTimer);
       options.updater?.stop();
-      clearInterval(heartbeatTimer);
       builds.stop();
       await restoring;
       // Paintings still waiting their turn are kept for the next start rather than waited out.
@@ -630,70 +369,13 @@ export function createApp(options: AppOptions): App {
       await Promise.allSettled([...world.pending]);
       saveAll();
       await regionServers?.close();
-      for (const client of wss.clients) client.terminate();
-      await new Promise<void>((resolve) => wss.close(() => resolve()));
+      await socket.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await store.flush();
       unwatchFetch();
       await apiLog.flush();
     },
   };
-}
-
-export function inviteUrl(publicUrl: string, code: string): string {
-  return `${publicUrl.replace(/\/$/, '')}/?invite=${encodeURIComponent(code)}`;
-}
-
-function suspendedText(account: Account): string {
-  return `Your account is suspended${account.suspended?.reason ? `: ${account.suspended.reason}` : ''}. Talk to the Owner.`;
-}
-
-function publicInfo(account: Account): PlayerInfo {
-  return { id: account.id, name: account.name, color: account.color, role: account.role };
-}
-
-function json(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-  res.end(JSON.stringify(body));
-}
-
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown> | null> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) return null;
-    chunks.push(chunk as Buffer);
-  }
-  try {
-    const value = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    return typeof value === 'object' && value !== null ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-async function serveStatic(root: string, urlPath: string, res: ServerResponse): Promise<void> {
-  const safe = normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, '');
-  let file = join(root, safe);
-  if (!file.startsWith(root)) return json(res, 403, { error: 'forbidden' });
-  try {
-    if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-  } catch {
-    // Unknown paths fall back to the app shell so invite links work.
-    file = join(root, 'index.html');
-  }
-  return serveFile(file, res);
-}
-
-async function serveFile(file: string, res: ServerResponse): Promise<void> {
-  try {
-    await stat(file);
-  } catch {
-    return json(res, 404, { error: 'not_found' });
-  }
-  res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
-  createReadStream(file).pipe(res);
 }
 
 /** The keys of `from` that are set, as a new object. */

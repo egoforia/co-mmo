@@ -95,10 +95,16 @@ export interface ShapedWish {
   look?: boolean;
 }
 
-/** What wishes need from the rest of the server: the AI services and the budget. */
+/** What wishes need from the rest of the server. */
 export interface WishServices {
   ai: AiServices;
   budget: Budget;
+  /** The painting log God's View shows. */
+  artJobs?: ArtJobs;
+  /** Wish paintings kept across a restart until they are done. */
+  paintRequests?: PaintRequests;
+  /** Keeps what was sent to make each picture, for God's View. */
+  recipes?: RecipeBook;
 }
 
 /** Where wish art lives, plus test stand-ins for the AI services (passed on to AiServices). */
@@ -132,12 +138,9 @@ export class Wishes {
   private readonly budget: Budget;
   /** Art being painted, so tests and shutdown can wait for it. */
   readonly painting = new Set<Promise<void>>();
-  /** The painting log God's View shows. */
-  artJobs?: ArtJobs;
-  /** Wish paintings kept across a restart until they are done. */
-  paintRequests?: PaintRequests;
-  /** Keeps what was sent to make each picture, for God's View. */
-  recipes?: RecipeBook;
+  private readonly artJobs?: ArtJobs;
+  private readonly paintRequests?: PaintRequests;
+  private readonly recipes?: RecipeBook;
   /** Told when a confirmed card became a wish (granted or sent for review), so its Workshop draft can go. */
   onCardUsed?: (playerId: string, cardId: string) => void;
 
@@ -150,6 +153,9 @@ export class Wishes {
   ) {
     this.ai = services.ai;
     this.budget = services.budget;
+    this.artJobs = services.artJobs;
+    this.paintRequests = services.paintRequests;
+    this.recipes = services.recipes;
     this.now = options.now ?? Date.now;
   }
 

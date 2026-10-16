@@ -25,6 +25,7 @@ export interface IssueComment {
 /** A report from the build workflows, hidden in an issue comment. */
 export type BuildReport =
   | { state: 'building'; run?: string }
+  | { state: 'fixing'; pr: number; url: string; reason: string; run?: string }
   | { state: 'review'; pr: number; url: string }
   | { state: 'failed'; reason: string; run?: string }
   | { state: 'too-big'; steps: string[]; reason?: string }
@@ -54,6 +55,8 @@ export function parseReport(body: string): BuildReport | undefined {
     switch (r.state) {
       case 'building':
         return { state: 'building', ...(url(r.run) ? { run: url(r.run) } : {}) };
+      case 'fixing':
+        return num(r.pr) && url(r.url) ? { state: 'fixing', pr: num(r.pr), url: url(r.url), reason: str(r.reason) || 'The checks failed.', ...(url(r.run) ? { run: url(r.run) } : {}) } : undefined;
       case 'review':
         return num(r.pr) && url(r.url) ? { state: 'review', pr: num(r.pr), url: url(r.url) } : undefined;
       case 'failed':
@@ -77,7 +80,7 @@ export function parseReport(body: string): BuildReport | undefined {
  * What one coding-agent run really cost, as Claude Code reported it. The
  * workflows add it to their comments next to the build report: `build` for
  * the run that wrote the wish, `followup` for an @claude run on its pull
- * request.
+ * request or an automatic fix of its failed checks.
  */
 export interface CostReport {
   run: string;
@@ -202,7 +205,7 @@ export class Builds {
   /** Checks GitHub every minute while a build is open. */
   start(): void {
     this.timer = setInterval(() => {
-      if (this.store.content.some((r) => r.build?.state === 'building' || r.build?.state === 'review')) this.track(this.sync());
+      if (this.store.content.some((r) => followed(r.build))) this.track(this.sync());
       else this.track(this.pump());
     }, SYNC_EVERY_MS);
     this.timer.unref();
@@ -291,7 +294,7 @@ export class Builds {
     if (!this.issues) return;
     for (const record of this.store.content) {
       const build = record.build;
-      if (!build?.issue || (build.state !== 'building' && build.state !== 'review')) continue;
+      if (!build?.issue || !followed(build)) continue;
       let comments: IssueComment[];
       try {
         comments = await this.issues.comments(build.issue.number);
@@ -330,12 +333,20 @@ export class Builds {
     switch (report.state) {
       case 'building':
         return;
+      case 'fixing':
+        if (build.state === 'fixing' && build.message === report.reason) return;
+        set({ state: 'fixing', pr: { number: report.pr, url: report.url }, message: report.reason });
+        return;
       case 'review':
         if (build.state === 'review' && build.pr?.number === report.pr) return;
         set({ state: 'review', pr: { number: report.pr, url: report.url } });
-        this.hooks.notifyOwner(`"${record.title}" is built and waits for your review: ${report.url}`);
+        this.hooks.notifyOwner(build.state === 'fixing'
+          ? `"${record.title}" passes its checks again and waits for your review: ${report.url}`
+          : `"${record.title}" is built and waits for your review: ${report.url}`);
         return;
       case 'failed':
+        // A failed build with a pull request is still followed, so its report comes back every sync.
+        if (build.state === 'failed' && build.message === report.reason) return;
         set({ state: 'failed', message: report.reason });
         this.hooks.notifyOwner(`Building "${record.title}" failed: ${report.reason}`);
         return;
@@ -415,6 +426,15 @@ export class Builds {
     const tracked = job.catch((err) => console.error('Builds:', (err as Error).message)).finally(() => this.jobs.delete(tracked));
     this.jobs.add(tracked);
   }
+}
+
+/**
+ * Builds whose issue is still read on GitHub: those being built, fixed or
+ * reviewed, and failed ones with an open pull request, which the Owner can
+ * still fix with @claude and merge.
+ */
+function followed(build: BuildTrack | undefined): boolean {
+  return build?.state === 'building' || build?.state === 'fixing' || build?.state === 'review' || (build?.state === 'failed' && Boolean(build.pr));
 }
 
 /** Names the guessed cost of the build on an issue, until its real cost replaces it. */

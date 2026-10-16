@@ -72,5 +72,16 @@ bypass list so you can still push yourself.
 5. After a merge the wish shows "Updating". Open God's View, Updates, and
    pull main and restart. The wish turns Live and the world is told.
 
+If CI fails on a wish's pull request, the "Fix a wish's failed checks"
+workflow has Claude Code find the cause in the failed log, push a fix to the
+same branch and comment on the pull request with what was wrong and what it
+changed. Meanwhile the wish shows "Fixing failed checks"; it goes back to
+"Waiting for the Owner's review" once the fix passes. It stops after 3 tries
+(set the repository variable `WISH_FIX_ATTEMPTS` under **Settings**,
+**Secrets and variables**, **Actions**, **Variables** to change that), and
+each try's cost is counted in the budget.
+
 If a build fails, the wish shows "Build failed" with the reason, and you can
-try again (a fresh issue) or give up on it.
+try again (a fresh issue) or give up on it. A pull request whose automatic
+fixes ran out stays open: you can still ask `@claude` for changes and merge
+it, and the game follows it.

@@ -11,6 +11,8 @@ import {
   MAX_WISHED_DROPS,
   MAX_WISHED_HEAL,
   MAX_WISHED_LEVEL,
+  FLAME_LIGHT,
+  MAX_LIGHT_RADIUS,
   REGION_WISH_COST,
   checkDraft,
   draftFromDefinition,
@@ -75,7 +77,7 @@ or, when offering a wish:
 {"say": "<what you say>", "wish": {"tier": "minor|moderate|major|engine|refused", "title": "<a few words>", "summary": "<one plain sentence of what will be made>", "definition": <definition or null>}}
 
 Definitions (only for minor and moderate):
-item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit (gear only: the stat it helps)","look":LOOK}
+item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit (gear only: the stat it helps)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"look":LOOK}
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
 ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
@@ -431,6 +433,8 @@ export class OfflineGod implements ChatModel {
       : /\b(hat|helmet|helm|hood|crown|cap)\b/.test(text) ? 'head'
         : /\b(armou?r|coat|cloak|robe|vest|mail|tunic)\b/.test(text) ? 'body'
           : /\b(ring|amulet|charm|necklace|pendant|talisman)\b/.test(text) ? 'charm' : undefined;
+    // Fire and lamps light the ground around whoever holds them.
+    const lit = /\b(torch|lantern|lamp|candle|fire|flaming|burning|blazing|glowing)\b/.test(text);
     if (slot) {
       return {
         say: `A ${thing} to wear? It will be waiting in your bag.`,
@@ -438,7 +442,7 @@ export class OfflineGod implements ChatModel {
           tier: 'minor',
           title: cap(thing),
           summary: `A ${thing} to wear, in your bag.`,
-          definition: { kind: 'item', name: cap(thing), description: `A ${thing}, made by a wish.`, itemKind: slot, rarity: 'common', look },
+          definition: { kind: 'item', name: cap(thing), description: `A ${thing}, made by a wish.`, itemKind: slot, rarity: 'common', ...(lit ? { light: FLAME_LIGHT } : {}), look },
         },
       };
     }

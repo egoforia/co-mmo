@@ -75,6 +75,8 @@ describe('build reports', () => {
     expect(parseReport('<!-- co-mmo-build {"state":"review","pr":12,"url":"https://github.com/a/b/pull/12"} -->')).toEqual({ state: 'review', pr: 12, url: 'https://github.com/a/b/pull/12' });
     expect(parseReport('<!-- co-mmo-build {"state":"review","pr":12,"url":"https://evil.example/pull/12"} -->')).toBeUndefined();
     expect(parseReport('<!-- co-mmo-build {"state":"merged","pr":3,"url":"https://github.com/a/b/pull/3","sha":"nope"} -->')).toBeUndefined();
+    expect(parseReport(`<!-- co-mmo-build {"state":"fixing","pr":12,"url":"${pr(12)}","reason":"A test failed. Fixing it (try 1 of 3)."} -->`)).toEqual({ state: 'fixing', pr: 12, url: pr(12), reason: 'A test failed. Fixing it (try 1 of 3).' });
+    expect(parseReport('<!-- co-mmo-build {"state":"fixing","reason":"no pull request"} -->')).toBeUndefined();
     expect(parseReport('<!-- co-mmo-build not json -->')).toBeUndefined();
     expect(parseReport('no marker')).toBeUndefined();
   });
@@ -118,6 +120,7 @@ describe('wish progress while building', () => {
     expect(wishProgress({ ...engine, build: { state: 'queued', at: 0, held: true, message: 'GitHub is not connected yet.' } }).state).toBe('needs-input');
     expect(wishProgress({ ...engine, build: { state: 'building', at: 0, issue: { number: 4, url: 'https://github.com/a/b/issues/4' } } })).toMatchObject({ label: 'Being built', link: 'https://github.com/a/b/issues/4' });
     expect(wishProgress({ ...engine, build: { state: 'review', at: 0, pr: { number: 5, url: pr(5) } } })).toMatchObject({ state: 'needs-input', label: "Waiting for the Owner's review", link: pr(5) });
+    expect(wishProgress({ ...engine, build: { state: 'fixing', at: 0, pr: { number: 5, url: pr(5) }, message: 'A test failed.' } })).toMatchObject({ state: 'in-progress', label: 'Fixing failed checks', detail: 'A test failed.', link: pr(5) });
     expect(wishProgress({ ...engine, build: { state: 'merged', at: 0 } }).label).toBe('Updating');
     expect(wishProgress({ status: 'granted', tier: 'engine', build: { state: 'live', at: 0 } })).toMatchObject({ state: 'done', label: 'Live' });
     expect(wishProgress({ ...engine, build: { state: 'failed', at: 0, message: 'Tests failed.' } })).toMatchObject({ state: 'error', label: 'Build failed' });
@@ -258,6 +261,32 @@ describe('building Engine wishes', () => {
     const gaveUp = await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: false });
     expect(gaveUp.status).toBe(200);
     expect(store.contentById(record.id)!.status).toBe('rejected');
+  });
+
+  it('shows the coding agent fixing failed checks, and still follows a pull request it could not fix', async () => {
+    const { store, base, github, owner, mara } = await setup();
+    const record = engineWish(store, mara.id);
+    await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true });
+    const sync = () => api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    github.report(1, { state: 'review', pr: 7, url: pr(7) });
+    await sync();
+
+    github.report(1, { state: 'fixing', pr: 7, url: pr(7), reason: 'A test failed. The coding agent is fixing it (try 1 of 3).' });
+    await sync();
+    expect(wishProgress(store.contentById(record.id)!)).toMatchObject({ state: 'in-progress', label: 'Fixing failed checks', link: pr(7) });
+    github.report(1, { state: 'review', pr: 7, url: pr(7) });
+    await sync();
+    expect(store.contentById(record.id)!.build).toMatchObject({ state: 'review', pr: { number: 7 } });
+
+    // Out of tries: it shows as failed, but the Owner can still fix and merge the pull request.
+    github.report(1, { state: 'fixing', pr: 7, url: pr(7), reason: 'A test failed again.' });
+    github.report(1, { state: 'failed', reason: 'The checks still fail after 3 automatic fixes.' });
+    await sync();
+    await sync();
+    expect(store.contentById(record.id)!.build).toMatchObject({ state: 'failed', pr: { number: 7 }, message: 'The checks still fail after 3 automatic fixes.' });
+    github.report(1, { state: 'merged', pr: 7, url: pr(7), sha: 'abc1234def' });
+    await sync();
+    expect(store.contentById(record.id)!.build!.state).toBe('merged');
   });
 
   it('hands a closed pull request back to the Owner and tells the wisher', async () => {

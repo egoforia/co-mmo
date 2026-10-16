@@ -38,7 +38,7 @@ async function wishes(): Promise<string> {
         ${view.owner && e.status === 'granted' && e.definition ? `<button type="button" class="quiet" data-paint="${e.id}">${e.art || e.kitArt || e.itemArt ? 'Repaint' : 'Paint'}</button>` : ''}
       </div></td>
     </tr>`).join('');
-  const active = content.filter((e) => e.build && ['queued', 'building', 'review', 'merged', 'failed'].includes(e.build.state));
+  const active = content.filter((e) => e.build && ['queued', 'building', 'fixing', 'review', 'merged', 'failed'].includes(e.build.state));
   const building = active.length
     ? active.map((e) => `
       <article class="wish">

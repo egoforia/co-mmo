@@ -109,7 +109,7 @@ export async function handleAdmin(
       rules: content.filter((c) => c.status === 'granted' && c.definition?.kind === 'rule').length,
       budget: owner ? ctx.budget.state() : null,
       update: owner ? updateSummary(ctx.updater) : null,
-      building: store.content.filter((c) => c.build && ['queued', 'building', 'review', 'merged'].includes(c.build.state)).length,
+      building: store.content.filter((c) => c.build && ['queued', 'building', 'fixing', 'review', 'merged'].includes(c.build.state)).length,
     }), true;
   }
 

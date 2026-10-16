@@ -2,6 +2,8 @@
 // quests. Content here is the hand-made starting set; wishes add more later
 // as data in the same shapes.
 
+import type { Light } from './light.ts';
+
 export interface Stats {
   /** Melee damage and health. */
   might: number;
@@ -264,6 +266,8 @@ export interface ItemDef {
   teaches?: string;
   /** What a shop pays for it is half of this, in gold. */
   value?: number;
+  /** Equipment that burns or glows: the light it casts while held. */
+  light?: Light;
 }
 
 export const ITEMS: Record<string, ItemDef> = {

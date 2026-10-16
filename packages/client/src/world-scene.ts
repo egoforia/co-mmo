@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   ABILITIES,
   CREATURES,
+  FLAME_LIGHT,
   ITEMS,
   Interpolator,
   HELD_SIZE,
@@ -29,6 +30,7 @@ import {
   type ClientMessage,
   type CreatureState,
   type HitMessage,
+  type Light,
   type NpcState,
   type RegionMap,
   type Side,
@@ -44,6 +46,7 @@ import {
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
+import { makeLight, placeLight, type LitPoint } from './lights.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Sprite;
@@ -76,6 +79,8 @@ interface Avatar {
 interface Held {
   item: string;
   image?: Phaser.GameObjects.Image;
+  /** The light it casts, when it burns or glows. */
+  lit?: LitPoint;
 }
 
 /** Which hand an item is held in. */
@@ -120,6 +125,8 @@ export interface WorldSceneOptions {
 }
 
 const T = TILE_PIXELS;
+/** A Firebolt's flame, smaller than a torch's. */
+const BOLT_LIGHT: Light = { ...FLAME_LIGHT, radius: 2 };
 const LABEL_DEPTH = 1_000_000;
 
 export class WorldScene extends Phaser.Scene {
@@ -609,9 +616,16 @@ export class WorldScene extends Phaser.Scene {
     const y = (a: Avatar) => a.body.y - a.body.displayHeight * 0.5;
     const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
     const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
+    // The flame lights the ground it flies over.
+    const lit = makeLight(this, BOLT_LIGHT, LABEL_DEPTH - 0.5);
+    const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2);
+    follow();
     this.tweens.add({
-      targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn',
-      onComplete: () => this.tweens.add({ targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onComplete: () => spark.destroy() }),
+      targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
+      onComplete: () => this.tweens.add({
+        targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onUpdate: follow,
+        onComplete: () => { spark.destroy(); lit?.point.destroy(); },
+      }),
     });
   }
 
@@ -884,7 +898,10 @@ export class WorldScene extends Phaser.Scene {
     const slot = hand === 'right' ? 'held' : 'offHeld';
     if (a[slot]?.item === item) return;
     a[slot]?.image?.destroy();
-    a[slot] = item ? { item } : undefined;
+    a[slot]?.lit?.point.destroy();
+    const light = item ? ITEMS[item]?.light : undefined;
+    // Above the biome's shade, so the light brightens what it falls on.
+    a[slot] = item ? { item, lit: light ? makeLight(this, light, LABEL_DEPTH - 0.5) : undefined } : undefined;
     const key = item ? ITEMS[item]?.art : undefined;
     if (key && !this.textures.exists(key)) void this.loadArt(key, artSrc(key));
   }
@@ -903,6 +920,12 @@ export class WorldScene extends Phaser.Scene {
     const b = a.body;
     const hand = this.handOf(a, side);
     const grip = key ? this.options.points[key]?.grip : undefined;
+    if (held.lit) {
+      // The light shines from the hand, or from the holder's middle until the hand is found.
+      const [hx, hy] = hand ?? [b.originX, b.originY - 0.5];
+      const lx = b.x + (b.flipX ? b.originX - hx : hx - b.originX) * b.displayWidth;
+      placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, this.time.now, b.visible);
+    }
     if (!key || !hand || !grip || !this.textures.exists(key)) {
       held.image?.setVisible(false);
       return;
@@ -962,6 +985,8 @@ function bodyLabel(b: BodyState): string {
 function destroyAvatar(a: Avatar): void {
   a.held?.image?.destroy();
   a.offHeld?.image?.destroy();
+  a.held?.lit?.point.destroy();
+  a.offHeld?.lit?.point.destroy();
   a.body.destroy();
   a.shadow.destroy();
   a.label.destroy();

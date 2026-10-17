@@ -1,0 +1,38 @@
+{
+  "id": "item-golem-club",
+  "description": {
+    "id": "item-golem-club",
+    "name": "Golem Club",
+    "kind": "item",
+    "biome": "any",
+    "references": [
+      "item-tonic",
+      "woods-bark-golem"
+    ],
+    "silhouetteHook": "a heavy club made from a gnarled branch with moss and an amber knot",
+    "body": "big club, handle at the bottom",
+    "materials": [
+      "wood",
+      "moss"
+    ],
+    "colors": {
+      "main": "dark bark brown",
+      "secondary": "teal moss",
+      "accent": "amber glow"
+    },
+    "mood": "treasured, inviting",
+    "extra": {
+      "category": "weapon"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Golem Club (item). Most recognisable feature: a heavy club made from a gnarled branch with moss and an amber knot. Body and shape: big club, handle at the bottom. Materials: wood, moss. Colours: main dark bark brown, secondary teal moss, small accent of amber glow. category: weapon. Mood: treasured, inviting.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-tonic",
+    "woods-bark-golem"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:23:58.412Z"
+}

@@ -1,11 +1,14 @@
+import type { KitAsset } from './kit.ts';
 import type { AssetDescription } from './style.ts';
 
 /**
  * The launch lands' new set pieces, creatures, people and treasures (shared
  * places.ts and lands.ts), and the plank bridge where roads cross water.
  * Each is painted beside an approved anchor of its land, so it matches.
+ * Their gaps (an archway, between sails or limbs, a ring) let the key
+ * colour show through, so it is cleared there too.
  */
-export const LAND_ANCHORS: (AssetDescription & { id: string; references?: string[] })[] = [
+export const LAND_ANCHORS: KitAsset[] = ([
   // Shared
   {
     id: 'bridge-planks', name: 'Plank bridge', kind: 'tile', biome: 'any', references: ['woods-path', 'sanctum-pond'],
@@ -89,7 +92,7 @@ export const LAND_ANCHORS: (AssetDescription & { id: string; references?: string
     id: 'shore-shipwreck', name: 'Shipwreck', kind: 'set-piece', biome: 'sunlit-shore', references: ['shore-lighthouse'],
     silhouetteHook: 'a big broken pirate ship lying tilted on the sand with a snapped mast and torn sails',
     body: 'long wooden hull on its side, wide and low', materials: ['old wood', 'canvas', 'rope'],
-    colors: { main: 'driftwood brown', secondary: 'faded cream sails', accent: 'coral red flag' }, details: ['barnacles on the hull', 'gulls perched on the mast'], mood: 'adventurous, eerie',
+    colors: { main: 'driftwood brown', secondary: 'off-white canvas sails', accent: 'dark brick red flag' }, details: ['barnacles on the hull', 'gulls perched on the mast', 'no pink or purple anywhere'], mood: 'adventurous, eerie',
   },
   {
     id: 'shore-giant-shell', name: 'Giant spiral shell', kind: 'set-piece', biome: 'sunlit-shore', references: ['shore-lighthouse'],
@@ -157,7 +160,7 @@ export const LAND_ANCHORS: (AssetDescription & { id: string; references?: string
     id: 'desert-mummy-guard', name: 'Mummy Guard', kind: 'monster', biome: 'mirage-desert', references: ['desert-scarab'],
     silhouetteHook: 'a tall mummy wrapped in old linen wearing a golden mask and holding a curved spear',
     body: 'tall stiff figure, loose bandage ends trailing', materials: ['linen', 'gold', 'bronze'],
-    colors: { main: 'dusty cream linen', secondary: 'gold mask', accent: 'turquoise eyes' }, details: ['a scarab brooch on the chest'], mood: 'grim, dutiful', extra: { threat: 'normal', movement: 'stiff march' },
+    colors: { main: 'dusty cream linen', secondary: 'gold mask and a deep blue sash', accent: 'turquoise eyes' }, details: ['a scarab brooch on the chest', 'no pink or purple anywhere'], mood: 'grim, dutiful', extra: { threat: 'normal', movement: 'stiff march' },
   },
   {
     id: 'desert-sand-wyrm', name: 'Sand Wyrm', kind: 'monster', biome: 'mirage-desert', references: ['desert-scarab'],
@@ -186,13 +189,13 @@ export const LAND_ANCHORS: (AssetDescription & { id: string; references?: string
   item('item-wyrm-scale', 'Wyrm Scale', 'a large bronze-coloured scale shaped like a shield', 'single scale', ['scale'], { main: 'bronze', secondary: 'sand gold', accent: 'orange sheen' }, 'material', 'desert-sand-wyrm'),
   item('item-sunstone-amulet', 'Sunstone Amulet', 'a golden sun-shaped amulet with a glowing orange stone in the middle', 'pendant on a chain', ['gold', 'sunstone'], { main: 'gold', secondary: 'orange stone', accent: 'turquoise' }, 'charm', 'item-scarab-charm'),
   item('item-pelt-cloak', 'Thorn Pelt Cloak', 'a folded hooded grey fur cloak with a thorny collar and a wooden clasp', 'folded cloak, hood on top', ['fur', 'leather', 'wood'], { main: 'slate grey', secondary: 'brown leather', accent: 'bramble green' }, 'armour', 'item-traveller-coat'),
-];
+] as KitAsset[]).map((a) => ({ holes: true, ...a }));
 
 /** A treasure's description, painted beside the item style anchor and what it comes from. */
 function item(
   id: string, name: string, hook: string, body: string, materials: string[],
   colors: AssetDescription['colors'], category: string, from: string,
-): AssetDescription & { id: string; references: string[] } {
+): KitAsset {
   return {
     id, name, kind: 'item', biome: 'any', references: ['item-tonic', from],
     silhouetteHook: hook, body, materials, colors, mood: 'treasured, inviting', extra: { category },

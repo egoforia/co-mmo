@@ -1,0 +1,39 @@
+{
+  "id": "item-pelt-cloak",
+  "description": {
+    "id": "item-pelt-cloak",
+    "name": "Thorn Pelt Cloak",
+    "kind": "item",
+    "biome": "any",
+    "references": [
+      "item-tonic",
+      "item-traveller-coat"
+    ],
+    "silhouetteHook": "a folded hooded grey fur cloak with a thorny collar and a wooden clasp",
+    "body": "folded cloak, hood on top",
+    "materials": [
+      "fur",
+      "leather",
+      "wood"
+    ],
+    "colors": {
+      "main": "slate grey",
+      "secondary": "brown leather",
+      "accent": "bramble green"
+    },
+    "mood": "treasured, inviting",
+    "extra": {
+      "category": "armour"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Thorn Pelt Cloak (item). Most recognisable feature: a folded hooded grey fur cloak with a thorny collar and a wooden clasp. Body and shape: folded cloak, hood on top. Materials: fur, leather, wood. Colours: main slate grey, secondary brown leather, small accent of bramble green. category: armour. Mood: treasured, inviting.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-tonic",
+    "item-traveller-coat"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:25:10.302Z"
+}

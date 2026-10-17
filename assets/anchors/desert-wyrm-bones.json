@@ -1,0 +1,36 @@
+{
+  "id": "desert-wyrm-bones",
+  "description": {
+    "id": "desert-wyrm-bones",
+    "name": "Wyrm bones",
+    "kind": "set-piece",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-ruin"
+    ],
+    "silhouetteHook": "the huge bleached ribcage and skull of a giant serpent half buried in the dunes",
+    "body": "long line of tall curved ribs with a great horned skull at one end",
+    "materials": [
+      "bone",
+      "sand"
+    ],
+    "colors": {
+      "main": "bone white",
+      "secondary": "sand gold",
+      "accent": "faint turquoise crystals"
+    },
+    "details": [
+      "sand pouring between the ribs"
+    ],
+    "mood": "eerie, awe-inspiring"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Wyrm bones (set-piece). Most recognisable feature: the huge bleached ribcage and skull of a giant serpent half buried in the dunes. Body and shape: long line of tall curved ribs with a great horned skull at one end. Materials: bone, sand. Colours: main bone white, secondary sand gold, small accent of faint turquoise crystals. Details: sand pouring between the ribs. Mood: eerie, awe-inspiring.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-ruin"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:22:44.890Z"
+}

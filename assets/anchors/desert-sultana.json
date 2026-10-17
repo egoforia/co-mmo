@@ -1,0 +1,41 @@
+{
+  "id": "desert-sultana",
+  "description": {
+    "id": "desert-sultana",
+    "name": "Sultana Zahra",
+    "kind": "npc",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-cactus-folk"
+    ],
+    "silhouetteHook": "an elegant sultana with a tall jewelled turban with a peacock feather and flowing silk robes",
+    "body": "3 heads tall, confident pose, hands together in front",
+    "materials": [
+      "silk",
+      "gold",
+      "jewels"
+    ],
+    "colors": {
+      "main": "saffron",
+      "secondary": "deep red",
+      "accent": "turquoise jewels"
+    },
+    "details": [
+      "gold bangles",
+      "embroidered sash"
+    ],
+    "mood": "regal, warm",
+    "extra": {
+      "role": "ruler of the desert palace"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Sultana Zahra (npc). Most recognisable feature: an elegant sultana with a tall jewelled turban with a peacock feather and flowing silk robes. Body and shape: 3 heads tall, confident pose, hands together in front. Materials: silk, gold, jewels. Colours: main saffron, secondary deep red, small accent of turquoise jewels. Details: gold bangles; embroidered sash. role: ruler of the desert palace. Mood: regal, warm.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-cactus-folk"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:23:17.037Z"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "woods-thorn-wolf",
+  "description": {
+    "id": "woods-thorn-wolf",
+    "name": "Thorn Wolf",
+    "kind": "monster",
+    "biome": "whispering-woods",
+    "references": [
+      "woods-mushroom"
+    ],
+    "silhouetteHook": "a lean grey wolf with a mane of curling bramble thorns down its back",
+    "body": "four legs, long snout, glowing amber eyes, bushy tail",
+    "materials": [
+      "fur",
+      "thorny vines"
+    ],
+    "colors": {
+      "main": "slate grey",
+      "secondary": "dark bramble green",
+      "accent": "amber eyes"
+    },
+    "details": [
+      "tiny red berries in the thorns"
+    ],
+    "mood": "fierce, wild",
+    "extra": {
+      "threat": "dangerous in packs",
+      "movement": "lope"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Thorn Wolf (monster). Most recognisable feature: a lean grey wolf with a mane of curling bramble thorns down its back. Body and shape: four legs, long snout, glowing amber eyes, bushy tail. Materials: fur, thorny vines. Colours: main slate grey, secondary dark bramble green, small accent of amber eyes. Details: tiny red berries in the thorns. threat: dangerous in packs. movement: lope. Mood: fierce, wild.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "woods-mushroom"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:21:10.389Z"
+}

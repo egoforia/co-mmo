@@ -1,0 +1,42 @@
+{
+  "id": "shore-drowned-deckhand",
+  "description": {
+    "id": "shore-drowned-deckhand",
+    "name": "Drowned Deckhand",
+    "kind": "monster",
+    "biome": "sunlit-shore",
+    "references": [
+      "shore-crab-knight"
+    ],
+    "silhouetteHook": "a ghostly sailor made of seaweed and knotted rope with glowing green eyes and a striped shirt",
+    "body": "tall thin figure, hunched, dripping, holding a rusty boat hook",
+    "materials": [
+      "seaweed",
+      "rope",
+      "wet cloth"
+    ],
+    "colors": {
+      "main": "murky green",
+      "secondary": "faded blue and white stripes",
+      "accent": "ghostly green glow"
+    },
+    "details": [
+      "a small crab on its shoulder"
+    ],
+    "mood": "spooky, sad",
+    "extra": {
+      "threat": "normal",
+      "movement": "shamble"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nPaint the character in the reference picture again, exactly the same: face, hair, clothes, colours, proportions, pose, size and framing.\nChange only this: the shirt has navy blue and off-white stripes; nothing on the figure is pink or magenta.",
+  "references": [
+    "shore-drowned-deckhand (before)"
+  ],
+  "edit": "the shirt has navy blue and off-white stripes; nothing on the figure is pink or magenta",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:27:30.633Z"
+}

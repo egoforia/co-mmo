@@ -381,6 +381,12 @@ export class Builds {
       this.store.updateContent(record.id, { status: 'granted', build: { ...build, state: 'live', at: this.now(), told: false } });
       this.hooks.changed(record.id);
       live.push(record);
+      // An undo that went live takes the wish it undoes out of the game for good.
+      const undone = record.undoes ? this.store.contentById(record.undoes) : undefined;
+      if (undone?.status === 'granted') {
+        this.store.updateContent(undone.id, { status: 'rolled-back' });
+        this.hooks.changed(undone.id);
+      }
     }
     if (live.length) {
       // Players are reconnecting after the restart; give them a moment.

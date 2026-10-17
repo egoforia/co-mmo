@@ -1,4 +1,4 @@
-import { CREATURES, ITEMS, RARITIES, REGION_WISH_COST, bonusText, regionDef, ruleItemId, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
+import { CREATURES, ITEMS, RARITIES, REGION_WISH_COST, bonusText, regionDef, ruleItemId, standing, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
 
@@ -125,7 +125,7 @@ export const CHAPTERS: Chapter[] = [
       <h3>Roles</h3>
       <ul>
         <li><b>The Owner</b> keeps the world and its budget.</li>
-        <li><b>Stewards</b> are trusted players who review large wishes, roll back creations, read reports and can suspend troublemakers. The Owner names new Stewards by asking the God.</li>
+        <li><b>Stewards</b> are trusted players who review large wishes, switch any wish off and on again or undo it, read reports and can suspend troublemakers. The Owner names new Stewards by asking the God.</li>
         <li><b>Players</b> are everyone, and anyone can invite a friend.</li>
       </ul>
       <h3>Characters</h3>
@@ -141,7 +141,7 @@ export const CHAPTERS: Chapter[] = [
         const where = regionDef(e.regionId)?.name ?? e.regionId;
         const pic = e.definition && e.status === 'granted' ? `<img src="${escapeHtml(art(pictureKey(e)))}" alt="">` : '<div class="mystery">✦</div>';
         const status = progress(e);
-        const howTo = e.definition?.kind === 'rule' && e.status === 'granted' ? `<br><b>How:</b> ${escapeHtml(e.definition.howTo)}` : '';
+        const howTo = e.definition?.kind === 'rule' && standing(e) ? `<br><b>How:</b> ${escapeHtml(e.definition.howTo)}` : '';
         const report = e.status === 'granted' ? ` <button type="button" class="report" data-report="${escapeHtml(e.id)}" data-title="${escapeHtml(e.title)}">Report</button>` : '';
         return `<figure${e.status === 'granted' ? '' : ' class="unknown"'}>${pic}<figcaption><b>${escapeHtml(e.title)}</b>${status}<br>${escapeHtml(e.summary)}${howTo}<br><small>Wished by ${escapeHtml(e.wisher.name)} in ${escapeHtml(where)}, ${when}</small>${report}</figcaption></figure>`;
       });

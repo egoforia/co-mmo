@@ -13,6 +13,7 @@ import { GameDown, api, rerender, toast, view, type Tab } from './gods-view/core
 import { worldTab } from './gods-view/world.ts';
 import { wishesTab } from './gods-view/wishes.ts';
 import { rulesTab } from './gods-view/rules.ts';
+import { modsTab } from './gods-view/mods.ts';
 import { reportsTab } from './gods-view/reports.ts';
 import { playersTab } from './gods-view/players.ts';
 import { aiTab } from './gods-view/ai.ts';
@@ -28,6 +29,7 @@ const artContext: ArtContext = { api, toast, rerender };
 const TABS: Tab[] = [
   worldTab,
   wishesTab,
+  modsTab,
   rulesTab,
   { id: 'loot', label: 'Loot', page: () => lootPage(artContext) },
   reportsTab,

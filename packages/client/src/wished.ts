@@ -1,4 +1,4 @@
-import { applyContent, placeholderArt, regionPictures, ruleItemId, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
+import { applyContent, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until the image model paints a wish's own
@@ -36,7 +36,7 @@ export function lookArt(playerId: string): string | undefined {
   // A newer look (changed in the Wish Workshop) replaces an older one.
   let newest: ContentEntry | undefined;
   for (const e of entries.values()) {
-    if (e.status === 'granted' && e.definition?.kind === 'player' && e.wisher.id === playerId && (!newest || e.at > newest.at)) newest = e;
+    if (standing(e) && e.definition?.kind === 'player' && e.wisher.id === playerId && (!newest || e.at > newest.at)) newest = e;
   }
   return newest ? wishArtKey(newest.id) : undefined;
 }

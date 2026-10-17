@@ -61,7 +61,7 @@ async function wishes(): Promise<string> {
 const PROGRESS_ICON = { 'in-progress': '⏳', 'needs-input': '✋', error: '✗', done: '✓', closed: '–' } as const;
 
 /** Where a wish stands: in progress, needs a person, error, done (or closed). */
-function progress(e: Entry): string {
+export function progress(e: Entry): string {
   const p = e.progress;
   if (!p) return `<span class="progress">${escapeHtml(e.status)}</span>`;
   const badge = `<span class="progress ${p.state}" title="${escapeHtml(p.detail ?? '')}">${PROGRESS_ICON[p.state]} ${escapeHtml(p.label)}</span>`;

@@ -147,7 +147,8 @@ export class KitUi {
     if (this.actions.typing() || e.ctrlKey || e.metaKey || e.altKey) return;
     const n = Number(e.key);
     if (n >= 1 && n <= 4) {
-      const id = this.character.abilities[n - 1];
+      // The same order as the bar: abilities whose wish is switched off are left out.
+      const id = this.character.abilities.filter((a) => ABILITIES[a])[n - 1];
       if (id) this.use(id);
     } else if (e.key.toLowerCase() === 'c') {
       this.toggleCrafting();

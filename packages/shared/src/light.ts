@@ -4,6 +4,8 @@
 // like a flame are data on the item, checked here so a wish cannot light the
 // whole world.
 
+import { engineModId } from './mods.ts';
+
 /** The light an item casts while held. */
 export interface Light {
   /** Its colour as #rrggbb. */
@@ -17,6 +19,9 @@ export interface Light {
 /** The farthest any light reaches, in tiles, so no wish lights a whole region. */
 export const MAX_LIGHT_RADIUS = 4;
 export const MIN_LIGHT_RADIUS = 1;
+
+/** The Dynamic Point Lighting wish (issue #59): its lights shine only while this mod is on. */
+export const LIGHT_MOD = engineModId(59);
 
 /** The warm light of a flame, for a fire whose colour was not said. */
 export const FLAME_LIGHT: Light = { color: '#ffb35c', radius: 3, flicker: true };

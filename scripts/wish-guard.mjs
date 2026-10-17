@@ -108,6 +108,40 @@ export function checkChanges(files, { allowCore = false } = {}) {
   return problems;
 }
 
+/** Game code outside tests, where a wish's own switch is checked. */
+const SOURCE = /^packages\/(client|server|shared)\/src\/.+\.ts$/;
+
+/**
+ * Checks that a wish adding game code puts it behind its own switch,
+ * `modOn(engineModId(<issue>))`, so a Steward can switch it off from God's
+ * View. A change that takes more code out than it adds (undoing a wish)
+ * needs no switch. Returns the problems, in plain words.
+ */
+export function checkMod(files, additions, issue) {
+  if (!issue) return [];
+  const source = files.filter((f) => SOURCE.test(f.path));
+  const added = source.reduce((n, f) => n + f.added, 0);
+  const removed = source.reduce((n, f) => n + f.removed, 0);
+  if (added <= removed) return [];
+  const byNumber = new RegExp(`engineModId\\(\\s*${issue}\\s*\\)|['"\`]wish-${issue}['"\`]`);
+  if (additions.some((a) => SOURCE.test(a.path) && byNumber.test(a.text))) return [];
+  return [`The wish adds game code but never checks its switch. Put what it adds behind modOn(engineModId(${issue})) from @co-mmo/shared, so a Steward can switch it off in God's View; while it is off, the game must work as it did before the wish.`];
+}
+
+/** The wish's issue number, from the branch wish/<issue> (in GitHub Actions, the pull request's branch). */
+export function wishIssue() {
+  let ref = process.env.GITHUB_HEAD_REF ?? '';
+  if (!ref) {
+    try {
+      ref = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim();
+    } catch {
+      return undefined;
+    }
+  }
+  const m = ref.match(/^wish\/(\d+)/);
+  return m ? Number(m[1]) : undefined;
+}
+
 /** Files changed between the base and HEAD, from git. */
 export function changedFiles(base) {
   const out = execFileSync('git', ['diff', '--numstat', '--no-renames', `${base}...HEAD`], { encoding: 'utf8' });
@@ -123,7 +157,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'origin/main';
   const allowCore = args.includes('--allow-core');
   const files = changedFiles(base);
-  const problems = [...checkChanges(files, { allowCore }), ...checkArt(addedLines(base))];
+  const additions = addedLines(base);
+  const problems = [...checkChanges(files, { allowCore }), ...checkArt(additions), ...checkMod(files, additions, wishIssue())];
   if (!files.length) problems.push('The change is empty.');
   if (problems.length) {
     console.log(problems.map((p) => `- ${p}`).join('\n'));

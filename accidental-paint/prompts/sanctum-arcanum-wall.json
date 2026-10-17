@@ -1,0 +1,24 @@
+{
+  "at": 1792245633295,
+  "steps": [
+    {
+      "label": "The Sanctum Arcanum: wall",
+      "media": "picture",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash-image",
+      "prompt": "Pixel art game graphics in the style of a 16-bit SNES / PS1 Legend of Mana RPG interior.\nEvery art pixel is a crisp, hard-edged square block: no anti-aliasing, no smooth gradients, no blur.\nA limited palette of about 16 colours taken from the reference painting, warm light from the upper left. No writing anywhere.\nA texture tile seen from directly above, filling the entire square frame edge to edge, drawn as if 32 by 32 pixels scaled up.\nEven lighting and low contrast, small details spread evenly with no single big feature, no moss clumps, mushrooms or objects,\nso it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.\nSubject: inside The Sanctum Arcanum, the top of a thick timber-framed wall: dark oak beams over grey stone, with a thin line of slate along it.\nColours: match the reference painting of the same building from outside.",
+      "note": "Match the art style of the reference images exactly; do not copy their subjects.",
+      "pictures": [
+        {
+          "name": "The Sanctum Arcanum: outside",
+          "url": "/wished-art/recipes/pictures/cd3b5f617cb9f230.webp"
+        }
+      ],
+      "settings": [
+        "shape 1:1",
+        "size 1K"
+      ],
+      "usd": 0.0387
+    }
+  ]
+}

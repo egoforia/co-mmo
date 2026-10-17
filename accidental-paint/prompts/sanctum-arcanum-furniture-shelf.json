@@ -1,0 +1,24 @@
+{
+  "at": 1792245610252,
+  "steps": [
+    {
+      "label": "The Sanctum Arcanum: shelf",
+      "media": "picture",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash-image",
+      "prompt": "Pixel art game graphics in the style of a 16-bit SNES / PS1 Legend of Mana RPG interior.\nEvery art pixel is a crisp, hard-edged square block: no anti-aliasing, no smooth gradients, no blur.\nA limited palette of about 16 colours taken from the reference painting, warm light from the upper left. No writing anywhere.\nA single sprite in three-quarter top-down view, centred, with empty margin all around it, with a darker coloured outline.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject, with no floor, gradient, glow or shadow on it. No magenta anywhere in the subject.\nFire and light have no glow or halo spilling outside the object.\nSubject: the shelf inside The Sanctum Arcanum: a tall wooden shelf crowded with glimmering crystal globes and swirling coloured tonic vials.\nColours: match the reference painting of the same building from outside.",
+      "note": "Match the art style of the reference images exactly; do not copy their subjects.",
+      "pictures": [
+        {
+          "name": "The Sanctum Arcanum: outside",
+          "url": "/wished-art/recipes/pictures/cd3b5f617cb9f230.webp"
+        }
+      ],
+      "settings": [
+        "shape 1:1",
+        "size 1K"
+      ],
+      "usd": 0.0387
+    }
+  ]
+}

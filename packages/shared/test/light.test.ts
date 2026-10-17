@@ -46,9 +46,9 @@ describe('wished lights', () => {
 });
 
 describe('lightGlow', () => {
-  it('brightens at night but never washes out what it falls on', () => {
+  it('shines brighter at night, but never so bright it bleaches what it lights', () => {
     expect(lightGlow(1)).toBeGreaterThan(lightGlow(0));
-    expect(lightGlow(1)).toBeLessThanOrEqual(0.5);
+    expect(lightGlow(1)).toBeLessThanOrEqual(1.5);
     expect(lightGlow(5)).toBe(lightGlow(1));
     expect(lightGlow(-1)).toBe(lightGlow(0));
   });

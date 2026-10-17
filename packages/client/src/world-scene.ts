@@ -47,7 +47,7 @@ import {
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
-import { makeLight, placeLight, type LitPoint } from './lights.ts';
+import { dropLight, lightScene, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
 
 interface Avatar {
@@ -170,6 +170,8 @@ export class WorldScene extends Phaser.Scene {
   /** Rendered position eases toward the predicted one to hide corrections. */
   private shown = { x: 0, y: 0 };
   private tint?: Phaser.GameObjects.Rectangle;
+  /** True when pictures are lit by the sky and lamps (WebGL); false when a shade is laid over them. */
+  private lit = false;
   /** The hour and the weather, which grade the light and brighten lights at night. */
   private readonly sky = new SkyClock();
   /** Which way we face: 1 right, -1 left. */
@@ -288,7 +290,7 @@ export class WorldScene extends Phaser.Scene {
       // Who and what we saw were counted from the old corner, and belong to the
       // region we left; the next snapshot shows the ones here.
       for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
-        for (const a of group.values()) destroyAvatar(a);
+        for (const a of group.values()) destroyAvatar(this, a);
         group.clear();
       }
     }
@@ -303,6 +305,8 @@ export class WorldScene extends Phaser.Scene {
 
   create(): void {
     const welcome = this.welcome;
+    // First, so every picture made from here on is lit.
+    this.lit = lightScene(this, LABEL_DEPTH);
     this.remotes = new Map();
     this.creatures = new Map();
     this.bodies = new Map();
@@ -336,8 +340,13 @@ export class WorldScene extends Phaser.Scene {
 
     // The biome's light, the hour and the weather grade everything under the labels.
     this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
-    this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
-    this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
+    // With WebGL it is the light every picture is lit by; without, a shade laid over them.
+    if (this.lit) {
+      setSkyLight(this, this.sky.tint(0));
+    } else {
+      this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
+      this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
+    }
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.fitTint, this));
@@ -410,7 +419,9 @@ export class WorldScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const predictor = this.predictor;
     if (!predictor) return;
-    this.tint?.setFillStyle(this.sky.tint(deltaMs));
+    const sky = this.sky.tint(deltaMs);
+    if (this.lit) setSkyLight(this, sky);
+    else this.tint?.setFillStyle(sky);
     // Fixed-rate input: one input per server tick, however fast we render.
     this.accumulator += Math.min(deltaMs, 250) / 1000;
     while (this.accumulator >= TICK_SECONDS) {
@@ -642,14 +653,14 @@ export class WorldScene extends Phaser.Scene {
     const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
     const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
     // The flame lights the ground it flies over.
-    const lit = makeLight(this, BOLT_LIGHT, LABEL_DEPTH - 0.5);
+    const lit = makeLight(this, BOLT_LIGHT);
     const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2, this.sky.darkness());
     follow();
     this.tweens.add({
       targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
       onComplete: () => this.tweens.add({
         targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onUpdate: follow,
-        onComplete: () => { spark.destroy(); lit?.point.destroy(); },
+        onComplete: () => { spark.destroy(); dropLight(this, lit); },
       }),
     });
   }
@@ -702,7 +713,7 @@ export class WorldScene extends Phaser.Scene {
     }
     for (const [id, remote] of group) {
       if (seen.has(id)) continue;
-      destroyAvatar(remote);
+      destroyAvatar(this, remote);
       group.delete(id);
     }
   }
@@ -973,10 +984,9 @@ export class WorldScene extends Phaser.Scene {
     const slot = hand === 'right' ? 'held' : 'offHeld';
     if (a[slot]?.item === item) return;
     a[slot]?.image?.destroy();
-    a[slot]?.lit?.point.destroy();
+    dropLight(this, a[slot]?.lit);
     const light = item ? ITEMS[item]?.light : undefined;
-    // Above the biome's shade, so the light brightens what it falls on.
-    a[slot] = item ? { item, lit: light ? makeLight(this, light, LABEL_DEPTH - 0.5) : undefined } : undefined;
+    a[slot] = item ? { item, lit: light ? makeLight(this, light) : undefined } : undefined;
     const key = item ? ITEMS[item]?.art : undefined;
     if (key && !this.textures.exists(key)) void this.loadArt(key, artSrc(key));
   }
@@ -1067,11 +1077,11 @@ function dropChunk(chunk: Chunk): void {
   chunk.tilemap.destroy();
 }
 
-function destroyAvatar(a: Avatar): void {
+function destroyAvatar(scene: Phaser.Scene, a: Avatar): void {
   a.held?.image?.destroy();
   a.offHeld?.image?.destroy();
-  a.held?.lit?.point.destroy();
-  a.offHeld?.lit?.point.destroy();
+  dropLight(scene, a.held?.lit);
+  dropLight(scene, a.offHeld?.lit);
   a.body.destroy();
   a.shadow.destroy();
   a.label.destroy();

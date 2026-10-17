@@ -46,15 +46,15 @@ export function lightStrength(light: Light, ms: number, seed = 0): number {
   return 0.875 + wave * 0.125;
 }
 
-/** How much a light adds at its centre by day, as a share of its colour. */
-const DAY_GLOW = 0.22;
-/** How much it adds at its centre at night, when it is all that lights the ground. */
-const NIGHT_GLOW = 0.4;
+/** How much light a lamp adds at its centre by day, on top of the sky's (1 is full daylight). */
+const DAY_GLOW = 0.3;
+/** How much it adds at night, when it is all that lights the ground. */
+const NIGHT_GLOW = 1.4;
 
 /**
- * How much a light adds at its centre, as a share of its colour, from day
- * (`dark` 0) to night (1). Kept well under 1 so the ground, its holder and
- * anyone beside them still show through the glow instead of turning white.
+ * How much light a lamp adds at its centre, from day (`dark` 0) to night
+ * (1). Things near it show in their own painted colours, a little brighter
+ * at the very centre; the light lights them, it is not painted over them.
  */
 export function lightGlow(dark: number): number {
   const d = Math.min(1, Math.max(0, dark));

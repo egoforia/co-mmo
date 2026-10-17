@@ -11,6 +11,11 @@ nothing is paid for; the offline God answers instead.
 **Checks first:** `npm run typecheck` and `npm test`. A wish branch also runs
 `node scripts/wish-guard.mjs --base origin/main`.
 
+**Robot playtester:** `npm run playtest` (about two minutes) has bots and a
+browser play the real game with fake AI: every region, the first quests,
+fights, loot, wishes, two players, and God's View. A new feature gets a
+`packages/server/playtest/<name>.play.ts`; see `docs/playtest.md`.
+
 **File mode** (nothing installed): `npm run dev`. The game is at
 http://localhost:5173 and God's View at http://localhost:5173/gods-view.html.
 The world is kept in `data/world.json`. On first start the server prints an

@@ -331,3 +331,14 @@ describe('a growing world', () => {
     expect(count(thick, Tile.Water)).toBeGreaterThan(100);
   });
 });
+
+describe('creature homes', () => {
+  it('are only where a player can walk from the middle of the region', () => {
+    for (const map of maps) {
+      const open = reachable(map, { x: map.width / 2, y: map.height / 2 });
+      for (const c of map.creatures) {
+        expect(open[Math.floor(c.y) * map.width + Math.floor(c.x)], `${c.name} at ${c.x}, ${c.y} in ${map.def.name}`).toBe(1);
+      }
+    }
+  });
+});

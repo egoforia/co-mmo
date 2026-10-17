@@ -167,7 +167,7 @@ describe('building Engine wishes', () => {
       // Code changes are undone on GitHub, not with Roll back.
       const rollback = await api(s.base, `/api/admin/content/${record.id}/rollback`, owner.token, 'POST');
       expect(rollback.status).toBe(409);
-      expect(rollback.body.message).toMatch(/reverting its pull request/);
+      expect(rollback.body.message).toMatch(/Undo on the Mods tab/);
     });
   });
 

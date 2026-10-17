@@ -1,7 +1,10 @@
 import {
+  ABILITIES,
   ITEMS,
+  SLEEPING_ABILITIES,
   WishError,
   applyContent,
+  standing,
   lookFromWords,
   regionFromWish,
   removeContent,
@@ -36,7 +39,7 @@ export class Granting {
   restore(): void {
     for (const record of this.store.content) {
       this.apply(record);
-      if (record.status !== 'granted') continue;
+      if (!standing(record)) continue;
       this.place(record);
       if (record.definition?.kind === 'rule') {
         this.rules.start(record).catch((err) => console.error(`Rule ${record.id} did not load:`, (err as Error).message));
@@ -58,7 +61,7 @@ export class Granting {
   /** The player's look wish, while it stands. */
   lookOf(playerId: string): ContentRecord | undefined {
     // A look changed in the Workshop replaces the older one; rolling it back brings the older one back.
-    return [...this.store.content].reverse().find((c) => c.definition?.kind === 'player' && c.wisher.id === playerId && c.status === 'granted');
+    return [...this.store.content].reverse().find((c) => c.definition?.kind === 'player' && c.wisher.id === playerId && standing(c));
   }
 
   /**
@@ -117,6 +120,88 @@ export class Granting {
     return record;
   }
 
+  // --- Mods: switching off and on, undoing -------------------------------------
+
+  /**
+   * Switches a granted wish off or back on (design doc, Wishes as mods).
+   * Off, its things leave the world and what players hold sleeps; an Engine
+   * wish's code stands aside through `modOn`. Returns the record, or why not
+   * in words for God's View.
+   */
+  switchOff(id: string, off: boolean, by: { id: string; name: string }): ContentRecord | string {
+    const record = this.store.contentById(id);
+    if (!record || record.status !== 'granted') return 'Only a granted wish can be switched off or on.';
+    if (Boolean(record.off) === off) return off ? 'This wish is switched off already.' : 'This wish is on already.';
+    if (record.build && !record.build.issue) return 'This wish changed the game before wishes became mods, so it has no switch. It can only be undone.';
+    if (!off && record.definition?.kind === 'region' && record.cell && !this.world.cellFree(record.cell)) {
+      return 'Another land has grown where this region stood, so it cannot come back there.';
+    }
+    this.store.updateContent(id, { off: off ? { by: by.name, at: this.now() } : undefined });
+    this.apply(record);
+    if (off) {
+      this.rules.stop(id);
+      if (record.definition?.kind === 'region') this.world.removeRegion(id);
+      this.world.unplace(id);
+      this.settleBags();
+    } else {
+      this.place(record);
+      if (record.definition?.kind === 'rule') {
+        this.rules.start(record).catch((err) => console.error(`Rule ${id} did not load:`, (err as Error).message));
+      }
+    }
+    this.news.broadcast(record);
+    if (record.wisher.id !== by.id) {
+      this.news.tellWisher(record, off
+        ? `Your wish "${record.title}" was switched off for now by ${by.name}. Nothing you hold is lost; it can be switched on again.`
+        : `Your wish "${record.title}" is back in the world.`);
+    }
+    return record;
+  }
+
+  /**
+   * Asks for a code change to be taken out again: a new Engine wish, "Undo:
+   * <title>", that the coding agent builds like any other (a pull request the
+   * Owner merges). When it goes live, the old wish is marked undone.
+   */
+  undoCode(id: string, by: { id: string; name: string }): ContentRecord | string {
+    const record = this.store.contentById(id);
+    const pr = record?.build?.pr;
+    if (!record || record.status !== 'granted' || record.build?.state !== 'live' || !pr) return 'Only a code change that is live in the game can be undone this way.';
+    const open = this.store.content.find((c) => c.undoes === id && (c.status === 'pending' || c.status === 'approved'));
+    if (open) return `Undoing it is already asked for: "${open.title}".`;
+    const undo: ContentRecord = {
+      id: newWishId(this.now()),
+      wisher: { id: by.id, name: by.name },
+      regionId: record.regionId,
+      at: this.now(),
+      tier: 'engine',
+      title: `Undo: ${record.title}`.slice(0, 80),
+      summary: `Take out what the wish "${record.title}" added to the game in pull request #${pr.number} (${pr.url}), so the game works as it did before it, keeping everything added since.${record.mod ? ` Its code checks modOn('${record.mod}'); remove those parts.` : ''}`,
+      status: 'pending',
+      favor: 0,
+      undoes: id,
+      conversation: [],
+      usd: 0,
+    };
+    this.store.addContent(undo);
+    this.news.broadcast(undo);
+    return undo;
+  }
+
+  /** Has every bag, body and spellbook catch up with a wish leaving: gone for good, or asleep. */
+  private settleBags(): void {
+    for (const region of this.world.regions.values()) {
+      for (const playerId of region.playerIds()) {
+        const c = region.character(playerId);
+        if (!c) continue;
+        const worn = Object.entries(c.equipment).some(([slot, item]) => item && ITEMS[item]?.slot !== slot);
+        if (worn || c.inventory.some((s) => !ITEMS[s.item]) || c.abilities.some((a) => !ABILITIES[a] && !SLEEPING_ABILITIES.has(a))) {
+          void region.change(playerId, { op: 'forget' });
+        }
+      }
+    }
+  }
+
   // --- Undo, review, art -------------------------------------------------------
 
   /** Undoes a granted wish everywhere (God's View, content log). */
@@ -129,14 +214,7 @@ export class Granting {
     this.rules.stop(id);
     if (record.definition?.kind === 'region') this.world.removeRegion(id);
     this.world.unplace(id);
-    for (const region of this.world.regions.values()) {
-      for (const playerId of region.playerIds()) {
-        const c = region.character(playerId);
-        if (c && (c.inventory.some((s) => !ITEMS[s.item]) || Object.values(c.equipment).some((i) => i && !ITEMS[i]) || c.abilities.includes(id))) {
-          void region.change(playerId, { op: 'forget' });
-        }
-      }
-    }
+    this.settleBags();
     this.news.broadcast(record);
     return record;
   }
@@ -220,7 +298,7 @@ export class Granting {
 
   /** Makes a wish's things exist here and on every region server, before anything is placed. */
   apply(record: ContentRecord): void {
-    applyContent(record);
+    applyContent(publicEntry(record));
     this.world.contentChanged([publicEntry(record)]);
   }
 

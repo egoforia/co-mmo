@@ -1,4 +1,4 @@
-import { BIOMES, type BiomeId, type PlayerInfo, type WishDefinition, type WishTier } from '@co-mmo/shared';
+import { BIOMES, standing, type BiomeId, type PlayerInfo, type WishDefinition, type WishTier } from '@co-mmo/shared';
 import type { ChatModel, ChatResult, ChatTurn } from '../ai/chat.ts';
 import type { AiServices } from '../ai/services.ts';
 import type { Budget } from '../budget.ts';
@@ -113,7 +113,7 @@ export class Prayers {
       nearby,
       edge: this.edgeLine(player.id),
       recentWishes: this.store.content
-        .filter((c) => c.status === 'granted')
+        .filter(standing)
         .slice(-8)
         .reverse()
         .map((c) => `${c.title} (wished by ${c.wisher.name})`),

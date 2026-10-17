@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error The guard is a plain script with no type declarations.
-import { MAX_LINES, checkArt, checkChanges } from '../../../scripts/wish-guard.mjs';
+import { MAX_LINES, checkArt, checkChanges, checkMod } from '../../../scripts/wish-guard.mjs';
 
 const file = (path: string, added = 10, removed = 0) => ({ path, added, removed });
 
@@ -54,5 +54,23 @@ describe('wish guard on art', () => {
       add('packages/server/src/assets/building-art.ts', '<rect width="100%" height="100%"/>'),
     ])).toEqual([]);
     expect(checkArt([add('packages/server/src/assets/wish-art.ts', '  const svg = `<svg><circle r="4"/></svg>`;')])[0]).toMatch(/wish-art\.ts draws art in code/);
+  });
+});
+
+describe('wish guard on switches', () => {
+  const add = (path: string, text: string) => ({ path, text });
+  const files = [file('packages/client/src/lights.ts', 30), file('packages/client/test/lights.test.ts', 40)];
+
+  it('asks new game code to check its own switch', () => {
+    expect(checkMod(files, [add('packages/client/src/lights.ts', 'const glow = 1;')], 59)[0]).toMatch(/modOn\(engineModId\(59\)\)/);
+    expect(checkMod(files, [add('packages/client/src/lights.ts', '  if (!modOn(engineModId(59))) return;')], 59)).toEqual([]);
+    expect(checkMod(files, [add('packages/shared/src/light.ts', "export const LIGHT_MOD = 'wish-59';")], 59)).toEqual([]);
+    // Another wish's switch does not count.
+    expect(checkMod(files, [add('packages/client/src/lights.ts', 'modOn(engineModId(60))')], 59)).toHaveLength(1);
+  });
+
+  it('lets an undo take code out without a switch, and leaves branches that are not wishes alone', () => {
+    expect(checkMod([file('packages/client/src/lights.ts', 2, 30)], [add('packages/client/src/lights.ts', 'x')], 61)).toEqual([]);
+    expect(checkMod(files, [], undefined)).toEqual([]);
   });
 });

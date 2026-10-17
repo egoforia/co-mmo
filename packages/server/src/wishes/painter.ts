@@ -2,6 +2,7 @@ import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   isPictured,
+  standing,
   regionDef,
   regionPictures,
   ruleItemId,
@@ -435,7 +436,7 @@ export class WishPainter {
   paintMissing(): void {
     if (this.budget.state().paused) return;
     for (const record of this.store.content) {
-      if (record.status === 'granted' && record.definition) this.paint(record);
+      if (standing(record) && record.definition) this.paint(record);
     }
   }
 }

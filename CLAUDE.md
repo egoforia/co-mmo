@@ -34,6 +34,11 @@ in-game God. TypeScript end to end: `packages/shared` (code both sides run),
   on its doorway in the south wall and covers its walls; its inside is
   seamless pixel-art tiles matched to the outside. The wish guard refuses
   drawing code.
+- Every wish is a mod a Steward can switch off (`docs/design.md`, Wishes as
+  mods). A wish branch `wish/<issue>` puts what it adds behind
+  `modOn(engineModId(<issue>))` from `@co-mmo/shared`; with it off, the game
+  works exactly as before the wish, and the wish guard checks this. A wish
+  that undoes another takes that wish's code out, its `modOn` checks too.
 - No new dependencies unless the Owner's approval allows core changes.
 - Never read or print secrets (`.env`, API keys), never change
   `.github/`, never push to main or merge.

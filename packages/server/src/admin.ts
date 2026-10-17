@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, WALK_DIRECTIONS, WishError, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
+import { ITEMS, WALK_DIRECTIONS, WishError, engineModId, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
@@ -117,6 +117,7 @@ export async function handleAdmin(
     const records = [...store.content].reverse().map((r) => ({
       ...r,
       progress: wishProgress(r),
+      ...(r.build?.issue ? { mod: engineModId(r.build.issue.number) } : {}),
       usd: owner ? r.usd : undefined,
       // What each picture cost is the Owner's to see, like the wish's total.
       ...(r.artPrompts && !owner ? { artPrompts: Object.fromEntries(Object.entries(r.artPrompts).map(([k, { usd: _u, ...p }]) => [k, p])) } : {}),
@@ -125,15 +126,31 @@ export async function handleAdmin(
     return json(res, 200, { content: records }), true;
   }
 
-  const contentAction = route.match(/^content\/([\w-]+)\/(rollback|review|paint|revise|rule|build)$/);
+  const contentAction = route.match(/^content\/([\w-]+)\/(rollback|review|paint|revise|rule|build|off|on|undo)$/);
   if (contentAction && method === 'POST') {
     const [, id, action] = contentAction;
     const record = store.contentById(id!);
     if (!record) return json(res, 404, { error: 'not_found' }), true;
     if (action === 'rollback') {
-      if (record.build) return json(res, 409, { error: 'code_change', message: 'This wish changed the game\'s code. Undo it by reverting its pull request on GitHub, then update.' }), true;
+      if (record.build) return json(res, 409, { error: 'code_change', message: 'This wish changed the game\'s code. Use Undo on the Mods tab: the coding agent takes the change out and the Owner merges it.' }), true;
       const done = wishes.rollback(id!);
       return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_granted', message: 'Only a granted wish can be rolled back.' }), true;
+    }
+    if (action === 'off' || action === 'on') {
+      const done = wishes.switchOff(id!, action === 'off', account);
+      return json(res, typeof done === 'string' ? 409 : 200, typeof done === 'string' ? { error: 'cannot_switch', message: done } : { ok: true }), true;
+    }
+    if (action === 'undo') {
+      if (!record.build) {
+        const done = wishes.rollback(id!);
+        return json(res, done ? 200 : 409, done ? { ok: true } : { error: 'not_granted', message: 'Only a granted wish can be undone.' }), true;
+      }
+      // A code change comes out the way it came in: a change the coding agent builds and the Owner merges.
+      const undo = wishes.undoCode(id!, account);
+      if (typeof undo === 'string') return json(res, 409, { error: 'cannot_undo', message: undo }), true;
+      if (owner) await builds.queue(undo.id);
+      else wishes.notifyStewards(`${account.name} asks to undo "${record.title}". The Owner can approve it on the Wishes tab.`);
+      return json(res, 200, { ok: true, undo: undo.id, queued: owner }), true;
     }
     if (action === 'review') {
       if (record.tier === 'engine' && ownerOnly()) return true;

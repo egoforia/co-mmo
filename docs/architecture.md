@@ -66,7 +66,13 @@ snapshots and split-region borders send), `split-region.ts`, the
 `region-*`/`remote-region.ts` files for region servers, `parties.ts`,
 `trades.ts`, `character-ops.ts`.
 
-**Wishes.** `wishes.ts` (prayers, granting, wish art), `god.ts` (the God's
+**Wishes.** `wishes.ts` is one face over the parts in `wishes/`:
+`prayers.ts` (talking to the God, its limits and cost), `cards.ts` (wish
+cards and what saying yes does), `granting.ts` (putting wishes into the
+world, review, switching off and on, undo), `drafting.ts` (scripted rule
+drafts), `painter.ts` (wish art) and `news.ts` (telling players and
+Stewards). Every granted wish is a mod: `shared/src/mods.ts` holds the
+switch (`modOn`) that Engine wish code checks. `god.ts` (the God's
 prompts), `workshop.ts` (Wish Workshop), `compiler.ts` + `rules.ts` +
 `rule-test.ts` + `live-rules.ts` (scripted rules in the QuickJS sandbox),
 `builds.ts` (Engine wishes built on GitHub).
@@ -111,5 +117,5 @@ prompt builders; never write style sentences anywhere else.
 
 ## Next splits (not done yet)
 
-`Wishes` into prayers, cards, granting and wish art; `Region` into systems
-(combat, commerce, quests); a renderer interface around Phaser.
+`Region` into systems (combat, commerce, quests); a renderer interface
+around Phaser.

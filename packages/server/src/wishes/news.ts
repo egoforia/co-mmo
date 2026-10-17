@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { wishProgress, type ContentEntry } from '@co-mmo/shared';
+import { engineModId, wishProgress, type ContentEntry } from '@co-mmo/shared';
 import type { ContentRecord, Store } from '../store.ts';
 import type { World } from '../world.ts';
 
@@ -45,7 +45,7 @@ export class WishNews {
 /** A content record without what only God's View sees (the conversation, cost, image prompts, and a rule's script). */
 export function publicEntry(record: ContentRecord): ContentEntry {
   const { conversation: _c, usd: _u, draft: _d, test: _t, rule: _r, build: _b, artPrompts: _p, shaped: _s, ...rest } = record;
-  const entry: ContentEntry = { ...rest, progress: wishProgress(record) };
+  const entry: ContentEntry = { ...rest, progress: wishProgress(record), ...(record.build?.issue ? { mod: engineModId(record.build.issue.number) } : {}) };
   if (entry.definition?.kind === 'rule') {
     const { script: _s, ...definition } = entry.definition;
     return { ...entry, definition };

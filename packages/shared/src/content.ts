@@ -9,6 +9,7 @@ import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
 import { applyLoot, removeLoot } from './loot.ts';
 import { cleanLight, type Light } from './light.ts';
+import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
 import {
   ABILITIES,
   CREATURES,
@@ -215,6 +216,12 @@ export interface ContentEntry {
   progress?: WishProgress;
   /** Made in God's View rather than wished (a creature's loot set there); `wisher` is who made it. */
   godsView?: boolean;
+  /** Switched off by a Steward: out of the world until switched on again. */
+  off?: ModSwitch;
+  /** An Engine wish's mod id, which its code checks with `modOn`. */
+  mod?: string;
+  /** An Engine wish that takes an earlier wish's code change out again: that wish's id. */
+  undoes?: string;
 }
 
 /**
@@ -277,10 +284,13 @@ export interface WishTrack {
   rule?: { paused: boolean; reason?: string };
 }
 
-export function wishProgress(entry: Pick<ContentEntry, 'status' | 'tier' | 'definition'> & WishTrack): WishProgress {
+export function wishProgress(entry: Pick<ContentEntry, 'status' | 'tier' | 'definition' | 'off'> & WishTrack): WishProgress {
   const { status, draft, test, rule, build } = entry;
   if (status === 'rejected') return { state: 'closed', label: 'Not approved' };
   if (status === 'rolled-back') return { state: 'closed', label: 'Undone' };
+  if (status === 'granted' && entry.off) {
+    return { state: 'closed', label: 'Switched off', detail: `Switched off by ${entry.off.by}. A Steward can switch it on again in God's View.` };
+  }
   if (build) {
     const built = buildProgress(status, build);
     if (built) return built;
@@ -736,9 +746,11 @@ export function wisherOf(id: string): string | undefined {
  * server's rules and the client's screens treat it like built-in content.
  */
 export function applyContent(entry: ContentEntry): void {
+  if (entry.mod) switchMod(entry.mod, !entry.off);
   const d = entry.definition;
   if (!d) return;
   if (entry.status !== 'granted') return removeContent(entry);
+  if (entry.off) return sleepContent(entry);
   if (d.kind === 'player') return;
   WISHERS.set(entry.id, entry.wisher.id);
   if (d.kind === 'rule') {
@@ -765,7 +777,30 @@ export function applyContent(entry: ContentEntry): void {
   }
 }
 
+/**
+ * A switched-off wish: its things leave the world, but what players hold
+ * stays in their bags as a sleeping copy (no use, no gear bonus, no trade)
+ * and its abilities stay in spellbooks unused, until it is switched on.
+ */
+function sleepContent(entry: ContentEntry): void {
+  removeContent(entry);
+  const d = entry.definition;
+  if (d?.kind === 'item') ITEMS[entry.id] = asleep(itemFromWish(entry.id, d));
+  else if (d?.kind === 'ability') {
+    ITEMS[entry.id] = asleep(scrollFromWish(entry.id, d));
+    SLEEPING_ABILITIES.add(entry.id);
+  } else if (d?.kind === 'rule') {
+    for (const [key, item] of Object.entries(d.items)) ITEMS[ruleItemId(entry.id, key)] = asleep(itemFromWish(ruleItemId(entry.id, key), item));
+  }
+}
+
+/** A thing whose wish is switched off: it keeps its look and name and does nothing. */
+function asleep(def: ItemDef): ItemDef {
+  return { name: def.name, kind: 'material', art: def.art, bound: true, description: `${def.description} It sleeps for now: the wish that made it is switched off.` };
+}
+
 export function removeContent(entry: ContentEntry): void {
+  SLEEPING_ABILITIES.delete(entry.id);
   if (entry.definition?.kind === 'rule') {
     for (const key of Object.keys(entry.definition.items)) {
       delete ITEMS[ruleItemId(entry.id, key)];

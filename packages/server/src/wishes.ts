@@ -163,6 +163,16 @@ export class Wishes {
     return this.granting.rollback(id);
   }
 
+  /** Switches a granted wish off or back on; returns the record, or why not. */
+  switchOff(id: string, off: boolean, by: { id: string; name: string }): ContentRecord | string {
+    return this.granting.switchOff(id, off, by);
+  }
+
+  /** Asks for a live code change to be taken out again, as a new Engine wish; returns it, or why not. */
+  undoCode(id: string, by: { id: string; name: string }): ContentRecord | string {
+    return this.granting.undoCode(id, by);
+  }
+
   /** A Steward or the Owner decided a major or engine wish. */
   review(id: string, approve: boolean): Promise<{ record: ContentRecord } | { error: string; message: string }> {
     return this.granting.review(id, approve);

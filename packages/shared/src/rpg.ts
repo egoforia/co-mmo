@@ -3,6 +3,7 @@
 // as data in the same shapes.
 
 import type { Light } from './light.ts';
+import { SLEEPING_ABILITIES } from './mods.ts';
 
 export interface Stats {
   /** Melee damage and health. */
@@ -118,14 +119,17 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   return c;
 }
 
-/** Things and abilities a rolled-back wish made are gone from every bag, body and spellbook. */
+/** Things and abilities a rolled-back wish made are gone from every bag, body and spellbook; a switched-off wish's sleep. */
 export function forgetVanished(c: Character): void {
   c.inventory = c.inventory.filter((s) => ITEMS[s.item]);
   for (const slot of EQUIP_SLOTS) {
     const worn = c.equipment[slot];
-    if (worn && ITEMS[worn]?.slot !== slot) delete c.equipment[slot];
+    if (!worn || ITEMS[worn]?.slot === slot) continue;
+    delete c.equipment[slot];
+    // Gear whose wish was switched off still exists, asleep: it goes back in the bag.
+    if (ITEMS[worn]) addItem(c, worn);
   }
-  c.abilities = c.abilities.filter((a) => ABILITIES[a]);
+  c.abilities = c.abilities.filter((a) => ABILITIES[a] || SLEEPING_ABILITIES.has(a));
 }
 
 /** Stats with what the character wears added. */

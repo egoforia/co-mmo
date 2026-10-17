@@ -37,6 +37,7 @@ import {
   type SnapshotMessage,
   type WalkDirection,
   type WelcomeMessage,
+  type Weather,
   walkArt,
   walkStandArt,
   walkDirection,
@@ -47,6 +48,7 @@ import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBu
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
 import { makeLight, placeLight, type LitPoint } from './lights.ts';
+import { SkyClock } from './sky.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Sprite;
@@ -148,6 +150,8 @@ export class WorldScene extends Phaser.Scene {
   /** Rendered position eases toward the predicted one to hide corrections. */
   private shown = { x: 0, y: 0 };
   private tint?: Phaser.GameObjects.Rectangle;
+  /** The hour and the weather, which grade the light and brighten lights at night. */
+  private readonly sky = new SkyClock();
   /** Which way we face: 1 right, -1 left. */
   private facing = 1;
   /**
@@ -265,8 +269,8 @@ export class WorldScene extends Phaser.Scene {
         for (const a of group.values()) destroyAvatar(a);
         group.clear();
       }
-      this.easeLight(lightTint(welcome.region.def.biome));
     }
+    this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
     if (far) {
       // A fall carries us back to the shrine: arrive there, not slide across the world.
       this.cameras.main.centerOn(this.me.body.x, this.me.body.y).fadeIn(250, 24, 20, 37);
@@ -308,8 +312,9 @@ export class WorldScene extends Phaser.Scene {
     cam.startFollow(this.me.body, true, 0.2, 0.2);
     cam.fadeIn(250, 24, 20, 37);
 
-    // The biome's light grades everything under the labels.
-    this.tint = this.add.rectangle(0, 0, 10, 10, lightTint(welcome.region.def.biome)).setOrigin(0.5).setScrollFactor(0);
+    // The biome's light, the hour and the weather grade everything under the labels.
+    this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
+    this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
     this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
@@ -350,20 +355,14 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setBounds(view.x, view.y, view.width, view.height);
   }
 
-  /** Eases the biome's light from what it is to `to`, so no edge switches it at once. */
-  private easeLight(to: number): void {
-    const tint = this.tint;
-    if (!tint || tint.fillColor === to) return;
-    const a = Phaser.Display.Color.ValueToColor(tint.fillColor);
-    const b = Phaser.Display.Color.ValueToColor(to);
-    this.tweens.killTweensOf(tint);
-    this.tweens.addCounter({
-      from: 0, to: 100, duration: 1200,
-      onUpdate: (tween) => {
-        const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, tween.getValue() ?? 100);
-        tint.setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
-      },
-    });
+  /** The weather over our land turned. */
+  setWeather(weather: Weather): void {
+    this.sky.setWeather(weather);
+  }
+
+  /** The hour and the weather in a few words. */
+  skyText(): string {
+    return this.sky.words();
   }
 
   onSnapshot(snapshot: SnapshotMessage): void {
@@ -378,7 +377,9 @@ export class WorldScene extends Phaser.Scene {
       this.setHeld(remote, p.offHeld, 'left');
     }
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
+    for (const c of snapshot.creatures ?? []) this.creatures.get(c.id)?.label.setText(creatureLabel(c));
     this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
+    for (const n of snapshot.npcs ?? []) this.npcs.get(n.id)?.label.setText(n.asleep ? `${n.name} (asleep)` : n.name);
     const bodies = snapshot.bodies ?? [];
     this.sync(this.bodies, bodies, now, (b) => this.makeBody(b));
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
@@ -387,6 +388,7 @@ export class WorldScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const predictor = this.predictor;
     if (!predictor) return;
+    this.tint?.setFillStyle(this.sky.tint(deltaMs));
     // Fixed-rate input: one input per server tick, however fast we render.
     this.accumulator += Math.min(deltaMs, 250) / 1000;
     while (this.accumulator >= TICK_SECONDS) {
@@ -618,7 +620,7 @@ export class WorldScene extends Phaser.Scene {
     const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
     // The flame lights the ground it flies over.
     const lit = makeLight(this, BOLT_LIGHT, LABEL_DEPTH - 0.5);
-    const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2);
+    const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2, this.sky.darkness());
     follow();
     this.tweens.add({
       targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
@@ -924,7 +926,7 @@ export class WorldScene extends Phaser.Scene {
       // The light shines from the hand, or from the holder's middle until the hand is found.
       const [hx, hy] = hand ?? [b.originX, b.originY - 0.5];
       const lx = b.x + (b.flipX ? b.originX - hx : hx - b.originX) * b.displayWidth;
-      placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, this.time.now, b.visible);
+      placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, this.time.now, b.visible, this.sky.darkness());
     }
     if (!key || !hand || !grip || !this.textures.exists(key)) {
       held.image?.setVisible(false);
@@ -975,6 +977,11 @@ export class WorldScene extends Phaser.Scene {
 /** True when tile (x, y) lies within a building's walls. */
 function within(b: Building, x: number, y: number): boolean {
   return x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height;
+}
+
+/** A creature's name tag says when it is asleep or running away. */
+function creatureLabel(c: CreatureState): string {
+  return c.mood === 'asleep' ? `${c.name} (asleep)` : c.mood === 'fleeing' ? `${c.name} (running away)` : c.name;
 }
 
 /** A body's name tag says when there is something on it for us. */

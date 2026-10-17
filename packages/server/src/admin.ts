@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, WALK_DIRECTIONS, WishError, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
+import { ITEMS, WALK_DIRECTIONS, WishError, skyWords, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
@@ -91,6 +91,7 @@ export async function handleAdmin(
       biome: r.def.biome,
       at: r.def.at,
       ...(r.def.wild ? { wisher: r.def.wild.wisher, danger: r.def.wild.danger } : {}),
+      sky: (({ phase, weather }) => skyWords(phase, weather))(world.skyOver(r.def)),
       width: r.map.width,
       height: r.map.height,
       players: r.playerIds().map((id) => ({ id, name: r.nameOf(id), ...r.position(id), level: r.character(id)?.level })),

@@ -12,6 +12,8 @@ interface Region {
   /** Wished regions: who wished it, and how dangerous it is. */
   wisher?: string;
   danger?: number;
+  /** The hour and the weather there now. */
+  sky?: string;
   width: number;
   height: number;
   players: { id: string; name: string; x: number; y: number; level?: number }[];
@@ -39,7 +41,7 @@ async function world(): Promise<string> {
     const alive = r.creatures.filter((c) => c.alive).length;
     const credit = r.wisher ? `<br><small>wished by ${escapeHtml(r.wisher)} · danger ${r.danger}</small>` : '';
     return `<figure class="region ${r.id} ${escapeHtml(r.biome)}"><canvas data-region="${r.id}" width="${r.width * 4}" height="${r.height * 4}"></canvas>
-      <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures${credit}</figcaption></figure>`;
+      <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures${r.sky ? ` · ${escapeHtml(r.sky)}` : ''}${credit}</figcaption></figure>`;
   };
   const grid: string[] = [];
   for (let y = top; y < top + rows; y++) for (let x = left; x < left + columns; x++) grid.push(cell(x, y));

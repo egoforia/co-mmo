@@ -462,11 +462,14 @@ function edgePoint(side: Side, size: number, c: number): { x: number; y: number 
 }
 
 function creatures(map: RegionMap, kind: string, name: string, asset: string, count: number): void {
+  // Only where players can walk to from the middle: a creature born in a
+  // pocket ringed by trees could never be reached or fought.
+  const open = openFromMiddle(map);
   let placed = 0;
   for (let i = 0; placed < count && i < 500; i++) {
     const x = 4 + Math.floor(rand2(i, 7, map.seed) * (map.width - 8));
     const y = 4 + Math.floor(rand2(i, 9, map.seed) * (map.height - 8));
-    if (map.tiles[y * map.width + x] !== Tile.Ground) continue;
+    if (map.tiles[y * map.width + x] !== Tile.Ground || !open[y * map.width + x]) continue;
     if (Math.hypot(x - map.width / 2, y - map.height / 2) < 8) continue;
     map.creatures.push({ kind, name, asset, x: x + 0.5, y: y + 0.5 });
     placed++;
@@ -496,4 +499,26 @@ export function outsideSide(map: RegionMap, x: number, y: number): Side | null {
   if (y < 0) return 'north';
   if (y >= map.height) return 'south';
   return null;
+}
+
+/** Tiles a player can walk to from the middle of the region, stepping square by square. */
+function openFromMiddle(map: RegionMap): Uint8Array {
+  const w = map.width;
+  const open = new Uint8Array(w * map.height);
+  const start = Math.floor(map.height / 2) * w + Math.floor(w / 2);
+  const queue = [start];
+  open[start] = 1;
+  for (let head = 0; head < queue.length; head++) {
+    const at = queue[head]!;
+    const x = at % w;
+    const y = (at - x) / w;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
+      if (nx < 0 || ny < 0 || nx >= w || ny >= map.height) continue;
+      const next = ny * w + nx;
+      if (open[next] || isBlocking(map.tiles[next] as Tile)) continue;
+      open[next] = 1;
+      queue.push(next);
+    }
+  }
+  return open;
 }

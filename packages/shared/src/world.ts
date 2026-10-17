@@ -238,9 +238,111 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
   }
   // NPCs stroll around their spot, so only landmarks block tiles.
   for (const l of map.landmarks) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
-  // A creature scattered before a great place was built may now stand in its walls.
-  map.creatures = map.creatures.filter((s) => !isBlocking(tileAt(map, s.x, s.y)));
+  openUp(map);
+  settle(map);
   return map;
+}
+
+/** Open ground cut off from the middle by trees or rocks is joined to it by a trail when it is at least this many tiles. */
+const GLADE_TILES = 12;
+
+/**
+ * Cuts trails through trees and rocks so every glade worth the walk can be
+ * reached from the middle: a big land is for exploring, and dense woods
+ * would otherwise shut most of it away. Each glade gets the trail that
+ * fells the fewest trees. Water, walls and landmarks are never cut.
+ */
+function openUp(map: RegionMap): void {
+  const { width, height, tiles } = map;
+  const n = width * height;
+  const cuttable = (t: Tile) => t === Tile.Tree || t === Tile.Rock;
+  // Trees felled to reach each tile from the middle, and the step it came from (0-1 search).
+  const cost = new Int32Array(n).fill(-1);
+  const from = new Int32Array(n).fill(-1);
+  const start = Math.floor(map.spawn.y) * width + Math.floor(map.spawn.x);
+  const deque = new Int32Array(n * 2);
+  let head = n;
+  let tail = n;
+  const best = new Int32Array(n).fill(0x7fffffff);
+  best[start] = 0;
+  deque[tail++] = start;
+  while (head < tail) {
+    const i = deque[head++]!;
+    if (cost[i]! >= 0) continue;
+    cost[i] = best[i]!;
+    const x = i % width;
+    const y = (i - x) / width;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      const j = ny * width + nx;
+      const t = tiles[j] as Tile;
+      if (cost[j]! >= 0 || (isBlocking(t) && !cuttable(t))) continue;
+      const step = cuttable(t) ? 1 : 0;
+      if (best[i]! + step >= best[j]!) continue;
+      best[j] = best[i]! + step;
+      from[j] = i;
+      if (step) deque[tail++] = j;
+      else deque[--head] = j;
+    }
+  }
+  // Each open glade not yet reached: fell the trees along its cheapest trail.
+  const done = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (done[i] || isBlocking(tiles[i] as Tile) || cost[i]! <= 0) continue;
+    const glade = gladeAt(map, i, done);
+    if (glade.length < GLADE_TILES) continue;
+    let cheapest = glade[0]!;
+    for (const g of glade) if (cost[g]! >= 0 && (cost[cheapest]! < 0 || cost[g]! < cost[cheapest]!)) cheapest = g;
+    for (let j = cheapest; j >= 0 && cost[j]! > 0; j = from[j]!) if (cuttable(tiles[j] as Tile)) tiles[j] = Tile.Ground;
+  }
+}
+
+/** The open tiles joined to tile i without crossing anything blocking, marked done. */
+function gladeAt(map: RegionMap, i: number, done: Uint8Array): number[] {
+  const out: number[] = [];
+  const stack = [i];
+  done[i] = 1;
+  while (stack.length) {
+    const k = stack.pop()!;
+    out.push(k);
+    const x = k % map.width;
+    const y = (k - x) / map.width;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+      const j = ny * map.width + nx;
+      if (done[j] || isBlocking(map.tiles[j] as Tile)) continue;
+      done[j] = 1;
+      stack.push(j);
+    }
+  }
+  return out;
+}
+
+/**
+ * Moves each creature shut away where no one could reach it (in walls built
+ * after it was placed, or a pocket among the trees) to open ground that can
+ * be walked to, and lets go of any with nowhere to go.
+ */
+function settle(map: RegionMap): void {
+  const reached = new Uint8Array(map.width * map.height);
+  const start = Math.floor(map.spawn.y) * map.width + Math.floor(map.spawn.x);
+  for (const k of gladeAt(map, start, reached)) reached[k] = 1;
+  const free = (x: number, y: number) => reached[Math.floor(y) * map.width + Math.floor(x)] === 1 && map.tiles[Math.floor(y) * map.width + Math.floor(x)] === Tile.Ground;
+  map.creatures = map.creatures.flatMap((c, n) => {
+    if (reached[Math.floor(c.y) * map.width + Math.floor(c.x)] && !isBlocking(tileAt(map, c.x, c.y))) return [c];
+    for (let i = 0; i < 400; i++) {
+      // Somewhere near where it was meant to be, farther afield the longer it looks.
+      const r = 4 + i / 4;
+      const x = Math.floor(c.x + (rand2(i, n, map.seed + 11) - 0.5) * 2 * r);
+      const y = Math.floor(c.y + (rand2(i, n, map.seed + 13) - 0.5) * 2 * r);
+      if (x >= 1 && y >= 1 && x < map.width - 1 && y < map.height - 1 && free(x, y)) return [{ ...c, x: x + 0.5, y: y + 0.5 }];
+    }
+    return [];
+  });
 }
 
 type Layout = (map: RegionMap, c: number) => void;

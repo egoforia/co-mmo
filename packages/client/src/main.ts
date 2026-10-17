@@ -168,12 +168,15 @@ function play(token: string): void {
         if (scene) scene.enterRegion(message);
         else void Promise.all([art, artPoints]).then(([manifest, found]) => start(message, manifest, found));
         break;
+      case 'sky':
+        scene?.setWeather(message.weather);
+        break;
       case 'snapshot':
         scene?.onSnapshot(message);
         rpg?.setVitals(message.hp, message.energy);
         kit?.setEnergy(message.energy);
         scene?.setWeakened(rpg?.weakened ?? false);
-        setHud(name, message.online, region);
+        setHud(name, message.online, region, scene?.skyText());
         break;
       case 'chat':
         if (message.channel === 'whisper' && message.from.id !== myId) sound.play('notify');

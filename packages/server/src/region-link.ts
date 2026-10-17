@@ -1,4 +1,4 @@
-import type { Character, ClientMessage, NpcPlacement, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage } from '@co-mmo/shared';
+import type { Character, ClientMessage, SkyConfig, NpcPlacement, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage } from '@co-mmo/shared';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { Carry, Cell, Connection, Departure, Ghosts, Leaving } from './region.ts';
 import type { Tile } from '@co-mmo/shared';
@@ -102,6 +102,8 @@ export interface WorldState {
   online: number;
   /** Party members by player, for shared XP. */
   parties: Record<string, string[]>;
+  /** How the sky turns, so every server's regions keep the same hours and weather. */
+  sky?: SkyConfig;
 }
 
 /** How busy a region server is, sent every couple of seconds. */

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, PIXEL_ART_SCALE, TILE_PIXELS, WORLD_REGIONS, buildingArtIds, generateRegion, type ArtManifest } from '@co-mmo/shared';
+import { BUILDING_STYLES, LAND_ITEMS, PIXEL_ART_SCALE, TILE_PIXELS, WORLD_REGIONS, buildingArtIds, generateRegion, type ArtManifest } from '@co-mmo/shared';
 import { buildingArtJobs, processBuildingArt } from '../src/assets/building-art.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import { BuildingPainter } from '../src/building-painter.ts';
@@ -127,5 +127,17 @@ describe('the shipped art', () => {
       for (const l of map.landmarks) expect(l.asset in manifest || painted.has(l.asset)).toBe(true);
     }
     expect(manifest).toHaveProperty(['fx-slash']);
+  });
+
+  it('has a picture for everyone and everything in the great places, and for the bridges', async () => {
+    const manifest = JSON.parse(await readFile(new URL('../../client/public/art/manifest.json', import.meta.url), 'utf8')) as ArtManifest;
+    const missing = new Set<string>();
+    for (const def of WORLD_REGIONS) {
+      const map = generateRegion(def);
+      for (const thing of [...map.creatures, ...map.npcs]) if (!(thing.asset in manifest)) missing.add(thing.asset);
+    }
+    for (const item of Object.values(LAND_ITEMS)) if (!(item.art in manifest)) missing.add(item.art);
+    if (!('bridge-planks' in manifest)) missing.add('bridge-planks');
+    expect([...missing]).toEqual([]);
   });
 });

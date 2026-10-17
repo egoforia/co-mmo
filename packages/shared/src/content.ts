@@ -12,6 +12,8 @@ import { cleanLight, type Light } from './light.ts';
 import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
 import {
   ABILITIES,
+  BEHAVIORS,
+  BEHAVIOR_NOTICE,
   CREATURES,
   EQUIP_SLOTS,
   ITEMS,
@@ -84,6 +86,8 @@ export interface CreatureWish {
   name: string;
   description: string;
   behavior: Behavior;
+  /** Up only by day or only by night, asleep the rest; about at all hours when missing. */
+  active?: 'day' | 'night';
   level: number;
   /** How many appear around the wisher. */
   count: number;
@@ -505,7 +509,8 @@ export function validateDefinition(raw: unknown): WishDefinition {
     return { kind: 'ability', name, description, effect, look };
   }
   if (d.kind === 'creature') {
-    const behavior: Behavior = d.behavior === 'guard' || d.behavior === 'chase' ? d.behavior : 'wander';
+    const behavior: Behavior = BEHAVIORS.find((b) => b === d.behavior) ?? 'wander';
+    const active = d.active === 'day' || d.active === 'night' ? d.active : undefined;
     const drops = Array.isArray(d.drops)
       ? d.drops.filter((i): i is string => typeof i === 'string' && !!ITEMS[i] && !ITEMS[i]!.bound).slice(0, 3)
       : [];
@@ -514,6 +519,7 @@ export function validateDefinition(raw: unknown): WishDefinition {
       name,
       description,
       behavior,
+      ...(active ? { active } : {}),
       level: clamp(Math.round(Number(d.level) || 1), 1, MAX_WISHED_LEVEL),
       count: clamp(Math.round(Number(d.count) || 3), 1, MAX_WISHED_COUNT),
       drops,
@@ -674,12 +680,14 @@ export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
     art: wishArtKey(id),
     description: w.description,
     behavior: w.behavior,
+    ...(w.active ? { active: w.active } : {}),
     level: l,
     hp: 14 + l * 8,
     damage: Math.round(2 + l * 1.5),
     cooldown: 1.3,
-    speed: w.behavior === 'chase' ? 2.8 : 2.2,
-    notice: w.behavior === 'chase' ? 4 : w.behavior === 'guard' ? 2.5 : 0,
+    // Hunters are quicker, and the timid quickest of all at running away.
+    speed: w.behavior === 'chase' || w.behavior === 'pack' ? 2.8 : w.behavior === 'timid' ? 3 : 2.2,
+    notice: BEHAVIOR_NOTICE[w.behavior] ?? 0,
     xp: 5 + l * 4,
     gold: [0, l * 2],
     drops: (w.drops ?? []).map((item) => ({ item, chance: 0.25 })),

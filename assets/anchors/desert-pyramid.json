@@ -1,0 +1,37 @@
+{
+  "id": "desert-pyramid",
+  "description": {
+    "id": "desert-pyramid",
+    "name": "Pyramid of the Sun King",
+    "kind": "set-piece",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-ruin"
+    ],
+    "silhouetteHook": "a great stepped sandstone pyramid with a golden capstone and a dark doorway at its foot",
+    "body": "wide stepped pyramid, much wider than tall",
+    "materials": [
+      "sandstone",
+      "gold"
+    ],
+    "colors": {
+      "main": "warm sandstone",
+      "secondary": "dusty ochre",
+      "accent": "shining gold capstone"
+    },
+    "details": [
+      "stone lion statues by the door",
+      "sand drifted up the sides"
+    ],
+    "mood": "majestic, ancient"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Pyramid of the Sun King (set-piece). Most recognisable feature: a great stepped sandstone pyramid with a golden capstone and a dark doorway at its foot. Body and shape: wide stepped pyramid, much wider than tall. Materials: sandstone, gold. Colours: main warm sandstone, secondary dusty ochre, small accent of shining gold capstone. Details: stone lion statues by the door; sand drifted up the sides. Mood: majestic, ancient.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-ruin"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:22:29.686Z"
+}

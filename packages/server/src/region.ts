@@ -12,7 +12,6 @@ import {
   outsideSide,
   regenPerSecond,
   step,
-  tileAt,
   Tile,
   type BodyState,
   type Character,
@@ -30,17 +29,29 @@ import {
   type RegionMap,
   type ServerMessage,
   type Side,
+  type SkyConfig,
+  type Weather,
+  DEFAULT_SKY,
+  WEATHER_NEWS,
+  dayPhase,
+  weatherAt,
+  skyWords,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
 import { bodyView, creatureView, npcView, playerView } from './region-views.ts';
+import { giveUp, makeCreature, mood, type Creature } from './creature-brain.ts';
+import { makeTownsperson } from './townsfolk.ts';
+import { findSpots } from './walkers.ts';
 import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
 import { Combat } from './region/combat.ts';
 import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
-import { RegionState, type Creature, type PlayerState, type Townsperson } from './region/state.ts';
+import { RegionState, type PlayerState } from './region/state.ts';
+
+export { findSpots, nearestTile } from './walkers.ts';
 
 /** Inputs a player may queue; extra inputs are dropped (anti speed-hack). */
 const MAX_QUEUED_INPUTS = 10;
@@ -91,6 +102,8 @@ export interface RegionHooks {
   neighbours?(): RegionDef[];
   /** Delivers a Region-channel line to every cell of a region that was split (see Cell). */
   regionChat?(message: ServerMessage): void;
+  /** How the sky turns (the same on every server); the usual day and weather when missing. */
+  sky?(): SkyConfig;
 }
 
 /**
@@ -121,7 +134,7 @@ export interface Ghosts {
 const CELL_MARGIN = 1;
 
 /** Tile kinds scripted rules can ask about, by name. */
-export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, floor: Tile.Floor, wall: Tile.Wall, door: Tile.Door };
+export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, floor: Tile.Floor, wall: Tile.Wall, door: Tile.Door, bridge: Tile.Bridge };
 
 export type Departure =
   | { id: string; side: Side; died?: undefined; cell?: undefined }
@@ -169,6 +182,8 @@ export class Region {
   private readonly quests: Quests;
   private readonly looting: Bodies;
   private readonly talk: Chat;
+  /** The weather over this land as players last heard it. */
+  private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
   private readonly ghosts = new Map<number, Ghosts>();
   /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
@@ -190,13 +205,13 @@ export class Region {
     this.map = generateRegion(def);
     this.s = new RegionState(this.map, this.hooks, this.now, this.random);
     this.looting = new Bodies(this.s);
-    this.quests = new Quests(this.s, this.looting);
+    this.quests = new Quests(this.s, this.looting, () => this.sky().phase);
     this.combat = new Combat(this.s, this.quests);
     this.minds = new Minds(this.s);
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y) : []));
-    this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => this.makeStroller(n));
+    this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
       character: (id) => this.s.players.get(id)?.character,
       nameOf: (id) => this.s.players.get(id)?.info.name,
@@ -225,29 +240,20 @@ export class Region {
     return !this.cell || (x >= this.cell.x0 && x < this.cell.x1);
   }
 
-  /** Lets an NPC stroll about where they were placed. */
-  private makeStroller(npc: NpcPlacement): Townsperson {
-    return Object.assign(npc, { home: { x: npc.x, y: npc.y }, target: null, rest: Math.floor(this.random() * TICK_RATE * 3) });
-  }
-
   private makeCreature(id: string, kind: string, x: number, y: number): Creature[] {
     const cdef = CREATURES[kind];
-    if (!cdef) return [];
-    return [{
-      id,
-      kind,
-      def: cdef,
-      x,
-      y,
-      home: { x, y },
-      hp: cdef.hp,
-      target: null,
-      rest: Math.floor(this.random() * TICK_RATE * 3),
-      aggro: null,
-      returning: false,
-      lastAttack: 0,
-      respawnAt: null,
-    }];
+    return cdef ? [makeCreature(id, kind, cdef, x, y, this.random)] : [];
+  }
+
+  /** How the sky turns over this land. */
+  get skyConfig(): SkyConfig {
+    return this.hooks.sky?.() ?? DEFAULT_SKY;
+  }
+
+  /** Where the day is and the weather here now. */
+  sky(now = this.now()): { phase: number; weather: Weather } {
+    const config = this.skyConfig;
+    return { phase: dayPhase(now, config), weather: weatherAt(this.def.id, this.def.biome, now, config) };
   }
 
   // --- Wished content ----------------------------------------------------------
@@ -260,7 +266,7 @@ export class Region {
   /** Places a wished NPC, who strolls about that spot. */
   addNpc(npc: NpcPlacement): void {
     this.s.townsfolk = this.s.townsfolk.filter((n) => n.id !== npc.id);
-    this.s.townsfolk.push(this.makeStroller({ ...npc }));
+    this.s.townsfolk.push(makeTownsperson({ ...npc }, this.map, this.random));
   }
 
   /** Takes away everything a wish placed here. */
@@ -285,10 +291,12 @@ export class Region {
     const lines: string[] = [];
     const near = (x: number, y: number, r: number) => Math.hypot(x - p.x, y - p.y) <= r;
     for (const other of this.s.players.values()) if (other !== p && near(other.x, other.y, 10)) lines.push(`${other.info.name} (player)`);
-    for (const n of this.s.townsfolk) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC)`);
+    for (const n of this.s.townsfolk) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
     const kinds = new Map<string, number>();
     for (const c of this.s.creatures) if (c.respawnAt === null && near(c.x, c.y, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
     for (const [name, n] of kinds) lines.push(`${n} ${name}${n > 1 ? 's' : ''}`);
+    const { phase, weather } = this.sky();
+    lines.push(`The sky: ${skyWords(phase, weather)}`);
     return lines;
   }
 
@@ -372,7 +380,9 @@ export class Region {
   }
 
   private welcome(p: PlayerState): void {
-    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character });
+    const now = this.now();
+    const sky = { config: this.skyConfig, now, weather: this.sky(now).weather };
+    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character, sky });
   }
 
   get online(): number {
@@ -411,14 +421,20 @@ export class Region {
   }
 
   /** Where an NPC stands now, for tests and tools. */
-  npc(id: string): { x: number; y: number; home: { x: number; y: number } } | undefined {
+  npc(id: string): { x: number; y: number; home: { x: number; y: number }; asleep: boolean } | undefined {
     const n = this.s.townsfolk.find((t) => t.id === id);
-    return n && { x: n.x, y: n.y, home: { ...n.home } };
+    return n && { x: n.x, y: n.y, home: { ...n.home }, asleep: n.asleep };
   }
 
   creature(id: string): { kind: string; x: number; y: number; hp: number; alive: boolean } | undefined {
     const c = this.s.creatures.find((k) => k.id === id);
     return c && { kind: c.kind, x: c.x, y: c.y, hp: c.hp, alive: c.respawnAt === null };
+  }
+
+  /** What a creature is up to, for tests and tools. */
+  creatureMood(id: string): { mood?: string; aggro: string | null } | undefined {
+    const c = this.s.creatures.find((k) => k.id === id);
+    return c && { mood: mood(c), aggro: c.aggro };
   }
 
   /** Moves a player, for tests and tools. */
@@ -430,7 +446,7 @@ export class Region {
   /** Moves a creature, for tests and (later) wishes. */
   placeCreature(id: string, x: number, y: number): void {
     const c = this.s.creatures.find((k) => k.id === id);
-    if (c) Object.assign(c, { x, y, home: { x, y }, target: null });
+    if (c) Object.assign(c, { x, y, home: { x, y }, target: null, route: undefined });
   }
 
   /**
@@ -468,7 +484,7 @@ export class Region {
     if (!p) return undefined;
     this.trades.leave(id);
     this.s.players.delete(id);
-    for (const c of this.s.creatures) if (c.aggro === id) this.minds.giveUp(c);
+    for (const c of this.s.creatures) if (c.aggro === id || c.fleeing === id) giveUp(c);
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
     const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
@@ -555,11 +571,13 @@ export class Region {
         p.character.energy = Math.min(maxE, p.character.energy + energyPerSecond(p.character) * TICK_SECONDS);
       }
     }
-    for (const c of this.s.creatures) this.minds.think(c, now);
+    const { phase, weather } = this.sky(now);
+    this.weatherTurns(weather);
+    this.minds.think(now, phase, weather);
     this.s.bodies = this.s.bodies.filter((b) => now < b.until);
     // A loot window closes when its body fades or its looter walks away.
     for (const p of this.s.players.values()) if (p.looting && !this.looting.lootable(p, p.looting)) this.looting.closeLoot(p);
-    for (const n of this.s.townsfolk) this.minds.stroll(n);
+    this.minds.live(phase);
     for (const p of this.s.players.values()) {
       if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id && d.cell === undefined)) {
         const i = departures.findIndex((d) => d.id === p.info.id);
@@ -585,7 +603,7 @@ export class Region {
       const creatures: CreatureState[] = [];
       for (const c of this.s.creatures) {
         if (c.respawnAt !== null || !near(c.x, c.y)) continue;
-        creatures.push(creatureView(c));
+        creatures.push(creatureView(c, mood(c)));
       }
       const bodies: BodyState[] = [];
       for (const b of this.s.bodies) {
@@ -623,7 +641,7 @@ export class Region {
       g.players.push(playerView(p));
     }
     for (const c of this.s.creatures) {
-      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c));
+      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c, mood(c)));
     }
     // Bodies are searched in their own cell; across the border they are only seen.
     for (const b of this.s.bodies) if (seen(b.x)) g.bodies.push(bodyView(b, false));
@@ -636,43 +654,13 @@ export class Region {
     this.ghosts.set(from, ghosts);
   }
 
-}
-
-/**
- * Up to `count` walkable spots around a point, nearest first, at least a
- * tile apart, for placing wished things.
- */
-export function findSpots(map: RegionMap, x: number, y: number, count: number, min = 1.5, max = 4): { x: number; y: number }[] {
-  const spots: { x: number; y: number }[] = [];
-  for (let r = min; r <= max && spots.length < count; r += 0.75) {
-    for (let a = 0; a < 12 && spots.length < count; a++) {
-      const angle = (a / 12) * Math.PI * 2 + r;
-      const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
-      if (outsideSide(map, s.x, s.y) || collides(map, s.x, s.y)) continue;
-      if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
-      spots.push(s);
-    }
+  /** Tells everyone here when the weather turns (not when it is first worked out). */
+  private weatherTurns(weather: Weather): void {
+    const was = this.weather;
+    this.weather = weather;
+    if (!was || was === weather) return;
+    this.broadcast({ t: 'sky', weather });
+    for (const p of this.s.players.values()) this.s.notice(p, WEATHER_NEWS[weather]);
   }
-  return spots;
-}
 
-/** The nearest tile of these kinds within a radius of a point (tile coordinates). */
-export function nearestTile(map: RegionMap, x: number, y: number, kinds: Tile[], radius: number): { tile: Tile; x: number; y: number } | undefined {
-  let best: { tile: Tile; x: number; y: number } | undefined;
-  let bestD = Infinity;
-  const r = Math.ceil(radius);
-  for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
-    for (let tx = Math.floor(x) - r; tx <= Math.floor(x) + r; tx++) {
-      if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) continue;
-      const tile = tileAt(map, tx, ty);
-      if (!kinds.includes(tile)) continue;
-      // Distance from the player to the closest point of the tile.
-      const d = Math.hypot(Math.max(tx - x, 0, x - (tx + 1)), Math.max(ty - y, 0, y - (ty + 1)));
-      if (d <= radius && d < bestD) {
-        bestD = d;
-        best = { tile, x: tx, y: ty };
-      }
-    }
-  }
-  return best;
 }

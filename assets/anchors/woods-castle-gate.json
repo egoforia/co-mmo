@@ -1,0 +1,38 @@
+{
+  "id": "woods-castle-gate",
+  "description": {
+    "id": "woods-castle-gate",
+    "name": "Mossgate ruin",
+    "kind": "set-piece",
+    "biome": "whispering-woods",
+    "references": [
+      "woods-tree-house"
+    ],
+    "silhouetteHook": "a ruined stone gatehouse arch swallowed by a giant tree, roots wrapping the stones",
+    "body": "broad stone arch with two broken towers, about four people tall",
+    "materials": [
+      "grey stone",
+      "roots",
+      "moss"
+    ],
+    "colors": {
+      "main": "grey-green stone",
+      "secondary": "bark brown roots",
+      "accent": "faded green banner"
+    },
+    "details": [
+      "a rusted portcullis",
+      "glowing mushrooms in the cracks"
+    ],
+    "mood": "forgotten, grand"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Mossgate ruin (set-piece). Most recognisable feature: a ruined stone gatehouse arch swallowed by a giant tree, roots wrapping the stones. Body and shape: broad stone arch with two broken towers, about four people tall. Materials: grey stone, roots, moss. Colours: main grey-green stone, secondary bark brown roots, small accent of faded green banner. Details: a rusted portcullis; glowing mushrooms in the cracks. Mood: forgotten, grand.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "woods-tree-house"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:21:01.459Z"
+}

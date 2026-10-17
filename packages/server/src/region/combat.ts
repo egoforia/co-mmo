@@ -13,6 +13,7 @@ import {
   maxHp,
   partyXp,
 } from '@co-mmo/shared';
+import { provoke } from '../creature-brain.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 
@@ -58,12 +59,7 @@ export class Combat {
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
     this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, ...(ability ? { ability } : {}) });
-    if (!defeated) {
-      target.aggro = p.info.id;
-      target.returning = false;
-      target.target = null;
-      return;
-    }
+    if (!defeated) return provoke(target, p.info.id, { creatures: this.s.creatures, now: this.s.now() });
     target.respawnAt = this.s.now() + target.def.respawnSeconds * 1000;
     target.aggro = null;
     this.reward(p, target);

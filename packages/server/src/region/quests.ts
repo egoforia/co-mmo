@@ -10,11 +10,11 @@ import {
   rewardText,
   tileAt,
   Tile,
-  type NpcPlacement,
   type ServerMessage,
 } from '@co-mmo/shared';
 import type { Bodies } from './bodies.ts';
 import { TILE_NAMES } from '../region.ts';
+import { greetingNow, type Townsperson } from '../townsfolk.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
 /**
@@ -25,11 +25,13 @@ export class Quests {
   constructor(
     private readonly s: RegionState,
     private readonly looting: Bodies,
+    /** Where the day is now (sky.ts dayPhase). */
+    private readonly phase: () => number,
   ) {}
 
   /** Pressing E: an NPC close by talks, else a body is searched, else the land is acted on. */
   interact(p: PlayerState): void {
-    let npc: NpcPlacement | undefined;
+    let npc: Townsperson | undefined;
     let best = TALK_RANGE;
     for (const n of this.s.townsfolk) {
       const d = Math.hypot(n.x - p.x, n.y - p.y);
@@ -68,10 +70,13 @@ export class Quests {
     }
 
     const offer = questOffered(ch, npc.id);
+    // What they are up to at this hour comes first: woken from sleep, or out gathering herbs.
+    const now = greetingNow(npc, this.phase());
+    const said = [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || NPC_GREETINGS[npc.id] || '...';
     const message: ServerMessage = {
       t: 'dialogue',
       npc: { id: npc.id, name: npc.name, asset: npc.asset },
-      text: [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || NPC_GREETINGS[npc.id] || '...',
+      text: now ? `${now}\n\n${said}` : said,
     };
     if (offer) message.offer = { quest: offer, title: QUESTS[offer]!.title, reward: rewardText(offer) };
     if (SHOPS[npc.id]) message.shop = true;

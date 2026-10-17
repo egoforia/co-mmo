@@ -6,12 +6,17 @@ import {
   type CreatorCredit,
   type CreatureDef,
   type InventorySlot,
-  type NpcPlacement,
   type PlayerInfo,
   type RegionMap,
   type ServerMessage,
 } from '@co-mmo/shared';
-import { nearestTile, type Connection, type RegionHooks } from '../region.ts';
+import type { Connection, RegionHooks } from '../region.ts';
+import type { Creature } from '../creature-brain.ts';
+import type { Townsperson } from '../townsfolk.ts';
+import { nearestTile } from '../walkers.ts';
+
+export type { Creature } from '../creature-brain.ts';
+export type { Townsperson } from '../townsfolk.ts';
 
 // What every system of a region shares: who and what is in it, and how to
 // tell players about it. The Region owns one RegionState and hands it to
@@ -41,17 +46,6 @@ export interface PlayerState {
   looting?: string;
 }
 
-/** Anything that strolls about a home spot: creatures and NPCs. */
-export interface Walker {
-  x: number;
-  y: number;
-  home: { x: number; y: number };
-  /** Where it is strolling to. */
-  target: { x: number; y: number } | null;
-  /** Ticks to rest before choosing the next spot. */
-  rest: number;
-}
-
 /** A defeated creature's body: what it dropped waits there for anyone to take. */
 export interface Body {
   id: string;
@@ -64,22 +58,6 @@ export interface Body {
   /** Who won it: the one who struck the last blow and party members who shared the fight. They hear what others take. */
   finders: string[];
   loot: InventorySlot[];
-}
-
-/** An NPC, where they stand now. */
-export type Townsperson = NpcPlacement & Walker;
-
-export interface Creature extends Walker {
-  id: string;
-  kind: string;
-  def: CreatureDef;
-  hp: number;
-  /** The player it is fighting. */
-  aggro: string | null;
-  returning: boolean;
-  lastAttack: number;
-  /** Epoch ms when a defeated creature comes back; null while alive. */
-  respawnAt: number | null;
 }
 
 /** The people, creatures, NPCs and bodies in one region (or cell), and how to reach its players. */

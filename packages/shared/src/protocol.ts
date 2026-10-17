@@ -5,6 +5,7 @@ import type { ContentEntry, WishCard } from './content.ts';
 import type { TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
+import type { SkyConfig, Weather } from './sky.ts';
 import { EQUIP_SLOTS, type Character, type EquipSlot, type InventorySlot } from './rpg.ts';
 
 /**
@@ -208,7 +209,26 @@ export interface WelcomeMessage {
   y: number;
   tickRate: number;
   character: Character;
+  /** The sky: how it turns, the server's clock to count the hour from, and this land's weather now. */
+  sky: SkyView;
 }
+
+/** What a player's screen needs to show the hour and the weather. */
+export interface SkyView {
+  config: SkyConfig;
+  /** The server's clock (epoch ms) when this was sent. */
+  now: number;
+  weather: Weather;
+}
+
+/** The weather over the player's land changed. */
+export interface SkyMessage {
+  t: 'sky';
+  weather: Weather;
+}
+
+/** What a creature is doing, when it is more than going about its business. */
+export type CreatureMood = 'asleep' | 'fleeing';
 
 export interface EntityState {
   id: string;
@@ -232,6 +252,7 @@ export interface CreatureState {
   x: number;
   y: number;
   health: number;
+  mood?: CreatureMood;
 }
 
 /** A defeated creature's body, lying where it fell until it fades. */
@@ -253,6 +274,8 @@ export interface NpcState {
   asset: string;
   x: number;
   y: number;
+  /** Asleep for the night (or the day, for those who keep other hours). */
+  asleep?: boolean;
 }
 
 export interface SnapshotMessage {
@@ -447,6 +470,7 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | SkyMessage
   | LootMessage
   | DraftUpdateMessage
   | CooldownMessage

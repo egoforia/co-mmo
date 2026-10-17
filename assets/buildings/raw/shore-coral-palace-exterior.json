@@ -1,0 +1,11 @@
+{
+  "id": "shore-coral-palace-exterior",
+  "kind": "exterior",
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nThe first image is a layout sketch: a dark door arch on a magenta background. Paint finished, richly detailed game art over it:\nthe front door of the building is exactly where the dark arch is, at the middle of the bottom edge,\nthe same size as the arch. Paint the whole building around that door, filling the frame from side to side and top to bottom, with its natural outline.\nwith a few short steps or a threshold leading down from the door to the bottom edge. Nothing else stands in front of the door.\nThe other images show the approved art style and, where it is the same place, how it looked before: keep its character.\nBiome: Sunlit Shore; its light and mood.\nSubject: The Coral Palace, the whole building seen from outside, three-quarter top-down view. a shining palace grown from pink and white coral on a rocky point by the sea: a tall arched doorway of pearl at the bottom middle, spiral towers like seashells with rounded tops, walls of pastel coral with barnacles and starfish, windows of sea glass glowing turquoise, little waterfalls of seawater running down its sides.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the building, with no ground, scenery, gradient, glow or shadow on it. No magenta anywhere in the building. Lanterns and windows have no glow or halo spilling onto the background.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, cast shadow on the background.",
+  "references": [
+    "shore-lighthouse"
+  ],
+  "provider": "gemini",
+  "model": "gemini-3.1-flash-image",
+  "createdAt": "2026-10-17T09:26:23.515Z"
+}

@@ -1,4 +1,4 @@
-import { heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureState, type EntityState, type NpcState, type PlayerInfo } from '@co-mmo/shared';
+import { heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type EntityState, type NpcState, type PlayerInfo } from '@co-mmo/shared';
 
 // What players see of each thing in a region, as sent in snapshots and
 // across a split region's cell borders. One builder per kind, so both
@@ -20,9 +20,9 @@ export function playerView(p: { info: PlayerInfo; x: number; y: number; characte
   };
 }
 
-/** A living creature. */
-export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; hp: number }): CreatureState {
-  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp) };
+/** A living creature, and what it is up to when that shows (asleep, running away). */
+export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; hp: number }, mood?: CreatureMood): CreatureState {
+  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), health: round(c.hp / c.def.hp), ...(mood ? { mood } : {}) };
 }
 
 /** A defeated creature's body; `loot` says whether the viewer may search it here. */
@@ -31,6 +31,6 @@ export function bodyView(b: { id: string; kind: string; def: CreatureDef; x: num
 }
 
 /** A person of the region. */
-export function npcView(n: { id: string; name: string; asset: string; x: number; y: number }): NpcState {
-  return { id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y) };
+export function npcView(n: { id: string; name: string; asset: string; x: number; y: number; asleep?: boolean }): NpcState {
+  return { id: n.id, name: n.name, asset: n.asset, x: round(n.x), y: round(n.y), ...(n.asleep ? { asleep: true } : {}) };
 }

@@ -1,0 +1,11 @@
+{
+  "id": "desert-tomb-door",
+  "kind": "tile",
+  "prompt": "Pixel art game graphics in the style of a 16-bit SNES / PS1 Legend of Mana RPG interior.\nEvery art pixel is a crisp, hard-edged square block: no anti-aliasing, no smooth gradients, no blur.\nA limited palette of about 16 colours taken from the reference painting, warm light from the upper left. No writing anywhere.\nA texture tile seen from directly above, filling the entire square frame edge to edge, drawn as if 32 by 32 pixels scaled up.\nEven lighting and low contrast, small details spread evenly with no single big feature, no moss clumps, mushrooms or objects,\nso it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.\nSubject: inside Tomb of the Sun King, a worn sandstone sill running left to right, darker than the floor, with sand drifted against it.\nColours: match the reference painting of the same building from outside.",
+  "references": [
+    "desert-tomb-exterior"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "createdAt": "2026-10-17T09:35:09.770Z"
+}

@@ -1,0 +1,41 @@
+{
+  "id": "woods-bark-golem",
+  "description": {
+    "id": "woods-bark-golem",
+    "name": "Bark Golem",
+    "kind": "monster",
+    "biome": "whispering-woods",
+    "references": [
+      "woods-mushroom"
+    ],
+    "silhouetteHook": "a hulking figure made of living bark and roots with a glowing amber knot in its chest",
+    "body": "broad heavy body, long arms down to the ground, short legs, small glowing eyes",
+    "materials": [
+      "bark",
+      "moss",
+      "stone"
+    ],
+    "colors": {
+      "main": "dark bark brown",
+      "secondary": "teal moss",
+      "accent": "amber heart glow"
+    },
+    "details": [
+      "a little bird nest on one shoulder"
+    ],
+    "mood": "slow, mighty",
+    "extra": {
+      "threat": "tough guardian",
+      "movement": "heavy stomp"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.\nSubject: Bark Golem (monster). Most recognisable feature: a hulking figure made of living bark and roots with a glowing amber knot in its chest. Body and shape: broad heavy body, long arms down to the ground, short legs, small glowing eyes. Materials: bark, moss, stone. Colours: main dark bark brown, secondary teal moss, small accent of amber heart glow. Details: a little bird nest on one shoulder. threat: tough guardian. movement: heavy stomp. Mood: slow, mighty.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "woods-mushroom"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:21:18.150Z"
+}

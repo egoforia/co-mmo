@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
-import { applyContent, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
+import { applyContent, DEFAULT_SKY, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
 import { answer, type Bus } from './bus.ts';
 import { Region, type Cell, type Connection, type Leaving } from './region.ts';
 import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
@@ -206,6 +206,7 @@ export class RegionServer {
       journal: (text, player) => this.hook(id, { hook: 'journal', text, player }),
       // A cell's Region channel reaches the cells beside it through the gateway.
       ...(cell ? { regionChat: (m: ServerMessage) => this.hook(id, { hook: 'regionChat', m }) } : {}),
+      sky: () => this.world.sky ?? DEFAULT_SKY,
       neighbours: () => this.world.defs.filter((d) => d.id !== def.id && Math.max(Math.abs(d.at.x - region.def.at.x), Math.abs(d.at.y - region.def.at.y)) === 1),
     }, this.now, this.random, cell);
     return region;

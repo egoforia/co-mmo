@@ -111,7 +111,9 @@ export const WISH_CATEGORIES: WishCategory[] = [
     subs: [
       { id: 'creature', name: 'Creature', blurb: 'A few of them appear near you.', tier: 'moderate', makes: 'creature',
         fields: [NAME, DESCRIPTION,
-          choice('behavior', 'How it acts', [['wander', 'Wanders, fights back'], ['guard', 'Guards its spot'], ['chase', 'Hunts anyone it sees']]),
+          choice('behavior', 'How it acts', [['wander', 'Wanders, fights back'], ['guard', 'Guards its spot'], ['chase', 'Hunts anyone it sees'],
+            ['patrol', 'Walks rounds and attacks anyone it meets'], ['timid', 'Shy: runs from anyone close'], ['pack', 'Roams and hunts in packs']]),
+          choice('active', 'When it is about', [['always', 'Day and night'], ['day', 'By day, asleep at night'], ['night', 'By night, asleep by day']], true),
           level('level', 'Level', 1, 6), level('count', 'How many', 1, 5),
           { key: 'drops', label: 'What it may drop', kind: 'items', optional: true }, ...LOOK] },
       { id: 'loot', name: 'Creature loot', blurb: 'Something a creature of the world may drop when it is defeated.', tier: 'moderate', makes: 'loot',
@@ -289,7 +291,7 @@ function rawDefinition(sub: WishSubcategory, f: DraftFields): Record<string, unk
     case 'item': return { ...base, itemKind: sub.fixed?.itemKind ?? str(f.itemKind), heal: num(f.heal), rarity: str(f.rarity), focus: str(f.focus), look };
     case 'recipe': return { ...base, materials: materials(f.materials), result: { item: str(f.result), qty: num(f.qty) ?? 1 } };
     case 'ability': return { ...base, effect: str(f.effect), look };
-    case 'creature': return { ...base, behavior: str(f.behavior), level: num(f.level), count: num(f.count), drops: list(f.drops), look };
+    case 'creature': return { ...base, behavior: str(f.behavior), active: str(f.active), level: num(f.level), count: num(f.count), drops: list(f.drops), look };
     case 'npc': return { ...base, greeting: str(f.greeting), look };
     case 'loot': return { ...base, creature: str(f.creature), drops: list(f.drops).map((item) => ({ item, chance: (num(f.chance) ?? 25) / 100, qty: num(f.qty) ?? 1 })) };
     case 'player': return { ...base, look };
@@ -410,7 +412,7 @@ export function draftFromDefinition(def: WishDefinition): { category: string; su
     }
     case 'recipe': return pick('know', 'recipe', { materials: def.materials, result: def.result.item, qty: def.result.qty });
     case 'ability': return pick('know', 'ability', { effect: def.effect });
-    case 'creature': return pick('living', 'creature', { behavior: def.behavior, level: def.level, count: def.count, drops: def.drops });
+    case 'creature': return pick('living', 'creature', { behavior: def.behavior, active: def.active ?? 'always', level: def.level, count: def.count, drops: def.drops });
     case 'npc': return pick('living', 'person', { greeting: def.greeting });
     case 'loot': return pick('living', 'loot', { creature: def.creature, drops: def.drops.map((d) => d.item), chance: Math.round((def.drops[0]?.chance ?? 0.25) * 100), qty: def.drops[0]?.qty ?? 1 });
     case 'player': return pick('living', 'look', {});

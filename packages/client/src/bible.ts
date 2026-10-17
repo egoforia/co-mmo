@@ -50,12 +50,17 @@ export const CHAPTERS: Chapter[] = [
         <li><b>Enter</b> to speak. <i>Say</i> reaches those nearby, <i>Region</i> everyone in this region, <i>Party</i> your party, <i>World</i> everyone. <b>/w</b> and a name whispers to one player; <b>/r</b> answers. Type <b>/help</b> for the rest.</li>
         <li><b>/invite</b> and a name asks someone into your party. A party shares the XP of every creature its members defeat together, and their defeat quests.</li>
         <li><b>Account</b> (top right) adds an email or Google/GitHub to sign in from any device, and is where you describe your look if you have not yet.</li>
-        <li><b>E</b> beside someone to talk to them. Some will ask for your help.</li>
+        <li><b>E</b> beside someone to talk to them. Some will ask for your help. People keep a day: at work by day, out in the square at dusk, asleep at night. Wake them and they will still talk and trade.</li>
+        <li>Days turn into nights, and each land has its own weather. The corner of the screen says the hour and the sky.</li>
+        <li>Every land is wide, and its roads lead out from the middle to great places: a temple, caves, a castle, palaces, a tomb, a pyramid and more. Follow a road, or leave it and explore. Bridges carry the roads over water.</li>
         <li><b>E</b> with nobody nearby works the land: beside water, a tree or a rock. Wished rules (like fishing) use it; the Chronicle says how to play each one.</li>
       </ul>
       <h3>Fighting</h3>
       <ul>
-        <li><b>Space</b> to strike the nearest creature. Walking Mushrooms only fight back; Crab Knights guard their sand; Sun Scarabs chase anyone they see.</li>
+        <li><b>Space</b> to strike the nearest creature. Walking Mushrooms only fight back, and scurry off when badly hurt; Crab Knights walk their rounds on the sand; Sun Scarabs hunt in packs, so when one comes for you the others near it follow.</li>
+        <li>Creatures keep hours. Sun Scarabs sleep at night, and some wished creatures only come out after dark. A sleeping creature wakes if you strike it.</li>
+        <li>The great places have creatures of their own: Thorn Wolves and Dune Jackals hunt in packs at night, Bark Golems and the Sand Wyrm guard their ground, Mummy Guards and Drowned Deckhands walk their rounds after dark, and Lantern Moths and Hermit Crabs only run away.</li>
+        <li>In the dark, in fog and in sandstorms, most creatures only notice you up close. Carry a torch or anything else that glows and they see you coming.</li>
         <li>Health returns slowly once you are out of the fight. A <b>Tonic</b> restores it at once.</li>
         <li>If you fall, you wake at the Sanctum shrine with everything you carried, Weakened for a short while.</li>
         <li><b>1</b> to <b>4</b> use your abilities. Each costs <b>Energy</b> (the blue bar), which comes back by itself, and rests a few seconds after use. Old Bramble teaches Power Strike when you help her, Sister Amala teaches Mend for a little gold, and the Cactus Elder sells the Scroll of Firebolt.</li>

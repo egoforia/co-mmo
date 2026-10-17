@@ -93,7 +93,11 @@ describe('the API Log', () => {
     }) as typeof fetch;
     await expect(withApiContext({ purpose: 'Opening an issue' }, () => recordingFetch(log, down)('https://api.github.com/repos/a/b/issues', { method: 'POST' }))).rejects.toThrow('fetch failed');
     await settled();
-    const [failed, sound] = log.query().calls;
+    // Both may be logged in the same millisecond, so find each by its service, not its place in the list.
+    const { calls } = log.query();
+    const sound = calls.find((c) => c.service === 'ElevenLabs');
+    const failed = calls.find((c) => c.service === 'GitHub');
+    expect(calls).toHaveLength(2);
     expect(sound).toMatchObject({ service: 'ElevenLabs', kind: 'Sound effect', model: 'eleven_text_to_sound_v2', responseBytes: 5000 });
     expect((await log.get(sound!.id))!.responseBody).toBe('[audio/mpeg, 4.9 KB, not kept]');
     expect(failed).toMatchObject({ service: 'GitHub', kind: 'Wish builds', status: 0, error: 'fetch failed', purpose: 'Opening an issue' });

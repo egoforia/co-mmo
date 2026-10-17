@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLAYER_SPEED, TICK_RATE, TICK_SECONDS, collides, newCharacter, regionDef, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { DEFAULT_SKY, PLAYER_SPEED, TICK_RATE, TICK_SECONDS, collides, newCharacter, regionDef, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 
 function fakeConn() {
@@ -143,7 +143,9 @@ describe('Region', () => {
   });
 
   it('lets wished NPCs stroll too, and takes them away with their wish', () => {
-    const region = new Region(sanctum);
+    // At noon, when people are up and about.
+    const clock = { now: DEFAULT_SKY.dayMinutes * 60_000 * 10.5 };
+    const region = new Region(sanctum, undefined, () => (clock.now += 50));
     const { spawn } = region.map;
     region.addNpc({ id: 'w-pell', name: 'Old Pell', asset: 'wish-w-pell', x: spawn.x, y: spawn.y });
     let moved = false;

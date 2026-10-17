@@ -1,0 +1,38 @@
+{
+  "id": "sanctum-bell-tower",
+  "description": {
+    "id": "sanctum-bell-tower",
+    "name": "Old bell tower",
+    "kind": "set-piece",
+    "biome": "sanctum",
+    "references": [
+      "sanctum-shrine"
+    ],
+    "silhouetteHook": "a tall slender ruined stone bell tower with a great bronze bell hanging in its open top",
+    "body": "narrow square tower about five people tall, crumbling at one corner",
+    "materials": [
+      "pale stone",
+      "bronze",
+      "ivy"
+    ],
+    "colors": {
+      "main": "cream stone",
+      "secondary": "green copper bell",
+      "accent": "warm lantern gold"
+    },
+    "details": [
+      "ivy climbing up",
+      "glowing moths around the bell"
+    ],
+    "mood": "lonely, beautiful"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSubject: Old bell tower (set-piece). Most recognisable feature: a tall slender ruined stone bell tower with a great bronze bell hanging in its open top. Body and shape: narrow square tower about five people tall, crumbling at one corner. Materials: pale stone, bronze, ivy. Colours: main cream stone, secondary green copper bell, small accent of warm lantern gold. Details: ivy climbing up; glowing moths around the bell. Mood: lonely, beautiful.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "sanctum-shrine"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:20:21.454Z"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "desert-sand-wyrm",
+  "description": {
+    "id": "desert-sand-wyrm",
+    "name": "Sand Wyrm",
+    "kind": "monster",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-scarab"
+    ],
+    "silhouetteHook": "a huge armoured sand worm rearing up out of the sand with a round mouth of teeth",
+    "body": "thick segmented body, big plated head, the rest of it under the sand",
+    "materials": [
+      "bronze-like scales",
+      "sand"
+    ],
+    "colors": {
+      "main": "bronze",
+      "secondary": "sand gold",
+      "accent": "glowing orange mouth"
+    },
+    "details": [
+      "sand spraying around it"
+    ],
+    "mood": "terrifying, mighty",
+    "extra": {
+      "threat": "very dangerous",
+      "movement": "burrow and lunge"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Sand Wyrm (monster). Most recognisable feature: a huge armoured sand worm rearing up out of the sand with a round mouth of teeth. Body and shape: thick segmented body, big plated head, the rest of it under the sand. Materials: bronze-like scales, sand. Colours: main bronze, secondary sand gold, small accent of glowing orange mouth. Details: sand spraying around it. threat: very dangerous. movement: burrow and lunge. Mood: terrifying, mighty.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-scarab"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:23:08.634Z"
+}

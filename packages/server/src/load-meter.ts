@@ -4,6 +4,8 @@ import type { ServerLoad } from './region-link.ts';
 
 /** How many recent ticks the averages cover (5 s at 20 ticks a second). */
 const KEPT = 100;
+/** Ticks timed before the meter judges how pressed the process is. */
+const MIN_TICKS = 10;
 
 /**
  * Measures how hard a game process works: how long its ticks take, its
@@ -46,7 +48,8 @@ export class LoadMeter {
    */
   get strain(): number {
     const times = this.times.slice(-20);
-    if (!times.length) return 0;
+    // A few ticks say little: the first ones run cold, before the code is warm.
+    if (times.length < MIN_TICKS) return 0;
     const share = times.reduce((a, b) => a + b, 0) / times.length / (TICK_SECONDS * 1000);
     return share > 0.8 ? 2 : share > 0.5 ? 1 : 0;
   }

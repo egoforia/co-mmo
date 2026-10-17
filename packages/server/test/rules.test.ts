@@ -15,6 +15,7 @@ function fakeHost() {
     name: (p) => (p === 'p1' ? 'Mara' : null),
     where: (p) => (p === 'p1' ? { region: 'shore', biome: 'sunlit-shore', x: 10, y: 10 } : null),
     near: (_p, tile) => tile === 'water',
+    sky: () => ({ time: 'night', hour: 22, weather: 'rain' }),
     count: (_p, item) => bag.get(item) ?? 0,
     give: (_p, item, qty) => (bag.set(item, (bag.get(item) ?? 0) + qty), true),
     take: (_p, item, qty) => {

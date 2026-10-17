@@ -28,9 +28,27 @@ const BOX: Record<string, { width: number; height: number }> = {
 };
 const ROCK_BOX = { width: 128, height: 128 };
 
-/** Set pieces that should stand smaller than the 512 px maximum. */
+/**
+ * Pieces drawn at their own size: set pieces smaller than the 512 px box, the
+ * launch lands' great wonders bigger (about a tile wider than their
+ * footprint), and the biggest monsters.
+ */
 const SET_PIECE_BOX: Record<string, { width: number; height: number }> = {
   'sanctum-shrine': { width: 256, height: 256 },
+  'sanctum-standing-stones': { width: 640, height: 512 },
+  'sanctum-fountain': { width: 384, height: 320 },
+  'sanctum-bell-tower': { width: 384, height: 768 },
+  'woods-fairy-ring': { width: 512, height: 320 },
+  'woods-fallen-giant': { width: 896, height: 512 },
+  'woods-castle-gate': { width: 640, height: 640 },
+  'shore-shipwreck': { width: 896, height: 640 },
+  'shore-giant-shell': { width: 512, height: 448 },
+  'shore-tide-shrine': { width: 320, height: 448 },
+  'desert-pyramid': { width: 1024, height: 768 },
+  'desert-obelisk': { width: 192, height: 704 },
+  'desert-wyrm-bones': { width: 896, height: 512 },
+  'woods-bark-golem': { width: 192, height: 192 },
+  'desert-sand-wyrm': { width: 256, height: 224 },
 };
 
 await mkdir(outDir, { recursive: true });

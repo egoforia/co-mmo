@@ -19,3 +19,7 @@ export * from './walk.ts';
 export * from './sounds.ts';
 export * from './held.ts';
 export * from './light.ts';
+export * from './sky.ts';
+export * from './routines.ts';
+export * from './lands.ts';
+export * from './places.ts';

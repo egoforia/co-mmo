@@ -44,6 +44,16 @@ describe('wished content', () => {
     expect(() => validateDefinition({ kind: 'spell', name: 'Fireball' })).toThrow(WishError);
   });
 
+  it('keeps a wished creature\'s way of acting and its hours, or the plainest ones', () => {
+    const owl = validateDefinition({ kind: 'creature', name: 'Moth Owl', behavior: 'pack', active: 'night', look }) as CreatureWish;
+    expect(owl).toMatchObject({ behavior: 'pack', active: 'night' });
+    expect(creatureFromWish('w', owl)).toMatchObject({ behavior: 'pack', active: 'night', notice: 4 });
+    const odd = validateDefinition({ kind: 'creature', name: 'Blob', behavior: 'teleport', active: 'always', look });
+    expect(odd).toMatchObject({ behavior: 'wander' });
+    expect(odd).not.toHaveProperty('active');
+    expect(creatureFromWish('t', validateDefinition({ kind: 'creature', name: 'Shy', behavior: 'timid', look }) as CreatureWish).notice).toBeGreaterThan(0);
+  });
+
   it('derives creature stats from level alone', () => {
     const weak = creatureFromWish('a', validateDefinition({ kind: 'creature', name: 'A', level: 1, look }) as any);
     const strong = creatureFromWish('b', validateDefinition({ kind: 'creature', name: 'B', level: 5, look }) as any);

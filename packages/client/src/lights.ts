@@ -26,8 +26,11 @@ export function makeLight(scene: Phaser.Scene, light: Light, depth: number): Lit
   return { light, point, seed: Math.random() * 100 };
 }
 
-/** Moves a light to (x, y) and sets how bright it burns at `ms`. */
-export function placeLight(lit: LitPoint, x: number, y: number, ms: number, visible: boolean): void {
+/** How much brighter a light shows at night, when it is all that lights the ground. */
+const NIGHT_BOOST = 0.8;
+
+/** Moves a light to (x, y) and sets how bright it burns at `ms`, brighter the darker it is (0 day to 1 night). */
+export function placeLight(lit: LitPoint, x: number, y: number, ms: number, visible: boolean, dark = 0): void {
   lit.point.setPosition(x, y).setVisible(visible);
-  lit.point.intensity = INTENSITY * lightStrength(lit.light, ms, lit.seed);
+  lit.point.intensity = INTENSITY * (1 + NIGHT_BOOST * dark) * lightStrength(lit.light, ms, lit.seed);
 }

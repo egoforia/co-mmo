@@ -1,0 +1,40 @@
+{
+  "id": "shore-shipwreck",
+  "description": {
+    "id": "shore-shipwreck",
+    "name": "Shipwreck",
+    "kind": "set-piece",
+    "biome": "sunlit-shore",
+    "references": [
+      "shore-lighthouse"
+    ],
+    "silhouetteHook": "a big broken pirate ship lying tilted on the sand with a snapped mast and torn sails",
+    "body": "long wooden hull on its side, wide and low",
+    "materials": [
+      "old wood",
+      "canvas",
+      "rope"
+    ],
+    "colors": {
+      "main": "driftwood brown",
+      "secondary": "off-white canvas sails",
+      "accent": "dark brick red flag"
+    },
+    "details": [
+      "barnacles on the hull",
+      "gulls perched on the mast",
+      "no pink or purple anywhere"
+    ],
+    "mood": "adventurous, eerie"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nPaint the character in the reference picture again, exactly the same: face, hair, clothes, colours, proportions, pose, size and framing.\nChange only this: every sail is plain off-white weathered canvas and the flag is dark brick red; nothing on the ship is pink or magenta.",
+  "references": [
+    "shore-shipwreck (before)"
+  ],
+  "edit": "every sail is plain off-white weathered canvas and the flag is dark brick red; nothing on the ship is pink or magenta",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:27:39.331Z"
+}

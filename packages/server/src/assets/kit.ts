@@ -15,6 +15,8 @@ export type KitAsset = AssetDescription & {
    * it is plain open water.
    */
   centerCrop?: number;
+  /** Clear the key colour showing through gaps inside the subject too (an archway, a ring). */
+  holes?: boolean;
 };
 
 const OPEN_WATER = 'flat open water seen from directly above, as if cut from the middle of a large lake: no shore, bank, rim, border or ripple rings, no centre point';

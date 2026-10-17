@@ -1,0 +1,40 @@
+{
+  "id": "sanctum-lantern-moth",
+  "description": {
+    "id": "sanctum-lantern-moth",
+    "name": "Lantern Moth",
+    "kind": "monster",
+    "biome": "sanctum",
+    "references": [
+      "sanctum-pilgrim"
+    ],
+    "silhouetteHook": "a fluffy moth as big as a cat whose round belly glows like a paper lantern",
+    "body": "round fuzzy body, four wide soft wings, feathery antennae, big dark gentle eyes",
+    "materials": [
+      "fuzz",
+      "wing dust"
+    ],
+    "colors": {
+      "main": "cream white",
+      "secondary": "pale lilac wings",
+      "accent": "warm golden belly glow"
+    },
+    "details": [
+      "sparkling dust falling from the wings"
+    ],
+    "mood": "gentle, shy",
+    "extra": {
+      "threat": "harmless",
+      "movement": "flutter"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSubject: Lantern Moth (monster). Most recognisable feature: a fluffy moth as big as a cat whose round belly glows like a paper lantern. Body and shape: round fuzzy body, four wide soft wings, feathery antennae, big dark gentle eyes. Materials: fuzz, wing dust. Colours: main cream white, secondary pale lilac wings, small accent of warm golden belly glow. Details: sparkling dust falling from the wings. threat: harmless. movement: flutter. Mood: gentle, shy.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "sanctum-pilgrim"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:20:28.717Z"
+}

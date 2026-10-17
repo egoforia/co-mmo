@@ -96,7 +96,8 @@ function crowdedWoods() {
   world.cellPlayers = 3;
   const map = world.region('woods')!.map;
   const conns = new Map<string, ReturnType<typeof fakeConn>>();
-  const xs = [5, 10, 20, 30, 40, 50, 58];
+  // Spread along the land as they would be on a 64-tile one.
+  const xs = [5, 10, 20, 30, 40, 50, 58].map((x) => Math.round((x * map.width) / 64));
   xs.forEach((x, i) => {
     const c = fakeConn();
     conns.set(`p${i}`, c);
@@ -185,7 +186,7 @@ describe('crowded regions', () => {
 
   it('keeps wished creatures in the cells where they stand, with ids that do not clash', async () => {
     const { world, map } = crowdedWoods();
-    const spots = [spotAt(map, 8), spotAt(map, 30), spotAt(map, 52)];
+    const spots = [8, 30, 52].map((x) => spotAt(map, Math.round((x * map.width) / 64)));
     world.placeCreatures('woods', 'walking-mushroom', spots);
     await second(world);
     const woods = world.region('woods') as SplitRegion;
@@ -222,9 +223,10 @@ describe('crowded regions on region servers', () => {
     const map = world.region('shore')!.map;
     const mara = fakeConn();
     const tom = fakeConn();
-    const y = clearRow(map, 26, 36);
-    world.join(info('mara'), mara, { regionId: 'shore', x: 29, y }, newCharacter());
-    world.join(info('tom'), tom, { regionId: 'shore', x: 34, y }, newCharacter());
+    const mid = map.width / 2;
+    const y = clearRow(map, mid - 4, mid + 4);
+    world.join(info('mara'), mara, { regionId: 'shore', x: mid - 3, y }, newCharacter());
+    world.join(info('tom'), tom, { regionId: 'shore', x: mid + 2, y }, newCharacter());
     await settle();
     await second(world);
     await until(() => (world.region('shore')!.cells?.length ?? 0) === 2);

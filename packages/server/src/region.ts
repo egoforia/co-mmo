@@ -73,10 +73,24 @@ import {
   type ServerMessage,
   type ShopMessage,
   type Side,
+  type SkyConfig,
+  type Weather,
+  DEFAULT_SKY,
+  WEATHER_NEWS,
+  dayPhase,
+  heldItem,
+  offHandItem,
+  weatherAt,
+  skyWords,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
 import { bodyView, creatureView, npcView, playerView } from './region-views.ts';
+import { giveUp, makeCreature, mood, provoke, think, type Creature, type Habitat, type Prey } from './creature-brain.ts';
+import { greetingNow, live, makeTownsperson, type Townsperson } from './townsfolk.ts';
+import { findSpots, nearestTile } from './walkers.ts';
+
+export { findSpots, nearestTile } from './walkers.ts';
 
 /** Inputs a player may queue; extra inputs are dropped (anti speed-hack). */
 const MAX_QUEUED_INPUTS = 10;
@@ -85,16 +99,6 @@ const MAX_INPUTS_PER_TICK = 2;
 /** Chat flood limit: at most this many messages per window. */
 const CHAT_BURST = 5;
 const CHAT_WINDOW_MS = 5000;
-/** Creatures stroll at this speed (tiles per second) within this many tiles of home. */
-const WANDER_SPEED = 1.5;
-const WANDER_RADIUS = 4;
-/** NPCs stroll more slowly, and stay closer to their spot so players can find them. */
-const STROLL_SPEED = 1;
-const STROLL_RADIUS = 2.5;
-/** A chasing creature gives up this far from home and walks back. */
-const LEASH = 8;
-/** Creatures strike from this close. */
-const CREATURE_REACH = 1.2;
 /** Health starts coming back this long after the last hit taken. */
 const REGEN_DELAY_MS = 5000;
 /** Snapshots come every tick until this many people and creatures are in view, then less often (see snapshotEvery). */
@@ -140,6 +144,8 @@ export interface RegionHooks {
   neighbours?(): RegionDef[];
   /** Delivers a Region-channel line to every cell of a region that was split (see Cell). */
   regionChat?(message: ServerMessage): void;
+  /** How the sky turns (the same on every server); the usual day and weather when missing. */
+  sky?(): SkyConfig;
 }
 
 /**
@@ -170,7 +176,7 @@ export interface Ghosts {
 const CELL_MARGIN = 1;
 
 /** Tile kinds scripted rules can ask about, by name. */
-export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, floor: Tile.Floor, wall: Tile.Wall, door: Tile.Door };
+export const TILE_NAMES: Record<string, Tile> = { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, floor: Tile.Floor, wall: Tile.Wall, door: Tile.Door, bridge: Tile.Bridge };
 
 interface PlayerState {
   info: PlayerInfo;
@@ -195,17 +201,6 @@ interface PlayerState {
   looting?: string;
 }
 
-/** Anything that strolls about a home spot: creatures and NPCs. */
-interface Walker {
-  x: number;
-  y: number;
-  home: { x: number; y: number };
-  /** Where it is strolling to. */
-  target: { x: number; y: number } | null;
-  /** Ticks to rest before choosing the next spot. */
-  rest: number;
-}
-
 /** A defeated creature's body: what it dropped waits there for anyone to take. */
 interface Body {
   id: string;
@@ -218,22 +213,6 @@ interface Body {
   /** Who won it: the one who struck the last blow and party members who shared the fight. They hear what others take. */
   finders: string[];
   loot: InventorySlot[];
-}
-
-/** An NPC, where they stand now. */
-type Townsperson = NpcPlacement & Walker;
-
-interface Creature extends Walker {
-  id: string;
-  kind: string;
-  def: CreatureDef;
-  hp: number;
-  /** The player it is fighting. */
-  aggro: string | null;
-  returning: boolean;
-  lastAttack: number;
-  /** Epoch ms when a defeated creature comes back; null while alive. */
-  respawnAt: number | null;
 }
 
 export type Departure =
@@ -282,6 +261,8 @@ export class Region {
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   private townsfolk: Townsperson[];
   private tickCount = 0;
+  /** The weather over this land as players last heard it. */
+  private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
   private readonly ghosts = new Map<number, Ghosts>();
   /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
@@ -302,7 +283,7 @@ export class Region {
     this.hooks = hooks ?? { worldChat: (m) => this.broadcast(m), online: () => this.players.size };
     this.map = generateRegion(def);
     this.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y) : []));
-    this.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => this.makeStroller(n));
+    this.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
       character: (id) => this.players.get(id)?.character,
       nameOf: (id) => this.players.get(id)?.info.name,
@@ -331,29 +312,20 @@ export class Region {
     return !this.cell || (x >= this.cell.x0 && x < this.cell.x1);
   }
 
-  /** Lets an NPC stroll about where they were placed. */
-  private makeStroller(npc: NpcPlacement): Townsperson {
-    return Object.assign(npc, { home: { x: npc.x, y: npc.y }, target: null, rest: Math.floor(this.random() * TICK_RATE * 3) });
-  }
-
   private makeCreature(id: string, kind: string, x: number, y: number): Creature[] {
     const cdef = CREATURES[kind];
-    if (!cdef) return [];
-    return [{
-      id,
-      kind,
-      def: cdef,
-      x,
-      y,
-      home: { x, y },
-      hp: cdef.hp,
-      target: null,
-      rest: Math.floor(this.random() * TICK_RATE * 3),
-      aggro: null,
-      returning: false,
-      lastAttack: 0,
-      respawnAt: null,
-    }];
+    return cdef ? [makeCreature(id, kind, cdef, x, y, this.random)] : [];
+  }
+
+  /** How the sky turns over this land. */
+  get skyConfig(): SkyConfig {
+    return this.hooks.sky?.() ?? DEFAULT_SKY;
+  }
+
+  /** Where the day is and the weather here now. */
+  sky(now = this.now()): { phase: number; weather: Weather } {
+    const config = this.skyConfig;
+    return { phase: dayPhase(now, config), weather: weatherAt(this.def.id, this.def.biome, now, config) };
   }
 
   // --- Wished content ----------------------------------------------------------
@@ -366,7 +338,7 @@ export class Region {
   /** Places a wished NPC, who strolls about that spot. */
   addNpc(npc: NpcPlacement): void {
     this.townsfolk = this.townsfolk.filter((n) => n.id !== npc.id);
-    this.townsfolk.push(this.makeStroller({ ...npc }));
+    this.townsfolk.push(makeTownsperson({ ...npc }, this.map, this.random));
   }
 
   /** Takes away everything a wish placed here. */
@@ -391,10 +363,12 @@ export class Region {
     const lines: string[] = [];
     const near = (x: number, y: number, r: number) => Math.hypot(x - p.x, y - p.y) <= r;
     for (const other of this.players.values()) if (other !== p && near(other.x, other.y, 10)) lines.push(`${other.info.name} (player)`);
-    for (const n of this.townsfolk) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC)`);
+    for (const n of this.townsfolk) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
     const kinds = new Map<string, number>();
     for (const c of this.creatures) if (c.respawnAt === null && near(c.x, c.y, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
     for (const [name, n] of kinds) lines.push(`${n} ${name}${n > 1 ? 's' : ''}`);
+    const { phase, weather } = this.sky();
+    lines.push(`The sky: ${skyWords(phase, weather)}`);
     return lines;
   }
 
@@ -478,7 +452,9 @@ export class Region {
   }
 
   private welcome(p: PlayerState): void {
-    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character });
+    const now = this.now();
+    const sky = { config: this.skyConfig, now, weather: this.sky(now).weather };
+    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character, sky });
   }
 
   get online(): number {
@@ -517,14 +493,20 @@ export class Region {
   }
 
   /** Where an NPC stands now, for tests and tools. */
-  npc(id: string): { x: number; y: number; home: { x: number; y: number } } | undefined {
+  npc(id: string): { x: number; y: number; home: { x: number; y: number }; asleep: boolean } | undefined {
     const n = this.townsfolk.find((t) => t.id === id);
-    return n && { x: n.x, y: n.y, home: { ...n.home } };
+    return n && { x: n.x, y: n.y, home: { ...n.home }, asleep: n.asleep };
   }
 
   creature(id: string): { kind: string; x: number; y: number; hp: number; alive: boolean } | undefined {
     const c = this.creatures.find((k) => k.id === id);
     return c && { kind: c.kind, x: c.x, y: c.y, hp: c.hp, alive: c.respawnAt === null };
+  }
+
+  /** What a creature is up to, for tests and tools. */
+  creatureMood(id: string): { mood?: string; aggro: string | null } | undefined {
+    const c = this.creatures.find((k) => k.id === id);
+    return c && { mood: mood(c), aggro: c.aggro };
   }
 
   /** Moves a player, for tests and tools. */
@@ -536,7 +518,7 @@ export class Region {
   /** Moves a creature, for tests and (later) wishes. */
   placeCreature(id: string, x: number, y: number): void {
     const c = this.creatures.find((k) => k.id === id);
-    if (c) Object.assign(c, { x, y, home: { x, y }, target: null });
+    if (c) Object.assign(c, { x, y, home: { x, y }, target: null, route: undefined });
   }
 
   /**
@@ -574,7 +556,7 @@ export class Region {
     if (!p) return undefined;
     this.trades.leave(id);
     this.players.delete(id);
-    for (const c of this.creatures) if (c.aggro === id) this.giveUp(c);
+    for (const c of this.creatures) if (c.aggro === id || c.fleeing === id) giveUp(c);
     if (announce !== '') this.broadcastSystem(announce ?? `${p.info.name} left.`);
     const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
@@ -661,11 +643,14 @@ export class Region {
         p.character.energy = Math.min(maxE, p.character.energy + energyPerSecond(p.character) * TICK_SECONDS);
       }
     }
-    for (const c of this.creatures) this.think(c, now);
+    const { phase, weather } = this.sky(now);
+    this.weatherTurns(weather);
+    const habitat = this.habitat(now, phase, weather);
+    for (const c of this.creatures) think(c, habitat);
     this.bodies = this.bodies.filter((b) => now < b.until);
     // A loot window closes when its body fades or its looter walks away.
     for (const p of this.players.values()) if (p.looting && !this.lootable(p, p.looting)) this.closeLoot(p);
-    for (const n of this.townsfolk) this.stroll(n);
+    for (const n of this.townsfolk) live(n, { map: this.map, random: this.random, phase, listening: this.listening(n) });
     for (const p of this.players.values()) {
       if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id && d.cell === undefined)) {
         const i = departures.findIndex((d) => d.id === p.info.id);
@@ -691,7 +676,7 @@ export class Region {
       const creatures: CreatureState[] = [];
       for (const c of this.creatures) {
         if (c.respawnAt !== null || !near(c.x, c.y)) continue;
-        creatures.push(creatureView(c));
+        creatures.push(creatureView(c, mood(c)));
       }
       const bodies: BodyState[] = [];
       for (const b of this.bodies) {
@@ -729,7 +714,7 @@ export class Region {
       g.players.push(playerView(p));
     }
     for (const c of this.creatures) {
-      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c));
+      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c, mood(c)));
     }
     // Bodies are searched in their own cell; across the border they are only seen.
     for (const b of this.bodies) if (seen(b.x)) g.bodies.push(bodyView(b, false));
@@ -775,12 +760,7 @@ export class Region {
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
     this.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, ...(ability ? { ability } : {}) });
-    if (!defeated) {
-      target.aggro = p.info.id;
-      target.returning = false;
-      target.target = null;
-      return;
-    }
+    if (!defeated) return provoke(target, p.info.id, { creatures: this.creatures, now: this.now() });
     target.respawnAt = this.now() + target.def.respawnSeconds * 1000;
     target.aggro = null;
     this.reward(p, target);
@@ -917,59 +897,37 @@ export class Region {
     this.hooks.journal?.(`${p.info.name} reached level ${p.character.level}.`, p.info.id);
   }
 
-  /** Creature behaviour for one tick: respawn, fight, walk home or wander. */
-  private think(c: Creature, now: number): void {
-    if (c.respawnAt !== null) {
-      if (now < c.respawnAt) return;
-      Object.assign(c, { respawnAt: null, hp: c.def.hp, x: c.home.x, y: c.home.y, target: null, returning: false, aggro: null });
-      return;
-    }
-    if (!c.aggro && !c.returning && c.def.behavior !== 'wander') {
-      const from = c.def.behavior === 'guard' ? c.home : c;
-      for (const p of this.players.values()) {
-        if (p.character.hp > 0 && Math.hypot(p.x - from.x, p.y - from.y) <= c.def.notice) {
-          c.aggro = p.info.id;
-          break;
-        }
-      }
-    }
-    if (c.aggro) {
-      const p = this.players.get(c.aggro);
-      if (!p || p.character.hp <= 0 || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH) return this.giveUp(c);
-      const d = Math.hypot(p.x - c.x, p.y - c.y);
-      if (d > CREATURE_REACH * 0.8) this.moveToward(c, p.x, p.y, c.def.speed);
-      if (d <= CREATURE_REACH && now - c.lastAttack >= c.def.cooldown * 1000) {
-        c.lastAttack = now;
-        this.hurt(p, c, now);
-      }
-      return;
-    }
-    if (c.returning) {
-      if (this.moveToward(c, c.home.x, c.home.y, c.def.speed) || this.tickCount % (TICK_RATE * 5) === 0) {
-        c.returning = false;
-        c.hp = c.def.hp;
-      }
-      return;
-    }
-    this.wander(c, WANDER_SPEED, WANDER_RADIUS);
-  }
-
-  /** NPCs stroll about their spot, but stand still while someone is close enough to talk. */
-  private stroll(n: Townsperson): void {
+  /** The land as its creatures find it this tick. */
+  private habitat(now: number, phase: number, weather: Weather): Habitat {
+    const players: Prey[] = [];
     for (const p of this.players.values()) {
-      if (p.character.hp > 0 && Math.hypot(p.x - n.x, p.y - n.y) <= TALK_RANGE) {
-        n.target = null;
-        n.rest = TICK_RATE;
-        return;
-      }
+      const lit = [heldItem(p.character), offHandItem(p.character)].some((item) => item && ITEMS[item]?.light);
+      players.push({ id: p.info.id, x: p.x, y: p.y, alive: p.character.hp > 0, lit });
     }
-    this.wander(n, STROLL_SPEED, STROLL_RADIUS);
+    return {
+      map: this.map, now, tick: this.tickCount, random: this.random, phase, weather, players, creatures: this.creatures,
+      hurt: (c, id) => {
+        const p = this.players.get(id);
+        if (p) this.hurt(p, c, now);
+      },
+    };
   }
 
-  private giveUp(c: Creature): void {
-    c.aggro = null;
-    c.returning = true;
-    c.target = null;
+  /** True while someone stands close enough to talk to this person, so they wait. */
+  private listening(n: Townsperson): boolean {
+    for (const p of this.players.values()) {
+      if (p.character.hp > 0 && Math.hypot(p.x - n.x, p.y - n.y) <= TALK_RANGE) return true;
+    }
+    return false;
+  }
+
+  /** Tells everyone here when the weather turns (not when it is first worked out). */
+  private weatherTurns(weather: Weather): void {
+    const was = this.weather;
+    this.weather = weather;
+    if (!was || was === weather) return;
+    this.broadcast({ t: 'sky', weather });
+    for (const p of this.players.values()) this.notice(p, WEATHER_NEWS[weather]);
   }
 
   private hurt(p: PlayerState, c: Creature, now: number): void {
@@ -978,56 +936,13 @@ export class Region {
     p.lastHurt = now;
     const defeated = p.character.hp === 0;
     this.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated });
-    if (defeated) this.giveUp(c);
-  }
-
-  /** Steps toward a point, sliding along walls. True once it arrives. */
-  private moveToward(c: Walker, tx: number, ty: number, speed: number): boolean {
-    const dx = tx - c.x;
-    const dy = ty - c.y;
-    const dist = Math.hypot(dx, dy);
-    const len = speed * TICK_SECONDS;
-    if (dist <= len) {
-      if (!collides(this.map, tx, ty)) {
-        c.x = tx;
-        c.y = ty;
-      }
-      return true;
-    }
-    const nx = c.x + (dx / dist) * len;
-    const ny = c.y + (dy / dist) * len;
-    if (!collides(this.map, nx, c.y)) c.x = nx;
-    if (!collides(this.map, c.x, ny)) c.y = ny;
-    return false;
-  }
-
-  /** Creatures and NPCs stroll between spots near home, resting in between. */
-  private wander(c: Walker, speed: number, radius: number): void {
-    if (!c.target) {
-      if (c.rest-- > 0) return;
-      for (let tries = 0; tries < 5 && !c.target; tries++) {
-        const angle = this.random() * Math.PI * 2;
-        const dist = 1 + this.random() * (radius - 1);
-        const t = { x: c.home.x + Math.cos(angle) * dist, y: c.home.y + Math.sin(angle) * dist };
-        if (!outsideSide(this.map, t.x, t.y) && !collides(this.map, t.x, t.y)) c.target = t;
-      }
-      if (!c.target) c.rest = TICK_RATE;
-      return;
-    }
-    const before = { x: c.x, y: c.y };
-    if (this.moveToward(c, c.target.x, c.target.y, speed)) {
-      c.target = null;
-      c.rest = Math.floor(TICK_RATE * (1 + this.random() * 3));
-    } else if (c.x === before.x && c.y === before.y) {
-      c.target = null;
-      c.rest = TICK_RATE;
-    }
+    if (defeated) giveUp(c);
   }
 
   // --- Talking, quests and items -----------------------------------------------
 
   private interact(p: PlayerState): void {
-    let npc: NpcPlacement | undefined;
+    let npc: Townsperson | undefined;
     let best = TALK_RANGE;
     for (const n of this.townsfolk) {
       const d = Math.hypot(n.x - p.x, n.y - p.y);
@@ -1066,10 +981,13 @@ export class Region {
     }
 
     const offer = questOffered(ch, npc.id);
+    // What they are up to at this hour comes first: woken from sleep, or out gathering herbs.
+    const now = greetingNow(npc, this.sky().phase);
+    const said = [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || NPC_GREETINGS[npc.id] || '...';
     const message: ServerMessage = {
       t: 'dialogue',
       npc: { id: npc.id, name: npc.name, asset: npc.asset },
-      text: [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || NPC_GREETINGS[npc.id] || '...',
+      text: now ? `${now}\n\n${said}` : said,
     };
     if (offer) message.offer = { quest: offer, title: QUESTS[offer]!.title, reward: rewardText(offer) };
     if (SHOPS[npc.id]) message.shop = true;
@@ -1244,45 +1162,6 @@ export class Region {
   private broadcastSystem(text: string): void {
     this.broadcast({ t: 'system', text, at: this.now() });
   }
-}
-
-/**
- * Up to `count` walkable spots around a point, nearest first, at least a
- * tile apart, for placing wished things.
- */
-export function findSpots(map: RegionMap, x: number, y: number, count: number, min = 1.5, max = 4): { x: number; y: number }[] {
-  const spots: { x: number; y: number }[] = [];
-  for (let r = min; r <= max && spots.length < count; r += 0.75) {
-    for (let a = 0; a < 12 && spots.length < count; a++) {
-      const angle = (a / 12) * Math.PI * 2 + r;
-      const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
-      if (outsideSide(map, s.x, s.y) || collides(map, s.x, s.y)) continue;
-      if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
-      spots.push(s);
-    }
-  }
-  return spots;
-}
-
-/** The nearest tile of these kinds within a radius of a point (tile coordinates). */
-export function nearestTile(map: RegionMap, x: number, y: number, kinds: Tile[], radius: number): { tile: Tile; x: number; y: number } | undefined {
-  let best: { tile: Tile; x: number; y: number } | undefined;
-  let bestD = Infinity;
-  const r = Math.ceil(radius);
-  for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
-    for (let tx = Math.floor(x) - r; tx <= Math.floor(x) + r; tx++) {
-      if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) continue;
-      const tile = tileAt(map, tx, ty);
-      if (!kinds.includes(tile)) continue;
-      // Distance from the player to the closest point of the tile.
-      const d = Math.hypot(Math.max(tx - x, 0, x - (tx + 1)), Math.max(ty - y, 0, y - (ty + 1)));
-      if (d <= radius && d < bestD) {
-        bestD = d;
-        best = { tile, x: tx, y: ty };
-      }
-    }
-  }
-  return best;
 }
 
 /** What a body's loot window shows. */

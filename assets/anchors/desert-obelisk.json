@@ -1,0 +1,36 @@
+{
+  "id": "desert-obelisk",
+  "description": {
+    "id": "desert-obelisk",
+    "name": "Sun obelisk",
+    "kind": "set-piece",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-ruin"
+    ],
+    "silhouetteHook": "a very tall narrow stone obelisk covered in carved sun symbols with a gold tip",
+    "body": "thin four-sided pillar about six people tall on a square base",
+    "materials": [
+      "red granite",
+      "gold"
+    ],
+    "colors": {
+      "main": "rose granite",
+      "secondary": "sand",
+      "accent": "gold tip"
+    },
+    "details": [
+      "cracks and a little sand at the base"
+    ],
+    "mood": "proud, timeless"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Sun obelisk (set-piece). Most recognisable feature: a very tall narrow stone obelisk covered in carved sun symbols with a gold tip. Body and shape: thin four-sided pillar about six people tall on a square base. Materials: red granite, gold. Colours: main rose granite, secondary sand, small accent of gold tip. Details: cracks and a little sand at the base. Mood: proud, timeless.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-ruin"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:22:37.646Z"
+}

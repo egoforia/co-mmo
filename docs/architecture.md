@@ -64,7 +64,13 @@ region's tick: movement, creatures, combat, loot, shops, quests, chat),
 `region-views.ts` (what players see of each thing: the one shape both
 snapshots and split-region borders send), `split-region.ts`, the
 `region-*`/`remote-region.ts` files for region servers, `parties.ts`,
-`trades.ts`, `character-ops.ts`.
+`trades.ts`, `character-ops.ts`. What lives in a region keeps its own module:
+`creature-brain.ts` (each creature's behaviour: wander, guard, chase,
+patrol, timid, pack; sleep out of its hours, fleeing), `townsfolk.ts`
+(people keeping their day) and `walkers.ts` (moving and path finding both
+use). The hour and weather come from shared `sky.ts`, worked out from the
+clock and the region alone, so every server, cell and browser agrees
+without being told; people's days are in shared `routines.ts`.
 
 **Wishes.** `wishes.ts` (prayers, granting, wish art), `god.ts` (the God's
 prompts), `workshop.ts` (Wish Workshop), `compiler.ts` + `rules.ts` +
@@ -79,10 +85,19 @@ tab API), `building-painter.ts`, `walk-painter.ts`, `hand-finder.ts` +
 restart). `assets/style.ts` names the active profile's words for the
 prompt builders; never write style sentences anywhere else.
 
+**The lands.** Shared `world.ts` lays out each region from its definition
+(256 tiles a side), `places.ts` adds the launch lands' great places (temple,
+caves, castle, palaces, tomb and wonders, joined by roads and bridges) and
+`lands.ts` their creatures, treasures, people and quests. Every picture
+they need is a description: buildings in `land-buildings.ts`, the rest in
+`server/src/assets/land-anchors.ts`.
+
 ## Client modules
 
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
-`world-scene.ts` (the Phaser scene; positions go through `PROJECTION`),
+`world-scene.ts` (the Phaser scene; positions go through `PROJECTION`; the
+ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
+light of the hour and the weather),
 `textures.ts` (tilesets from painted art), `wished.ts` (wished content),
 `lights.ts`, `sound.ts`, and one `*-ui.ts` per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and

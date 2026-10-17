@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
-import { TICK_SECONDS, type ArtManifest } from '@co-mmo/shared';
+import { TICK_SECONDS, type ArtManifest, type SkyConfig } from '@co-mmo/shared';
 import { Auth, type Mailer } from './auth.ts';
 import { World } from './world.ts';
 import type { Account, Store } from './store.ts';
@@ -85,6 +85,8 @@ export interface AppOptions {
   regionBus?: Bus;
   /** Every request to an outside service, for God's View's API Log; kept in memory unless given. */
   apiLog?: ApiLog;
+  /** How the sky turns: the length of a day and of each spell of weather (from .env). */
+  sky?: SkyConfig;
 }
 
 export interface App {
@@ -115,7 +117,7 @@ export interface App {
 /** HTTP API, static client, and game WebSocket on one server. */
 export function createApp(options: AppOptions): App {
   const { store } = options;
-  const world = new World();
+  const world = new World(Date.now, Math.random, options.sky);
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   const env = options.wishes.env ?? process.env;

@@ -38,6 +38,7 @@ game API (p is a player id, always e.player or e.data.player):
 - game.give(p, item, qty=1), game.take(p, item, qty=1) -> boolean, game.has(p, item) -> count. Items: this rule's own keys, or built-in ids (${'%ITEMS%'}).
 - game.heal(p, n<=${LIMITS.perCall.heal}), game.hurt(p, n<=${LIMITS.perCall.hurt}, never below 1 health), game.gold(p, n) (n<=${LIMITS.perCall.gold}; negative to charge, false if they cannot pay), game.xp(p, n<=${LIMITS.perCall.xp}).
 - game.where(p) -> {region, biome, x, y}; game.near(p, tile, radius<=3) -> boolean; game.name(p) -> name or null if they left.
+- game.sky(p) -> {time: 'dawn'|'day'|'dusk'|'night', hour: 0-23, weather: 'clear'|'cloudy'|'rain'|'storm'|'fog'|'snow'|'sandstorm'} where p is.
 - game.after(seconds 0.5-600, 'event-name', data): fire your own event later. Timers are lost if the server restarts.
 - game.get(p, key), game.set(p, key, value): small JSON state per player (2 KB), or shared with p = null (8 KB); set null to delete. Survives restarts.
 - game.random(), game.chance(probability) -> boolean, game.pick([[value, weight], ...]), game.now() -> ms.

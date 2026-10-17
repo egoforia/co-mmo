@@ -1,0 +1,39 @@
+{
+  "id": "bridge-planks",
+  "description": {
+    "id": "bridge-planks",
+    "name": "Plank bridge",
+    "kind": "tile",
+    "biome": "any",
+    "references": [
+      "woods-path",
+      "sanctum-pond"
+    ],
+    "silhouetteHook": "weathered wooden planks laid side by side, seen from straight above",
+    "body": "flat walkable deck of planks running left to right, filling the whole tile",
+    "materials": [
+      "old wood",
+      "iron nails"
+    ],
+    "colors": {
+      "main": "warm honey brown",
+      "secondary": "grey weathered wood",
+      "accent": "dark iron nail heads"
+    },
+    "details": [
+      "thin dark gaps between planks",
+      "a few knots"
+    ],
+    "mood": "sturdy, inviting"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.\nNot a block, diamond, island or platform: no sides, thickness, border, frame or horizon.\nEven lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.\nSubject: Plank bridge (tile). Most recognisable feature: weathered wooden planks laid side by side, seen from straight above. Body and shape: flat walkable deck of planks running left to right, filling the whole tile. Materials: old wood, iron nails. Colours: main warm honey brown, secondary grey weathered wood, small accent of dark iron nail heads. Details: thin dark gaps between planks; a few knots. Mood: sturdy, inviting.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon.",
+  "references": [
+    "woods-path",
+    "sanctum-pond"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:19:28.152Z"
+}

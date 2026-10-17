@@ -1,0 +1,43 @@
+{
+  "id": "desert-mummy-guard",
+  "description": {
+    "id": "desert-mummy-guard",
+    "name": "Mummy Guard",
+    "kind": "monster",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-scarab"
+    ],
+    "silhouetteHook": "a tall mummy wrapped in old linen wearing a golden mask and holding a curved spear",
+    "body": "tall stiff figure, loose bandage ends trailing",
+    "materials": [
+      "linen",
+      "gold",
+      "bronze"
+    ],
+    "colors": {
+      "main": "dusty cream linen",
+      "secondary": "gold mask and a deep blue sash",
+      "accent": "turquoise eyes"
+    },
+    "details": [
+      "a scarab brooch on the chest",
+      "no pink or purple anywhere"
+    ],
+    "mood": "grim, dutiful",
+    "extra": {
+      "threat": "normal",
+      "movement": "stiff march"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nPaint the character in the reference picture again, exactly the same: face, hair, clothes, colours, proportions, pose, size and framing.\nChange only this: the sash and loincloth are deep blue cloth; nothing on the mummy is pink or magenta.",
+  "references": [
+    "desert-mummy-guard (before)"
+  ],
+  "edit": "the sash and loincloth are deep blue cloth; nothing on the mummy is pink or magenta",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:27:20.990Z"
+}

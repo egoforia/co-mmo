@@ -80,13 +80,13 @@ Definitions (only for minor and moderate):
 item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit (gear only: the stat it helps)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"look":LOOK}
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
 ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
-creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
+creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase|patrol|timid|pack","active":"day|night (leave out for creatures about at all hours)","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
 loot: {"kind":"loot","creature":"<id from: %CREATURES%>","drops":[<up to ${MAX_WISHED_DROPS} of {"item":"<id from: %ITEMS%>","chance":<0.05-${MAX_WISHED_CHANCE}>,"qty":<1-${MAX_WISHED_DROP_QTY}>}>]} (a chance of 0.25 is one defeat in four; keep rare and valuable things rare)
 npc: {"kind":"npc","name":"...","description":"...","greeting":"<what they say when spoken to>","look":LOOK}
-region: {"kind":"region","name":"<the land's name>","description":"...","biome":"%BIOMES%","danger":<1-${MAX_WISHED_LEVEL}>,"trees":<0-3>,"rocks":<0-3>,"water":<0-3>,"creatures":[<one or two of: {"existing":"<id from: %CREATURES%>","count":<1-${MAX_REGION_CREATURES}>} or a new one {"name":"...","description":"...","behavior":"wander|guard|chase","count":<1-${MAX_REGION_CREATURES}>,"drops":[<item ids>],"look":LOOK}>],"npc":<null or {"name":"...","description":"...","greeting":"...","look":LOOK}>} (new creatures there are as strong as its danger; prefer existing creatures when they fit)
+region: {"kind":"region","name":"<the land's name>","description":"...","biome":"%BIOMES%","danger":<1-${MAX_WISHED_LEVEL}>,"trees":<0-3>,"rocks":<0-3>,"water":<0-3>,"creatures":[<one or two of: {"existing":"<id from: %CREATURES%>","count":<1-${MAX_REGION_CREATURES}>} or a new one {"name":"...","description":"...","behavior":"wander|guard|chase|patrol|timid|pack","active":"day|night (optional)","count":<1-${MAX_REGION_CREATURES}>,"drops":[<item ids>],"look":LOOK}>],"npc":<null or {"name":"...","description":"...","greeting":"...","look":LOOK}>} (new creatures there are as strong as its danger; prefer existing creatures when they fit)
 LOOK: {"hook":"<the one feature you would recognise it by>","body":"<body and shape in a sentence>","color":"#rrggbb main colour","mood":"<a few words>"}
 The world decides how strong gear and abilities are from their rarity and kind. Epic and Legendary gear is earned, never wished; offer Rare at most. Wished things are for everyone's fun: refuse gear or recipes that would flood the world with gold.
-wander creatures only fight back; guard creatures attack anyone near their spot; chase creatures hunt anyone they see. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).
+wander creatures only fight back and run when badly hurt; guard creatures attack anyone near their spot; chase creatures hunt anyone they see; patrol creatures walk rounds about their spot and attack anyone they meet; timid creatures never fight and run from anyone close; pack creatures roam together and all hunt when one does. Day creatures sleep at night and night creatures by day; in the dark they notice players from closer, unless the player carries a light. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).
 A new region is a whole square of land next to the one the player is in; the world places it beyond the edge named below, and joins it with roads to every land beside it.`;
 
 function tradableItems(): string {
@@ -405,14 +405,19 @@ export class OfflineGod implements ChatModel {
       };
     }
     if (/\b(creature|monster|beast|animal|critter|slime|wolf|goat|bird|beetle|spider|dragon)\b/.test(text)) {
-      const behavior = /\b(fierce|hunt|angry|aggressive|chase)\b/.test(text) ? 'chase' : /\b(guard|protect)\b/.test(text) ? 'guard' : 'wander';
+      const behavior = /\b(pack|packs|swarm|herd)\b/.test(text) ? 'pack'
+        : /\b(fierce|hunt|angry|aggressive|chase)\b/.test(text) ? 'chase'
+          : /\b(guard|protect)\b/.test(text) ? 'guard'
+            : /\b(patrol|patrols|sentry|watchman)\b/.test(text) ? 'patrol'
+              : /\b(shy|timid|skittish|scared)\b/.test(text) ? 'timid' : 'wander';
+      const active = /\b(night|nocturnal|moon|moonlit)\b/.test(text) ? 'night' : /\b(sun|sunny|daytime)\b/.test(text) ? 'day' : undefined;
       return {
         say: `I can feel it stirring already. A ${thing}, here beside you?`,
         wish: {
           tier: 'moderate',
           title: cap(thing),
           summary: `Three ${cap(thing)}s will appear near you.`,
-          definition: { kind: 'creature', name: cap(thing), description: `A ${thing}, wished into the world.`, behavior, level: 1, count: 3, drops: ['tonic'], look },
+          definition: { kind: 'creature', name: cap(thing), description: `A ${thing}, wished into the world.`, behavior, ...(active ? { active } : {}), level: 1, count: 3, drops: ['tonic'], look },
         },
       };
     }

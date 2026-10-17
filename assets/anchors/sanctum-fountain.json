@@ -1,0 +1,38 @@
+{
+  "id": "sanctum-fountain",
+  "description": {
+    "id": "sanctum-fountain",
+    "name": "Fountain of the Pilgrims",
+    "kind": "set-piece",
+    "biome": "sanctum",
+    "references": [
+      "sanctum-shrine"
+    ],
+    "silhouetteHook": "a round white marble fountain with a small statue of a robed pilgrim pouring water from a jar",
+    "body": "low round basin about as wide as two people, the statue in the middle",
+    "materials": [
+      "white marble",
+      "clear water",
+      "gold"
+    ],
+    "colors": {
+      "main": "cream white",
+      "secondary": "sky blue water",
+      "accent": "pale gold trim"
+    },
+    "details": [
+      "coins glinting in the water",
+      "rose petals floating"
+    ],
+    "mood": "peaceful, welcoming"
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.\nSubject: Fountain of the Pilgrims (set-piece). Most recognisable feature: a round white marble fountain with a small statue of a robed pilgrim pouring water from a jar. Body and shape: low round basin about as wide as two people, the statue in the middle. Materials: white marble, clear water, gold. Colours: main cream white, secondary sky blue water, small accent of pale gold trim. Details: coins glinting in the water; rose petals floating. Mood: peaceful, welcoming.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "sanctum-shrine"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:20:14.388Z"
+}

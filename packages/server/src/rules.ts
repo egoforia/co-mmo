@@ -6,7 +6,7 @@
 // limits. A rule that keeps failing or hits its limits is paused on its own.
 
 import { getQuickJS, shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime, type QuickJSWASMModule } from 'quickjs-emscripten';
-import { ITEMS, addItem, discover, itemCount, maxHp, ruleItemId, takeItem, type RuleWish } from '@co-mmo/shared';
+import { ITEMS, addItem, dayPart, discover, gameHour, itemCount, maxHp, ruleItemId, takeItem, type DayPart, type RuleWish, type Weather } from '@co-mmo/shared';
 import { TILE_NAMES } from './region.ts';
 import type { World } from './world.ts';
 import type { CharacterOp } from './character-ops.ts';
@@ -57,6 +57,8 @@ export interface RuleHost {
   name(player: string): string | null;
   where(player: string): { region: string; biome: string; x: number; y: number } | null;
   near(player: string, tile: string, radius: number): boolean;
+  /** The hour and the weather where the player is. */
+  sky(player: string): { time: DayPart; hour: number; weather: Weather } | null;
   count(player: string, item: string): number;
   give(player: string, item: string, qty: number): boolean;
   take(player: string, item: string, qty: number): boolean;
@@ -120,6 +122,7 @@ const PRELUDE = `
     name: (p) => call('name', p),
     where: (p) => call('where', p),
     near: (p, tile, radius = 1.5) => call('near', p, tile, radius),
+    sky: (p) => call('sky', p),
     has: (p, item) => call('has', p, item),
     give: (p, item, qty = 1) => call('give', p, item, qty),
     take: (p, item, qty = 1) => call('take', p, item, qty),
@@ -362,6 +365,8 @@ export class RuleRuntime {
         return p ? host.name(p) : null;
       case 'where':
         return p ? host.where(p) : null;
+      case 'sky':
+        return p ? host.sky(p) : null;
       case 'near': {
         const tile = str(args[1], 16);
         if (!(tile in TILE_NAMES)) throw new RuleError(`Unknown tile "${tile}"; use ${Object.keys(TILE_NAMES).join(', ')}.`);
@@ -483,6 +488,12 @@ export function worldHost(world: World): RuleHost {
       return { region: region.def.id, biome: region.def.biome, x: Math.round(pos.x * 10) / 10, y: Math.round(pos.y * 10) / 10 };
     },
     near: (p, tile, radius) => at(p)?.nearTile(p, TILE_NAMES[tile]!, radius) ?? false,
+    sky: (p) => {
+      const region = at(p);
+      if (!region) return null;
+      const { phase, weather } = world.skyOver(region.def);
+      return { time: dayPart(phase), hour: Math.floor(gameHour(phase)), weather };
+    },
     count: (p, item) => {
       const c = at(p)?.character(p);
       return c ? itemCount(c, item) : 0;

@@ -37,6 +37,7 @@ import {
   type SnapshotMessage,
   type WalkDirection,
   type WelcomeMessage,
+  type Weather,
   walkArt,
   walkStandArt,
   walkDirection,
@@ -47,6 +48,7 @@ import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBu
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
 import { makeLight, placeLight, type LitPoint } from './lights.ts';
+import { SkyClock } from './sky.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Sprite;
@@ -112,7 +114,27 @@ interface DrawnRegion {
   buildings: BuildingView[];
   /** Art ids of its biome kit: when one is painted, it is drawn again. */
   kit: Set<string>;
+  map: RegionMap;
+  /** The ground tiles to draw, buildings and landmarks taken out. */
+  ground: number[][];
+  /** Its ground and scenery near us, in chunks, by chunk index. */
+  chunks: Map<number, Chunk>;
 }
+
+/** A square of a region's ground and its trees and rocks, drawn only while we are near. */
+interface Chunk {
+  tilemap: Phaser.Tilemaps.Tilemap;
+  objects: Phaser.GameObjects.GameObject[];
+}
+
+/**
+ * Lands are big (256 tiles a side), so their ground, trees and rocks are
+ * drawn in chunks this many tiles across, only those near us: chunks within
+ * DRAW_REACH tiles are drawn and those beyond FORGET_REACH let go.
+ */
+const CHUNK = 32;
+const DRAW_REACH = 36;
+const FORGET_REACH = 60;
 
 export interface WorldSceneOptions {
   welcome: WelcomeMessage;
@@ -148,6 +170,8 @@ export class WorldScene extends Phaser.Scene {
   /** Rendered position eases toward the predicted one to hide corrections. */
   private shown = { x: 0, y: 0 };
   private tint?: Phaser.GameObjects.Rectangle;
+  /** The hour and the weather, which grade the light and brighten lights at night. */
+  private readonly sky = new SkyClock();
   /** Which way we face: 1 right, -1 left. */
   private facing = 1;
   /**
@@ -161,6 +185,8 @@ export class WorldScene extends Phaser.Scene {
   private drawn = new Map<string, DrawnRegion>();
   /** Kit art painted since the land was last drawn. */
   private painted = new Set<string>();
+  /** Where we stood, roughly, when the chunks near us were last drawn. */
+  private nearAt = '';
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -265,8 +291,8 @@ export class WorldScene extends Phaser.Scene {
         for (const a of group.values()) destroyAvatar(a);
         group.clear();
       }
-      this.easeLight(lightTint(welcome.region.def.biome));
     }
+    this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
     if (far) {
       // A fall carries us back to the shrine: arrive there, not slide across the world.
       this.cameras.main.centerOn(this.me.body.x, this.me.body.y).fadeIn(250, 24, 20, 37);
@@ -308,8 +334,9 @@ export class WorldScene extends Phaser.Scene {
     cam.startFollow(this.me.body, true, 0.2, 0.2);
     cam.fadeIn(250, 24, 20, 37);
 
-    // The biome's light grades everything under the labels.
-    this.tint = this.add.rectangle(0, 0, 10, 10, lightTint(welcome.region.def.biome)).setOrigin(0.5).setScrollFactor(0);
+    // The biome's light, the hour and the weather grade everything under the labels.
+    this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
+    this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
     this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
@@ -350,20 +377,14 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setBounds(view.x, view.y, view.width, view.height);
   }
 
-  /** Eases the biome's light from what it is to `to`, so no edge switches it at once. */
-  private easeLight(to: number): void {
-    const tint = this.tint;
-    if (!tint || tint.fillColor === to) return;
-    const a = Phaser.Display.Color.ValueToColor(tint.fillColor);
-    const b = Phaser.Display.Color.ValueToColor(to);
-    this.tweens.killTweensOf(tint);
-    this.tweens.addCounter({
-      from: 0, to: 100, duration: 1200,
-      onUpdate: (tween) => {
-        const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, tween.getValue() ?? 100);
-        tint.setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
-      },
-    });
+  /** The weather over our land turned. */
+  setWeather(weather: Weather): void {
+    this.sky.setWeather(weather);
+  }
+
+  /** The hour and the weather in a few words. */
+  skyText(): string {
+    return this.sky.words();
   }
 
   onSnapshot(snapshot: SnapshotMessage): void {
@@ -378,7 +399,9 @@ export class WorldScene extends Phaser.Scene {
       this.setHeld(remote, p.offHeld, 'left');
     }
     this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
+    for (const c of snapshot.creatures ?? []) this.creatures.get(c.id)?.label.setText(creatureLabel(c));
     this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
+    for (const n of snapshot.npcs ?? []) this.npcs.get(n.id)?.label.setText(n.asleep ? `${n.name} (asleep)` : n.name);
     const bodies = snapshot.bodies ?? [];
     this.sync(this.bodies, bodies, now, (b) => this.makeBody(b));
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
@@ -387,6 +410,7 @@ export class WorldScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const predictor = this.predictor;
     if (!predictor) return;
+    this.tint?.setFillStyle(this.sky.tint(deltaMs));
     // Fixed-rate input: one input per server tick, however fast we render.
     this.accumulator += Math.min(deltaMs, 250) / 1000;
     while (this.accumulator >= TICK_SECONDS) {
@@ -411,6 +435,7 @@ export class WorldScene extends Phaser.Scene {
     }
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     this.revealBuildings(false);
+    this.drawNear();
 
     const now = performance.now();
     for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
@@ -618,7 +643,7 @@ export class WorldScene extends Phaser.Scene {
     const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
     // The flame lights the ground it flies over.
     const lit = makeLight(this, BOLT_LIGHT, LABEL_DEPTH - 0.5);
-    const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2);
+    const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2, this.sky.darkness());
     follow();
     this.tweens.add({
       targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
@@ -708,10 +733,80 @@ export class WorldScene extends Phaser.Scene {
       o.destroy();
     }
     for (const m of region.tilemaps) m.destroy();
+    for (const chunk of region.chunks.values()) dropChunk(chunk);
     this.drawn.delete(id);
   }
 
-  /** Paints a region's ground and scenery at its square in the world. */
+  /** Draws the ground and scenery near us and lets go of what is far, when we have moved a little. */
+  private drawNear(force = false): void {
+    const x = this.origin.x + this.shown.x;
+    const y = this.origin.y + this.shown.y;
+    const at = `${Math.floor(x / 8)},${Math.floor(y / 8)}`;
+    if (at === this.nearAt && !force) return;
+    this.nearAt = at;
+    for (const region of this.drawn.values()) {
+      const { map } = region;
+      const ox = map.def.at.x * map.width;
+      const oy = map.def.at.y * map.height;
+      const across = Math.ceil(map.width / CHUNK);
+      for (let cy = 0; cy < Math.ceil(map.height / CHUNK); cy++) {
+        for (let cx = 0; cx < across; cx++) {
+          const left = ox + cx * CHUNK;
+          const top = oy + cy * CHUNK;
+          const dx = Math.max(left - x, 0, x - (left + CHUNK));
+          const dy = Math.max(top - y, 0, y - (top + CHUNK));
+          const far = Math.hypot(dx, dy);
+          const index = cy * across + cx;
+          const chunk = region.chunks.get(index);
+          if (!chunk && far <= DRAW_REACH) region.chunks.set(index, this.drawChunk(region, cx * CHUNK, cy * CHUNK));
+          else if (chunk && far > FORGET_REACH) {
+            dropChunk(chunk);
+            region.chunks.delete(index);
+          }
+        }
+      }
+    }
+  }
+
+  /** One chunk of a region's ground, with the trees and rocks standing on it. */
+  private drawChunk(region: DrawnRegion, x0: number, y0: number): Chunk {
+    const { map } = region;
+    const ox = map.def.at.x * map.width;
+    const oy = map.def.at.y * map.height;
+    const rows = region.ground.slice(y0, y0 + CHUNK).map((row) => row.slice(x0, x0 + CHUNK));
+    const { tilemap } = this.groundLayer(rows, ox + x0, oy + y0, -1, registerTileset(this, map.def));
+    const objects: Phaser.GameObjects.GameObject[] = [];
+    const biome = map.def.biome;
+    for (let y = y0; y < Math.min(y0 + CHUNK, map.height); y++) {
+      for (let x = x0; x < Math.min(x0 + CHUNK, map.width); x++) {
+        const tile = map.tiles[y * map.width + x];
+        if (tile !== Tile.Tree && tile !== Tile.Rock) continue;
+        const variant = Math.floor(rand2(x, y, 5) * 3);
+        const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
+        if (!key) continue;
+        const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
+        const at = PROJECTION.toScreen(ox + x + 0.5, oy + y + 1);
+        const img = this.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
+        img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
+        img.setDepth(PROJECTION.depth(ox + x + 0.5, oy + y + 1) - 1);
+        objects.push(img);
+      }
+    }
+    return { tilemap, objects };
+  }
+
+  /** A tile layer of the rows given, its top-left tile at world (x, y). */
+  private groundLayer(tiles: number[][], x: number, y: number, depth: number, key: string): Phaser.Tilemaps.TilemapLayer {
+    const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
+    const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
+    const at = PROJECTION.toScreen(x, y);
+    return tilemap.createLayer(0, tileset, at.x, at.y)!.setDepth(depth);
+  }
+
+  /**
+   * Draws a region at its square in the world: its buildings and landmarks
+   * now, its ground, trees and rocks in chunks as we come near (drawNear).
+   */
   private drawRegion(map: RegionMap, layout: string): DrawnRegion {
     const ox = map.def.at.x * map.width;
     const oy = map.def.at.y * map.height;
@@ -720,7 +815,6 @@ export class WorldScene extends Phaser.Scene {
     const kit = new Set<string>();
     const look = biomeLook(map.def.biome);
     for (const id of [look.ground, look.path, look.water, ...look.trees, ...look.rocks]) kit.add(id);
-    const tilesetKey = registerTileset(this, map.def);
     const data: number[][] = [];
     for (let y = 0; y < map.height; y++) {
       data.push(Array.from(map.tiles.subarray(y * map.width, (y + 1) * map.width)));
@@ -733,27 +827,23 @@ export class WorldScene extends Phaser.Scene {
         data[y]![x] = around.includes(Tile.Floor) ? Tile.Floor : around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
       }
     }
-    const layer = (tiles: number[][], depth: number, key = tilesetKey) => {
-      const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
-      tilemaps.push(tilemap);
-      const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-      const at = PROJECTION.toScreen(ox, oy);
-      return tilemap.createLayer(0, tileset, at.x, at.y)!.setDepth(depth);
-    };
-    // Each building keeps its floor and walls on a layer of its own, in its
-    // own painted tiles, hidden behind its outside art until we come close;
-    // the ground runs on underneath.
+    // Each building keeps its floor and walls on a layer of its own, just its
+    // size, in its own painted tiles, hidden behind its outside art until we
+    // come close; the ground runs on underneath.
     const views = map.buildings.map((b) => {
-      const inside = data.map((row, y) => row.map((t, x) => (within(b, x, y) ? t : -1)));
+      const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
       for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
       const exterior = hasExterior(this, b.style) ? this.exterior(b, ox, oy) : undefined;
-      const view: BuildingView = { building: b, ox, oy, exterior, inside: [layer(inside, -0.5, registerBuildingTileset(this, b.style))], open: !exterior };
+      const floor = this.groundLayer(inside, ox + b.x, oy + b.y, -0.5, registerBuildingTileset(this, b.style));
+      tilemaps.push(floor.tilemap);
+      const view: BuildingView = { building: b, ox, oy, exterior, inside: [floor], open: !exterior };
       return view;
     });
-    layer(data, -1);
-    this.placeScenery(map, ox, oy, views);
+    this.placeLandmarks(map, ox, oy, views);
     const objects = this.children.list.filter((o) => !before.has(o));
-    return { layout, objects, tilemaps, buildings: views, kit };
+    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map() };
+    this.nearAt = '';
+    return region;
   }
 
   /**
@@ -769,29 +859,14 @@ export class WorldScene extends Phaser.Scene {
     return img.setDepth(PROJECTION.depth(ox + b.x, oy + b.y + b.height));
   }
 
-  /** Landmarks, and the trees and rocks standing on blocking tiles. */
-  private placeScenery(map: RegionMap, ox: number, oy: number, views: BuildingView[]): void {
-    const biome = map.def.biome;
+  /** Landmarks: set pieces out in the land, and furniture inside buildings. */
+  private placeLandmarks(map: RegionMap, ox: number, oy: number, views: BuildingView[]): void {
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
       const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
       const img = this.add.image(at.x, at.y, l.asset).setOrigin(0.5, 0.92);
       img.setDepth(PROJECTION.depth(ox + l.x, oy + l.y));
       views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
-    }
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        const tile = map.tiles[y * map.width + x];
-        if (tile !== Tile.Tree && tile !== Tile.Rock) continue;
-        const variant = Math.floor(rand2(x, y, 5) * 3);
-        const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
-        if (!key) continue;
-        const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
-        const at = PROJECTION.toScreen(ox + x + 0.5, oy + y + 1);
-        const img = this.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
-        img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
-        img.setDepth(PROJECTION.depth(ox + x + 0.5, oy + y + 1) - 1);
-      }
     }
   }
 
@@ -924,7 +999,7 @@ export class WorldScene extends Phaser.Scene {
       // The light shines from the hand, or from the holder's middle until the hand is found.
       const [hx, hy] = hand ?? [b.originX, b.originY - 0.5];
       const lx = b.x + (b.flipX ? b.originX - hx : hx - b.originX) * b.displayWidth;
-      placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, this.time.now, b.visible);
+      placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, this.time.now, b.visible, this.sky.darkness());
     }
     if (!key || !hand || !grip || !this.textures.exists(key)) {
       held.image?.setVisible(false);
@@ -977,9 +1052,19 @@ function within(b: Building, x: number, y: number): boolean {
   return x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height;
 }
 
+/** A creature's name tag says when it is asleep or running away. */
+function creatureLabel(c: CreatureState): string {
+  return c.mood === 'asleep' ? `${c.name} (asleep)` : c.mood === 'fleeing' ? `${c.name} (running away)` : c.name;
+}
+
 /** A body's name tag says when there is something on it for us. */
 function bodyLabel(b: BodyState): string {
   return b.loot ? `${b.name} (E for loot)` : b.name;
+}
+
+function dropChunk(chunk: Chunk): void {
+  for (const o of chunk.objects) o.destroy();
+  chunk.tilemap.destroy();
 }
 
 function destroyAvatar(a: Avatar): void {

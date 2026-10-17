@@ -1,3 +1,4 @@
+import { standing } from '@co-mmo/shared';
 import type { ContentRecord, Store } from './store.ts';
 import { RuleRuntime, worldHost, type RuleStatus } from './rules.ts';
 import type { World } from './world.ts';
@@ -32,8 +33,9 @@ export class LiveRules {
       },
     }).then((runtime) => {
       this.loading.delete(record.id);
-      // Rolled back while it loaded.
-      if (this.store.contentById(record.id)?.status !== 'granted') return runtime.dispose();
+      // Rolled back or switched off while it loaded.
+      const now = this.store.contentById(record.id);
+      if (!now || !standing(now)) return runtime.dispose();
       if (record.rule?.paused) runtime.pause(record.rule.reason ?? 'Paused by a Steward.', false);
       this.loaded.set(record.id, runtime);
     }, (err) => {

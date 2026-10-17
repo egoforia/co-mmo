@@ -85,3 +85,18 @@ If a build fails, the wish shows "Build failed" with the reason, and you can
 try again (a fresh issue) or give up on it. A pull request whose automatic
 fixes ran out stays open: you can still ask `@claude` for changes and merge
 it, and the game follows it.
+
+## Switching a wish off, and undoing it
+
+Every Engine wish is a mod with the id `wish-<issue>`: the coding agent puts
+what it adds behind `modOn(engineModId(<issue>))`, and the wish guard
+refuses new code that never checks it. On God's View's Mods tab, **Switch
+off** stops it at once, everywhere, without a restart; **Switch on** brings
+it back.
+
+**Undo** takes the change out for good. It is built the same way it came
+in: a new Engine wish, "Undo: <title>", opens an issue, the coding agent
+writes a change that removes it, and you merge it. When a Steward presses
+Undo, it waits on the Wishes tab for your approval; when you press it, it
+is queued at once. Once the undo is live after an update, the old wish
+shows "Undone".

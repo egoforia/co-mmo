@@ -60,7 +60,10 @@ on another object after it is built). `region-main.ts` starts a region server.
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
 
 **The world.** `world.ts` (regions, travel, hosting), `region.ts` (one
-region's tick: movement, creatures, combat, loot, shops, quests, chat),
+region's tick: movement, snapshots, joining and leaving) with its systems in
+`region/`: `state.ts` (who and what is here, shared by all), `combat.ts`,
+`minds.ts` (runs the creatures and NPCs below each tick), `kit.ts` (gear, items, crafting, shops),
+`quests.ts` (talking and quests), `bodies.ts` (loot) and `chat.ts`,
 `region-views.ts` (what players see of each thing: the one shape both
 snapshots and split-region borders send), `split-region.ts`, the
 `region-*`/`remote-region.ts` files for region servers, `parties.ts`,
@@ -72,7 +75,13 @@ use). The hour and weather come from shared `sky.ts`, worked out from the
 clock and the region alone, so every server, cell and browser agrees
 without being told; people's days are in shared `routines.ts`.
 
-**Wishes.** `wishes.ts` (prayers, granting, wish art), `god.ts` (the God's
+**Wishes.** `wishes.ts` is one face over the parts in `wishes/`:
+`prayers.ts` (talking to the God, its limits and cost), `cards.ts` (wish
+cards and what saying yes does), `granting.ts` (putting wishes into the
+world, review, switching off and on, undo), `drafting.ts` (scripted rule
+drafts), `painter.ts` (wish art) and `news.ts` (telling players and
+Stewards). Every granted wish is a mod: `shared/src/mods.ts` holds the
+switch (`modOn`) that Engine wish code checks. `god.ts` (the God's
 prompts), `workshop.ts` (Wish Workshop), `compiler.ts` + `rules.ts` +
 `rule-test.ts` + `live-rules.ts` (scripted rules in the QuickJS sandbox),
 `builds.ts` (Engine wishes built on GitHub).
@@ -126,5 +135,4 @@ light of the hour and the weather),
 
 ## Next splits (not done yet)
 
-`Wishes` into prayers, cards, granting and wish art; `Region` into systems
-(combat, commerce, quests); a renderer interface around Phaser.
+A renderer interface around Phaser.

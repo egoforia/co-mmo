@@ -10,7 +10,8 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
   into regions on separate processes, never by refusing players.
 - Players make wishes to an AI God from anywhere. Wishes become content data
   (most), sandboxed scripts (some), or reviewed engine changes (rare). Every
-  wish is versioned and can be rolled back.
+  wish is versioned and is a mod: it can be switched off and on again, or
+  undone for good (see Wishes as mods).
 - Mature content rating with no content-rating limits; players must be 18+.
 - AI and asset providers sit behind adapters and are chosen in settings
   (God's View), never hard-coded.
@@ -49,6 +50,24 @@ conversation, an optional paid sample (off by default; switched on in God's
 View Budget, one per draft, paid in Favor, paused past the warning line, and
 used as the final art when the wish is sent unchanged), and rewording a
 picture's prompt before repainting, for Stewards and the Owner.
+
+## Wishes as mods
+
+Every granted wish is a mod. On God's View's Mods tab, a Steward or the
+Owner can **switch it off**: its creatures, people, region, recipe, loot or
+rule leave the world, while things players hold stay in their bags asleep
+(no use, no gear bonus, no trade) and its abilities stay in spellbooks
+unused, until it is **switched on** again. The switch survives restarts and
+reaches every region server and browser with the content log (`off` on the
+entry; `applyContent` in `packages/shared/src/content.ts`). **Undo** takes a
+wish out for good. A wish that changed the code (an Engine wish) has a mod
+id, `wish-<issue>`, and its code runs only while `modOn(id)` is true
+(`packages/shared/src/mods.ts`); the wish guard refuses new wish code that
+never checks it. Undoing a code change is itself an Engine wish, "Undo:
+<title>", which the coding agent builds and the Owner merges; a Steward's
+undo waits for the Owner's approval. When it goes live, the old wish is
+marked undone. The lighting wish (issue #59) was switched behind
+`LIGHT_MOD` when mods arrived.
 
 ## Milestones
 

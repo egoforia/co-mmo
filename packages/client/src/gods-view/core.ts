@@ -57,6 +57,12 @@ export interface Entry {
   test?: { passed: boolean; at: number; summary: string[]; errors: string[]; sample: string[] };
   rule?: { paused: boolean; reason?: string };
   build?: Build;
+  /** Switched off by a Steward: who and when. */
+  off?: { by: string; at: number };
+  /** An Engine wish's switch, which its code checks. */
+  mod?: string;
+  /** An Engine wish that takes an earlier wish's code change out: that wish's id. */
+  undoes?: string;
   progress?: { state: 'in-progress' | 'needs-input' | 'error' | 'done' | 'closed'; label: string; detail?: string; link?: string };
   live?: { paused: boolean; reason?: string; runs: number; errors: { at: number; message: string }[]; effects: Record<string, number>; events: string[]; timers: number } | null;
 }

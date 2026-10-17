@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { TILE_PIXELS, lightStrength, type Light } from '@co-mmo/shared';
+import { LIGHT_MOD, TILE_PIXELS, lightStrength, modOn, type Light } from '@co-mmo/shared';
 
 // Point lights for things that burn or glow: a soft pool of added light that
 // sits above the biome's shade, so a torch brightens the ground around its
@@ -31,6 +31,7 @@ const NIGHT_BOOST = 0.8;
 
 /** Moves a light to (x, y) and sets how bright it burns at `ms`, brighter the darker it is (0 day to 1 night). */
 export function placeLight(lit: LitPoint, x: number, y: number, ms: number, visible: boolean, dark = 0): void {
-  lit.point.setPosition(x, y).setVisible(visible);
+  // A Steward can switch the lighting wish off; its lights go dark until it is on again.
+  lit.point.setPosition(x, y).setVisible(visible && modOn(LIGHT_MOD));
   lit.point.intensity = INTENSITY * (1 + NIGHT_BOOST * dark) * lightStrength(lit.light, ms, lit.seed);
 }

@@ -90,8 +90,8 @@ prompts), `workshop.ts` (Wish Workshop), `compiler.ts` + `rules.ts` +
 prompt builder; `art-jobs.ts` (the painting log), `art-recipes.ts` (what was
 sent for each picture), `art-history.ts` (versions), `art-studio.ts` (Art
 tab API), `building-painter.ts`, `walk-painter.ts`, `hand-finder.ts` +
-`hand-sources.ts`, `sound-maker.ts`, `paint-requests.ts` (resume after
-restart). `assets/style.ts` names the active profile's words for the
+`hand-sources.ts`, `sound-maker.ts`, `normal-painter.ts` (painted normal
+maps), `paint-requests.ts` (resume after restart). `assets/style.ts` names the active profile's words for the
 prompt builders; never write style sentences anywhere else.
 
 **The lands.** Shared `world.ts` lays out each region from its definition
@@ -108,7 +108,10 @@ they need is a description: buildings in `land-buildings.ts`, the rest in
 ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
 light of the hour and the weather),
 `textures.ts` (tilesets from painted art), `wished.ts` (wished content),
-`lights.ts`, `sound.ts`, and one `*-ui.ts` per panel. God's View is
+`lights.ts` (pictures are lit with Phaser's Light2D: the sky's colour plus
+lamps), `normal-maps.ts` + `relief.ts` + `relief-worker.ts` (a normal map
+worked out for every picture in a worker; a painted `<key>-normal` wins),
+`sound.ts`, and one `*-ui.ts` per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and
 `api-log-ui.ts`.
 

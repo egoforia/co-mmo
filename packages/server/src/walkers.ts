@@ -74,7 +74,7 @@ export function wander(map: RegionMap, w: Walker, speed: number, radius: number,
 }
 
 /** The farthest a path is searched for, in tiles walked; beyond it walkers go straight and slide. */
-const MAX_PATH_TILES = 4096;
+const MAX_PATH_TILES = 16384;
 
 /**
  * A way from one point to another around anything in the way, as tile

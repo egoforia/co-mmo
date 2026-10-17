@@ -14,12 +14,19 @@ which milestone the code is at.
   Owner; any player can then make invite links. Players confirm they are 18+.
   Players sign back in with an email link or a linked Google or GitHub account
   (milestone 7, below).
-- Four regions, each a procedurally generated 64×64 tile map: the Sanctum
+- Four regions, each a procedurally generated 256×256 tile map: the Sanctum
   (the God's shrine, Sister Amala) in the middle, with Whispering Woods to the
   west, Sunlit Shore to the east and Mirage Desert to the south. Walk off the
   end of a road to travel; your region and position are saved.
-- Each region has its landmark, an NPC and wandering creatures (walking
-  mushrooms, crab knights, sun scarabs). Creatures only wander for now.
+- Each region has great places to explore, joined to its middle by roads and
+  bridges: the Temple of the Bell and old standing stones in the Sanctum, a
+  wolf cave and Mossgate Castle in the Woods, the Coral Palace, a smugglers'
+  sea cave and a shipwreck on the Shore, Sultana Zahra's palace, the Sun
+  King's tomb and pyramid in the Desert. Each has its own people, creatures,
+  treasures and quests.
+- A living world: day and night and each land's weather; creatures that
+  patrol, guard, hunt in packs, flee when hurt or shy away, and sleep out of
+  their hours; people who keep a daily routine.
 - Server-authoritative movement at 20 ticks per second, with client-side
   prediction for your own character and interpolation for everyone else.
 - Area of interest: each player only receives others within 24 tiles.
@@ -237,6 +244,9 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DATABASE_URL` | none | Postgres for the saved world ([docs/scale.md](docs/scale.md)); without it the world is kept in `DATA_FILE` |
 | `REDIS_URL` | none | Redis for the paint queue, shared by servers and kept across restarts ([docs/scale.md](docs/scale.md)) |
 | `REGION_SERVERS` | none | How many region servers `npm run dev` starts beside the game (needs `REDIS_URL`; [docs/scale.md](docs/scale.md)) |
+| `DAY_MINUTES` | `60` | Real minutes in one game day, dawn to dawn |
+| `WEATHER_MINUTES` | `20` | Real minutes each spell of weather lasts before it may turn |
+| `WEATHER` | on | `off` keeps every land's sky clear |
 | `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored without Postgres (and brought in from on Postgres's first run) |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |

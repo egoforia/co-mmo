@@ -1,4 +1,5 @@
 import type { AssetDescription } from './style.ts';
+import { LAND_ANCHORS } from './land-anchors.ts';
 
 /**
  * The first reference set (Style Bible, Open decisions): the Sanctum and the
@@ -211,4 +212,5 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[] })
     body: 'small fireball flying to the right', materials: ['magic fire'], colors: { main: 'amber orange', secondary: 'pale gold core', accent: 'rose sparks' },
     details: ['a few tiny embers trailing behind'], mood: 'bright, magical', extra: { category: 'spell effect' },
   },
+  ...LAND_ANCHORS,
 ];

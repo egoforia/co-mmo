@@ -723,7 +723,8 @@ export function questProgressText(state: QuestState): string {
   return `Defeat ${name}s: ${state.count}/${q.goal.count}`;
 }
 
-const NPC_NAMES: Record<string, string> = {
+/** NPC names as said in lines like "Walk up to ... to trade". */
+export const NPC_NAMES: Record<string, string> = {
   'sister-amala': 'Sister Amala',
   'old-bramble': 'Old Bramble',
   marina: 'Marina the Trader',

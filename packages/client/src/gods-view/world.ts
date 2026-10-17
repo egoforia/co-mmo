@@ -40,7 +40,7 @@ async function world(): Promise<string> {
     if (!r) return '<div></div>';
     const alive = r.creatures.filter((c) => c.alive).length;
     const credit = r.wisher ? `<br><small>wished by ${escapeHtml(r.wisher)} · danger ${r.danger}</small>` : '';
-    return `<figure class="region ${r.id} ${escapeHtml(r.biome)}"><canvas data-region="${r.id}" width="${r.width * 4}" height="${r.height * 4}"></canvas>
+    return `<figure class="region ${r.id} ${escapeHtml(r.biome)}"><canvas data-region="${r.id}" width="320" height="${Math.round((320 * r.height) / r.width)}"></canvas>
       <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures${r.sky ? ` · ${escapeHtml(r.sky)}` : ''}${credit}</figcaption></figure>`;
   };
   const grid: string[] = [];

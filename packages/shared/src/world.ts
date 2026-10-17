@@ -1,6 +1,7 @@
 import type { BiomeId } from './biomes.ts';
 import { rand2, valueNoise } from './random.ts';
 import { furnitureArt } from './buildings.ts';
+import { layPlaces } from './places.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -18,6 +19,8 @@ export enum Tile {
   Wall = 7,
   /** An open doorway in a building's wall: walk through it to go inside. */
   Door = 8,
+  /** Wooden planks where a road crosses water. */
+  Bridge = 9,
 }
 
 const BLOCKING = new Set<Tile>([Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Wall]);
@@ -199,7 +202,11 @@ export interface RegionMap {
   creatures: CreatureSpawn[];
 }
 
-export const REGION_SIZE = 64;
+/**
+ * Tiles along each side of a region: 256, sixteen times the first lands'
+ * area, so there is room to explore (egoforia, 2026-10-17).
+ */
+export const REGION_SIZE = 256;
 
 /** Builds a region from its definition. Deterministic, so server and client agree. */
 export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
@@ -219,6 +226,8 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
   const c = Math.floor(size / 2);
   const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? sanctumLayout;
   layout(map, c);
+  // The launch lands' caves, palaces, castles and the rest, each joined to the middle by a road.
+  if (!def.wild) layPlaces(map, c);
 
   // Roads from every open edge to the middle, then entry points just inside.
   for (const side of Object.keys(def.exits) as Side[]) {
@@ -229,6 +238,8 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
   }
   // NPCs stroll around their spot, so only landmarks block tiles.
   for (const l of map.landmarks) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
+  // A creature scattered before a great place was built may now stand in its walls.
+  map.creatures = map.creatures.filter((s) => !isBlocking(tileAt(map, s.x, s.y)));
   return map;
 }
 
@@ -249,6 +260,8 @@ const sanctumLayout: Layout = (map, c) => {
   const top = c - 16;
   const shop = building(map, left, top, ARCANUM_SIZE.width, ARCANUM_SIZE.height, 'sanctum-arcanum');
   map.buildings.push(shop);
+  disc(map, left - 5, top + 4, 3, Tile.Water);
+  disc(map, left + ARCANUM_SIZE.width + 7, top + 3, 3, Tile.Water);
   const lane = shop.y + shop.height + 1;
   road(map, c, lane, shop.door.x, shop.door.y + 1);
   furnishArcanum(map, left + 1, top + 1);
@@ -274,7 +287,7 @@ function furnishArcanum(map: RegionMap, fx: number, fy: number): void {
 }
 
 /** Places a building style's furniture as landmarks, from its floor's top-left tile. */
-function placer(map: RegionMap, style: string, fx: number, fy: number) {
+export function placer(map: RegionMap, style: string, fx: number, fy: number) {
   return (key: string, x: number, y: number, width: number, height: number) =>
     map.landmarks.push({ asset: furnitureArt(style, key), x: fx + x, y: fy + y, footprint: { width, height } });
 }
@@ -287,7 +300,7 @@ const woodsLayout: Layout = (map, c) => {
   // The cottage stands west of the middle. From outside it is her great
   // hollow tree, and the doorway sits in the south wall right where the
   // tree's door is painted, so the door you see is the door you walk through.
-  const left = 3;
+  const left = c - 30;
   const top = c - 10;
   const home = building(map, left, top, COTTAGE_SIZE, COTTAGE_SIZE, 'bramble-cottage');
   map.buildings.push(home);
@@ -298,7 +311,7 @@ const woodsLayout: Layout = (map, c) => {
   road(map, c, c, c, lane);
   furnish(map, left + 1, top + 1);
   map.npcs.push({ id: 'old-bramble', name: 'Old Bramble', asset: 'woods-herbalist', x: left + 9.5, y: top + 12.5 });
-  creatures(map, 'walking-mushroom', 'Walking Mushroom', 'woods-mushroom', 5);
+  creatures(map, 'walking-mushroom', 'Walking Mushroom', 'woods-mushroom', 5 * SPREAD);
   map.spawn = { x: c, y: c + 1 };
 };
 
@@ -329,7 +342,7 @@ const shoreLayout: Layout = (map, c) => {
   road(map, c, c, lx - 2, c);
   map.landmarks.push({ asset: 'shore-lighthouse', x: lx + 0.5, y: c - 1, footprint: { width: 2, height: 2 } });
   map.npcs.push({ id: 'marina', name: 'Marina the Trader', asset: 'shore-trader', x: lx - 3.5, y: c + 2.5 });
-  creatures(map, 'crab-knight', 'Crab Knight', 'shore-crab-knight', 5);
+  creatures(map, 'crab-knight', 'Crab Knight', 'shore-crab-knight', 5 * SPREAD);
   map.spawn = { x: c, y: c + 1 };
 };
 
@@ -347,7 +360,7 @@ const desertLayout: Layout = (map, c) => {
   road(map, c, c, c, ry - 3);
   map.landmarks.push({ asset: 'desert-ruin', x: c + 0.5, y: ry, footprint: { width: 3, height: 2 } });
   map.npcs.push({ id: 'cactus-elder', name: 'Cactus Elder', asset: 'desert-cactus-folk', x: c + 3.5, y: ry - 3.5 });
-  creatures(map, 'sun-scarab', 'Sun Scarab', 'desert-scarab', 5);
+  creatures(map, 'sun-scarab', 'Sun Scarab', 'desert-scarab', 5 * SPREAD);
   map.spawn = { x: c, y: c + 1 };
 };
 
@@ -374,6 +387,7 @@ function wildLayout(wild: WildLand): Layout {
     });
     disc(map, c, c, 5, Tile.Ground);
     if (wild.npc) map.npcs.push({ ...wild.npc, x: c - 2.5, y: c + 3.5 });
+    // A wished land has just the creatures its wisher asked for.
     for (const kind of wild.creatures) creatures(map, kind.kind, kind.name, kind.asset, kind.count);
     map.spawn = { x: c, y: c + 1 };
   };
@@ -386,17 +400,22 @@ const BIOME_LAYOUTS: Partial<Record<BiomeId, Layout>> = {
   'mirage-desert': desertLayout,
 };
 
+/** Creatures roam the whole land, so each kind comes this many times over to keep the first lands' liveliness. */
+const SPREAD = 8;
+
 function scatter(map: RegionMap, pick: (x: number, y: number) => Tile): void {
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) map.tiles[y * map.width + x] = pick(x, y);
   }
 }
 
-function set(map: RegionMap, x: number, y: number, t: Tile): void {
+/** Sets one tile, ignoring spots outside the region. */
+export function set(map: RegionMap, x: number, y: number, t: Tile): void {
   if (x >= 0 && y >= 0 && x < map.width && y < map.height) map.tiles[y * map.width + x] = t;
 }
 
-function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void {
+/** A round patch of one tile kind. */
+export function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void {
   for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r) set(map, cx + x, cy + y, t);
 }
 
@@ -405,7 +424,7 @@ function disc(map: RegionMap, cx: number, cy: number, r: number, t: Tile): void 
  * top-left corner at (left, top), in a clearing a tile wide, with a two-tile
  * doorway in the south wall. Its look is a key of BUILDING_STYLES.
  */
-function building(map: RegionMap, left: number, top: number, width: number, height: number, style: string): Building {
+export function building(map: RegionMap, left: number, top: number, width: number, height: number, style: string): Building {
   const right = left + width + 1;
   const bottom = top + height + 1;
   for (let y = top - 1; y <= bottom + 1; y++) {
@@ -433,20 +452,26 @@ function building(map: RegionMap, left: number, top: number, width: number, heig
   };
 }
 
-/** A two-tile-wide road: horizontal leg first, then vertical. */
-function road(map: RegionMap, x0: number, y0: number, x1: number, y1: number): void {
+/** A two-tile-wide road: horizontal leg first, then vertical. Where it crosses water it becomes a bridge. */
+export function road(map: RegionMap, x0: number, y0: number, x1: number, y1: number): void {
+  const pave = (x: number, y: number) => {
+    const here = x >= 0 && y >= 0 && x < map.width && y < map.height ? map.tiles[y * map.width + x] : undefined;
+    // Roads never cut through a building's walls or floor.
+    if (here === Tile.Wall || here === Tile.Floor || here === Tile.Door || here === Tile.Blocked) return;
+    set(map, x, y, here === Tile.Water || here === Tile.Bridge ? Tile.Bridge : Tile.Path);
+  };
   for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
-    set(map, x, y0, Tile.Path);
-    set(map, x, y0 + 1, Tile.Path);
+    pave(x, y0);
+    pave(x, y0 + 1);
   }
   for (let y = Math.min(y0, y1); y <= Math.max(y0, y1) + 1; y++) {
-    set(map, x1, y, Tile.Path);
-    set(map, x1 + 1, y, Tile.Path);
+    pave(x1, y);
+    pave(x1 + 1, y);
   }
 }
 
 /** Blocks the footprint whose bottom row is centred under (x, y). */
-function block(map: RegionMap, x: number, y: number, w: number, h: number): void {
+export function block(map: RegionMap, x: number, y: number, w: number, h: number): void {
   const left = Math.floor(x - w / 2);
   const bottom = Math.floor(y - 0.01);
   for (let ty = bottom - h + 1; ty <= bottom; ty++) for (let tx = left; tx < left + w; tx++) set(map, tx, ty, Tile.Blocked);
@@ -461,9 +486,10 @@ function edgePoint(side: Side, size: number, c: number): { x: number; y: number 
   }
 }
 
-function creatures(map: RegionMap, kind: string, name: string, asset: string, count: number): void {
+/** Scatters creatures of a kind over open ground, away from the middle where travellers arrive. */
+export function creatures(map: RegionMap, kind: string, name: string, asset: string, count: number): void {
   let placed = 0;
-  for (let i = 0; placed < count && i < 500; i++) {
+  for (let i = 0; placed < count && i < count * 100; i++) {
     const x = 4 + Math.floor(rand2(i, 7, map.seed) * (map.width - 8));
     const y = 4 + Math.floor(rand2(i, 9, map.seed) * (map.height - 8));
     if (map.tiles[y * map.width + x] !== Tile.Ground) continue;

@@ -64,7 +64,7 @@ describe('a growing world', () => {
     const other = await joined(ws, ilya.token);
     const woods = app!.world.local('woods')!;
     const entry = woods.map.entries[side]!;
-    const out = { north: [entry.x, 0.2], south: [entry.x, 63.8], west: [0.2, entry.y] }[side];
+    const out = { north: [entry.x, 0.2], south: [entry.x, woods.map.height - 0.2], west: [0.2, entry.y] }[side];
     woods.placePlayer(ilya.id, out[0]!, out[1]!);
     const step = { north: [0, -1], south: [0, 1], west: [-1, 0] }[side];
     for (let i = 1; i <= 3; i++) await other.send({ t: 'input', seq: i, dx: step[0], dy: step[1] });

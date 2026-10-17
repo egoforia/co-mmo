@@ -1,4 +1,5 @@
 import type { BiomeId } from './biomes.ts';
+import { LAND_BUILDING_STYLES } from './land-buildings.ts';
 
 // Buildings are described here as data, and the image model chosen in God's
 // View paints every picture they need: the outside, the floor, wall and door
@@ -89,6 +90,7 @@ export const BUILDING_STYLES: Record<string, BuildingStyle> = {
       stool: { name: 'stool', look: 'a small round wooden stool with a plum velvet cushion', width: 1 },
     },
   },
+  ...LAND_BUILDING_STYLES,
 };
 
 /** The style whose inside tiles stand in for a building whose own are not painted yet. */

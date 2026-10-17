@@ -65,6 +65,12 @@
     "width": 128,
     "height": 128
   },
+  "bridge-planks": {
+    "file": "art/bridge-planks.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
   "desert-cactus-a": {
     "file": "art/desert-cactus-a.png",
     "kind": "prop",
@@ -83,9 +89,21 @@
     "width": 142,
     "height": 192
   },
+  "desert-dune-jackal": {
+    "file": "art/desert-dune-jackal.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
   "desert-dunes": {
     "file": "art/desert-dunes.png",
     "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-mummy-guard": {
+    "file": "art/desert-mummy-guard.png",
+    "kind": "monster",
     "width": 128,
     "height": 128
   },
@@ -94,6 +112,72 @@
     "kind": "tile",
     "width": 128,
     "height": 128
+  },
+  "desert-obelisk": {
+    "file": "art/desert-obelisk.png",
+    "kind": "set-piece",
+    "width": 192,
+    "height": 704
+  },
+  "desert-palace-door": {
+    "file": "art/desert-palace-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-palace-exterior": {
+    "file": "art/desert-palace-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2207
+  },
+  "desert-palace-floor": {
+    "file": "art/desert-palace-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-palace-furniture-carpet": {
+    "file": "art/desert-palace-furniture-carpet.png",
+    "kind": "furniture",
+    "width": 512,
+    "height": 352
+  },
+  "desert-palace-furniture-cushions": {
+    "file": "art/desert-palace-furniture-cushions.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 256
+  },
+  "desert-palace-furniture-golden-throne": {
+    "file": "art/desert-palace-furniture-golden-throne.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 532
+  },
+  "desert-palace-furniture-palace-fountain": {
+    "file": "art/desert-palace-furniture-palace-fountain.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 212
+  },
+  "desert-palace-furniture-palm-pot": {
+    "file": "art/desert-palace-furniture-palm-pot.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 244
+  },
+  "desert-palace-wall": {
+    "file": "art/desert-palace-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-pyramid": {
+    "file": "art/desert-pyramid.png",
+    "kind": "set-piece",
+    "width": 1024,
+    "height": 768
   },
   "desert-rock": {
     "file": "art/desert-rock.png",
@@ -107,11 +191,71 @@
     "width": 512,
     "height": 512
   },
+  "desert-sand-wyrm": {
+    "file": "art/desert-sand-wyrm.png",
+    "kind": "monster",
+    "width": 256,
+    "height": 224
+  },
   "desert-scarab": {
     "file": "art/desert-scarab.png",
     "kind": "monster",
     "width": 128,
     "height": 128
+  },
+  "desert-sultana": {
+    "file": "art/desert-sultana.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "desert-tomb-door": {
+    "file": "art/desert-tomb-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-tomb-exterior": {
+    "file": "art/desert-tomb-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2304
+  },
+  "desert-tomb-floor": {
+    "file": "art/desert-tomb-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-tomb-furniture-canopic-jars": {
+    "file": "art/desert-tomb-furniture-canopic-jars.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 232
+  },
+  "desert-tomb-furniture-sarcophagus": {
+    "file": "art/desert-tomb-furniture-sarcophagus.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 232
+  },
+  "desert-tomb-furniture-sun-statue": {
+    "file": "art/desert-tomb-furniture-sun-statue.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 208
+  },
+  "desert-tomb-wall": {
+    "file": "art/desert-tomb-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "desert-wyrm-bones": {
+    "file": "art/desert-wyrm-bones.png",
+    "kind": "set-piece",
+    "width": 896,
+    "height": 512
   },
   "fx-slash": {
     "file": "art/fx-slash.png",
@@ -119,8 +263,20 @@
     "width": 128,
     "height": 128
   },
+  "item-ancient-linen": {
+    "file": "art/item-ancient-linen.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-bible": {
     "file": "art/item-bible.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-coral-spear": {
+    "file": "art/item-coral-spear.png",
     "kind": "item",
     "width": 128,
     "height": 128
@@ -149,6 +305,36 @@
     "width": 128,
     "height": 128
   },
+  "item-golem-club": {
+    "file": "art/item-golem-club.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-gull-feather": {
+    "file": "art/item-gull-feather.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-heartwood": {
+    "file": "art/item-heartwood.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-jackal-fang": {
+    "file": "art/item-jackal-fang.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-moth-dust": {
+    "file": "art/item-moth-dust.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-mushroom-cap": {
     "file": "art/item-mushroom-cap.png",
     "kind": "item",
@@ -157,6 +343,18 @@
   },
   "item-mushroom-hat": {
     "file": "art/item-mushroom-hat.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-pearl": {
+    "file": "art/item-pearl.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-pelt-cloak": {
+    "file": "art/item-pelt-cloak.png",
     "kind": "item",
     "width": 128,
     "height": 128
@@ -185,6 +383,18 @@
     "width": 128,
     "height": 128
   },
+  "item-sunstone-amulet": {
+    "file": "art/item-sunstone-amulet.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-temple-lantern": {
+    "file": "art/item-temple-lantern.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-tonic": {
     "file": "art/item-tonic.png",
     "kind": "item",
@@ -197,8 +407,20 @@
     "width": 128,
     "height": 128
   },
+  "item-wolf-pelt": {
+    "file": "art/item-wolf-pelt.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
   "item-wooden-sword": {
     "file": "art/item-wooden-sword.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "item-wyrm-scale": {
+    "file": "art/item-wyrm-scale.png",
     "kind": "item",
     "width": 128,
     "height": 128
@@ -215,6 +437,18 @@
     "width": 136,
     "height": 192
   },
+  "sanctum-bell-keeper": {
+    "file": "art/sanctum-bell-keeper.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "sanctum-bell-tower": {
+    "file": "art/sanctum-bell-tower.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 768
+  },
   "sanctum-blossom-tree-a": {
     "file": "art/sanctum-blossom-tree-a.png",
     "kind": "prop",
@@ -230,6 +464,18 @@
   "sanctum-flagstones": {
     "file": "art/sanctum-flagstones.png",
     "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-fountain": {
+    "file": "art/sanctum-fountain.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 320
+  },
+  "sanctum-lantern-moth": {
+    "file": "art/sanctum-lantern-moth.png",
+    "kind": "monster",
     "width": 128,
     "height": 128
   },
@@ -263,8 +509,134 @@
     "width": 256,
     "height": 256
   },
+  "sanctum-standing-stones": {
+    "file": "art/sanctum-standing-stones.png",
+    "kind": "set-piece",
+    "width": 640,
+    "height": 512
+  },
+  "sanctum-temple-door": {
+    "file": "art/sanctum-temple-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-temple-exterior": {
+    "file": "art/sanctum-temple-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2275
+  },
+  "sanctum-temple-floor": {
+    "file": "art/sanctum-temple-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-temple-furniture-altar": {
+    "file": "art/sanctum-temple-furniture-altar.png",
+    "kind": "furniture",
+    "width": 384,
+    "height": 360
+  },
+  "sanctum-temple-furniture-bell-rack": {
+    "file": "art/sanctum-temple-furniture-bell-rack.png",
+    "kind": "furniture",
+    "width": 384,
+    "height": 408
+  },
+  "sanctum-temple-furniture-brazier": {
+    "file": "art/sanctum-temple-furniture-brazier.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 232
+  },
+  "sanctum-temple-furniture-pew": {
+    "file": "art/sanctum-temple-furniture-pew.png",
+    "kind": "furniture",
+    "width": 384,
+    "height": 332
+  },
+  "sanctum-temple-wall": {
+    "file": "art/sanctum-temple-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-coral-palace-door": {
+    "file": "art/shore-coral-palace-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-coral-palace-exterior": {
+    "file": "art/shore-coral-palace-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2280
+  },
+  "shore-coral-palace-floor": {
+    "file": "art/shore-coral-palace-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-coral-palace-furniture-coral-throne": {
+    "file": "art/shore-coral-palace-furniture-coral-throne.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 376
+  },
+  "shore-coral-palace-furniture-giant-clam": {
+    "file": "art/shore-coral-palace-furniture-giant-clam.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 312
+  },
+  "shore-coral-palace-furniture-kelp-pillar": {
+    "file": "art/shore-coral-palace-furniture-kelp-pillar.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 344
+  },
+  "shore-coral-palace-furniture-pearl-fountain": {
+    "file": "art/shore-coral-palace-furniture-pearl-fountain.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 240
+  },
+  "shore-coral-palace-wall": {
+    "file": "art/shore-coral-palace-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
   "shore-crab-knight": {
     "file": "art/shore-crab-knight.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "shore-drowned-deckhand": {
+    "file": "art/shore-drowned-deckhand.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "shore-giant-shell": {
+    "file": "art/shore-giant-shell.png",
+    "kind": "set-piece",
+    "width": 512,
+    "height": 448
+  },
+  "shore-gull-raider": {
+    "file": "art/shore-gull-raider.png",
+    "kind": "monster",
+    "width": 128,
+    "height": 128
+  },
+  "shore-hermit-crab": {
+    "file": "art/shore-hermit-crab.png",
     "kind": "monster",
     "width": 128,
     "height": 128
@@ -305,11 +677,191 @@
     "width": 128,
     "height": 128
   },
+  "shore-sea-cave-door": {
+    "file": "art/shore-sea-cave-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-sea-cave-exterior": {
+    "file": "art/shore-sea-cave-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2304
+  },
+  "shore-sea-cave-floor": {
+    "file": "art/shore-sea-cave-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-sea-cave-furniture-rope-coil": {
+    "file": "art/shore-sea-cave-furniture-rope-coil.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 108
+  },
+  "shore-sea-cave-furniture-rum-barrel": {
+    "file": "art/shore-sea-cave-furniture-rum-barrel.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 156
+  },
+  "shore-sea-cave-furniture-ship-lantern": {
+    "file": "art/shore-sea-cave-furniture-ship-lantern.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 260
+  },
+  "shore-sea-cave-furniture-treasure-chest": {
+    "file": "art/shore-sea-cave-furniture-treasure-chest.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 264
+  },
+  "shore-sea-cave-wall": {
+    "file": "art/shore-sea-cave-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "shore-sea-queen": {
+    "file": "art/shore-sea-queen.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "shore-shipwreck": {
+    "file": "art/shore-shipwreck.png",
+    "kind": "set-piece",
+    "width": 896,
+    "height": 640
+  },
+  "shore-tide-shrine": {
+    "file": "art/shore-tide-shrine.png",
+    "kind": "set-piece",
+    "width": 320,
+    "height": 448
+  },
   "shore-trader": {
     "file": "art/shore-trader.png",
     "kind": "npc",
     "width": 128,
     "height": 192
+  },
+  "woods-bark-golem": {
+    "file": "art/woods-bark-golem.png",
+    "kind": "monster",
+    "width": 192,
+    "height": 192
+  },
+  "woods-castle-door": {
+    "file": "art/woods-castle-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-castle-exterior": {
+    "file": "art/woods-castle-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2258
+  },
+  "woods-castle-floor": {
+    "file": "art/woods-castle-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-castle-furniture-armour-stand": {
+    "file": "art/woods-castle-furniture-armour-stand.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 228
+  },
+  "woods-castle-furniture-pillar": {
+    "file": "art/woods-castle-furniture-pillar.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 176
+  },
+  "woods-castle-furniture-tapestry": {
+    "file": "art/woods-castle-furniture-tapestry.png",
+    "kind": "furniture",
+    "width": 384,
+    "height": 796
+  },
+  "woods-castle-furniture-throne": {
+    "file": "art/woods-castle-furniture-throne.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 516
+  },
+  "woods-castle-gate": {
+    "file": "art/woods-castle-gate.png",
+    "kind": "set-piece",
+    "width": 640,
+    "height": 640
+  },
+  "woods-castle-wall": {
+    "file": "art/woods-castle-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-cave-door": {
+    "file": "art/woods-cave-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-cave-exterior": {
+    "file": "art/woods-cave-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2285
+  },
+  "woods-cave-floor": {
+    "file": "art/woods-cave-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-cave-furniture-crystals": {
+    "file": "art/woods-cave-furniture-crystals.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 276
+  },
+  "woods-cave-furniture-old-chest": {
+    "file": "art/woods-cave-furniture-old-chest.png",
+    "kind": "furniture",
+    "width": 256,
+    "height": 248
+  },
+  "woods-cave-furniture-stalagmite": {
+    "file": "art/woods-cave-furniture-stalagmite.png",
+    "kind": "furniture",
+    "width": 128,
+    "height": 284
+  },
+  "woods-cave-wall": {
+    "file": "art/woods-cave-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "woods-fairy-ring": {
+    "file": "art/woods-fairy-ring.png",
+    "kind": "set-piece",
+    "width": 512,
+    "height": 320
+  },
+  "woods-fallen-giant": {
+    "file": "art/woods-fallen-giant.png",
+    "kind": "set-piece",
+    "width": 896,
+    "height": 512
   },
   "woods-herbalist": {
     "file": "art/woods-herbalist.png",
@@ -329,6 +881,12 @@
     "width": 128,
     "height": 128
   },
+  "woods-old-knight": {
+    "file": "art/woods-old-knight.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
   "woods-path": {
     "file": "art/woods-path.png",
     "kind": "tile",
@@ -344,6 +902,12 @@
   "woods-rock": {
     "file": "art/woods-rock.png",
     "kind": "prop",
+    "width": 128,
+    "height": 128
+  },
+  "woods-thorn-wolf": {
+    "file": "art/woods-thorn-wolf.png",
+    "kind": "monster",
     "width": 128,
     "height": 128
   },

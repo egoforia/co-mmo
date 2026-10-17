@@ -111,7 +111,7 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       'a magnificent desert palace of sandstone and white plaster: a tall pointed arch doorway with carved wooden doors at the bottom middle, ' +
       'golden onion domes and slender minarets, blue and turquoise mosaic tiles around the arches, ' +
       'silk awnings in deep red and saffron, palm trees and a reflecting pool before the doors',
-    floor: 'patterned glazed floor tiles in turquoise, cream and terracotta forming star shapes',
+    floor: 'smooth cream stone floor with small turquoise and terracotta diamond inlays spread evenly',
     wall: 'the top of a thick sandstone wall with a band of blue mosaic tiles along it',
     door: 'a smooth sandstone threshold running left to right with a thin row of turquoise tiles along it',
     furniture: {

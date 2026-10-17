@@ -30,6 +30,8 @@ export interface StyleProfile {
   animation: string;
   /** What the style check's judge is told the game is, and what belonging to its look means. */
   judge: { game: string; look: string };
+  /** How a picture's normal map is asked for: the light's guide to which way each pixel faces. */
+  normalMap: string;
 }
 
 const MAGENTA = { r: 255, g: 0, b: 255, hex: '#FF00FF' };
@@ -92,6 +94,14 @@ export const STORYBOOK: StyleProfile = {
     game: 'a hand-painted 2D fantasy RPG',
     look: 'hand-painted with soft brush shading, warm light, the same kind of view and outline',
   },
+  normalMap: [
+    'Make the tangent-space normal map of the attached game picture, for 2D lighting.',
+    'Exactly the same shapes, outline and size as the picture, every detail in the same place, filling the same frame.',
+    'Colours mean the direction each surface faces: flat facing the viewer is lavender blue (128, 128, 255); facing right is pinker, facing left is bluer-green; facing the top of the picture is greener, facing the bottom is more purple.',
+    'Smooth rounded forms for bodies, cloth and leaves; crisp edges for stone, wood and metal; small bumps for texture.',
+    'Where the picture is empty or magenta, fill with flat lavender blue (128, 128, 255).',
+    'No shading, no light, no colours of the picture itself, no outlines, no writing.',
+  ].join('\n'),
 };
 
 /** Every style the game knows, by id. A new style is one more entry. */

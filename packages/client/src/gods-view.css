@@ -165,6 +165,9 @@ ul.brief { margin: 4px 0 8px; padding-left: 18px; }
 .art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
 .art-item { margin: 0; background: var(--panel); border: 1px solid var(--edge); padding: 8px; }
 .art-item img, .art-item .ph { display: grid; place-items: center; width: 100%; height: 120px; object-fit: contain; border: 0; color: var(--gold); }
+.art-item .normal { border-top: 1px solid var(--edge); margin-top: 6px; padding-top: 4px; }
+.art-item img.normal-map { height: 60px; }
+.direction img.normal-map { max-width: 100%; max-height: 120px; object-fit: contain; }
 .art-item.missing { border-style: dashed; }
 .art-item.redone { border-color: var(--gold); }
 .art-item.flagged { border-color: var(--bad); }
@@ -321,3 +324,7 @@ pre.prompt mark { background: rgba(254, 174, 52, 0.28); color: var(--ink); }
 .hand-row .hand-head button, .hands > button { font-size: 11px; padding: 2px 8px; }
 .hand-row .frame.busy { opacity: 0.4; }
 .hand-question textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; }
+.light-previews { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.light-previews figure { margin: 0; text-align: center; }
+.light-previews img { height: 72px; display: block; background: #2a2533; border-radius: 4px; }
+.light-previews figcaption { font-size: 11px; opacity: 0.8; }

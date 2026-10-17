@@ -7,6 +7,8 @@
 
 import { HELD_SIZE, heldBehind, type ArtPoint, type ArtPointsManifest } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
+import { workedOutNormalMap } from './normal-preview.ts';
+import { lightPreviews } from './light-preview.ts';
 
 /** What the Art tab needs from God's View. */
 export interface ArtContext {
@@ -61,6 +63,10 @@ interface ArtItem {
   shipped?: { url: string; recipe?: Recipe };
   check?: { pass: boolean; why?: string; tries: number };
   reused?: string;
+  /** Its painted normal map, when one was painted; otherwise the game works one out. */
+  normalMap?: string;
+  /** Whether a normal map can be painted for it. */
+  normalPaintable?: boolean;
 }
 
 type Direction = 'front' | 'right' | 'back' | 'left';
@@ -116,7 +122,8 @@ type Ask =
   | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean }
   | { what: 'view'; walker: string; direction: Direction; prompt?: string; from?: string[] }
   | { what: 'clip'; walker: string; body: string; direction: Direction; prompt?: string }
-  | { what: 'sound'; sound: string };
+  | { what: 'sound'; sound: string }
+  | { what: 'normal'; asset: string; prompt?: string };
 
 interface Review {
   title: string;
@@ -296,7 +303,24 @@ function itemHtml(item: ArtItem): string {
     ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'paint', asset: item.id }))}" data-note="${item.takesNote ? 'yes' : ''}">${item.source === 'missing' ? 'Paint' : 'Paint again'} · about ${usd(item.estimateUsd)}</button>`
     : item.why ? `<small>${esc(item.why)}</small>` : '';
   const details = item.source !== 'missing' ? `<button type="button" class="quiet" data-art-versions="${esc(item.id)}">${older ? `Versions (${older + 1})` : 'What made it'}</button>` : '';
-  return `<figure class="art-item ${item.source}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b><br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${check}<div class="card-actions">${paint}${details}</div></figcaption></figure>`;
+  return `<figure class="art-item ${item.source}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b><br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${check}<div class="card-actions">${paint}${details}</div>${normalHtml(item)}</figcaption></figure>`;
+}
+
+/** Its normal map: worked out by the game, or painted, with buttons to paint one or go back. */
+function normalHtml(item: ArtItem): string {
+  if (!item.normalPaintable) return '';
+  const paint = `<button type="button" class="quiet" data-art-review="${esc(JSON.stringify({ what: 'normal', asset: item.id }))}">${item.normalMap ? 'Paint the normal map again' : 'Paint a normal map'} · about ${usd(item.estimateUsd)}</button>`;
+  const back = item.normalMap ? `<button type="button" class="quiet" data-normal-drop="${esc(item.id)}">Use the worked-out map</button>` : '';
+  const look = item.normalMap
+    ? `<a href="${esc(item.normalMap)}" target="_blank" rel="noopener"><img class="normal-map" src="${esc(item.normalMap)}" alt="Its painted normal map" loading="lazy"></a>`
+    : item.url ? `<button type="button" class="quiet" data-normal-show="${esc(item.url)}">Show the worked-out map</button>` : '';
+  const light = item.url ? lightButton(item.url, item.normalMap, false) : '';
+  return `<div class="normal">${look}<small>${item.normalMap ? 'Normal map: painted' : 'Normal map: worked out by the game, free'}</small><div class="card-actions">${light}${paint}${back}</div></div>`;
+}
+
+/** A button that shows a picture lit at dawn, midday, dusk, night and by a lantern; `figure` adds the rim light characters get. */
+function lightButton(url: string, normal: string | undefined, figure: boolean): string {
+  return `<button type="button" class="quiet" data-light-preview="${esc(JSON.stringify({ url, normal, figure }))}">Preview the light</button>`;
 }
 
 function stripHtml(strip: { url: string; frames: number; width: number; height: number; cycleSeconds: number } | undefined, label: string, height = 72): string {
@@ -324,6 +348,7 @@ function walkerHtml(w: WalkerView): string {
         <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${view.approved ? 'approved picture' : view.url ? 'standing picture' : 'no standing picture'}</small></div>
         ${stripHtml(strip, label, 110)}
         <div class="card-actions">${paintView}${viewVersions}${clip}${walkVersions}</div>
+        <div class="card-actions">${view.url ? `<button type="button" class="quiet" data-normal-show="${esc(view.url)}">Standing normal map</button>${lightButton(view.url, undefined, true)}` : ''}${strip ? `<button type="button" class="quiet" data-normal-show="${esc(strip.url)}">Walk normal maps</button>` : ''}</div>
       </div>`;
   };
   return `
@@ -504,7 +529,7 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
   if (!d.open) d.showModal();
   let review: Review;
   // A walk's standing picture or clip takes the Owner's own prompt in place of the usual one.
-  const editable = ask.what === 'view' || ask.what === 'clip' ? ask : undefined;
+  const editable = ask.what === 'view' || ask.what === 'clip' || ask.what === 'normal' ? ask : undefined;
   try {
     review = await ctx.api<Review>('art/review', 'POST', { ...ask, ...(note ? { note } : {}) });
   } catch (err) {
@@ -671,6 +696,30 @@ export function artClick(target: HTMLElement): boolean {
     const body = t.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value;
     if (ask.what === 'clip' && t.dataset.walkerBody !== undefined && body) ask.body = body;
     void openReview(ask, t.dataset.note === 'yes');
+  } else if (t.dataset.normalShow) {
+    t.disabled = true;
+    t.textContent = 'Working it out…';
+    void workedOutNormalMap(t.dataset.normalShow).then(
+      (src) => { t.outerHTML = `<a href="${esc(src)}" target="_blank" rel="noopener"><img class="normal-map" src="${esc(src)}" alt="Its worked-out normal map"></a>`; },
+      () => { t.disabled = false; t.textContent = 'Show the worked-out map'; ctx.toast('That normal map could not be worked out here.'); },
+    );
+  } else if (t.dataset.lightPreview) {
+    const ask = JSON.parse(t.dataset.lightPreview) as { url: string; normal?: string; figure: boolean };
+    t.disabled = true;
+    t.textContent = 'Lighting it…';
+    void (ask.normal ? Promise.resolve(ask.normal) : workedOutNormalMap(ask.url))
+      .then((normal) => lightPreviews(ask.url, normal, ask.figure))
+      .then(
+        (shots) => { t.outerHTML = `<div class="light-previews">${shots.map((s) => `<figure><img src="${esc(s.src)}" alt="${esc(s.label)}"><figcaption>${esc(s.label)}</figcaption></figure>`).join('')}</div>`; },
+        () => { t.disabled = false; t.textContent = 'Preview the light'; ctx.toast('That picture could not be lit here.'); },
+      );
+  } else if (t.dataset.normalDrop) {
+    const item = data.items.find((i) => i.id === t.dataset.normalDrop);
+    if (!confirm(`Go back to the normal map the game works out for ${item?.name ?? 'this picture'}? The painted one is kept and can be painted again.`)) return true;
+    void ctx.api('art/normal-drop', 'POST', { asset: t.dataset.normalDrop }).then(
+      () => { ctx.toast('Done. Players see it after they reload.'); ctx.rerender(); },
+      (err: Error) => ctx.toast(err.message),
+    );
   } else if (t.dataset.artVersions) {
     const item = data.items.find((i) => i.id === t.dataset.artVersions);
     if (item) pictureVersions(item);

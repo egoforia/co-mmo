@@ -3,6 +3,8 @@ import {
   ABILITIES,
   CREATURES,
   FLAME_LIGHT,
+  WINDOW_LIGHT,
+  glowOf,
   ITEMS,
   Interpolator,
   HELD_SIZE,
@@ -47,7 +49,8 @@ import {
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
-import { makeLight, placeLight, type LitPoint } from './lights.ts';
+import { shadePictures } from './normal-maps.ts';
+import { dropLight, lightScene, litFigure, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
 
 interface Avatar {
@@ -119,6 +122,16 @@ interface DrawnRegion {
   ground: number[][];
   /** Its ground and scenery near us, in chunks, by chunk index. */
   chunks: Map<number, Chunk>;
+  /** Fires, lanterns, shrines and lit windows standing in it. */
+  lamps: Lamp[];
+}
+
+/** A light standing in the world, at a screen point; windows light up only after dark. */
+interface Lamp {
+  lit: LitPoint;
+  x: number;
+  y: number;
+  window: boolean;
 }
 
 /** A square of a region's ground and its trees and rocks, drawn only while we are near. */
@@ -170,6 +183,8 @@ export class WorldScene extends Phaser.Scene {
   /** Rendered position eases toward the predicted one to hide corrections. */
   private shown = { x: 0, y: 0 };
   private tint?: Phaser.GameObjects.Rectangle;
+  /** True when pictures are lit by the sky and lamps (WebGL); false when a shade is laid over them. */
+  private lit = false;
   /** The hour and the weather, which grade the light and brighten lights at night. */
   private readonly sky = new SkyClock();
   /** Which way we face: 1 right, -1 left. */
@@ -288,7 +303,7 @@ export class WorldScene extends Phaser.Scene {
       // Who and what we saw were counted from the old corner, and belong to the
       // region we left; the next snapshot shows the ones here.
       for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
-        for (const a of group.values()) destroyAvatar(a);
+        for (const a of group.values()) destroyAvatar(this, a);
         group.clear();
       }
     }
@@ -303,6 +318,9 @@ export class WorldScene extends Phaser.Scene {
 
   create(): void {
     const welcome = this.welcome;
+    // First, so every picture made from here on is lit.
+    this.lit = lightScene(this, LABEL_DEPTH);
+    if (this.lit) shadePictures(this);
     this.remotes = new Map();
     this.creatures = new Map();
     this.bodies = new Map();
@@ -336,8 +354,14 @@ export class WorldScene extends Phaser.Scene {
 
     // The biome's light, the hour and the weather grade everything under the labels.
     this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
-    this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
-    this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
+    // With WebGL it is the light every picture is lit by; without, a shade laid over them.
+    if (this.lit) {
+      const { sun, fill } = this.sky.sun(0);
+      setSkyLight(this, this.sky.tint(0), sun, fill);
+    } else {
+      this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
+      this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
+    }
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.fitTint, this));
@@ -410,7 +434,12 @@ export class WorldScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const predictor = this.predictor;
     if (!predictor) return;
-    this.tint?.setFillStyle(this.sky.tint(deltaMs));
+    const sky = this.sky.tint(deltaMs);
+    if (this.lit) {
+      const { sun, fill } = this.sky.sun(deltaMs);
+      setSkyLight(this, sky, sun, fill);
+      this.lightLamps();
+    } else this.tint?.setFillStyle(sky);
     // Fixed-rate input: one input per server tick, however fast we render.
     this.accumulator += Math.min(deltaMs, 250) / 1000;
     while (this.accumulator >= TICK_SECONDS) {
@@ -642,14 +671,14 @@ export class WorldScene extends Phaser.Scene {
     const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
     const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
     // The flame lights the ground it flies over.
-    const lit = makeLight(this, BOLT_LIGHT, LABEL_DEPTH - 0.5);
+    const lit = makeLight(this, BOLT_LIGHT);
     const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2, this.sky.darkness());
     follow();
     this.tweens.add({
       targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
       onComplete: () => this.tweens.add({
         targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onUpdate: follow,
-        onComplete: () => { spark.destroy(); lit?.point.destroy(); },
+        onComplete: () => { spark.destroy(); dropLight(this, lit); },
       }),
     });
   }
@@ -660,7 +689,7 @@ export class WorldScene extends Phaser.Scene {
 
   /** A defeated creature sinks away; the real sprite is removed by the next snapshot. */
   private fadeOut(a: Avatar): void {
-    const ghost = this.add.image(a.body.x, a.body.y, a.body.texture.key).setOrigin(0.5, 0.97);
+    const ghost = litFigure(this, this.add.image(a.body.x, a.body.y, a.body.texture.key).setOrigin(0.5, 0.97));
     ghost.setScale(a.body.scaleX, a.body.scaleY).setFlipX(a.body.flipX).setDepth(a.body.depth);
     a.body.setVisible(false);
     this.tweens.add({ targets: ghost, alpha: 0, scaleY: 0.1, duration: 450, ease: 'Quad.easeIn', onComplete: () => ghost.destroy() });
@@ -702,7 +731,7 @@ export class WorldScene extends Phaser.Scene {
     }
     for (const [id, remote] of group) {
       if (seen.has(id)) continue;
-      destroyAvatar(remote);
+      destroyAvatar(this, remote);
       group.delete(id);
     }
   }
@@ -733,6 +762,7 @@ export class WorldScene extends Phaser.Scene {
       o.destroy();
     }
     for (const m of region.tilemaps) m.destroy();
+    for (const lamp of region.lamps) dropLight(this, lamp.lit);
     for (const chunk of region.chunks.values()) dropChunk(chunk);
     this.drawn.delete(id);
   }
@@ -841,7 +871,8 @@ export class WorldScene extends Phaser.Scene {
     });
     this.placeLandmarks(map, ox, oy, views);
     const objects = this.children.list.filter((o) => !before.has(o));
-    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map() };
+    const lamps = this.placeLamps(map, ox, oy, views);
+    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps };
     this.nearAt = '';
     return region;
   }
@@ -868,6 +899,39 @@ export class WorldScene extends Phaser.Scene {
       img.setDepth(PROJECTION.depth(ox + l.x, oy + l.y));
       views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
     }
+  }
+
+  /** Burns the world's lamps for this frame: brighter after dark, windows only then. */
+  private lightLamps(): void {
+    const dark = this.sky.darkness();
+    for (const region of this.drawn.values()) {
+      for (const lamp of region.lamps) {
+        placeLight(lamp.lit, lamp.x, lamp.y, this.time.now, !lamp.window || dark > 0, dark);
+        if (lamp.window) lamp.lit.point.intensity *= dark;
+      }
+    }
+  }
+
+  /** Lights for a region's fires, lanterns and shrines, and its buildings' windows. */
+  private placeLamps(map: RegionMap, ox: number, oy: number, views: BuildingView[]): Lamp[] {
+    const lamps: Lamp[] = [];
+    const add = (light: Light, x: number, y: number, window: boolean) => {
+      const lit = makeLight(this, light);
+      if (lit) lamps.push({ lit, x, y, window });
+    };
+    for (const l of map.landmarks) {
+      const light = glowOf(l.asset);
+      // The flame sits a little above where the piece stands.
+      const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
+      if (light) add(light, at.x, at.y - T * 0.6, false);
+    }
+    for (const v of views) {
+      if (!v.exterior) continue;
+      const b = v.building;
+      const at = PROJECTION.toScreen(ox + b.x + b.width / 2, oy + b.y + b.height);
+      add(WINDOW_LIGHT, at.x, at.y - T * 0.8, true);
+    }
+    return lamps;
   }
 
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
@@ -922,7 +986,7 @@ export class WorldScene extends Phaser.Scene {
 
   private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97);
+    const body = litFigure(this, this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97));
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -973,10 +1037,9 @@ export class WorldScene extends Phaser.Scene {
     const slot = hand === 'right' ? 'held' : 'offHeld';
     if (a[slot]?.item === item) return;
     a[slot]?.image?.destroy();
-    a[slot]?.lit?.point.destroy();
+    dropLight(this, a[slot]?.lit);
     const light = item ? ITEMS[item]?.light : undefined;
-    // Above the biome's shade, so the light brightens what it falls on.
-    a[slot] = item ? { item, lit: light ? makeLight(this, light, LABEL_DEPTH - 0.5) : undefined } : undefined;
+    a[slot] = item ? { item, lit: light ? makeLight(this, light) : undefined } : undefined;
     const key = item ? ITEMS[item]?.art : undefined;
     if (key && !this.textures.exists(key)) void this.loadArt(key, artSrc(key));
   }
@@ -1007,7 +1070,7 @@ export class WorldScene extends Phaser.Scene {
     }
     if (!held.image || held.image.texture.key !== key) {
       held.image?.destroy();
-      held.image = this.add.image(0, 0, key);
+      held.image = litFigure(this, this.add.image(0, 0, key));
     }
     const mirrored = b.flipX;
     const x = b.x + (mirrored ? b.originX - hand[0] : hand[0] - b.originX) * b.displayWidth;
@@ -1067,11 +1130,11 @@ function dropChunk(chunk: Chunk): void {
   chunk.tilemap.destroy();
 }
 
-function destroyAvatar(a: Avatar): void {
+function destroyAvatar(scene: Phaser.Scene, a: Avatar): void {
   a.held?.image?.destroy();
   a.offHeld?.image?.destroy();
-  a.held?.lit?.point.destroy();
-  a.offHeld?.lit?.point.destroy();
+  dropLight(scene, a.held?.lit);
+  dropLight(scene, a.offHeld?.lit);
   a.body.destroy();
   a.shadow.destroy();
   a.label.destroy();

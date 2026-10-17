@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLAME_LIGHT, MAX_LIGHT_RADIUS, cleanLight, itemFromWish, lightStrength, validateDefinition, type ItemWish } from '../src/index.ts';
+import { FLAME_LIGHT, MAX_LIGHT_RADIUS, cleanLight, itemFromWish, lightGlow, lightStrength, validateDefinition, type ItemWish } from '../src/index.ts';
 
 const look = { hook: 'a blade wreathed in flame', body: 'a long sword', color: '#d0402a', mood: 'fierce' };
 
@@ -42,5 +42,14 @@ describe('wished lights', () => {
     const plain = validateDefinition({ kind: 'item', name: 'Iron Sword', description: 'Sharp.', itemKind: 'weapon', look }) as ItemWish;
     expect(plain.light).toBeUndefined();
     expect(itemFromWish('w2', plain).light).toBeUndefined();
+  });
+});
+
+describe('lightGlow', () => {
+  it('shines brighter at night, but never so bright it bleaches what it lights', () => {
+    expect(lightGlow(1)).toBeGreaterThan(lightGlow(0));
+    expect(lightGlow(1)).toBeLessThanOrEqual(1.5);
+    expect(lightGlow(5)).toBe(lightGlow(1));
+    expect(lightGlow(-1)).toBe(lightGlow(0));
   });
 });

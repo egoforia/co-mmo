@@ -60,7 +60,10 @@ on another object after it is built). `region-main.ts` starts a region server.
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
 
 **The world.** `world.ts` (regions, travel, hosting), `region.ts` (one
-region's tick: movement, creatures, combat, loot, shops, quests, chat),
+region's tick: movement, snapshots, joining and leaving) with its systems in
+`region/`: `state.ts` (who and what is here, shared by all), `combat.ts`,
+`minds.ts` (creatures and NPCs), `kit.ts` (gear, items, crafting, shops),
+`quests.ts` (talking and quests), `bodies.ts` (loot) and `chat.ts`,
 `region-views.ts` (what players see of each thing: the one shape both
 snapshots and split-region borders send), `split-region.ts`, the
 `region-*`/`remote-region.ts` files for region servers, `parties.ts`,
@@ -117,5 +120,4 @@ prompt builders; never write style sentences anywhere else.
 
 ## Next splits (not done yet)
 
-`Region` into systems (combat, commerce, quests); a renderer interface
-around Phaser.
+A renderer interface around Phaser.

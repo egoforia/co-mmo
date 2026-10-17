@@ -11,7 +11,7 @@ nothing is paid for; the offline God answers instead.
 **Checks first:** `npm run typecheck` and `npm test`. A wish branch also runs
 `node scripts/wish-guard.mjs --base origin/main`.
 
-**Robot playtester:** `npm run playtest` (about two minutes) has bots and a
+**Robot playtester:** `npm run playtest` (about six minutes) has bots and a
 browser play the real game with fake AI: every region, the first quests,
 fights, loot, wishes, two players, and God's View. A new feature gets a
 `packages/server/playtest/<name>.play.ts`; see `docs/playtest.md`.

@@ -76,7 +76,7 @@ export class Bot {
   private readonly waiters = new Set<() => void>();
   private lastAttack = 0;
 
-  private constructor(readonly name: string, private readonly socket: WebSocket) {
+  private constructor(readonly name: string, private readonly socket: WebSocket, /** Its session, for God's View calls. */ readonly token: string) {
     socket.on('message', (raw) => this.receive(JSON.parse(raw.toString()) as ServerMessage));
     socket.on('close', (code, reason) => {
       this.closed = `${code} ${reason.toString()}`.trim();
@@ -87,7 +87,7 @@ export class Bot {
   /** Connects with a session token and waits to be welcomed into the world. */
   static async join(url: string, token: string, name: string): Promise<Bot> {
     const socket = new WebSocket(url);
-    const bot = new Bot(name, socket);
+    const bot = new Bot(name, socket, token);
     await new Promise<void>((resolve, reject) => {
       socket.once('open', () => resolve());
       socket.once('error', reject);

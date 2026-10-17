@@ -9,7 +9,7 @@ or sound), whatever keys are set.
 npm run playtest
 ```
 
-It takes about two minutes. Each `*.play.ts` file under
+It takes about six minutes since the lands grew. Each `*.play.ts` file under
 `packages/server/playtest/` starts its own server on a random port and runs
 alongside the others.
 
@@ -20,6 +20,7 @@ alongside the others.
 | `world.play.ts` | Walk every road between every region, both ways, and check each region can be walked: people, roads, doors, creatures and the spawn point all in reach. Also lays out 60 wished lands and checks the same. |
 | `journey.play.ts` | Play the first quests as a new player: Sister Amala, Old Bramble in the Woods, four mushrooms with their loot, Power Strike, then Marina's shop on the Shore. |
 | `wishes.play.ts` | Pray, then wish for a thing to wear, a creature (and fight it), a person (and talk to them), a power (learn and cast it), a drop and a new land (and walk into it). A player without Favor is turned away. |
+| `mods.play.ts` | The Owner switches a wished creature and a wished ring off and on again in God's View while another player watches, then undoes the creature for good. |
 | `together.play.ts` | Two players see each other, chat, form a party, share a fight's XP and trade. |
 | `browser.play.ts` | In Chromium: join by invite link, walk with the arrow keys, pray and grant a wish from its card, open the bag, open every God's View tab, and open the game on a phone-sized screen. Screenshots go to `playtest-results/`. |
 

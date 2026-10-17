@@ -208,8 +208,27 @@ export interface RegionMap {
  */
 export const REGION_SIZE = 256;
 
-/** Builds a region from its definition. Deterministic, so server and client agree. */
+/** Lands laid out lately, by definition: a big land takes a while to lay out, and the world, its cells and every browser ask for the same few again. */
+const laidOut = new Map<string, RegionMap>();
+const LAID_OUT_KEPT = 24;
+
+/**
+ * Builds a region from its definition. Deterministic, so server and client
+ * agree. Each call gets its own copy, free to change.
+ */
 export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
+  const key = `${size}:${JSON.stringify(def)}`;
+  let map = laidOut.get(key);
+  if (!map) {
+    map = layOut(structuredClone(def), size);
+    laidOut.set(key, map);
+    if (laidOut.size > LAID_OUT_KEPT) laidOut.delete(laidOut.keys().next().value!);
+  }
+  const { def: _, ...rest } = map;
+  return { ...structuredClone(rest), def };
+}
+
+function layOut(def: RegionDef, size: number): RegionMap {
   const map: RegionMap = {
     def,
     width: size,

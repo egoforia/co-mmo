@@ -79,6 +79,8 @@ export async function start(opts: {
   sound?: AppOptions['sound'];
   /** Messages to region servers, for tests that run regions on them. */
   regionBus?: AppOptions['regionBus'];
+  /** The built client to serve, for tests that play in a browser. */
+  clientDir?: string;
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
@@ -96,6 +98,7 @@ export async function start(opts: {
     paintQueue: opts.paintQueue ?? new MemoryPaintQueue({ limit: () => undefined }),
     ...(opts.sound ? { sound: opts.sound } : {}),
     ...(opts.regionBus ? { regionBus: opts.regionBus } : {}),
+    ...(opts.clientDir ? { clientDir: opts.clientDir } : {}),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',

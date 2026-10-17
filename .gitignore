@@ -6,3 +6,4 @@ data/
 .DS_Store
 coverage/
 .wish/
+playtest-results/

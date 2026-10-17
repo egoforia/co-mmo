@@ -122,6 +122,12 @@ light of the hour and the weather),
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |
 
+## The robot playtester
+
+`packages/server/playtest/`: robot players (`bot.ts`) and a browser play the
+real server with fake AI; `npm run playtest`. One `*.play.ts` per area of
+play; a new feature adds one. See `playtest.md`.
+
 ## Rules every module keeps
 
 - A short doc comment on each export; comments say why.

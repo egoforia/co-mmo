@@ -232,6 +232,9 @@ export function createApp(options: AppOptions): App {
   const artStudio = new ArtStudio({
     store, wishes, ai, budget, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests, recipes,
+    readArt: artFileReader(options.wishes.artDir, options.shippedArt),
+    // Pages already open load a newly painted normal map without a reload.
+    onPainted: (ids) => world.broadcast({ t: 'art', walks: ids }),
   });
   // Held items: where each walker's free hand is and where each weapon or charm is gripped.
   const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...(await walkPainter.standingManifest()), ...walkPainter.manifest(), ...(await artStudio.manifest()) });

@@ -131,6 +131,39 @@ describe('the Art tab', () => {
     expect(art['sanctum-rock']).toBeUndefined();
   });
 
+  it('paints a normal map for a picture from the picture itself, serves it beside it, and goes back to the worked-out one', async () => {
+    const { base, store, painter, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+    expect((await ask(base, owner.token, 'paint', { asset: 'sanctum-rock' })).status).toBe(202);
+    await app!.art.idle();
+    const item = async () => (await api(base, '/api/admin/art', owner.token)).body.items.find((i: any) => i.id === 'sanctum-rock');
+    expect(await item()).toMatchObject({ normalPaintable: true });
+    expect((await item()).normalMap).toBeUndefined();
+
+    // The review shows the usual words and the picture sent along; the Owner's own words replace them.
+    const usual = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'normal', asset: 'sanctum-rock' });
+    expect(usual.body.title).toBe('Paint a normal map for Mossy white stone');
+    expect(usual.body.parts[0].recipe.steps[0]).toMatchObject({ prompt: expect.stringContaining('normal map'), pictures: [{ name: 'Mossy white stone' }] });
+    const own = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'normal', asset: 'sanctum-rock', prompt: 'A normal map of this stone, very bumpy.' });
+    expect(own.body.parts[0].recipe.steps[0].prompt).toBe('A normal map of this stone, very bumpy.');
+
+    const painted = await ask(base, owner.token, 'normal', { asset: 'sanctum-rock', prompt: 'A normal map of this stone, very bumpy.' });
+    expect(painted.status).toBe(202);
+    await app!.art.idle();
+    expect((painter as any).prompts.at(-1)).toBe('A normal map of this stone, very bumpy.');
+    const { body: art } = await api(base, '/api/art', owner.token);
+    expect(art['sanctum-rock-normal']).toMatchObject({ kind: 'normal', width: 128, height: 128, redone: expect.any(Number) });
+    // Exactly the picture's size, so each pixel of the map lies on its pixel.
+    const map = await sharp(await readFile(join(artDir, 'redone', 'sanctum-rock-normal.png'))).metadata();
+    expect([map.width, map.height]).toEqual([128, 128]);
+    expect((await item()).normalMap).toMatch(/^\/wished-art\/redone\/sanctum-rock-normal\.png\?v=/);
+
+    expect((await api(base, '/api/admin/art/normal-drop', owner.token, 'POST', { asset: 'sanctum-rock' })).status).toBe(200);
+    expect((await api(base, '/api/art', owner.token)).body['sanctum-rock-normal']).toBeUndefined();
+    expect((await api(base, '/api/admin/art/normal-drop', owner.token, 'POST', { asset: 'sanctum-rock' })).body.message).toMatch(/no painted normal map/);
+    expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'normal', asset: 'no-such-thing' })).body.message).toMatch(/not part of the game/);
+  });
+
   it('paints a whole group again, one request per picture', async () => {
     const { base, store, painter } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
     const owner = account(store, 'Ego', 'owner');

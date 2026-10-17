@@ -369,12 +369,13 @@ export interface CharacterMessage {
 }
 
 /**
- * Walks were painted or painted again while you play: fetch the art list
- * again and swap these walk strips in, so walkers on screen step with them.
+ * Walks or other pictures (a painted normal map) were painted or painted
+ * again while you play: fetch the art list again and swap them in, so
+ * walkers on screen step with them.
  */
 export interface ArtMessage {
   t: 'art';
-  /** The walk strips that changed, by art key. */
+  /** The walk strips and pictures that changed, by art key. */
   walks: string[];
 }
 

@@ -61,6 +61,10 @@ interface ArtItem {
   shipped?: { url: string; recipe?: Recipe };
   check?: { pass: boolean; why?: string; tries: number };
   reused?: string;
+  /** Its painted normal map, when one was painted; otherwise the game works one out. */
+  normalMap?: string;
+  /** Whether a normal map can be painted for it. */
+  normalPaintable?: boolean;
 }
 
 type Direction = 'front' | 'right' | 'back' | 'left';
@@ -116,7 +120,8 @@ type Ask =
   | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean }
   | { what: 'view'; walker: string; direction: Direction; prompt?: string; from?: string[] }
   | { what: 'clip'; walker: string; body: string; direction: Direction; prompt?: string }
-  | { what: 'sound'; sound: string };
+  | { what: 'sound'; sound: string }
+  | { what: 'normal'; asset: string; prompt?: string };
 
 interface Review {
   title: string;
@@ -296,7 +301,16 @@ function itemHtml(item: ArtItem): string {
     ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'paint', asset: item.id }))}" data-note="${item.takesNote ? 'yes' : ''}">${item.source === 'missing' ? 'Paint' : 'Paint again'} · about ${usd(item.estimateUsd)}</button>`
     : item.why ? `<small>${esc(item.why)}</small>` : '';
   const details = item.source !== 'missing' ? `<button type="button" class="quiet" data-art-versions="${esc(item.id)}">${older ? `Versions (${older + 1})` : 'What made it'}</button>` : '';
-  return `<figure class="art-item ${item.source}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b><br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${check}<div class="card-actions">${paint}${details}</div></figcaption></figure>`;
+  return `<figure class="art-item ${item.source}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b><br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${check}<div class="card-actions">${paint}${details}</div>${normalHtml(item)}</figcaption></figure>`;
+}
+
+/** Its normal map: worked out by the game, or painted, with buttons to paint one or go back. */
+function normalHtml(item: ArtItem): string {
+  if (!item.normalPaintable) return '';
+  const paint = `<button type="button" class="quiet" data-art-review="${esc(JSON.stringify({ what: 'normal', asset: item.id }))}">${item.normalMap ? 'Paint the normal map again' : 'Paint a normal map'} · about ${usd(item.estimateUsd)}</button>`;
+  const back = item.normalMap ? `<button type="button" class="quiet" data-normal-drop="${esc(item.id)}">Use the worked-out map</button>` : '';
+  const look = item.normalMap ? `<img class="normal-map" src="${esc(item.normalMap)}" alt="" loading="lazy">` : '';
+  return `<div class="normal">${look}<small>${item.normalMap ? 'Normal map: painted' : 'Normal map: worked out by the game, free'}</small><div class="card-actions">${paint}${back}</div></div>`;
 }
 
 function stripHtml(strip: { url: string; frames: number; width: number; height: number; cycleSeconds: number } | undefined, label: string, height = 72): string {
@@ -504,7 +518,7 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
   if (!d.open) d.showModal();
   let review: Review;
   // A walk's standing picture or clip takes the Owner's own prompt in place of the usual one.
-  const editable = ask.what === 'view' || ask.what === 'clip' ? ask : undefined;
+  const editable = ask.what === 'view' || ask.what === 'clip' || ask.what === 'normal' ? ask : undefined;
   try {
     review = await ctx.api<Review>('art/review', 'POST', { ...ask, ...(note ? { note } : {}) });
   } catch (err) {
@@ -671,6 +685,13 @@ export function artClick(target: HTMLElement): boolean {
     const body = t.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value;
     if (ask.what === 'clip' && t.dataset.walkerBody !== undefined && body) ask.body = body;
     void openReview(ask, t.dataset.note === 'yes');
+  } else if (t.dataset.normalDrop) {
+    const item = data.items.find((i) => i.id === t.dataset.normalDrop);
+    if (!confirm(`Go back to the normal map the game works out for ${item?.name ?? 'this picture'}? The painted one is kept and can be painted again.`)) return true;
+    void ctx.api('art/normal-drop', 'POST', { asset: t.dataset.normalDrop }).then(
+      () => { ctx.toast('Done. Players see it after they reload.'); ctx.rerender(); },
+      (err: Error) => ctx.toast(err.message),
+    );
   } else if (t.dataset.artVersions) {
     const item = data.items.find((i) => i.id === t.dataset.artVersions);
     if (item) pictureVersions(item);

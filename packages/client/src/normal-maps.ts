@@ -10,7 +10,7 @@ import type { ReliefJob } from './relief-worker.ts';
 // each gets its own map.
 
 /** Biggest picture worked out (pixels); bigger ones stay flat. */
-const MAX_PIXELS = 2048 * 2048;
+const MAX_PIXELS = 3000 * 3000;
 /** Pictures being worked out at once. */
 const AT_ONCE = 2;
 

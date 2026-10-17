@@ -402,6 +402,7 @@ export async function handleAdmin(
       'art/walk': () => ({ kind: 'walk', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), directions, views: body?.views === true }),
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
       'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}) }),
+      'art/normal': () => ({ kind: 'normal', asset: String(body?.asset ?? ''), ...(prompt ? { prompt } : {}) }),
     };
     try {
       if (route === 'art/review' && method === 'POST') {
@@ -417,6 +418,14 @@ export async function handleAdmin(
       if (route === 'art/paint-group' && method === 'POST') {
         const done = await ctx.art.repaintGroup(String(body?.group ?? ''));
         return json(res, 202, { ok: true, ...done }), true;
+      }
+      if (route === 'art/normal' && method === 'POST') {
+        const done = await ctx.art.paintNormal(String(body?.asset ?? ''), prompt);
+        return json(res, 202, { ok: true, ...done }), true;
+      }
+      if (route === 'art/normal-drop' && method === 'POST') {
+        await ctx.art.dropNormal(String(body?.asset ?? ''));
+        return json(res, 200, { ok: true }), true;
       }
       if (route === 'art/restore' && method === 'POST') {
         await ctx.art.restore(String(body?.asset ?? ''), String(body?.version ?? ''));

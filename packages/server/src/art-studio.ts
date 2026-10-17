@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
+import sharp from 'sharp';
 import {
   BODY_TYPES,
   BUILDING_STYLES,
@@ -18,6 +19,7 @@ import {
   type WalkDirection,
 } from '@co-mmo/shared';
 import { ANCHORS } from './assets/anchors.ts';
+import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { buildingArtJobs } from './assets/building-art.ts';
 import { BIOME_KIT, type KitAsset } from './assets/kit.ts';
 import { paintKitAsset, wildKit } from './assets/wild-kit.ts';
@@ -28,6 +30,7 @@ import { plain, type ArtJob, type ArtJobHandle, type ArtJobs } from './art-jobs.
 import { buildingPlace, shippedPlace, wishedPlace, landName, type ArtPlace } from './art-places.ts';
 import { Previewed, dryImage, keepingImage, recipeUsd, type Recipe, type RecipeBook } from './art-recipes.ts';
 import type { BuildingPainter } from './building-painter.ts';
+import { fitNormalMap, normalMapId, normalRequest } from './normal-painter.ts';
 import { watched } from './paint-queue.ts';
 import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { SoundItem, SoundMaker } from './sound-maker.ts';
@@ -79,6 +82,10 @@ export interface ArtItem {
   check?: { pass: boolean; why?: string; tries: number };
   /** The existing picture a wished thing shows instead of its own. */
   reused?: string;
+  /** Its painted normal map, when one was painted; otherwise the game works one out. */
+  normalMap?: string;
+  /** Whether a normal map can be painted for it here. */
+  normalPaintable?: boolean;
 }
 
 /** A group of pictures in the Art tab that can be painted again together: one heading on one page. */
@@ -106,7 +113,8 @@ export type ArtAsk =
   | { kind: 'walk'; walker: string; body: string; directions?: WalkDirection[]; views?: boolean }
   | { kind: 'view'; walker: string; direction: WalkDirection; prompt?: string; from?: string[] }
   | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
-  | { kind: 'sound'; sound: string; note?: string };
+  | { kind: 'sound'; sound: string; note?: string }
+  | { kind: 'normal'; asset: string; prompt?: string };
 
 /** Everything a request will send, for the Owner to approve. */
 export interface ArtReview {
@@ -159,6 +167,10 @@ export interface ArtStudioOptions {
   sounds?: SoundMaker;
   /** What was sent to make each picture. */
   recipes: RecipeBook;
+  /** Reads a picture the game shows, by its path from the site root, to send along. */
+  readArt?: (file: string) => Promise<Buffer>;
+  /** Tells pages already open which pictures changed, so they load them without a reload. */
+  onPainted?: (ids: string[]) => void;
 }
 
 /** A refusal the Owner reads as it is. */
@@ -252,6 +264,10 @@ export class ArtStudio {
     }
     items.push(...this.wishedItems(this.pictureUsd('wishes')));
     for (const item of items) {
+      // Normal maps are painted for the game's own pictures, which share their id with the picture the game draws.
+      if (!item.id.includes(':') && item.url && this.options.readArt) item.normalPaintable = true;
+      const normal = this.redone[normalMapId(item.id)];
+      if (normal) item.normalMap = `/${normal.file}`;
       const versions = await this.history.versions(item.id);
       if (versions.length) item.versions = versions;
       const recipe = item.source === 'missing' ? undefined : await this.recipeOf(item.id, item.source === 'shipped');
@@ -385,6 +401,10 @@ export class ArtStudio {
         const direction = this.direction(ask.direction);
         title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : `facing ${direction}`}`;
         parts.push({ name: walker.name, recipe: await this.options.walks.previewClip(walker, direction, ownPrompt(ask.prompt)) });
+      } else if (ask.kind === 'normal') {
+        const name = await this.nameOf(ask.asset);
+        title = `Paint a normal map for ${name}`;
+        parts.push({ name, recipe: await this.previewNormal(ask.asset, ask.prompt) });
       } else {
         const sounds = this.options.sounds;
         const item = (await sounds?.list())?.find((x) => x.id === ask.sound);
@@ -429,6 +449,84 @@ export class ArtStudio {
       if (!(err instanceof Previewed)) throw err;
     });
     return { at: Date.now(), steps: [await this.options.recipes.imageStep(kit.name ?? asset, provider, dry.sent!, estimateImageUsd(provider.model))] };
+  }
+
+  /** What painting a picture's normal map would send. */
+  private async previewNormal(asset: string, prompt?: string): Promise<Recipe> {
+    const { name, provider, request } = await this.normalAsk(asset, prompt);
+    return { at: Date.now(), steps: [await this.options.recipes.imageStep(`Normal map of ${name}`, provider, request, estimateImageUsd(provider.model))] };
+  }
+
+  /** The picture, model and request for painting a picture's normal map; refused when it cannot be painted. */
+  private async normalAsk(asset: string, prompt?: string): Promise<{ name: string; picture: Buffer; provider: ImageProvider; request: ImageRequest }> {
+    const read = this.options.readArt;
+    if (asset.includes(':') || !read) throw new ArtRequestError('Normal maps can be painted for the game\'s own pictures, not for wished ones yet.');
+    const file = await this.pictureFile(asset);
+    if (!file) throw new ArtRequestError('That picture is not part of the game yet, so it has no normal map to paint.');
+    const provider = this.options.ai.image(this.useFor(asset));
+    if (!provider) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
+    const name = await this.nameOf(asset);
+    const picture = await read(file).catch(() => {
+      throw new ArtRequestError('That picture could not be read from disk.');
+    });
+    return { name, picture, provider, request: await normalRequest(picture, name, ownPrompt(prompt)) };
+  }
+
+  /** Where the picture the game shows now is loaded from, for the game's own pictures. */
+  private async pictureFile(asset: string): Promise<string | undefined> {
+    await this.load();
+    const painted = this.options.buildings.manifest();
+    const shipped = await this.options.shipped();
+    return this.redone[asset]?.file ?? (painted[asset]?.redone ? painted[asset]!.file : undefined) ?? shipped[asset]?.file ?? painted[asset]?.file;
+  }
+
+  /** Which image model paints a picture's things. */
+  private useFor(asset: string): ArtUse {
+    if (Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`))) return 'buildings';
+    const kit = this.kitAsset(asset);
+    return kit ? useOf(kit) : 'wishes';
+  }
+
+  /**
+   * Paints a normal map for one of the game's own pictures, in place of the
+   * one the game works out; the Owner's `prompt` replaces the usual words.
+   */
+  async paintNormal(asset: string, prompt?: string): Promise<{ estimateUsd: number }> {
+    this.refuseWhenSpent();
+    const { name, provider } = await this.normalAsk(asset, prompt);
+    const id = normalMapId(asset);
+    const estimateUsd = estimateImageUsd(provider.model);
+    const handle = this.options.jobs.add(id, `Normal map of ${name}`, 'picture', 'gods-view', estimateUsd);
+    this.enqueue(async () => {
+      // Read again when its turn comes, so the map is made for the picture shown then.
+      const { picture, request } = await this.normalAsk(asset, prompt);
+      handle.start();
+      const sent = keepingImage(watched(provider, handle));
+      const image = await sent.generate(request);
+      const { width = 1, height = 1 } = await sharp(picture).metadata();
+      const png = await fitNormalMap(image.data, width, height);
+      const usd = imageUsd(provider.model, image);
+      await this.keepCurrent(id);
+      await this.options.recipes.record(id, { at: Date.now(), steps: [await this.options.recipes.imageStep(`Normal map of ${name}`, provider, request, usd)] });
+      this.options.budget.spend('image', { provider: provider.id, model: provider.model }, usd);
+      await mkdir(this.redoneDir, { recursive: true });
+      await writeFile(resolve(this.redoneDir, `${id}.png`), png);
+      this.redone[id] = { file: `${REDONE_ART_PATH}/${id}.png?v=${Date.now().toString(36)}`, kind: 'normal', width, height, redone: Date.now() };
+      await this.saveRedone();
+      handle.done(usd);
+      this.options.onPainted?.([id]);
+    }, handle);
+    return { estimateUsd };
+  }
+
+  /** Puts back the normal map the game works out by itself; the painted one is kept as a version. */
+  async dropNormal(asset: string): Promise<void> {
+    await this.load();
+    const id = normalMapId(asset);
+    if (!this.redone[id]) throw new ArtRequestError('That picture has no painted normal map.');
+    await this.keepCurrent(id);
+    delete this.redone[id];
+    await this.saveRedone();
   }
 
   /** A picture's name, for a review's title. */

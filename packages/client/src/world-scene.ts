@@ -47,6 +47,7 @@ import {
 import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
+import { shadePictures } from './normal-maps.ts';
 import { dropLight, lightScene, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
 
@@ -307,6 +308,7 @@ export class WorldScene extends Phaser.Scene {
     const welcome = this.welcome;
     // First, so every picture made from here on is lit.
     this.lit = lightScene(this, LABEL_DEPTH);
+    if (this.lit) shadePictures(this);
     this.remotes = new Map();
     this.creatures = new Map();
     this.bodies = new Map();

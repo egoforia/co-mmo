@@ -1,13 +1,15 @@
 import Phaser from 'phaser';
-import { LIGHT_MOD, TILE_PIXELS, lightGlow, lightStrength, modOn, type Light } from '@co-mmo/shared';
+import { LIGHT_MOD, TILE_PIXELS, lightGlow, lightStrength, modOn, type Light, type Sun } from '@co-mmo/shared';
+import { LIT, LIT_FIGURE, setSun } from './lit-pipeline.ts';
 
-// Lighting for things that burn or glow. The world's pictures are drawn with
-// Phaser's Light2D pipeline: each pixel is its painted colour times the light
-// that reaches it, the sky's colour plus any lamp nearby. So a lantern shows
-// its holder and the ground around them in their own colours instead of
-// painting a glow over them, and nothing gets brighter than lit paint.
-// Light2D is a WebGL effect; without WebGL the sky shades the scene with an
-// overlay instead and lights simply do not show.
+// Lighting for the world. Its pictures are drawn with the Lit pipeline
+// (lit-pipeline.ts, Phaser's Light2D plus a sun): each pixel is its painted
+// colour times the light that reaches it, the sky's colour, the sun or moon
+// on the side facing it and any lamp nearby. So a lantern shows its holder
+// and the ground around them in their own colours instead of painting a glow
+// over them, and nothing gets brighter than lit paint. Characters get a rim
+// light too. This is a WebGL effect; without WebGL the sky shades the scene
+// with an overlay instead and lights simply do not show.
 
 /** A light in the world, with the seed that keeps its flicker out of step with others. */
 export interface LitPoint {
@@ -34,7 +36,8 @@ export function lightScene(scene: Phaser.Scene, labelDepth: number): boolean {
   const onPreRender = () => {
     for (const o of added) {
       const pic = o as Phaser.GameObjects.Image;
-      if (pic.active && PICTURES.has(o.type) && pic.depth < labelDepth) pic.setPipeline('Light2D');
+      // Characters were already given the figure pipeline, with its rim light.
+      if (pic.active && PICTURES.has(o.type) && pic.depth < labelDepth && pic.pipeline?.name !== LIT_FIGURE) pic.setPipeline(LIT);
     }
     added = [];
   };
@@ -47,9 +50,16 @@ export function lightScene(scene: Phaser.Scene, labelDepth: number): boolean {
   return true;
 }
 
-/** Sets the light everything gets with no lamp near: the sky's colour. */
-export function setSkyLight(scene: Phaser.Scene, color: number): void {
+/** Lights a character, creature or what they hold with the rim light that keeps them readable. */
+export function litFigure<T extends Phaser.GameObjects.Image>(scene: Phaser.Scene, pic: T): T {
+  if (scene.lights.active) pic.setPipeline(LIT_FIGURE);
+  return pic;
+}
+
+/** Sets the light everything gets with no lamp near: the sky's colour, with the sun or moon and the sky's all-round share. */
+export function setSkyLight(scene: Phaser.Scene, color: number, sun: Sun, fill: number): void {
   scene.lights.setAmbientColor(color);
+  setSun(sun, fill);
 }
 
 /** Makes a light, or nothing when the scene is not lit. */

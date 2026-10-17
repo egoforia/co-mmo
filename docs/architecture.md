@@ -108,8 +108,10 @@ they need is a description: buildings in `land-buildings.ts`, the rest in
 ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
 light of the hour and the weather),
 `textures.ts` (tilesets from painted art), `wished.ts` (wished content),
-`lights.ts` (pictures are lit with Phaser's Light2D: the sky's colour plus
-lamps), `normal-maps.ts` + `relief.ts` + `relief-worker.ts` (a normal map
+`lights.ts` + `lit-pipeline.ts` (pictures are lit by the sky's colour, the
+sun or moon of the hour from shared `lighting.ts`, and lamps at fires,
+lanterns, shrines and windows; characters get a rim light; `light-preview.ts`
+shows the same light in the Art tab), `normal-maps.ts` + `relief.ts` + `relief-worker.ts` (a normal map
 worked out for every picture in a worker; a painted `<key>-normal` wins),
 `sound.ts`, and one `*-ui.ts` per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and

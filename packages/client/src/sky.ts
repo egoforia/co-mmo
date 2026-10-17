@@ -1,4 +1,4 @@
-import { DEFAULT_SKY, darkness, dayPhase, skyTint, skyWords, type SkyView, type Weather } from '@co-mmo/shared';
+import { DEFAULT_SKY, darkness, dayPhase, skyFill, skyTint, skyWords, sunAt, type SkyView, type Sun, type Weather } from '@co-mmo/shared';
 
 // The hour and the weather on this screen. The server says how the sky
 // turns and what its clock reads; the hour is counted on from there every
@@ -15,6 +15,8 @@ export class SkyClock {
   private biomeTint = 0xffffff;
   /** The grade shown now, per channel, kept unrounded so slow eases still arrive. */
   private shown?: [number, number, number];
+  /** The sun's colour and the sky's all-round share shown now, eased the same way. */
+  private shownSun?: { color: [number, number, number]; fill: number };
 
   /** A welcome said how the sky turns, its clock and the weather here, and the land's own light. */
   set(view: SkyView | undefined, biomeTint: number): void {
@@ -52,5 +54,17 @@ export class SkyClock {
     this.shown = this.shown ? (this.shown.map((v, i) => v + (goal[i]! - v) * t) as [number, number, number]) : goal;
     const [r, g, b] = this.shown.map(Math.round) as [number, number, number];
     return (r << 16) | (g << 8) | b;
+  }
+
+  /** The sun or moon and the sky's all-round share this frame; a change of weather eases in like the grade. */
+  sun(deltaMs: number): { sun: Sun; fill: number } {
+    const goal = sunAt(this.phase(), this.view.weather);
+    const fill = skyFill(this.view.weather);
+    const t = Math.min(1, (EASE_PER_SECOND * deltaMs) / 1000);
+    const was = this.shownSun;
+    this.shownSun = was
+      ? { color: was.color.map((v, i) => v + (goal.color[i]! - v) * t) as [number, number, number], fill: was.fill + (fill - was.fill) * t }
+      : { color: goal.color, fill };
+    return { sun: { dir: goal.dir, color: this.shownSun.color }, fill: this.shownSun.fill };
   }
 }

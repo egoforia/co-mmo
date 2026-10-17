@@ -324,3 +324,7 @@ pre.prompt mark { background: rgba(254, 174, 52, 0.28); color: var(--ink); }
 .hand-row .hand-head button, .hands > button { font-size: 11px; padding: 2px 8px; }
 .hand-row .frame.busy { opacity: 0.4; }
 .hand-question textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; }
+.light-previews { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.light-previews figure { margin: 0; text-align: center; }
+.light-previews img { height: 72px; display: block; background: #2a2533; border-radius: 4px; }
+.light-previews figcaption { font-size: 11px; opacity: 0.8; }

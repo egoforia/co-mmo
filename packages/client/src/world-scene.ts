@@ -3,6 +3,8 @@ import {
   ABILITIES,
   CREATURES,
   FLAME_LIGHT,
+  WINDOW_LIGHT,
+  glowOf,
   ITEMS,
   Interpolator,
   HELD_SIZE,
@@ -48,7 +50,7 @@ import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBu
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
 import { shadePictures } from './normal-maps.ts';
-import { dropLight, lightScene, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
+import { dropLight, lightScene, litFigure, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
 
 interface Avatar {
@@ -120,6 +122,16 @@ interface DrawnRegion {
   ground: number[][];
   /** Its ground and scenery near us, in chunks, by chunk index. */
   chunks: Map<number, Chunk>;
+  /** Fires, lanterns, shrines and lit windows standing in it. */
+  lamps: Lamp[];
+}
+
+/** A light standing in the world, at a screen point; windows light up only after dark. */
+interface Lamp {
+  lit: LitPoint;
+  x: number;
+  y: number;
+  window: boolean;
 }
 
 /** A square of a region's ground and its trees and rocks, drawn only while we are near. */
@@ -344,7 +356,8 @@ export class WorldScene extends Phaser.Scene {
     this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
     // With WebGL it is the light every picture is lit by; without, a shade laid over them.
     if (this.lit) {
-      setSkyLight(this, this.sky.tint(0));
+      const { sun, fill } = this.sky.sun(0);
+      setSkyLight(this, this.sky.tint(0), sun, fill);
     } else {
       this.tint = this.add.rectangle(0, 0, 10, 10, this.sky.tint(0)).setOrigin(0.5).setScrollFactor(0);
       this.tint.setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(LABEL_DEPTH - 1);
@@ -422,8 +435,11 @@ export class WorldScene extends Phaser.Scene {
     const predictor = this.predictor;
     if (!predictor) return;
     const sky = this.sky.tint(deltaMs);
-    if (this.lit) setSkyLight(this, sky);
-    else this.tint?.setFillStyle(sky);
+    if (this.lit) {
+      const { sun, fill } = this.sky.sun(deltaMs);
+      setSkyLight(this, sky, sun, fill);
+      this.lightLamps();
+    } else this.tint?.setFillStyle(sky);
     // Fixed-rate input: one input per server tick, however fast we render.
     this.accumulator += Math.min(deltaMs, 250) / 1000;
     while (this.accumulator >= TICK_SECONDS) {
@@ -673,7 +689,7 @@ export class WorldScene extends Phaser.Scene {
 
   /** A defeated creature sinks away; the real sprite is removed by the next snapshot. */
   private fadeOut(a: Avatar): void {
-    const ghost = this.add.image(a.body.x, a.body.y, a.body.texture.key).setOrigin(0.5, 0.97);
+    const ghost = litFigure(this, this.add.image(a.body.x, a.body.y, a.body.texture.key).setOrigin(0.5, 0.97));
     ghost.setScale(a.body.scaleX, a.body.scaleY).setFlipX(a.body.flipX).setDepth(a.body.depth);
     a.body.setVisible(false);
     this.tweens.add({ targets: ghost, alpha: 0, scaleY: 0.1, duration: 450, ease: 'Quad.easeIn', onComplete: () => ghost.destroy() });
@@ -746,6 +762,7 @@ export class WorldScene extends Phaser.Scene {
       o.destroy();
     }
     for (const m of region.tilemaps) m.destroy();
+    for (const lamp of region.lamps) dropLight(this, lamp.lit);
     for (const chunk of region.chunks.values()) dropChunk(chunk);
     this.drawn.delete(id);
   }
@@ -854,7 +871,8 @@ export class WorldScene extends Phaser.Scene {
     });
     this.placeLandmarks(map, ox, oy, views);
     const objects = this.children.list.filter((o) => !before.has(o));
-    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map() };
+    const lamps = this.placeLamps(map, ox, oy, views);
+    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps };
     this.nearAt = '';
     return region;
   }
@@ -881,6 +899,39 @@ export class WorldScene extends Phaser.Scene {
       img.setDepth(PROJECTION.depth(ox + l.x, oy + l.y));
       views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
     }
+  }
+
+  /** Burns the world's lamps for this frame: brighter after dark, windows only then. */
+  private lightLamps(): void {
+    const dark = this.sky.darkness();
+    for (const region of this.drawn.values()) {
+      for (const lamp of region.lamps) {
+        placeLight(lamp.lit, lamp.x, lamp.y, this.time.now, !lamp.window || dark > 0, dark);
+        if (lamp.window) lamp.lit.point.intensity *= dark;
+      }
+    }
+  }
+
+  /** Lights for a region's fires, lanterns and shrines, and its buildings' windows. */
+  private placeLamps(map: RegionMap, ox: number, oy: number, views: BuildingView[]): Lamp[] {
+    const lamps: Lamp[] = [];
+    const add = (light: Light, x: number, y: number, window: boolean) => {
+      const lit = makeLight(this, light);
+      if (lit) lamps.push({ lit, x, y, window });
+    };
+    for (const l of map.landmarks) {
+      const light = glowOf(l.asset);
+      // The flame sits a little above where the piece stands.
+      const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
+      if (light) add(light, at.x, at.y - T * 0.6, false);
+    }
+    for (const v of views) {
+      if (!v.exterior) continue;
+      const b = v.building;
+      const at = PROJECTION.toScreen(ox + b.x + b.width / 2, oy + b.y + b.height);
+      add(WINDOW_LIGHT, at.x, at.y - T * 0.8, true);
+    }
+    return lamps;
   }
 
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
@@ -935,7 +986,7 @@ export class WorldScene extends Phaser.Scene {
 
   private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97);
+    const body = litFigure(this, this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97));
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -1019,7 +1070,7 @@ export class WorldScene extends Phaser.Scene {
     }
     if (!held.image || held.image.texture.key !== key) {
       held.image?.destroy();
-      held.image = this.add.image(0, 0, key);
+      held.image = litFigure(this, this.add.image(0, 0, key));
     }
     const mirrored = b.flipX;
     const x = b.x + (mirrored ? b.originX - hand[0] : hand[0] - b.originX) * b.displayWidth;

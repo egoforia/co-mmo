@@ -8,6 +8,7 @@
 import { HELD_SIZE, heldBehind, type ArtPoint, type ArtPointsManifest } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
+import { lightPreviews } from './light-preview.ts';
 
 /** What the Art tab needs from God's View. */
 export interface ArtContext {
@@ -313,7 +314,13 @@ function normalHtml(item: ArtItem): string {
   const look = item.normalMap
     ? `<a href="${esc(item.normalMap)}" target="_blank" rel="noopener"><img class="normal-map" src="${esc(item.normalMap)}" alt="Its painted normal map" loading="lazy"></a>`
     : item.url ? `<button type="button" class="quiet" data-normal-show="${esc(item.url)}">Show the worked-out map</button>` : '';
-  return `<div class="normal">${look}<small>${item.normalMap ? 'Normal map: painted' : 'Normal map: worked out by the game, free'}</small><div class="card-actions">${paint}${back}</div></div>`;
+  const light = item.url ? lightButton(item.url, item.normalMap, false) : '';
+  return `<div class="normal">${look}<small>${item.normalMap ? 'Normal map: painted' : 'Normal map: worked out by the game, free'}</small><div class="card-actions">${light}${paint}${back}</div></div>`;
+}
+
+/** A button that shows a picture lit at dawn, midday, dusk, night and by a lantern; `figure` adds the rim light characters get. */
+function lightButton(url: string, normal: string | undefined, figure: boolean): string {
+  return `<button type="button" class="quiet" data-light-preview="${esc(JSON.stringify({ url, normal, figure }))}">Preview the light</button>`;
 }
 
 function stripHtml(strip: { url: string; frames: number; width: number; height: number; cycleSeconds: number } | undefined, label: string, height = 72): string {
@@ -341,7 +348,7 @@ function walkerHtml(w: WalkerView): string {
         <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${view.approved ? 'approved picture' : view.url ? 'standing picture' : 'no standing picture'}</small></div>
         ${stripHtml(strip, label, 110)}
         <div class="card-actions">${paintView}${viewVersions}${clip}${walkVersions}</div>
-        <div class="card-actions">${view.url ? `<button type="button" class="quiet" data-normal-show="${esc(view.url)}">Standing normal map</button>` : ''}${strip ? `<button type="button" class="quiet" data-normal-show="${esc(strip.url)}">Walk normal maps</button>` : ''}</div>
+        <div class="card-actions">${view.url ? `<button type="button" class="quiet" data-normal-show="${esc(view.url)}">Standing normal map</button>${lightButton(view.url, undefined, true)}` : ''}${strip ? `<button type="button" class="quiet" data-normal-show="${esc(strip.url)}">Walk normal maps</button>` : ''}</div>
       </div>`;
   };
   return `
@@ -696,6 +703,16 @@ export function artClick(target: HTMLElement): boolean {
       (src) => { t.outerHTML = `<a href="${esc(src)}" target="_blank" rel="noopener"><img class="normal-map" src="${esc(src)}" alt="Its worked-out normal map"></a>`; },
       () => { t.disabled = false; t.textContent = 'Show the worked-out map'; ctx.toast('That normal map could not be worked out here.'); },
     );
+  } else if (t.dataset.lightPreview) {
+    const ask = JSON.parse(t.dataset.lightPreview) as { url: string; normal?: string; figure: boolean };
+    t.disabled = true;
+    t.textContent = 'Lighting it…';
+    void (ask.normal ? Promise.resolve(ask.normal) : workedOutNormalMap(ask.url))
+      .then((normal) => lightPreviews(ask.url, normal, ask.figure))
+      .then(
+        (shots) => { t.outerHTML = `<div class="light-previews">${shots.map((s) => `<figure><img src="${esc(s.src)}" alt="${esc(s.label)}"><figcaption>${esc(s.label)}</figcaption></figure>`).join('')}</div>`; },
+        () => { t.disabled = false; t.textContent = 'Preview the light'; ctx.toast('That picture could not be lit here.'); },
+      );
   } else if (t.dataset.normalDrop) {
     const item = data.items.find((i) => i.id === t.dataset.normalDrop);
     if (!confirm(`Go back to the normal map the game works out for ${item?.name ?? 'this picture'}? The painted one is kept and can be painted again.`)) return true;

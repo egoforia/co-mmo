@@ -13,6 +13,7 @@ import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
+import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
 
 async function boot(): Promise<void> {
   const params = new URLSearchParams(location.search);
@@ -339,6 +340,10 @@ function play(token: string): void {
       parent: 'game',
       backgroundColor: '#181425',
       antialias: true,
+      // The world's lighting: the sun, the sky and lamps, with a rim light on characters.
+      // Room for the lamps, fires and lit windows near us, not just a few.
+      render: { maxLights: 16 },
+      pipeline: { [LIT]: LitPipeline, [LIT_FIGURE]: LitFigurePipeline } as unknown as Phaser.Types.Core.PipelineConfig,
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });

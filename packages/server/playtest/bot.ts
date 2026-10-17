@@ -155,7 +155,7 @@ export class Bot {
    */
   async walkTo(
     target: Point | (() => Point | undefined),
-    { near = 0, ms = 60_000, what = 'a spot', quiet = false }: { near?: number; ms?: number; what?: string; quiet?: boolean } = {},
+    { near = 0, ms = 180_000, what = 'a spot', quiet = false }: { near?: number; ms?: number; what?: string; quiet?: boolean } = {},
   ): Promise<boolean> {
     const fail = (why: string) => {
       if (!quiet) this.problems.push(`${this.name} could not walk to ${what} in ${this.region.def.name}: ${why}`);

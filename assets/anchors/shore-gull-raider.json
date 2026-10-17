@@ -1,0 +1,40 @@
+{
+  "id": "shore-gull-raider",
+  "description": {
+    "id": "shore-gull-raider",
+    "name": "Gull Raider",
+    "kind": "monster",
+    "biome": "sunlit-shore",
+    "references": [
+      "shore-crab-knight"
+    ],
+    "silhouetteHook": "a big grey and white seagull wearing a red pirate bandana and an eye patch",
+    "body": "stout bird standing on webbed feet, wings half open, mean beak",
+    "materials": [
+      "feathers",
+      "cloth"
+    ],
+    "colors": {
+      "main": "grey",
+      "secondary": "white",
+      "accent": "red bandana"
+    },
+    "details": [
+      "a stolen gold coin in its beak"
+    ],
+    "mood": "cheeky, greedy",
+    "extra": {
+      "threat": "normal, in flocks",
+      "movement": "hop and flap"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Sunlit Shore. Palette leans on its key colours; light tint and mood of Sunlit Shore.\nSubject: Gull Raider (monster). Most recognisable feature: a big grey and white seagull wearing a red pirate bandana and an eye patch. Body and shape: stout bird standing on webbed feet, wings half open, mean beak. Materials: feathers, cloth. Colours: main grey, secondary white, small accent of red bandana. Details: a stolen gold coin in its beak. threat: normal, in flocks. movement: hop and flap. Mood: cheeky, greedy.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "shore-crab-knight"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:21:58.991Z"
+}

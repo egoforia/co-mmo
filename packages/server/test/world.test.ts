@@ -71,7 +71,7 @@ describe('World', () => {
     const entry = woods.map.entries.east!;
     // A row open on both sides of the Sanctum's west edge, away from the road.
     let y = 2;
-    while (collides(home.map, 0.5, y) || collides(woods.map, entry.x, y) || Math.abs(y - entry.y) < 3) y++;
+    while (collides(home.map, 0.5, y) || collides(woods.map, entry.x, y) || collides(woods.map, woods.map.width - 0.5, y) || Math.abs(y - entry.y) < 3) y++;
     world.join(info('a', 'Mara'), fakeConn(), { regionId: 'sanctum', x: 0.5, y }, newCharacter());
     for (let seq = 1; seq <= 10 && world.regionOf('a') === home; seq++) {
       world.handle('a', { t: 'input', seq, dx: -1, dy: 0 });

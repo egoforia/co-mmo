@@ -1,0 +1,40 @@
+{
+  "id": "desert-dune-jackal",
+  "description": {
+    "id": "desert-dune-jackal",
+    "name": "Dune Jackal",
+    "kind": "monster",
+    "biome": "mirage-desert",
+    "references": [
+      "desert-scarab"
+    ],
+    "silhouetteHook": "a lean sand-coloured jackal with huge pointed ears and a turquoise beaded collar",
+    "body": "four long legs, slim body, long snout, sly eyes",
+    "materials": [
+      "fur",
+      "beads"
+    ],
+    "colors": {
+      "main": "sand gold",
+      "secondary": "dark brown back stripe",
+      "accent": "turquoise collar"
+    },
+    "details": [
+      "a gold ring in one ear"
+    ],
+    "mood": "sly, hungry",
+    "extra": {
+      "threat": "dangerous in packs",
+      "movement": "lope"
+    }
+  },
+  "prompt": "Hand-painted 2D game art in the style of a 1999 storybook RPG.\nSoft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.\nWarm golden key light from the upper left, blue-violet shadows.\nSelective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.\nNo writing anywhere: labels, signs and covers are blank or carry simple symbols.\nA single game sprite in three-quarter top-down view, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nBiome: Mirage Desert. Palette leans on its key colours; light tint and mood of Mirage Desert.\nSubject: Dune Jackal (monster). Most recognisable feature: a lean sand-coloured jackal with huge pointed ears and a turquoise beaded collar. Body and shape: four long legs, slim body, long snout, sly eyes. Materials: fur, beads. Colours: main sand gold, secondary dark brown back stripe, small accent of turquoise collar. Details: a gold ring in one ear. threat: dangerous in packs. movement: lope. Mood: sly, hungry.\nAvoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "desert-scarab"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-17T09:22:53.185Z"
+}

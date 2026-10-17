@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.ts';
+import { DEFAULT_SKY, cleanSky } from '@co-mmo/shared';
 import { inviteUrl } from './account-routes.ts';
 import { Store } from './store.ts';
 import { connectPostgres } from './db.ts';
@@ -58,6 +59,12 @@ const apiLog = await ApiLog.open({
 });
 const app = createApp({
   store,
+  // A game day of DAY_MINUTES, weather that changes every WEATHER_MINUTES; WEATHER=off keeps skies clear.
+  sky: cleanSky({
+    dayMinutes: positive('DAY_MINUTES', DEFAULT_SKY.dayMinutes),
+    weatherMinutes: positive('WEATHER_MINUTES', DEFAULT_SKY.weatherMinutes),
+    weather: process.env.WEATHER?.trim().toLowerCase() !== 'off',
+  }),
   apiLog,
   publicUrl,
   clientDir,

@@ -24,6 +24,11 @@ import {
   type PartyMessage,
   type PlayerInfo,
   type ServerMessage,
+  DEFAULT_SKY,
+  dayPhase,
+  weatherAt,
+  type SkyConfig,
+  type Weather,
 } from '@co-mmo/shared';
 import { Parties } from './parties.ts';
 import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
@@ -96,7 +101,12 @@ export class World {
   private readonly quietSince = new Map<string, number>();
   private ticks = 0;
 
-  constructor(private readonly now: () => number = Date.now, private readonly random: () => number = Math.random) {
+  constructor(
+    private readonly now: () => number = Date.now,
+    private readonly random: () => number = Math.random,
+    /** How the sky turns over every region (DAY_MINUTES, WEATHER_MINUTES, WEATHER in .env). */
+    readonly sky: SkyConfig = DEFAULT_SKY,
+  ) {
     this.parties = new Parties(now);
     // Each world keeps its own copies: wished regions change the exits.
     const launch = WORLD_REGIONS.map((def) => structuredClone(def));
@@ -134,12 +144,22 @@ export class World {
       journal: (text, playerId) => this.onJournal?.(text, playerId),
       // Every region around this one, corners too, so the world is drawn as one map.
       neighbours: () => this.neighbours(region.def),
+      sky: () => this.sky,
     }, this.now, this.random, cell);
     for (const p of placements) {
       if (p.kind === 'creatures') region.addCreatures(p.id, p.spots);
       else region.addNpc(p.npc);
     }
     return region;
+  }
+
+  /**
+   * Where the day is and the weather over a region now. Both follow from the
+   * time and the land alone, so this reads the same wherever the region runs.
+   */
+  skyOver(def: RegionDef): { phase: number; weather: Weather } {
+    const now = this.now();
+    return { phase: dayPhase(now, this.sky), weather: weatherAt(def.id, def.biome, now, this.sky) };
   }
 
   /** The regions around one, corners too. */
@@ -154,7 +174,7 @@ export class World {
       const members = this.parties.members(id);
       if (members.length > 1) parties[id] = members;
     }
-    return { defs: this.defs(), online: this.where.size, parties };
+    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky };
   }
 
   /** Wished things came into being or went away (wishes granted, restored or rolled back). */

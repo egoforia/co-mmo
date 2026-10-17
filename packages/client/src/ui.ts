@@ -157,10 +157,12 @@ export class ChatBox {
   }
 }
 
-export function setHud(name: string, online: number, region: string): void {
+export function setHud(name: string, online: number, region: string, sky = ''): void {
   $('hud').hidden = false;
   $('hud-name').textContent = region ? `${name} · ${region}` : name;
   $('hud-online').textContent = `${online} online`;
+  $('hud-sky').textContent = sky;
+  $('hud-sky').hidden = !sky;
 }
 
 export function onInviteClick(handler: () => void): void {

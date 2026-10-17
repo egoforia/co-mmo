@@ -22,7 +22,7 @@ import {
 const T = TILE_PIXELS;
 /** Each tile is extruded by this much so filtered tiles never show seams. */
 export const TILE_MARGIN = 2;
-const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Floor, Tile.Wall, Tile.Door];
+const TILE_ORDER: Tile[] = [Tile.Ground, Tile.Path, Tile.Water, Tile.Tree, Tile.Rock, Tile.Blocked, Tile.Floor, Tile.Wall, Tile.Door, Tile.Bridge];
 
 /** How a biome is drawn; a wished biome's kit is painted when its first region is wished. */
 export function biomeLook(biome: string): BiomeLook {
@@ -30,6 +30,8 @@ export function biomeLook(biome: string): BiomeLook {
 }
 
 const SANCTUM = sharedLook('sanctum');
+/** The painted planks where a road crosses water. */
+const BRIDGE_ART = 'bridge-planks';
 
 export function lightTint(biome: string): number {
   return BIOMES[biome as BiomeId]?.lightTint ?? 0xffffff;
@@ -59,6 +61,8 @@ export function registerTileset(scene: Phaser.Scene, def: RegionDef): string {
     [Tile.Tree]: ground,
     [Tile.Rock]: ground,
     [Tile.Blocked]: ground,
+    // One painted plank bridge serves every land; a road's own tile until it is painted.
+    [Tile.Bridge]: loaded(scene, BRIDGE_ART, look.path, sanctum.path),
     ...buildingTiles(scene, FALLBACK_BUILDING_STYLE),
   });
 }

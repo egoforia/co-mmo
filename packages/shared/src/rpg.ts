@@ -3,6 +3,7 @@
 // as data in the same shapes.
 
 import type { Light } from './light.ts';
+import type { Active } from './sky.ts';
 
 export interface Stats {
   /** Melee damage and health. */
@@ -500,10 +501,19 @@ export function equipmentBonus(slot: EquipSlot, rarity: Rarity, focus?: keyof St
 
 /**
  * Behaviours from the design doc's small library. `wander` creatures only
- * fight back; `guard` creatures attack anyone close to their spot; `chase`
- * creatures go after anyone they notice.
+ * fight back, and run when badly hurt; `guard` creatures attack anyone close
+ * to their spot; `chase` creatures go after anyone they notice; `patrol`
+ * creatures walk rounds about their spot and attack anyone they meet;
+ * `timid` creatures never fight and run from anyone who comes close; `pack`
+ * creatures roam together and all join in when one of them hunts.
  */
-export type Behavior = 'wander' | 'guard' | 'chase';
+export type Behavior = 'wander' | 'guard' | 'chase' | 'patrol' | 'timid' | 'pack';
+
+/** Every behaviour, for checking wishes. */
+export const BEHAVIORS: Behavior[] = ['wander', 'guard', 'chase', 'patrol', 'timid', 'pack'];
+
+/** How close a player must come before a creature of each behaviour notices them, unless its kind says. */
+export const BEHAVIOR_NOTICE: Record<Behavior, number> = { wander: 0, guard: 2.5, chase: 4, patrol: 3, timid: 3.5, pack: 4 };
 
 export interface Drop {
   item: string;
@@ -523,8 +533,10 @@ export interface CreatureDef {
   cooldown: number;
   /** Tiles per second when chasing. */
   speed: number;
-  /** How close a player must come before it attacks (guard, chase). */
+  /** How close a player must come before it attacks (guard, chase, patrol, pack) or runs (timid). */
   notice: number;
+  /** When it is up and about; it sleeps the rest of the time (see sky.ts). Always, unless said. */
+  active?: Active;
   xp: number;
   gold: [number, number];
   drops: Drop[];
@@ -566,7 +578,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     name: 'Crab Knight',
     art: 'shore-crab-knight',
     description: 'A crab in a plumed helm who guards its patch of sand with a needle-sharp lance.',
-    behavior: 'guard',
+    behavior: 'patrol',
     level: 2,
     hp: 34,
     damage: 5,
@@ -582,7 +594,8 @@ export const CREATURES: Record<string, CreatureDef> = {
     name: 'Sun Scarab',
     art: 'desert-scarab',
     description: 'A golden beetle that rolls out of the dunes at anything that moves.',
-    behavior: 'chase',
+    behavior: 'pack',
+    active: 'day',
     level: 3,
     hp: 30,
     damage: 6,
@@ -710,7 +723,8 @@ export function questProgressText(state: QuestState): string {
   return `Defeat ${name}s: ${state.count}/${q.goal.count}`;
 }
 
-const NPC_NAMES: Record<string, string> = {
+/** NPC names as said in lines like "Walk up to ... to trade". */
+export const NPC_NAMES: Record<string, string> = {
   'sister-amala': 'Sister Amala',
   'old-bramble': 'Old Bramble',
   marina: 'Marina the Trader',

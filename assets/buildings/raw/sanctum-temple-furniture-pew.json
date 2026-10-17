@@ -1,0 +1,11 @@
+{
+  "id": "sanctum-temple-furniture-pew",
+  "kind": "furniture",
+  "prompt": "Pixel art game graphics in the style of a 16-bit SNES / PS1 Legend of Mana RPG interior.\nEvery art pixel is a crisp, hard-edged square block: no anti-aliasing, no smooth gradients, no blur.\nA limited palette of about 16 colours taken from the reference painting, warm light from the upper left. No writing anywhere.\nA single sprite in three-quarter top-down view, centred, with empty margin all around it, with a darker coloured outline.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject, with no floor, gradient, glow or shadow on it. No magenta anywhere in the subject.\nFire and light have no glow or halo spilling outside the object.\nSubject: the pew inside The Temple of the Bell: a long dark wooden pew with a carved back, seen from behind.\nColours: match the reference painting of the same building from outside.",
+  "references": [
+    "sanctum-temple-exterior"
+  ],
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "createdAt": "2026-10-17T09:28:34.369Z"
+}

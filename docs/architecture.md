@@ -35,13 +35,15 @@ adapter) and picking it in the place named under "Chosen in".
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN` | `PROJECTION` |
 | Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | not used in play yet (kit plan, step 4) |
+| Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` | `KitSheets` in `app.ts` |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
 
 Every contract has a test a new implementation must pass:
 `server/test/services.test.ts` (services swap one at a time),
 `server/test/style-profile.test.ts`, `client/test/projection.test.ts`,
-`shared/test/building-kit.test.ts` and `server/test/building-kit-render.test.ts`
-(good buildings pass, every planted fault is caught), and the store, bus and
+`shared/test/building-kit.test.ts`, `server/test/building-kit-render.test.ts`
+and `server/test/building-kit-sheets.test.ts` (good buildings and sheets pass,
+every planted fault is caught), and the store, bus and
 paint-queue tests.
 
 ## Server modules
@@ -115,7 +117,15 @@ and each storey's cutaway, on one frame) into unlit colour, normal and glow
 maps (`buildingViews`) and checks the picture: hidden faces stay hidden, no
 gaps, no stretched paint, no layout colour, no two surfaces in one place,
 rooms take only inside light, the way down shows. Code makes the shapes; the
-image model paints only their flat textures. The plan for bringing it into
+image model paints only their flat textures, all of a look at once on one
+sheet: a magenta guide with a green shape per texture (`sheet.ts`), painted
+through the Art tab's review, the budget and the paint queue
+(`ArtStudio.paintSheet`, route `art/sheet`). `KitSheets` keeps each painting
+with its layout and words (shipped ones in `assets/kit-sheets/`, later ones
+in the art folder) and checks them in a worker thread (`sheet-checks.ts`,
+`tiling.ts`): in place, filled, no spill, no baked light, even, no frame, and
+a tile that repeats without slicing shapes. Each texture comes from the
+newest painting where it passed. The plan for bringing it into
 play is
 https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 

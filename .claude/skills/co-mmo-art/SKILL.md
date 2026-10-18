@@ -39,7 +39,10 @@ Where things are:
   draws each view (outside and each storey's cutaway) into unlit colour,
   normal and glow maps and runs the picture checks on it. Never accept a
   building the checks refuse; fix the kit or the layout instead. The image
-  model paints only the flat textures the parts are covered with.
+  model paints only the flat textures the parts are covered with, on one
+  sheet per look (`sheet.ts`; a look's words in `KIT_LOOKS`, the style's in
+  the profile's `kitTextures`), and only textures that pass the sheet checks
+  are used. Keep the sheet layout: today's paintings are read against it.
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
 - Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`.
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.

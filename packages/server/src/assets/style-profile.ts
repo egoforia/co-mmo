@@ -32,6 +32,8 @@ export interface StyleProfile {
   judge: { game: string; look: string };
   /** How a picture's normal map is asked for: the light's guide to which way each pixel faces. */
   normalMap: string;
+  /** How the building kit's flat textures are painted on their sheet: square-on, unlit, unframed, in the style's look. */
+  kitTextures: string;
 }
 
 const MAGENTA = { r: 255, g: 0, b: 255, hex: '#FF00FF' };
@@ -102,6 +104,15 @@ export const STORYBOOK: StyleProfile = {
     'Where the picture is empty or magenta, fill with flat lavender blue (128, 128, 255).',
     'No shading, no light, no colours of the picture itself, no outlines, no writing.',
   ].join('\n'),
+  // Kit buildings come with the isometric camera and the flat faceted look of
+  // Art Direction v2; until that look has its own profile (camera plan, step
+  // 5), its texture words are kept here, exactly as the first sheets were painted.
+  kitTextures: [
+    'Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top.',
+    'Built from a few flat facets of solid colour with crisp edges and very low contrast, in one small palette of soft muted warm pastels: cream, sand, warm honey-brown timber, terracotta, dusty rose, sage green.',
+    'No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture.',
+    'No border, frame or outline round any shape. No writing, letters or symbols.',
+  ].join(' '),
 };
 
 /** Every style the game knows, by id. A new style is one more entry. */

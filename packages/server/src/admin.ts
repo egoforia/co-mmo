@@ -393,6 +393,8 @@ export async function handleAdmin(
     const prompt = typeof body?.prompt === 'string' && body.prompt.trim() ? body.prompt : undefined;
     // The pictures a walk's standing picture is painted from: the approved picture and standing pictures by direction.
     const from = Array.isArray(body?.from) ? body.from.filter((f): f is string => typeof f === 'string' && (f === 'approved' || (WALK_DIRECTIONS as readonly string[]).includes(f))) : undefined;
+    // A building sheet's textures to paint again; none paints the whole sheet.
+    const textures = Array.isArray(body?.textures) ? body.textures.filter((t): t is string => typeof t === 'string').slice(0, 20) : [];
     const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
     // Each paid request is one of these; the Owner reviews it, then approves exactly that.
     const asks: Record<string, () => ArtAsk> = {
@@ -403,6 +405,7 @@ export async function handleAdmin(
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
       'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}) }),
       'art/normal': () => ({ kind: 'normal', asset: String(body?.asset ?? ''), ...(prompt ? { prompt } : {}) }),
+      'art/sheet': () => ({ kind: 'sheet', look: String(body?.look ?? ''), textures, note }),
     };
     try {
       if (route === 'art/review' && method === 'POST') {
@@ -421,6 +424,10 @@ export async function handleAdmin(
       }
       if (route === 'art/normal' && method === 'POST') {
         const done = await ctx.art.paintNormal(String(body?.asset ?? ''), prompt);
+        return json(res, 202, { ok: true, ...done }), true;
+      }
+      if (route === 'art/sheet' && method === 'POST') {
+        const done = await ctx.art.paintSheet(String(body?.look ?? ''), textures, note);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/normal-drop' && method === 'POST') {

@@ -74,6 +74,7 @@ const app = createApp({
   ...(regionBus ? { regionBus } : {}),
   builds: { repoDir: repoRoot },
   shippedArt: resolve(repoRoot, 'packages/client/public/art/manifest.json'),
+  kitSheets: resolve(repoRoot, 'assets/kit-sheets'),
   wishes: {
     anchorDir: resolve(repoRoot, 'assets/anchors'),
     artDir: resolve(process.env.ART_DIR ?? resolve(dirname(dataFile), 'art')),

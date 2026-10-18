@@ -34,14 +34,15 @@ adapter) and picking it in the place named under "Chosen in".
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN` | `PROJECTION` |
-| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) | timber-frame kit (`K`) | not used in play yet (kit plan, step 4) |
+| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | not used in play yet (kit plan, step 4) |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
 
 Every contract has a test a new implementation must pass:
 `server/test/services.test.ts` (services swap one at a time),
 `server/test/style-profile.test.ts`, `client/test/projection.test.ts`,
-`shared/test/building-kit.test.ts` (good buildings pass, every planted fault
-is caught), and the store, bus and paint-queue tests.
+`shared/test/building-kit.test.ts` and `server/test/building-kit-render.test.ts`
+(good buildings pass, every planted fault is caught), and the store, bus and
+paint-queue tests.
 
 ## Server modules
 
@@ -109,8 +110,13 @@ windows per wall, stairs) into exact parts on one set of sizes, with each
 storey's blocking lines and a cutaway per storey. `shapeChecks` measures
 every recorded joint on the placed solids (rests on, set into, held by,
 clear of, level with) and that walls are complete, nothing floats and the
-stairs fit. Code makes the shapes; the image model paints only their flat
-textures. The plan for bringing it into play is
+stairs fit. On the server, `assets/building-kit/` draws every view (outside
+and each storey's cutaway, on one frame) into unlit colour, normal and glow
+maps (`buildingViews`) and checks the picture: hidden faces stay hidden, no
+gaps, no stretched paint, no layout colour, no two surfaces in one place,
+rooms take only inside light, the way down shows. Code makes the shapes; the
+image model paints only their flat textures. The plan for bringing it into
+play is
 https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 
 ## Client modules

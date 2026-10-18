@@ -35,9 +35,11 @@ Where things are:
   doorway and covers the walls; the inside matches it.
 - Kit buildings: `packages/shared/src/building-kit/` builds a house from a
   `BuildingSpec` (bays, storeys, doors, windows, stairs) into exact parts,
-  and `shapeChecks` measures every joint. Never accept a building the checks
-  refuse; fix the kit or the layout instead. The image model paints only the
-  flat textures the parts are covered with.
+  and `shapeChecks` measures every joint. `server/src/assets/building-kit/`
+  draws each view (outside and each storey's cutaway) into unlit colour,
+  normal and glow maps and runs the picture checks on it. Never accept a
+  building the checks refuse; fix the kit or the layout instead. The image
+  model paints only the flat textures the parts are covered with.
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
 - Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`.
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.

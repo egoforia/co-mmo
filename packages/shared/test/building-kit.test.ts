@@ -1,26 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { K, KitBuilding, add, shapeChecks, type BuildingSpec, type Part, type Vec3 } from '../src/building-kit/index.ts';
+import { K, KitBuilding, SAMPLE_BUILDINGS, add, shapeChecks, type BuildingSpec, type Part, type Vec3 } from '../src/building-kit/index.ts';
 import { buildingKit } from '../src/index.ts';
 
-// The kit's own test buildings (layouts only; the image model paints their textures).
-const COTTAGE: BuildingSpec = {
-  W: 3, D: 2, chimney: [2.4, 1.25],
-  storeys: [{ front: { 0: 'window', 1: 'door', 2: 'window' }, left: { 1: 'window' }, right: { 0: 'window' }, back: { 1: 'window' } }],
-};
-const TWO: BuildingSpec = {
-  W: 3, D: 2, stairs: true, chimney: [0.6, 1.25],
-  storeys: [
-    { front: { 0: 'door', 2: 'window' }, left: { 0: 'window' }, back: { 2: 'window' }, right: { 0: 'window' } },
-    { front: { 0: 'window', 1: 'window', 2: 'window' }, left: { 1: 'window' }, back: { 0: 'window', 2: 'window' }, right: { 0: 'window' } },
-  ],
-};
-const TOWER: BuildingSpec = {
-  W: 2, D: 2, stairs: true,
-  storeys: [{ front: { 0: 'door' }, left: { 0: 'window' } }, { front: { 1: 'window' }, right: { 0: 'window' } }, { front: { 0: 'window', 1: 'window' }, back: { 0: 'window' }, right: { 1: 'window' } }],
-};
-const LONG: BuildingSpec = { W: 5, D: 2, chimney: [1.5, 1.25], storeys: [{ front: { 0: 'window', 1: 'door', 2: 'window', 3: 'door', 4: 'window' }, left: { 0: 'window', 1: 'window' } }] };
-const SHED: BuildingSpec = { W: 2, D: 1, storeys: [{ front: { 0: 'door' }, left: { 0: 'window' } }] };
-const SIDE_DOOR: BuildingSpec = { W: 2, D: 3, chimney: [1.25, 2.4], storeys: [{ left: { 1: 'door' }, front: { 0: 'window', 1: 'window' }, right: { 2: 'window' }, back: { 0: 'window' } }] };
+const { cottage: COTTAGE, 'two-storey house': TWO } = SAMPLE_BUILDINGS;
+// Layouts with a known fault in their stairs.
 const NARROW: BuildingSpec = { W: 1, D: 2, stairs: true, storeys: [{ front: { 0: 'door' } }, { front: { 0: 'window' } }] };
 const BACKDOOR: BuildingSpec = { W: 3, D: 2, stairs: [{ storey: 0, wall: 'back', up: 1 }], storeys: [{ front: { 0: 'door' }, back: { 0: 'door' } }, { front: { 1: 'window' } }] };
 const BEHIND: BuildingSpec = { W: 3, D: 2, stairs: [{ storey: 0, wall: 'back', up: -1 }], storeys: [{ front: { 0: 'door' } }, { front: { 1: 'window' } }] };
@@ -94,7 +77,7 @@ const FAULTS: [string, () => KitBuilding, string[]][] = [
 ];
 
 describe('building kit shapes', () => {
-  for (const [name, spec] of [['cottage', COTTAGE], ['two-storey house', TWO], ['tower', TOWER], ['long house', LONG], ['shed', SHED], ['cottage, door on the side', SIDE_DOOR]] as const) {
+  for (const [name, spec] of Object.entries(SAMPLE_BUILDINGS)) {
     it(`builds the ${name} with every joint meeting, outside and in every cutaway`, () => {
       for (const cut of [null, ...spec.storeys.map((_, i) => i)]) {
         const b = new KitBuilding(spec, { cut });

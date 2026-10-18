@@ -1,0 +1,9 @@
+This picture is a finished game texture sheet with 2 green shapes still to paint. Paint only inside the green shapes: fill each completely, right to their exact edges, with the texture described below. Keep everything else in the picture exactly as it is: the magenta background and every texture already painted stay untouched, in the same places. Do not move, shrink, enlarge or round the green shapes, and leave no green anywhere.
+
+Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top. Built from a few flat facets of solid colour with crisp edges and very low contrast, in one small palette of soft muted warm pastels: cream, sand, warm honey-brown timber, terracotta, dusty rose, sage green. No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture. No border, frame or outline round any shape. No writing, letters or symbols. Match the textures already painted on the sheet.
+
+1. The green square in the top row, fourth from the left: a window: four panes of glass, each one flat even pale blue-grey with no reflections, glints or streaks, divided by a slim warm-brown timber cross that reaches all four edges; no outer frame.
+
+2. The green wide rectangle in the bottom row, third from the left, the upper one: a stone wall of rounded rectangular blocks in warm grey and sand only (no other colours), four rows of blocks from top to bottom, five or six blocks in each row, with the joints offset from row to row; thin pale mortar lines between the rows and between the blocks, all equally thick.
+
+Texture 2 is repeated side by side and one above another in the game, so keep every shape the same size all over and the lines between rows and shapes the same thickness all over.

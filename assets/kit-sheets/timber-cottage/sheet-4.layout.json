@@ -1,0 +1,36 @@
+{
+ "window": {
+  "name": "window",
+  "box": [
+   1690,
+   70,
+   331,
+   368
+  ],
+  "kind": "fit",
+  "shape": "rect",
+  "world": [
+   0.45,
+   0.5
+  ],
+  "rowsByDesign": true,
+  "stagger": false
+ },
+ "stone": {
+  "name": "stone",
+  "box": [
+   1839,
+   880,
+   750,
+   280
+  ],
+  "kind": "tile",
+  "shape": "rect",
+  "world": [
+   1.3392857142857142,
+   0.5
+  ],
+  "rowsByDesign": true,
+  "stagger": true
+ }
+}

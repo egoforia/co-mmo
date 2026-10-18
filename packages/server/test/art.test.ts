@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { BUILDING_STYLES, WALK_DIRECTIONS, buildingArtIds, walkArt, walkStandArt } from '@co-mmo/shared';
-import type { ImageProvider } from '../src/assets/provider.ts';
+import type { ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
 import { MemoryPaintQueue } from '../src/paint-queue.ts';
 import { account, api, app, start, stop } from './helpers.ts';
@@ -403,6 +403,54 @@ describe('the Art tab', () => {
     await until(async () => (await api(again.base, '/api/art', owner.token)).body['bramble-cottage-furniture-bed']?.redone);
     await app!.art.idle();
   });
+
+  it('paints a building look\'s texture sheet only once approved, keeps it with its layout and words, and checks it for free', async () => {
+    // The test painter fills the guide's green shapes with one plain colour: a stand-in, never game art.
+    const sheetPainter: ImageProvider & { asked: ImageRequest[] } = {
+      id: 'gemini',
+      model: 'gemini-3.1-flash-image',
+      asked: [],
+      async generate(request) {
+        this.asked.push(request);
+        const { data, info } = await sharp(request.references![0]!.data).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        for (let i = 0; i < data.length; i += 3) if (data[i] === 0 && data[i + 1] === 255 && data[i + 2] === 0) data.set([196, 172, 140], i);
+        return { mimeType: 'image/png', data: await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).png().toBuffer() };
+      },
+    };
+    const { base, store, artDir } = await start({ painter: sheetPainter });
+    const owner = account(store, 'Ego', 'owner');
+    const review = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'sheet', look: 'timber-cottage', textures: ['window'] });
+    expect(review.status).toBe(200);
+    expect(review.body.title).toBe('Paint the window texture of the timber-framed cottage sheet again');
+    const [step] = review.body.parts[0].recipe.steps;
+    expect(step).toMatchObject({ media: 'picture', model: 'gemini-3.1-flash-image', prompt: expect.stringContaining('window'), pictures: [{ name: 'Layout guide: the green shapes to paint', url: expect.any(String) }] });
+    expect(step.settings).toEqual(expect.arrayContaining(['shape 16:9', 'size 2K']));
+    // nothing is painted before it is approved
+    expect((await api(base, '/api/admin/art/sheet', owner.token, 'POST', { look: 'timber-cottage', textures: ['window'] })).status).toBe(409);
+    expect(sheetPainter.asked).toHaveLength(0);
+
+    const painting = await ask(base, owner.token, 'sheet', { look: 'timber-cottage', textures: ['window'] });
+    expect(painting.status).toBe(202);
+    expect(painting.body.estimateUsd).toBeGreaterThan(0);
+    await app!.art.idle();
+    expect(sheetPainter.asked).toHaveLength(1);
+    expect(sheetPainter.asked[0]).toMatchObject({ prompt: step.prompt, edit: true, aspectRatio: '16:9', size: '2K' });
+    const kept = join(artDir, 'kit-sheets', 'timber-cottage');
+    expect(await readFile(join(kept, 'sheet-1.prompt.txt'), 'utf8')).toBe(step.prompt);
+    expect(Object.keys(JSON.parse(await readFile(join(kept, 'sheet-1.layout.json'), 'utf8')))).toEqual(['window']);
+    expect(store.spendThisMonth(Date.now())).toHaveLength(1);
+    const { body: jobs } = await api(base, '/api/admin/art/jobs', owner.token);
+    expect(jobs.jobs[0]).toMatchObject({ asset: 'kit-sheet-timber-cottage', status: 'done', label: review.body.title });
+
+    // checked for free: the window passes and is used, the rest are not painted yet
+    const sheet = await until(async () => (await api(base, '/api/admin/art', owner.token)).body.sheets.find((x: any) => x.look === 'timber-cottage' && !x.checking));
+    expect(sheet.paintings).toEqual([{ id: 'painted/sheet-1', shipped: false }]);
+    expect(sheet.textures.find((t: any) => t.name === 'window')).toEqual({ name: 'window', ok: true, painting: 'painted/sheet-1', failed: [] });
+    expect(sheet.textures.find((t: any) => t.name === 'roof')).toEqual({ name: 'roof', ok: false, failed: ['not painted yet'] });
+
+    expect((await ask(base, owner.token, 'sheet', { look: 'castle' })).body.message).toMatch(/no building look/);
+    expect((await ask(base, owner.token, 'sheet', { look: 'timber-cottage', textures: ['chimney'] })).body.message).toMatch(/no texture called chimney/);
+  }, 30_000);
 });
 
 /** Reviews a paid request as God's View does, then approves exactly what it showed. */

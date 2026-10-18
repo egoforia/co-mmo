@@ -16,6 +16,12 @@ describe('wish guard', () => {
     expect(checkChanges(files, { allowCore: true })).toEqual([]);
   });
 
+  it('keeps the building kit core, so wishes add buildings as data', () => {
+    expect(checkChanges([file('packages/shared/src/building-kit/checks.ts')])[0]).toMatch(/the building kit and its checks/);
+    expect(checkChanges([file('packages/server/src/assets/building-kit/raster.ts')])[0]).toMatch(/the building kit and its checks/);
+    expect(checkChanges([file('packages/shared/src/land-buildings.ts')])).toEqual([]);
+  });
+
   it('never lets a wish change the workflows or the guard itself', () => {
     expect(checkChanges([file('.github/workflows/ci.yml'), file('scripts/wish-guard.mjs'), file('.env')], { allowCore: true })).toHaveLength(3);
   });

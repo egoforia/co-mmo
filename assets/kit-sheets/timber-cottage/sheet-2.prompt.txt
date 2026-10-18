@@ -1,0 +1,27 @@
+This picture is a layout guide for a game texture sheet. Repaint it as the finished sheet: keep the magenta background exactly as it is, and fill every green shape completely, right to its exact edges, with the texture described for it below. Keep every shape exactly where it is and exactly its size and outline; do not move, shrink, enlarge or round any shape. Paint nothing outside the green shapes and leave no green anywhere.
+
+Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top. Built from a few flat facets of solid colour with crisp edges and very low contrast, in one small palette of soft muted warm pastels: cream, sand, warm honey-brown timber, terracotta, dusty rose, sage green. No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture. No border, frame or outline round any shape. No writing, letters or symbols.
+
+Top row, left to right:
+
+1. The tall rectangle on the far left: one outside wall section of a timber-framed cottage, between two posts: cream plaster with one slim warm-brown timber brace running diagonally from its lower left corner to its upper right corner.
+
+2. The second tall rectangle: the same wall seen from inside the room: plain warm cream plaster on the upper two thirds, and simple upright honey-brown boards on the lower third.
+
+3. The round-topped arch: a front door made of upright sage-green planks filling the whole arch, with two dark iron straps across it and a small iron ring handle on the right.
+
+4. The small rectangle: a window: four panes of flat pale blue-grey glass divided by a slim warm-brown timber cross that reaches all four edges; no outer frame.
+
+5. The square on the far right: plain cream plaster with a few very faint flat facets, nothing else.
+
+Bottom row:
+
+6. The big square on the left: wooden floor boards running from left to right, honey-brown, six boards from top to bottom with staggered plank ends.
+
+7. The wide rectangle in the middle: roof shingles in rows running from left to right, rectangular flat shingles in dusty rose and terracotta, four rows from top to bottom, each row overlapping the one below it.
+
+8. The rectangle at the upper right: a stone wall of rounded rectangular blocks in warm grey and sand with thin pale mortar lines between them, two rows of blocks; the blocks run right up to the top and bottom edges, with no mortar line along the top or bottom edge.
+
+9. The long thin strip at the lower right: one timber beam: warm brown wood with a long grain running from left to right along the strip.
+
+Textures 5 to 9 are repeated side by side and one above another in the game, so each must continue seamlessly across its left and right edges and across its top and bottom edges: no shape cut off at an edge, no line along an edge.

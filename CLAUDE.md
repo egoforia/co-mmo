@@ -31,9 +31,13 @@ in-game God. TypeScript end to end: `packages/shared` (code both sides run),
   (`packages/shared/src/buildings.ts`), which the server paints at start-up
   when the art is missing; scenery in the biome kit
   (`packages/server/src/assets/kit.ts`). A building's outside art is centred
-  on its doorway in the south wall and covers its walls; its inside is
-  seamless pixel-art tiles matched to the outside. The wish guard refuses
-  drawing code.
+  on its doorway in the south wall and covers its walls; its inside matches
+  the outside. The wish guard refuses drawing code.
+- One exception, the building kit (`packages/shared/src/building-kit/`, the
+  Owner's choice on 2026-10-18): code builds house shapes from plain data,
+  the image model paints every surface they show as flat textures, and a
+  building is shown only when its shape and picture checks pass. Buildings may be
+  mirrored; characters and anything that walks never are.
 - Every wish is a mod a Steward can switch off (`docs/design.md`, Wishes as
   mods). A wish branch `wish/<issue>` puts what it adds behind
   `modOn(engineModId(<issue>))` from `@co-mmo/shared`; with it off, the game

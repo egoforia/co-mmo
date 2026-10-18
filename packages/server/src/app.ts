@@ -24,6 +24,8 @@ import type { VideoProvider } from './assets/video.ts';
 import { ArtJobs } from './art-jobs.ts';
 import { RecipeBook } from './art-recipes.ts';
 import { ArtStudio } from './art-studio.ts';
+import { KitSheets } from './assets/building-kit/kit-sheets.ts';
+import { STYLE } from './assets/style-profile.ts';
 import { DailyClips, MemoryPaintQueue, nextDailyReset, type PaintQueue } from './paint-queue.ts';
 import { SoundMaker } from './sound-maker.ts';
 import type { SoundProvider } from './assets/sound.ts';
@@ -64,6 +66,8 @@ export interface AppOptions {
    * from it is painted at start-up with the image model chosen in God's View.
    */
   shippedArt?: string;
+  /** The building kit's texture sheets shipped with the game, one folder per look. */
+  kitSheets?: string;
   /** The video model for painting walks; Veo through the Gemini key unless a test says otherwise. */
   videoProvider?: () => VideoProvider | undefined;
   /** Turns a clip into its frames; ffmpeg unless a test says otherwise. */
@@ -233,6 +237,7 @@ export function createApp(options: AppOptions): App {
     store, wishes, ai, budget, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests, recipes,
     readArt: artFileReader(options.wishes.artDir, options.shippedArt),
+    sheets: new KitSheets({ shippedDir: options.kitSheets, dir: resolve(options.wishes.artDir, 'kit-sheets'), style: STYLE.kitTextures }),
     // Pages already open load a newly painted normal map without a reload.
     onPainted: (ids) => world.broadcast({ t: 'art', walks: ids }),
   });
@@ -256,6 +261,7 @@ export function createApp(options: AppOptions): App {
     walk: (request) => artStudio.walk(request.walker, request.body, [], false),
     view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt, request.from),
     clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),
+    sheet: (request) => artStudio.paintSheet(request.look, request.textures, request.note),
   });
   const reports = new Reports(store, world);
   const builds = new Builds(store, {

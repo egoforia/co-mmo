@@ -21,6 +21,8 @@ import {
 import { ANCHORS } from './assets/anchors.ts';
 import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { buildingArtJobs } from './assets/building-art.ts';
+import type { KitSheets, KitSheetView } from './assets/building-kit/kit-sheets.ts';
+import type { SheetGuide } from './assets/building-kit/sheet.ts';
 import { BIOME_KIT, type KitAsset } from './assets/kit.ts';
 import { paintKitAsset, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd, imageUsd } from './assets/wish-art.ts';
@@ -114,7 +116,8 @@ export type ArtAsk =
   | { kind: 'view'; walker: string; direction: WalkDirection; prompt?: string; from?: string[] }
   | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string }
-  | { kind: 'normal'; asset: string; prompt?: string };
+  | { kind: 'normal'; asset: string; prompt?: string }
+  | { kind: 'sheet'; look: string; textures?: string[]; note?: string };
 
 /** Everything a request will send, for the Owner to approve. */
 export interface ArtReview {
@@ -171,6 +174,8 @@ export interface ArtStudioOptions {
   readArt?: (file: string) => Promise<Buffer>;
   /** Tells pages already open which pictures changed, so they load them without a reload. */
   onPainted?: (ids: string[]) => void;
+  /** The building kit's texture sheets, painted flat and checked before any building uses them. */
+  sheets?: KitSheets;
 }
 
 /** A refusal the Owner reads as it is. */
@@ -215,6 +220,7 @@ export class ArtStudio {
     sounds: SoundItem[];
     effectsModel: string | null;
     musicModel: string | null;
+    sheets: KitSheetView[];
   }> {
     await this.load();
     await this.options.walks.load();
@@ -235,6 +241,7 @@ export class ArtStudio {
       sounds: (await this.options.sounds?.list()) ?? [],
       effectsModel: this.options.sounds?.models().effects ?? null,
       musicModel: this.options.sounds?.models().music ?? null,
+      sheets: (await this.options.sheets?.overview()) ?? [],
     };
   }
 
@@ -405,6 +412,10 @@ export class ArtStudio {
         const name = await this.nameOf(ask.asset);
         title = `Paint a normal map for ${name}`;
         parts.push({ name, recipe: await this.previewNormal(ask.asset, ask.prompt) });
+      } else if (ask.kind === 'sheet') {
+        const { name, label, provider, request } = await this.sheetAsk(ask.look, ask.textures ?? [], ask.note ?? '');
+        title = label;
+        parts.push({ name, recipe: { at: Date.now(), steps: [await this.options.recipes.imageStep(label, provider, request, estimateImageUsd(provider.model))], notes: ['Each texture is checked for free when it comes back; only those that pass are used, and the rest stay as they were.'] } });
       } else {
         const sounds = this.options.sounds;
         const item = (await sounds?.list())?.find((x) => x.id === ask.sound);
@@ -527,6 +538,48 @@ export class ArtStudio {
     await this.keepCurrent(id);
     delete this.redone[id];
     await this.saveRedone();
+  }
+
+  /** The guide, model and request for painting a building look's texture sheet, or only some of its textures again. */
+  private async sheetAsk(look: string, textures: string[], note: string): Promise<{ name: string; label: string; provider: ImageProvider; request: ImageRequest; guide: SheetGuide }> {
+    const sheets = this.options.sheets;
+    const found = sheets?.look(look);
+    if (!sheets || !found) throw new ArtRequestError('There is no building look by that name.');
+    const provider = this.options.ai.image('buildings');
+    if (!provider) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
+    const names = [...new Set(textures)];
+    const guide = await sheets.guide(look, names, note).catch((err) => {
+      throw new ArtRequestError(plain(err));
+    });
+    const label = names.length ? `Paint ${names.length === 1 ? `the ${names[0]} texture` : `${names.length} textures`} of the ${found.name.toLowerCase()} sheet again` : `Paint the ${found.name.toLowerCase()} texture sheet`;
+    return { name: found.name, label, provider, request: sheets.request(guide), guide };
+  }
+
+  /**
+   * Paints a building look's texture sheet, or only some of its textures
+   * again. The new painting is kept beside the others and checked for free;
+   * a texture is used only once a painting of it passes.
+   */
+  async paintSheet(look: string, textures: string[] = [], note = ''): Promise<{ estimateUsd: number }> {
+    this.refuseWhenSpent();
+    const { label, provider } = await this.sheetAsk(look, textures, note);
+    const estimateUsd = estimateImageUsd(provider.model);
+    const id = `kit-sheet-${look}`;
+    const handle = this.options.jobs.add(id, label, 'picture', 'gods-view', estimateUsd);
+    this.enqueue(async () => {
+      // Made again when its turn comes, so a sheet painted meanwhile is painted over.
+      const { request, guide } = await this.sheetAsk(look, textures, note);
+      handle.start();
+      const image = await watched(provider, handle).generate(request);
+      const usd = imageUsd(provider.model, image);
+      this.options.budget.spend('image', { provider: provider.id, model: provider.model }, usd);
+      const kept = await this.options.sheets!.keep(look, image.data, guide);
+      await this.options.recipes.record(`${id}-${kept.id.split('/')[1]}`, { at: Date.now(), steps: [await this.options.recipes.imageStep(label, provider, request, usd)] });
+      handle.done(usd);
+      // checked now, so the Art tab shows how it fared as soon as it can
+      void this.options.sheets!.checked(look).catch(() => undefined);
+    }, handle, { kind: 'sheet', look, ...(textures.length ? { textures } : {}), ...(note ? { note } : {}) });
+    return { estimateUsd };
   }
 
   /** A picture's name, for a review's title. */
@@ -851,6 +904,7 @@ export class ArtStudio {
     if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
     if (request.kind === 'repaint') return this.repaint(request.asset, request.note);
+    if (request.kind === 'sheet') return this.paintSheet(request.look, request.textures, request.note);
     return undefined;
   }
 

@@ -11,8 +11,11 @@ Rules from the Owner, all binding:
   stand-ins. Every picture comes from the image model chosen in God's View,
   from a description. The only exceptions are the invisible pose guides
   (`assets/pose-guide.ts`) and the building doorway sketch, which steer the
-  model and are never shown to players. The wish guard refuses drawing code.
-- **No left/right mirroring.** Each direction is painted on its own.
+  model and are never shown to players, and the building kit, whose shapes
+  code builds and the image model paints (the Owner, 2026-10-18). The wish
+  guard refuses drawing code.
+- **No left/right mirroring of characters.** Each direction of anything
+  that walks is painted on its own. Buildings may be mirrored.
 - **Size consistency.** Things of a kind are the same size in game (all
   people 168 px tall).
 - **Reviewable before paying.** Anything that costs money shows the exact
@@ -28,8 +31,18 @@ Where things are:
   `assets/style.ts` gives prompt builders its words. Never write style or
   framing sentences anywhere else; add a field to the profile instead.
 - Buildings: `BUILDING_STYLES` in `packages/shared/src/buildings.ts`, painted
-  by `building-art.ts`. Outside art is centred on the south-wall doorway and
-  covers the walls; the inside is seamless pixel-art tiles matching it.
+  whole by `building-art.ts`. Outside art is centred on the south-wall
+  doorway and covers the walls; the inside matches it.
+- Kit buildings: `packages/shared/src/building-kit/` builds a house from a
+  `BuildingSpec` (bays, storeys, doors, windows, stairs) into exact parts,
+  and `shapeChecks` measures every joint. `server/src/assets/building-kit/`
+  draws each view (outside and each storey's cutaway) into unlit colour,
+  normal and glow maps and runs the picture checks on it. Never accept a
+  building the checks refuse; fix the kit or the layout instead. The image
+  model paints only the flat textures the parts are covered with, on one
+  sheet per look (`sheet.ts`; a look's words in `KIT_LOOKS`, the style's in
+  the profile's `kitTextures`), and only textures that pass the sheet checks
+  are used. Keep the sheet layout: today's paintings are read against it.
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
 - Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`.
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.

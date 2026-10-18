@@ -34,12 +34,17 @@ adapter) and picking it in the place named under "Chosen in".
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN` | `PROJECTION` |
+| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | not used in play yet (kit plan, step 4) |
+| Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` | `KitSheets` in `app.ts` |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
 
 Every contract has a test a new implementation must pass:
 `server/test/services.test.ts` (services swap one at a time),
-`server/test/style-profile.test.ts`, `client/test/projection.test.ts`, and the
-store, bus and paint-queue tests.
+`server/test/style-profile.test.ts`, `client/test/projection.test.ts`,
+`shared/test/building-kit.test.ts`, `server/test/building-kit-render.test.ts`
+and `server/test/building-kit-sheets.test.ts` (good buildings and sheets pass,
+every planted fault is caught), and the store, bus and
+paint-queue tests.
 
 ## Server modules
 
@@ -101,6 +106,29 @@ caves, castle, palaces, tomb and wonders, joined by roads and bridges) and
 they need is a description: buildings in `land-buildings.ts`, the rest in
 `server/src/assets/land-anchors.ts`.
 
+**The building kit.** `shared/src/building-kit/` (exported as `buildingKit`)
+turns a building as data (`BuildingSpec`: footprint in bays, doors and
+windows per wall, stairs) into exact parts on one set of sizes, with each
+storey's blocking lines and a cutaway per storey. `shapeChecks` measures
+every recorded joint on the placed solids (rests on, set into, held by,
+clear of, level with) and that walls are complete, nothing floats and the
+stairs fit. On the server, `assets/building-kit/` draws every view (outside
+and each storey's cutaway, on one frame) into unlit colour, normal and glow
+maps (`buildingViews`) and checks the picture: hidden faces stay hidden, no
+gaps, no stretched paint, no layout colour, no two surfaces in one place,
+rooms take only inside light, the way down shows. Code makes the shapes; the
+image model paints only their flat textures, all of a look at once on one
+sheet: a magenta guide with a green shape per texture (`sheet.ts`), painted
+through the Art tab's review, the budget and the paint queue
+(`ArtStudio.paintSheet`, route `art/sheet`). `KitSheets` keeps each painting
+with its layout and words (shipped ones in `assets/kit-sheets/`, later ones
+in the art folder) and checks them in a worker thread (`sheet-checks.ts`,
+`tiling.ts`): in place, filled, no spill, no baked light, even, no frame, and
+a tile that repeats without slicing shapes. Each texture comes from the
+newest painting where it passed. The plan for bringing it into
+play is
+https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
+
 ## Client modules
 
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
@@ -138,7 +166,9 @@ play; a new feature adds one. See `playtest.md`.
 - A short doc comment on each export; comments say why.
 - Paid calls go through the paint queue and the budget, and are reviewable
   before they are sent (the Art tab shows the exact prompt).
-- No art drawn in code, and no left/right mirroring of painted art.
+- No art drawn in code (the building kit's shapes are the one exception:
+  code builds them, the image model paints them), and no left/right
+  mirroring of characters.
 - Limits and settings come from `.env` or God's View, not constants in code.
 - Words players read are plain and friendly, never error codes.
 - The wish guard (`scripts/wish-guard.mjs`) protects core files by path:

@@ -23,6 +23,7 @@ import {
   nearBuilding,
   rand2,
   biomeLook,
+  buildingKit,
   type ArtEntry,
   type ArtManifest,
   type ArtPoint,
@@ -46,9 +47,10 @@ import {
   walkFrameRate,
   wishArtKey,
 } from '@co-mmo/shared';
-import { TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerTileset } from './textures.ts';
+import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerDiamondTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
+import { HouseArt, standHouse, type HouseSource } from './kit-house-view.ts';
 import { shadePictures } from './normal-maps.ts';
 import { dropLight, lightScene, litFigure, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
@@ -101,11 +103,13 @@ interface BuildingView {
   /** The region's top-left corner in the world, in tiles. */
   ox: number;
   oy: number;
-  /** Undefined until the building's outside is painted: then its inside always shows. */
-  exterior?: Phaser.GameObjects.Image;
-  /** Floor, walls and furniture: hidden while the exterior shows. */
+  /** Its outside: empty until the building's outside is painted, and then its inside always shows. A kit house's comes in strips. */
+  outside: Phaser.GameObjects.Image[];
+  /** Floor, walls and furniture: hidden while the outside shows. */
   inside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[];
   open: boolean;
+  /** True once a kit house stands in place of its painted picture. */
+  kit?: boolean;
 }
 
 /** A region drawn into the world: its layout and everything that pictures it. */
@@ -157,6 +161,8 @@ export interface WorldSceneOptions {
   send: (message: ClientMessage) => void;
   /** True while the player is typing, so keys go to the chat box. */
   typing: () => boolean;
+  /** The kit houses of a region, for the isometric camera (only the Owner's preview has them for now). */
+  houses?: HouseSource;
 }
 
 const T = TILE_PIXELS;
@@ -202,6 +208,8 @@ export class WorldScene extends Phaser.Scene {
   private painted = new Set<string>();
   /** Where we stood, roughly, when the chunks near us were last drawn. */
   private nearAt = '';
+  /** Kit houses' pictures, loaded as they are drawn on the server. */
+  private houseArt!: HouseArt;
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -321,6 +329,7 @@ export class WorldScene extends Phaser.Scene {
     // First, so every picture made from here on is lit.
     this.lit = lightScene(this, LABEL_DEPTH);
     if (this.lit) shadePictures(this);
+    this.houseArt = new HouseArt(this);
     this.remotes = new Map();
     this.creatures = new Map();
     this.bodies = new Map();
@@ -388,6 +397,7 @@ export class WorldScene extends Phaser.Scene {
       if (region?.layout === layout) continue;
       if (region) this.undraw(d.id, region);
       this.drawn.set(d.id, this.drawRegion(d.id === def.id ? this.map : generateRegion(d, size), layout));
+      void this.raiseHouses(d.id);
     }
     // Roads lead only into the regions beside us, so the camera stops at the others.
     const bounds = { left: this.origin.x, top: this.origin.y, right: this.origin.x + size, bottom: this.origin.y + size };
@@ -815,21 +825,24 @@ export class WorldScene extends Phaser.Scene {
         const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
         if (!key) continue;
         const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
-        const at = PROJECTION.toScreen(ox + x + 0.5, oy + y + 1);
+        const feet = PROJECTION.stand(ox + x, oy + y, 1, 1);
+        const at = PROJECTION.toScreen(feet.x, feet.y);
         const img = this.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
         img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
-        img.setDepth(PROJECTION.depth(ox + x + 0.5, oy + y + 1) - 1);
+        img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1);
         objects.push(img);
       }
     }
     return { tilemap, objects };
   }
 
-  /** A tile layer of the rows given, its top-left tile at world (x, y). */
+  /** A tile layer of the rows given, its top-left tile at world (x, y), from the square tile strip `key`. */
   private groundLayer(tiles: number[][], x: number, y: number, depth: number, key: string): Phaser.Tilemaps.TilemapLayer {
+    const at = PROJECTION.toScreen(x, y);
+    const ground = PROJECTION.ground;
+    if (ground.kind === 'diamond') return diamondLayer(this, tiles, at, registerDiamondTileset(this, key, ground.width, ground.height), ground).setDepth(depth);
     const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
     const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-    const at = PROJECTION.toScreen(x, y);
     return tilemap.createLayer(0, tileset, at.x, at.y)!.setDepth(depth);
   }
 
@@ -863,10 +876,10 @@ export class WorldScene extends Phaser.Scene {
     const views = map.buildings.map((b) => {
       const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
       for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-      const exterior = hasExterior(this, b.style) ? this.exterior(b, ox, oy) : undefined;
+      const outside = hasExterior(this, b.style) ? [this.exterior(b, ox, oy)] : [];
       const floor = this.groundLayer(inside, ox + b.x, oy + b.y, -0.5, registerBuildingTileset(this, b.style));
       tilemaps.push(floor.tilemap);
-      const view: BuildingView = { building: b, ox, oy, exterior, inside: [floor], open: !exterior };
+      const view: BuildingView = { building: b, ox, oy, outside, inside: [floor], open: !outside.length };
       return view;
     });
     this.placeLandmarks(map, ox, oy, views);
@@ -883,20 +896,68 @@ export class WorldScene extends Phaser.Scene {
    */
   private exterior(b: Building, ox: number, oy: number): Phaser.GameObjects.Image {
     const span = exteriorSpan(b);
-    const at = PROJECTION.toScreen(ox + span.left, oy + span.bottom);
-    const img = this.add.image(at.x, at.y, buildingArt(b.style, 'exterior')).setOrigin(0, 1);
+    // The middle of the doorway's outer edge, where the painted door stands.
+    const door = { x: ox + b.door.x + 1, y: oy + span.bottom };
+    const at = PROJECTION.toScreen(door.x, door.y);
+    const img = this.add.image(at.x, at.y, buildingArt(b.style, 'exterior')).setOrigin(0.5, 1);
     const w = span.width * T;
     img.setDisplaySize(w, (w * img.height) / img.width);
-    return img.setDepth(PROJECTION.depth(ox + b.x, oy + b.y + b.height));
+    return img.setDepth(PROJECTION.depth(door.x, door.y));
+  }
+
+  /**
+   * The isometric camera shows a kit house in place of a building's painted
+   * picture once the server has drawn it, which it does the first time it is
+   * asked; meanwhile the painted picture stays and the server is asked again
+   * now and then.
+   */
+  private async raiseHouses(id: string, tries = 0): Promise<void> {
+    const source = this.options.houses;
+    const region = this.drawn.get(id);
+    if (!source || !region || PROJECTION.ground.kind !== 'diamond') return;
+    if (!region.map.buildings.some((b) => buildingKit.kitHouse(b))) return;
+    const houses = await source(id).catch(() => []);
+    for (const info of houses) {
+      const view = region.buildings[info.building];
+      if (info.status !== 'ready' || !info.frame || !view || view.kit) continue;
+      const [outside, inside] = await Promise.all([this.houseArt.view(info, 'outside'), this.houseArt.view(info, 'storey-1')]);
+      // Drawn again or let go while the pictures loaded.
+      if (!outside || !inside || this.drawn.get(id) !== region) continue;
+      this.standHouse(region, view, info.frame, outside, inside);
+    }
+    // By the wall clock: the server's drawing does not wait for our frames.
+    if (houses.some((h) => h.status === 'building') && tries < HOUSE_TRIES) {
+      setTimeout(() => void (this.sys.isActive() && this.raiseHouses(id, tries + 1)), HOUSE_RETRY_MS);
+    }
+  }
+
+  /** Stands a kit house on a building's floor: its outside from afar, its cutaway close by, with the furniture inside. */
+  private standHouse(region: DrawnRegion, v: BuildingView, frame: NonNullable<buildingKit.KitHouseInfo['frame']>, outside: string, inside: string): void {
+    const house = buildingKit.kitHouse(v.building);
+    if (!house) return;
+    const floor = { left: v.ox + house.floor.left, top: v.oy + house.floor.top, right: v.ox + house.floor.right, bottom: v.oy + house.floor.bottom };
+    for (const o of v.outside) o.destroy();
+    // The house brings its own floor.
+    const furniture = v.inside.filter((o) => {
+      if (o instanceof Phaser.Tilemaps.TilemapLayer) o.setVisible(false);
+      return !(o instanceof Phaser.Tilemaps.TilemapLayer);
+    });
+    const cutaway = standHouse(this, inside, frame, floor, false);
+    v.outside = standHouse(this, outside, frame, floor, true);
+    v.inside = [...cutaway, ...furniture];
+    v.kit = true;
+    region.objects.push(...v.outside, ...cutaway);
+    this.revealBuildings(true);
   }
 
   /** Landmarks: set pieces out in the land, and furniture inside buildings. */
   private placeLandmarks(map: RegionMap, ox: number, oy: number, views: BuildingView[]): void {
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
-      const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
+      const feet = landmarkFeet(l, ox, oy);
+      const at = PROJECTION.toScreen(feet.x, feet.y);
       const img = this.add.image(at.x, at.y, l.asset).setOrigin(0.5, 0.92);
-      img.setDepth(PROJECTION.depth(ox + l.x, oy + l.y));
+      img.setDepth(PROJECTION.depth(feet.x, feet.y));
       views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
     }
   }
@@ -922,11 +983,12 @@ export class WorldScene extends Phaser.Scene {
     for (const l of map.landmarks) {
       const light = glowOf(l.asset);
       // The flame sits a little above where the piece stands.
-      const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
+      const feet = landmarkFeet(l, ox, oy);
+      const at = PROJECTION.toScreen(feet.x, feet.y);
       if (light) add(light, at.x, at.y - T * 0.6, false);
     }
     for (const v of views) {
-      if (!v.exterior) continue;
+      if (!v.outside.length) continue;
       const b = v.building;
       const at = PROJECTION.toScreen(ox + b.x + b.width / 2, oy + b.y + b.height);
       add(WINDOW_LIGHT, at.x, at.y - T * 0.8, true);
@@ -937,11 +999,11 @@ export class WorldScene extends Phaser.Scene {
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
     for (const v of this.buildings()) {
-      if (!v.exterior) continue;
+      if (!v.outside.length) continue;
       const open = nearBuilding(v.building, this.origin.x + this.shown.x - v.ox, this.origin.y + this.shown.y - v.oy);
       if (open === v.open && !instant) continue;
       v.open = open;
-      const fades = [{ target: v.exterior, alpha: open ? 0 : 1 }, ...v.inside.map((target) => ({ target, alpha: open ? 1 : 0 }))];
+      const fades = [...v.outside.map((target) => ({ target, alpha: open ? 0 : 1 })), ...v.inside.map((target) => ({ target, alpha: open ? 1 : 0 }))];
       for (const { target, alpha } of fades) {
         this.tweens.killTweensOf(target);
         if (instant) target.setAlpha(alpha);
@@ -1108,6 +1170,37 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.tint?.setPosition(cam.width / 2, cam.height / 2).setSize(cam.width / cam.zoom + 8, cam.height / cam.zoom + 8);
   }
+}
+
+/** How often the isometric camera asks for kit houses the server is still drawing, and how many times. */
+const HOUSE_RETRY_MS = 5000;
+const HOUSE_TRIES = 36;
+
+/** Where a landmark stands: its footprint's bottom row is centred under (l.x, l.y). */
+function landmarkFeet(l: { x: number; y: number; footprint: { width: number; height: number } }, ox: number, oy: number): { x: number; y: number } {
+  const { width, height } = l.footprint;
+  return PROJECTION.stand(ox + l.x - width / 2, oy + l.y - height, width, height);
+}
+
+/**
+ * A ground layer of diamond tiles for the isometric camera, from a strip
+ * made by registerDiamondTileset: the tile in row y, column x has its top
+ * corner `(x - y) * width / 2` across and `(x + y) * height / 2` down from `top`.
+ */
+function diamondLayer(scene: Phaser.Scene, tiles: number[][], top: { x: number; y: number }, key: string, size: { width: number; height: number }): Phaser.Tilemaps.TilemapLayer {
+  const { width: w, height: h } = size;
+  const iso = Phaser.Tilemaps.Orientation.ISOMETRIC;
+  const rows = tiles.length;
+  const columns = tiles[0]?.length ?? 0;
+  const layer = new Phaser.Tilemaps.LayerData({ name: 'ground', width: columns, height: rows, tileWidth: w, tileHeight: h });
+  // Before the tiles, which work out where they stand from it.
+  layer.orientation = iso;
+  layer.data = tiles.map((row, y) => row.map((index, x) => new Phaser.Tilemaps.Tile(layer, index, x, y, w, h, w, h)));
+  const data = new Phaser.Tilemaps.MapData({ name: key, width: columns, height: rows, tileWidth: w, tileHeight: h, orientation: iso, format: Phaser.Tilemaps.Formats.ARRAY_2D, layers: [layer] });
+  const tilemap = new Phaser.Tilemaps.Tilemap(scene, data);
+  const tileset = tilemap.addTilesetImage(key, key, w, h, DIAMOND_PAD, DIAMOND_PAD * 2)!;
+  // Phaser stands each diamond's box, not its top corner, at the tile's place.
+  return tilemap.createLayer(0, tileset, top.x - w / 2, top.y)!;
 }
 
 /** True when tile (x, y) lies within a building's walls. */

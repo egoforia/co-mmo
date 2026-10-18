@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem } from '@co-mmo/shared';
-import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
+import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
@@ -13,6 +13,7 @@ import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
+import { chooseCamera } from './camera-preview.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
 
 async function boot(): Promise<void> {
@@ -285,7 +286,7 @@ function play(token: string): void {
     chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     party.start(myId);
-    const account = new AccountWindow(token);
+    const account = new AccountWindow(token, welcome.you.role === 'owner');
     onAccountClick(() => void account.toggle());
     void accountInfo(token).then((info) => {
       if (!info.look) chat?.add({ kind: 'system', text: '✦ You have not described your look yet. Open Account to make your first wish, free: the God paints you as you describe.' });
@@ -327,11 +328,16 @@ function play(token: string): void {
       trade: (m) => connection.send(m),
       typing: isTyping,
     });
+    // Before the scene, which draws through whichever camera is chosen.
+    const preview = chooseCamera(welcome.you.role);
+    if (preview) chat.add({ kind: 'system', text: 'You are in the isometric preview, which only you can see. Switch back to the top-down view in Account.' });
     scene = new WorldScene({
       welcome,
       art: manifest,
       points: found,
       send: (m) => connection.send(m),
+      // Kit houses stand in the preview, drawn on the server the first time they are asked for.
+      ...(preview ? { houses: (region: string) => kitHouses(token, region) } : {}),
       // The arrow keys choose loot while its window is open, so the player stands still.
       typing: () => isTyping() || !!loot?.open,
     });

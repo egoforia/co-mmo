@@ -14,6 +14,8 @@ export interface KitView {
   /** 'outside', or 'storey-1', 'storey-2'... for the cutaways. */
   view: string;
   maps: KitMaps;
+  /** Where the kit's corner, (0, 0) on the ground, falls in the maps, in their pixels: where the game pins the picture. */
+  origin: [number, number];
   checks: KitCheck[];
   ok: boolean;
 }
@@ -34,6 +36,7 @@ export function buildingViews(spec: BuildingSpec, textures: Record<string, Textu
   return buildings.map((b) => {
     const r = render(b.faces, textures, cv);
     const checks = [...buildingKit.shapeChecks(b), ...pictureChecks(b, r)];
-    return { view: b.cut === null ? 'outside' : `storey-${b.cut + 1}`, maps: lightNeutralMaps(r), checks, ok: checks.every((c) => c.ok) };
+    const origin: [number, number] = [cv.origin[0] / cv.ss, cv.origin[1] / cv.ss];
+    return { view: b.cut === null ? 'outside' : `storey-${b.cut + 1}`, maps: lightNeutralMaps(r), origin, checks, ok: checks.every((c) => c.ok) };
   });
 }

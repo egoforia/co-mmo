@@ -1,9 +1,9 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Worker } from 'node:worker_threads';
 import sharp from 'sharp';
 import { buildingKit } from '@co-mmo/shared';
 import type { ImageRequest } from '../provider.ts';
+import { offThread } from './off-thread.ts';
 import { crop, evenRound, readImg, resized, type Img } from './pixels.ts';
 import type { Texture } from './raster.ts';
 import { checkSheet, combineSheets, type CheckedSheet, type TextureReport } from './sheet-checks.ts';
@@ -87,21 +87,9 @@ export async function prefilter(T: Img, world: readonly [number, number], wrap: 
   return { w: out.w, h: out.h, rgb };
 }
 
-/** Checks one painting in a worker thread, so the game keeps running meanwhile; in this thread when no worker can start (one needs Node 22.7 or later to read TypeScript). */
-async function checkOffThread(painting: KitPainting): Promise<CheckedSheet> {
-  try {
-    return await new Promise<CheckedSheet>((ok, fail) => {
-      const worker = new Worker(new URL('./sheet-worker.ts', import.meta.url), {
-        workerData: { file: painting.file, layout: painting.layout },
-        execArgv: [...process.execArgv, '--experimental-transform-types', '--disable-warning=ExperimentalWarning'],
-      });
-      worker.once('message', ok);
-      worker.once('error', fail);
-      worker.once('exit', (code) => fail(new Error(`The sheet checks stopped early (${code}).`)));
-    });
-  } catch {
-    return checkSheet(await readImg(painting.file), painting.layout);
-  }
+/** Checks one painting in a worker thread, so the game keeps running meanwhile. */
+function checkOffThread(painting: KitPainting): Promise<CheckedSheet> {
+  return offThread(new URL('./sheet-worker.ts', import.meta.url), { file: painting.file, layout: painting.layout }, async () => checkSheet(await readImg(painting.file), painting.layout));
 }
 
 /** One look's checks, started for one set of paintings; `done` once they finished. */

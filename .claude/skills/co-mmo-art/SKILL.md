@@ -48,7 +48,9 @@ Where things are:
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.
 - The camera: every tile-to-screen sum goes through `PROJECTION` in
   `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in
-  the scene.
+  the scene. Players see `TOP_DOWN`; `ISOMETRIC` is the Owner's preview
+  (Account window), with the same painted ground tiles turned into diamonds
+  and kit houses in place of painted buildings. Both must keep working.
 
 Changing a prompt changes what is paid for. Show that prompts you did not
 mean to change stay byte for byte the same (snapshot them before and after),

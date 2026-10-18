@@ -1,5 +1,6 @@
 import { MAX_LOOK_LENGTH } from '@co-mmo/shared';
 import { accountInfo, describeLook, emailSignIn, linkUrl, setEmail, signInOptions, signOut, type AccountInfo } from './api.ts';
+import { previewOn, switchPreview } from './camera-preview.ts';
 import { escapeHtml, showPanel } from './ui.ts';
 
 const PROVIDER_NAME = { google: 'Google', github: 'GitHub' } as const;
@@ -37,11 +38,15 @@ export async function showSignIn(message = ''): Promise<void> {
   });
 }
 
-/** The Account window: sign-in email, linked Google and GitHub, your look, signing out. */
+/** The Account window: sign-in email, linked Google and GitHub, your look, signing out, and for the Owner the camera preview. */
 export class AccountWindow {
   private readonly el = document.getElementById('account')!;
 
-  constructor(private readonly token: string) {
+  constructor(
+    private readonly token: string,
+    /** The Owner may switch on the isometric camera preview. */
+    private readonly owner = false,
+  ) {
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !this.el.hidden) this.el.hidden = true;
     });
@@ -86,6 +91,9 @@ export class AccountWindow {
       ${providers.map((p) => info.logins.includes(p)
         ? `<p>✓ ${PROVIDER_NAME[p]} is linked.</p>`
         : `<button type="button" class="quiet" data-link="${p}">Link ${PROVIDER_NAME[p]}</button>`).join('')}
+      ${this.owner ? `<h3>Camera</h3>
+      <p>The isometric camera is a preview only you can see, in this browser. Everyone else keeps today's view.</p>
+      <button type="button" class="quiet" id="camera-preview">${previewOn() ? 'Back to the top-down view' : 'Try the isometric preview'}</button>` : ''}
       <p class="note" id="account-note"></p>
       <button type="button" class="quiet" id="sign-out">Sign out on this device</button>`;
     const note = this.el.querySelector<HTMLElement>('#account-note')!;
@@ -120,6 +128,7 @@ export class AccountWindow {
         }
       });
     }
+    this.el.querySelector('#camera-preview')?.addEventListener('click', () => switchPreview(!previewOn()));
     this.el.querySelector('#sign-out')!.addEventListener('click', async () => {
       await signOut(this.token);
       location.href = '/';

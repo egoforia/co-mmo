@@ -33,8 +33,8 @@ adapter) and picking it in the place named under "Chosen in".
 | Video (walks) | `VideoProvider` (`assets/video.ts`) | Veo | `ai/services.ts` |
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
-| Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN` | `PROJECTION` |
-| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | not used in play yet (kit plan, step 4) |
+| Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN`, `ISOMETRIC` (the Owner's preview) | `chooseCamera` (`client/src/camera-preview.ts`) |
+| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | `kitHouse` (a building style's `kit` look), drawn by `KitHouses` for the isometric camera |
 | Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` | `KitSheets` in `app.ts` |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
 
@@ -43,8 +43,8 @@ Every contract has a test a new implementation must pass:
 `server/test/style-profile.test.ts`, `client/test/projection.test.ts`,
 `shared/test/building-kit.test.ts`, `server/test/building-kit-render.test.ts`
 and `server/test/building-kit-sheets.test.ts` (good buildings and sheets pass,
-every planted fault is caught), and the store, bus and
-paint-queue tests.
+every planted fault is caught), `shared/test/kit-houses.test.ts` and
+`server/test/kit-houses.test.ts`, and the store, bus and paint-queue tests.
 
 ## Server modules
 
@@ -125,8 +125,13 @@ with its layout and words (shipped ones in `assets/kit-sheets/`, later ones
 in the art folder) and checks them in a worker thread (`sheet-checks.ts`,
 `tiling.ts`): in place, filled, no spill, no baked light, even, no frame, and
 a tile that repeats without slicing shapes. Each texture comes from the
-newest painting where it passed. The plan for bringing it into
-play is
+newest painting where it passed. In play so far: a building style with a
+`kit` look (`BUILDING_STYLES`) whose floor falls on whole bays, two tiles to
+a bay, becomes a kit house on that floor (`kitHouse`); `KitHouses` draws it
+in a worker the first time `GET /api/kit-houses` asks (the Owner only, for
+the isometric preview), keeps it in the art folder and draws it again when
+its look is painted again. The game's collision is still its wall tiles.
+The plan for bringing the rest into play is
 https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 
 ## Client modules
@@ -135,7 +140,11 @@ https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 `world-scene.ts` (the Phaser scene; positions go through `PROJECTION`; the
 ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
 light of the hour and the weather),
-`textures.ts` (tilesets from painted art), `wished.ts` (wished content),
+`textures.ts` (tilesets from painted art, and the same tiles turned into
+diamonds for the isometric camera), `camera-preview.ts` (the Owner's switch
+for the isometric preview, kept in the browser), `kit-house-view.ts` (kit
+houses stood on their floors in upright strips, so walkers pass behind and in
+front of them), `wished.ts` (wished content),
 `lights.ts` + `lit-pipeline.ts` (pictures are lit by the sky's colour, the
 sun or moon of the hour from shared `lighting.ts`, and lamps at fires,
 lanterns, shrines and windows; characters get a rim light; `light-preview.ts`
@@ -150,7 +159,7 @@ worked out for every picture in a worker; a painted `<key>-normal` wins),
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). |
-| Isometric camera | A `Projection` passing the contract test, the view words in the style profile, diamond ground tiles drawn as isometric tilemaps in `WorldScene.drawRegion`, and diagonal walks. |
+| Isometric camera for everyone | `ISOMETRIC` exists as the Owner's preview (camera plan step 1, ground and scenery from step 2, kit houses). Still to come: lands repainted in its view words, four facing ways for walkers, upright strips for big trees and set pieces, then `chooseCamera` picks it for players: https://claude.ai/code/artifact/3850d394-7032-47cb-bed1-a0a9fc135159 |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |

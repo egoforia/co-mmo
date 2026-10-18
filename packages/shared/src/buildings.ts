@@ -39,6 +39,12 @@ export interface BuildingStyle {
   furniture: Record<string, FurnitureStyle>;
   /** Approved reference images the outside should resemble. */
   references?: string[];
+  /**
+   * For a plain rectangular house: the kit look (building-kit/looks.ts) the
+   * building kit builds it in, for the isometric camera. Its painted pictures
+   * stay for the top-down view.
+   */
+  kit?: string;
 }
 
 /** The parts of a building that get their own picture. */
@@ -73,6 +79,8 @@ export const BUILDING_STYLES: Record<string, BuildingStyle> = {
     id: 'sanctum-arcanum',
     name: 'The Sanctum Arcanum',
     biome: 'sanctum',
+    // A timber-framed shop: the kit builds it as a cottage until it has a look of its own.
+    kit: 'timber-cottage',
     exterior:
       'The Sanctum Arcanum, a whimsical little arcane shop of dark timber beams and grey slate: a steep crooked slate roof with a crooked stone chimney, ' +
       'a wooden front door whose doorframe is etched with softly glowing violet runes, a small round stone step before the door, ' +

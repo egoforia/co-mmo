@@ -13,6 +13,7 @@ import {
   type BuildingPart,
   type RegionDef,
 } from '@co-mmo/shared';
+import { reliefFrom } from './normal-maps.ts';
 
 // Every picture in the world is art painted by the image model: the approved
 // anchors, the biome kit and building art. Nothing here is drawn in code; a
@@ -107,6 +108,63 @@ function tileStrip(scene: Phaser.Scene, key: string, sources: Partial<Record<Til
     ctx.drawImage(canvas, x + TILE_MARGIN + T - 1, 0, 1, step, x + T + TILE_MARGIN, 0, TILE_MARGIN, step);
   }
   scene.textures.addCanvas(key, canvas);
+  return key;
+}
+
+/** How far each diamond runs past its edges, in the square tile's pixels, so neighbours overlap and no seam shows between them. */
+const DIAMOND_BLEED = 3;
+/** Room round each diamond in its strip, so filtering at its tips reads its own paint. */
+export const DIAMOND_PAD = 8;
+
+/**
+ * The tiles of a square tile strip turned 45 degrees and squashed to half
+ * height, for the isometric camera: each painted tile becomes a diamond
+ * `width` by `height`, in the same slot. The square's top-left corner is the
+ * diamond's top, its east edge runs down to the right and its south edge
+ * down to the left. Nothing new is painted: these are the same tiles, turned.
+ */
+export function registerDiamondTileset(scene: Phaser.Scene, square: string, width: number, height: number): string {
+  const key = `${square}-diamond`;
+  if (scene.textures.exists(key)) return key;
+  const source = scene.textures.get(square).getSourceImage() as HTMLCanvasElement;
+  const step = T + TILE_MARGIN * 2;
+  const slots = Math.round(source.width / step);
+  const [slotW, slotH] = [width + DIAMOND_PAD * 2, height + DIAMOND_PAD * 2];
+  const strip = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = slotW * slots;
+    canvas.height = slotH;
+    return canvas;
+  };
+  const art = strip();
+  // The same diamonds running on to fill their slots: the light's map is
+  // worked out from these, so a diamond's edge does not read as an outline.
+  const shape = strip();
+  // One tile three by three, so a diamond can run past its edges into the paint that repeats there.
+  const tiled = document.createElement('canvas');
+  tiled.width = tiled.height = T * 3;
+  const slot = document.createElement('canvas');
+  [slot.width, slot.height] = [slotW, slotH];
+  const tctx = tiled.getContext('2d')!;
+  const sctx = slot.getContext('2d')!;
+  // Room enough to fill a slot's corners, which lie this far past the square's edges.
+  const fill = Math.ceil(T / 2 + DIAMOND_PAD * T * (1 / width + 1 / height)) + 2;
+  for (let k = 0; k < slots; k++) {
+    tctx.clearRect(0, 0, tiled.width, tiled.height);
+    for (let j = 0; j < 3; j++) {
+      for (let i = 0; i < 3; i++) tctx.drawImage(source, k * step + TILE_MARGIN, TILE_MARGIN, T, T, i * T, j * T, T, T);
+    }
+    for (const [out, grow] of [[art, DIAMOND_BLEED], [shape, fill]] as const) {
+      // Drawn in a slot of its own first, whose edges keep it out of its neighbours' slots.
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      sctx.clearRect(0, 0, slotW, slotH);
+      sctx.setTransform(width / 2 / T, height / 2 / T, -width / 2 / T, height / 2 / T, DIAMOND_PAD + width / 2, DIAMOND_PAD);
+      sctx.drawImage(tiled, T - grow, T - grow, T + grow * 2, T + grow * 2, -grow, -grow, T + grow * 2, T + grow * 2);
+      out.getContext('2d')!.drawImage(slot, k * slotW, 0);
+    }
+  }
+  reliefFrom(art, shape);
+  scene.textures.addCanvas(key, art);
   return key;
 }
 

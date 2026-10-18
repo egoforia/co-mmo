@@ -1,4 +1,4 @@
-import type { PlayerInfo } from '@co-mmo/shared';
+import type { PlayerInfo, buildingKit } from '@co-mmo/shared';
 
 const TOKEN_KEY = 'co-mmo.token';
 
@@ -86,6 +86,13 @@ export async function redeemLogin(code: string): Promise<string> {
   const body = await res.json();
   if (!res.ok) throw new Error(body.message ?? 'That sign-in link did not work. Ask for a new one.');
   return body.token as string;
+}
+
+/** The kit houses of a land's buildings, for the isometric preview; none when the server will not say. */
+export async function kitHouses(token: string, region: string): Promise<buildingKit.KitHouseInfo[]> {
+  const res = await fetch(`/api/kit-houses?region=${encodeURIComponent(region)}`, { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
+  if (!res?.ok) return [];
+  return ((await res.json()) as { houses: buildingKit.KitHouseInfo[] }).houses;
 }
 
 export async function signOut(token: string): Promise<void> {

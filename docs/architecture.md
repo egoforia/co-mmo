@@ -34,12 +34,14 @@ adapter) and picking it in the place named under "Chosen in".
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN` | `PROJECTION` |
+| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) | timber-frame kit (`K`) | not used in play yet (kit plan, step 4) |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
 
 Every contract has a test a new implementation must pass:
 `server/test/services.test.ts` (services swap one at a time),
-`server/test/style-profile.test.ts`, `client/test/projection.test.ts`, and the
-store, bus and paint-queue tests.
+`server/test/style-profile.test.ts`, `client/test/projection.test.ts`,
+`shared/test/building-kit.test.ts` (good buildings pass, every planted fault
+is caught), and the store, bus and paint-queue tests.
 
 ## Server modules
 
@@ -101,6 +103,16 @@ caves, castle, palaces, tomb and wonders, joined by roads and bridges) and
 they need is a description: buildings in `land-buildings.ts`, the rest in
 `server/src/assets/land-anchors.ts`.
 
+**The building kit.** `shared/src/building-kit/` (exported as `buildingKit`)
+turns a building as data (`BuildingSpec`: footprint in bays, doors and
+windows per wall, stairs) into exact parts on one set of sizes, with each
+storey's blocking lines and a cutaway per storey. `shapeChecks` measures
+every recorded joint on the placed solids (rests on, set into, held by,
+clear of, level with) and that walls are complete, nothing floats and the
+stairs fit. Code makes the shapes; the image model paints only their flat
+textures. The plan for bringing it into play is
+https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
+
 ## Client modules
 
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
@@ -138,7 +150,9 @@ play; a new feature adds one. See `playtest.md`.
 - A short doc comment on each export; comments say why.
 - Paid calls go through the paint queue and the budget, and are reviewable
   before they are sent (the Art tab shows the exact prompt).
-- No art drawn in code, and no left/right mirroring of painted art.
+- No art drawn in code (the building kit's shapes are the one exception:
+  code builds them, the image model paints them), and no left/right
+  mirroring of characters.
 - Limits and settings come from `.env` or God's View, not constants in code.
 - Words players read are plain and friendly, never error codes.
 - The wish guard (`scripts/wish-guard.mjs`) protects core files by path:

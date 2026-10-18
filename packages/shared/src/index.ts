@@ -25,3 +25,5 @@ export * from './sky.ts';
 export * from './routines.ts';
 export * from './lands.ts';
 export * from './places.ts';
+// The building kit uses short geometry names (box, rect, add), so it gets its own namespace.
+export * as buildingKit from './building-kit/index.ts';

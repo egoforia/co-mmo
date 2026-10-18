@@ -44,6 +44,8 @@ export const CORE = [
   { pattern: /^packages\/server\/src\/main\.ts$/, what: 'server start-up and secrets' },
   { pattern: /(^|\/)package(-lock)?\.json$/, what: 'package dependencies' },
   { pattern: /^Dockerfile$/, what: 'the server image' },
+  // A wish adds buildings as data (a BuildingSpec), never by changing how the kit builds or checks them.
+  { pattern: /^packages\/shared\/src\/building-kit\//, what: 'the building kit and its checks' },
   // A wish may add a playtest (a new .play.ts file), not change how the robot judges the game.
   { pattern: /^packages\/server\/playtest\/(?!.*\.play\.ts$)/, what: 'the robot playtester' },
   { pattern: /^vitest(\.playtest)?\.config\.ts$/, what: 'how the tests run' },

@@ -81,6 +81,8 @@ export async function start(opts: {
   regionBus?: AppOptions['regionBus'];
   /** The built client to serve, for tests that play in a browser. */
   clientDir?: string;
+  /** The kit buildings' shipped texture sheets, for tests that draw kit houses. */
+  kitSheets?: string;
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
@@ -99,6 +101,7 @@ export async function start(opts: {
     ...(opts.sound ? { sound: opts.sound } : {}),
     ...(opts.regionBus ? { regionBus: opts.regionBus } : {}),
     ...(opts.clientDir ? { clientDir: opts.clientDir } : {}),
+    ...(opts.kitSheets ? { kitSheets: opts.kitSheets } : {}),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',

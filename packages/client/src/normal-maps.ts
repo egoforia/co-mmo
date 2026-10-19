@@ -14,6 +14,18 @@ const MAX_PIXELS = 3000 * 3000;
 /** Pictures being worked out at once. */
 const AT_ONCE = 2;
 
+/**
+ * Stand-ins to work maps out from, by picture: for pictures whose see-through
+ * edges are not outlines (the diamond ground tiles), the same paint running
+ * on past those edges, so the map has no rim.
+ */
+const standIns = new WeakMap<object, HTMLCanvasElement>();
+
+/** Works `picture`'s normal map out from `standIn`, the same paint without its see-through edges. */
+export function reliefFrom(picture: HTMLCanvasElement, standIn: HTMLCanvasElement): void {
+  standIns.set(picture, standIn);
+}
+
 /** True for textures that are pictures of the world rather than Phaser's own. */
 function isPicture(key: string): boolean {
   return !key.startsWith('__') && !key.endsWith('-normal');
@@ -51,10 +63,11 @@ export function shadePictures(scene: Phaser.Scene): void {
         continue;
       }
       const source = texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement;
-      if (!source.width || !source.height || source.width * source.height > MAX_PIXELS) continue;
+      const shape = standIns.get(source) ?? source;
+      if (!shape.width || !shape.height || shape.width * shape.height > MAX_PIXELS) continue;
       const id = next++;
       working.set(id, { key, source });
-      void createImageBitmap(source).then(
+      void createImageBitmap(shape).then(
         (picture) => worker.postMessage({ id, picture } satisfies ReliefJob, [picture]),
         () => { working.delete(id); pump(); },
       );

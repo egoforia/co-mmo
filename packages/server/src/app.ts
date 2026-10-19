@@ -25,6 +25,8 @@ import { ArtJobs } from './art-jobs.ts';
 import { RecipeBook } from './art-recipes.ts';
 import { ArtStudio } from './art-studio.ts';
 import { KitSheets } from './assets/building-kit/kit-sheets.ts';
+import { KitHouses } from './assets/building-kit/kit-houses.ts';
+import { handleKitHouses } from './kit-house-routes.ts';
 import { STYLE } from './assets/style-profile.ts';
 import { DailyClips, MemoryPaintQueue, nextDailyReset, type PaintQueue } from './paint-queue.ts';
 import { SoundMaker } from './sound-maker.ts';
@@ -233,11 +235,14 @@ export function createApp(options: AppOptions): App {
     dayTimer.unref?.();
   };
   nextDay();
+  // Kit buildings' texture sheets, and the houses drawn from them for the isometric camera.
+  const kitSheets = new KitSheets({ shippedDir: options.kitSheets, dir: resolve(options.wishes.artDir, 'kit-sheets'), style: STYLE.kitTextures });
+  const kitHouses = new KitHouses({ dir: resolve(options.wishes.artDir, 'kit-houses'), url: '/wished-art/kit-houses', sheets: kitSheets });
   const artStudio = new ArtStudio({
     store, wishes, ai, budget, buildings: buildingPainter, walks: walkPainter, jobs: artJobs, sounds,
     anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, shipped: painterOptions.shipped, requests: paintRequests, recipes,
     readArt: artFileReader(options.wishes.artDir, options.shippedArt),
-    sheets: new KitSheets({ shippedDir: options.kitSheets, dir: resolve(options.wishes.artDir, 'kit-sheets'), style: STYLE.kitTextures }),
+    sheets: kitSheets,
     // Pages already open load a newly painted normal map without a reload.
     onPainted: (ids) => world.broadcast({ t: 'art', walks: ids }),
   });
@@ -296,6 +301,8 @@ export function createApp(options: AppOptions): App {
 
     const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
+
+    if (await handleKitHouses(req, res, url, authenticate(req), { world, houses: kitHouses })) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
     if (path === '/api/art' && req.method === 'GET') return json(res, 200, await paintedArt());
@@ -374,6 +381,7 @@ export function createApp(options: AppOptions): App {
       await sounds.job;
       await Promise.allSettled([...sounds.pending]);
       await artStudio.idle();
+      await kitHouses.close();
       await Promise.allSettled([...wishes.painting]);
       rules.dispose();
       clearInterval(autosaveTimer);

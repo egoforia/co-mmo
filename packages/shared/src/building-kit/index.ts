@@ -12,3 +12,4 @@ export * from './stairs.ts';
 export * from './checks.ts';
 export * from './samples.ts';
 export * from './looks.ts';
+export * from './houses.ts';

@@ -14,6 +14,7 @@ import { onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
 import { EditorUi } from './editor-ui.ts';
+import { MiniMap } from './mini-map.ts';
 import { chooseCamera } from './camera-preview.ts';
 import { PerfOverlay } from './perf-overlay.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
@@ -370,6 +371,8 @@ function play(token: string): void {
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });
+    // The mini map of your floor, in both cameras.
+    new MiniMap({ view: () => scene?.miniMapView() });
     // The performance overlay, for Stewards and the Owner checking where the game is slow.
     if (welcome.you.role !== 'player') {
       const world = scene;

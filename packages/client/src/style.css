@@ -504,3 +504,21 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #perf tr.warn td { color: var(--accent); }
 #perf tr.bad td { color: var(--error); }
 @media (max-width: 720px) { #perf { left: 12px; top: 160px; } }
+
+/* The mini map, top right; the quest list moves down beneath it while it shows. */
+#mini-map {
+  position: fixed; top: 56px; right: 12px; width: 220px;
+  background: var(--panel); border: 1px solid var(--edge); font-size: 12px;
+}
+#mini-map canvas { display: block; width: 100%; aspect-ratio: 1; background: var(--bg); }
+#mini-map [data-act="back"] { flex: 2.5; }
+#mini-map .mm-bar { display: flex; gap: 4px; padding: 4px; border-top: 1px solid var(--edge); }
+#mini-map button { flex: 1; min-width: 0; padding: 3px 0; background: transparent; color: var(--ink); border: 1px solid var(--edge); font: inherit; cursor: pointer; }
+#mini-map button:hover:not(:disabled) { border-color: var(--accent); }
+#mini-map button:disabled { opacity: 0.35; cursor: default; }
+#mini-map .mm-caption { margin: 0; padding: 0 6px 5px; color: var(--muted); }
+body.has-mini-map #quests { top: 340px; }
+@media (max-width: 720px) {
+  #mini-map { width: 150px; }
+  body.has-mini-map #quests { top: 260px; }
+}

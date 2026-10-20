@@ -15,6 +15,7 @@
       <span id="hud-online"></span>
       <a id="gods-view-link" href="/gods-view.html" target="_blank" hidden>God's View</a>
       <button id="edit-world-button" type="button" hidden>Edit world</button>
+      <button id="map-button" type="button" aria-expanded="false" hidden>Map</button>
       <button id="sound-button" type="button" aria-expanded="false">Sound</button>
       <button id="invite-button" type="button">Invite a friend</button>
       <button id="account-button" type="button">Account</button>
@@ -27,6 +28,17 @@
       <div id="stats-line"></div>
     </div>
     <ol id="quests" hidden></ol>
+    <div id="mini-map" hidden>
+      <canvas aria-label="Map of where you are"></canvas>
+      <div class="mm-bar">
+        <button type="button" data-act="out" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" data-act="in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" data-act="up" title="Look at the floor above" aria-label="Look at the floor above">▲</button>
+        <button type="button" data-act="down" title="Look at the floor below" aria-label="Look at the floor below">▼</button>
+        <button type="button" data-act="back" title="Back to your floor" hidden>My floor</button>
+      </div>
+      <p class="mm-caption"></p>
+    </div>
     <div id="keys" hidden>
       <span><kbd>Space</kbd> strike</span><span><kbd>E</kbd> talk</span>
       <button type="button" data-open="inventory"><kbd>I</kbd> bag</button>

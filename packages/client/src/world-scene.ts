@@ -26,6 +26,8 @@ import {
   nearBuilding,
   rand2,
   biomeLook,
+  stairsLabel,
+  storeyAt,
   buildingKit,
   type ArtEntry,
   type ArtManifest,
@@ -42,6 +44,8 @@ import {
   type RegionMap,
   type Side,
   type SnapshotMessage,
+  type Storey,
+  type TileRect,
   type WalkDirection,
   type WelcomeMessage,
   type Weather,
@@ -51,7 +55,7 @@ import {
   walkFrameRate,
   wishArtKey,
 } from '@co-mmo/shared';
-import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerDiamondTileset, registerTileset } from './textures.ts';
+import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerDiamondTileset, registerStoreyTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
 import { HouseArt, standHouse, type HouseSource } from './kit-house-view.ts';
@@ -116,7 +120,7 @@ interface BuildingView {
   /** Its outside: empty until the building's outside is painted, and then its inside always shows. A kit house's comes in strips. */
   outside: Phaser.GameObjects.Image[];
   /** Floor, walls and furniture: hidden while the outside shows. */
-  inside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[];
+  inside: (Phaser.GameObjects.Image | Phaser.GameObjects.Text | Phaser.Tilemaps.TilemapLayer)[];
   open: boolean;
   /** True once a kit house stands in place of its painted picture. */
   kit?: boolean;
@@ -138,6 +142,16 @@ interface DrawnRegion {
   chunks: Map<number, Chunk>;
   /** Fires, lanterns, shrines and lit windows standing in it. */
   lamps: Lamp[];
+  /** Its floors above and below the ground, each shown only while we are on it. */
+  floors: FloorView[];
+  /** Stair pictures and labels on the ground out in the open, shown while we are on the ground. */
+  stairs: Phaser.GameObjects.GameObject[];
+}
+
+/** A storey drawn over its rectangle: its tiles, its furniture, and its stairs' pictures and labels. */
+interface FloorView {
+  storey: Storey;
+  objects: Phaser.GameObjects.GameObject[];
 }
 
 /** A light standing in the world, at a screen point; windows light up only after dark. */
@@ -151,6 +165,7 @@ interface Lamp {
 /** A square of a region's ground and its trees and rocks, drawn only while we are near. */
 interface Chunk {
   tilemap: Phaser.Tilemaps.Tilemap;
+  layer: Phaser.Tilemaps.TilemapLayer;
   objects: Phaser.GameObjects.GameObject[];
 }
 
@@ -212,6 +227,8 @@ export class WorldScene extends Phaser.Scene {
   private accumulator = 0;
   /** Rendered position eases toward the predicted one to hide corrections. */
   private shown = { x: 0, y: 0 };
+  /** The floor we are on and are shown (floors.ts): 0 the ground. */
+  private floor = 0;
   private tint?: Phaser.GameObjects.Rectangle;
   /** True when pictures are lit by the sky and lamps (WebGL); false when a shade is laid over them. */
   private lit = false;
@@ -327,7 +344,7 @@ export class WorldScene extends Phaser.Scene {
     this.shown.x += was.x - this.origin.x;
     this.shown.y += was.y - this.origin.y;
     // Steps the server has not applied yet carry over with us and replay on its word.
-    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.predictor.lastSeq, this.predictor.unapplied, welcome.ack);
+    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y, floor: welcome.floor }, this.predictor.lastSeq, this.predictor.unapplied, welcome.ack);
     const far = Math.hypot(this.predictor.position.x - this.shown.x, this.predictor.position.y - this.shown.y) > 2;
     if (far) this.shown = { ...this.predictor.position };
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
@@ -364,8 +381,10 @@ export class WorldScene extends Phaser.Scene {
     this.showRegion(welcome);
     this.makeWalks();
 
-    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y }, this.lastSeq);
-    this.shown = { ...this.predictor.position };
+    this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y, floor: welcome.floor }, this.lastSeq);
+    this.floor = this.predictor.position.floor;
+    this.shown = { x: welcome.x, y: welcome.y };
+    this.applyFloor();
     this.me = this.makeAvatar(this.playerTexture(welcome.you.id), welcome.you.name, true);
     this.setHeld(this.me, heldItem(welcome.character), 'right');
     this.setHeld(this.me, offHandItem(welcome.character), 'left');
@@ -433,6 +452,43 @@ export class WorldScene extends Phaser.Scene {
     }
     const view = PROJECTION.bounds(bounds.left, bounds.top, bounds.right, bounds.bottom);
     this.cameras.main.setBounds(view.x, view.y, view.width, view.height);
+    this.applyFloor();
+  }
+
+  /** We took stairs or a ladder: stand on the landing and show the floor we came to. */
+  private changeFloor(to: { x: number; y: number; floor: number }): void {
+    this.floor = to.floor;
+    this.shown = { x: to.x, y: to.y };
+    this.applyFloor();
+    this.cameras.main.fadeIn(200, 24, 20, 37);
+  }
+
+  /**
+   * Shows what can be seen from the floor we are on. On the ground, the land
+   * as ever. Upstairs, our floor stands over its building, whose ground floor
+   * and outside are hidden beneath it, and the land around shows below.
+   * Underground, only our floor: the land above is out of sight. Floors are
+   * drawn in place in both cameras for now; stacking them in the isometric
+   * cutaway comes with the building kit.
+   */
+  private applyFloor(): void {
+    const mine = this.floor;
+    const under = mine < 0;
+    const here = mine ? storeyAt(this.map, Math.floor(this.shown.x), Math.floor(this.shown.y), mine) : undefined;
+    for (const [id, region] of this.drawn) {
+      const current = id === this.welcome.region.def.id;
+      for (const o of region.objects) setShown(o, !under);
+      for (const chunk of region.chunks.values()) {
+        chunk.layer.setVisible(!under);
+        for (const o of chunk.objects) setShown(o, !under);
+      }
+      for (const v of region.buildings) {
+        const covered = Boolean(current && here && overlaps(here, v.building));
+        for (const o of [...v.outside, ...v.inside]) o.setVisible(!under && !covered);
+      }
+      for (const o of region.stairs) setShown(o, mine === 0);
+      for (const f of region.floors) for (const o of f.objects) setShown(o, current && f.storey.floor === mine);
+    }
   }
 
   /** The weather over our land turned. */
@@ -462,7 +518,7 @@ export class WorldScene extends Phaser.Scene {
 
   onSnapshot(snapshot: SnapshotMessage): void {
     if (!this.predictor || !this.sys.isActive()) return;
-    this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y });
+    this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
     const now = performance.now();
     this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
     for (const p of snapshot.players) {
@@ -506,7 +562,8 @@ export class WorldScene extends Phaser.Scene {
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);
-    if (gap > 2) this.shown = { ...target };
+    if (target.floor !== this.floor) this.changeFloor(target);
+    else if (gap > 2) this.shown = { x: target.x, y: target.y };
     else {
       this.shown.x += (target.x - this.shown.x) * 0.5;
       this.shown.y += (target.y - this.shown.y) * 0.5;
@@ -903,7 +960,8 @@ export class WorldScene extends Phaser.Scene {
     const ox = map.def.at.x * map.width;
     const oy = map.def.at.y * map.height;
     const rows = region.ground.slice(y0, y0 + CHUNK).map((row) => row.slice(x0, x0 + CHUNK));
-    const { tilemap } = this.groundLayer(rows, ox + x0, oy + y0, -1, registerTileset(this, map.def));
+    const layer = this.groundLayer(rows, ox + x0, oy + y0, -1, registerTileset(this, map.def)).setVisible(this.floor >= 0);
+    const tilemap = layer.tilemap;
     const objects: Phaser.GameObjects.GameObject[] = [];
     const biome = map.def.biome;
     for (let y = y0; y < Math.min(y0 + CHUNK, map.height); y++) {
@@ -919,10 +977,10 @@ export class WorldScene extends Phaser.Scene {
         const img = this.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
         img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
         img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1);
-        objects.push(img);
+        objects.push(img.setVisible(this.floor >= 0));
       }
     }
-    return { tilemap, objects };
+    return { tilemap, layer, objects };
   }
 
   /** A tile layer of the rows given, its top-left tile at world (x, y), from the square tile strip `key`. */
@@ -971,10 +1029,21 @@ export class WorldScene extends Phaser.Scene {
       const view: BuildingView = { building: b, ox, oy, outside, inside: [floor], open: !outside.length };
       return view;
     });
-    this.placeLandmarks(map, ox, oy, views);
+    // Each floor off the ground on a layer of its own over its rectangle, furniture drawn as floor beneath it.
+    const floors: FloorView[] = map.storeys.map((storey) => {
+      const rows: number[][] = [];
+      for (let y = 0; y < storey.height; y++) {
+        rows.push(Array.from(storey.tiles.subarray(y * storey.width, (y + 1) * storey.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
+      }
+      const layer = this.groundLayer(rows, ox + storey.x, oy + storey.y, -0.5, registerStoreyTileset(this, storey));
+      tilemaps.push(layer.tilemap);
+      return { storey, objects: [layer] };
+    });
+    this.placeLandmarks(map, ox, oy, views, floors);
+    const stairs = this.placeStairs(map, ox, oy, views, floors);
     const objects = this.children.list.filter((o) => !before.has(o));
     const lamps = this.placeLamps(map, ox, oy, views);
-    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps };
+    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs };
     this.nearAt = '';
     return region;
   }
@@ -1037,18 +1106,52 @@ export class WorldScene extends Phaser.Scene {
     v.kit = true;
     region.objects.push(...v.outside, ...cutaway);
     this.revealBuildings(true);
+    this.applyFloor();
   }
 
-  /** Landmarks: set pieces out in the land, and furniture inside buildings. */
-  private placeLandmarks(map: RegionMap, ox: number, oy: number, views: BuildingView[]): void {
+  /** Landmarks: set pieces out in the land, furniture inside buildings, and furniture on the floors above and below. */
+  private placeLandmarks(map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): void {
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
       const feet = landmarkFeet(l, ox, oy);
       const at = PROJECTION.toScreen(feet.x, feet.y);
       const img = this.add.image(at.x, at.y, l.asset).setOrigin(0.5, 0.92);
       img.setDepth(PROJECTION.depth(feet.x, feet.y));
-      views.find((v) => within(v.building, Math.floor(l.x), Math.floor(l.y - 0.01)))?.inside.push(img);
+      const [tx, ty] = [Math.floor(l.x), Math.floor(l.y - 0.01)];
+      if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(img);
+      else views.find((v) => within(v.building, tx, ty))?.inside.push(img);
     }
+  }
+
+  /**
+   * Each flight of stairs and ladder, on both floors it joins: its painted
+   * picture going up or down once there is one, and always a label saying
+   * where it goes, since nothing about it is drawn in code.
+   */
+  private placeStairs(map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): Phaser.GameObjects.GameObject[] {
+    const open: Phaser.GameObjects.GameObject[] = [];
+    for (const s of map.stairways) {
+      for (const floor of [s.lower, s.upper]) {
+        const parts: Phaser.GameObjects.GameObject[] = [];
+        const art = floor === s.lower ? s.art?.up : s.art?.down;
+        const feet = PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
+        const at = PROJECTION.toScreen(feet.x, feet.y);
+        if (art && this.textures.exists(art)) {
+          const img = this.add.image(at.x, at.y, art).setOrigin(0.5, 0.92);
+          parts.push(img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1));
+        }
+        const label = this.add.text(at.x, at.y - T * 0.6, stairsLabel(s, floor), { fontFamily: 'sans-serif', fontSize: '22px', color: '#fff6dc', stroke: '#1c1830', strokeThickness: 4 });
+        parts.push(label.setOrigin(0.5, 1).setDepth(LABEL_DEPTH - 2));
+        const [tx, ty] = [s.x, s.y];
+        if (floor) floorAt(floors, tx, ty, floor)?.objects.push(...parts);
+        else {
+          const inside = views.find((v) => within(v.building, tx, ty));
+          if (inside) inside.inside.push(...(parts as Phaser.GameObjects.Image[]));
+          else open.push(...parts);
+        }
+      }
+    }
+    return open;
   }
 
   /** Burns the world's lamps for this frame: brighter after dark, windows only then. */
@@ -1340,6 +1443,21 @@ function diamondLayer(scene: Phaser.Scene, tiles: number[][], top: { x: number; 
   const tileset = tilemap.addTilesetImage(key, key, w, h, DIAMOND_PAD, DIAMOND_PAD * 2)!;
   // Phaser stands each diamond's box, not its top corner, at the tile's place.
   return tilemap.createLayer(0, tileset, top.x - w / 2, top.y)!;
+}
+
+/** The drawn storey of a floor over a tile. */
+function floorAt(floors: FloorView[], x: number, y: number, floor: number): FloorView | undefined {
+  return floors.find(({ storey: s }) => s.floor === floor && x >= s.x && y >= s.y && x < s.x + s.width && y < s.y + s.height);
+}
+
+/** True when two tile rectangles share a tile. */
+function overlaps(a: TileRect, b: { x: number; y: number; width: number; height: number }): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/** Shows or hides anything drawn that can be. */
+function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void {
+  (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
 }
 
 /** True when tile (x, y) lies within a building's walls. */

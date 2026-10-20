@@ -195,7 +195,7 @@ describe('people', () => {
     const woods = setup('woods', 12).region;
     const bramble = woods.npc('old-bramble')!;
     const path = findPath(woods.map, woods.map.spawn, bramble.home)!;
-    expect(path.at(-1)).toEqual(bramble.home);
+    expect(path.at(-1)).toEqual({ x: bramble.home.x, y: bramble.home.y });
     expect(path.length).toBeGreaterThan(2);
   });
 });

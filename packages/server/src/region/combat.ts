@@ -42,7 +42,7 @@ export class Combat {
     let target: Creature | undefined;
     let best = range;
     for (const c of this.s.creatures) {
-      if (c.respawnAt !== null || (id && c.id !== id)) continue;
+      if (c.respawnAt !== null || c.floor !== p.floor || (id && c.id !== id)) continue;
       const d = Math.hypot(c.x - p.x, c.y - p.y);
       if (d <= best) {
         best = d;
@@ -112,7 +112,7 @@ export class Combat {
     }
     // What it carried stays on its body for anyone to take (E): its loot as set in God's View and by wishes.
     this.s.bodies.push({
-      id: `body-${++this.s.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y,
+      id: `body-${++this.s.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y, floor: c.floor,
       until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: rollDrops(lootTable(c.kind), this.s.random),
     });
     discover(ch, c.kind);

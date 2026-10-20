@@ -23,6 +23,8 @@ export interface Account {
   regionId: string;
   x: number | null;
   y: number | null;
+  /** The floor they were on (floors.ts), when not the ground. */
+  floor?: number;
   /** Missing until the character first plays. */
   character?: Character;
   /** Set while a Steward or the Owner has suspended the account. */
@@ -375,13 +377,15 @@ export class Store {
     this.persist();
   }
 
-  savePosition(id: string, x: number, y: number, regionId?: string, character?: Character): void {
+  savePosition(id: string, x: number, y: number, regionId?: string, character?: Character, floor = 0): void {
     const account = this.accountById(id);
     if (!account) return;
     if (regionId) account.regionId = regionId;
     account.lastSeen = Date.now();
     account.x = x;
     account.y = y;
+    if (floor) account.floor = floor;
+    else delete account.floor;
     if (character) account.character = structuredClone(character);
     this.persist();
   }

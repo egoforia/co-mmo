@@ -1,11 +1,13 @@
 import { TICK_RATE, awake, collides, noticeScale, type CreatureDef, type CreatureMood, type RegionMap, type Weather } from '@co-mmo/shared';
-import { moveAway, moveToward, wander, type Walker } from './walkers.ts';
+import { canReach, goTo, moveAway, moveToward, wander, type Walker } from './walkers.ts';
 
 // How creatures behave, one tick at a time: sleeping out of their hours,
 // noticing players (less in the dark and the fog, more if they carry a
 // light), fighting, running when hurt or timid, walking patrol rounds and
 // roaming in packs. The region owns the creatures and the players; this
-// decides what each creature does next.
+// decides what each creature does next. Creatures only notice and strike
+// those on their own floor; one chasing someone follows them up or down
+// stairs (never a ladder) while they stay within its leash.
 
 type Spot = { x: number; y: number };
 
@@ -52,6 +54,7 @@ export interface Prey {
   id: string;
   x: number;
   y: number;
+  floor: number;
   alive: boolean;
   /** Carrying something that burns or glows, so easy to see in the dark. */
   lit: boolean;
@@ -74,9 +77,9 @@ export interface Habitat {
 }
 
 /** A new live creature of a kind, at its home spot. */
-export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number): Creature {
+export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number, floor = 0): Creature {
   return {
-    id, kind, def, x, y, home: { x, y }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
+    id, kind, def, x, y, floor, home: { x, y, floor }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
     aggro: null, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0,
   };
 }
@@ -85,7 +88,7 @@ export function makeCreature(id: string, kind: string, def: CreatureDef, x: numb
 export function think(c: Creature, h: Habitat): void {
   if (c.respawnAt !== null) {
     if (h.now < c.respawnAt) return;
-    Object.assign(c, { respawnAt: null, hp: c.def.hp, x: c.home.x, y: c.home.y, target: null, returning: false, aggro: null, fleeing: null, asleep: false });
+    Object.assign(c, { respawnAt: null, hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, fleeing: null, asleep: false });
     return;
   }
   const up = awake(c.def.active, h.phase);
@@ -93,7 +96,7 @@ export function think(c: Creature, h: Habitat): void {
   if (c.fleeing) return run(c, h);
   if (c.aggro) return fight(c, h);
   if (c.returning) {
-    if (moveToward(h.map, c, c.home.x, c.home.y, c.def.speed) || h.tick % (TICK_RATE * 5) === 0) {
+    if (goTo(h.map, c, c.home, c.def.speed) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) {
       c.returning = false;
       c.hp = c.def.hp;
     }
@@ -140,7 +143,7 @@ function notice(c: Creature, h: Habitat): void {
   if (def.behavior === 'wander' || def.notice <= 0) return;
   const from = def.behavior === 'guard' ? c.home : c;
   for (const p of h.players) {
-    if (!p.alive || Math.hypot(p.x - from.x, p.y - from.y) > def.notice * noticeScale(def.active, h.phase, h.weather, p.lit)) continue;
+    if (!p.alive || p.floor !== c.floor || Math.hypot(p.x - from.x, p.y - from.y) > def.notice * noticeScale(def.active, h.phase, h.weather, p.lit)) continue;
     if (def.behavior === 'timid') return flee(c, p.id, h.now);
     c.aggro = p.id;
     c.asleep = false;
@@ -153,6 +156,12 @@ function fight(c: Creature, h: Habitat): void {
   const p = h.players.find((x) => x.id === c.aggro);
   if (!p || !p.alive || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH) return giveUp(c);
   if (shouldFlee(c)) return flee(c, p.id, h.now);
+  // Gone up or down: after them by the stairs, or give up if only a ladder leads there.
+  if (p.floor !== c.floor) {
+    if (!canReach(h.map, c, p)) return giveUp(c);
+    goTo(h.map, c, p, c.def.speed);
+    return;
+  }
   const d = Math.hypot(p.x - c.x, p.y - c.y);
   if (d > CREATURE_REACH * 0.8) moveToward(h.map, c, p.x, p.y, c.def.speed);
   if (d <= CREATURE_REACH && h.now - c.lastAttack >= c.def.cooldown * 1000) {
@@ -164,7 +173,7 @@ function fight(c: Creature, h: Habitat): void {
 /** Runs from whoever frightened it until it is safe, then heads home. */
 function run(c: Creature, h: Habitat): void {
   const p = h.players.find((x) => x.id === c.fleeing);
-  const safe = !p || !p.alive || Math.hypot(p.x - c.x, p.y - c.y) > c.def.notice + 6;
+  const safe = !p || !p.alive || p.floor !== c.floor || Math.hypot(p.x - c.x, p.y - c.y) > c.def.notice + 6;
   if (safe || h.now > c.fleeUntil || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH * 1.5) return giveUp(c);
   moveAway(h.map, c, p.x, p.y, c.def.speed * 1.1);
 }
@@ -172,7 +181,9 @@ function run(c: Creature, h: Habitat): void {
 /** Out of its hours: walks home and sleeps there. */
 function sleep(c: Creature, h: Habitat): void {
   c.target = null;
-  if (Math.hypot(c.x - c.home.x, c.y - c.home.y) > 0.5 && !moveToward(h.map, c, c.home.x, c.home.y, WANDER_SPEED)) return;
+  const away = c.floor !== c.home.floor || Math.hypot(c.x - c.home.x, c.y - c.home.y) > 0.5;
+  // One that cannot find its way home (no stairs back) sleeps where it is.
+  if (away && canReach(h.map, c, c.home) && !goTo(h.map, c, c.home, WANDER_SPEED)) return;
   c.asleep = true;
 }
 
@@ -197,7 +208,7 @@ function rounds(c: Creature, h: Habitat): Spot[] {
   for (let i = 0; i < 4; i++) {
     const a = turn + (i * Math.PI) / 2;
     const s = { x: c.home.x + Math.cos(a) * PATROL_RADIUS, y: c.home.y + Math.sin(a) * PATROL_RADIUS };
-    if (s.x > 0.5 && s.y > 0.5 && s.x < h.map.width - 0.5 && s.y < h.map.height - 0.5 && !collides(h.map, s.x, s.y)) corners.push(s);
+    if (s.x > 0.5 && s.y > 0.5 && s.x < h.map.width - 0.5 && s.y < h.map.height - 0.5 && !collides(h.map, s.x, s.y, c.floor)) corners.push(s);
   }
   return corners;
 }
@@ -214,7 +225,7 @@ function flee(c: Creature, playerId: string, now: number): void {
 /** Others of its pack close by join the hunt. */
 function rally(c: Creature, playerId: string, creatures: Creature[]): void {
   for (const k of creatures) {
-    if (k === c || k.kind !== c.kind || k.respawnAt !== null || k.aggro || k.fleeing) continue;
+    if (k === c || k.kind !== c.kind || k.floor !== c.floor || k.respawnAt !== null || k.aggro || k.fleeing) continue;
     if (Math.hypot(k.x - c.x, k.y - c.y) > PACK_RADIUS) continue;
     Object.assign(k, { aggro: playerId, asleep: false, returning: false, target: null });
   }
@@ -223,7 +234,7 @@ function rally(c: Creature, playerId: string, creatures: Creature[]): void {
 /** The pack member the others roam after: the first of its kind whose home is near this one's. */
 function packLeader(c: Creature, creatures: Creature[]): Creature {
   for (const k of creatures) {
-    if (k.kind !== c.kind || k.respawnAt !== null) continue;
+    if (k.kind !== c.kind || k.respawnAt !== null || k.home.floor !== c.home.floor) continue;
     if (Math.hypot(k.home.x - c.home.x, k.home.y - c.home.y) <= PACK_RADIUS) return k;
   }
   return c;

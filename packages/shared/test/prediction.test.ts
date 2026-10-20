@@ -19,14 +19,14 @@ describe('Predictor', () => {
     const server = step(map, map.spawn, 1, 0);
     p.reconcile(1, server);
     expect(p.unacknowledged).toBe(2);
-    expect(p.position).toEqual(step(map, step(map, server, 1, 0), 0, 1));
+    expect(p.position).toMatchObject(step(map, step(map, server, 1, 0), 0, 1));
   });
 
   it('snaps to the server when it disagrees', () => {
     const p = new Predictor(map, map.spawn);
     p.apply(1, 0);
     p.reconcile(1, { x: 10.5, y: 10.5 });
-    expect(p.position).toEqual({ x: 10.5, y: 10.5 });
+    expect(p.position).toMatchObject({ x: 10.5, y: 10.5 });
   });
 });
 
@@ -61,7 +61,7 @@ describe('crossing into another region', () => {
     const next = new Predictor(map, start, old.lastSeq, old.unapplied, 2);
     let expected = start;
     for (let i = 0; i < 2; i++) expected = step(map, expected, 1, 0);
-    expect(next.position).toEqual(expected);
+    expect(next.position).toMatchObject(expected);
     expect(next.unacknowledged).toBe(2);
     expect(next.lastSeq).toBe(4);
   });

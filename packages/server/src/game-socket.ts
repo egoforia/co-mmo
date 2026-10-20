@@ -96,7 +96,7 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
             if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
           },
           close: (reason) => socket.close(4000, reason),
-        }, { regionId: account.regionId, x: account.x, y: account.y }, upgradeCharacter(account.character));
+        }, { regionId: account.regionId, x: account.x, y: account.y, floor: account.floor }, upgradeCharacter(account.character));
         world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
         if (away) world.sendTo(account.id, away);
         rules.fire('join', account.id);
@@ -140,7 +140,7 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
       sockets.delete(account.id);
       const id = account.id;
       void settle(world.leave(id), (place) => {
-        if (place) store.savePosition(id, place.x, place.y, place.regionId, place.character);
+        if (place) store.savePosition(id, place.x, place.y, place.regionId, place.character, place.floor);
       });
     });
   });

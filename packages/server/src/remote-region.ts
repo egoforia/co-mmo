@@ -132,7 +132,7 @@ export class RemoteRegion implements RegionHandle {
     this.command({ t: 'welcome-all', region: this.key });
   }
 
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void {
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null; floor?: number }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void {
     this.players.set(info.id, { info, conn, x: at.x ?? this.map.spawn.x, y: at.y ?? this.map.spawn.y, character, ack: carry?.ack ?? 0 });
     this.command({ t: 'join', region: this.key, info, at, character, ...(announce !== undefined ? { announce } : {}), ...(carry ? { carry: carryData(carry) } : {}), ...(handoff ? { handoff } : {}) });
   }

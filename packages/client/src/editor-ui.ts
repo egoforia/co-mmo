@@ -4,6 +4,8 @@ import {
   CREATURES,
   KIT_HOUSE_FLOORS,
   MAX_CLEAR_RADIUS,
+  MAX_FLOORS,
+  buildingAt,
   MAX_SPAWN,
   MAX_STROKE,
   PAINT_TILES,
@@ -27,7 +29,7 @@ import type { WorldScene } from './world-scene.ts';
 // everyone there; undo takes it back. The outlines it draws over the world
 // are the editor's own marks, seen only while it is open, never game art.
 
-type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'piece' | 'spawn' | 'clear';
+type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'floors' | 'piece' | 'spawn' | 'clear';
 
 const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'look', name: 'Look', hint: 'Point at the world to see what is there.' },
@@ -35,6 +37,7 @@ const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'move', name: 'Move', hint: 'Click a tree, rock, water or set piece to pick it up, then click where it goes.' },
   { id: 'road', name: 'Road', hint: 'Click where the road starts, then where it ends. It runs across, then down.' },
   { id: 'house', name: 'House', hint: 'Click the doorstep: the house stands just north of it, its doorway on that spot.' },
+  { id: 'floors', name: 'Floors', hint: 'Click a building to give it floors above and below the ground, joined by stairs or ladders. 0 and 0 takes them off.' },
   // Only while the Smugglers' Sea Cave Art Kit wish is on (see setPieces).
   { id: 'piece', name: 'Set piece', hint: 'Click open ground or a floor to stand a sea cave piece there. It shows once its picture is painted in the Art tab.' },
   { id: 'spawn', name: 'Monsters', hint: 'Click open ground where the monsters should live. They come back there after they fall.' },
@@ -67,6 +70,9 @@ export class EditorUi {
   private brush = 1;
   private houseStyle = Object.values(BUILDING_STYLES).find((s) => s.kit)?.id ?? Object.keys(BUILDING_STYLES)[0]!;
   private houseSize = 1;
+  private floorsUp = 1;
+  private floorsDown = 0;
+  private ladders = false;
   private piece = '';
   private creature = '';
   private count = 4;
@@ -203,6 +209,9 @@ export class EditorUi {
         const floor = KIT_HOUSE_FLOORS[this.houseSize]!.floor;
         return void this.act({ edit: { kind: 'house', at: houseCorner(at, floor), floor, style: this.houseStyle } }, region);
       }
+      case 'floors':
+        if (!buildingAt(map, at)) return this.say('Click a building to give it floors.');
+        return void this.act({ edit: { kind: 'floors', at, up: this.floorsUp, down: this.floorsDown, ...(this.ladders ? { ladders: true } : {}) } }, region);
       case 'piece':
         if (!setPiece(this.piece)) return this.say('Choose a set piece first.');
         return void this.act({ edit: { kind: 'piece', piece: this.piece, at } }, region);
@@ -293,6 +302,10 @@ export class EditorUi {
         box(map, x, y, floor[0] + 2, floor[1] + 2);
         return box(map, at[0], at[1] - 1, 2, 1, 0x6fd08c);
       }
+      case 'floors': {
+        const b = buildingAt(map, at);
+        return b ? box(map, b.x, b.y, b.width, b.height) : box(map, at[0], at[1], 1, 1, 0xf6757a);
+      }
       case 'piece': {
         const footprint = setPiece(this.piece)?.footprint ?? { width: 1, height: 1 };
         return box(map, at[0], at[1] - footprint.height + 1, footprint.width, footprint.height);
@@ -345,6 +358,9 @@ export class EditorUi {
     else if (input.name === 'brush') this.brush = Number(value);
     else if (input.name === 'style') this.houseStyle = value;
     else if (input.name === 'size') this.houseSize = Number(value);
+    else if (input.name === 'up') this.floorsUp = Number(value);
+    else if (input.name === 'down') this.floorsDown = Number(value);
+    else if (input.name === 'way') this.ladders = value === 'ladders';
     else if (input.name === 'piece') this.piece = value;
     else if (input.name === 'creature') this.creature = value;
     else if (input.name === 'count') this.count = Math.max(1, Math.min(MAX_SPAWN, Number(value) || 1));
@@ -372,6 +388,9 @@ export class EditorUi {
       road: '',
       house: `<label>Look <select name="style">${Object.values(BUILDING_STYLES).map((s) => option(s.id, `${s.name}${s.kit ? ' (kit house)' : ''}`, s.id === this.houseStyle)).join('')}</select></label>
         <label>Size <select name="size">${KIT_HOUSE_FLOORS.map((f, i) => option(String(i), `${f.name}, ${f.floor[0]} × ${f.floor[1]} floor`, i === this.houseSize)).join('')}</select></label>`,
+      floors: `<label>Floors up <select name="up">${range(MAX_FLOORS.up).map((n) => option(String(n), String(n), n === this.floorsUp)).join('')}</select></label>
+        <label>Floors down <select name="down">${range(MAX_FLOORS.down).map((n) => option(String(n), String(n), n === this.floorsDown)).join('')}</select></label>
+        <label>Joined by <select name="way">${option('stairs', 'Stairs', !this.ladders)}${option('ladders', 'Ladders (monsters cannot climb them)', this.ladders)}</select></label>`,
       piece: `<label>Piece <select name="piece">${pieces.map((p) => option(p.id, p.name, p.id === this.piece)).join('')}</select></label>`,
       spawn: `<label>Monster <select name="creature">${creatures.map(([id, c]) => option(id, `${c.name} (level ${c.level})`, id === this.creature)).join('')}</select></label>
         <label>How many <input name="count" type="number" min="1" max="${MAX_SPAWN}" value="${this.count}" /></label>`,
@@ -412,5 +431,11 @@ export function editWords(e: WorldEdit): string {
     case 'spawn': return `${e.count} ${e.name ?? e.creature} at ${e.at.join(', ')}`;
     case 'clear': return `Cleared monsters within ${e.radius} of ${e.at.join(', ')}`;
     case 'piece': return `${setPiece(e.piece)?.name ?? 'A set piece'} at ${e.at.join(', ')}`;
+    case 'floors': return e.up || e.down ? `${e.up} floor${e.up === 1 ? '' : 's'} up and ${e.down} down by ${e.ladders ? 'ladders' : 'stairs'}, at ${e.at.join(', ')}` : `Took the floors off the building at ${e.at.join(', ')}`;
   }
+}
+
+/** 0 to n. */
+function range(n: number): number[] {
+  return Array.from({ length: n + 1 }, (_, i) => i);
 }

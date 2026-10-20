@@ -111,12 +111,31 @@ caves, castle, palaces, tomb and wonders, joined by roads and bridges) and
 they need is a description: buildings in `land-buildings.ts`, the rest in
 `server/src/assets/land-anchors.ts`.
 
+**Floors.** Shared `floors.ts`: the ground is floor 0, a building's upper
+floors 1, 2... and the floors under it -1, -2... Each floor off the ground is
+a `Storey` on the map, its own tiles over a rectangle (`tileAt` and
+`collides` take a floor; off every storey a floor is solid). A `Stairway`
+(stairs, or a ladder only players and people climb) takes up the same tiles
+on the two floors it joins; stepping onto it puts you on the landing beside
+it on the other floor (`walkOn`, used by the server and by each browser's
+prediction alike). Players, creatures, NPCs and bodies carry their floor, and
+snapshots, fights, talk, loot, trades and chat only reach the same floor.
+Walkers take stairs only on purpose (`goTo`, `stairsToward`): a creature
+follows its prey up stairs within its leash, never up a ladder; people who
+live upstairs come down to the square. `buildFloors` gives a building floors
+and finds room for each flight; the world editor's Floors tool uses it. The
+browser draws only the floor you are on: upstairs over its building, with
+the land below around it; underground, the land above hidden. Your floor is
+saved with your place. Stairs show their painted pictures (`Stairway.art`)
+once there are any, and always a label saying where they go.
+
 **The world editor.** The Owner and Stewards change the lands in the game
 (the "Edit world" button). An edit is data on its land's definition
 (`RegionDef.edits`, shared `world-edits.ts`): paint ground, paths, water,
 trees or rocks; move or take away a tree, rock, water or set piece; a road;
 a house of any building style (kit-friendly floor sizes, so it stands as a
-kit house in the isometric preview); a monster spawn; clearing monsters
+kit house in the isometric preview); floors above and below a building, by
+stairs or ladders; a monster spawn; clearing monsters
 away. `generateRegion` lays the edits over the land in order, so the server,
 every region server and every browser lay out the same map, and a browser
 draws a land again when its definition changes. `world-editor.ts` keeps

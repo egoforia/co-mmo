@@ -351,7 +351,7 @@ export function createApp(options: AppOptions): App {
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 
   function saveAll(): void {
-    for (const p of world.places()) store.savePosition(p.id, p.x, p.y, p.regionId, p.character);
+    for (const p of world.places()) store.savePosition(p.id, p.x, p.y, p.regionId, p.character, p.floor);
   }
 
   return {

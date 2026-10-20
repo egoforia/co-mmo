@@ -1,4 +1,5 @@
-import { step, type Vec2 } from './movement.ts';
+import { walkOn, type Placed } from './floors.ts';
+import type { Vec2 } from './movement.ts';
 import type { RegionMap } from './world.ts';
 
 export interface PendingInput {
@@ -10,12 +11,14 @@ export interface PendingInput {
 /**
  * Client-side prediction for the local player: inputs move the player
  * immediately, and each server snapshot rewinds to the authoritative
- * position and replays the inputs the server has not applied yet.
+ * position and replays the inputs the server has not applied yet. Stairs
+ * are taken here exactly as the server takes them (walkOn), so the floor
+ * changes on the same step on both.
  */
 export class Predictor {
   private pending: PendingInput[] = [];
   private seq: number;
-  position: Vec2;
+  position: Placed;
 
   /**
    * `lastSeq` carries numbering over when the player changes region, since
@@ -24,8 +27,8 @@ export class Predictor {
    * those after `start` over too, so they are replayed here and the player
    * walks on without a jump.
    */
-  constructor(private readonly map: RegionMap, start: Vec2, lastSeq = 0, carried: PendingInput[] = [], ack = 0) {
-    this.position = { ...start };
+  constructor(private readonly map: RegionMap, start: Vec2 & { floor?: number }, lastSeq = 0, carried: PendingInput[] = [], ack = 0) {
+    this.position = { x: start.x, y: start.y, floor: start.floor ?? 0 };
     this.seq = lastSeq;
     if (carried.length) {
       this.pending = carried.slice();
@@ -46,15 +49,15 @@ export class Predictor {
   apply(dx: number, dy: number): PendingInput {
     const input = { seq: ++this.seq, dx, dy };
     this.pending.push(input);
-    this.position = step(this.map, this.position, dx, dy);
+    this.position = walkOn(this.map, this.position, dx, dy);
     return input;
   }
 
   /** Reconciles with the server's state after it applied input `ack`. */
-  reconcile(ack: number, server: Vec2): void {
+  reconcile(ack: number, server: Vec2 & { floor?: number }): void {
     this.pending = this.pending.filter((i) => i.seq > ack);
-    let pos: Vec2 = { x: server.x, y: server.y };
-    for (const input of this.pending) pos = step(this.map, pos, input.dx, input.dy);
+    let pos: Placed = { x: server.x, y: server.y, floor: server.floor ?? 0 };
+    for (const input of this.pending) pos = walkOn(this.map, pos, input.dx, input.dy);
     this.position = pos;
   }
 

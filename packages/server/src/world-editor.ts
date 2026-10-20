@@ -74,6 +74,7 @@ export class WorldEditor {
       case 'house': return { kind: 'house', at: draft.at, floor: draft.floor, style: draft.style, ...stamp };
       case 'clear': return { kind: 'clear', at: draft.at, radius: draft.radius, ...stamp };
       case 'piece': return { kind: 'piece', piece: draft.piece, at: draft.at, ...stamp };
+      case 'floors': return { kind: 'floors', at: draft.at, up: draft.up, down: draft.down, ...(draft.ladders ? { ladders: true } : {}), ...stamp };
       case 'spawn': {
         const def = CREATURES[draft.creature]!;
         return { kind: 'spawn', creature: draft.creature, at: draft.at, count: draft.count, name: def.name, asset: def.art, ...stamp };

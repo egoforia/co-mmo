@@ -29,7 +29,7 @@ export class Minds {
     const players: Prey[] = [];
     for (const p of this.s.players.values()) {
       const lit = [heldItem(p.character), offHandItem(p.character)].some((item) => item && ITEMS[item]?.light);
-      players.push({ id: p.info.id, x: p.x, y: p.y, alive: p.character.hp > 0, lit });
+      players.push({ id: p.info.id, x: p.x, y: p.y, floor: p.floor, alive: p.character.hp > 0, lit });
     }
     return {
       map: this.s.map, now, tick: this.s.tickCount, random: this.s.random, phase, weather, players, creatures: this.s.creatures,
@@ -43,7 +43,7 @@ export class Minds {
   /** True while someone stands close enough to talk to this person, so they wait. */
   private listening(n: Townsperson): boolean {
     for (const p of this.s.players.values()) {
-      if (p.character.hp > 0 && Math.hypot(p.x - n.x, p.y - n.y) <= TALK_RANGE) return true;
+      if (p.character.hp > 0 && p.floor === n.floor && Math.hypot(p.x - n.x, p.y - n.y) <= TALK_RANGE) return true;
     }
     return false;
   }

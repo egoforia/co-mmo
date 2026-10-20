@@ -1,9 +1,11 @@
-import { TICK_RATE, dayPart, routineOf, routineWords, type DayPart, type NpcPlacement, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
+import { TICK_RATE, dayPart, routineOf, routineWords, stairsMiddle, stairsToward, takeStairs, type DayPart, type NpcPlacement, type Placed, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
 import { findPath, findSpots, moveToward, wander, type Walker } from './walkers.ts';
 
 // The people of a region going about their day (routines.ts): walking to
 // work at dawn, out to the square at dusk, home to sleep at night, and
 // strolling about wherever they are. They stop to talk when someone is close.
+// Someone who lives upstairs or below takes the stairs (or a ladder) down to
+// the square and back.
 
 type Spot = { x: number; y: number };
 
@@ -18,7 +20,8 @@ const SQUARE_FAR = 5;
 
 /** An NPC, where they stand now and where their day takes them. */
 export interface Townsperson extends NpcPlacement, Walker {
-  spots: Record<RoutinePlace, Spot>;
+  floor: number;
+  spots: Record<RoutinePlace, Placed>;
   /** The part of the day they last set off for. */
   part?: DayPart;
   /** The way still to walk to where they are going. */
@@ -41,12 +44,14 @@ export interface Town {
  * itself becomes the townsperson, so the map's own list stays current.
  */
 export function makeTownsperson(npc: NpcPlacement, map: RegionMap, random: () => number): Townsperson {
-  const work = { x: npc.x, y: npc.y };
+  const floor = npc.floor ?? 0;
+  const work = { x: npc.x, y: npc.y, floor };
   const around = findSpots(map, map.spawn.x, map.spawn.y, 8, SQUARE_NEAR, SQUARE_FAR);
   // Each person has their own place in the square, the same every evening.
-  const square = around[[...npc.id].reduce((h, ch) => h + ch.charCodeAt(0), 0) % Math.max(1, around.length)] ?? work;
+  const pick = around[[...npc.id].reduce((h, ch) => h + ch.charCodeAt(0), 0) % Math.max(1, around.length)];
+  const square = pick ? { ...pick, floor: 0 } : work;
   return Object.assign(npc, {
-    home: work, target: null, rest: Math.floor(random() * TICK_RATE * 3), spots: { work, square }, path: [], asleep: false,
+    floor, home: work, target: null, rest: Math.floor(random() * TICK_RATE * 3), spots: { work, square }, path: [], asleep: false,
   });
 }
 
@@ -59,8 +64,7 @@ export function live(n: Townsperson, town: Town): void {
     n.part = part;
     n.asleep = false;
     n.target = null;
-    const far = Math.hypot(spot.x - n.x, spot.y - n.y) > STROLL_RADIUS;
-    n.path = far ? findPath(town.map, n, spot) ?? [spot] : [];
+    n.path = plan(town.map, n, spot);
   }
   if (town.listening) {
     n.target = null;
@@ -72,6 +76,14 @@ export function live(n: Townsperson, town: Town): void {
     const before = { x: n.x, y: n.y };
     // Something in the way (a new building, a wished thing) skips to the next bend.
     if (moveToward(town.map, n, next.x, next.y, WALK_SPEED) || (n.x === before.x && n.y === before.y)) n.path.shift();
+    // At the stairs on the way (the end of this leg): up or down them, then on from the landing.
+    if (n.floor !== spot.floor && !n.path.length) {
+      const landed = takeStairs(town.map, n);
+      if (landed) {
+        Object.assign(n, landed);
+        n.path = plan(town.map, n, spot);
+      }
+    }
     return;
   }
   if (step.sleep) {
@@ -79,7 +91,20 @@ export function live(n: Townsperson, town: Town): void {
     n.target = null;
     return;
   }
-  wander(town.map, n, STROLL_SPEED, STROLL_RADIUS, town.random, spot);
+  // Kept from their spot's floor (its stairs gone), they stroll where they are.
+  wander(town.map, n, STROLL_SPEED, STROLL_RADIUS, town.random, spot.floor === n.floor ? spot : n.home.floor === n.floor ? n.home : n);
+}
+
+/** The way to walk to a spot: there on this floor, or to the stairs that lead toward its floor; none when close by. */
+function plan(map: RegionMap, n: Townsperson, spot: Placed): Spot[] {
+  if (n.floor !== spot.floor) {
+    const way = stairsToward(map, n, spot.floor);
+    if (!way) return [];
+    const middle = stairsMiddle(way);
+    return findPath(map, n, middle) ?? [middle];
+  }
+  const far = Math.hypot(spot.x - n.x, spot.y - n.y) > STROLL_RADIUS;
+  return far ? findPath(map, n, spot) ?? [spot] : [];
 }
 
 /** What a person says first when spoken to now (woken up, or busy with their evening), if anything. */

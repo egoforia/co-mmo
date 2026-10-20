@@ -24,6 +24,7 @@ alongside the others.
 | `together.play.ts` | Two players see each other, chat, form a party, share a fight's XP and trade. |
 | `editor.play.ts` | In Chromium: a Steward opens the world editor, plants a tree and takes it back, lays a road with a house at its end and places monsters, while a robot in the same land is shown each change. |
 | `browser.play.ts` | In Chromium: join by invite link, walk with the arrow keys, pray and grant a wish from its card, open the bag, open every God's View tab, and open the game on a phone-sized screen. Screenshots go to `playtest-results/`. |
+| `perf.play.ts` | In Chromium: a Steward shows the performance overlay with F3 and sees frames, a ping and the server running their region; it stays on across a reload and hides from Account. A player's F3 shows nothing. |
 
 A run fails when a robot notes a problem (it could not walk somewhere, a
 message never came, the server sent an error, a body kept its loot), when

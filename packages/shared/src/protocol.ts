@@ -33,6 +33,12 @@ export interface ChatSendMessage {
   to?: string;
 }
 
+/** Asks the game server to answer at once, to time the round trip (the performance overlay). */
+export interface PingMessage {
+  t: 'ping';
+  n: number;
+}
+
 /** Strike the nearest creature in reach. */
 export interface AttackMessage {
   t: 'attack';
@@ -174,7 +180,8 @@ export type ClientMessage =
   | AcceptQuestMessage
   | PrayMessage
   | WishAnswerMessage
-  | ReportMessage;
+  | ReportMessage
+  | PingMessage;
 
 export interface PlayerInfo {
   id: string;
@@ -343,6 +350,37 @@ export interface SystemMessage {
   at: number;
 }
 
+/** What the performance overlay shows of the server (`GET /api/admin/perf`, Stewards and the Owner): the one running your region, and the whole world. */
+export interface PerfView {
+  /** Where you are: the region (or the part of a split region) and the server that runs it. */
+  here?: {
+    region: string;
+    part?: number;
+    parts?: number;
+    players: number;
+    creatures: number;
+    server: string;
+    tickMs: number;
+    worstTickMs: number;
+    ticksPerSecond: number;
+    lagMs: number;
+    worstLagMs: number;
+    memoryMb: number;
+    heapMb: number;
+  };
+  /** Players online, and how many servers share the regions. */
+  online: number;
+  servers: number;
+  /** Ticks a second when a server keeps up. */
+  tickRate: number;
+}
+
+/** The answer to a ping, carrying back its number. */
+export interface PongMessage {
+  t: 'pong';
+  n: number;
+}
+
 export interface ErrorMessage {
   t: 'error';
   code: string;
@@ -491,6 +529,7 @@ export type ServerMessage =
   | SnapshotMessage
   | ChatMessage
   | SystemMessage
+  | PongMessage
   | ErrorMessage;
 
 export function isClientMessage(value: unknown): value is ClientMessage {
@@ -512,6 +551,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64));
   }
   if (m.t === 'attack' || m.t === 'interact') return true;
+  if (m.t === 'ping') return Number.isSafeInteger(m.n);
   if (m.t === 'loot') {
     return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&
       (m.index === undefined || (Number.isInteger(m.index) && (m.index as number) >= 0 && (m.index as number) < 100)) &&

@@ -5,7 +5,7 @@
 // be sent to the AI model and approved it, and every version keeps that same
 // information so an old one can be compared with today's and put back.
 
-import { HELD_SIZE, heldBehind, type ArtPoint, type ArtPointsManifest } from '@co-mmo/shared';
+import { HELD_SIZE, ISO_WAYS, heldBehind, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
 import { lightPreviews } from './light-preview.ts';
@@ -82,7 +82,7 @@ interface WalkerView {
   place: Place;
   walks: Partial<Record<Direction, WalkStrip>>;
   lost: Partial<Record<Direction, WalkVersion[]>>;
-  standing: Record<Direction, StandingView>;
+  standing: Record<Facing, StandingView>;
   estimateUsd: number;
   clipUsd: number;
   viewUsd: number;
@@ -120,7 +120,8 @@ type Ask =
   | { what: 'paint'; asset: string }
   | { what: 'paint-group'; group: string }
   | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean }
-  | { what: 'view'; walker: string; direction: Direction; prompt?: string; from?: string[] }
+  | { what: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
+  | { what: 'ways'; walker?: string }
   | { what: 'clip'; walker: string; body: string; direction: Direction; prompt?: string }
   | { what: 'sound'; sound: string }
   | { what: 'normal'; asset: string; prompt?: string };
@@ -136,6 +137,10 @@ const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monste
 type Subtab = (typeof SUBTABS)[number][0];
 const ITEM_ORDER = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
 const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']];
+/** The isometric camera's ways, in words, as the Art tab shows them. */
+const WAYS: [IsoWay, string][] = [['front-left', 'towards us, left'], ['front-right', 'towards us, right'], ['back-left', 'away, left'], ['back-right', 'away, right']];
+/** Every way a standing picture can face, in words. */
+const FACING_WORDS: [Facing, string][] = [...DIRECTIONS, ...WAYS];
 /** The way a walker faces after turning round. */
 const TURNED: Record<Direction, Direction> = { front: 'back', back: 'front', left: 'right', right: 'left' };
 const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
@@ -253,7 +258,11 @@ function peoplePage(tab: 'characters' | 'monsters', page?: string): string {
   const chosen = page && names.includes(page) ? page : names[0]!;
   const own = items.filter((i) => i.place.page === chosen);
   const walking = walkers.filter((w) => w.place.page === chosen);
+  const missing = data!.walkers.reduce((n, w) => n + ISO_WAYS.filter((d) => !w.standing[d]?.url).length, 0);
+  const ways = missing ? `<p class="note">The isometric preview shows every walker in four ways of its own. ${missing} of those pictures are not painted yet; until they are, walkers show their top-down walks there.
+    <button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways' }))}">Paint every walker's missing ways · about ${usd(missing * (data!.walkers[0]?.viewUsd ?? 0))}</button></p>` : '';
   return `
+    ${ways}
     ${pagesNav(tab, names, chosen)}
     <h2>${esc(chosen)}</h2>
     ${own.length ? `<h3>Pictures</h3><div class="art-grid">${own.map(itemHtml).join('')}</div>` : ''}
@@ -358,6 +367,7 @@ function walkerHtml(w: WalkerView): string {
       <p class="note">Each direction has a standing picture, and a short clip that starts and ends on it. Paint the picture first and look at it (paint it again until you like it), then make the clip from it. Both prompts can be edited before anything is sent.</p>
       <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
       ${handsHtml(w)}
+      ${waysHtml(w)}
       ${made < 4 ? `
         <details><summary>Or make all the missing walks in one go</summary>
           <form class="form art-walk" data-walker="${esc(w.id)}">
@@ -373,6 +383,34 @@ function walkerHtml(w: WalkerView): string {
           </form>
         </details>` : ''}
     </div>`;
+}
+
+/**
+ * The isometric camera's four ways: a standing picture each, which walkers
+ * glide in there until animation is decided, and where their hands were
+ * found in it.
+ */
+function waysHtml(w: WalkerView): string {
+  const missing = WAYS.filter(([d]) => !w.standing[d].url).length;
+  const way = ([d, label]: [IsoWay, string]) => {
+    const view = w.standing[d];
+    const id = walkStandArt(w.id, d);
+    const looked = points[id];
+    const [right, left] = [!!looked?.hands?.[0], !!looked?.leftHands?.[0]];
+    const found = !view.url ? '' : !looked ? 'hands not looked at yet' : right && left ? 'both hands found' : right ? 'right hand found' : left ? 'left hand found' : 'no hands found';
+    const versions = view.url || view.versions.length ? `<button type="button" class="quiet" data-view-versions="${esc(w.id)}" data-direction="${d}">${view.versions.length ? `Picture versions (${view.versions.length + 1})` : 'What made the picture'}</button>` : '';
+    return `
+      <div class="direction">
+        <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${esc(label)}${found ? ` · ${found}` : ''}</small></div>
+        <div class="card-actions"><button type="button" data-art-review="${esc(JSON.stringify({ what: 'view', walker: w.id, direction: d }))}">${view.url ? 'Paint again' : 'Paint'} · about ${usd(w.viewUsd)}</button>${versions}${view.url ? `<button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [id] }))}">Find hands again</button>` : ''}</div>
+      </div>`;
+  };
+  return `
+    <details class="ways"><summary>The isometric ways${missing ? ` · ${4 - missing} of 4 painted` : ''}</summary>
+      <p class="note">The isometric preview turns walkers four ways of its own, halfway between the front or back and a side. Each way is one standing picture: walks are made from video, which waits until animation is decided, so walkers glide in these pictures there.</p>
+      <div class="walks">${WAYS.map(way).join('')}</div>
+      ${missing > 1 ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways', walker: w.id }))}">Paint the ${missing} missing ways · about ${usd(missing * w.viewUsd)}</button>` : ''}
+    </details>`;
 }
 
 /** Items tried in each hand in the hands preview, by art id; the same for every character while God's View is open. */
@@ -580,7 +618,7 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
     try {
       await ctx.api(`art/${ask.what}`, 'POST', { ...ask, ...(note ? { note } : {}), approved: review.fingerprint });
       d.close();
-      ctx.toast(ask.what === 'walk' || ask.what === 'clip' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : ask.what === 'view' ? 'Approved. The picture shows here once it is painted; then make the clip from it.' : 'Approved. Follow it under Painting now.');
+      ctx.toast(ask.what === 'walk' || ask.what === 'clip' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : ask.what === 'view' ? (ask.direction.includes('-') ? 'Approved. The picture shows here once it is painted.' : 'Approved. The picture shows here once it is painted; then make the clip from it.') : ask.what === 'ways' ? 'Approved. Each picture shows here as it is painted; follow them under Painting now.' : 'Approved. Follow it under Painting now.');
       ctx.rerender();
     } catch (err) {
       button.disabled = false;
@@ -595,7 +633,7 @@ function sourcesHtml(ask: Extract<Ask, { what: 'view' }>): string {
   if (!w) return '';
   const from = ask.from ?? ['approved'];
   const options: [string, string, string | undefined][] = [['approved', 'The approved picture', w.url]];
-  for (const [d, label] of DIRECTIONS) {
+  for (const [d, label] of FACING_WORDS) {
     const view = w.standing[d];
     if (view.url && !view.approved) options.push([d, `Standing, ${label}`, view.url]);
   }
@@ -663,8 +701,8 @@ function walkVersions(w: WalkerView, direction: Direction): void {
   openVersions(`${w.name} walking ${label === 'towards us' ? 'towards us' : label === 'away' ? 'away' : label}`, now, earlier, (version) => ctx.api('art/restore-walk', 'POST', { walker: w.id, direction, version }));
 }
 
-function viewVersions(w: WalkerView, direction: Direction): void {
-  const label = DIRECTIONS.find(([d]) => d === direction)![1];
+function viewVersions(w: WalkerView, direction: Facing): void {
+  const label = FACING_WORDS.find(([d]) => d === direction)![1];
   const view = w.standing[direction];
   const earlier: Shown[] = view.versions.map((v) => ({ id: v.id, label: v.id === 'approved' ? 'The approved picture' : `Put aside ${putAside(v.id)}`, look: picture(v.url), recipe: v.recipe }));
   const now: Shown = { id: 'now', label: view.approved ? 'the approved picture' : madeOn(view.recipe, 'painted here'), look: view.url ? picture(view.url) : '', recipe: view.recipe };
@@ -749,7 +787,7 @@ export function artClick(target: HTMLElement): boolean {
     void ctx.api('art/hands/question', 'POST', { facing: t.dataset.handsUsual, prompt: '' }).then(() => { ctx.toast('Back to the usual words.'); ctx.rerender(); }, (err: Error) => ctx.toast(err.message));
   } else if (t.dataset.viewVersions) {
     const w = data.walkers.find((x) => x.id === t.dataset.viewVersions);
-    if (w) viewVersions(w, t.dataset.direction as Direction);
+    if (w) viewVersions(w, t.dataset.direction as Facing);
   } else if (t.dataset.soundVersions) {
     const s = data.sounds.find((x) => x.id === t.dataset.soundVersions);
     if (s) soundVersions(s);

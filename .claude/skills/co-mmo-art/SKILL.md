@@ -44,7 +44,10 @@ Where things are:
   the profile's `kitTextures`), and only textures that pass the sheet checks
   are used. Keep the sheet layout: today's paintings are read against it.
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
-- Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`.
+- Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`. Walks are
+  made for the four top-down ways (`WALK_DIRECTIONS`). The isometric camera's
+  four ways (`ISO_WAYS`: front-left, front-right, back-left, back-right) are
+  standing pictures only, each painted on its own, never a mirror.
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.
 - The camera: every tile-to-screen sum goes through `PROJECTION` in
   `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in

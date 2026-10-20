@@ -1,13 +1,17 @@
 // The Server health tab: each server's regions, players, tick time and memory, with restart and move.
 
 import { escapeHtml } from '../ui.ts';
-import { TICK_SECONDS } from '@co-mmo/shared';
+import { TICK_RATE, TICK_SECONDS } from '@co-mmo/shared';
 import { api, toast, type Handled, type Tab } from './core.ts';
 
 interface ServerLoad {
   tickMs: number;
   worstTickMs: number;
+  ticksPerSecond: number;
+  lagMs: number;
+  worstLagMs: number;
   memoryMb: number;
+  heapMb: number;
   errors: number;
   lastError?: string;
   host: string;
@@ -19,7 +23,7 @@ interface Host {
   id: string;
   kind: 'gateway' | 'region-server';
   /** Whole regions, or cells of a crowded region split into parts. */
-  regions: { id: string; region: string; name: string; players: number; part?: number; parts?: number }[];
+  regions: { id: string; region: string; name: string; players: number; creatures: number; part?: number; parts?: number }[];
   players: number;
   load: ServerLoad;
   seen: number;
@@ -37,9 +41,13 @@ async function servers(): Promise<string> {
     const l = h.load;
     // Half a tick is fine; a whole tick means players feel it.
     const busy = l.worstTickMs >= TICK_MS ? 'bad' : l.tickMs >= TICK_MS / 2 ? 'warn' : '';
+    // Fewer ticks than the rate means the world runs slow for everyone there.
+    const behind = l.ticksPerSecond && l.ticksPerSecond < TICK_RATE * 0.9 ? 'bad' : '';
+    // A busy event loop holds up ticks, messages and God's View alike.
+    const waiting = l.worstLagMs >= TICK_MS ? 'warn' : '';
     const quiet = s.now - h.seen;
     const moveTo = () => s.hosts.filter((o) => o.id !== h.id).map((o) => `<option value="${escapeHtml(o.id)}">${o.kind === 'gateway' ? 'Game server' : escapeHtml(o.id)}</option>`).join('');
-    const rows = h.regions.map((r) => `<tr><td><b>${escapeHtml(r.name)}</b>${r.parts ? ` <small>part ${r.part} of ${r.parts}</small>` : ''}</td><td>${r.players} here</td><td class="actions">
+    const rows = h.regions.map((r) => `<tr><td><b>${escapeHtml(r.name)}</b>${r.parts ? ` <small>part ${r.part} of ${r.parts}</small>` : ''}</td><td>${r.players} here, ${r.creatures} creature${r.creatures === 1 ? '' : 's'}</td><td class="actions">
         <button type="button" data-region-restart="${escapeHtml(r.region)}" data-players="${r.players}">Restart${r.parts ? ' all parts' : ''}</button>
         ${s.hosts.length > 1 && !r.parts ? `<select data-move-for="${escapeHtml(r.id)}" aria-label="Move ${escapeHtml(r.name)} to">${moveTo()}</select><button type="button" data-region-move="${escapeHtml(r.id)}" data-players="${r.players}">Move</button>` : ''}
       </td></tr>`).join('');
@@ -48,7 +56,9 @@ async function servers(): Promise<string> {
       <div class="stats">
         <div class="stat ${busy}"><b>${l.tickMs.toFixed(1)} ms</b><span>a tick on average (slowest ${l.worstTickMs.toFixed(1)} ms of ${TICK_MS} ms)</span></div>
         <div class="stat"><b>${h.players}</b><span>player${h.players === 1 ? '' : 's'} in ${h.regions.length} region${h.regions.length === 1 ? '' : 's'}</span></div>
-        <div class="stat"><b>${l.memoryMb} MB</b><span>memory</span></div>
+        <div class="stat ${behind}"><b>${l.ticksPerSecond.toFixed(0)}</b><span>ticks a second (of ${TICK_RATE})</span></div>
+        <div class="stat ${waiting}"><b>${l.lagMs.toFixed(1)} ms</b><span>waiting to run (worst ${l.worstLagMs.toFixed(0)} ms)</span></div>
+        <div class="stat"><b>${l.memoryMb} MB</b><span>memory (${l.heapMb} MB of it data)</span></div>
         <div class="stat ${l.errors ? 'warn' : ''}"><b>${l.errors}</b><span>error${l.errors === 1 ? '' : 's'} since it started</span></div>
       </div>
       ${l.lastError ? `<p class="note warn">Last error: ${escapeHtml(l.lastError)}</p>` : ''}

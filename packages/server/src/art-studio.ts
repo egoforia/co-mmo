@@ -5,6 +5,8 @@ import sharp from 'sharp';
 import {
   BODY_TYPES,
   BUILDING_STYLES,
+  FACINGS,
+  ISO_WAYS,
   WALK_CYCLE_SECONDS,
   WALK_DIRECTIONS,
   WALK_FRAMES,
@@ -12,8 +14,11 @@ import {
   ruleItemId,
   walkArt,
   wishArtKey,
+  isFacing,
   type ArtManifest,
   type BiomeId,
+  type Facing,
+  type IsoWay,
   type ItemWish,
   type PicturedWish,
   type WalkDirection,
@@ -38,7 +43,7 @@ import type { PaintRequest, PaintRequests } from './paint-requests.ts';
 import type { SoundItem, SoundMaker } from './sound-maker.ts';
 import type { ContentRecord, Store } from './store.ts';
 import type { ArtUse } from './settings.ts';
-import { estimateClipUsd, type StandingView, type ViewSource, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
+import { estimateClipUsd, facingWords, type StandingView, type ViewSource, type WalkPainter, type WalkVersion, type Walker } from './walk-painter.ts';
 import type { Wishes } from './wishes.ts';
 import type { AiServices } from './ai/services.ts';
 import type { Budget, BudgetState } from './budget.ts';
@@ -113,7 +118,9 @@ export type ArtAsk =
   | { kind: 'paint'; asset: string; note?: string }
   | { kind: 'group'; group: string }
   | { kind: 'walk'; walker: string; body: string; directions?: WalkDirection[]; views?: boolean }
-  | { kind: 'view'; walker: string; direction: WalkDirection; prompt?: string; from?: string[] }
+  | { kind: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
+  /** The isometric ways one walker, or every walker, has no standing picture for yet. */
+  | { kind: 'ways'; walker?: string }
   | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string }
   | { kind: 'normal'; asset: string; prompt?: string }
@@ -141,8 +148,8 @@ export interface WalkerView {
   walks: Partial<Record<WalkDirection, WalkStrip>>;
   /** Earlier walks of directions that have none now. */
   lost: Partial<Record<WalkDirection, WalkVersion[]>>;
-  /** Each direction's standing picture, which its walk clip starts and ends on. */
-  standing: Record<WalkDirection, StandingView>;
+  /** Each way's standing picture: for the top-down ways, what its walk clip starts and ends on. */
+  standing: Record<Facing, StandingView>;
   /** About what making the missing walks costs. */
   estimateUsd: number;
   /** About what painting one direction again costs (one clip). */
@@ -368,7 +375,7 @@ export class ArtStudio {
       }
       const needs = await this.options.walks.needs(w);
       const standing = {} as WalkerView['standing'];
-      for (const d of WALK_DIRECTIONS) standing[d] = await this.options.walks.standing(w, d, w.url);
+      for (const d of FACINGS) standing[d] = await this.options.walks.standing(w, d, w.url);
       views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
     }
     return views;
@@ -400,9 +407,25 @@ export class ArtStudio {
         parts.push({ name: walker.name, recipe });
       } else if (ask.kind === 'view') {
         const walker = this.walker(ask.walker, 'two-legged');
-        const direction = this.direction(ask.direction);
+        const direction = this.facing(ask.direction);
         title = `Paint ${walker.name} standing, facing ${facingWords(direction)}`;
         parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), viewSources(ask.from)) });
+      } else if (ask.kind === 'ways') {
+        const todo = await this.missingWays(ask.walker);
+        const one = ask.walker ? this.walker(ask.walker, 'two-legged') : undefined;
+        if (!todo.length) throw new ArtRequestError(one ? `${one.name} already has a standing picture for every isometric way.` : 'Every walker already has a standing picture for every isometric way.');
+        title = one
+          ? `Paint ${one.name} standing in ${todo.length === ISO_WAYS.length ? 'the four isometric ways' : `${todo.length} more isometric way${todo.length > 1 ? 's' : ''}`}`
+          : `Paint every walker standing in the isometric ways: ${todo.length} pictures`;
+        // One part per walker, a picture for each way it lacks.
+        const byWalker = new Map<string, { name: string; recipe: Recipe }>();
+        for (const t of todo) {
+          const recipe = await this.options.walks.previewView(t.walker, t.way, undefined, t.from);
+          const part = byWalker.get(t.walker.id);
+          if (part) part.recipe.steps.push(...recipe.steps);
+          else byWalker.set(t.walker.id, { name: t.walker.name, recipe });
+        }
+        parts.push(...byWalker.values());
       } else if (ask.kind === 'clip') {
         const walker = this.walker(ask.walker, ask.body);
         const direction = this.direction(ask.direction);
@@ -619,6 +642,34 @@ export class ArtStudio {
     return direction as WalkDirection;
   }
 
+  /** A way a standing picture can face: one a walk can face, or an isometric way. */
+  private facing(facing: string): Facing {
+    if (!isFacing(facing)) throw new ArtRequestError('That is not a direction.');
+    return facing;
+  }
+
+  /**
+   * The isometric ways each walker (or only `walkerId`) has no standing
+   * picture for, with the pictures each is painted from: the approved
+   * picture, and the standing pictures painted for the ways on either side.
+   */
+  private async missingWays(walkerId?: string): Promise<{ walker: Walker; way: IsoWay; from: ViewSource[] }[]> {
+    const walkers = walkerId ? [this.walker(walkerId, 'two-legged')] : this.walkerList();
+    const out: { walker: Walker; way: IsoWay; from: ViewSource[] }[] = [];
+    for (const walker of walkers) {
+      for (const way of ISO_WAYS) {
+        if ((await this.options.walks.standing(walker, way)).url) continue;
+        const from: ViewSource[] = ['approved'];
+        for (const beside of WAYS_BESIDE[way]) {
+          const view = await this.options.walks.standing(walker, beside);
+          if (view.url && !view.approved) from.push(beside);
+        }
+        out.push({ walker, way, from });
+      }
+    }
+    return out;
+  }
+
   /** A shipped scenery piece, character or item that can be painted again. */
   private kitAsset(asset: string): KitAsset | undefined {
     return [...BIOME_KIT.filter(repaintableKit), ...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
@@ -731,7 +782,7 @@ export class ArtStudio {
   async paintView(walkerId: string, direction: string, prompt?: string, from?: string[]): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, 'two-legged');
-    const d = this.direction(direction);
+    const d = this.facing(direction);
     const image = this.options.ai.image('walks');
     if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
     const estimateUsd = estimateImageUsd(image.model);
@@ -740,6 +791,24 @@ export class ArtStudio {
     const sources = viewSources(from);
     this.enqueue(() => this.options.walks.paintView(walker, d, own, handle, sources), handle, { kind: 'view', walker: walkerId, direction: d, ...(own ? { prompt: own } : {}), ...(sources ? { from: [...sources] } : {}) });
     return { estimateUsd };
+  }
+
+  /**
+   * Paints the isometric ways one walker, or every walker, has no standing
+   * picture for, each a picture of its own in the painting log.
+   */
+  async paintWays(walkerId?: string): Promise<{ estimateUsd: number; count: number }> {
+    this.refuseWhenSpent();
+    const image = this.options.ai.image('walks');
+    if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
+    const todo = await this.missingWays(walkerId);
+    if (!todo.length) throw new ArtRequestError('Every isometric way already has a standing picture.');
+    const usd = estimateImageUsd(image.model);
+    for (const { walker, way, from } of todo) {
+      const handle = this.options.jobs.add(`${walker.id}-${way}`, `${walker.name} standing, facing ${facingWords(way)}`, 'picture', 'gods-view', usd);
+      this.enqueue(() => this.options.walks.paintView(walker, way, undefined, handle, from), handle, { kind: 'view', walker: walker.id, direction: way, from: [...from] });
+    }
+    return { estimateUsd: usd * todo.length, count: todo.length };
   }
 
   /** Makes one direction's walk clip from the standing picture there now, and only that. */
@@ -826,7 +895,7 @@ export class ArtStudio {
   async restoreView(walkerId: string, direction: string, version: string): Promise<void> {
     const found = this.walkerList().find((w) => w.id === walkerId);
     if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
-    if (!(await this.options.walks.restoreView(found, this.direction(direction), version))) throw new ArtRequestError('That earlier picture is not there any more.');
+    if (!(await this.options.walks.restoreView(found, this.facing(direction), version))) throw new ArtRequestError('That earlier picture is not there any more.');
   }
 
   /** Puts an earlier version of a sound back, for free. */
@@ -1034,11 +1103,14 @@ function ownPrompt(prompt: string | undefined): string | undefined {
 
 /** The pictures chosen to paint a standing picture from; undefined keeps the approved picture alone. */
 function viewSources(from: string[] | undefined): ViewSource[] | undefined {
-  const sources = (from ?? []).filter((f): f is ViewSource => f === 'approved' || WALK_DIRECTIONS.includes(f as WalkDirection));
+  const sources = (from ?? []).filter((f): f is ViewSource => f === 'approved' || isFacing(f));
   return sources.length ? sources : undefined;
 }
 
-/** Which way a direction faces, in words. */
-function facingWords(direction: WalkDirection): string {
-  return direction === 'front' ? 'towards us' : direction === 'back' ? 'away' : direction;
-}
+/** The ways on either side of each isometric way, whose standing pictures show what it shows. */
+const WAYS_BESIDE: Record<IsoWay, Facing[]> = {
+  'front-left': ['front', 'left'],
+  'front-right': ['front', 'right'],
+  'back-left': ['back', 'left'],
+  'back-right': ['back', 'right'],
+};

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
-import type { WalkDirection } from '@co-mmo/shared';
+import { heldBehind, isWalkDirection, type Facing, type WalkDirection } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
 import { countFigures, cutFigures, type Box } from './walk-frames.ts';
 import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
@@ -32,11 +32,16 @@ export const LOOK_GEAR: Record<string, Carried[]> = {
   // The walking looks carry nothing: their weapon or charm is drawn in hand by the game (held items).
 };
 
-const SEEN: Record<WalkDirection, string> = {
+const SEEN: Record<Facing, string> = {
   front: 'facing the viewer, seen from the front',
   right: 'facing right, seen exactly side-on: the face in profile points to the RIGHT edge of the picture and we see their left side',
   back: 'facing away from the viewer, seen from behind, the face hidden',
   left: 'facing left, seen exactly side-on: the face in profile points to the LEFT edge of the picture and we see their right side',
+  // The isometric camera's ways: turned exactly halfway, which the model drifts away from unless told both ends.
+  'front-left': 'turned halfway to the left: facing towards the viewer and the LEFT edge of the picture at once, exactly halfway between seen from the front and seen side-on; we see the face and chest turned towards the lower left',
+  'front-right': 'turned halfway to the right: facing towards the viewer and the RIGHT edge of the picture at once, exactly halfway between seen from the front and seen side-on; we see the face and chest turned towards the lower right',
+  'back-left': 'turned halfway away to the left: facing away from the viewer and towards the LEFT edge of the picture at once, exactly halfway between seen from behind and seen side-on; we see the back and the back of the head turned towards the upper left, the face hidden',
+  'back-right': 'turned halfway away to the right: facing away from the viewer and towards the RIGHT edge of the picture at once, exactly halfway between seen from behind and seen side-on; we see the back and the back of the head turned towards the upper right, the face hidden',
 };
 
 /**
@@ -44,11 +49,17 @@ const SEEN: Record<WalkDirection, string> = {
  * left side" in general fail; naming each item and saying in front of or
  * behind the body works.
  */
-export function gearPlacement(gear: Carried[], direction: WalkDirection): string {
+export function gearPlacement(gear: Carried[], direction: Facing): string {
   const where = (g: Carried): string => {
-    if (g.side === 'back') return direction === 'back' ? `the ${g.item} is fully seen on the back` : `the ${g.item} peeks out behind the body`;
+    if (g.side === 'back') return direction === 'back' || direction === 'back-left' || direction === 'back-right' ? `the ${g.item} is fully seen on the back` : `the ${g.item} peeks out behind the body`;
     if (direction === 'front') return `the ${g.item} is on the viewer's ${g.side === 'right' ? 'left' : 'right'}`;
     if (direction === 'back') return `the ${g.item} is on the viewer's ${g.side}`;
+    // Turned halfway, the side turned towards the way they face is the far one, as the game draws held items.
+    if (!isWalkDirection(direction)) {
+      return heldBehind(direction, g.side)
+        ? `the ${g.item} is on the far side, BEHIND the body, partly hidden`
+        : `the ${g.item} is on the near side, IN FRONT of the body, fully visible`;
+    }
     const near = (direction === 'right') === (g.side === 'left');
     return near
       ? `the ${g.item} is on the near side, IN FRONT of the body, fully visible`
@@ -57,8 +68,8 @@ export function gearPlacement(gear: Carried[], direction: WalkDirection): string
   return gear.length ? `In this view: ${gear.map(where).join('; ')}.` : '';
 }
 
-/** The prompt for painting a look standing still in one direction, from its front-facing reference. */
-export function viewPrompt(name: string, gear: Carried[], direction: WalkDirection, references = 1): string {
+/** The prompt for painting a look standing still facing one way, from its front-facing reference. */
+export function viewPrompt(name: string, gear: Carried[], direction: Facing, references = 1): string {
   const from = references > 1
     ? `from the ${references} reference images alone (all of them show ${name}: take every detail from them, such as how clothes hang seen from different sides)`
     : 'from the reference image alone';

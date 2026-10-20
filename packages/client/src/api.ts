@@ -1,4 +1,4 @@
-import type { PlayerInfo, WorldEdit, WorldEditDraft, buildingKit } from '@co-mmo/shared';
+import type { PerfView, PlayerInfo, WorldEdit, WorldEditDraft, buildingKit } from '@co-mmo/shared';
 
 const TOKEN_KEY = 'co-mmo.token';
 
@@ -118,6 +118,12 @@ export async function worldEdits(token: string, region: string, action?: { edit:
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.message ?? 'The editor could not reach the server. Try again.');
   return body as EditLog;
+}
+
+/** How the server running your part of the world keeps up, for the performance overlay (Stewards and the Owner). */
+export async function perfStats(token: string): Promise<PerfView | undefined> {
+  const res = await fetch('/api/admin/perf', { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
+  return res?.ok ? ((await res.json()) as PerfView) : undefined;
 }
 
 export async function signOut(token: string): Promise<void> {

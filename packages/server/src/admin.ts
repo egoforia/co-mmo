@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, WALK_DIRECTIONS, WishError, engineModId, skyWords, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
+import { ITEMS, WALK_DIRECTIONS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
@@ -20,6 +20,7 @@ import type { AiServices } from './ai/services.ts';
 import type { Budget } from './budget.ts';
 import type { World } from './world.ts';
 import type { LoadMeter } from './load-meter.ts';
+import { perfView } from './perf.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
@@ -391,8 +392,10 @@ export async function handleAdmin(
     const note = typeof body?.note === 'string' ? body.note : '';
     // The Owner's own words in place of a prompt, for a walk's standing picture or clip.
     const prompt = typeof body?.prompt === 'string' && body.prompt.trim() ? body.prompt : undefined;
-    // The pictures a walk's standing picture is painted from: the approved picture and standing pictures by direction.
-    const from = Array.isArray(body?.from) ? body.from.filter((f): f is string => typeof f === 'string' && (f === 'approved' || (WALK_DIRECTIONS as readonly string[]).includes(f))) : undefined;
+    // The pictures a walk's standing picture is painted from: the approved picture and standing pictures by way.
+    const from = Array.isArray(body?.from) ? body.from.filter((f): f is string => typeof f === 'string' && (f === 'approved' || isFacing(f))) : undefined;
+    // The walker whose isometric ways to paint; none paints every walker's.
+    const walker = typeof body?.walker === 'string' && body.walker ? body.walker : undefined;
     // A building sheet's textures to paint again; none paints the whole sheet.
     const textures = Array.isArray(body?.textures) ? body.textures.filter((t): t is string => typeof t === 'string').slice(0, 20) : [];
     const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
@@ -402,7 +405,8 @@ export async function handleAdmin(
       'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
       'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
       'art/walk': () => ({ kind: 'walk', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), directions, views: body?.views === true }),
-      'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
+      'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
+      'art/ways': () => ({ kind: 'ways', ...(walker ? { walker } : {}) }),
       'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}) }),
       'art/normal': () => ({ kind: 'normal', asset: String(body?.asset ?? ''), ...(prompt ? { prompt } : {}) }),
       'art/sheet': () => ({ kind: 'sheet', look: String(body?.look ?? ''), textures, note }),
@@ -446,6 +450,10 @@ export async function handleAdmin(
         const done = await ctx.art.paintView(String(body?.walker ?? ''), String(body?.direction ?? ''), prompt, from);
         return json(res, 202, { ok: true, ...done }), true;
       }
+      if (route === 'art/ways' && method === 'POST') {
+        const done = await ctx.art.paintWays(walker);
+        return json(res, 202, { ok: true, ...done }), true;
+      }
       if (route === 'art/clip' && method === 'POST') {
         const done = await ctx.art.makeClip(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), String(body?.direction ?? ''), prompt);
         return json(res, 202, { ok: true, ...done }), true;
@@ -456,8 +464,8 @@ export async function handleAdmin(
       }
       if (route === 'art/hands/question' && method === 'POST') {
         const facing = String(body?.facing ?? '');
-        if (!ctx.hands || !(WALK_DIRECTIONS as readonly string[]).includes(facing)) return json(res, 400, { error: 'bad_request', message: 'There is no question like that.' }), true;
-        await ctx.hands.setQuestion(facing as WalkDirection, typeof body?.prompt === 'string' ? body.prompt : '');
+        if (!ctx.hands || !isFacing(facing)) return json(res, 400, { error: 'bad_request', message: 'There is no question like that.' }), true;
+        await ctx.hands.setQuestion(facing, typeof body?.prompt === 'string' ? body.prompt : '');
         return json(res, 200, { ok: true }), true;
       }
       if (route === 'art/hands/mirror' && method === 'POST') {
@@ -555,16 +563,20 @@ export async function handleAdmin(
   }
 
   // Server health (Owner): where each region runs and how hard each host works.
+  const hosts = () => (ctx.regionServers ? ctx.regionServers.status(ctx.meter.load()) : hostStatus(world, ctx.meter.load()));
   if (route === 'servers' && method === 'GET') {
     if (ownerOnly()) return true;
     const servers = ctx.regionServers;
     return json(res, 200, {
-      hosts: servers ? servers.status(ctx.meter.load()) : hostStatus(world, ctx.meter.load()),
+      hosts: hosts(),
       regionServers: Boolean(servers),
       store: store.label,
       now: Date.now(),
     }), true;
   }
+
+  // The performance overlay (Stewards and the Owner): how the server running your part of the world keeps up.
+  if (route === 'perf' && method === 'GET') return json(res, 200, perfView(world, account.id, hosts())), true;
 
   // Moves a region to another host, or sets it up again where it is (a restart).
   if (route === 'servers/move' && method === 'POST') {

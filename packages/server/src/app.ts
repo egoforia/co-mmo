@@ -371,6 +371,7 @@ export function createApp(options: AppOptions): App {
     ready,
     async close() {
       clearInterval(tickTimer);
+      meter.close();
       clearTimeout(dayTimer);
       clearInterval(handTimer);
       options.updater?.stop();

@@ -60,6 +60,11 @@ on another object after it is built). `region-main.ts` starts a region server.
   from settings, keys and the budget; tests override one at a time.
 - `api-log.ts`: records every request to an outside service, secrets masked.
 
+**How hard it works.** `load-meter.ts` times each tick, ticks a second,
+the event loop's delay and memory, in the gateway and every region server;
+God's View's Server health tab shows every host, and `perf.ts` gives the
+performance overlay the host running a player's region.
+
 **HTTP and the socket.** `http.ts` (JSON, files, bearer tokens),
 `account-routes.ts`, `auth.ts`, `admin.ts` (God's View API), `art-files.ts`
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
@@ -153,7 +158,9 @@ https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 ## Client modules
 
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
-`world-scene.ts` (the Phaser scene; positions go through `PROJECTION`; the
+`world-scene.ts` (the Phaser scene; positions go through `PROJECTION`, and
+walkers face its `ways`: the four isometric ways show standing pictures
+until walks are made for them; the
 ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
 light of the hour and the weather),
 `textures.ts` (tilesets from painted art, and the same tiles turned into
@@ -166,7 +173,12 @@ sun or moon of the hour from shared `lighting.ts`, and lamps at fires,
 lanterns, shrines and windows; characters get a rim light; `light-preview.ts`
 shows the same light in the Art tab), `normal-maps.ts` + `relief.ts` + `relief-worker.ts` (a normal map
 worked out for every picture in a worker; a painted `<key>-normal` wins),
-`sound.ts`, and one `*-ui.ts` per panel. God's View is
+`sound.ts`, `perf-overlay.ts` + `perf-stats.ts` (the performance overlay for
+Stewards and the Owner, F3 or Account: frame rate and stutters, draw calls,
+objects, lights, pictures held for the GPU, memory, ping and snapshots, what
+is drawn near you, and the server running your part of the world from
+`GET /api/admin/perf`; it measures nothing while hidden), and one `*-ui.ts`
+per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and
 `api-log-ui.ts`.
 
@@ -175,7 +187,7 @@ worked out for every picture in a worker; a painted `<key>-normal` wins),
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). |
-| Isometric camera for everyone | `ISOMETRIC` exists as the Owner's preview (camera plan step 1, ground and scenery from step 2, kit houses). Still to come: lands repainted in its view words, four facing ways for walkers, upright strips for big trees and set pieces, then `chooseCamera` picks it for players: https://claude.ai/code/artifact/3850d394-7032-47cb-bed1-a0a9fc135159 |
+| Isometric camera for everyone | `ISOMETRIC` exists as the Owner's preview (camera plan step 1, ground and scenery from step 2, kit houses). Still to come: lands repainted in its view words, the four facing ways painted for every walker (the Art tab's "Paint every walker's missing ways"; walks for them wait on the Owner), upright strips for big trees and set pieces, then `chooseCamera` picks it for players: https://claude.ai/code/artifact/3850d394-7032-47cb-bed1-a0a9fc135159 |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |

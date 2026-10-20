@@ -24,7 +24,7 @@ alongside the others.
 | `together.play.ts` | Two players see each other, chat, form a party, share a fight's XP and trade. |
 | `editor.play.ts` | In Chromium: a Steward opens the world editor, plants a tree and takes it back, lays a road with a house at its end and places monsters, while a robot in the same land is shown each change. |
 | `floors.play.ts` | In Chromium: the Owner gives the Sanctum Arcanum a floor up and a cellar with the world editor's Floors tool, walks up the stairs and back down, is carried into the cellar (the land above hidden), and sees floor 1 again through the isometric preview after a reload. |
-| `mini-map.play.ts` | In Chromium: the Owner gives the Sanctum Arcanum a floor up and a cellar; the mini map shows the ground floor, zooms in and out, looks at the floor above and the cellar without moving them, follows them upstairs, hides and shows with M, and turns with the isometric preview. |
+| `mini-map.play.ts` | In Chromium: the Owner gives the Sanctum Arcanum a floor up and a cellar; the mini map shows the ground floor, zooms in and out, looks at the floor above and the cellar without moving them, follows them upstairs, maximizes, minimizes (drawing nothing) and closes, comes back with M or the Map button, and turns with the isometric preview. |
 | `browser.play.ts` | In Chromium: join by invite link, walk with the arrow keys, pray and grant a wish from its card, open the bag, open every God's View tab, and open the game on a phone-sized screen. Screenshots go to `playtest-results/`. |
 | `perf.play.ts` | In Chromium: a Steward shows the performance overlay with F3 and sees frames, a ping and the server running their region; it stays on across a reload and hides from Account. A player's F3 shows nothing. |
 

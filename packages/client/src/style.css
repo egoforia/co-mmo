@@ -517,8 +517,16 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #mini-map button:hover:not(:disabled) { border-color: var(--accent); }
 #mini-map button:disabled { opacity: 0.35; cursor: default; }
 #mini-map .mm-caption { margin: 0; padding: 0 6px 5px; color: var(--muted); }
-body.has-mini-map #quests { top: 340px; }
+#mini-map .mm-title { display: flex; gap: 4px; align-items: center; padding: 3px 4px 3px 8px; border-bottom: 1px solid var(--edge); }
+#mini-map .mm-title span { margin-right: auto; color: var(--muted); }
+#mini-map .mm-title button { flex: none; width: 24px; padding: 1px 0; }
+#mini-map.min { width: auto; }
+#mini-map.min .mm-title { border-bottom: 0; }
+#mini-map.min canvas, #mini-map.min .mm-bar, #mini-map.min .mm-caption { display: none; }
+#mini-map.max { width: min(70vh, calc(100vw - 24px)); z-index: 4; }
+body.has-mini-map #quests { top: 372px; }
+body.has-mini-map-min #quests { top: 92px; }
 @media (max-width: 720px) {
   #mini-map { width: 150px; }
-  body.has-mini-map #quests { top: 260px; }
+  body.has-mini-map #quests { top: 292px; }
 }

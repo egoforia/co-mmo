@@ -1,8 +1,8 @@
 // The mini map, in a real browser: the Owner gives the Sanctum Arcanum a
 // floor up and a cellar, and the map in the corner shows the ground floor
 // around them, zooms in and out, looks at the floor above and the cellar
-// without moving them, follows them up the stairs, and turns with the
-// isometric preview. Screenshots land in playtest-results/.
+// without moving them, follows them up the stairs, maximizes, minimizes
+// (drawing nothing) and closes, and turns with the isometric preview. Screenshots land in playtest-results/.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -113,10 +113,31 @@ describe('the mini map', () => {
     await expect.poll(() => caption(page)).toBe('Floor 1');
     await page.locator('#mini-map').screenshot({ path: resolve(shots, 'mini-map-upstairs.png') });
 
-    // M hides and shows it.
-    await page.keyboard.press('m');
+    // Maximized it is drawn larger; minimized only its title bar stays and nothing is drawn.
+    const width = () => page.locator('#mini-map canvas').evaluate((c: HTMLCanvasElement) => c.width);
+    const usual = await width();
+    await page.click('#mini-map [data-act="max"]');
+    await expect.poll(width, { timeout: 10_000 }).toBeGreaterThan(usual);
+    await page.locator('#mini-map').screenshot({ path: resolve(shots, 'mini-map-max.png') });
+    await page.click('#mini-map [data-act="max"]');
+    await expect.poll(width, { timeout: 10_000 }).toBe(usual);
+    await page.click('#mini-map [data-act="min"]');
+    expect(await page.locator('#mini-map canvas').isHidden()).toBe(true);
+    expect(await width(), 'its canvas let go').toBe(0);
+    await page.waitForTimeout(500);
+    expect(await width(), 'not drawn while minimized').toBe(0);
+    await page.locator('#mini-map').screenshot({ path: resolve(shots, 'mini-map-min.png') });
+    await page.click('#mini-map [data-act="min"]');
+    await expect.poll(width, { timeout: 10_000 }).toBe(usual);
+
+    // Closed, M or the Map button brings it back.
+    await page.click('#mini-map [data-act="close"]');
     expect(await page.locator('#mini-map').isHidden()).toBe(true);
     await page.keyboard.press('m');
+    expect(await page.locator('#mini-map').isVisible()).toBe(true);
+    await page.keyboard.press('m');
+    expect(await page.locator('#mini-map').isHidden()).toBe(true);
+    await page.click('#map-button');
     expect(await page.locator('#mini-map').isVisible()).toBe(true);
 
     // The isometric preview turns the map as it turns the world.

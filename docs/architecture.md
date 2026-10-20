@@ -200,7 +200,8 @@ is drawn near you, and the server running your part of the world from
 `mini-map-plan.ts` + `mini-map-art.ts` (the mini map, M or the HUD's Map
 button: your floor centred on you, turned as the camera turns, put together
 from the land's painted tiles, trees, set pieces and people's pictures
-shrunk, with zoom and a look at the other floors where you stand; the
+shrunk, with zoom and a look at the other floors where you stand;
+minimized or closed it draws nothing; the
 scene hands it `miniMapView()`), and one `*-ui.ts`
 per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and

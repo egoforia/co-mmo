@@ -29,6 +29,12 @@
     </div>
     <ol id="quests" hidden></ol>
     <div id="mini-map" hidden>
+      <div class="mm-title">
+        <span>Map</span>
+        <button type="button" data-act="min" title="Minimize the map" aria-label="Minimize the map">_</button>
+        <button type="button" data-act="max" title="Maximize the map" aria-label="Maximize the map">□</button>
+        <button type="button" data-act="close" title="Close the map (M or the Map button opens it again)" aria-label="Close the map">×</button>
+      </div>
       <canvas aria-label="Map of where you are"></canvas>
       <div class="mm-bar">
         <button type="button" data-act="out" title="Zoom out" aria-label="Zoom out">−</button>

@@ -8,7 +8,9 @@ import type { MiniMapView } from './world-scene.ts';
 // The mini map in the corner: the floor you are on, centred on you, turned
 // the way the camera sees the world. Its buttons zoom in and out and look at
 // the other floors of where you stand (only look: you stay where you are).
-// M or the HUD's Map button shows and hides it.
+// Its title bar minimizes it (only the bar stays, and nothing is drawn, so
+// its cost can be measured with it off), maximizes it, or closes it; M or
+// the HUD's Map button closes it and brings it back.
 
 /** How often the map is drawn again, in milliseconds: often enough to follow a walk. */
 const REDRAW_MS = 100;
@@ -18,6 +20,10 @@ const FIGURE_PX = { me: 22, player: 15, npc: 13, creature: 13 } as const;
 const BELOW_ALPHA = 0.4;
 
 const SAVED = 'co-mmo.mini-map';
+
+/** How the map's window stands: drawn at its usual size or large, or not drawn at all (minimized to its title bar, or closed). */
+export type MapWindow = 'open' | 'max' | 'min' | 'closed';
+const WINDOWS: readonly MapWindow[] = ['open', 'max', 'min', 'closed'];
 
 export interface MiniMapOptions {
   /** The scene's view of our floor, when there is one. */
@@ -39,6 +45,7 @@ export class MiniMap {
   private plans = new Map<number, PlanPiece[]>();
   private planned?: { map: RegionMap; art: number };
   private timer?: number;
+  private state: MapWindow = 'open';
 
   constructor(private readonly options: MiniMapOptions) {
     const saved = load();
@@ -52,27 +59,53 @@ export class MiniMap {
     window.addEventListener('keydown', (e) => {
       if (e.key.toLowerCase() === 'm' && !isTyping() && !e.ctrlKey && !e.metaKey && !e.altKey) this.toggle();
     });
-    this.toggle(saved.open);
+    this.show(saved.window);
   }
 
-  /** Shows or hides the map (flips it when not said). */
-  toggle(open = this.root.hidden): void {
-    this.root.hidden = !open;
-    this.button.setAttribute('aria-expanded', String(open));
-    document.body.classList.toggle('has-mini-map', open);
+  /** Closes the map, or brings it back at its usual size when it is closed or minimized. */
+  toggle(): void {
+    this.show(this.state === 'open' || this.state === 'max' ? 'closed' : 'open');
+  }
+
+  /**
+   * Opens, maximizes, minimizes or closes the map. Minimized or closed it
+   * draws nothing at all, and lets go of its floor pictures and canvas.
+   */
+  show(state: MapWindow): void {
+    this.state = state;
+    const drawn = state === 'open' || state === 'max';
+    this.root.hidden = state === 'closed';
+    this.root.classList.toggle('max', state === 'max');
+    this.root.classList.toggle('min', state === 'min');
+    this.button.setAttribute('aria-expanded', String(drawn));
+    for (const [cls, on] of [['has-mini-map', state === 'open'], ['has-mini-map-max', state === 'max'], ['has-mini-map-min', state === 'min']] as const) {
+      document.body.classList.toggle(cls, on);
+    }
+    const min = this.root.querySelector<HTMLButtonElement>('[data-act="min"]')!;
+    const max = this.root.querySelector<HTMLButtonElement>('[data-act="max"]')!;
+    label(min, state === 'min' ? 'Show the map again' : 'Minimize the map');
+    label(max, state === 'max' ? 'Back to its usual size' : 'Maximize the map');
     clearInterval(this.timer);
-    if (open) {
+    this.timer = undefined;
+    if (drawn) {
       this.timer = window.setInterval(() => this.draw(), REDRAW_MS);
       this.draw();
+    } else {
+      this.plans.clear();
+      this.planned = undefined;
+      this.canvas.width = this.canvas.height = 0;
     }
-    save({ open, zoom: this.zoom });
+    save({ window: state, zoom: this.zoom });
   }
 
   private act(act: string): void {
+    if (act === 'min') return this.show(this.state === 'min' ? 'open' : 'min');
+    if (act === 'max') return this.show(this.state === 'max' ? 'open' : 'max');
+    if (act === 'close') return this.show('closed');
     const view = this.options.view();
     if (act === 'in' || act === 'out') {
       this.zoom = nextZoom(this.zoom, act === 'in' ? 1 : -1);
-      save({ open: true, zoom: this.zoom });
+      save({ window: this.state, zoom: this.zoom });
     } else if (view && (act === 'up' || act === 'down')) {
       const me = view.figures[0]!;
       const next = peekStep(floorsAt(view.map, me.x, me.y, view.floor), this.looking ?? view.floor, act === 'up' ? 1 : -1);
@@ -83,6 +116,7 @@ export class MiniMap {
 
   /** Draws the floor looked at, around us, with everyone on it we can see. */
   private draw(): void {
+    if (this.state !== 'open' && this.state !== 'max') return;
     const view = this.options.view();
     if (!view) return;
     const me = view.figures[0]!;
@@ -172,18 +206,24 @@ export class MiniMap {
   }
 }
 
-/** Whether the map was open and how near it looked, as this browser last left it. */
-function load(): { open: boolean; zoom: number } {
+/** Names a button for a hover and for screen readers. */
+function label(button: HTMLButtonElement, words: string): void {
+  button.title = words;
+  button.setAttribute('aria-label', words);
+}
+
+/** How the map's window stood and how near it looked, as this browser last left it. */
+function load(): { window: MapWindow; zoom: number } {
   try {
-    const saved = JSON.parse(localStorage.getItem(SAVED) ?? '{}') as { open?: boolean; zoom?: number };
+    const saved = JSON.parse(localStorage.getItem(SAVED) ?? '{}') as { window?: MapWindow; zoom?: number };
     const zoom = typeof saved.zoom === 'number' && MAP_ZOOMS[saved.zoom] !== undefined ? saved.zoom : MAP_ZOOM_START;
-    return { open: saved.open ?? true, zoom };
+    return { window: saved.window && WINDOWS.includes(saved.window) ? saved.window : 'open', zoom };
   } catch {
-    return { open: true, zoom: MAP_ZOOM_START };
+    return { window: 'open', zoom: MAP_ZOOM_START };
   }
 }
 
-function save(state: { open: boolean; zoom: number }): void {
+function save(state: { window: MapWindow; zoom: number }): void {
   try {
     localStorage.setItem(SAVED, JSON.stringify(state));
   } catch {

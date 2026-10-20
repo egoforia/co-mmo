@@ -55,7 +55,7 @@ import {
   walkFrameRate,
   wishArtKey,
 } from '@co-mmo/shared';
-import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerBuildingTileset, registerDiamondTileset, registerStoreyTileset, registerTileset } from './textures.ts';
+import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerDiamondTileset, registerKitTileset, registerStoreyTileset, registerTileset } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
 import { HouseArt, standHouse, type HouseSource } from './kit-house-view.ts';
@@ -160,6 +160,11 @@ interface Lamp {
   x: number;
   y: number;
   window: boolean;
+  /** The floor it burns on and the tile it stands on, so it is out of sight from other floors. */
+  floor: number;
+  tile: { x: number; y: number };
+  /** True while we are on a floor it cannot be seen from. */
+  hidden?: boolean;
 }
 
 /** A square of a region's ground and its trees and rocks, drawn only while we are near. */
@@ -487,6 +492,11 @@ export class WorldScene extends Phaser.Scene {
         for (const o of [...v.outside, ...v.inside]) o.setVisible(!under && !covered);
       }
       for (const o of region.stairs) setShown(o, mine === 0);
+      // Lamps burn only on their own floor, and those on the ground show from upstairs unless the floor we stand on covers them.
+      for (const lamp of region.lamps) {
+        const covered = Boolean(current && here && within(here, lamp.tile.x, lamp.tile.y));
+        lamp.hidden = lamp.floor === mine ? false : !(mine > 0 && lamp.floor === 0 && !covered);
+      }
       for (const f of region.floors) for (const o of f.objects) setShown(o, current && f.storey.floor === mine);
     }
   }
@@ -1023,8 +1033,9 @@ export class WorldScene extends Phaser.Scene {
     const views = map.buildings.map((b) => {
       const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
       for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-      const outside = hasExterior(this, b.style) ? [this.exterior(b, ox, oy)] : [];
-      const floor = this.groundLayer(inside, ox + b.x, oy + b.y, -0.5, registerBuildingTileset(this, b.style));
+      // One built from a kit's pieces (the sea cave) has no outside picture: its rock is seen from above.
+      const outside = !b.art && hasExterior(this, b.style) ? [this.exterior(b, ox, oy)] : [];
+      const floor = this.groundLayer(inside, ox + b.x, oy + b.y, -0.5, registerKitTileset(this, b.style, b.art));
       tilemaps.push(floor.tilemap);
       const view: BuildingView = { building: b, ox, oy, outside, inside: [floor], open: !outside.length };
       return view;
@@ -1159,7 +1170,7 @@ export class WorldScene extends Phaser.Scene {
     const dark = this.sky.darkness();
     for (const region of this.drawn.values()) {
       for (const lamp of region.lamps) {
-        placeLight(lamp.lit, lamp.x, lamp.y, this.time.now, !lamp.window || dark > 0, dark);
+        placeLight(lamp.lit, lamp.x, lamp.y, this.time.now, !lamp.hidden && (!lamp.window || dark > 0), dark);
         if (lamp.window) lamp.lit.point.intensity *= dark;
       }
     }
@@ -1168,22 +1179,22 @@ export class WorldScene extends Phaser.Scene {
   /** Lights for a region's fires, lanterns and shrines, and its buildings' windows. */
   private placeLamps(map: RegionMap, ox: number, oy: number, views: BuildingView[]): Lamp[] {
     const lamps: Lamp[] = [];
-    const add = (light: Light, x: number, y: number, window: boolean) => {
+    const add = (light: Light, x: number, y: number, window: boolean, floor: number, tile: { x: number; y: number }) => {
       const lit = makeLight(this, light);
-      if (lit) lamps.push({ lit, x, y, window });
+      if (lit) lamps.push({ lit, x, y, window, floor, tile });
     };
     for (const l of map.landmarks) {
       const light = glowOf(l.asset);
       // The flame sits a little above where the piece stands.
       const feet = landmarkFeet(l, ox, oy);
       const at = PROJECTION.toScreen(feet.x, feet.y);
-      if (light) add(light, at.x, at.y - T * 0.6, false);
+      if (light) add(light, at.x, at.y - T * 0.6, false, l.floor ?? 0, { x: Math.floor(l.x), y: Math.floor(l.y - 0.01) });
     }
     for (const v of views) {
       if (!v.outside.length) continue;
       const b = v.building;
       const at = PROJECTION.toScreen(ox + b.x + b.width / 2, oy + b.y + b.height);
-      add(WINDOW_LIGHT, at.x, at.y - T * 0.8, true);
+      add(WINDOW_LIGHT, at.x, at.y - T * 0.8, true, 0, { x: b.door.x, y: b.door.y });
     }
     return lamps;
   }
@@ -1460,8 +1471,8 @@ function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void {
   (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
 }
 
-/** True when tile (x, y) lies within a building's walls. */
-function within(b: Building, x: number, y: number): boolean {
+/** True when tile (x, y) lies within a building's walls (or a floor's rectangle). */
+function within(b: Pick<Building, 'x' | 'y' | 'width' | 'height'>, x: number, y: number): boolean {
   return x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height;
 }
 

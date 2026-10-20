@@ -1,5 +1,6 @@
 import type { BiomeId } from './biomes.ts';
 import { block, building, creatures, disc, placer, road, Tile, type RegionMap } from './world.ts';
+import { SEA_CAVE_SIZE, buildSeaCave, seaCaveBuilt } from './sea-cave.ts';
 
 // The great places of each launch land: temples, caves, castles, palaces,
 // tombs and wonders out in the wilds, each joined to the middle by a road
@@ -30,6 +31,12 @@ export type Place =
     den?: Den;
     /** Someone who lives there: where they stand, from the floor's top-left tile. */
     npc?: { id: string; name: string; asset: string; x: number; y: number };
+    /**
+     * Built from a kit's pieces, floors and all, while that kit is on
+     * (sea-cave.ts), in place of its painted outside, furniture and den. Its
+     * doorway stays where it was, so the road still reaches it.
+     */
+    kit?: 'sea-cave';
   }
   | {
     kind: 'landmark';
@@ -88,7 +95,7 @@ export const BIOME_PLACES: Partial<Record<BiomeId, Place[]>> = {
       npc: { id: 'queen-nerissa', name: 'Queen Nerissa', asset: 'shore-sea-queen', x: 11, y: 4.5 },
     },
     {
-      kind: 'building', style: 'shore-sea-cave', at: [10, 56], floor: [14, 10],
+      kind: 'building', style: 'shore-sea-cave', at: [10, 56], floor: [14, 10], kit: 'sea-cave',
       furniture: [['treasure-chest', 6, 1, 2, 1], ['rum-barrel', 1, 2, 1, 1], ['rum-barrel', 2, 2, 1, 1], ['rope-coil', 11, 7, 1, 1], ['ship-lantern', 12, 2, 1, 1]],
       den: DECKHANDS,
     },
@@ -125,7 +132,16 @@ const ROAMERS: Partial<Record<BiomeId, Den[]>> = {
 /** Lays out a launch land's great places and roamers. */
 export function layPlaces(map: RegionMap, c: number): void {
   for (const place of BIOME_PLACES[map.def.biome] ?? []) {
-    if (place.kind === 'building') {
+    if (place.kind === 'building' && place.kit === 'sea-cave' && seaCaveBuilt()) {
+      // The cave is its plans' size; its doorway stays where the painted cave's was.
+      const [w, h] = [SEA_CAVE_SIZE.width - 2, SEA_CAVE_SIZE.height - 2];
+      const left = c + place.at[0] + Math.floor(place.floor[0] / 2) - Math.floor(w / 2);
+      const top = c + place.at[1] + place.floor[1] - h;
+      const b = building(map, left, top, w, h, place.style);
+      map.buildings.push(b);
+      road(map, b.door.x, b.door.y + 1, c, c);
+      buildSeaCave(map, b);
+    } else if (place.kind === 'building') {
       const left = c + place.at[0];
       const top = c + place.at[1];
       const b = building(map, left, top, place.floor[0], place.floor[1], place.style);

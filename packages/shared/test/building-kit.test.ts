@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { K, KitBuilding, SAMPLE_BUILDINGS, add, shapeChecks, type BuildingSpec, type Part, type Vec3 } from '../src/building-kit/index.ts';
 import { buildingKit } from '../src/index.ts';
 
-const { cottage: COTTAGE, 'two-storey house': TWO } = SAMPLE_BUILDINGS;
+const { cottage: COTTAGE, 'two-storey house': TWO, temple: TEMPLE, castle: CASTLE } = SAMPLE_BUILDINGS;
 // Layouts with a known fault in their stairs.
 const NARROW: BuildingSpec = { W: 1, D: 2, stairs: true, storeys: [{ front: { 0: 'door' } }, { front: { 0: 'window' } }] };
 const BACKDOOR: BuildingSpec = { W: 3, D: 2, stairs: [{ storey: 0, wall: 'back', up: 1 }], storeys: [{ front: { 0: 'door' }, back: { 0: 'door' } }, { front: { 1: 'window' } }] };
@@ -74,6 +74,10 @@ const FAULTS: [string, () => KitBuilding, string[]][] = [
   ['stairs placed in front of a back door', () => new KitBuilding(BACKDOOR), [stairsFit]],
   ['no stairwell cut in the floor above the stairs', () => new NoStairwell(TWO), ['meets: the stairs from storey 1 climb through an opening in the floor above']],
   ['stairs told to climb towards a wall the cutaway above cuts low', () => new KitBuilding(BEHIND, { cut: 1 }), [stairsFit]],
+  ['flat roof lifted 0.05 off the beams', () => move(new KitBuilding(TEMPLE), (p) => ['roof', 'parapet', 'dome'].includes(p.role), [0, 0, 0.05]), ['meets: the flat roof rests on the beams', 'nothing floats']],
+  ['dome and drum lifted 0.05 off the roof', () => move(new KitBuilding(TEMPLE), (p) => p.role === 'dome', [0, 0, 0.05]), ['meets: the drum stands on the roof', 'nothing floats']],
+  ['a merlon lifted 0.05 off its wall', () => move(new KitBuilding(CASTLE), named('battlement.front.3'), [0, 0, 0.05]), ['meets: merlon 4 of battlement front stands on its wall', 'nothing floats']],
+  ['a tower\'s roof lifted 0.05 off its eave', () => move(new KitBuilding(CASTLE), (p) => p.name.endsWith('front-left.roof'), [0, 0, 0.05]), ['meets: the roof of the front-left tower sits on its eave', 'nothing floats']],
 ];
 
 describe('building kit shapes', () => {

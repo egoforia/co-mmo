@@ -10,7 +10,7 @@ import { KitCanvas, render, type Texture } from '../src/assets/building-kit/rast
 import { buildingViews } from '../src/assets/building-kit/views.ts';
 
 const { KitBuilding, SAMPLE_BUILDINGS, K } = buildingKit;
-const { cottage: COTTAGE, 'two-storey house': TWO, tower: TOWER } = SAMPLE_BUILDINGS;
+const { cottage: COTTAGE, 'two-storey house': TWO, tower: TOWER, temple: TEMPLE, castle: CASTLE } = SAMPLE_BUILDINGS;
 const U = 64; // pixels per bay: small enough to be quick, fine enough for a 0.06 trim
 
 /** Flat grey test stand-ins for painted textures (a test pattern, never game art). */
@@ -33,7 +33,7 @@ class Unplaced extends KitBuilding {
 }
 
 describe('building kit renderer', () => {
-  for (const [name, spec] of Object.entries({ cottage: COTTAGE, 'two-storey house': TWO, tower: TOWER })) {
+  for (const [name, spec] of Object.entries({ cottage: COTTAGE, 'two-storey house': TWO, tower: TOWER, temple: TEMPLE, castle: CASTLE })) {
     it(`draws the ${name} outside and in every cutaway with every check passing`, () => {
       const views = buildingViews(spec, clay(), { u: U });
       expect(views.map((v) => v.view)).toEqual(['outside', ...spec.storeys.map((_, i) => `storey-${i + 1}`)]);

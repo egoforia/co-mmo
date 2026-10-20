@@ -2,6 +2,8 @@ import { BUILDING_STYLES } from '../buildings.ts';
 import { hashString } from '../random.ts';
 import type { Building } from '../world.ts';
 import { KIT_LOOKS } from './looks.ts';
+import type { Corner } from './crown.ts';
+import type { Side } from './sizes.ts';
 import type { BuildingSpec, Opening } from './spec.ts';
 
 // The game's buildings the kit builds. In the game a building's walls are a
@@ -30,6 +32,14 @@ export interface KitHouse {
   key: string;
 }
 
+/** The walls meeting at each corner, and which end of each the corner is (bays count left to right seen from outside). */
+const TOWER_ENDS: Record<Corner, [Side, 'start' | 'end'][]> = {
+  'front-left': [['front', 'start'], ['left', 'end']],
+  'front-right': [['front', 'end'], ['right', 'start']],
+  'back-right': [['right', 'end'], ['back', 'start']],
+  'back-left': [['back', 'end'], ['left', 'start']],
+};
+
 /** Bays 1, 3, 5... of a wall n bays long, which get windows. */
 function everyOther(n: number): Record<number, Opening> {
   const out: Record<number, Opening> = {};
@@ -39,7 +49,8 @@ function everyOther(n: number): Record<number, Opening> {
 
 /** The kit house for a building, or undefined when its style has no kit look or it does not fall on whole bays. */
 export function kitHouse(b: Building): KitHouse | undefined {
-  const look = BUILDING_STYLES[b.style]?.kit;
+  const style = BUILDING_STYLES[b.style];
+  const look = style?.kit;
   if (!look || !KIT_LOOKS[look]) return undefined;
   const floor = { left: b.x + 1, top: b.y + 1, right: b.x + b.width - 1, bottom: b.y + b.height - 1 };
   const [across, deep] = [floor.right - floor.left, floor.bottom - floor.top];
@@ -52,12 +63,23 @@ export function kitHouse(b: Building): KitHouse | undefined {
   // The door, with windows two bays along on either side of it.
   const south: Record<number, Opening> = { [door]: 'door' };
   for (let j = door % 2; j < D; j += 2) if (j !== door) south[j] = 'window';
+  const shape = style.kitShape ?? {};
+  const storey = { left: south, front: everyOther(W), right: everyOther(D), back: everyOther(W) };
+  // A tower stands over the end bays of the two walls at its corner: no window there, and no house if the door is.
+  for (const t of shape.towers ?? []) {
+    for (const [side, end] of TOWER_ENDS[t.corner]) {
+      const bay = end === 'start' ? 0 : (side === 'front' || side === 'back' ? W : D) - 1;
+      if (storey[side][bay] === 'door') return undefined;
+      delete storey[side][bay];
+    }
+  }
   const spec: BuildingSpec = {
     W,
     D,
-    storeys: [{ left: south, front: everyOther(W), right: everyOther(D), back: everyOther(W) }],
-    // Beside the ridge, which runs along the longer side, towards the back.
-    chimney: W >= D ? [Math.round(W * 7) / 10, D / 2 + 0.25] : [W / 2 + 0.25, Math.round(D * 7) / 10],
+    storeys: [storey],
+    ...shape,
+    // Beside the ridge, which runs along the longer side, towards the back; a flat roof has none.
+    ...(shape.roof === 'flat' ? {} : { chimney: W >= D ? [Math.round(W * 7) / 10, D / 2 + 0.25] : [W / 2 + 0.25, Math.round(D * 7) / 10] }),
   };
   const key = `${look}-${W}x${D}-${hashString(JSON.stringify({ spec, look, LAYOUT_VERSION })).toString(36)}`;
   return { spec, look, floor, key };

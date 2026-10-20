@@ -1,4 +1,5 @@
 import type { BiomeId } from './biomes.ts';
+import type { BuildingSpec } from './building-kit/spec.ts';
 import { LAND_BUILDING_STYLES } from './land-buildings.ts';
 
 // Buildings are described here as data, and the image model chosen in God's
@@ -40,12 +41,16 @@ export interface BuildingStyle {
   /** Approved reference images the outside should resemble. */
   references?: string[];
   /**
-   * For a plain rectangular house: the kit look (building-kit/looks.ts) the
-   * building kit builds it in, for the isometric camera. Its painted pictures
-   * stay for the top-down view.
+   * The kit look (building-kit/looks.ts) the building kit builds it in, for
+   * the isometric camera. Its painted pictures stay for the top-down view.
    */
   kit?: string;
+  /** What the kit builds over its walls besides a gable roof: a flat roof, battlements, towers, a dome. */
+  kitShape?: KitShape;
 }
+
+/** The parts of a kit building's spec a building style may choose. */
+export type KitShape = Pick<BuildingSpec, 'roof' | 'battlements' | 'towers' | 'dome'>;
 
 /** The parts of a building that get their own picture. */
 export type BuildingPart = 'exterior' | 'floor' | 'wall' | 'door';

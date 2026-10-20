@@ -5,7 +5,7 @@
 // be sent to the AI model and approved it, and every version keeps that same
 // information so an old one can be compared with today's and put back.
 
-import { HELD_SIZE, ISO_WAYS, ISO_WAY_BESIDE, heldBehind, isWalkDirection, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
+import { BUILDING_STYLES, HELD_SIZE, ISO_WAYS, ISO_WAY_BESIDE, heldBehind, isWalkDirection, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
 import { lightPreviews } from './light-preview.ts';
@@ -113,6 +113,17 @@ interface ArtOverview {
   sounds: SoundItem[];
   effectsModel: string | null;
   musicModel: string | null;
+  /** The building kit's looks: each one's texture sheets and how every texture fared in its checks. */
+  sheets?: KitSheetView[];
+}
+
+/** A building look's texture sheets, as the server checked them. */
+interface KitSheetView {
+  look: string;
+  name: string;
+  paintings: { id: string; shipped: boolean }[];
+  checking: boolean;
+  textures: { name: string; ok: boolean; painting?: string; failed: string[] }[];
 }
 
 /** A paid request, as the server's review and approval take it. */
@@ -124,7 +135,8 @@ type Ask =
   | { what: 'ways'; walker?: string }
   | { what: 'clip'; walker: string; body: string; direction: Facing; prompt?: string }
   | { what: 'sound'; sound: string }
-  | { what: 'normal'; asset: string; prompt?: string };
+  | { what: 'normal'; asset: string; prompt?: string }
+  | { what: 'sheet'; look: string; textures?: string[] };
 
 interface Review {
   title: string;
@@ -133,7 +145,7 @@ interface Review {
   fingerprint: string;
 }
 
-const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monsters', 'Monsters'], ['items', 'Items'], ['biomes', 'Biomes'], ['sounds', 'Sounds and music']] as const;
+const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monsters', 'Monsters'], ['items', 'Items'], ['biomes', 'Biomes'], ['looks', 'Building looks'], ['sounds', 'Sounds and music']] as const;
 type Subtab = (typeof SUBTABS)[number][0];
 const ITEM_ORDER = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
 const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']];
@@ -186,7 +198,7 @@ export async function artPage(context: ArtContext): Promise<string> {
   mirrored = asked.mirrored ?? {};
   const o = data;
   const { sub, page } = where();
-  const pages: Record<Subtab, () => string> = { now: nowPage, characters: () => peoplePage('characters', page), monsters: () => peoplePage('monsters', page), items: () => itemsPage(page), biomes: () => biomesPage(page), sounds: soundsPage };
+  const pages: Record<Subtab, () => string> = { now: nowPage, characters: () => peoplePage('characters', page), monsters: () => peoplePage('monsters', page), items: () => itemsPage(page), biomes: () => biomesPage(page), looks: looksPage, sounds: soundsPage };
   return `
     <p>${o.imageModel ? `Pictures: <b>${esc(o.imageModel)}</b>` : '<b class="bad">No image model is set</b> (AI models tab)'} · ${o.videoModel ? `Walks: <b>${esc(o.videoModel)}</b>` : 'Walks need Google AI Studio as the image model'} · ${budgetLine(o.budget)}</p>
     <nav class="subtabs">${SUBTABS.map(([id, label]) => `<a href="${go(id)}" data-art-go${id === sub ? ' aria-current="page"' : ''}>${label}${id === 'now' ? openCount(o.jobs) : ''}</a>`).join('')}</nav>
@@ -513,6 +525,31 @@ function handsHtml(w: WalkerView): string {
 
 /** Hand panels left open, so they stay open when the page is drawn again after a look. */
 const openHands = new Set<string>();
+
+/** The building kit's looks: what each paints, how its textures fared, and buttons to paint a sheet. */
+function looksPage(): string {
+  const looks = data!.sheets ?? [];
+  if (!looks.length) return '<p class="note">This server has no building looks.</p>';
+  const look = (v: KitSheetView) => {
+    const usedBy = Object.values(BUILDING_STYLES).filter((b) => b.kit === v.look).map((b) => b.name);
+    const failing = v.textures.filter((t) => !t.ok);
+    const state = v.checking ? 'Still being checked; look again shortly.' : failing.length ? `${failing.length} of ${v.textures.length} textures still to paint or fix: no building in this look is shown until all pass.` : 'Every texture passed: buildings in this look are shown.';
+    const texture = (t: KitSheetView['textures'][number]) => `<li class="${t.ok ? '' : 'bad'}">${esc(t.name)}${t.ok ? ` <small>from ${esc(t.painting ?? '')}</small>` : v.checking ? '' : ` <small>${esc(t.failed.join(', '))}</small>`}</li>`;
+    const again = !v.checking && failing.length && failing.length < v.textures.length
+      ? `<button type="button" class="quiet" data-art-review="${esc(JSON.stringify({ what: 'sheet', look: v.look, textures: failing.map((t) => t.name) }))}" data-note="yes">Paint the ${failing.length} failing again</button>`
+      : '';
+    return `
+      <div class="look">
+        <h3>${esc(v.name)}</h3>
+        <p class="note">${usedBy.length ? `Builds ${usedBy.map(esc).join(', ')}. ` : ''}${v.paintings.length} sheet${v.paintings.length === 1 ? '' : 's'} painted. ${state}</p>
+        <ul class="textures">${v.textures.map(texture).join('')}</ul>
+        <div class="card-actions"><button type="button" data-art-review="${esc(JSON.stringify({ what: 'sheet', look: v.look }))}" data-note="yes">Paint a sheet</button>${again}</div>
+      </div>`;
+  };
+  return `
+    <p class="note">The building kit builds houses from their layout and paints every surface with flat textures from one sheet per look. The review shows the guide sent with the words and what it costs before anything is painted.</p>
+    <div class="looks">${looks.map(look).join('')}</div>`;
+}
 
 function soundsPage(): string {
   const o = data!;

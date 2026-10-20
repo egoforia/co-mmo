@@ -79,10 +79,10 @@ export const BIOME_PLACES: Partial<Record<BiomeId, Place[]>> = {
       den: { ...WOLVES, count: 4 },
     },
     {
-      kind: 'building', style: 'woods-castle', at: [30, -80], floor: [24, 16],
-      furniture: [['throne', 12, 1, 2, 1], ['tapestry', 5, 1, 3, 1], ['tapestry', 18, 1, 3, 1], ['pillar', 6, 6, 1, 1], ['pillar', 18, 6, 1, 1],
-        ['pillar', 6, 11, 1, 1], ['pillar', 18, 11, 1, 1], ['armour-stand', 2, 14, 1, 1], ['armour-stand', 22, 14, 1, 1]],
-      npc: { id: 'sir-alder', name: 'Sir Alder', asset: 'woods-old-knight', x: 12.5, y: 4.5 },
+      kind: 'building', style: 'woods-castle', at: [30, -80], floor: [26, 16],
+      furniture: [['throne', 12, 1, 2, 1], ['tapestry', 5, 1, 3, 1], ['tapestry', 18, 1, 3, 1], ['pillar', 6, 6, 1, 1], ['pillar', 19, 6, 1, 1],
+        ['pillar', 6, 11, 1, 1], ['pillar', 19, 11, 1, 1], ['armour-stand', 2, 14, 1, 1], ['armour-stand', 23, 14, 1, 1]],
+      npc: { id: 'sir-alder', name: 'Sir Alder', asset: 'woods-old-knight', x: 13, y: 4.5 },
     },
     { kind: 'landmark', asset: 'woods-fairy-ring', at: [46, 46], footprint: [3, 1], clearing: 5 },
     { kind: 'landmark', asset: 'woods-fallen-giant', at: [-56, -44], footprint: [6, 2], clearing: 4, den: WOLVES },
@@ -105,10 +105,10 @@ export const BIOME_PLACES: Partial<Record<BiomeId, Place[]>> = {
   ],
   'mirage-desert': [
     {
-      kind: 'building', style: 'desert-palace', at: [-78, 30], floor: [24, 16],
-      furniture: [['golden-throne', 11, 1, 2, 1], ['carpet', 10, 7, 4, 2], ['cushions', 4, 4, 2, 1], ['cushions', 18, 4, 2, 1],
-        ['palace-fountain', 11, 11, 2, 1], ['palm-pot', 1, 1, 1, 1], ['palm-pot', 22, 1, 1, 1]],
-      npc: { id: 'sultana-zahra', name: 'Sultana Zahra', asset: 'desert-sultana', x: 12, y: 4.5 },
+      kind: 'building', style: 'desert-palace', at: [-78, 30], floor: [26, 16],
+      furniture: [['golden-throne', 12, 1, 2, 1], ['carpet', 11, 7, 4, 2], ['cushions', 4, 4, 2, 1], ['cushions', 20, 4, 2, 1],
+        ['palace-fountain', 12, 11, 2, 1], ['palm-pot', 1, 1, 1, 1], ['palm-pot', 24, 1, 1, 1]],
+      npc: { id: 'sultana-zahra', name: 'Sultana Zahra', asset: 'desert-sultana', x: 13, y: 4.5 },
     },
     {
       kind: 'building', style: 'desert-tomb', at: [44, 44], floor: [16, 12],

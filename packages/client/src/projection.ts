@@ -23,7 +23,7 @@ export interface Projection {
   depth(x: number, y: number): number;
   /** The screen rectangle covering tiles from (left, top) to (right, bottom), for the camera's bounds. */
   bounds(left: number, top: number, right: number, bottom: number): { x: number; y: number; width: number; height: number };
-  /** The world step for the arrow keys held (each -1, 0 or 1), so up on screen walks up on screen. */
+  /** The world step for the arrow keys held (each -1, 0 or 1): each key walks towards its side of the screen. */
   inputToWorld(dx: number, dy: number): { dx: number; dy: number };
   /**
    * How the ground's tiles are laid: the painted square tiles as they are,
@@ -78,8 +78,10 @@ export const ISOMETRIC: Projection = {
     const y = (left + top) * HALF_H;
     return { x, y, width: (right - top) * HALF_W - x, height: (right + bottom) * HALF_H - y };
   },
-  // Up on screen is north-west on the grid; up with right is due north.
-  inputToWorld: (dx, dy) => ({ dx: Math.sign(dx + dy), dy: Math.sign(dy - dx) }),
+  // Each key walks along the grid, as the tiles' edges run: Down is south
+  // (down and to the left), Right east, Up north, Left west. Two keys
+  // together walk straight across the screen.
+  inputToWorld: (dx, dy) => ({ dx, dy }),
   ground: { kind: 'diamond', width: HALF_W * 2, height: HALF_H * 2 },
   // Seen from a corner, a thing stands on the middle of the tiles it covers.
   stand: (left, top, width, height) => ({ x: left + width / 2, y: top + height / 2 }),

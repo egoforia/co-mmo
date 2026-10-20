@@ -180,6 +180,21 @@ export interface Building {
    * the middle of its bottom edge, so it is drawn centred on the doorway.
    */
   exteriorWidth: number;
+  /**
+   * Picture ids its floor, walls and walkways are drawn in instead of its
+   * style's tiles: a building put together from a kit's pieces (the sea
+   * cave), which shows no outside picture, its rock seen from above.
+   */
+  art?: TileArt;
+}
+
+/** Kit pictures drawn for a building's or a storey's tiles: its floor, its walls, and planks or paths across it. */
+export interface TileArt {
+  floor?: string;
+  wall?: string;
+  path?: string;
+  /** The upright face of its walls, which the isometric camera shows on their edges facing it. */
+  face?: string;
 }
 
 /** Where a building's outside art is drawn: left edge and width, in tiles, bottom on the doorway's outer edge. */
@@ -273,8 +288,8 @@ function layOut(def: RegionDef, size: number): RegionMap {
     const inward = { north: [0, 1], south: [0, -1], east: [-1, 0], west: [1, 0] }[side];
     map.entries[side] = { x: edge.x + 1 + inward[0]! * 1.5, y: edge.y + 1 + inward[1]! * 1.5 };
   }
-  // NPCs stroll around their spot, so only landmarks block tiles.
-  for (const l of map.landmarks) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
+  // NPCs stroll around their spot, so only landmarks block tiles. Those on other floors blocked theirs when placed.
+  for (const l of map.landmarks) if (!l.floor) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
   openUp(map);
   // After the trails are cut, so a tree an editor planted stays where it was put.
   if (def.edits?.length) applyEdits(map, def.edits);

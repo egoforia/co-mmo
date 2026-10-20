@@ -248,6 +248,8 @@ function footprint(l: Landmark): { left: number; top: number; width: number; hei
 /** The set piece (or piece of furniture) standing on a tile, the one drawn in front first. */
 export function landmarkAt(map: RegionMap, [x, y]: TilePoint): Landmark | undefined {
   for (let i = map.landmarks.length - 1; i >= 0; i--) {
+    // The editor works on the ground; furniture on other floors stays put.
+    if (map.landmarks[i]!.floor) continue;
     const f = footprint(map.landmarks[i]!);
     if (x >= f.left && x < f.left + f.width && y >= f.top && y < f.top + f.height) return map.landmarks[i];
   }

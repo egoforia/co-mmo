@@ -1,5 +1,5 @@
 import { collides, step } from './movement.ts';
-import { Tile, block, isBlocking, set, storeyAt, tileAt, type RegionMap } from './world.ts';
+import { Tile, block, isBlocking, set, storeyAt, tileAt, type RegionMap, type TileArt } from './world.ts';
 
 // Floors above and below the ground. The ground is floor 0; a building's
 // upper floors are 1, 2... and the floors under it -1, -2... Each floor off
@@ -34,8 +34,8 @@ export interface Storey extends TileRect {
   tiles: Uint8Array;
   /** Its look: a key of BUILDING_STYLES, whose floor and wall tiles it is drawn in. */
   style: string;
-  /** Picture ids drawn instead of the style's floor or wall tiles (a kit's own pieces). */
-  art?: { floor?: string; wall?: string };
+  /** Picture ids drawn instead of the style's tiles (a kit's own pieces). */
+  art?: TileArt;
 }
 
 /** Stairs anyone can take; a ladder only those with hands to climb it (players and people, not creatures). */
@@ -52,6 +52,8 @@ export interface Stairway extends TileRect {
   top: { x: number; y: number };
   /** Its pictures' ids: going up, drawn on the lower floor, and going down, on the upper; a label says where it goes until they are painted. */
   art?: { up?: string; down?: string };
+  /** What the floors it joins are called there (the sea cave's "Smugglers' Loft"), for its label and what players are told. */
+  names?: { lower?: string; upper?: string };
 }
 
 /** A floor in plain words. */
@@ -112,6 +114,7 @@ export interface StairPlan extends TileRect {
    */
   climbs?: Heading;
   art?: Stairway['art'];
+  names?: Stairway['names'];
 }
 
 const BEHIND: Record<Heading, Heading> = { north: 'south', south: 'north', east: 'west', west: 'east' };
@@ -122,7 +125,7 @@ const BEHIND: Record<Heading, Heading> = { north: 'south', south: 'north', east:
  * (and their furniture) first, so the landings fall on open floor.
  */
 export function addStairs(map: RegionMap, plan: StairPlan): Stairway {
-  const { kind, x, y, width, height, from, art } = plan;
+  const { kind, x, y, width, height, from, art, names } = plan;
   const [lower, upper] = [from, from + 1];
   // Off the ground its tiles become floor; on the ground they are whatever the land or building has there.
   for (const floor of [lower, upper]) {
@@ -134,7 +137,7 @@ export function addStairs(map: RegionMap, plan: StairPlan): Stairway {
   const bottom = landing(map, rect, lower, BEHIND[ahead]);
   const top = landing(map, rect, upper, ahead);
   if (!bottom || !top) throw new Error(`The ${kind} at (${x}, ${y}) has no open floor beside it on ${floorName(bottom ? upper : lower)}.`);
-  const way: Stairway = { kind, x, y, width, height, lower, upper, bottom, top, ...(art ? { art } : {}) };
+  const way: Stairway = { kind, x, y, width, height, lower, upper, bottom, top, ...(art ? { art } : {}), ...(names ? { names } : {}) };
   map.stairways.push(way);
   return way;
 }
@@ -255,13 +258,16 @@ export function stairsMiddle(s: TileRect): { x: number; y: number } {
 /** What a stairway's label says on a floor: where it goes. */
 export function stairsLabel(s: Stairway, floor: number): string {
   const up = floor === s.lower;
-  return `${s.kind === 'ladder' ? 'Ladder' : 'Stairs'} ${up ? 'up' : 'down'} to ${floorName(up ? s.upper : s.lower)}`;
+  const name = up ? s.names?.upper : s.names?.lower;
+  const to = floorName(up ? s.upper : s.lower);
+  return `${s.kind === 'ladder' ? 'Ladder' : 'Stairs'} ${up ? 'up' : 'down'} to ${name ? `${name} (${to})` : to}`;
 }
 
 /** What a player is told on taking a stairway from a floor. */
 export function climbWords(s: Stairway, floor: number): string {
   const up = floor === s.lower;
-  const to = floorName(up ? s.upper : s.lower);
+  const name = up ? s.names?.upper : s.names?.lower;
+  const to = name ? `${name}, ${floorName(up ? s.upper : s.lower)}` : floorName(up ? s.upper : s.lower);
   if (s.kind === 'ladder') return `You climb ${up ? 'up' : 'down'} the ladder to ${to}.`;
   return up ? `You climb the stairs to ${to}.` : `You go down the stairs to ${to}.`;
 }
@@ -315,6 +321,7 @@ export const MAX_FLOORS = { up: 4, down: 3 };
 interface Walled extends TileRect {
   door: { x: number; y: number };
   style: string;
+  art?: TileArt;
 }
 
 /**
@@ -329,8 +336,8 @@ export function buildFloors(map: RegionMap, b: Walled, up: number, down: number,
   const before = { storeys: map.storeys, stairways: map.stairways };
   map.storeys = map.storeys.filter((s) => !mine(s));
   map.stairways = map.stairways.filter((s) => !mine(s));
-  for (let f = 1; f <= up; f++) addStorey(map, b, f, b.style);
-  for (let f = -1; f >= -down; f--) addStorey(map, b, f, b.style);
+  for (let f = 1; f <= up; f++) addStorey(map, b, f, b.style, b.art);
+  for (let f = -1; f >= -down; f--) addStorey(map, b, f, b.style, b.art);
   for (let from = -down, n = 0; from < up; from++, n++) {
     if (placeFlight(map, b, from, kind, n % 2 === 1)) continue;
     map.storeys = before.storeys;

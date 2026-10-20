@@ -130,3 +130,27 @@ describe('floors in a building', () => {
     expect(region.position('b')).toEqual({ x: 128.5, y: 129.5 });
   });
 });
+
+describe("the Smugglers' Sea Cave", () => {
+  it('takes a player up from the cave mouth, and keeps the hoard guards below their ladder', () => {
+    const clock = { now: hour(12) };
+    const region = new Region(regionDef('shore')!, undefined, () => clock.now, () => 0.5);
+    const up = region.map.stairways.find((s) => s.lower === 0)!;
+    const conn = fakeConn();
+    region.join(info('a'), conn, { x: up.bottom.x, y: up.bottom.y }, newCharacter());
+    const guards = region.creatureIds().filter((id) => region.floorOf(id) === -2);
+    expect(guards.length).toBeGreaterThan(0);
+    for (let i = 0; i < 20; i++) {
+      region.handle('a', { t: 'input', seq: i + 1, dx: 0, dy: -1 });
+      clock.now += 1000 / TICK_RATE;
+      region.tick();
+    }
+    expect(region.position('a')?.floor).toBe(1);
+    expect(conn.messages.some((m) => m.t === 'notice' && (m as { text: string }).text === "You climb the stairs to the Smugglers' Loft, floor 1.")).toBe(true);
+    for (let i = 0; i < 30 * TICK_RATE; i++) {
+      clock.now += 1000 / TICK_RATE;
+      region.tick();
+    }
+    for (const id of guards) expect(region.floorOf(id)).toBe(-2);
+  });
+});

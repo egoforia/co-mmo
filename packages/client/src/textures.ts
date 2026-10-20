@@ -13,6 +13,7 @@ import {
   type BuildingPart,
   type RegionDef,
   type Storey,
+  type TileArt,
 } from '@co-mmo/shared';
 import { reliefFrom } from './normal-maps.ts';
 
@@ -81,13 +82,51 @@ export function registerBuildingTileset(scene: Phaser.Scene, style: string): str
  * kit pieces it names (a sea cave's rock and floor) in their place once painted.
  */
 export function registerStoreyTileset(scene: Phaser.Scene, storey: Storey): string {
-  const floor = storey.art?.floor && loaded(scene, storey.art.floor);
-  const wall = storey.art?.wall && loaded(scene, storey.art.wall);
-  if (!floor && !wall) return registerBuildingTileset(scene, storey.style);
-  const key = `tileset-storey-${storey.style}-${floor ?? ''}-${wall ?? ''}`;
+  return registerKitTileset(scene, storey.style, storey.art);
+}
+
+/**
+ * A strip for a building or storey drawn in a kit's pieces: each tile the kit
+ * names once it is painted, else the style's own. Planks and paths across it
+ * are the kit's walkway, or its floor until that is painted.
+ */
+export function registerKitTileset(scene: Phaser.Scene, style: string, art: TileArt | undefined): string {
+  const floor = art?.floor && loaded(scene, art.floor);
+  const wall = art?.wall && loaded(scene, art.wall);
+  const path = art?.path && loaded(scene, art.path);
+  if (!floor && !wall && !path && !art?.path) return registerBuildingTileset(scene, style);
+  const key = `tileset-kit-${style}-${floor ?? ''}-${wall ?? ''}-${path ?? ''}`;
   if (scene.textures.exists(key)) return key;
-  const tiles = buildingTiles(scene, storey.style);
-  return tileStrip(scene, key, { ...tiles, ...(floor ? { [Tile.Floor]: floor, [Tile.Door]: floor } : {}), ...(wall ? { [Tile.Wall]: wall } : {}) });
+  const tiles = buildingTiles(scene, style);
+  if (floor) Object.assign(tiles, { [Tile.Floor]: floor, [Tile.Door]: path ?? floor });
+  if (wall) tiles[Tile.Wall] = wall;
+  tiles[Tile.Path] = path ?? tiles[Tile.Floor];
+  return tileStrip(scene, key, tiles);
+}
+
+/**
+ * A painted wall face fitted to one edge of a ground diamond `width` by
+ * `height`, rising `rise` pixels: the south edge runs down to the right, the
+ * east edge (the same picture mirrored, as buildings may be) down to the
+ * left. Its top-left corner is the top of the edge's left end. Undefined
+ * until the face is painted.
+ */
+export function registerWallFace(scene: Phaser.Scene, face: string, side: 'south' | 'east', width: number, height: number, rise: number): string | undefined {
+  if (!scene.textures.exists(face)) return undefined;
+  const key = `${face}-face-${side}-${width}x${height}-${rise}`;
+  if (scene.textures.exists(key)) return key;
+  const source = scene.textures.get(face).getSourceImage() as CanvasImageSource & { width: number; height: number };
+  const canvas = document.createElement('canvas');
+  [canvas.width, canvas.height] = [width / 2, height / 2 + rise];
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  // Across the picture runs along the edge; down it runs straight down the screen.
+  const [w, h] = [source.width, source.height];
+  if (side === 'south') ctx.setTransform(width / 2 / w, height / 2 / w, 0, rise / h, 0, 0);
+  else ctx.setTransform(-width / 2 / w, height / 2 / w, 0, rise / h, width / 2, 0);
+  ctx.drawImage(source, 0, 0);
+  scene.textures.addCanvas(key, canvas);
+  return key;
 }
 
 /** A building style's inside tiles, each falling back to the fallback style's. */

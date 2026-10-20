@@ -42,12 +42,14 @@ export interface AssetDescription {
   mood: string;
   /** Kind-specific extras, e.g. role for NPCs or threat for monsters. */
   extra?: Record<string, string>;
+  /** Words on how it is seen and framed, in place of its kind's (a wall face seen from the front, not ground from above). */
+  framing?: string;
 }
 
 /** Builds the full text prompt: base style, biome signatures, subject, things to avoid. */
 export function buildPrompt(d: AssetDescription): string {
   const tile = d.kind === 'tile';
-  const lines = [BASE_PROMPT, tile ? TILE_FRAMING : SPRITE_FRAMING];
+  const lines = [BASE_PROMPT, d.framing ?? (tile ? TILE_FRAMING : SPRITE_FRAMING)];
   if (d.biome !== 'any') {
     const b = BIOMES[d.biome];
     lines.push(`Biome: ${b.name}. Palette leans on its key colours; light tint and mood of ${b.name}.`);

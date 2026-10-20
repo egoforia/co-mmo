@@ -12,7 +12,7 @@ import { Tile, type Building, type RegionMap, type TileArt } from './world.ts';
 // While the kit's wish is switched off the cave stands as it was before.
 
 /** The kit pieces the cave's tiles are drawn in. */
-export const SEA_CAVE_ART: TileArt = { floor: 'sea-cave-floor', wall: 'sea-cave-wall', path: 'sea-cave-planks' };
+export const SEA_CAVE_ART: TileArt = { floor: 'sea-cave-floor', wall: 'sea-cave-wall', path: 'sea-cave-planks', face: 'sea-cave-rock-face' };
 
 /**
  * What each letter of a plan lays. Props stand on their leftmost letter's

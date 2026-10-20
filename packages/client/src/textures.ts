@@ -104,6 +104,31 @@ export function registerKitTileset(scene: Phaser.Scene, style: string, art: Tile
   return tileStrip(scene, key, tiles);
 }
 
+/**
+ * A painted wall face fitted to one edge of a ground diamond `width` by
+ * `height`, rising `rise` pixels: the south edge runs down to the right, the
+ * east edge (the same picture mirrored, as buildings may be) down to the
+ * left. Its top-left corner is the top of the edge's left end. Undefined
+ * until the face is painted.
+ */
+export function registerWallFace(scene: Phaser.Scene, face: string, side: 'south' | 'east', width: number, height: number, rise: number): string | undefined {
+  if (!scene.textures.exists(face)) return undefined;
+  const key = `${face}-face-${side}-${width}x${height}-${rise}`;
+  if (scene.textures.exists(key)) return key;
+  const source = scene.textures.get(face).getSourceImage() as CanvasImageSource & { width: number; height: number };
+  const canvas = document.createElement('canvas');
+  [canvas.width, canvas.height] = [width / 2, height / 2 + rise];
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  // Across the picture runs along the edge; down it runs straight down the screen.
+  const [w, h] = [source.width, source.height];
+  if (side === 'south') ctx.setTransform(width / 2 / w, height / 2 / w, 0, rise / h, 0, 0);
+  else ctx.setTransform(-width / 2 / w, height / 2 / w, 0, rise / h, width / 2, 0);
+  ctx.drawImage(source, 0, 0);
+  scene.textures.addCanvas(key, canvas);
+  return key;
+}
+
 /** A building style's inside tiles, each falling back to the fallback style's. */
 function buildingTiles(scene: Phaser.Scene, style: string): Partial<Record<Tile, string>> {
   const part = (p: BuildingPart) => loaded(scene, buildingArt(style, p), buildingArt(FALLBACK_BUILDING_STYLE, p));

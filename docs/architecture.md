@@ -136,7 +136,10 @@ and Drowned Hoard below) is a plan of letters the size of its walls: rock,
 floor, plank walkway, kit props, stairs and ladders. The building carries
 `Building.art` (like `Storey.art`), so it shows no outside picture and is
 drawn in the kit's rock, floor and plank tiles (`registerKitTileset`); stairs
-name the floors they join. Lamps burn only on their own floor. With the wish
+name the floors they join. In the isometric camera its walls stand up, cut
+low like the building kit's near walls: their tops lifted and the painted
+`sea-cave-rock-face` (`TileArt.face`) fitted to each edge facing the camera
+(`registerWallFace`; the east side mirrored). Lamps burn only on their own floor. With the wish
 off the painted one-floor cave stands as before.
 
 **The world editor.** The Owner and Stewards change the lands in the game

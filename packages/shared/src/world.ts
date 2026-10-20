@@ -193,6 +193,8 @@ export interface TileArt {
   floor?: string;
   wall?: string;
   path?: string;
+  /** The upright face of its walls, which the isometric camera shows on their edges facing it. */
+  face?: string;
 }
 
 /** Where a building's outside art is drawn: left edge and width, in tiles, bottom on the doorway's outer edge. */

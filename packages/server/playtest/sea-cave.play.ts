@@ -1,8 +1,9 @@
-// The Smugglers' Sea Cave built from its Art Kit, in a real browser: a
-// player stands in the cave mouth, walks up the stairs to the Smugglers'
+// The Smugglers' Sea Cave built from its Art Kit, in a real browser: the Owner
+// stands in the cave mouth, walks up the stairs to the Smugglers'
 // Loft, and is carried to the Lookout at the top and down to the Tide Grotto
-// and the Drowned Hoard below, each floor drawn on its own. Nothing is
-// painted here: unpainted kit pieces show their style's tiles, or nothing.
+// and the Drowned Hoard below, each floor drawn on its own, then sees the
+// cave's walls stand up in the isometric preview. Nothing is painted here:
+// unpainted kit pieces show their style's tiles, or nothing.
 // Screenshots land in playtest-results/.
 
 import { execFileSync } from 'node:child_process';
@@ -46,7 +47,7 @@ describe('the sea cave', () => {
     const problems: string[] = [];
     const map = generateRegion(regionDef('shore')!);
     const way = (lower: number) => map.stairways.find((s) => s.lower === lower)!;
-    const { id, token } = account(world.store, 'Robo', 'player');
+    const { id, token } = account(world.store, 'Robo', 'owner');
     world.store.savePosition(id, way(0).bottom.x, way(0).bottom.y, 'shore', newCharacter());
 
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -81,6 +82,27 @@ describe('the sea cave', () => {
       await page.waitForTimeout(1500);
       await page.screenshot({ path: resolve(shots, `${file}.png`) });
     }
+
+    // The isometric preview, with the kit's pieces stood in for by shipped
+    // pictures (nothing is painted here): the walkway's planks as the rock
+    // face, so the walls' faces show plainly against their tops.
+    const standIn = (file: string) => ({ file, kind: 'tile', width: 128, height: 128 });
+    await page.route('**/api/art', (route) => route.fulfill({ json: {
+      'sea-cave-wall': standIn('art/shore-sea-cave-wall.png'),
+      'sea-cave-floor': standIn('art/shore-sea-cave-floor.png'),
+      'sea-cave-rock-face': standIn('art/shore-sea-cave-door.png'),
+    } }));
+    shore().placePlayer(id, way(0).bottom.x, way(0).bottom.y, 0);
+    await expect.poll(floor).toBe(0);
+    await page.evaluate(() => localStorage.setItem('co-mmo.camera-preview', 'isometric'));
+    await page.reload();
+    await page.waitForSelector('#game canvas', { timeout: 20_000 });
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: resolve(shots, 'sea-cave-isometric-0.png') });
+    shore().placePlayer(id, way(1).bottom.x, way(1).bottom.y, 1);
+    await expect.poll(floor).toBe(1);
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: resolve(shots, 'sea-cave-isometric-1.png') });
 
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

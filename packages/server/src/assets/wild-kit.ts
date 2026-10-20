@@ -143,7 +143,8 @@ export async function paintKitAsset(
   const references: GeneratedImage[] = [];
   const sent: string[] = [];
   for (const ref of asset.references ?? []) {
-    for (const path of [resolve(anchorDir, 'raw', `${ref}.png`), resolve(anchorDir, `${ref}.png`)]) {
+    // Shipped anchors first; a piece painted in the Art tab (the sea cave's rock) after them.
+    for (const path of [resolve(anchorDir, 'raw', `${ref}.png`), resolve(anchorDir, `${ref}.png`), resolve(outDir, 'raw', `${ref}.png`), resolve(outDir, `${ref}.png`)]) {
       const data = await readFile(path).catch(() => undefined);
       if (!data) continue;
       references.push({ mimeType: 'image/png', data });

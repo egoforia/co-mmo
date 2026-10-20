@@ -15,13 +15,13 @@ function contract(p: Projection): void {
   expect(b.y + b.height).toBe(Math.max(...corners.map((c) => c.y)));
   // No keys held is no step.
   expect(p.inputToWorld(0, 0)).toEqual({ dx: 0, dy: 0 });
-  // Each arrow key walks the way it points on screen.
+  // Each arrow key walks towards its side of the screen.
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]] as const) {
     const step = p.inputToWorld(dx, dy);
     const from = p.toScreen(5, 5);
     const to = p.toScreen(5 + step.dx, 5 + step.dy);
-    if (dx) expect(Math.sign(to.x - from.x)).toBe(dx);
-    if (dy) expect(Math.sign(to.y - from.y)).toBe(dy);
+    if (dx) expect(Math.sign(to.x - from.x) === dx || (dy !== 0 && to.x === from.x)).toBe(true);
+    if (dy) expect(Math.sign(to.y - from.y) === dy || (dx !== 0 && to.y === from.y)).toBe(true);
   }
   // Whatever stands on a tile is drawn on that tile, and sorts behind the tile south of it.
   const feet = p.stand(4, 6, 1, 1);
@@ -65,15 +65,20 @@ describe('the camera projection', () => {
     expect(ISOMETRIC.stand(2, 4, 2, 1)).toEqual({ x: 3, y: 4.5 });
   });
 
-  it('walks up the screen on W, which is north-west on the grid, and due north on W with D', () => {
-    expect(ISOMETRIC.inputToWorld(0, -1)).toEqual({ dx: -1, dy: -1 });
-    expect(ISOMETRIC.inputToWorld(1, -1)).toEqual({ dx: 0, dy: -1 });
-    expect(ISOMETRIC.inputToWorld(1, 0)).toEqual({ dx: 1, dy: -1 });
-    expect(ISOMETRIC.inputToWorld(1, 1)).toEqual({ dx: 1, dy: 0 });
-    expect(ISOMETRIC.inputToWorld(0, 1)).toEqual({ dx: 1, dy: 1 });
-    // Straight up the screen: the step's screen x stays put.
-    const step = ISOMETRIC.inputToWorld(0, -1);
+  it('walks along the grid on each key, and straight across the screen on two', () => {
+    // Down is south, down and to the left; Right is east, down and to the right.
+    expect(ISOMETRIC.inputToWorld(0, 1)).toEqual({ dx: 0, dy: 1 });
+    expect(ISOMETRIC.inputToWorld(1, 0)).toEqual({ dx: 1, dy: 0 });
+    expect(ISOMETRIC.inputToWorld(0, -1)).toEqual({ dx: 0, dy: -1 });
+    expect(ISOMETRIC.inputToWorld(-1, 0)).toEqual({ dx: -1, dy: 0 });
+    // Down with Right: straight down the screen.
+    const step = ISOMETRIC.inputToWorld(1, 1);
     expect(ISOMETRIC.toScreen(step.dx, step.dy).x).toBe(0);
+    // Each key faces the way it walks.
+    expect(ISOMETRIC.face(0, 1, 'back-right')).toBe('front-left');
+    expect(ISOMETRIC.face(1, 0, 'back-right')).toBe('front-right');
+    expect(ISOMETRIC.face(0, -1, 'front-left')).toBe('back-right');
+    expect(ISOMETRIC.face(-1, 0, 'front-left')).toBe('back-left');
   });
 
   it('faces the top-down ways as the arrow keys point, as it always has', () => {
@@ -90,20 +95,20 @@ describe('the camera projection', () => {
     expect(ISOMETRIC.face(0, -1, 'front-left')).toBe('back-right');
     // A wandering creature faces the grid line nearest its step.
     expect(ISOMETRIC.face(0.9, 0.3, 'back-left')).toBe('front-right');
-    // Straight up the screen (W): the back way on the side they faced.
-    const up = ISOMETRIC.inputToWorld(0, -1);
+    // Straight up the screen (Up with Left): the back way on the side they faced.
+    const up = ISOMETRIC.inputToWorld(-1, -1);
     expect(ISOMETRIC.face(up.dx, up.dy, 'front-left')).toBe('back-left');
     expect(ISOMETRIC.face(up.dx, up.dy, 'front-right')).toBe('back-right');
     expect(ISOMETRIC.face(up.dx, up.dy, 'back-right')).toBe('back-right');
-    // Straight down (S): the front way on that side.
-    const down = ISOMETRIC.inputToWorld(0, 1);
+    // Straight down (Down with Right): the front way on that side.
+    const down = ISOMETRIC.inputToWorld(1, 1);
     expect(ISOMETRIC.face(down.dx, down.dy, 'back-left')).toBe('front-left');
     expect(ISOMETRIC.face(down.dx, down.dy, 'front-right')).toBe('front-right');
-    // Straight right (D): front or back as they faced.
-    const right = ISOMETRIC.inputToWorld(1, 0);
+    // Straight right (Up with Right): front or back as they faced.
+    const right = ISOMETRIC.inputToWorld(1, -1);
     expect(ISOMETRIC.face(right.dx, right.dy, 'front-left')).toBe('front-right');
     expect(ISOMETRIC.face(right.dx, right.dy, 'back-left')).toBe('back-right');
-    const left = ISOMETRIC.inputToWorld(-1, 0);
+    const left = ISOMETRIC.inputToWorld(-1, 1);
     expect(ISOMETRIC.face(left.dx, left.dy, 'back-right')).toBe('back-left');
     // A newcomer facing us turns to a front way.
     expect(ISOMETRIC.face(down.dx, down.dy, 'front')).toMatch(/^front-/);

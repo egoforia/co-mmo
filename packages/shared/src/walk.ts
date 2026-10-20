@@ -22,6 +22,45 @@ export const WALK_CYCLE_SECONDS = 0.6;
 export const WALK_DIRECTIONS = WALK_VIEWS;
 export type WalkDirection = WalkView;
 
+/**
+ * The ways a walker faces in the isometric camera (the camera plan of
+ * 2026-10-18): turned halfway between the front or back and a side, which
+ * lines them up with the grid. Front-left faces south, front-right east,
+ * back-left west and back-right north. Walks are painted as video, which
+ * waits on the Owner, so these ways have standing pictures only for now.
+ */
+export const ISO_WAYS = ['front-left', 'front-right', 'back-left', 'back-right'] as const;
+export type IsoWay = (typeof ISO_WAYS)[number];
+
+/** Every way a walker can be painted standing: the top-down camera's four, then the isometric ones. */
+export const FACINGS = [...WALK_DIRECTIONS, ...ISO_WAYS] as const;
+export type Facing = WalkDirection | IsoWay;
+
+/** The grid step each isometric way faces along. */
+export const ISO_WAY_STEPS: Record<IsoWay, { dx: number; dy: number }> = {
+  'front-left': { dx: 0, dy: 1 },
+  'front-right': { dx: 1, dy: 0 },
+  'back-left': { dx: -1, dy: 0 },
+  'back-right': { dx: 0, dy: -1 },
+};
+
+/** True for the ways walks are painted in (the isometric ways have none yet). */
+export function isWalkDirection(facing: string): facing is WalkDirection {
+  return (WALK_DIRECTIONS as readonly string[]).includes(facing);
+}
+
+/** True for any way a walker can be painted standing. */
+export function isFacing(facing: string): facing is Facing {
+  return (FACINGS as readonly string[]).includes(facing);
+}
+
+/** Which side of the picture a walker facing this way looks towards, if either. */
+export function facingSide(facing: Facing): 'left' | 'right' | undefined {
+  if (facing === 'left' || facing === 'front-left' || facing === 'back-left') return 'left';
+  if (facing === 'right' || facing === 'front-right' || facing === 'back-right') return 'right';
+  return undefined;
+}
+
 /** The approved player looks that have walks. */
 export const WALKING_LOOKS = ['player-mara', 'player-ilya'] as const;
 
@@ -30,8 +69,8 @@ export function walkArt(look: string, direction: WalkDirection): string {
   return `${look}-walk-${direction}`;
 }
 
-/** Art id of a look's standing picture facing one direction, shown while it has no walk that way. */
-export function walkStandArt(look: string, direction: WalkDirection): string {
+/** Art id of a look's standing picture facing one way, shown while it has no walk that way. */
+export function walkStandArt(look: string, direction: Facing): string {
   return `${look}-stand-${direction}`;
 }
 

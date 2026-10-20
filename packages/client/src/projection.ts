@@ -1,4 +1,4 @@
-import { TILE_PIXELS } from '@co-mmo/shared';
+import { ISO_WAYS, TILE_PIXELS, WALK_DIRECTIONS, facingSide, isWalkDirection, walkDirection, type Facing, type IsoWay } from '@co-mmo/shared';
 
 /** A point or step on screen, in game pixels before the camera's zoom. */
 export interface ScreenPoint {
@@ -36,6 +36,10 @@ export interface Projection {
    * sorted by.
    */
   stand(left: number, top: number, width: number, height: number): { x: number; y: number };
+  /** The ways walkers are painted facing for this camera. */
+  readonly ways: readonly Facing[];
+  /** Which of its ways someone stepping (dx, dy) along the grid faces; standing still keeps `before`. */
+  face(dx: number, dy: number, before: Facing): Facing;
 }
 
 /** The launch camera: looking straight down at the ground, with sprites painted in three-quarter view. */
@@ -49,6 +53,8 @@ export const TOP_DOWN: Projection = {
   ground: { kind: 'square', width: TILE_PIXELS, height: TILE_PIXELS },
   // Seen from above, a thing's feet are on the south edge of the tiles it stands on.
   stand: (left, top, width, height) => ({ x: left + width / 2, y: top + height }),
+  ways: WALK_DIRECTIONS,
+  face: (dx, dy, before) => walkDirection(dx, dy, isWalkDirection(before) ? before : 'front'),
 };
 
 /** Half a ground diamond across and down: each tile is drawn 160 by 80 pixels. */
@@ -77,7 +83,31 @@ export const ISOMETRIC: Projection = {
   ground: { kind: 'diamond', width: HALF_W * 2, height: HALF_H * 2 },
   // Seen from a corner, a thing stands on the middle of the tiles it covers.
   stand: (left, top, width, height) => ({ x: left + width / 2, y: top + height / 2 }),
+  ways: ISO_WAYS,
+  face: isoFace,
 };
+
+/**
+ * Which isometric way someone stepping (dx, dy) on the grid faces: the way
+ * along the grid line nearest their step. A step halfway between two ways,
+ * straight up, down, left or right on screen, keeps whichever of the two
+ * they faced; turning from another way, it keeps their side going up or
+ * down (back-left becomes front-left) and their front or back going left
+ * or right (front-left becomes front-right).
+ */
+function isoFace(dx: number, dy: number, before: Facing): Facing {
+  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return before;
+  // Eighths of a turn from east, clockwise (y runs south): even ones lie along the grid.
+  const eighth = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+  const along: Record<number, IsoWay> = { 0: 'front-right', 2: 'front-left', 4: 'back-left', 6: 'back-right' };
+  if (along[eighth]) return along[eighth]!;
+  const [a, b] = [along[(eighth + 7) % 8]!, along[(eighth + 1) % 8]!];
+  if (before === a || before === b) return before;
+  // Straight down (south-east) or up (north-west) on screen: keep the side. Right (north-east) or left (south-west): keep front or back.
+  const vertical = eighth === 1 || eighth === 5;
+  const keep = (w: IsoWay) => (vertical ? facingSide(w) === facingSide(before) : w.startsWith(before.startsWith('back') ? 'back' : 'front'));
+  return keep(a) ? a : keep(b) ? b : a;
+}
 
 /** Every camera, by id. */
 export const PROJECTIONS: Record<string, Projection> = { [TOP_DOWN.id]: TOP_DOWN, [ISOMETRIC.id]: ISOMETRIC };

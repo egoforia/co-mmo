@@ -10,6 +10,9 @@ import {
   HELD_SIZE,
   heldBehind,
   heldItem,
+  ISO_WAY_STEPS,
+  facingSide,
+  isWalkDirection,
   offHandItem,
   Predictor,
   TICK_SECONDS,
@@ -32,6 +35,7 @@ import {
   type Building,
   type ClientMessage,
   type CreatureState,
+  type Facing,
   type HitMessage,
   type Light,
   type NpcState,
@@ -59,8 +63,14 @@ interface Avatar {
   body: Phaser.GameObjects.Sprite;
   /** The texture this avatar should wear, once it has loaded. */
   art: string;
-  /** The way it last walked, for looks with painted walk sheets. */
-  facing: WalkDirection;
+  /** The way it faces, among the camera's ways. */
+  facing: Facing;
+  /** The way it last walked on screen, for the walks and standing pictures painted for the top-down camera. */
+  turn: WalkDirection;
+  /** The way the picture it wears now faces, for which hand is in front. */
+  worn: Facing;
+  /** Where it was last placed, in our region's tiles. */
+  at?: { x: number; y: number };
   /** Its size on screen when it wears its own picture. */
   scale: number;
   /**
@@ -463,7 +473,7 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     const held = this.readInput();
-    this.walk(this.me, held.dx, held.dy);
+    this.walk(this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);
@@ -483,11 +493,14 @@ export class WorldScene extends Phaser.Scene {
         if (!pos) continue;
         // Measured without the lunge nudge, so a strike is not a step.
         const before = { x: remote.body.x - remote.nudge.x, y: remote.body.y - remote.nudge.y };
+        const was = remote.at;
         this.placeAvatar(remote, pos.x, pos.y);
         const dx = remote.body.x - remote.nudge.x - before.x;
         const dy = remote.body.y - remote.nudge.y - before.y;
         // Under half a pixel is standing still, not a step.
-        this.walk(remote, Math.abs(dx) > 0.5 ? dx : 0, Math.abs(dy) > 0.5 ? dy : 0);
+        const screen = { dx: Math.abs(dx) > 0.5 ? dx : 0, dy: Math.abs(dy) > 0.5 ? dy : 0 };
+        const step = was && (screen.dx || screen.dy) ? { dx: pos.x - was.x, dy: pos.y - was.y } : { dx: 0, dy: 0 };
+        this.walk(remote, step, screen);
         // People indoors stay out of sight until we come close enough to see in.
         if (group === this.remotes || group === this.npcs) {
           const seen = !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
@@ -518,14 +531,28 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Plays an avatar's walk for the way it moves by (dx, dy), and stands it
-   * still facing that way when it stops. Each way on its own: its walk when
-   * one is painted, else its standing picture facing that way, else its own
-   * picture, turned to face left or right.
+   * Plays an avatar's walk for its step, `step` along the grid and `screen`
+   * on screen, and stands it still facing that way when it stops. A camera
+   * with ways of its own (the isometric one) shows the standing picture
+   * painted for the way it faces, gliding, since those ways have no walks
+   * yet. Until that is painted, and in the top-down camera, each way on its
+   * own: its walk when one is painted, else its standing picture facing that
+   * way, else its own picture, turned to face left or right.
    */
-  private walk(a: Avatar, dx: number, dy: number): void {
-    a.facing = walkDirection(dx, dy, a.facing);
-    const sheet = walkArt(a.art, a.facing);
+  private walk(a: Avatar, step: { dx: number; dy: number }, screen: { dx: number; dy: number }): void {
+    a.facing = PROJECTION.face(step.dx, step.dy, a.facing);
+    a.turn = walkDirection(screen.dx, screen.dy, a.turn);
+    const way = walkStandArt(a.art, a.facing);
+    if (!isWalkDirection(a.facing) && this.textures.exists(way)) {
+      if (a.body.anims.isPlaying) a.body.stop();
+      a.body.setFlipX(false);
+      if (a.body.texture.key !== way) this.dress(a, way);
+      a.worn = a.facing;
+      return;
+    }
+    a.worn = a.turn;
+    const { dx, dy } = screen;
+    const sheet = walkArt(a.art, a.turn);
     if (this.anims.exists(sheet)) {
       a.body.setFlipX(false);
       if (dx !== 0 || dy !== 0) {
@@ -539,7 +566,7 @@ export class WorldScene extends Phaser.Scene {
       if (!a.body.anims.isPlaying) return;
       a.body.stop();
       // Facing us, the approved standing pose; any other way, the walk's first step.
-      if (a.facing === 'front' && this.textures.exists(a.art)) this.dress(a, a.art);
+      if (a.turn === 'front' && this.textures.exists(a.art)) this.dress(a, a.art);
       else {
         a.body.setTexture(sheet, 0);
         this.fit(a, sheet, !!a.fit);
@@ -548,7 +575,7 @@ export class WorldScene extends Phaser.Scene {
     }
     // No walk painted this way: another way's walk stops.
     if (a.body.anims.isPlaying) a.body.stop();
-    const stand = walkStandArt(a.art, a.facing);
+    const stand = walkStandArt(a.art, a.turn);
     if (this.textures.exists(stand)) {
       a.body.setFlipX(false);
       if (a.body.texture.key !== stand) this.dress(a, stand);
@@ -642,7 +669,7 @@ export class WorldScene extends Phaser.Scene {
     const attacker = hit.by === myId ? this.me : this.remotes.get(hit.by) ?? this.creatures.get(hit.by);
     const bolt = hit.ability && ABILITIES[hit.ability]?.effect === 'bolt';
     if (attacker && target && bolt) this.bolt(attacker, target);
-    else if (attacker && attacker !== this.me && target) this.lunge(attacker, target.body.x - attacker.body.x);
+    else if (attacker && attacker !== this.me && target) this.lunge(attacker, this.toward(attacker, target));
     if (!target) return;
     const hurtMe = target === this.me;
     const number = this.add
@@ -666,12 +693,26 @@ export class WorldScene extends Phaser.Scene {
   /** Our own strike: a lunge and a slash, whether or not it lands. */
   swing(): void {
     if (!this.predictor) return;
-    this.lunge(this.me, this.facing);
+    // Along the isometric way we face, or left or right as we last walked.
+    const aim = isWalkDirection(this.me.facing) ? { x: this.facing, y: 0 } : wayOnScreen(this.me.facing);
+    this.lunge(this.me, aim);
     if (!this.textures.exists('fx-slash')) return;
-    // The painted slash curves like a C; mirror it so it bulges the way we face.
-    const slash = this.add.image(this.me.body.x + this.facing * T * 0.45, this.me.body.y - this.me.body.displayHeight * 0.45, 'fx-slash');
-    slash.setDisplaySize(T * 0.9, T * 0.9).setFlipX(this.facing > 0).setDepth(this.me.body.depth + 1);
+    // The painted slash curves like a C; mirror it so it bulges the way we face, tilted along the way.
+    const right = aim.x > 0;
+    const slash = this.add.image(this.me.body.x + aim.x * T * 0.45, this.me.body.y - this.me.body.displayHeight * 0.45 + aim.y * T * 0.45, 'fx-slash');
+    slash.setDisplaySize(T * 0.9, T * 0.9).setFlipX(right).setRotation(right ? Math.atan2(aim.y, aim.x) : Math.atan2(-aim.y, -aim.x)).setDepth(this.me.body.depth + 1);
     this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
+  }
+
+  /**
+   * Which way an attacker lunges at whom it strikes, as a step on screen:
+   * left or right in the top-down camera; in the isometric one, along the
+   * way nearest them, which it turns to face.
+   */
+  private toward(a: Avatar, target: Avatar): { x: number; y: number } {
+    if (isWalkDirection(a.facing) || !a.at || !target.at) return { x: Math.sign(target.body.x - a.body.x || 1), y: 0 };
+    a.facing = PROJECTION.face(target.at.x - a.at.x, target.at.y - a.at.y, a.facing);
+    return wayOnScreen(a.facing);
   }
 
   /** The painted Firebolt spark flies from the caster to the target. */
@@ -693,8 +734,9 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  private lunge(a: Avatar, direction: number): void {
-    this.tweens.add({ targets: a.nudge, x: Math.sign(direction || 1) * T * 0.18, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
+  /** A short jab and back along `aim`, a step on screen one long. */
+  private lunge(a: Avatar, aim: { x: number; y: number }): void {
+    this.tweens.add({ targets: a.nudge, x: aim.x * T * 0.18, y: aim.y * T * 0.18, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
   }
 
   /** A defeated creature sinks away; the real sprite is removed by the next snapshot. */
@@ -1058,13 +1100,14 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, art: texture, facing: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
+    return { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
   }
 
   /** Places an avatar at (x, y) in our region, counted from its corner. */
   private placeAvatar(a: Avatar, x: number, y: number): void {
     const { x: px, y: py } = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
     const depth = PROJECTION.depth(this.origin.x + x, this.origin.y + y);
+    a.at = { x, y };
     a.shadow.setPosition(px, py + T / 16);
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
     const top = py + T / 10 - a.body.displayHeight;
@@ -1137,14 +1180,14 @@ export class WorldScene extends Phaser.Scene {
     const mirrored = b.flipX;
     const x = b.x + (mirrored ? b.originX - hand[0] : hand[0] - b.originX) * b.displayWidth;
     const y = b.y + (hand[1] - b.originY) * b.displayHeight;
-    const flip = mirrored || a.facing === 'left';
+    const flip = mirrored || facingSide(a.worn) === 'left';
     const image = held.image;
     image
       .setFlipX(flip)
       .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
       .setScale((b.displayHeight * HELD_SIZE) / Math.max(image.width, image.height))
       .setPosition(x, y)
-      .setDepth(b.depth + (heldBehind(a.facing, side) ? -1 : 1))
+      .setDepth(b.depth + (heldBehind(a.worn, side) ? -1 : 1))
       .setVisible(b.visible);
   }
 
@@ -1175,6 +1218,15 @@ export class WorldScene extends Phaser.Scene {
 /** How often the isometric camera asks for kit houses the server is still drawing, and how many times. */
 const HOUSE_RETRY_MS = 5000;
 const HOUSE_TRIES = 36;
+
+/** An isometric way as a step on screen, one long. */
+function wayOnScreen(way: Facing): { x: number; y: number } {
+  const step = isWalkDirection(way) ? { dx: 0, dy: 1 } : ISO_WAY_STEPS[way];
+  const from = PROJECTION.toScreen(0, 0);
+  const to = PROJECTION.toScreen(step.dx, step.dy);
+  const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
+}
 
 /** Where a landmark stands: its footprint's bottom row is centred under (l.x, l.y). */
 function landmarkFeet(l: { x: number; y: number; footprint: { width: number; height: number } }, ox: number, oy: number): { x: number; y: number } {

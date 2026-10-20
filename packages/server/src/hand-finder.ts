@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { ArtPoints, ArtPointsManifest } from '@co-mmo/shared';
+import { FACINGS, type ArtPoints, type ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
 import { GRIP, HAND_QUESTIONS, POINTS_VERSION, findHands, findPoint, handSystem, mirroredHands, steadyHands, stripFrames, type BothHands, type Facing } from './assets/points.ts';
 
@@ -17,7 +17,7 @@ export interface PointSource {
   /** A walker's picture or walk strip (its hand), or an item (its grip). */
   kind: 'hands' | 'grip';
   /** Which way a walker faces in it; a still picture faces us. */
-  facing?: 'front' | 'back' | 'left' | 'right';
+  facing?: Facing;
   /** The file it is served from, with any version; a new one means look again. */
   file: string;
   /** A walk strip's frames side by side; a still picture has one. */
@@ -182,7 +182,7 @@ export class HandFinder {
   /** The question asked for each way of facing, with the usual words beside the Owner's. */
   async questions(): Promise<HandQuestion[]> {
     const own = JSON.parse(await readFile(this.questionsFile, 'utf8').catch(() => '{}')) as Partial<Record<Facing, string>>;
-    return (['front', 'right', 'back', 'left'] as const).map((facing) => ({ facing, prompt: own[facing] ?? HAND_QUESTIONS[facing], usual: HAND_QUESTIONS[facing], own: !!own[facing], system: handSystem(facing) }));
+    return FACINGS.map((facing) => ({ facing, prompt: own[facing] ?? HAND_QUESTIONS[facing], usual: HAND_QUESTIONS[facing], own: !!own[facing], system: handSystem(facing) }));
   }
 
   /** Words the Owner's question for one way of facing; empty goes back to the usual words. Nothing is looked at again until asked. */

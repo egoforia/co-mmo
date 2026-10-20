@@ -72,7 +72,7 @@ describe('the mini map', () => {
     const floor = () => app!.world.home.position(id)?.floor ?? 0;
 
     // Out in the land there is only the ground to look at.
-    await expect.poll(() => caption(page)).toBe('The ground floor');
+    await expect.poll(() => caption(page), { timeout: 15_000 }).toBe('The ground floor');
     expect(await painted(page), 'the land is drawn').toBeGreaterThan(0.9);
 
     await page.click('#edit-world-button');

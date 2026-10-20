@@ -70,12 +70,10 @@ describe('the isometric camera', () => {
     await again.waitForTimeout(3000);
     await again.screenshot({ path: resolve(shots, 'camera-house.png') });
 
-    // Down and right on screen is due east: along the lane, towards the doorstep.
+    // The keys walk along the grid: D is due east, along the lane towards the doorstep.
     await again.locator('#game canvas').click();
     const at = () => app!.world.regionOf(id)!.position(id)!;
-    await again.keyboard.down('s');
     await walk(again, 'd', () => at().x > start.x + 1, 30_000);
-    await again.keyboard.up('s');
     expect(at().x, 'walked east').toBeGreaterThan(start.x + 1);
     expect(Math.abs(at().y - start.y), 'without drifting north or south').toBeLessThan(0.5);
 

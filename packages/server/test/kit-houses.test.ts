@@ -60,18 +60,18 @@ describe('kit houses on the server', () => {
     expect(kept.paintings).toBe('shipped/sheet-4,shipped/sheet-2');
   }, SLOW);
 
-  it('shows nothing until its look is painted, and only to the Owner', async () => {
+  it('shows nothing until its look is painted, to every signed-in player', async () => {
     // The test server ships no kit sheets.
     const { base, store } = await start();
     const owner = account(store, 'Ego', 'owner');
     const player = account(store, 'Pip');
     const ask = (token: string, region = 'sanctum') => fetch(`${base}/api/kit-houses?region=${region}`, { headers: { authorization: `Bearer ${token}` } });
-    expect((await ask(player.token)).status).toBe(403);
+    expect((await fetch(`${base}/api/kit-houses?region=sanctum`)).status).toBe(401);
     expect((await ask(owner.token, 'nowhere')).status).toBe(404);
     const { index } = arcanum();
     let houses: buildingKit.KitHouseInfo[] = [];
     for (let i = 0; i < 50; i++) {
-      houses = ((await (await ask(owner.token)).json()) as { houses: buildingKit.KitHouseInfo[] }).houses;
+      houses = ((await (await ask(player.token)).json()) as { houses: buildingKit.KitHouseInfo[] }).houses;
       if (houses[0]?.status !== 'building') break;
       await new Promise((r) => setTimeout(r, 50));
     }

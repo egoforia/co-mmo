@@ -2,7 +2,7 @@
 // stands in the cave mouth, walks up the stairs to the Smugglers'
 // Loft, and is carried to the Lookout at the top and down to the Tide Grotto
 // and the Drowned Hoard below, each floor drawn on its own, then sees the
-// cave's walls stand up in the isometric preview. Nothing is painted here:
+// cave's walls stand up with their painted faces. Nothing is painted here:
 // unpainted kit pieces show their style's tiles, or nothing.
 // Screenshots land in playtest-results/.
 
@@ -83,7 +83,7 @@ describe('the sea cave', () => {
       await page.screenshot({ path: resolve(shots, `${file}.png`) });
     }
 
-    // The isometric preview, with the kit's pieces stood in for by shipped
+    // Again with the kit's pieces stood in for by shipped
     // pictures (nothing is painted here): the walkway's planks as the rock
     // face, so the walls' faces show plainly against their tops.
     const standIn = (file: string) => ({ file, kind: 'tile', width: 128, height: 128 });
@@ -94,7 +94,6 @@ describe('the sea cave', () => {
     } }));
     shore().placePlayer(id, way(0).bottom.x, way(0).bottom.y, 0);
     await expect.poll(floor).toBe(0);
-    await page.evaluate(() => localStorage.setItem('co-mmo.camera-preview', 'isometric'));
     await page.reload();
     await page.waitForSelector('#game canvas', { timeout: 20_000 });
     await page.waitForTimeout(3000);

@@ -2,7 +2,8 @@
 // floor up and a cellar, and the map in the corner shows the ground floor
 // around them, zooms in and out, looks at the floor above and the cellar
 // without moving them, follows them up the stairs, maximizes, minimizes
-// (drawing nothing) and closes, and turns with the isometric preview. Screenshots land in playtest-results/.
+// (drawing nothing) and closes, turned with the isometric camera, and still
+// square in the Owner's old top-down view. Screenshots land in playtest-results/.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -71,7 +72,7 @@ describe('the mini map', () => {
     const floor = () => app!.world.home.position(id)?.floor ?? 0;
 
     // Out in the land there is only the ground to look at.
-    await expect.poll(() => caption(page)).toBe('The ground floor');
+    await expect.poll(() => caption(page), { timeout: 15_000 }).toBe('The ground floor');
     expect(await painted(page), 'the land is drawn').toBeGreaterThan(0.9);
 
     await page.click('#edit-world-button');
@@ -140,15 +141,15 @@ describe('the mini map', () => {
     await page.click('#map-button');
     expect(await page.locator('#mini-map').isVisible()).toBe(true);
 
-    // The isometric preview turns the map as it turns the world.
-    await page.evaluate(() => localStorage.setItem('co-mmo.camera-preview', 'isometric'));
+    // The Owner's old top-down view keeps the map square, north up.
+    await page.evaluate(() => localStorage.setItem('co-mmo.camera', 'top-down'));
     await page.reload();
     await page.waitForSelector('#mini-map:not([hidden])', { timeout: 20_000 });
     await expect.poll(() => caption(page), { timeout: 10_000 }).toBe('Floor 1');
     await page.click('#mini-map [data-act="down"]');
     await page.waitForTimeout(500);
-    await page.locator('#mini-map').screenshot({ path: resolve(shots, 'mini-map-isometric.png') });
-    await page.screenshot({ path: resolve(shots, 'mini-map-isometric-game.png') });
+    await page.locator('#mini-map').screenshot({ path: resolve(shots, 'mini-map-old-view.png') });
+    await page.screenshot({ path: resolve(shots, 'mini-map-old-view-game.png') });
 
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

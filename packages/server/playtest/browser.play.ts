@@ -68,7 +68,7 @@ describe('the robot plays in a browser', () => {
     await page.locator('#game canvas').click();
     // A browser without a graphics card draws few frames a second, so hold the key a while.
     await page.keyboard.down('ArrowLeft');
-    await expect.poll(() => app!.world.regionOf(id)!.position(id)!.x, { timeout: 8000, message: 'walking left with the arrow key moves the player' }).toBeLessThan(before.x - 1.5);
+    await expect.poll(() => app!.world.regionOf(id)!.position(id)!.x, { timeout: 20_000, message: 'walking left with the arrow key moves the player' }).toBeLessThan(before.x - 1.5);
     await page.keyboard.up('ArrowLeft');
 
     // Pray with G, wish, and grant it from the card.

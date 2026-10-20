@@ -16,8 +16,9 @@ import { playWorld } from './harness.ts';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
 const shots = resolve(root, 'playtest-results');
-/** Pixels a tile spans on a 1280-wide screen (the game's zoom there is a half). */
-const TILE_ON_SCREEN = 64;
+/** Half a ground diamond across and down on a 1280-wide screen: 160 by 80 at the game's zoom there, a half. */
+const HALF_W = 40;
+const HALF_H = 20;
 let browser: Browser;
 
 beforeAll(() => {
@@ -74,7 +75,7 @@ describe('the world editor', () => {
     const canvas = (await page.locator('#game canvas').boundingBox())!;
     const centre = { x: canvas.x + canvas.width / 2, y: canvas.y + canvas.height / 2 };
     /** Clicks the tile this many tiles east and south of the one we stand on. */
-    const clickTile = (dx: number, dy: number) => page.mouse.click(centre.x + dx * TILE_ON_SCREEN, centre.y + dy * TILE_ON_SCREEN);
+    const clickTile = (dx: number, dy: number) => page.mouse.click(centre.x + (dx - dy) * HALF_W, centre.y + (dx + dy) * HALF_H);
     const tile = (x: number, y: number) => app!.world.home.map.tiles[y * app!.world.home.map.width + x];
     const edits = () => world.store.worldEdits('sanctum').edits;
 

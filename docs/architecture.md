@@ -33,7 +33,7 @@ adapter) and picking it in the place named under "Chosen in".
 | Video (walks) | `VideoProvider` (`assets/video.ts`) | Veo | `ai/services.ts` |
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
-| Camera | `Projection` (`client/src/projection.ts`) | `TOP_DOWN`, `ISOMETRIC` (the Owner's preview) | `chooseCamera` (`client/src/camera-preview.ts`) |
+| Camera | `Projection` (`client/src/projection.ts`) | `ISOMETRIC` for everyone; `TOP_DOWN` (retired, the Owner's old view until the lands are repainted) | `chooseCamera` (`client/src/camera.ts`) |
 | Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | `kitHouse` (a building style's `kit` look), drawn by `KitHouses` for the isometric camera |
 | Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` | `KitSheets` in `app.ts` |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
@@ -147,7 +147,7 @@ off the painted one-floor cave stands as before.
 (`RegionDef.edits`, shared `world-edits.ts`): paint ground, paths, water,
 trees or rocks; move or take away a tree, rock, water or set piece; a road;
 a house of any building style (kit-friendly floor sizes, so it stands as a
-kit house in the isometric preview); floors above and below a building, by
+kit house in the isometric camera); floors above and below a building, by
 stairs or ladders; a monster spawn; clearing monsters
 away. `generateRegion` lays the edits over the land in order, so the server,
 every region server and every browser lay out the same map, and a browser
@@ -181,8 +181,8 @@ a tile that repeats without slicing shapes. Each texture comes from the
 newest painting where it passed. In play so far: a building style with a
 `kit` look (`BUILDING_STYLES`) whose floor falls on whole bays, two tiles to
 a bay, becomes a kit house on that floor (`kitHouse`); `KitHouses` draws it
-in a worker the first time `GET /api/kit-houses` asks (the Owner only, for
-the isometric preview), keeps it in the art folder and draws it again when
+in a worker the first time `GET /api/kit-houses` asks (any signed-in
+player, for the isometric camera), keeps it in the art folder and draws it again when
 its look is painted again. The game's collision is still its wall tiles.
 The plan for bringing the rest into play is
 https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
@@ -196,8 +196,8 @@ until walks are made for them; the
 ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
 light of the hour and the weather),
 `textures.ts` (tilesets from painted art, and the same tiles turned into
-diamonds for the isometric camera), `camera-preview.ts` (the Owner's switch
-for the isometric preview, kept in the browser), `kit-house-view.ts` (kit
+diamonds for the isometric camera), `camera.ts` (isometric for everyone; the Owner's
+switch to the old top-down view, kept in the browser), `kit-house-view.ts` (kit
 houses stood on their floors in upright strips, so walkers pass behind and in
 front of them), `wished.ts` (wished content),
 `lights.ts` + `lit-pipeline.ts` (pictures are lit by the sky's colour, the
@@ -225,7 +225,7 @@ per panel. God's View is
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). |
-| Isometric camera for everyone | `ISOMETRIC` exists as the Owner's preview (camera plan step 1, ground and scenery from step 2, kit houses). Still to come: lands repainted in its view words, the four facing ways painted for every walker (the Art tab's "Paint every walker's missing ways", then each way's walk clip), upright strips for big trees and set pieces, then `chooseCamera` picks it for players: https://claude.ai/code/artifact/3850d394-7032-47cb-bed1-a0a9fc135159 |
+| Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20). Still to come: an isometric style profile, walkers painted straight into the four isometric ways, upright strips for trees and set pieces, every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |

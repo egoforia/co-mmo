@@ -88,7 +88,7 @@ export async function redeemLogin(code: string): Promise<string> {
   return body.token as string;
 }
 
-/** The kit houses of a land's buildings, for the isometric preview; none when the server will not say. */
+/** The kit houses of a land's buildings, for the isometric camera; none when the server will not say. */
 export async function kitHouses(token: string, region: string): Promise<buildingKit.KitHouseInfo[]> {
   const res = await fetch(`/api/kit-houses?region=${encodeURIComponent(region)}`, { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
   if (!res?.ok) return [];

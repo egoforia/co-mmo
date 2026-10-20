@@ -15,7 +15,7 @@ import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
 import { EditorUi } from './editor-ui.ts';
 import { MiniMap } from './mini-map.ts';
-import { chooseCamera } from './camera-preview.ts';
+import { chooseCamera } from './camera.ts';
 import { PerfOverlay } from './perf-overlay.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
 
@@ -347,15 +347,15 @@ function play(token: string): void {
       typing: isTyping,
     });
     // Before the scene, which draws through whichever camera is chosen.
-    const preview = chooseCamera(welcome.you.role);
-    if (preview) chat.add({ kind: 'system', text: 'You are in the isometric preview, which only you can see. Switch back to the top-down view in Account.' });
+    const iso = chooseCamera(welcome.you.role);
+    if (!iso) chat.add({ kind: 'system', text: 'You are looking through the old top-down view, which only you can see. Switch back to the isometric view in Account.' });
     scene = new WorldScene({
       welcome,
       art: manifest,
       points: found,
       send: (m) => connection.send(m),
-      // Kit houses stand in the preview, drawn on the server the first time they are asked for.
-      ...(preview ? { houses: (region: string) => kitHouses(token, region) } : {}),
+      // Kit houses stand in the isometric camera, drawn on the server the first time they are asked for.
+      ...(iso ? { houses: (region: string) => kitHouses(token, region) } : {}),
       // The arrow keys choose loot while its window is open, so the player stands still.
       typing: () => isTyping() || !!loot?.open,
     });
@@ -382,7 +382,7 @@ function play(token: string): void {
         received: connection.received,
         ping: (n) => connection.send({ t: 'ping', n }),
         server: () => perfStats(token),
-        camera: preview ? 'isometric preview' : 'top-down',
+        camera: iso ? 'isometric' : 'old top-down view',
         region: () => region,
       });
     }

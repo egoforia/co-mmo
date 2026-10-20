@@ -2,7 +2,7 @@
 // world editor inside the Sanctum Arcanum, gives it a floor up and one down,
 // walks up the stairs and back down, and is carried into the cellar. Each
 // floor is drawn on its own: upstairs over the shop, underground with the
-// land above out of sight, and through the isometric preview too.
+// land above out of sight, and still upstairs after the page reloads.
 // Screenshots land in playtest-results/.
 
 import { execFileSync } from 'node:child_process';
@@ -97,10 +97,9 @@ describe('floors', () => {
     await page.waitForTimeout(1500);
     await page.screenshot({ path: resolve(shots, 'floors-cellar.png') });
 
-    // The Owner's isometric preview draws the floor we are on in place too.
+    // Coming back draws the floor we are on in place.
     app!.world.local('sanctum')!.placePlayer(id, up.top.x, up.top.y, 1);
     await page.waitForTimeout(500);
-    await page.evaluate(() => localStorage.setItem('co-mmo.camera-preview', 'isometric'));
     await page.reload();
     await page.waitForSelector('#game canvas', { timeout: 20_000 });
     await page.waitForTimeout(3000);

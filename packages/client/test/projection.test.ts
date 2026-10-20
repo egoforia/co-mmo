@@ -49,8 +49,8 @@ describe('the camera projection', () => {
     expect(TOP_DOWN.stand(3, 4, 1, 1)).toEqual({ x: 3.5, y: 5 });
   });
 
-  it('is top-down for everyone unless the preview is switched on', () => {
-    expect(PROJECTION).toBe(TOP_DOWN);
+  it('is isometric for everyone', () => {
+    expect(PROJECTION).toBe(ISOMETRIC);
   });
 
   it('draws isometric tiles as 160 by 80 diamonds, the south-east corner nearest', () => {

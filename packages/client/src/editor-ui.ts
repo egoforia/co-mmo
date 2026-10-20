@@ -10,6 +10,8 @@ import {
   Tile,
   houseCorner,
   landmarkAt,
+  setPiece,
+  setPieces,
   type PaintTile,
   type RegionMap,
   type TilePoint,
@@ -25,7 +27,7 @@ import type { WorldScene } from './world-scene.ts';
 // everyone there; undo takes it back. The outlines it draws over the world
 // are the editor's own marks, seen only while it is open, never game art.
 
-type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'spawn' | 'clear';
+type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'piece' | 'spawn' | 'clear';
 
 const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'look', name: 'Look', hint: 'Point at the world to see what is there.' },
@@ -33,6 +35,8 @@ const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'move', name: 'Move', hint: 'Click a tree, rock, water or set piece to pick it up, then click where it goes.' },
   { id: 'road', name: 'Road', hint: 'Click where the road starts, then where it ends. It runs across, then down.' },
   { id: 'house', name: 'House', hint: 'Click the doorstep: the house stands just north of it, its doorway on that spot.' },
+  // Only while the Smugglers' Sea Cave Art Kit wish is on (see setPieces).
+  { id: 'piece', name: 'Set piece', hint: 'Click open ground or a floor to stand a sea cave piece there. It shows once its picture is painted in the Art tab.' },
   { id: 'spawn', name: 'Monsters', hint: 'Click open ground where the monsters should live. They come back there after they fall.' },
   { id: 'clear', name: 'Clear', hint: 'Click to send away every monster living near that spot.' },
 ];
@@ -63,6 +67,7 @@ export class EditorUi {
   private brush = 1;
   private houseStyle = Object.values(BUILDING_STYLES).find((s) => s.kit)?.id ?? Object.keys(BUILDING_STYLES)[0]!;
   private houseSize = 1;
+  private piece = '';
   private creature = '';
   private count = 4;
   private radius = 6;
@@ -198,6 +203,9 @@ export class EditorUi {
         const floor = KIT_HOUSE_FLOORS[this.houseSize]!.floor;
         return void this.act({ edit: { kind: 'house', at: houseCorner(at, floor), floor, style: this.houseStyle } }, region);
       }
+      case 'piece':
+        if (!setPiece(this.piece)) return this.say('Choose a set piece first.');
+        return void this.act({ edit: { kind: 'piece', piece: this.piece, at } }, region);
       case 'spawn':
         if (!this.creature) return this.say('Choose a kind of monster first.');
         return void this.act({ edit: { kind: 'spawn', creature: this.creature, at, count: this.count } }, region);
@@ -285,6 +293,10 @@ export class EditorUi {
         box(map, x, y, floor[0] + 2, floor[1] + 2);
         return box(map, at[0], at[1] - 1, 2, 1, 0x6fd08c);
       }
+      case 'piece': {
+        const footprint = setPiece(this.piece)?.footprint ?? { width: 1, height: 1 };
+        return box(map, at[0], at[1] - footprint.height + 1, footprint.width, footprint.height);
+      }
       case 'spawn':
         box(map, at[0] - 3, at[1] - 3, 7, 7, 0xf6757a);
         return box(map, at[0], at[1]);
@@ -333,6 +345,7 @@ export class EditorUi {
     else if (input.name === 'brush') this.brush = Number(value);
     else if (input.name === 'style') this.houseStyle = value;
     else if (input.name === 'size') this.houseSize = Number(value);
+    else if (input.name === 'piece') this.piece = value;
     else if (input.name === 'creature') this.creature = value;
     else if (input.name === 'count') this.count = Math.max(1, Math.min(MAX_SPAWN, Number(value) || 1));
     else if (input.name === 'radius') this.radius = Math.max(1, Math.min(MAX_CLEAR_RADIUS, Number(value) || 1));
@@ -343,6 +356,10 @@ export class EditorUi {
   private render(status?: string): void {
     if (status !== undefined) this.status = status;
     if (!this.open) return;
+    const pieces = setPieces();
+    if (!pieces.some((p) => p.id === this.piece)) this.piece = pieces[0]?.id ?? '';
+    if (this.tool === 'piece' && !pieces.length) this.tool = 'look';
+    const tools = TOOLS.filter((t) => t.id !== 'piece' || pieces.length);
     const tool = TOOLS.find((t) => t.id === this.tool)!;
     const option = (value: string, label: string, chosen: boolean) => `<option value="${escapeHtml(value)}"${chosen ? ' selected' : ''}>${escapeHtml(label)}</option>`;
     const creatures = Object.entries(CREATURES).sort(([, a], [, b]) => a.name.localeCompare(b.name));
@@ -355,6 +372,7 @@ export class EditorUi {
       road: '',
       house: `<label>Look <select name="style">${Object.values(BUILDING_STYLES).map((s) => option(s.id, `${s.name}${s.kit ? ' (kit house)' : ''}`, s.id === this.houseStyle)).join('')}</select></label>
         <label>Size <select name="size">${KIT_HOUSE_FLOORS.map((f, i) => option(String(i), `${f.name}, ${f.floor[0]} × ${f.floor[1]} floor`, i === this.houseSize)).join('')}</select></label>`,
+      piece: `<label>Piece <select name="piece">${pieces.map((p) => option(p.id, p.name, p.id === this.piece)).join('')}</select></label>`,
       spawn: `<label>Monster <select name="creature">${creatures.map(([id, c]) => option(id, `${c.name} (level ${c.level})`, id === this.creature)).join('')}</select></label>
         <label>How many <input name="count" type="number" min="1" max="${MAX_SPAWN}" value="${this.count}" /></label>`,
       clear: `<label>Tiles around <input name="radius" type="number" min="1" max="${MAX_CLEAR_RADIUS}" value="${this.radius}" /></label>`,
@@ -363,7 +381,7 @@ export class EditorUi {
       <button type="button" class="quiet" data-remove="${escapeHtml(e.id)}" aria-label="Take this edit out" title="Take this edit out">×</button></li>`).join('');
     this.box.innerHTML = `
       <h2>World editor <button type="button" class="close" aria-label="Close">×</button></h2>
-      <div class="tools">${TOOLS.map((t) => `<button type="button" data-tool="${t.id}" class="${t.id === this.tool ? '' : 'quiet'}">${t.name}</button>`).join('')}</div>
+      <div class="tools">${tools.map((t) => `<button type="button" data-tool="${t.id}" class="${t.id === this.tool ? '' : 'quiet'}">${t.name}</button>`).join('')}</div>
       <p class="note">${escapeHtml(tool.hint)}</p>
       <div class="settings">${settings[this.tool]}</div>
       <p class="status" aria-live="polite">${escapeHtml(this.status)}</p>
@@ -377,7 +395,7 @@ export class EditorUi {
 /** What stands on a tile, in a few words. */
 function describe(map: RegionMap, at: TilePoint): string {
   const piece = landmarkAt(map, at);
-  if (piece) return `A set piece (${piece.asset})`;
+  if (piece) return setPiece(piece.asset)?.name ?? `A set piece (${piece.asset})`;
   const building = map.buildings.find((b) => at[0] >= b.x && at[0] < b.x + b.width && at[1] >= b.y && at[1] < b.y + b.height);
   const words = TILE_NAMES[map.tiles[at[1] * map.width + at[0]] as Tile] ?? 'Something';
   const name = building && BUILDING_STYLES[building.style]?.name;
@@ -393,5 +411,6 @@ export function editWords(e: WorldEdit): string {
     case 'house': return `${BUILDING_STYLES[e.style]?.name ?? 'A house'}, ${e.floor[0]} × ${e.floor[1]}`;
     case 'spawn': return `${e.count} ${e.name ?? e.creature} at ${e.at.join(', ')}`;
     case 'clear': return `Cleared monsters within ${e.radius} of ${e.at.join(', ')}`;
+    case 'piece': return `${setPiece(e.piece)?.name ?? 'A set piece'} at ${e.at.join(', ')}`;
   }
 }

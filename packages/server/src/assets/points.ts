@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import type { ArtPoint } from '@co-mmo/shared';
+import type { ArtPoint, Facing } from '@co-mmo/shared';
 import { parseJsonObject, type ChatModel } from '../ai/chat.ts';
 
 // Finding one point in a painted picture with a vision model: where a
@@ -19,7 +19,8 @@ const SYSTEM = [
  * asked for by where they are in the picture (near and far side-on, picture
  * left and right otherwise), and told apart from those: the right hand is
  * the near hand facing right, the far hand facing left, the picture's left
- * facing us and the picture's right seen from behind.
+ * facing us and the picture's right seen from behind. Turned halfway, as in
+ * the isometric ways, they are near and far too.
  */
 export async function findHands(model: ChatModel, picture: Buffer, facing: Facing, question = HAND_QUESTIONS[facing]): Promise<BothHands & { usd: number }> {
   const result = await model.complete({
@@ -48,7 +49,7 @@ export interface BothHands {
  * side-on the hands cross, so nothing is swapped.
  */
 export function steadyHands(facing: Facing, frames: BothHands[]): { right: (ArtPoint | null)[]; left: (ArtPoint | null)[] } {
-  const side = facing === 'left' || facing === 'right';
+  const side = facing !== 'front' && facing !== 'back';
   // The side of the picture the right hand is on, by most frames' answers.
   const xs = frames.filter((f) => f.right && f.left).map((f) => f.right![0] - f.left![0]);
   const sign = side ? 0 : Math.sign(xs.reduce((n, x) => n + Math.sign(x), 0));
@@ -70,11 +71,16 @@ export function mirroredHands(hands: readonly (ArtPoint | null)[] | undefined, f
   });
 }
 
-/** The way a walker faces after turning round. */
-export const TURNED: Record<Facing, Facing> = { front: 'back', back: 'front', left: 'right', right: 'left' };
+/** The way a walker faces after turning round; an isometric way's mirror image. */
+export const TURNED: Record<Facing, Facing> = {
+  front: 'back', back: 'front', left: 'right', right: 'left',
+  'front-left': 'front-right', 'front-right': 'front-left', 'back-left': 'back-right', 'back-right': 'back-left',
+};
 
-/** Which way a walker faces in a picture: a still picture faces us. */
-export type Facing = 'front' | 'back' | 'left' | 'right';
+export type { Facing };
+
+/** Turned halfway, both hands may show; the far one is partly behind the body. */
+const HALFWAY = 'Point to both of the character\'s hands. The character is turned halfway between facing straight at us (or away) and side-on. "near" is the hand on the side nearer to us; "far" is the hand on the far side, partly behind the body: if it is hidden, point to where it must be behind the body. Look at the arms, not the legs.';
 
 /** The usual question for each way a walker faces; the Owner can word them differently in God's View. */
 export const HAND_QUESTIONS: Record<Facing, string> = {
@@ -82,15 +88,19 @@ export const HAND_QUESTIONS: Record<Facing, string> = {
   back: 'Point to both of the character\'s hands. "left" is the hand on the LEFT side of the picture, "right" the hand on the RIGHT side of the picture. Look at the arms, not the legs: follow each arm from the shoulder down to its hand.',
   right: 'Point to both of the character\'s hands. "near" is the hand on the side nearer to us, in front of the body; "far" is the hand on the far side, behind the body: if it is hidden, point to where it must be behind the body.',
   left: 'Point to both of the character\'s hands. "near" is the hand on the side nearer to us, in front of the body; "far" is the hand on the far side, behind the body: if it is hidden, point to where it must be behind the body.',
+  'front-left': HALFWAY,
+  'front-right': HALFWAY,
+  'back-left': HALFWAY,
+  'back-right': HALFWAY,
 };
 
-/** The answers that are the character's own right and left hands, for each way it faces. */
-export const RIGHT_HAND_KEY: Record<Facing, string> = { front: 'left', back: 'right', right: 'near', left: 'far' };
-export const LEFT_HAND_KEY: Record<Facing, string> = { front: 'right', back: 'left', right: 'far', left: 'near' };
+/** The answers that are the character's own right and left hands, for each way it faces: turned to the left, the right hand is the far one. */
+export const RIGHT_HAND_KEY: Record<Facing, string> = { front: 'left', back: 'right', right: 'near', left: 'far', 'front-left': 'far', 'front-right': 'near', 'back-left': 'far', 'back-right': 'near' };
+export const LEFT_HAND_KEY: Record<Facing, string> = { front: 'right', back: 'left', right: 'far', left: 'near', 'front-left': 'near', 'front-right': 'far', 'back-left': 'near', 'back-right': 'far' };
 
 /** The fixed part of a hand question: the shape of the answer. */
 export function handSystem(facing: Facing): string {
-  const side = facing === 'left' || facing === 'right';
+  const side = facing !== 'front' && facing !== 'back';
   return [
     'You locate things in game sprites.',
     `Reply with JSON ${side ? '{"near": [y, x], "far": [y, x]}' : '{"left": [y, x], "right": [y, x]}'}, y and x from 0 to 1000 across the picture (0,0 is the top left); null for a hand you cannot place.`,

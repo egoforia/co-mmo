@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TILE_PIXELS } from '@co-mmo/shared';
+import { ISO_WAY_STEPS, TILE_PIXELS, type IsoWay } from '@co-mmo/shared';
 import { ISOMETRIC, PROJECTION, PROJECTIONS, TOP_DOWN, type Projection } from '../src/projection.ts';
 
 /** What every projection must keep true, whatever the camera. */
@@ -31,6 +31,11 @@ function contract(p: Projection): void {
   expect(feet.y).toBeLessThanOrEqual(7);
   const south = p.stand(4, 7, 1, 1);
   expect(p.depth(south.x, south.y)).toBeGreaterThan(p.depth(feet.x, feet.y));
+  // Walkers only ever face the camera's own ways, and keep facing that way when they stop.
+  for (const before of p.ways) {
+    expect(p.face(0, 0, before)).toBe(before);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [0.3, -0.9]] as const) expect(p.ways).toContain(p.face(dx, dy, before));
+  }
 }
 
 describe('the camera projection', () => {
@@ -69,5 +74,43 @@ describe('the camera projection', () => {
     // Straight up the screen: the step's screen x stays put.
     const step = ISOMETRIC.inputToWorld(0, -1);
     expect(ISOMETRIC.toScreen(step.dx, step.dy).x).toBe(0);
+  });
+
+  it('faces the top-down ways as the arrow keys point, as it always has', () => {
+    expect(TOP_DOWN.ways).toEqual(['front', 'right', 'back', 'left']);
+    expect(TOP_DOWN.face(1, 1, 'front')).toBe('right');
+    expect(TOP_DOWN.face(0, -1, 'left')).toBe('back');
+  });
+
+  it('faces the four isometric ways along the grid, keeping the nearest one walking straight up, down or sideways', () => {
+    // Along the grid: south, east, west and north.
+    expect(ISOMETRIC.face(0, 1, 'back-left')).toBe('front-left');
+    expect(ISOMETRIC.face(1, 0, 'back-left')).toBe('front-right');
+    expect(ISOMETRIC.face(-1, 0, 'front-right')).toBe('back-left');
+    expect(ISOMETRIC.face(0, -1, 'front-left')).toBe('back-right');
+    // A wandering creature faces the grid line nearest its step.
+    expect(ISOMETRIC.face(0.9, 0.3, 'back-left')).toBe('front-right');
+    // Straight up the screen (W): the back way on the side they faced.
+    const up = ISOMETRIC.inputToWorld(0, -1);
+    expect(ISOMETRIC.face(up.dx, up.dy, 'front-left')).toBe('back-left');
+    expect(ISOMETRIC.face(up.dx, up.dy, 'front-right')).toBe('back-right');
+    expect(ISOMETRIC.face(up.dx, up.dy, 'back-right')).toBe('back-right');
+    // Straight down (S): the front way on that side.
+    const down = ISOMETRIC.inputToWorld(0, 1);
+    expect(ISOMETRIC.face(down.dx, down.dy, 'back-left')).toBe('front-left');
+    expect(ISOMETRIC.face(down.dx, down.dy, 'front-right')).toBe('front-right');
+    // Straight right (D): front or back as they faced.
+    const right = ISOMETRIC.inputToWorld(1, 0);
+    expect(ISOMETRIC.face(right.dx, right.dy, 'front-left')).toBe('front-right');
+    expect(ISOMETRIC.face(right.dx, right.dy, 'back-left')).toBe('back-right');
+    const left = ISOMETRIC.inputToWorld(-1, 0);
+    expect(ISOMETRIC.face(left.dx, left.dy, 'back-right')).toBe('back-left');
+    // A newcomer facing us turns to a front way.
+    expect(ISOMETRIC.face(down.dx, down.dy, 'front')).toMatch(/^front-/);
+    // Each way faces the grid step it is named after.
+    for (const way of ISOMETRIC.ways) {
+      const { dx, dy } = ISO_WAY_STEPS[way as IsoWay];
+      expect(ISOMETRIC.face(dx, dy, 'front')).toBe(way);
+    }
   });
 });

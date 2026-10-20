@@ -1,4 +1,5 @@
 import type { Character } from './rpg.ts';
+import { facingSide, type Facing } from './walk.ts';
 
 // Held items (milestone 10): a player's painted look stays as it is, and the
 // weapon they wear, or else their charm, is shown in their right hand, and
@@ -24,11 +25,12 @@ export const HELD_SIZE = 0.42;
 
 /**
  * Whether an item in this hand is drawn behind the body: walking away, or
- * walking the way that puts the hand on the far side (the right hand
- * walking left, the left hand walking right).
+ * facing the way that puts the hand on the far side (the right hand facing
+ * left, the left hand facing right). Turned halfway, as in the isometric
+ * ways, the far hand is the one on the side the walker turns towards.
  */
-export function heldBehind(facing: 'front' | 'back' | 'left' | 'right', hand: 'right' | 'left'): boolean {
-  return facing === 'back' || facing === (hand === 'right' ? 'left' : 'right');
+export function heldBehind(facing: Facing, hand: 'right' | 'left'): boolean {
+  return facing === 'back' || facingSide(facing) === (hand === 'right' ? 'left' : 'right');
 }
 
 /** Points by art id, as the server serves them. */

@@ -13,6 +13,7 @@ import { PrayerUi } from './prayer-ui.ts';
 import { onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
+import { EditorUi } from './editor-ui.ts';
 import { chooseCamera } from './camera-preview.ts';
 import { PerfOverlay } from './perf-overlay.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
@@ -110,6 +111,9 @@ function play(token: string): void {
   });
   let name = '';
   let region = '';
+  let regionId = '';
+  /** The world editor, for the Owner and Stewards. */
+  let editor: EditorUi | undefined;
   // Art loads alongside the connection; the world waits for both.
   // The art shipped with the game, and building art the server painted since
   // (say, for a building a wish added); shipped art wins.
@@ -162,6 +166,7 @@ function play(token: string): void {
     switch (message.t) {
       case 'welcome':
         region = message.region.name;
+        regionId = message.region.id;
         character = message.character;
         sound.music(message.region.def.biome);
         rpg?.setCharacter(message.character);
@@ -170,7 +175,8 @@ function play(token: string): void {
         // A body's loot stays behind in the region you left.
         loot?.show(null);
         if (scene) scene.enterRegion(message);
-        else void Promise.all([art, artPoints]).then(([manifest, found]) => start(message, manifest, found));
+        editor?.regionChanged();
+        if (!scene) void Promise.all([art, artPoints]).then(([manifest, found]) => start(message, manifest, found));
         break;
       case 'sky':
         scene?.setWeather(message.weather);
@@ -306,6 +312,12 @@ function play(token: string): void {
     if (welcome.you.role !== 'player') {
       const link = document.getElementById('gods-view-link')!;
       link.hidden = false;
+      // The Owner and Stewards can change the world where they stand.
+      const edit = document.getElementById('edit-world-button')!;
+      const opened = new EditorUi({ token, scene: () => scene ?? undefined, region: () => ({ id: regionId, name: region }) });
+      editor = opened;
+      edit.hidden = false;
+      edit.addEventListener('click', () => opened.toggle());
     }
     rpg = new RpgUi(welcome.character, {
       attack: () => {

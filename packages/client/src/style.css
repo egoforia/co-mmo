@@ -463,6 +463,24 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #loot .buttons { display: flex; gap: 8px; margin-top: 12px; }
 #loot .note kbd { border: 1px solid var(--edge); padding: 0 4px; margin-right: 2px; }
 
+/* The world editor (Owner and Stewards): beside the world, so what it changes stays in view. */
+#editor { inset: 64px 16px auto auto; margin: 0; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 96px); }
+#editor .tools { display: flex; flex-wrap: wrap; gap: 4px; }
+#editor .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+#editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }
+#editor select, #editor input { background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; padding: 4px; max-width: 100%; }
+#editor input[type='number'] { width: 70px; }
+#editor .status { min-height: 1.4em; margin: 6px 0; color: #f2dc6b; }
+#editor h3 { display: flex; justify-content: space-between; align-items: center; }
+#editor h3 span { display: flex; gap: 4px; text-transform: none; }
+#editor .edits { list-style: none; margin: 0; padding: 0; }
+#editor .edits li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--edge); }
+#editor .edits .by { color: var(--muted); font-size: 11px; }
+#editor .edits button { padding: 0 6px; }
+@media (max-width: 600px) { #editor { inset: auto 16px 16px 16px; width: auto; max-height: 50vh; } }
+#editor button.quiet:not(.close) { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
+#editor button:disabled { opacity: 0.45; cursor: default; }
+
 /* --- Performance overlay (Stewards and the Owner, F3) ---------------------- */
 
 #perf {

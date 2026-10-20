@@ -1154,6 +1154,46 @@ export class WorldScene extends Phaser.Scene {
     this.placeHeld(a, 'left');
   }
 
+  /**
+   * The land and tile under a point on the screen (a pointer's position
+   * in the page), for the world editor; undefined over no land drawn.
+   * Works through either camera: the projection is turned back from screen
+   * to tiles by its own three points.
+   */
+  tileAt(screenX: number, screenY: number): { region: string; map: RegionMap; x: number; y: number } | undefined {
+    const at = this.cameras.main.getWorldPoint(screenX, screenY);
+    const o = PROJECTION.toScreen(0, 0);
+    const ex = PROJECTION.toScreen(1, 0);
+    const ey = PROJECTION.toScreen(0, 1);
+    const [ax, ay, bx, by] = [ex.x - o.x, ex.y - o.y, ey.x - o.x, ey.y - o.y];
+    const det = ax * by - bx * ay;
+    const [sx, sy] = [at.x - o.x, at.y - o.y];
+    const wx = Math.floor((sx * by - bx * sy) / det);
+    const wy = Math.floor((ax * sy - sx * ay) / det);
+    for (const [region, drawn] of this.drawn) {
+      const { at: cell } = drawn.map.def;
+      const x = wx - cell.x * drawn.map.width;
+      const y = wy - cell.y * drawn.map.height;
+      if (x >= 0 && y >= 0 && x < drawn.map.width && y < drawn.map.height) return { region, map: drawn.map, x, y };
+    }
+    return undefined;
+  }
+
+  /** The name of a land drawn around us. */
+  landName(region: string): string | undefined {
+    return this.drawn.get(region)?.map.def.name;
+  }
+
+  /** The screen corners of a rectangle of tiles in a land, for the world editor's outlines. */
+  tileCorners(map: RegionMap, x: number, y: number, width = 1, height = 1): Phaser.Math.Vector2[] {
+    const ox = map.def.at.x * map.width;
+    const oy = map.def.at.y * map.height;
+    return [[x, y], [x + width, y], [x + width, y + height], [x, y + height]].map(([cx, cy]) => {
+      const p = PROJECTION.toScreen(ox + cx!, oy + cy!);
+      return new Phaser.Math.Vector2(p.x, p.y);
+    });
+  }
+
   /** Our own weapon or charm (right hand) and off-hand item (left hand). */
   setMyHeld(item: string | undefined, offHand: string | undefined): void {
     if (!this.me) return;

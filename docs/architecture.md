@@ -111,6 +111,22 @@ caves, castle, palaces, tomb and wonders, joined by roads and bridges) and
 they need is a description: buildings in `land-buildings.ts`, the rest in
 `server/src/assets/land-anchors.ts`.
 
+**The world editor.** The Owner and Stewards change the lands in the game
+(the "Edit world" button). An edit is data on its land's definition
+(`RegionDef.edits`, shared `world-edits.ts`): paint ground, paths, water,
+trees or rocks; move or take away a tree, rock, water or set piece; a road;
+a house of any building style (kit-friendly floor sizes, so it stands as a
+kit house in the isometric preview); a monster spawn; clearing monsters
+away. `generateRegion` lays the edits over the land in order, so the server,
+every region server and every browser lay out the same map, and a browser
+draws a land again when its definition changes. `world-editor.ts` keeps
+each land's edits in the store (`world_edits` table) with undo and redo,
+refuses edits that do not fit or would block where players arrive, and has
+`World.reshape` set the land up again wherever it runs, players put back
+where they stood or the nearest open spot. Routes in `world-edit-routes.ts`;
+the window is `client/src/editor-ui.ts`, whose tile outlines are the
+editor's own marks, seen only while it is open, never game art.
+
 **The building kit.** `shared/src/building-kit/` (exported as `buildingKit`)
 turns a building as data (`BuildingSpec`: footprint in bays, doors and
 windows per wall, stairs) into exact parts on one set of sizes, with each

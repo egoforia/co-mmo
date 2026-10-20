@@ -6,7 +6,7 @@ import type { Sql, SqlQuery } from './db.ts';
  * read the tables with any Postgres tool; the game keeps a copy in memory
  * and writes only what changed.
  */
-export const TABLES = ['accounts', 'invites', 'content', 'reports', 'spend', 'journal', 'drafts', 'rule_data', 'settings'] as const;
+export const TABLES = ['accounts', 'invites', 'content', 'reports', 'spend', 'journal', 'drafts', 'rule_data', 'world_edits', 'settings'] as const;
 export type Table = (typeof TABLES)[number];
 
 /** One saved thing: its key, its place in the order, and its JSON. */

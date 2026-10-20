@@ -7,6 +7,7 @@ import {
   BUILDING_STYLES,
   FACINGS,
   ISO_WAYS,
+  ISO_WAY_BESIDE,
   WALK_CYCLE_SECONDS,
   WALK_DIRECTIONS,
   WALK_FRAMES,
@@ -15,6 +16,7 @@ import {
   walkArt,
   wishArtKey,
   isFacing,
+  isWalkDirection,
   type ArtManifest,
   type BiomeId,
   type Facing,
@@ -409,7 +411,7 @@ export class ArtStudio {
         const walker = this.walker(ask.walker, 'two-legged');
         const direction = this.facing(ask.direction);
         title = `Paint ${walker.name} standing, facing ${facingWords(direction)}`;
-        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), viewSources(ask.from)) });
+        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), await this.sourcesFor(walker, direction, ask.from)) });
       } else if (ask.kind === 'ways') {
         const todo = await this.missingWays(ask.walker);
         const one = ask.walker ? this.walker(ask.walker, 'two-legged') : undefined;
@@ -659,15 +661,29 @@ export class ArtStudio {
     for (const walker of walkers) {
       for (const way of ISO_WAYS) {
         if ((await this.options.walks.standing(walker, way)).url) continue;
-        const from: ViewSource[] = ['approved'];
-        for (const beside of WAYS_BESIDE[way]) {
-          const view = await this.options.walks.standing(walker, beside);
-          if (view.url && !view.approved) from.push(beside);
-        }
-        out.push({ walker, way, from });
+        out.push({ walker, way, from: await this.besideSources(walker, way) });
       }
     }
     return out;
+  }
+
+  /**
+   * What a standing picture is painted from: the pictures chosen, or for an
+   * isometric way, the approved picture and the standing pictures painted
+   * for the ways on either side; otherwise the approved picture alone.
+   */
+  private async sourcesFor(walker: Walker, direction: Facing, from: string[] | undefined): Promise<ViewSource[] | undefined> {
+    return viewSources(from) ?? (isWalkDirection(direction) ? undefined : this.besideSources(walker, direction));
+  }
+
+  /** The approved picture, and the painted standing pictures of the ways either side of an isometric way. */
+  private async besideSources(walker: Walker, way: IsoWay): Promise<ViewSource[]> {
+    const from: ViewSource[] = ['approved'];
+    for (const beside of ISO_WAY_BESIDE[way]) {
+      const view = await this.options.walks.standing(walker, beside);
+      if (view.url && !view.approved) from.push(beside);
+    }
+    return from;
   }
 
   /** A shipped scenery piece, character or item that can be painted again. */
@@ -788,7 +804,7 @@ export class ArtStudio {
     const estimateUsd = estimateImageUsd(image.model);
     const own = ownPrompt(prompt);
     const handle = this.options.jobs.add(`${walker.id}-${d}`, `${walker.name} standing, facing ${facingWords(d)}`, 'picture', 'gods-view', estimateUsd);
-    const sources = viewSources(from);
+    const sources = await this.sourcesFor(walker, d, from);
     this.enqueue(() => this.options.walks.paintView(walker, d, own, handle, sources), handle, { kind: 'view', walker: walkerId, direction: d, ...(own ? { prompt: own } : {}), ...(sources ? { from: [...sources] } : {}) });
     return { estimateUsd };
   }
@@ -1107,10 +1123,3 @@ function viewSources(from: string[] | undefined): ViewSource[] | undefined {
   return sources.length ? sources : undefined;
 }
 
-/** The ways on either side of each isometric way, whose standing pictures show what it shows. */
-const WAYS_BESIDE: Record<IsoWay, Facing[]> = {
-  'front-left': ['front', 'left'],
-  'front-right': ['front', 'right'],
-  'back-left': ['back', 'left'],
-  'back-right': ['back', 'right'],
-};

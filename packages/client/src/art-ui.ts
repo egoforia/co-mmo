@@ -5,7 +5,7 @@
 // be sent to the AI model and approved it, and every version keeps that same
 // information so an old one can be compared with today's and put back.
 
-import { HELD_SIZE, ISO_WAYS, heldBehind, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
+import { HELD_SIZE, ISO_WAYS, ISO_WAY_BESIDE, heldBehind, isWalkDirection, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
 import { lightPreviews } from './light-preview.ts';
@@ -631,7 +631,9 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
 function sourcesHtml(ask: Extract<Ask, { what: 'view' }>): string {
   const w = data!.walkers.find((x) => x.id === ask.walker);
   if (!w) return '';
-  const from = ask.from ?? ['approved'];
+  // The server's choice when none is made: an isometric way is painted from the ways either side too.
+  const beside = isWalkDirection(ask.direction) ? [] : ISO_WAY_BESIDE[ask.direction].filter((d) => w.standing[d].url && !w.standing[d].approved);
+  const from = ask.from ?? ['approved', ...beside];
   const options: [string, string, string | undefined][] = [['approved', 'The approved picture', w.url]];
   for (const [d, label] of FACING_WORDS) {
     const view = w.standing[d];

@@ -374,6 +374,10 @@ describe('the Art tab', () => {
     // The rest in one go, each painted from the approved picture and any way beside it already painted.
     expect((await ask(base, owner.token, 'view', { walker: 'desert-scarab', direction: 'left' })).status).toBe(202);
     await app!.art.idle();
+    // Painted again on its own, an isometric way is painted from the side view beside it too, so it turns the right way.
+    const again = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left' });
+    expect(again.body.parts[0].recipe.steps[0].pictures.map((p: any) => p.name)).toEqual(["Sun Scarab's approved picture, on magenta", 'Sun Scarab standing, facing left, on magenta']);
+    expect(again.body.parts[0].recipe.steps[0].prompt).toContain('facing the lower-right corner.');
     const rest = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'ways', walker: 'desert-scarab' });
     expect(rest.status).toBe(200);
     expect(rest.body.title).toBe('Paint Sun Scarab standing in 3 more isometric ways');

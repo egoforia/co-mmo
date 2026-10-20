@@ -46,6 +46,14 @@ const SEEN: Record<Facing, string> = {
   'back-right': "in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us",
 };
 
+/** The mirror of each isometric way, which the image model kept painting instead. */
+const WRONG_CORNER: Record<Exclude<Facing, WalkDirection>, string> = {
+  'front-left': 'facing the lower-right corner',
+  'front-right': 'facing the lower-left corner',
+  'back-left': 'facing the upper-right corner',
+  'back-right': 'facing the upper-left corner',
+};
+
 /**
  * Where each carried item shows in a view, item by item. Rules about "their
  * left side" in general fail; naming each item and saying in front of or
@@ -80,7 +88,7 @@ export function viewPrompt(name: string, gear: Carried[], direction: Facing, ref
     `Paint ${name} ${from}, full body, standing in a relaxed pose, ${SEEN[direction]}. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.`,
     gearPlacement(gear, direction),
     `Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (${KEY_COLOR.hex}), with no floor or shadow. No magenta in the character.`,
-    `Avoid: ${[...NEGATIVE_PROMPT, 'second figure', 'turnaround sheet', 'cast shadow'].join(', ')}.`,
+    `Avoid: ${[...NEGATIVE_PROMPT, 'second figure', 'turnaround sheet', 'cast shadow', ...(isWalkDirection(direction) ? [] : [WRONG_CORNER[direction]])].join(', ')}.`,
   ].filter(Boolean).join('\n');
 }
 

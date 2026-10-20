@@ -7,6 +7,7 @@ import {
   BUILDING_STYLES,
   FACINGS,
   ISO_WAYS,
+  ISO_WAY_BESIDE,
   WALK_CYCLE_SECONDS,
   WALK_DIRECTIONS,
   WALK_FRAMES,
@@ -15,6 +16,7 @@ import {
   walkArt,
   wishArtKey,
   isFacing,
+  isWalkDirection,
   type ArtManifest,
   type BiomeId,
   type Facing,
@@ -121,7 +123,7 @@ export type ArtAsk =
   | { kind: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   /** The isometric ways one walker, or every walker, has no standing picture for yet. */
   | { kind: 'ways'; walker?: string }
-  | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
+  | { kind: 'clip'; walker: string; body: string; direction: Facing; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string }
   | { kind: 'normal'; asset: string; prompt?: string }
   | { kind: 'sheet'; look: string; textures?: string[]; note?: string };
@@ -144,10 +146,10 @@ export interface WalkerView {
   url?: string;
   /** Where it sits in the Art tab. */
   place: ArtPlace;
-  /** Each direction's walk strip, when it has one: its frames side by side. */
-  walks: Partial<Record<WalkDirection, WalkStrip>>;
-  /** Earlier walks of directions that have none now. */
-  lost: Partial<Record<WalkDirection, WalkVersion[]>>;
+  /** Each way's walk strip, when it has one: its frames side by side. */
+  walks: Partial<Record<Facing, WalkStrip>>;
+  /** Earlier walks of ways that have none now. */
+  lost: Partial<Record<Facing, WalkVersion[]>>;
   /** Each way's standing picture: for the top-down ways, what its walk clip starts and ends on. */
   standing: Record<Facing, StandingView>;
   /** About what making the missing walks costs. */
@@ -362,7 +364,7 @@ export class ArtStudio {
     for (const w of this.walkerList()) {
       const walks: WalkerView['walks'] = {};
       const lost: WalkerView['lost'] = {};
-      for (const d of WALK_DIRECTIONS) {
+      for (const d of FACINGS) {
         const id = walkArt(w.id, d);
         const entry = painted[id] ?? shipped[id];
         const versions = await this.options.walks.versions(w.id, d);
@@ -409,7 +411,7 @@ export class ArtStudio {
         const walker = this.walker(ask.walker, 'two-legged');
         const direction = this.facing(ask.direction);
         title = `Paint ${walker.name} standing, facing ${facingWords(direction)}`;
-        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), viewSources(ask.from)) });
+        parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), await this.sourcesFor(walker, direction, ask.from)) });
       } else if (ask.kind === 'ways') {
         const todo = await this.missingWays(ask.walker);
         const one = ask.walker ? this.walker(ask.walker, 'two-legged') : undefined;
@@ -428,8 +430,8 @@ export class ArtStudio {
         parts.push(...byWalker.values());
       } else if (ask.kind === 'clip') {
         const walker = this.walker(ask.walker, ask.body);
-        const direction = this.direction(ask.direction);
-        title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : `facing ${direction}`}`;
+        const direction = this.facing(ask.direction);
+        title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : isWalkDirection(direction) ? `facing ${direction}` : `walking ${facingWords(direction)}`}`;
         parts.push({ name: walker.name, recipe: await this.options.walks.previewClip(walker, direction, ownPrompt(ask.prompt)) });
       } else if (ask.kind === 'normal') {
         const name = await this.nameOf(ask.asset);
@@ -659,15 +661,29 @@ export class ArtStudio {
     for (const walker of walkers) {
       for (const way of ISO_WAYS) {
         if ((await this.options.walks.standing(walker, way)).url) continue;
-        const from: ViewSource[] = ['approved'];
-        for (const beside of WAYS_BESIDE[way]) {
-          const view = await this.options.walks.standing(walker, beside);
-          if (view.url && !view.approved) from.push(beside);
-        }
-        out.push({ walker, way, from });
+        out.push({ walker, way, from: await this.besideSources(walker, way) });
       }
     }
     return out;
+  }
+
+  /**
+   * What a standing picture is painted from: the pictures chosen, or for an
+   * isometric way, the approved picture and the standing pictures painted
+   * for the ways on either side; otherwise the approved picture alone.
+   */
+  private async sourcesFor(walker: Walker, direction: Facing, from: string[] | undefined): Promise<ViewSource[] | undefined> {
+    return viewSources(from) ?? (isWalkDirection(direction) ? undefined : this.besideSources(walker, direction));
+  }
+
+  /** The approved picture, and the painted standing pictures of the ways either side of an isometric way. */
+  private async besideSources(walker: Walker, way: IsoWay): Promise<ViewSource[]> {
+    const from: ViewSource[] = ['approved'];
+    for (const beside of ISO_WAY_BESIDE[way]) {
+      const view = await this.options.walks.standing(walker, beside);
+      if (view.url && !view.approved) from.push(beside);
+    }
+    return from;
   }
 
   /** A shipped scenery piece, character or item that can be painted again. */
@@ -788,7 +804,7 @@ export class ArtStudio {
     const estimateUsd = estimateImageUsd(image.model);
     const own = ownPrompt(prompt);
     const handle = this.options.jobs.add(`${walker.id}-${d}`, `${walker.name} standing, facing ${facingWords(d)}`, 'picture', 'gods-view', estimateUsd);
-    const sources = viewSources(from);
+    const sources = await this.sourcesFor(walker, d, from);
     this.enqueue(() => this.options.walks.paintView(walker, d, own, handle, sources), handle, { kind: 'view', walker: walkerId, direction: d, ...(own ? { prompt: own } : {}), ...(sources ? { from: [...sources] } : {}) });
     return { estimateUsd };
   }
@@ -815,7 +831,7 @@ export class ArtStudio {
   async makeClip(walkerId: string, body: string, direction: string, prompt?: string): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, body);
-    const d = this.direction(direction);
+    const d = this.facing(direction);
     const video = this.options.ai.video();
     if (!video) throw new ArtRequestError("Walks are made with Google's video model, which needs Google AI Studio as the image model and its key.");
     const estimateUsd = estimateClipUsd(video.model);
@@ -887,8 +903,7 @@ export class ArtStudio {
   async restoreWalk(walkerId: string, direction: string, version: string): Promise<void> {
     const found = this.walkerList().find((w) => w.id === walkerId);
     if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
-    if (!WALK_DIRECTIONS.includes(direction as WalkDirection)) throw new ArtRequestError('That is not a direction.');
-    if (!(await this.options.walks.restore(found, direction as WalkDirection, version))) throw new ArtRequestError('That earlier walk is not there any more.');
+    if (!(await this.options.walks.restore(found, this.facing(direction), version))) throw new ArtRequestError('That earlier walk is not there any more.');
   }
 
   /** Puts an earlier standing picture back in one direction, for free; its walk clip is not made again. */
@@ -1107,10 +1122,3 @@ function viewSources(from: string[] | undefined): ViewSource[] | undefined {
   return sources.length ? sources : undefined;
 }
 
-/** The ways on either side of each isometric way, whose standing pictures show what it shows. */
-const WAYS_BESIDE: Record<IsoWay, Facing[]> = {
-  'front-left': ['front', 'left'],
-  'front-right': ['front', 'right'],
-  'back-left': ['back', 'left'],
-  'back-right': ['back', 'right'],
-};

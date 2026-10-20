@@ -407,7 +407,7 @@ export async function handleAdmin(
       'art/walk': () => ({ kind: 'walk', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), directions, views: body?.views === true }),
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
       'art/ways': () => ({ kind: 'ways', ...(walker ? { walker } : {}) }),
-      'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as WalkDirection, ...(prompt ? { prompt } : {}) }),
+      'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}) }),
       'art/normal': () => ({ kind: 'normal', asset: String(body?.asset ?? ''), ...(prompt ? { prompt } : {}) }),
       'art/sheet': () => ({ kind: 'sheet', look: String(body?.look ?? ''), textures, note }),
     };

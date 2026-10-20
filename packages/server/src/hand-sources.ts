@@ -40,7 +40,7 @@ export function pointSources(store: Store, shipped: ArtManifest, painted: ArtMan
   const looks = store.content.filter((r) => r.status === 'granted' && r.definition?.kind === 'player').map((r) => wishArtKey(r.id));
   return [
     ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'walk' ? source(id, 'hands', e.file, e.frames ?? WALK_FRAMES) : [])),
-    // The isometric ways have no walks yet: walkers stand in these pictures, so their hands are found there.
+    // Walkers stand in the isometric ways' pictures (and glide in them until those ways have walks), so their hands are found there.
     ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'stand' && ISO_STAND.test(id) ? source(id, 'hands', e.file) : [])),
     ...WALKING_LOOKS.flatMap((id) => source(id, 'hands', art[id]?.file)),
     ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),

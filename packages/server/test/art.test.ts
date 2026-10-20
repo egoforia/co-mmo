@@ -348,7 +348,7 @@ describe('the Art tab', () => {
     expect(Object.keys(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8')))).toEqual([walkArt('desert-scarab', 'left')]);
   }, 60_000);
 
-  it('paints the isometric ways as standing pictures only, from the approved picture and the ways beside them', async () => {
+  it('paints the isometric ways standing, from the approved picture and the ways beside them, and makes their walks only when asked', async () => {
     const clips = video();
     const painted: string[] = [];
     const base0 = figurePainter();
@@ -359,7 +359,7 @@ describe('the Art tab', () => {
     const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter, video: clips, frames });
     const owner = account(store, 'Ego', 'owner');
 
-    // One way on its own: turned halfway, and served as a standing picture, never walked.
+    // One way on its own: turned halfway, and served as a standing picture; nothing walks until a clip is asked for.
     const one = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left' });
     expect(one.status).toBe(200);
     expect(one.body.title).toBe('Paint Sun Scarab standing, facing towards us and to the left');
@@ -369,11 +369,16 @@ describe('the Art tab', () => {
     const art = (await api(base, '/api/art', owner.token)).body;
     expect(art[walkStandArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'stand', file: expect.stringMatching(/^wished-art\/walks\/views\/desert-scarab-front-left\.png\?v=/) });
     expect(art[walkStandArt('desert-scarab', 'left')]).toBeUndefined();
-    expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'front-left' })).body.message).toBeTruthy();
+    expect(art[walkArt('desert-scarab', 'front-left')]).toBeUndefined();
+    expect(clips.asked).toHaveLength(0);
 
     // The rest in one go, each painted from the approved picture and any way beside it already painted.
     expect((await ask(base, owner.token, 'view', { walker: 'desert-scarab', direction: 'left' })).status).toBe(202);
     await app!.art.idle();
+    // Painted again on its own, an isometric way is painted from the side view beside it too, so it turns the right way.
+    const again = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left' });
+    expect(again.body.parts[0].recipe.steps[0].pictures.map((p: any) => p.name)).toEqual(["Sun Scarab's approved picture, on magenta", 'Sun Scarab standing, facing left, on magenta']);
+    expect(again.body.parts[0].recipe.steps[0].prompt).toContain('facing the lower-right corner.');
     const rest = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'ways', walker: 'desert-scarab' });
     expect(rest.status).toBe(200);
     expect(rest.body.title).toBe('Paint Sun Scarab standing in 3 more isometric ways');
@@ -389,6 +394,22 @@ describe('the Art tab', () => {
     const scarab = (await api(base, '/api/admin/art', owner.token)).body.walkers.find((w: any) => w.id === 'desert-scarab');
     for (const way of ['front-left', 'front-right', 'back-left', 'back-right']) expect(scarab.standing[way].url).toBeTruthy();
     expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'ways', walker: 'desert-scarab' })).body.message).toMatch(/already has a standing picture for every isometric way/);
+
+    // A way's walk clip starts and ends on its standing picture, keeping the three-quarter turn, and the game walks it at once.
+    const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'front-left' });
+    expect(clip.status).toBe(200);
+    expect(clip.body.title).toBe("Make Sun Scarab's walk clip, walking towards us and to the left");
+    expect(clip.body.parts[0].recipe.steps[0]).toMatchObject({ media: 'clip', pictures: [{ name: 'First and last frame: Sun Scarab standing, facing towards us and to the left' }] });
+    expect(clip.body.parts[0].recipe.steps[0].prompt).toContain('facing the LOWER-LEFT corner of the picture: the nose');
+    expect(clip.body.parts[0].recipe.steps[0].prompt).toContain('keeps exactly this three-quarter turn the whole time');
+    expect((await api(base, '/api/admin/art/clip', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', direction: 'front-left', approved: clip.body.fingerprint })).status).toBe(202);
+    await app!.art.idle();
+    expect(clips.asked).toHaveLength(1);
+    const walked = (await api(base, '/api/art', owner.token)).body;
+    expect(walked[walkArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'walk', frames: expect.any(Number) });
+    expect(walked[walkArt('desert-scarab', 'front-right')]).toBeUndefined();
+    const after = (await api(base, '/api/admin/art', owner.token)).body.walkers.find((w: any) => w.id === 'desert-scarab');
+    expect(after.walks['front-left']).toMatchObject({ frames: expect.any(Number) });
   }, 60_000);
 
   it('shows every walker\'s missing isometric ways in one review, a part per walker', async () => {

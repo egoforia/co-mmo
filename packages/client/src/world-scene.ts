@@ -562,44 +562,39 @@ export class WorldScene extends Phaser.Scene {
   /**
    * Plays an avatar's walk for its step, `step` along the grid and `screen`
    * on screen, and stands it still facing that way when it stops. A camera
-   * with ways of its own (the isometric one) shows the standing picture
-   * painted for the way it faces, gliding, since those ways have no walks
-   * yet. Until that is painted, and in the top-down camera, each way on its
-   * own: its walk when one is painted, else its standing picture facing that
-   * way, else its own picture, turned to face left or right.
+   * with ways of its own (the isometric one) shows the walk made for the way
+   * it faces, else the standing picture painted for it, gliding. Until that
+   * is painted, and in the top-down camera, each way on its own: its walk
+   * when one is made, else its standing picture facing that way, else its
+   * own picture, turned to face left or right.
    */
   private walk(a: Avatar, step: { dx: number; dy: number }, screen: { dx: number; dy: number }): void {
     a.facing = PROJECTION.face(step.dx, step.dy, a.facing);
     a.turn = walkDirection(screen.dx, screen.dy, a.turn);
-    const way = walkStandArt(a.art, a.facing);
-    if (!isWalkDirection(a.facing) && this.textures.exists(way)) {
-      if (a.body.anims.isPlaying) a.body.stop();
-      a.body.setFlipX(false);
-      if (a.body.texture.key !== way) this.dress(a, way);
-      a.worn = a.facing;
-      return;
-    }
-    a.worn = a.turn;
-    const { dx, dy } = screen;
-    const sheet = walkArt(a.art, a.turn);
-    if (this.anims.exists(sheet)) {
-      a.body.setFlipX(false);
-      if (dx !== 0 || dy !== 0) {
-        if (a.body.anims.currentAnim?.key !== sheet || !a.body.anims.isPlaying) {
-          a.body.play(sheet, true);
-          this.fit(a, sheet, !!a.fit);
-        }
-        a.body.anims.timeScale = a.pace ?? 1;
+    const moving = screen.dx !== 0 || screen.dy !== 0;
+    if (!isWalkDirection(a.facing)) {
+      const way = walkStandArt(a.art, a.facing);
+      const walking = walkArt(a.art, a.facing);
+      if (this.anims.exists(walking)) {
+        a.worn = a.facing;
+        // Standing still since it came into view: show the way it faces, not whatever it wore before.
+        if (!moving && !a.body.anims.isPlaying && this.textures.exists(way) && a.body.texture.key !== way && a.body.texture.key !== walking) this.dress(a, way);
+        else this.stride(a, walking, moving, way);
         return;
       }
-      if (!a.body.anims.isPlaying) return;
-      a.body.stop();
-      // Facing us, the approved standing pose; any other way, the walk's first step.
-      if (a.turn === 'front' && this.textures.exists(a.art)) this.dress(a, a.art);
-      else {
-        a.body.setTexture(sheet, 0);
-        this.fit(a, sheet, !!a.fit);
+      if (this.textures.exists(way)) {
+        if (a.body.anims.isPlaying) a.body.stop();
+        a.body.setFlipX(false);
+        if (a.body.texture.key !== way) this.dress(a, way);
+        a.worn = a.facing;
+        return;
       }
+    }
+    a.worn = a.turn;
+    const sheet = walkArt(a.art, a.turn);
+    if (this.anims.exists(sheet)) {
+      // Facing us, the approved standing pose; any other way, the walk's first step.
+      this.stride(a, sheet, moving, a.turn === 'front' ? a.art : undefined);
       return;
     }
     // No walk painted this way: another way's walk stops.
@@ -611,7 +606,30 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     if (this.textures.exists(a.art) && a.body.texture.key !== a.art) this.dress(a, a.art);
-    if (dx !== 0) a.body.setFlipX(dx < 0);
+    if (screen.dx !== 0) a.body.setFlipX(screen.dx < 0);
+  }
+
+  /**
+   * Plays the walk strip `sheet` while moving; on stopping, stands in
+   * `standing` when that picture is there, else the walk's first step.
+   */
+  private stride(a: Avatar, sheet: string, moving: boolean, standing: string | undefined): void {
+    a.body.setFlipX(false);
+    if (moving) {
+      if (a.body.anims.currentAnim?.key !== sheet || !a.body.anims.isPlaying) {
+        a.body.play(sheet, true);
+        this.fit(a, sheet, !!a.fit);
+      }
+      a.body.anims.timeScale = a.pace ?? 1;
+      return;
+    }
+    if (!a.body.anims.isPlaying) return;
+    a.body.stop();
+    if (standing && this.textures.exists(standing)) this.dress(a, standing);
+    else {
+      a.body.setTexture(sheet, 0);
+      this.fit(a, sheet, !!a.fit);
+    }
   }
 
   /** Puts a picture on an avatar, at the size its own picture is shown at. */

@@ -209,7 +209,13 @@ worked out for every picture in a worker; a painted `<key>-normal` wins),
 Stewards and the Owner, F3 or Account: frame rate and stutters, draw calls,
 objects, lights, pictures held for the GPU, memory, ping and snapshots, what
 is drawn near you, and the server running your part of the world from
-`GET /api/admin/perf`; it measures nothing while hidden), and one `*-ui.ts`
+`GET /api/admin/perf`; it measures nothing while hidden), `mini-map.ts` +
+`mini-map-plan.ts` + `mini-map-art.ts` (the mini map, M or the HUD's Map
+button: your floor centred on you, turned as the camera turns, put together
+from the land's painted tiles, trees, set pieces and people's pictures
+shrunk, with zoom and a look at the other floors where you stand;
+minimized or closed it draws nothing; the
+scene hands it `miniMapView()`), and one `*-ui.ts`
 per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and
 `api-log-ui.ts`.

@@ -203,6 +203,27 @@ const LABEL_DEPTH = 1_000_000;
 /** How high kit walls stand in the isometric camera, as a share of a ground diamond's height: cut low, like the building kit's near walls. */
 const WALL_RISE = 0.4;
 
+/** Someone the mini map shows: where they stand in our region's tiles, and the picture they wear. */
+export interface MapFigure {
+  x: number;
+  y: number;
+  art: string;
+  kind: 'me' | 'player' | 'creature' | 'npc';
+}
+
+/** What the mini map needs to draw our floor and look at the others. */
+export interface MiniMapView {
+  /** The scene whose painted pictures the map is put together from. */
+  scene: Phaser.Scene;
+  map: RegionMap;
+  /** Grows as more art is painted and loaded, so the map is put together again (as it is when `map` is laid out anew). */
+  artLoaded: number;
+  /** The floor we are on. */
+  floor: number;
+  /** Us first, then everyone near us on our floor. */
+  figures: MapFigure[];
+}
+
 /** What the world scene holds right now, for the performance overlay. */
 export interface SceneCounts {
   players: number;
@@ -259,6 +280,8 @@ export class WorldScene extends Phaser.Scene {
   private nearAt = '';
   /** Kit houses' pictures, loaded as they are drawn on the server. */
   private houseArt!: HouseArt;
+  /** Counts pictures loaded since we started, so the mini map knows when to put its floors together again. */
+  private artLoaded = 0;
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -529,6 +552,19 @@ export class WorldScene extends Phaser.Scene {
     };
   }
 
+  /** Our floor and who is on it, for the mini map; undefined until we have arrived. */
+  miniMapView(): MiniMapView | undefined {
+    if (!this.predictor || !this.me || !this.sys.isActive()) return undefined;
+    const figures: MapFigure[] = [{ x: this.shown.x, y: this.shown.y, art: this.me.art, kind: 'me' }];
+    const add = (group: Map<string, Avatar>, kind: MapFigure['kind']) => {
+      for (const a of group.values()) if (a.at) figures.push({ x: a.at.x, y: a.at.y, art: a.art, kind });
+    };
+    add(this.remotes, 'player');
+    add(this.creatures, 'creature');
+    add(this.npcs, 'npc');
+    return { scene: this, map: this.map, artLoaded: this.artLoaded, floor: this.floor, figures };
+  }
+
   onSnapshot(snapshot: SnapshotMessage): void {
     if (!this.predictor || !this.sys.isActive()) return;
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
@@ -766,6 +802,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.loadedArt.get(key) !== url) return;
     if (this.textures.exists(key)) this.textures.remove(key);
     this.textures.addImage(key, img);
+    this.artLoaded++;
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
     if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
     this.figures.delete(key);

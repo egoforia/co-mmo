@@ -170,6 +170,20 @@ const T = TILE_PIXELS;
 const BOLT_LIGHT: Light = { ...FLAME_LIGHT, radius: 2 };
 const LABEL_DEPTH = 1_000_000;
 
+/** What the world scene holds right now, for the performance overlay. */
+export interface SceneCounts {
+  players: number;
+  creatures: number;
+  npcs: number;
+  bodies: number;
+  /** Regions drawn (ours and those beside it), and their chunks of ground and scenery drawn near us. */
+  regions: number;
+  chunks: number;
+  lamps: number;
+  /** The tile we stand on. */
+  tile?: { x: number; y: number };
+}
+
 export class WorldScene extends Phaser.Scene {
   private welcome: WelcomeMessage;
   private map!: RegionMap;
@@ -419,6 +433,21 @@ export class WorldScene extends Phaser.Scene {
   /** The hour and the weather in a few words. */
   skyText(): string {
     return this.sky.words();
+  }
+
+  /** What is drawn and alive on screen, for the performance overlay. */
+  counts(): SceneCounts {
+    const regions = [...this.drawn.values()];
+    return {
+      players: this.remotes.size + (this.me ? 1 : 0),
+      creatures: this.creatures.size,
+      npcs: this.npcs.size,
+      bodies: this.bodies.size,
+      regions: regions.length,
+      chunks: regions.reduce((n, r) => n + r.chunks.size, 0),
+      lamps: regions.reduce((n, r) => n + r.lamps.length, 0),
+      tile: this.predictor ? { x: Math.floor(this.predictor.position.x), y: Math.floor(this.predictor.position.y) } : undefined,
+    };
   }
 
   onSnapshot(snapshot: SnapshotMessage): void {

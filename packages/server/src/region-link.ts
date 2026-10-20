@@ -112,7 +112,14 @@ export interface ServerLoad {
   tickMs: number;
   /** The slowest tick lately, ms. */
   worstTickMs: number;
+  /** Ticks run a second lately; the tick rate when it keeps up. */
+  ticksPerSecond: number;
+  /** How late the event loop ran timers lately, ms: the usual delay and the worst one in a hundred. */
+  lagMs: number;
+  worstLagMs: number;
+  /** All the process holds, and the part that is JavaScript objects. */
   memoryMb: number;
+  heapMb: number;
   errors: number;
   lastError?: string;
   /** Machine and process, so the Owner can find it. */

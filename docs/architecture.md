@@ -60,6 +60,11 @@ on another object after it is built). `region-main.ts` starts a region server.
   from settings, keys and the budget; tests override one at a time.
 - `api-log.ts`: records every request to an outside service, secrets masked.
 
+**How hard it works.** `load-meter.ts` times each tick, ticks a second,
+the event loop's delay and memory, in the gateway and every region server;
+God's View's Server health tab shows every host, and `perf.ts` gives the
+performance overlay the host running a player's region.
+
 **HTTP and the socket.** `http.ts` (JSON, files, bearer tokens),
 `account-routes.ts`, `auth.ts`, `admin.ts` (God's View API), `art-files.ts`
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
@@ -150,7 +155,12 @@ sun or moon of the hour from shared `lighting.ts`, and lamps at fires,
 lanterns, shrines and windows; characters get a rim light; `light-preview.ts`
 shows the same light in the Art tab), `normal-maps.ts` + `relief.ts` + `relief-worker.ts` (a normal map
 worked out for every picture in a worker; a painted `<key>-normal` wins),
-`sound.ts`, and one `*-ui.ts` per panel. God's View is
+`sound.ts`, `perf-overlay.ts` + `perf-stats.ts` (the performance overlay for
+Stewards and the Owner, F3 or Account: frame rate and stutters, draw calls,
+objects, lights, pictures held for the GPU, memory, ping and snapshots, what
+is drawn near you, and the server running your part of the world from
+`GET /api/admin/perf`; it measures nothing while hidden), and one `*-ui.ts`
+per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and
 `api-log-ui.ts`.
 

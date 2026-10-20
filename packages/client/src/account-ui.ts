@@ -1,6 +1,7 @@
 import { MAX_LOOK_LENGTH } from '@co-mmo/shared';
 import { accountInfo, describeLook, emailSignIn, linkUrl, setEmail, signInOptions, signOut, type AccountInfo } from './api.ts';
 import { previewOn, switchPreview } from './camera-preview.ts';
+import type { PerfOverlay } from './perf-overlay.ts';
 import { escapeHtml, showPanel } from './ui.ts';
 
 const PROVIDER_NAME = { google: 'Google', github: 'GitHub' } as const;
@@ -38,7 +39,7 @@ export async function showSignIn(message = ''): Promise<void> {
   });
 }
 
-/** The Account window: sign-in email, linked Google and GitHub, your look, signing out, and for the Owner the camera preview. */
+/** The Account window: sign-in email, linked Google and GitHub, your look, signing out, for the Owner the camera preview, and for Stewards and the Owner the performance overlay. */
 export class AccountWindow {
   private readonly el = document.getElementById('account')!;
 
@@ -46,6 +47,8 @@ export class AccountWindow {
     private readonly token: string,
     /** The Owner may switch on the isometric camera preview. */
     private readonly owner = false,
+    /** Stewards and the Owner may show the performance overlay. */
+    private readonly perf?: () => PerfOverlay | null,
   ) {
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !this.el.hidden) this.el.hidden = true;
@@ -94,6 +97,9 @@ export class AccountWindow {
       ${this.owner ? `<h3>Camera</h3>
       <p>The isometric camera is a preview only you can see, in this browser. Everyone else keeps today's view.</p>
       <button type="button" class="quiet" id="camera-preview">${previewOn() ? 'Back to the top-down view' : 'Try the isometric preview'}</button>` : ''}
+      ${this.perf ? `<h3>Performance</h3>
+      <p>Frame rate, memory, the network and the server, on top of the game. F3 shows and hides it too.</p>
+      <button type="button" class="quiet" id="perf-overlay">${this.perf()?.open ? 'Hide the performance numbers' : 'Show the performance numbers'}</button>` : ''}
       <p class="note" id="account-note"></p>
       <button type="button" class="quiet" id="sign-out">Sign out on this device</button>`;
     const note = this.el.querySelector<HTMLElement>('#account-note')!;
@@ -129,6 +135,12 @@ export class AccountWindow {
       });
     }
     this.el.querySelector('#camera-preview')?.addEventListener('click', () => switchPreview(!previewOn()));
+    this.el.querySelector<HTMLButtonElement>('#perf-overlay')?.addEventListener('click', (event) => {
+      const overlay = this.perf?.();
+      if (!overlay) return;
+      overlay.show(!overlay.open);
+      (event.currentTarget as HTMLButtonElement).textContent = overlay.open ? 'Hide the performance numbers' : 'Show the performance numbers';
+    });
     this.el.querySelector('#sign-out')!.addEventListener('click', async () => {
       await signOut(this.token);
       location.href = '/';

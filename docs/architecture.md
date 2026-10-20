@@ -187,7 +187,7 @@ per panel. God's View is
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). |
-| Isometric camera for everyone | `ISOMETRIC` exists as the Owner's preview (camera plan step 1, ground and scenery from step 2, kit houses). Still to come: lands repainted in its view words, the four facing ways painted for every walker (the Art tab's "Paint every walker's missing ways"; walks for them wait on the Owner), upright strips for big trees and set pieces, then `chooseCamera` picks it for players: https://claude.ai/code/artifact/3850d394-7032-47cb-bed1-a0a9fc135159 |
+| Isometric camera for everyone | `ISOMETRIC` exists as the Owner's preview (camera plan step 1, ground and scenery from step 2, kit houses). Still to come: lands repainted in its view words, the four facing ways painted for every walker (the Art tab's "Paint every walker's missing ways", then each way's walk clip), upright strips for big trees and set pieces, then `chooseCamera` picks it for players: https://claude.ai/code/artifact/3850d394-7032-47cb-bed1-a0a9fc135159 |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |

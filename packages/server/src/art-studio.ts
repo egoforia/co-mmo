@@ -123,7 +123,7 @@ export type ArtAsk =
   | { kind: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   /** The isometric ways one walker, or every walker, has no standing picture for yet. */
   | { kind: 'ways'; walker?: string }
-  | { kind: 'clip'; walker: string; body: string; direction: WalkDirection; prompt?: string }
+  | { kind: 'clip'; walker: string; body: string; direction: Facing; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string }
   | { kind: 'normal'; asset: string; prompt?: string }
   | { kind: 'sheet'; look: string; textures?: string[]; note?: string };
@@ -146,10 +146,10 @@ export interface WalkerView {
   url?: string;
   /** Where it sits in the Art tab. */
   place: ArtPlace;
-  /** Each direction's walk strip, when it has one: its frames side by side. */
-  walks: Partial<Record<WalkDirection, WalkStrip>>;
-  /** Earlier walks of directions that have none now. */
-  lost: Partial<Record<WalkDirection, WalkVersion[]>>;
+  /** Each way's walk strip, when it has one: its frames side by side. */
+  walks: Partial<Record<Facing, WalkStrip>>;
+  /** Earlier walks of ways that have none now. */
+  lost: Partial<Record<Facing, WalkVersion[]>>;
   /** Each way's standing picture: for the top-down ways, what its walk clip starts and ends on. */
   standing: Record<Facing, StandingView>;
   /** About what making the missing walks costs. */
@@ -364,7 +364,7 @@ export class ArtStudio {
     for (const w of this.walkerList()) {
       const walks: WalkerView['walks'] = {};
       const lost: WalkerView['lost'] = {};
-      for (const d of WALK_DIRECTIONS) {
+      for (const d of FACINGS) {
         const id = walkArt(w.id, d);
         const entry = painted[id] ?? shipped[id];
         const versions = await this.options.walks.versions(w.id, d);
@@ -430,8 +430,8 @@ export class ArtStudio {
         parts.push(...byWalker.values());
       } else if (ask.kind === 'clip') {
         const walker = this.walker(ask.walker, ask.body);
-        const direction = this.direction(ask.direction);
-        title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : `facing ${direction}`}`;
+        const direction = this.facing(ask.direction);
+        title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : isWalkDirection(direction) ? `facing ${direction}` : `walking ${facingWords(direction)}`}`;
         parts.push({ name: walker.name, recipe: await this.options.walks.previewClip(walker, direction, ownPrompt(ask.prompt)) });
       } else if (ask.kind === 'normal') {
         const name = await this.nameOf(ask.asset);
@@ -831,7 +831,7 @@ export class ArtStudio {
   async makeClip(walkerId: string, body: string, direction: string, prompt?: string): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.walker(walkerId, body);
-    const d = this.direction(direction);
+    const d = this.facing(direction);
     const video = this.options.ai.video();
     if (!video) throw new ArtRequestError("Walks are made with Google's video model, which needs Google AI Studio as the image model and its key.");
     const estimateUsd = estimateClipUsd(video.model);
@@ -903,8 +903,7 @@ export class ArtStudio {
   async restoreWalk(walkerId: string, direction: string, version: string): Promise<void> {
     const found = this.walkerList().find((w) => w.id === walkerId);
     if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
-    if (!WALK_DIRECTIONS.includes(direction as WalkDirection)) throw new ArtRequestError('That is not a direction.');
-    if (!(await this.options.walks.restore(found, direction as WalkDirection, version))) throw new ArtRequestError('That earlier walk is not there any more.');
+    if (!(await this.options.walks.restore(found, this.facing(direction), version))) throw new ArtRequestError('That earlier walk is not there any more.');
   }
 
   /** Puts an earlier standing picture back in one direction, for free; its walk clip is not made again. */

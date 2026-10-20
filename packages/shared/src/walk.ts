@@ -27,7 +27,8 @@ export type WalkDirection = WalkView;
  * 2026-10-18): turned halfway between the front or back and a side, which
  * lines them up with the grid. Front-left faces south, front-right east,
  * back-left west and back-right north. Walks are painted as video, which
- * waits on the Owner, so these ways have standing pictures only for now.
+ * is made for them only when the Owner asks in the Art tab, so until then
+ * a walker glides in their standing pictures.
  */
 export const ISO_WAYS = ['front-left', 'front-right', 'back-left', 'back-right'] as const;
 export type IsoWay = (typeof ISO_WAYS)[number];
@@ -57,7 +58,7 @@ export const ISO_WAY_BESIDE: Record<IsoWay, readonly WalkDirection[]> = {
   'back-right': ['back', 'right'],
 };
 
-/** True for the ways walks are painted in (the isometric ways have none yet). */
+/** True for the top-down camera's four ways, which every walker walks in. */
 export function isWalkDirection(facing: string): facing is WalkDirection {
   return (WALK_DIRECTIONS as readonly string[]).includes(facing);
 }
@@ -77,8 +78,8 @@ export function facingSide(facing: Facing): 'left' | 'right' | undefined {
 /** The approved player looks that have walks. */
 export const WALKING_LOOKS = ['player-mara', 'player-ilya'] as const;
 
-/** Art id of a look's walk strip for one direction. */
-export function walkArt(look: string, direction: WalkDirection): string {
+/** Art id of a look's walk strip for one way: the top-down ways, or an isometric one once its walk is made. */
+export function walkArt(look: string, direction: Facing): string {
   return `${look}-walk-${direction}`;
 }
 

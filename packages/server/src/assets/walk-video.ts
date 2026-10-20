@@ -93,9 +93,11 @@ export function viewPrompt(name: string, gear: Carried[], direction: Facing, ref
 }
 
 /** The prompt that makes a standing picture walk in place and come back to the same pose. */
-export function walkVideoPrompt(gear: Carried[], direction: WalkDirection, body = 'two-legged'): string {
+export function walkVideoPrompt(gear: Carried[], direction: Facing, body = 'two-legged'): string {
   // Clips walking away drifted into a diagonal three-quarter view, and side walks slid their feet, so each is spelled out.
-  const facing = direction === 'front'
+  const facing = !isWalkDirection(direction)
+    ? `${SEEN[direction]}: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`
+    : direction === 'front'
     ? 'towards the viewer, seen exactly from the front: the body stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways'
     : direction === 'back'
       ? 'away from the viewer, seen exactly from behind: the back stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways or diagonally'

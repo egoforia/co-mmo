@@ -5,16 +5,15 @@ import { json } from './http.ts';
 import type { Account } from './store.ts';
 import type { World } from './world.ts';
 
-// The kit houses of a region's buildings, for the isometric camera. Only the
-// Owner sees that camera for now (a preview), so only the Owner may ask: a
-// house is drawn the first time it is asked for, which takes the server a
-// few seconds of work.
+// The kit houses of a region's buildings, for the isometric camera every
+// player looks through. A house is drawn the first time it is asked for,
+// which takes the server a few seconds of work in a worker; after that it
+// is kept in the art folder, so later asks only read it.
 
 /** Answers GET /api/kit-houses?region=<id>; false when the request is not for it. */
 export async function handleKitHouses(req: IncomingMessage, res: ServerResponse, url: URL, account: Account | undefined, ctx: { world: World; houses: KitHouses }): Promise<boolean> {
   if (url.pathname !== '/api/kit-houses' || req.method !== 'GET') return false;
   if (!account) return json(res, 401, { error: 'unauthorized' }), true;
-  if (account.role !== 'owner') return json(res, 403, { error: 'forbidden', message: 'Kit houses show in the isometric preview, which only the Owner can switch on for now.' }), true;
   const region = ctx.world.regions.get(url.searchParams.get('region') ?? '');
   if (!region) return json(res, 404, { error: 'not_found', message: 'There is no land by that name.' }), true;
   const houses: buildingKit.KitHouseInfo[] = [];

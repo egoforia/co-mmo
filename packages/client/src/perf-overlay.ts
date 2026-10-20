@@ -7,7 +7,7 @@ import { escapeHtml } from './ui.ts';
 // The performance overlay (egoforia's ask of 2026-10-20): frame rate,
 // memory, what is drawn, the network and the server running your part of
 // the world, for the Owner and Stewards checking where the game is slow.
-// F3 or Account switches it, kept in this browser like the camera preview.
+// F3 or Account switches it, kept in this browser like the Owner's camera choice.
 // While it is off nothing is measured, so it costs players nothing.
 
 const KEY = 'co-mmo.perf-overlay';

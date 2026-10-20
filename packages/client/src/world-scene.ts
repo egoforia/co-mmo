@@ -192,7 +192,7 @@ export interface WorldSceneOptions {
   send: (message: ClientMessage) => void;
   /** True while the player is typing, so keys go to the chat box. */
   typing: () => boolean;
-  /** The kit houses of a region, for the isometric camera (only the Owner's preview has them for now). */
+  /** The kit houses of a region, for the isometric camera. */
   houses?: HouseSource;
 }
 

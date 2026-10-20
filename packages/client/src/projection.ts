@@ -42,7 +42,7 @@ export interface Projection {
   face(dx: number, dy: number, before: Facing): Facing;
 }
 
-/** The launch camera: looking straight down at the ground, with sprites painted in three-quarter view. */
+/** The launch camera, retired on 2026-10-20: looking straight down at the ground, with sprites painted in three-quarter view. Kept only for the Owner's comparisons until the lands are repainted. */
 export const TOP_DOWN: Projection = {
   id: 'top-down',
   tile: TILE_PIXELS,
@@ -115,10 +115,10 @@ function isoFace(dx: number, dy: number, before: Facing): Facing {
 export const PROJECTIONS: Record<string, Projection> = { [TOP_DOWN.id]: TOP_DOWN, [ISOMETRIC.id]: ISOMETRIC };
 
 /**
- * The camera the game is drawn with: top-down for everyone, until the
- * isometric one is switched on (only the Owner can, as a preview).
+ * The camera the game is drawn with: isometric for everyone. The Owner may
+ * still look through the old top-down camera until its code is taken out.
  */
-export let PROJECTION: Projection = TOP_DOWN;
+export let PROJECTION: Projection = ISOMETRIC;
 
 /** Chooses the camera before the world is drawn; the scene reads it as it draws. */
 export function setProjection(p: Projection): void {

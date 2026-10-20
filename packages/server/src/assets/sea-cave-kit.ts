@@ -64,6 +64,20 @@ export const SEA_CAVE_KIT: KitAsset[] = [
     materials: ['driftwood', 'iron nails'], colors: { main: 'pale driftwood', secondary: 'sandy brown gaps', accent: 'rusty nail heads' },
     details: ['nail heads', 'grains of sand between boards'], mood: 'weathered',
   },
+  {
+    // Only the isometric camera shows it: fitted to the cave rock's edges that face the camera, under the rock lifted a little.
+    id: 'sea-cave-rock-face', name: 'Sea cave rock face', kind: 'tile', biome: 'sunlit-shore',
+    references: ['sea-cave-wall', 'sea-cave-floor', 'sea-cave-planks'],
+    framing: [
+      'A wall texture: the upright face of a rock wall seen straight on from the front, filling the entire square frame edge to edge.',
+      'Not ground seen from above, and not a block: no top, no sides, no border, frame or horizon.',
+      'Even lighting and low contrast; cracks and ledges run evenly across it, so it repeats seamlessly left and right.',
+      'The same rock as the first image sent along, which is its top seen from above; the other images are the cave floor and walkway it rises from.',
+    ].join('\n'),
+    silhouetteHook: 'the upright face of a sea-worn sandy-brown cave wall, ledges and cracks running across it, barnacles and dark seaweed near its foot', body: 'flat upright rock face, ledges spread evenly',
+    materials: ['stone', 'barnacles', 'seaweed'], colors: { main: 'sandy brown', secondary: 'slate shadow', accent: 'kelp green' },
+    details: ['barnacles near the foot', 'thin horizontal ledges'], mood: 'rugged',
+  },
   ...SEA_CAVE_PIECES.map((p): KitAsset => ({ id: p.id, name: p.name, kind: 'prop', biome: 'sunlit-shore', references: SHORE, ...PROP_LOOKS[p.id]! })),
 ];
 

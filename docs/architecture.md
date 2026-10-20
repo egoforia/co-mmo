@@ -129,6 +129,19 @@ the land below around it; underground, the land above hidden. Your floor is
 saved with your place. Stairs show their painted pictures (`Stairway.art`)
 once there are any, and always a label saying where they go.
 
+**The Smugglers' Sea Cave.** Shared `sea-cave.ts`: the shore's sea cave built
+from its Art Kit (wish #75) while that wish is on. Each of its six floors (the
+Lookout, Gallery and Smugglers' Loft above, the Cave Mouth, the Tide Grotto
+and Drowned Hoard below) is a plan of letters the size of its walls: rock,
+floor, plank walkway, kit props, stairs and ladders. The building carries
+`Building.art` (like `Storey.art`), so it shows no outside picture and is
+drawn in the kit's rock, floor and plank tiles (`registerKitTileset`); stairs
+name the floors they join. In the isometric camera its walls stand up, cut
+low like the building kit's near walls: their tops lifted and the painted
+`sea-cave-rock-face` (`TileArt.face`) fitted to each edge facing the camera
+(`registerWallFace`; the east side mirrored). Lamps burn only on their own floor. With the wish
+off the painted one-floor cave stands as before.
+
 **The world editor.** The Owner and Stewards change the lands in the game
 (the "Edit world" button). An edit is data on its land's definition
 (`RegionDef.edits`, shared `world-edits.ts`): paint ground, paths, water,

@@ -29,6 +29,8 @@ export interface PlayerState {
   character: Character;
   x: number;
   y: number;
+  /** The floor they are on (floors.ts): 0 the ground. */
+  floor: number;
   inputs: { seq: number; dx: number; dy: number }[];
   ack: number;
   chatTimes: number[];
@@ -53,6 +55,7 @@ export interface Body {
   def: CreatureDef;
   x: number;
   y: number;
+  floor: number;
   /** Epoch ms when it fades away. */
   until: number;
   /** Who won it: the one who struck the last blow and party members who shared the fight. They hear what others take. */
@@ -107,9 +110,9 @@ export class RegionState {
     this.hooks.journal?.(`${p.info.name} reached level ${p.character.level}.`, p.info.id);
   }
 
-  /** The nearest tile of these kinds within a radius (see nearestTile). */
-  nearestTile(x: number, y: number, kinds: Tile[], radius: number): { tile: Tile; x: number; y: number } | undefined {
-    return nearestTile(this.map, x, y, kinds, radius);
+  /** The nearest tile of these kinds within a radius, on a floor (see nearestTile). */
+  nearestTile(x: number, y: number, kinds: Tile[], radius: number, floor = 0): { tile: Tile; x: number; y: number } | undefined {
+    return nearestTile(this.map, x, y, kinds, radius, floor);
   }
 
   /** Sends a player's character if it changed. */

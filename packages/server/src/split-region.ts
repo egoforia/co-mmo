@@ -90,7 +90,7 @@ export class SplitRegion implements RegionHandle {
     return this.of(id)?.nameOf(id);
   }
 
-  position(id: string): { x: number; y: number } | undefined {
+  position(id: string): { x: number; y: number; floor?: number } | undefined {
     return this.of(id)?.position(id);
   }
 
@@ -168,7 +168,7 @@ export class SplitRegion implements RegionHandle {
     for (const c of this.cells) c.welcomeAll();
   }
 
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void {
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null; floor?: number }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void {
     this.at(at.x ?? this.map.spawn.x).join(info, conn, at, character, announce, carry, handoff);
   }
 

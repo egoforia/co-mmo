@@ -60,6 +60,8 @@ export interface SavedPlace {
   regionId: string;
   x: number | null;
   y: number | null;
+  /** The floor they were on (floors.ts), when not the ground. */
+  floor?: number;
 }
 
 /** Where a player is and who they are, for saving. */
@@ -68,6 +70,7 @@ export interface Place {
   regionId: string;
   x: number;
   y: number;
+  floor?: number;
   character: Character;
 }
 
@@ -455,7 +458,7 @@ export class World {
     if (!region) return undefined;
     this.where.delete(playerId);
     this.moving.delete(playerId);
-    const left = settle(region.remove(playerId), (l) => l && { id: playerId, regionId: region.def.id, x: l.x, y: l.y, character: l.character });
+    const left = settle(region.remove(playerId), (l) => l && { id: playerId, regionId: region.def.id, x: l.x, y: l.y, ...(l.carry.floor ? { floor: l.carry.floor } : {}), character: l.character });
     this.partyChanged(playerId);
     this.stateChanged();
     return left;

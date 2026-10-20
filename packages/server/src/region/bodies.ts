@@ -24,6 +24,7 @@ export class Bodies {
    */
   search(p: PlayerState): boolean {
     const inReach = this.s.bodies
+      .filter((b) => b.floor === p.floor)
       .map((b) => ({ b, d: Math.hypot(b.x - p.x, b.y - p.y) }))
       .filter((o) => o.d <= SEARCH_RANGE)
       .sort((a, c) => a.d - c.d)
@@ -92,7 +93,7 @@ export class Bodies {
   lootable(p: PlayerState, bodyId: string): boolean {
     const b = this.s.bodies.find((x) => x.id === bodyId);
     // A little slack, so a step while choosing does not shut the window.
-    return !!b && p.character.hp > 0 && Math.hypot(b.x - p.x, b.y - p.y) <= SEARCH_RANGE + 1;
+    return !!b && p.character.hp > 0 && b.floor === p.floor && Math.hypot(b.x - p.x, b.y - p.y) <= SEARCH_RANGE + 1;
   }
 
 }

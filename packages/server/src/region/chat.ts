@@ -39,7 +39,7 @@ export class Chat {
       return;
     }
     for (const p of this.s.players.values()) {
-      if (Math.hypot(p.x - from.x, p.y - from.y) <= SAY_RADIUS) p.conn.send(message);
+      if (p.floor === from.floor && Math.hypot(p.x - from.x, p.y - from.y) <= SAY_RADIUS) p.conn.send(message);
     }
   }
 }

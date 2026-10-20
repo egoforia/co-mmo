@@ -12,6 +12,7 @@ import {
   type BiomeLook,
   type BuildingPart,
   type RegionDef,
+  type Storey,
 } from '@co-mmo/shared';
 import { reliefFrom } from './normal-maps.ts';
 
@@ -73,6 +74,20 @@ export function registerBuildingTileset(scene: Phaser.Scene, style: string): str
   const key = `tileset-building-${style}`;
   if (scene.textures.exists(key)) return key;
   return tileStrip(scene, key, buildingTiles(scene, style));
+}
+
+/**
+ * A strip for a floor above or below the ground: its style's tiles, with the
+ * kit pieces it names (a sea cave's rock and floor) in their place once painted.
+ */
+export function registerStoreyTileset(scene: Phaser.Scene, storey: Storey): string {
+  const floor = storey.art?.floor && loaded(scene, storey.art.floor);
+  const wall = storey.art?.wall && loaded(scene, storey.art.wall);
+  if (!floor && !wall) return registerBuildingTileset(scene, storey.style);
+  const key = `tileset-storey-${storey.style}-${floor ?? ''}-${wall ?? ''}`;
+  if (scene.textures.exists(key)) return key;
+  const tiles = buildingTiles(scene, storey.style);
+  return tileStrip(scene, key, { ...tiles, ...(floor ? { [Tile.Floor]: floor, [Tile.Door]: floor } : {}), ...(wall ? { [Tile.Wall]: wall } : {}) });
 }
 
 /** A building style's inside tiles, each falling back to the fallback style's. */

@@ -32,7 +32,7 @@ export interface RegionHandle {
   playerIds(): string[];
   has(id: string): boolean;
   nameOf(id: string): string | undefined;
-  position(id: string): { x: number; y: number } | undefined;
+  position(id: string): { x: number; y: number; floor?: number } | undefined;
   character(id: string): Character | undefined;
   creatureIds(): string[];
   creature(id: string): { kind: string; x: number; y: number; hp: number; alive: boolean } | undefined;
@@ -51,7 +51,7 @@ export interface RegionHandle {
   setExits(exits: RegionDef['exits']): void;
   welcomeAll(): void;
   /** `handoff`: the player walked in from the next cell of the same land, so they are not welcomed again. */
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void;
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null; floor?: number }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void;
   /** Takes a player out; a region on another server answers a moment later. */
   remove(id: string, announce?: string): Leaving | undefined | Promise<Leaving | undefined>;
   handle(id: string, message: ClientMessage): void;
@@ -72,6 +72,7 @@ export interface CarryData {
   lastAttack: number;
   lastHurt: number;
   readyAt: [string, number][];
+  floor?: number;
 }
 
 export function carryData(carry: Carry): CarryData {
@@ -139,7 +140,7 @@ export interface RegionBeat {
 export type ToServer =
   | { t: 'host'; region: RegionDef; placements: Placement[]; cell?: Cell }
   | { t: 'drop'; region: string; ask?: number; replyTo?: string }
-  | { t: 'join'; region: string; info: PlayerInfo; at: { x: number | null; y: number | null }; character: Character; announce?: string; carry?: CarryData; handoff?: boolean }
+  | { t: 'join'; region: string; info: PlayerInfo; at: { x: number | null; y: number | null; floor?: number }; character: Character; announce?: string; carry?: CarryData; handoff?: boolean }
   | { t: 'remove'; region: string; id: string; announce?: string; ask?: number; replyTo?: string }
   | { t: 'input'; region: string; id: string; m: ClientMessage }
   | { t: 'change'; region: string; id: string; op: CharacterOp; ask?: number; replyTo?: string }

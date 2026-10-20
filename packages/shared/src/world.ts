@@ -4,6 +4,7 @@ import { furnitureArt } from './buildings.ts';
 import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
 import { applyEdits, type WorldEdit } from './world-edits.ts';
+import type { Stairway, Storey } from './floors.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -135,6 +136,8 @@ export interface Landmark {
   x: number;
   y: number;
   footprint: { width: number; height: number };
+  /** The floor it stands on (floors.ts), when not the ground. */
+  floor?: number;
 }
 
 /** Where an NPC starts; on the server, where they stand now as they stroll. */
@@ -144,6 +147,8 @@ export interface NpcPlacement {
   asset: string;
   x: number;
   y: number;
+  /** The floor they live on (floors.ts), when not the ground. */
+  floor?: number;
 }
 
 export interface CreatureSpawn {
@@ -152,6 +157,8 @@ export interface CreatureSpawn {
   asset: string;
   x: number;
   y: number;
+  /** The floor it lives on (floors.ts), when not the ground. */
+  floor?: number;
 }
 
 /**
@@ -202,6 +209,10 @@ export interface RegionMap {
   entries: Partial<Record<Side, { x: number; y: number }>>;
   landmarks: Landmark[];
   buildings: Building[];
+  /** Floors above and below the ground, each over its own rectangle (floors.ts). */
+  storeys: Storey[];
+  /** The stairs and ladders between floors. */
+  stairways: Stairway[];
   npcs: NpcPlacement[];
   creatures: CreatureSpawn[];
 }
@@ -244,6 +255,8 @@ function layOut(def: RegionDef, size: number): RegionMap {
     entries: {},
     landmarks: [],
     buildings: [],
+    storeys: [],
+    stairways: [],
     npcs: [],
     creatures: [],
   };
@@ -627,15 +640,28 @@ export function creatures(map: RegionMap, kind: string, name: string, asset: str
   }
 }
 
-/** The tile under a position; outside the region counts as an open or closed edge. */
-export function tileAt(map: RegionMap, x: number, y: number): Tile {
+/**
+ * The tile under a position on a floor (the ground unless said); outside the
+ * region counts as an open or closed edge. Off the ground, wherever no storey
+ * of that floor lies is solid: there is nothing there to stand on.
+ */
+export function tileAt(map: RegionMap, x: number, y: number, floor = 0): Tile {
   const tx = Math.floor(x);
   const ty = Math.floor(y);
+  if (floor !== 0) {
+    const s = storeyAt(map, tx, ty, floor);
+    return s ? (s.tiles[(ty - s.y) * s.width + (tx - s.x)] as Tile) : Tile.Blocked;
+  }
   if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) {
     const side = outsideSide(map, x, y);
     return side && map.def.exits[side] ? Tile.Path : Tile.Water;
   }
   return map.tiles[ty * map.width + tx] as Tile;
+}
+
+/** The storey of a floor over a tile, if any. */
+export function storeyAt(map: RegionMap, tx: number, ty: number, floor: number): Storey | undefined {
+  return map.storeys.find((s) => s.floor === floor && tx >= s.x && ty >= s.y && tx < s.x + s.width && ty < s.y + s.height);
 }
 
 /** Where the neighbour beyond `side` sits, in tiles, so regions can be drawn side by side. */

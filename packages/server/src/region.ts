@@ -11,7 +11,10 @@ import {
   maxHp,
   outsideSide,
   regenPerSecond,
-  step,
+  climbWords,
+  storeyAt,
+  walkOn,
+  wayTaken,
   Tile,
   type BodyState,
   type Character,
@@ -32,6 +35,7 @@ import {
   type SkyConfig,
   type Weather,
   DEFAULT_SKY,
+  floorName,
   WEATHER_NEWS,
   dayPhase,
   weatherAt,
@@ -163,6 +167,8 @@ export interface Carry {
   lastAttack: number;
   lastHurt: number;
   readyAt: Map<string, number>;
+  /** The floor they were on (floors.ts), so moving the region elsewhere keeps them upstairs. */
+  floor?: number;
 }
 
 /**
@@ -210,7 +216,7 @@ export class Region {
     this.minds = new Minds(this.s);
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
-    this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y) : []));
+    this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
     this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
       character: (id) => this.s.players.get(id)?.character,
@@ -219,7 +225,7 @@ export class Region {
       distance: (a, b) => {
         const pa = this.s.players.get(a);
         const pb = this.s.players.get(b);
-        return pa && pb ? Math.hypot(pa.x - pb.x, pa.y - pb.y) : Infinity;
+        return pa && pb && pa.floor === pb.floor ? Math.hypot(pa.x - pb.x, pa.y - pb.y) : Infinity;
       },
       send: (id, m) => this.send(id, m),
       changed: (id) => {
@@ -240,9 +246,9 @@ export class Region {
     return !this.cell || (x >= this.cell.x0 && x < this.cell.x1);
   }
 
-  private makeCreature(id: string, kind: string, x: number, y: number): Creature[] {
+  private makeCreature(id: string, kind: string, x: number, y: number, floor = 0): Creature[] {
     const cdef = CREATURES[kind];
-    return cdef ? [makeCreature(id, kind, cdef, x, y, this.random)] : [];
+    return cdef ? [makeCreature(id, kind, cdef, x, y, this.random, floor)] : [];
   }
 
   /** How the sky turns over this land. */
@@ -289,11 +295,12 @@ export class Region {
     const p = this.s.players.get(id);
     if (!p) return [];
     const lines: string[] = [];
-    const near = (x: number, y: number, r: number) => Math.hypot(x - p.x, y - p.y) <= r;
-    for (const other of this.s.players.values()) if (other !== p && near(other.x, other.y, 10)) lines.push(`${other.info.name} (player)`);
-    for (const n of this.s.townsfolk) if (near(n.x, n.y, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
+    const near = (o: { x: number; y: number; floor: number }, r: number) => o.floor === p.floor && Math.hypot(o.x - p.x, o.y - p.y) <= r;
+    if (p.floor) lines.push(`They are on ${floorName(p.floor)}.`);
+    for (const other of this.s.players.values()) if (other !== p && near(other, 10)) lines.push(`${other.info.name} (player)`);
+    for (const n of this.s.townsfolk) if (near(n, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
     const kinds = new Map<string, number>();
-    for (const c of this.s.creatures) if (c.respawnAt === null && near(c.x, c.y, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
+    for (const c of this.s.creatures) if (c.respawnAt === null && near(c, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
     for (const [name, n] of kinds) lines.push(`${n} ${name}${n > 1 ? 's' : ''}`);
     const { phase, weather } = this.sky();
     lines.push(`The sky: ${skyWords(phase, weather)}`);
@@ -325,7 +332,7 @@ export class Region {
   /** True when a tile of this kind lies within `radius` tiles of the player. */
   nearTile(id: string, tile: Tile, radius: number): boolean {
     const p = this.s.players.get(id);
-    return Boolean(p && this.s.nearestTile(p.x, p.y, [tile], radius));
+    return Boolean(p && this.s.nearestTile(p.x, p.y, [tile], radius, p.floor));
   }
 
   /** XP from a scripted rule, with the usual level-up messages. */
@@ -369,7 +376,7 @@ export class Region {
     this.map.entries = fresh.entries;
     for (const p of this.s.players.values()) {
       // A road may now run where someone stood; the new land never traps anyone.
-      if (collides(this.map, p.x, p.y)) Object.assign(p, this.map.spawn);
+      if (collides(this.map, p.x, p.y, p.floor)) Object.assign(p, this.map.spawn, { floor: 0 });
       this.welcome(p);
     }
   }
@@ -382,7 +389,7 @@ export class Region {
   private welcome(p: PlayerState): void {
     const now = this.now();
     const sky = { config: this.skyConfig, now, weather: this.sky(now).weather };
-    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ack: p.ack, tickRate: TICK_RATE, character: p.character, sky });
+    p.conn.send({ t: 'welcome', you: p.info, region: this.info, neighbours: this.hooks.neighbours?.() ?? [], x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), ack: p.ack, tickRate: TICK_RATE, character: p.character, sky });
   }
 
   get online(): number {
@@ -401,9 +408,9 @@ export class Region {
     return this.s.players.get(id)?.info.name;
   }
 
-  position(id: string): { x: number; y: number } | undefined {
+  position(id: string): { x: number; y: number; floor?: number } | undefined {
     const p = this.s.players.get(id);
-    return p && { x: p.x, y: p.y };
+    return p && { x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}) };
   }
 
   character(id: string): Character | undefined {
@@ -438,35 +445,45 @@ export class Region {
   }
 
   /** Moves a player, for tests and tools. */
-  placePlayer(id: string, x: number, y: number): void {
+  placePlayer(id: string, x: number, y: number, floor = 0): void {
     const p = this.s.players.get(id);
-    if (p) Object.assign(p, { x, y });
+    if (p) Object.assign(p, { x, y, floor });
   }
 
   /** Moves a creature, for tests and (later) wishes. */
-  placeCreature(id: string, x: number, y: number): void {
+  placeCreature(id: string, x: number, y: number, floor = 0): void {
     const c = this.s.creatures.find((k) => k.id === id);
-    if (c) Object.assign(c, { x, y, home: { x, y }, target: null, route: undefined });
+    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined });
+  }
+
+  /** The floor a creature or NPC is on, for tests and tools. */
+  floorOf(id: string): number | undefined {
+    return (this.s.creatures.find((k) => k.id === id) ?? this.s.townsfolk.find((n) => n.id === id) ?? this.s.players.get(id))?.floor;
   }
 
   /**
    * Adds a player at the given position, or at the spawn point when it is
    * missing or no longer walkable (a wish may have changed the map).
    */
-  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null }, character: Character, announce?: string, carry?: Carry, handoff = false): void {
+  join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null; floor?: number }, character: Character, announce?: string, carry?: Carry, handoff = false): void {
     const existing = this.s.players.get(info.id);
     if (existing) {
       existing.conn.close('Signed in from another window.');
       this.s.players.delete(info.id);
     }
     let { x, y } = this.map.spawn;
+    let floor = 0;
     if (at.x !== null && at.y !== null && !outsideSide(this.map, at.x, at.y)) {
+      // The floor they were on, while it is still there; else the ground below.
+      const wanted = carry?.floor ?? at.floor ?? 0;
+      floor = wanted && storeyAt(this.map, Math.floor(at.x), Math.floor(at.y), wanted) ? wanted : 0;
       // Something may have been built or planted where they stood (the world editor): the nearest open spot, then.
-      const free = collides(this.map, at.x, at.y) ? nearestOpen(this.map, at.x, at.y) : { x: at.x, y: at.y };
+      const free = collides(this.map, at.x, at.y, floor) ? nearestOpen(this.map, at.x, at.y, floor) : { x: at.x, y: at.y };
       if (free) ({ x, y } = free);
+      else floor = 0;
     }
     const p: PlayerState = {
-      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), ...carry,
+      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), ...carry, floor,
     };
     this.s.players.set(info.id, p);
     // Walking into the next cell of the same land: nothing changes on the player's screen.
@@ -487,7 +504,7 @@ export class Region {
     this.s.players.delete(id);
     for (const c of this.s.creatures) if (c.aggro === id || c.fleeing === id) giveUp(c);
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
-    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt };
+    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}) };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
   }
 
@@ -553,9 +570,12 @@ export class Region {
     for (const p of this.s.players.values()) {
       const batch = p.inputs.splice(0, MAX_INPUTS_PER_TICK);
       for (const input of batch) {
-        const next = step(this.map, p, input.dx, input.dy);
+        const next = walkOn(this.map, p, input.dx, input.dy);
+        const way = wayTaken(this.map, p.floor, next);
+        if (way) this.s.notice(p, climbWords(way, p.floor));
         p.x = next.x;
         p.y = next.y;
+        p.floor = next.floor;
         p.ack = input.seq;
       }
       const side = outsideSide(this.map, p.x, p.y);
@@ -595,36 +615,37 @@ export class Region {
         this.s.flush(p);
         continue;
       }
-      const near = (x: number, y: number) => Math.abs(x - p.x) <= VIEW_RADIUS && Math.abs(y - p.y) <= VIEW_RADIUS;
+      // Only what is on their own floor: the floors above and below are out of sight.
+      const near = (o: { x: number; y: number; floor?: number }) => (o.floor ?? 0) === p.floor && Math.abs(o.x - p.x) <= VIEW_RADIUS && Math.abs(o.y - p.y) <= VIEW_RADIUS;
       const players: EntityState[] = [];
       for (const other of all) {
-        if (other === p || !near(other.x, other.y)) continue;
+        if (other === p || !near(other)) continue;
         players.push(playerView(other));
       }
       const creatures: CreatureState[] = [];
       for (const c of this.s.creatures) {
-        if (c.respawnAt !== null || !near(c.x, c.y)) continue;
+        if (c.respawnAt !== null || !near(c)) continue;
         creatures.push(creatureView(c, mood(c)));
       }
       const bodies: BodyState[] = [];
       for (const b of this.s.bodies) {
-        if (!near(b.x, b.y)) continue;
+        if (!near(b)) continue;
         bodies.push(bodyView(b, b.loot.length > 0));
       }
       const npcs: NpcState[] = [];
       for (const n of this.s.townsfolk) {
-        if (near(n.x, n.y)) npcs.push(npcView(n));
+        if (near(n)) npcs.push(npcView(n));
       }
       // What the cells beside this one show across the border.
       for (const g of this.ghosts.values()) {
-        for (const e of g.players) if (e.id !== p.info.id && near(e.x, e.y)) players.push(e);
-        for (const e of g.creatures) if (near(e.x, e.y)) creatures.push(e);
-        for (const e of g.bodies) if (near(e.x, e.y)) bodies.push(e);
-        for (const e of g.npcs) if (near(e.x, e.y)) npcs.push(e);
+        for (const e of g.players) if (e.id !== p.info.id && near(e)) players.push(e);
+        for (const e of g.creatures) if (near(e)) creatures.push(e);
+        for (const e of g.bodies) if (near(e)) bodies.push(e);
+        for (const e of g.npcs) if (near(e)) npcs.push(e);
       }
       p.crowd = players.length + creatures.length;
       p.conn.send({
-        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, bodies, npcs, online,
+        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, bodies, npcs, online,
       });
       this.s.flush(p);
     }
@@ -667,14 +688,14 @@ export class Region {
 }
 
 /** The open spot nearest (x, y), within a few tiles, at the middle of a tile. */
-function nearestOpen(map: RegionMap, x: number, y: number): { x: number; y: number } | undefined {
+function nearestOpen(map: RegionMap, x: number, y: number, floor = 0): { x: number; y: number } | undefined {
   for (let r = 1; r <= 4; r++) {
     let best: { x: number; y: number; d: number } | undefined;
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         const spot = { x: Math.floor(x) + dx + 0.5, y: Math.floor(y) + dy + 0.5 };
         const d = Math.hypot(spot.x - x, spot.y - y);
-        if (d > r || outsideSide(map, spot.x, spot.y) || collides(map, spot.x, spot.y)) continue;
+        if (d > r || outsideSide(map, spot.x, spot.y) || collides(map, spot.x, spot.y, floor)) continue;
         if (!best || d < best.d) best = { ...spot, d };
       }
     }

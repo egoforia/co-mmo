@@ -214,6 +214,8 @@ export interface WelcomeMessage {
   ack: number;
   x: number;
   y: number;
+  /** The floor they are on (floors.ts), when not the ground. */
+  floor?: number;
   tickRate: number;
   character: Character;
   /** The sky: how it turns, the server's clock to count the hour from, and this land's weather now. */
@@ -243,6 +245,8 @@ export interface EntityState {
   color: number;
   x: number;
   y: number;
+  /** The floor it is on (floors.ts), when not the ground. */
+  floor?: number;
   /** Health as a fraction of the maximum, 0 to 1. */
   health: number;
   /** The item shown in their right hand (see heldItem), when they wear one. */
@@ -258,6 +262,8 @@ export interface CreatureState {
   name: string;
   x: number;
   y: number;
+  /** The floor it is on (floors.ts), when not the ground. */
+  floor?: number;
   health: number;
   mood?: CreatureMood;
 }
@@ -270,6 +276,8 @@ export interface BodyState {
   name: string;
   x: number;
   y: number;
+  /** The floor it is on (floors.ts), when not the ground. */
+  floor?: number;
   /** Something is still on it to take (anyone may). */
   loot: boolean;
 }
@@ -281,6 +289,8 @@ export interface NpcState {
   asset: string;
   x: number;
   y: number;
+  /** The floor it is on (floors.ts), when not the ground. */
+  floor?: number;
   /** Asleep for the night (or the day, for those who keep other hours). */
   asleep?: boolean;
 }
@@ -292,6 +302,8 @@ export interface SnapshotMessage {
   ack: number;
   x: number;
   y: number;
+  /** The floor they are on (floors.ts), when not the ground; everyone below is on it too. */
+  floor?: number;
   hp: number;
   energy: number;
   /** Other players inside the view radius. */

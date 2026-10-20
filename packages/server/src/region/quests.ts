@@ -34,6 +34,7 @@ export class Quests {
     let npc: Townsperson | undefined;
     let best = TALK_RANGE;
     for (const n of this.s.townsfolk) {
+      if (n.floor !== p.floor) continue;
       const d = Math.hypot(n.x - p.x, n.y - p.y);
       if (d <= best) {
         best = d;
@@ -44,8 +45,8 @@ export class Quests {
     if (!npc && this.looting.search(p)) return;
     if (!npc) {
       // Nobody to talk to: the player is acting on the land (fishing at water, say).
-      const spot = this.s.nearestTile(p.x, p.y, [Tile.Water, Tile.Tree, Tile.Rock], 1.6);
-      const tile = spot ? spot.tile : tileAt(this.s.map, p.x, p.y);
+      const spot = this.s.nearestTile(p.x, p.y, [Tile.Water, Tile.Tree, Tile.Rock], 1.6, p.floor);
+      const tile = spot ? spot.tile : tileAt(this.s.map, p.x, p.y, p.floor);
       const name = Object.keys(TILE_NAMES).find((k) => TILE_NAMES[k] === tile) ?? 'ground';
       this.s.hooks.event?.('interact', p.info.id, { tile: name, x: spot?.x ?? Math.floor(p.x), y: spot?.y ?? Math.floor(p.y) });
       return;
@@ -88,7 +89,7 @@ export class Quests {
     const def = QUESTS[questId];
     if (!def || questOffered(p.character, def.giver) !== questId) return;
     const giver = this.s.map.npcs.find((n) => n.id === def.giver);
-    if (!giver || Math.hypot(giver.x - p.x, giver.y - p.y) > TALK_RANGE + 1) return;
+    if (!giver || (giver.floor ?? 0) !== p.floor || Math.hypot(giver.x - p.x, giver.y - p.y) > TALK_RANGE + 1) return;
     p.character.quests.push({ id: questId, count: 0, done: false });
     this.s.notice(p, `New quest: ${def.title}.`);
     p.dirty = true;

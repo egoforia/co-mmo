@@ -55,7 +55,7 @@ export class Kit {
   /** Buying, selling and lessons, only while standing by the shopkeeper. */
   shop(p: PlayerState, m: ShopMessage): void {
     const keeper = this.s.townsfolk.find((n) => n.id === m.npc);
-    if (!keeper || !SHOPS[m.npc] || Math.hypot(keeper.x - p.x, keeper.y - p.y) > TALK_RANGE + 1) {
+    if (!keeper || !SHOPS[m.npc] || keeper.floor !== p.floor || Math.hypot(keeper.x - p.x, keeper.y - p.y) > TALK_RANGE + 1) {
       return this.s.notice(p, `Walk up to ${npcName(m.npc)} to trade.`);
     }
     const ch = p.character;

@@ -11,7 +11,7 @@ export interface Vec2 {
  * authoritative) and the client (which predicts its own movement with it).
  * Axes are resolved separately so players slide along walls.
  */
-export function step(map: RegionMap, pos: Vec2, dx: number, dy: number): Vec2 {
+export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 0): Vec2 {
   if (dx === 0 && dy === 0) return pos;
   const len = Math.hypot(dx, dy);
   const dist = PLAYER_SPEED * TICK_SECONDS;
@@ -20,18 +20,19 @@ export function step(map: RegionMap, pos: Vec2, dx: number, dy: number): Vec2 {
 
   let x = pos.x;
   let y = pos.y;
-  if (!collides(map, x + mx, y)) x += mx;
-  if (!collides(map, x, y + my)) y += my;
+  if (!collides(map, x + mx, y, floor)) x += mx;
+  if (!collides(map, x, y + my, floor)) y += my;
   return { x, y };
 }
 
-export function collides(map: RegionMap, x: number, y: number): boolean {
+/** True when a body standing at (x, y) on a floor (the ground unless said) would touch something solid. */
+export function collides(map: RegionMap, x: number, y: number, floor = 0): boolean {
   const r = PLAYER_RADIUS;
   return (
-    isBlocking(tileAt(map, x - r, y - r)) ||
-    isBlocking(tileAt(map, x + r, y - r)) ||
-    isBlocking(tileAt(map, x - r, y + r)) ||
-    isBlocking(tileAt(map, x + r, y + r))
+    isBlocking(tileAt(map, x - r, y - r, floor)) ||
+    isBlocking(tileAt(map, x + r, y - r, floor)) ||
+    isBlocking(tileAt(map, x - r, y + r, floor)) ||
+    isBlocking(tileAt(map, x + r, y + r, floor))
   );
 }
 

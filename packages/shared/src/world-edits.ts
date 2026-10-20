@@ -1,6 +1,7 @@
 import { BUILDING_STYLES } from './buildings.ts';
 import { hashString, rand2 } from './random.ts';
 import { setPiece } from './sea-cave-kit.ts';
+import { MAX_FLOORS, buildFloors } from './floors.ts';
 import { block, building, isBlocking, road, set, Tile, type Building, type Landmark, type RegionMap } from './world.ts';
 
 // The Owner and Stewards edit the world in the game: move a tree or a set
@@ -40,7 +41,9 @@ export type WorldEditDraft =
   /** Sends away every monster living within `radius` tiles of a spot. */
   | { kind: 'clear'; at: TilePoint; radius: number }
   /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */
-  | { kind: 'piece'; piece: string; at: TilePoint };
+  | { kind: 'piece'; piece: string; at: TilePoint }
+  /** Gives the building over `at` floors above and below the ground (floors.ts), joined by stairs or ladders; 0 and 0 takes them off. */
+  | { kind: 'floors'; at: TilePoint; up: number; down: number; ladders?: boolean };
 
 /** Who made an edit and when, plus a spawn's name and picture, filled in by the server. */
 export interface EditStamp {
@@ -103,7 +106,17 @@ export function applyEdit(map: RegionMap, edit: WorldEdit): void {
       return;
     case 'piece':
       return place(map, edit.piece, edit.at);
+    case 'floors': {
+      const b = buildingAt(map, edit.at);
+      if (b) buildFloors(map, b, edit.up, edit.down, edit.ladders ? 'ladder' : 'stairs');
+      return;
+    }
   }
+}
+
+/** The building whose walls stand over a tile. */
+export function buildingAt(map: RegionMap, [x, y]: TilePoint): Building | undefined {
+  return map.buildings.find((b) => x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height);
 }
 
 /**
@@ -156,6 +169,18 @@ export function checkEdit(map: RegionMap, edit: WorldEditDraft, creatures: Recor
       const tiles = pieceTiles(edit.at, piece.footprint);
       if (!tiles.every(inside)) return 'It would stand off the edge of this land.';
       return tiles.every((t) => open(tileOf(map, t))) ? undefined : 'Something already stands there. Pick open ground or a floor.';
+    }
+    case 'floors': {
+      if (!inside(edit.at)) return off;
+      const b = buildingAt(map, edit.at);
+      if (!b) return 'Click a building to give it floors.';
+      const counts = [edit.up, edit.down];
+      if (!counts.every((n) => Number.isInteger(n) && n >= 0) || edit.up > MAX_FLOORS.up || edit.down > MAX_FLOORS.down) {
+        return `A building has up to ${MAX_FLOORS.up} floors above the ground and ${MAX_FLOORS.down} below.`;
+      }
+      // Tried on a copy: the stairs need room on every floor they join.
+      const copy = { ...map, storeys: [...map.storeys], stairways: [...map.stairways] };
+      return buildFloors(copy, b, edit.up, edit.down, edit.ladders ? 'ladder' : 'stairs') ? undefined : 'There is no room for the stairs in this building. Move some furniture, or try a bigger one.';
     }
     default:
       return 'The editor does not know that kind of change.';

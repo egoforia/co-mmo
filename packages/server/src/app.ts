@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import { TICK_SECONDS, type ArtManifest, type SkyConfig } from '@co-mmo/shared';
 import { Auth, type Mailer } from './auth.ts';
 import { World } from './world.ts';
+import { WorldEditor } from './world-editor.ts';
+import { handleWorldEdits } from './world-edit-routes.ts';
 import type { Account, Store } from './store.ts';
 import { dailyClips } from './settings.ts';
 import { AiServices } from './ai/services.ts';
@@ -123,7 +125,8 @@ export interface App {
 /** HTTP API, static client, and game WebSocket on one server. */
 export function createApp(options: AppOptions): App {
   const { store } = options;
-  const world = new World(Date.now, Math.random, options.sky);
+  // Each land is laid out with the world editor's saved changes over it.
+  const world = new World(Date.now, Math.random, options.sky, (regionId) => store.worldEdits(regionId).edits);
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   const env = options.wishes.env ?? process.env;
@@ -269,6 +272,8 @@ export function createApp(options: AppOptions): App {
     sheet: (request) => artStudio.paintSheet(request.look, request.textures, request.note),
   });
   const reports = new Reports(store, world);
+  // The Owner's and Stewards' in-game world editor.
+  const worldEditor = new WorldEditor(store, world);
   const builds = new Builds(store, {
     changed: (id) => wishes.changed(id),
     tellWisher: (record, text) => wishes.tellWisher(record, text),
@@ -303,6 +308,8 @@ export function createApp(options: AppOptions): App {
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (await handleKitHouses(req, res, url, authenticate(req), { world, houses: kitHouses })) return;
+
+    if (await handleWorldEdits(req, res, url, authenticate(req), worldEditor)) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
     if (path === '/api/art' && req.method === 'GET') return json(res, 200, await paintedArt());

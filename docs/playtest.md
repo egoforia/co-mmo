@@ -22,6 +22,7 @@ alongside the others.
 | `wishes.play.ts` | Pray, then wish for a thing to wear, a creature (and fight it), a person (and talk to them), a power (learn and cast it), a drop and a new land (and walk into it). A player without Favor is turned away. |
 | `mods.play.ts` | The Owner switches a wished creature and a wished ring off and on again in God's View while another player watches, then undoes the creature for good. |
 | `together.play.ts` | Two players see each other, chat, form a party, share a fight's XP and trade. |
+| `editor.play.ts` | In Chromium: a Steward opens the world editor, plants a tree and takes it back, lays a road with a house at its end and places monsters, while a robot in the same land is shown each change. |
 | `browser.play.ts` | In Chromium: join by invite link, walk with the arrow keys, pray and grant a wish from its card, open the bag, open every God's View tab, and open the game on a phone-sized screen. Screenshots go to `playtest-results/`. |
 
 A run fails when a robot notes a problem (it could not walk somewhere, a

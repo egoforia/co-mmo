@@ -28,7 +28,7 @@ describe('Region', () => {
     expect(a.messages[1]).toMatchObject({ t: 'system', text: 'Mara entered the Sanctum.' });
   });
 
-  it('restores a saved position only when it is walkable', () => {
+  it('restores a saved position when it is walkable, else the nearest open spot', () => {
     const region = new Region(sanctum);
     const ok = { x: region.map.spawn.x + 1, y: region.map.spawn.y };
     region.join(info('a'), fakeConn(), ok, newCharacter());
@@ -36,7 +36,9 @@ describe('Region', () => {
     const shrine = region.map.landmarks.find((l) => l.asset === 'sanctum-shrine')!;
     const blocked = { x: Math.floor(shrine.x) + 0.5, y: Math.floor(shrine.y) - 0.5 };
     region.join(info('b'), fakeConn(), blocked, newCharacter());
-    expect(region.position('b')).toEqual(region.map.spawn);
+    const moved = region.position('b')!;
+    expect(collides(region.map, moved.x, moved.y)).toBe(false);
+    expect(Math.hypot(moved.x - blocked.x, moved.y - blocked.y)).toBeLessThanOrEqual(4);
   });
 
   it('applies inputs on tick and acknowledges them', () => {

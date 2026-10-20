@@ -29,6 +29,7 @@ import {
   weatherAt,
   type SkyConfig,
   type Weather,
+  type WorldEdit,
 } from '@co-mmo/shared';
 import { Parties } from './parties.ts';
 import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
@@ -100,12 +101,16 @@ export class World {
   /** Since when each split region has been quiet enough to join up again. */
   private readonly quietSince = new Map<string, number>();
   private ticks = 0;
+  /** Lands being laid out again after an edit, one after another per land. */
+  private readonly reshaping = new Map<string, Promise<void>>();
 
   constructor(
     private readonly now: () => number = Date.now,
     private readonly random: () => number = Math.random,
     /** How the sky turns over every region (DAY_MINUTES, WEATHER_MINUTES, WEATHER in .env). */
     readonly sky: SkyConfig = DEFAULT_SKY,
+    /** The world editor's changes to a land, saved in the store; laid over it every time it is set up. */
+    private readonly edits: (regionId: string) => WorldEdit[] = () => [],
   ) {
     this.parties = new Parties(now);
     // Each world keeps its own copies: wished regions change the exits.
@@ -119,6 +124,9 @@ export class World {
 
   /** Sets a region up wherever the hosting says, with what was wished into it; split into cells when asked. */
   private makeRegion(def: RegionDef, count = 1): RegionHandle {
+    const edits = this.edits(def.id);
+    if (edits.length) def.edits = edits;
+    else delete def.edits;
     const placements = this.placements.get(def.id) ?? [];
     const map = generateRegion(def);
     const cells = count > 1 ? cellsFor(def, map.width, count) : [];
@@ -240,6 +248,29 @@ export class World {
     } finally {
       for (const p of players) this.moving.delete(p);
     }
+  }
+
+  /**
+   * A land's edits changed: it is laid out again wherever it runs, everyone
+   * in it put back where they stood (or the nearest open spot), and the
+   * lands around it shown the change, since their players see across the
+   * border. Edits to one land are laid one after another.
+   */
+  reshape(id: string): Promise<void> {
+    const before = this.reshaping.get(id) ?? Promise.resolve();
+    const next = before.then(async () => {
+      const region = this.regions.get(id);
+      if (!region) return;
+      await this.moveRegion(id);
+      this.stateChanged();
+      for (const other of this.neighbours(region.def)) this.regions.get(other.id)?.welcomeAll();
+    });
+    const settled = next.catch((err) => console.error(`Laying out ${id} again failed:`, err)).finally(() => {
+      if (this.reshaping.get(id) === settled) this.reshaping.delete(id);
+    });
+    this.reshaping.set(id, settled);
+    this.track(settled);
+    return next;
   }
 
   /** Every region's layout, launch and wished. */

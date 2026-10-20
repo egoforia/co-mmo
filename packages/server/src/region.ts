@@ -460,9 +460,10 @@ export class Region {
       this.s.players.delete(info.id);
     }
     let { x, y } = this.map.spawn;
-    if (at.x !== null && at.y !== null && !outsideSide(this.map, at.x, at.y) && !collides(this.map, at.x, at.y)) {
-      x = at.x;
-      y = at.y;
+    if (at.x !== null && at.y !== null && !outsideSide(this.map, at.x, at.y)) {
+      // Something may have been built or planted where they stood (the world editor): the nearest open spot, then.
+      const free = collides(this.map, at.x, at.y) ? nearestOpen(this.map, at.x, at.y) : { x: at.x, y: at.y };
+      if (free) ({ x, y } = free);
     }
     const p: PlayerState = {
       info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), ...carry,
@@ -663,4 +664,21 @@ export class Region {
     for (const p of this.s.players.values()) this.s.notice(p, WEATHER_NEWS[weather]);
   }
 
+}
+
+/** The open spot nearest (x, y), within a few tiles, at the middle of a tile. */
+function nearestOpen(map: RegionMap, x: number, y: number): { x: number; y: number } | undefined {
+  for (let r = 1; r <= 4; r++) {
+    let best: { x: number; y: number; d: number } | undefined;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const spot = { x: Math.floor(x) + dx + 0.5, y: Math.floor(y) + dy + 0.5 };
+        const d = Math.hypot(spot.x - x, spot.y - y);
+        if (d > r || outsideSide(map, spot.x, spot.y) || collides(map, spot.x, spot.y)) continue;
+        if (!best || d < best.d) best = { ...spot, d };
+      }
+    }
+    if (best) return { x: best.x, y: best.y };
+  }
+  return undefined;
 }

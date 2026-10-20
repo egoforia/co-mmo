@@ -1,4 +1,4 @@
-import type { PlayerInfo, buildingKit } from '@co-mmo/shared';
+import type { PlayerInfo, WorldEdit, WorldEditDraft, buildingKit } from '@co-mmo/shared';
 
 const TOKEN_KEY = 'co-mmo.token';
 
@@ -93,6 +93,31 @@ export async function kitHouses(token: string, region: string): Promise<building
   const res = await fetch(`/api/kit-houses?region=${encodeURIComponent(region)}`, { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
   if (!res?.ok) return [];
   return ((await res.json()) as { houses: buildingKit.KitHouseInfo[] }).houses;
+}
+
+/** A land's edits (newest last) and how many were taken back and can be made again. */
+export interface EditLog {
+  edits: WorldEdit[];
+  undone: number;
+}
+
+/**
+ * The world editor (Owner and Stewards): reads a land's edits, or makes a
+ * change (`edit`), `undo`, `redo` or `remove` one. Throws with the server's
+ * words when it cannot be done.
+ */
+export async function worldEdits(token: string, region: string, action?: { edit: WorldEditDraft } | { undo: true } | { redo: true } | { remove: string }): Promise<EditLog> {
+  const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  const res = !action
+    ? await fetch(`/api/world-edits?region=${encodeURIComponent(region)}`, { headers })
+    : await fetch(`/api/world-edits${'edit' in action ? '' : 'undo' in action ? '/undo' : 'redo' in action ? '/redo' : '/remove'}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ region, ...('edit' in action ? { edit: action.edit } : 'remove' in action ? { id: action.remove } : {}) }),
+    });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.message ?? 'The editor could not reach the server. Try again.');
+  return body as EditLog;
 }
 
 export async function signOut(token: string): Promise<void> {

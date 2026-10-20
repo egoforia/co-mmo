@@ -2,6 +2,7 @@ import type { BiomeId } from './biomes.ts';
 import { rand2, valueNoise } from './random.ts';
 import { furnitureArt } from './buildings.ts';
 import { layPlaces } from './places.ts';
+import { applyEdits, type WorldEdit } from './world-edits.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -44,6 +45,8 @@ export interface RegionDef {
   at: { x: number; y: number };
   /** A region wished into being: how wild it is and what lives there. */
   wild?: WildLand;
+  /** Changes the Owner and Stewards made in the world editor, laid over the land in order (world-edits.ts). */
+  edits?: WorldEdit[];
 }
 
 /**
@@ -258,6 +261,8 @@ function layOut(def: RegionDef, size: number): RegionMap {
   // NPCs stroll around their spot, so only landmarks block tiles.
   for (const l of map.landmarks) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
   openUp(map);
+  // After the trails are cut, so a tree an editor planted stays where it was put.
+  if (def.edits?.length) applyEdits(map, def.edits);
   settle(map);
   return map;
 }

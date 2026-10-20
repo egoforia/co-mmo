@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role, type WishDraft } from '@co-mmo/shared';
+import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
 import { defaultSettings, type Settings } from './settings.ts';
 import type { RuleTestReport } from './rule-test.ts';
@@ -138,6 +138,14 @@ interface Data {
   journal: JournalEntry[];
   /** Wish Workshop drafts, by player id (missing in older saves). */
   drafts?: Record<string, WishDraft>;
+  /** The world editor's changes to each land, by region id (missing in older saves). */
+  worldEdits?: Record<string, WorldEditLog>;
+}
+
+/** A land's edits in the order they are laid, and those taken back, newest last, for redo. */
+export interface WorldEditLog {
+  edits: WorldEdit[];
+  undone: WorldEdit[];
 }
 
 /**
@@ -461,6 +469,18 @@ export class Store {
     this.persistSoon();
   }
 
+  // --- World editor --------------------------------------------------------
+
+  /** A land's edits and those taken back; empty for a land never edited. */
+  worldEdits(regionId: string): WorldEditLog {
+    return this.data.worldEdits?.[regionId] ?? { edits: [], undone: [] };
+  }
+
+  setWorldEdits(regionId: string, log: WorldEditLog): void {
+    this.data.worldEdits = { ...this.data.worldEdits, [regionId]: log };
+    this.persist();
+  }
+
   // --- Settings and spending -----------------------------------------------
 
   get settings(): Settings {
@@ -620,6 +640,7 @@ class PostgresBackend implements StoreBackend {
       journal: numbered<JournalEntry>(t.journal),
       drafts: Object.fromEntries(t.drafts.map((r) => [r.key, r.data as WishDraft])),
       ruleData: Object.fromEntries(t.rule_data.map((r) => [r.key, r.data as Record<string, Record<string, unknown>>])),
+      worldEdits: Object.fromEntries(t.world_edits.map((r) => [r.key, r.data as WorldEditLog])),
       ...(settings ? { settings } : {}),
     };
   }
@@ -642,6 +663,7 @@ class PostgresBackend implements StoreBackend {
       journal: numbered(data.journal),
       drafts: Object.entries(data.drafts ?? {}).map(([key, d]) => ({ key, data: d })),
       rule_data: Object.entries(data.ruleData).map(([key, d]) => ({ key, data: d })),
+      world_edits: Object.entries(data.worldEdits ?? {}).map(([key, d]) => ({ key, data: d })),
       settings: [{ key: 'settings', data: data.settings }],
     });
   }

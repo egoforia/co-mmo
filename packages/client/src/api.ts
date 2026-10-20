@@ -1,4 +1,4 @@
-import type { PlayerInfo, buildingKit } from '@co-mmo/shared';
+import type { PerfView, PlayerInfo, buildingKit } from '@co-mmo/shared';
 
 const TOKEN_KEY = 'co-mmo.token';
 
@@ -93,6 +93,12 @@ export async function kitHouses(token: string, region: string): Promise<building
   const res = await fetch(`/api/kit-houses?region=${encodeURIComponent(region)}`, { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
   if (!res?.ok) return [];
   return ((await res.json()) as { houses: buildingKit.KitHouseInfo[] }).houses;
+}
+
+/** How the server running your part of the world keeps up, for the performance overlay (Stewards and the Owner). */
+export async function perfStats(token: string): Promise<PerfView | undefined> {
+  const res = await fetch('/api/admin/perf', { headers: { authorization: `Bearer ${token}` } }).catch(() => undefined);
+  return res?.ok ? ((await res.json()) as PerfView) : undefined;
 }
 
 export async function signOut(token: string): Promise<void> {

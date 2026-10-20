@@ -225,6 +225,18 @@ describe("God's View Server health", () => {
     expect(gateway.load).toMatchObject({ tickMs: expect.any(Number), memoryMb: expect.any(Number), errors: 0, pid: process.pid });
     expect(r1).toMatchObject({ id: 'r1', kind: 'region-server', players: 1 });
     expect(r1.regions.map((r: any) => r.id).sort()).toEqual(['desert', 'sanctum', 'shore', 'woods']);
+    expect(r1.load).toMatchObject({ ticksPerSecond: expect.any(Number), lagMs: expect.any(Number), worstLagMs: expect.any(Number), heapMb: expect.any(Number) });
+    for (const r of r1.regions) expect(r.creatures).toEqual(expect.any(Number));
+
+    // The performance overlay: Stewards see the server running their part of the world, players do not.
+    const playerToken = account(store, 'Ilya').token;
+    expect((await api(base, '/api/admin/perf', playerToken)).status).toBe(403);
+    const perf = await api(base, '/api/admin/perf', steward.token);
+    expect(perf.body).toMatchObject({ online: 1, servers: 2, tickRate: 20 });
+    expect(perf.body.here).toBeUndefined();
+    const mine = (await api(base, '/api/admin/perf', owner.token)).body;
+    expect(mine.here).toMatchObject({ region: 'the Sanctum', server: 'Region server r1', players: 1, creatures: expect.any(Number), tickMs: expect.any(Number) });
+    expect(mine.here.host).toBeUndefined();
 
     // Restart where it runs: the player is welcomed again where they stood.
     const before = app!.world.home.position(owner.id)!;
@@ -238,6 +250,16 @@ describe("God's View Server health", () => {
     expect(app!.world.home.host).toBe('gateway');
     expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum', to: 'nowhere' })).status).toBe(400);
     expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'atlantis' })).status).toBe(404);
+  });
+
+  it('answers a ping at once, for the performance overlay', async () => {
+    const { store, ws, base } = await start();
+    const owner = account(store, 'egoforia', 'owner');
+    const c = await joined(ws, owner.token);
+    await c.send({ t: 'ping', n: 7 });
+    expect(await c.waitFor((m) => m.t === 'pong')).toEqual({ t: 'pong', n: 7 });
+    const perf = (await api(base, '/api/admin/perf', owner.token)).body;
+    expect(perf.here).toMatchObject({ server: 'Game server', players: 1 });
   });
 
   it('restarts a region when every region runs in the game server', async () => {

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
 import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem } from '@co-mmo/shared';
-import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
+import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
@@ -14,6 +14,7 @@ import { onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
 import { chooseCamera } from './camera-preview.ts';
+import { PerfOverlay } from './perf-overlay.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
 
 async function boot(): Promise<void> {
@@ -94,6 +95,7 @@ function play(token: string): void {
   let prayer: PrayerUi | null = null;
   let draft: DraftView | null = null;
   let party: PartyUi | null = null;
+  let perf: PerfOverlay | null = null;
   let myId = '';
   const sound = new GameSound();
   soundControls(sound);
@@ -256,6 +258,9 @@ function play(token: string): void {
         kit?.tradeRequested(message);
         chat?.add({ kind: 'system', text: `${message.from.name} wants to trade with you.` });
         break;
+      case 'pong':
+        perf?.pong(message.n);
+        break;
       case 'error':
         chat?.add({ kind: 'error', text: message.message });
         break;
@@ -286,7 +291,7 @@ function play(token: string): void {
     chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     party.start(myId);
-    const account = new AccountWindow(token, welcome.you.role === 'owner');
+    const account = new AccountWindow(token, welcome.you.role === 'owner', welcome.you.role !== 'player' ? () => perf : undefined);
     onAccountClick(() => void account.toggle());
     void accountInfo(token).then((info) => {
       if (!info.look) chat?.add({ kind: 'system', text: '✦ You have not described your look yet. Open Account to make your first wish, free: the God paints you as you describe.' });
@@ -341,7 +346,7 @@ function play(token: string): void {
       // The arrow keys choose loot while its window is open, so the player stands still.
       typing: () => isTyping() || !!loot?.open,
     });
-    new Phaser.Game({
+    const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: 'game',
       backgroundColor: '#181425',
@@ -353,6 +358,19 @@ function play(token: string): void {
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });
+    // The performance overlay, for Stewards and the Owner checking where the game is slow.
+    if (welcome.you.role !== 'player') {
+      const world = scene;
+      perf = new PerfOverlay({
+        game,
+        counts: () => world.counts(),
+        received: connection.received,
+        ping: (n) => connection.send({ t: 'ping', n }),
+        server: () => perfStats(token),
+        camera: preview ? 'isometric preview' : 'top-down',
+        region: () => region,
+      });
+    }
     setHud(name, 1, region);
     onInviteClick(async () => {
       try {

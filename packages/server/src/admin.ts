@@ -20,6 +20,7 @@ import type { AiServices } from './ai/services.ts';
 import type { Budget } from './budget.ts';
 import type { World } from './world.ts';
 import type { LoadMeter } from './load-meter.ts';
+import { perfView } from './perf.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
@@ -562,16 +563,20 @@ export async function handleAdmin(
   }
 
   // Server health (Owner): where each region runs and how hard each host works.
+  const hosts = () => (ctx.regionServers ? ctx.regionServers.status(ctx.meter.load()) : hostStatus(world, ctx.meter.load()));
   if (route === 'servers' && method === 'GET') {
     if (ownerOnly()) return true;
     const servers = ctx.regionServers;
     return json(res, 200, {
-      hosts: servers ? servers.status(ctx.meter.load()) : hostStatus(world, ctx.meter.load()),
+      hosts: hosts(),
       regionServers: Boolean(servers),
       store: store.label,
       now: Date.now(),
     }), true;
   }
+
+  // The performance overlay (Stewards and the Owner): how the server running your part of the world keeps up.
+  if (route === 'perf' && method === 'GET') return json(res, 200, perfView(world, account.id, hosts())), true;
 
   // Moves a region to another host, or sets it up again where it is (a restart).
   if (route === 'servers/move' && method === 'POST') {

@@ -63,6 +63,7 @@ export class RegionServer {
   async stop(): Promise<void> {
     clearInterval(this.tickTimer);
     clearInterval(this.beatTimer);
+    this.meter.close();
     this.toGateway({ t: 'bye', server: this.id });
     await this.unsubscribe?.();
   }

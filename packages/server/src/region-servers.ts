@@ -21,7 +21,7 @@ export interface HostStatus {
   id: string;
   kind: 'gateway' | 'region-server';
   /** What runs there: whole regions, or cells of split ones (`part` of `parts`). */
-  regions: { id: string; region: string; name: string; players: number; part?: number; parts?: number }[];
+  regions: { id: string; region: string; name: string; players: number; creatures: number; part?: number; parts?: number }[];
   players: number;
   load: ServerLoad;
   /** When it was last heard from. */
@@ -36,7 +36,7 @@ export function hostStatus(world: World, gateway: ServerLoad, servers: ServerInf
     const units = byHost.get(id) ?? [];
     return {
       regions: units.map((r) => ({
-        id: r.key, region: r.def.id, name: r.def.name, players: r.online,
+        id: r.key, region: r.def.id, name: r.def.name, players: r.online, creatures: r.creatureIds().length,
         ...(r.cell ? { part: r.cell.index + 1, parts: r.cell.count } : {}),
       })),
       players: units.reduce((n, r) => n + r.online, 0),

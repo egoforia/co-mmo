@@ -1,5 +1,6 @@
 import { BUILDING_STYLES } from './buildings.ts';
 import { hashString, rand2 } from './random.ts';
+import { setPiece } from './sea-cave-kit.ts';
 import { block, building, isBlocking, road, set, Tile, type Building, type Landmark, type RegionMap } from './world.ts';
 
 // The Owner and Stewards edit the world in the game: move a tree or a set
@@ -37,7 +38,9 @@ export type WorldEditDraft =
   /** Monsters of a kind that live around a spot, and come back there after they fall. */
   | { kind: 'spawn'; creature: string; at: TilePoint; count: number }
   /** Sends away every monster living within `radius` tiles of a spot. */
-  | { kind: 'clear'; at: TilePoint; radius: number };
+  | { kind: 'clear'; at: TilePoint; radius: number }
+  /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */
+  | { kind: 'piece'; piece: string; at: TilePoint };
 
 /** Who made an edit and when, plus a spawn's name and picture, filled in by the server. */
 export interface EditStamp {
@@ -97,6 +100,9 @@ export function applyEdit(map: RegionMap, edit: WorldEdit): void {
       return spawn(map, edit);
     case 'clear':
       map.creatures = map.creatures.filter((c) => Math.hypot(c.x - edit.at[0] - 0.5, c.y - edit.at[1] - 0.5) > edit.radius);
+      return;
+    case 'piece':
+      return place(map, edit.piece, edit.at);
   }
 }
 
@@ -143,6 +149,14 @@ export function checkEdit(map: RegionMap, edit: WorldEditDraft, creatures: Recor
     case 'clear':
       if (!inside(edit.at)) return off;
       return typeof edit.radius === 'number' && edit.radius > 0 && edit.radius <= MAX_CLEAR_RADIUS ? undefined : `Clear 1 to ${MAX_CLEAR_RADIUS} tiles around.`;
+    case 'piece': {
+      const piece = typeof edit.piece === 'string' ? setPiece(edit.piece) : undefined;
+      if (!piece) return 'There is no set piece of that kind.';
+      if (!inside(edit.at)) return off;
+      const tiles = pieceTiles(edit.at, piece.footprint);
+      if (!tiles.every(inside)) return 'It would stand off the edge of this land.';
+      return tiles.every((t) => open(tileOf(map, t))) ? undefined : 'Something already stands there. Pick open ground or a floor.';
+    }
     default:
       return 'The editor does not know that kind of change.';
   }
@@ -158,6 +172,30 @@ function movable(t: Tile): boolean {
 /** Tiles that belong to a building or lie under a set piece, which only a house or a move lays. */
 function built(t: Tile): boolean {
   return t === Tile.Wall || t === Tile.Floor || t === Tile.Door || t === Tile.Blocked;
+}
+
+/** Tiles a set piece may stand on: open ground, paths and floors. */
+function open(t: Tile): boolean {
+  return !isBlocking(t) && t !== Tile.Door && t !== Tile.Bridge;
+}
+
+/** The tiles a set piece covers, from its bottom-left tile up and to the right. */
+function pieceTiles(at: TilePoint, footprint: { width: number; height: number }): TilePoint[] {
+  const tiles: TilePoint[] = [];
+  for (let dy = 0; dy < footprint.height; dy++) for (let dx = 0; dx < footprint.width; dx++) tiles.push([at[0] + dx, at[1] - dy]);
+  return tiles;
+}
+
+/** Stands a set piece, unless its kit is switched off or something took its spot since. */
+function place(map: RegionMap, id: string, at: TilePoint): void {
+  const piece = setPiece(id);
+  if (!piece) return;
+  const tiles = pieceTiles(at, piece.footprint);
+  if (!tiles.every(([x, y]) => x >= 0 && y >= 0 && x < map.width && y < map.height && open(tileOf(map, [x, y])))) return;
+  // Bottom centre of its footprint, as block() and the scene read a landmark.
+  const landmark: Landmark = { asset: piece.id, x: at[0] + piece.footprint.width / 2, y: at[1] + 1, footprint: { ...piece.footprint } };
+  map.landmarks.push(landmark);
+  block(map, landmark.x, landmark.y, piece.footprint.width, piece.footprint.height);
 }
 
 function tileOf(map: RegionMap, [x, y]: TilePoint): Tile {

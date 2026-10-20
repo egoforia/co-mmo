@@ -30,7 +30,8 @@ import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { buildingArtJobs } from './assets/building-art.ts';
 import type { KitSheets, KitSheetView } from './assets/building-kit/kit-sheets.ts';
 import type { SheetGuide } from './assets/building-kit/sheet.ts';
-import { BIOME_KIT, type KitAsset } from './assets/kit.ts';
+import type { KitAsset } from './assets/kit.ts';
+import { kitPieces, seaCaveBox } from './assets/sea-cave-kit.ts';
 import { paintKitAsset, wildKit } from './assets/wild-kit.ts';
 import { artRequest, estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { pictureName } from './assets/names.ts';
@@ -264,7 +265,7 @@ export class ArtStudio {
       return { source: 'missing' };
     };
     const items: ArtItem[] = [];
-    for (const a of BIOME_KIT.filter(repaintableKit)) {
+    for (const a of kitPieces().filter(repaintableKit)) {
       items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd('scenery'), repaintable: true, takesNote: true });
     }
     for (const a of ANCHORS) {
@@ -476,7 +477,8 @@ export class ArtStudio {
     if (Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`))) return this.options.buildings.preview(asset, note);
     const kit = this.kitAsset(asset);
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
-    const box = (await this.options.shipped())[asset];
+    // A sea cave piece is painted the first time at its kit's size.
+    const box = (await this.options.shipped())[asset] ?? seaCaveBox(asset);
     if (!box) throw new ArtRequestError('That picture is not part of the game yet.');
     const provider = this.options.ai.image(useOf(kit));
     if (!provider) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
@@ -688,7 +690,7 @@ export class ArtStudio {
 
   /** A shipped scenery piece, character or item that can be painted again. */
   private kitAsset(asset: string): KitAsset | undefined {
-    return [...BIOME_KIT.filter(repaintableKit), ...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
+    return [...kitPieces().filter(repaintableKit),...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
   }
 
   /**
@@ -760,7 +762,7 @@ export class ArtStudio {
       return { estimateUsd };
     }
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
-    const shipped = (await this.options.shipped())[asset];
+    const shipped = (await this.options.shipped())[asset] ?? seaCaveBox(asset);
     if (!shipped) throw new ArtRequestError('That picture is not part of the game yet.');
     const handle = this.options.jobs.add(asset, kit.name ?? asset, 'picture', 'gods-view', estimateUsd);
     this.enqueue(async () => {

@@ -1,6 +1,7 @@
 import type { BiomeId } from './biomes.ts';
 import { rand2, valueNoise } from './random.ts';
 import { furnitureArt } from './buildings.ts';
+import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
 import { applyEdits, type WorldEdit } from './world-edits.ts';
 
@@ -220,7 +221,8 @@ const LAID_OUT_KEPT = 24;
  * agree. Each call gets its own copy, free to change.
  */
 export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
-  const key = `${size}:${JSON.stringify(def)}`;
+  // Edits from a wish (a sea cave piece) are laid only while it is on.
+  const key = `${size}:${modsOff()}:${JSON.stringify(def)}`;
   let map = laidOut.get(key);
   if (!map) {
     map = layOut(structuredClone(def), size);

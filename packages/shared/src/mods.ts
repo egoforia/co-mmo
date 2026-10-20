@@ -32,6 +32,11 @@ export function modOn(id: string): boolean {
   return !OFF.has(id);
 }
 
+/** The mod ids switched off now, sorted, so a land laid out with a wish on is not reused with it off. */
+export function modsOff(): string {
+  return [...OFF].sort().join(',');
+}
+
 /** Switches an Engine wish's code on or off here (server, region server or browser). */
 export function switchMod(id: string, on: boolean): void {
   if (on) OFF.delete(id);

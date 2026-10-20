@@ -363,7 +363,7 @@ describe('the Art tab', () => {
     const one = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left' });
     expect(one.status).toBe(200);
     expect(one.body.title).toBe('Paint Sun Scarab standing, facing towards us and to the left');
-    expect(one.body.parts[0].recipe.steps[0].prompt).toContain('turned halfway to the left');
+    expect(one.body.parts[0].recipe.steps[0].prompt).toContain('facing the LOWER-LEFT corner of the picture');
     expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'front-left', approved: one.body.fingerprint })).status).toBe(202);
     await app!.art.idle();
     const art = (await api(base, '/api/art', owner.token)).body;

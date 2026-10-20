@@ -38,10 +38,12 @@ const SEEN: Record<Facing, string> = {
   back: 'facing away from the viewer, seen from behind, the face hidden',
   left: 'facing left, seen exactly side-on: the face in profile points to the LEFT edge of the picture and we see their right side',
   // The isometric camera's ways: turned exactly halfway, which the model drifts away from unless told both ends.
-  'front-left': 'turned halfway to the left: facing towards the viewer and the LEFT edge of the picture at once, exactly halfway between seen from the front and seen side-on; we see the face and chest turned towards the lower left',
-  'front-right': 'turned halfway to the right: facing towards the viewer and the RIGHT edge of the picture at once, exactly halfway between seen from the front and seen side-on; we see the face and chest turned towards the lower right',
-  'back-left': 'turned halfway away to the left: facing away from the viewer and towards the LEFT edge of the picture at once, exactly halfway between seen from behind and seen side-on; we see the back and the back of the head turned towards the upper left, the face hidden',
-  'back-right': 'turned halfway away to the right: facing away from the viewer and towards the RIGHT edge of the picture at once, exactly halfway between seen from behind and seen side-on; we see the back and the back of the head turned towards the upper right, the face hidden',
+  // "Turned to the left" reads as the figure's own left (the picture's right), so each is named by the
+  // picture's corner and the nearer shoulder instead.
+  'front-left': "in a three-quarter view from the front, facing the LOWER-LEFT corner of the picture: the nose, chest and toes point towards the viewer's left, exactly halfway between facing the viewer and a profile facing the left edge of the picture; their LEFT shoulder is nearer to us and their right shoulder further away",
+  'front-right': "in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away",
+  'back-left': "in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder is nearer to us",
+  'back-right': "in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us",
 };
 
 /**

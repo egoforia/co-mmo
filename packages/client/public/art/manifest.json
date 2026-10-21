@@ -962,161 +962,161 @@
   "bramble-ursine-walk-front-left": {
     "file": "art/bramble-ursine-walk-front-left.png",
     "kind": "walk",
-    "width": 1988,
-    "height": 219,
-    "frames": 14,
+    "width": 1656,
+    "height": 218,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "bramble-ursine-walk-front-right": {
     "file": "art/bramble-ursine-walk-front-right.png",
     "kind": "walk",
-    "width": 1988,
-    "height": 219,
-    "frames": 14,
+    "width": 1656,
+    "height": 218,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "bramble-ursine-walk-back-left": {
     "file": "art/bramble-ursine-walk-back-left.png",
     "kind": "walk",
-    "width": 1988,
-    "height": 219,
-    "frames": 14,
+    "width": 1656,
+    "height": 218,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "bramble-ursine-walk-back-right": {
     "file": "art/bramble-ursine-walk-back-right.png",
     "kind": "walk",
-    "width": 1988,
-    "height": 219,
-    "frames": 14,
+    "width": 1656,
+    "height": 218,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "tide-lutran-walk-front-left": {
     "file": "art/tide-lutran-walk-front-left.png",
     "kind": "walk",
-    "width": 2520,
-    "height": 224,
-    "frames": 14,
+    "width": 2232,
+    "height": 223,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "tide-lutran-walk-front-right": {
     "file": "art/tide-lutran-walk-front-right.png",
     "kind": "walk",
-    "width": 2520,
-    "height": 224,
-    "frames": 14,
+    "width": 2232,
+    "height": 223,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "tide-lutran-walk-back-left": {
     "file": "art/tide-lutran-walk-back-left.png",
     "kind": "walk",
-    "width": 2520,
-    "height": 224,
-    "frames": 14,
+    "width": 2232,
+    "height": 223,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "tide-lutran-walk-back-right": {
     "file": "art/tide-lutran-walk-back-right.png",
     "kind": "walk",
-    "width": 2520,
-    "height": 224,
-    "frames": 14,
+    "width": 2232,
+    "height": 223,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "zephyr-falcon-walk-front-left": {
     "file": "art/zephyr-falcon-walk-front-left.png",
     "kind": "walk",
-    "width": 2072,
+    "width": 1680,
     "height": 207,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "zephyr-falcon-walk-front-right": {
     "file": "art/zephyr-falcon-walk-front-right.png",
     "kind": "walk",
-    "width": 2072,
+    "width": 1680,
     "height": 207,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "zephyr-falcon-walk-back-left": {
     "file": "art/zephyr-falcon-walk-back-left.png",
     "kind": "walk",
-    "width": 2072,
+    "width": 1680,
     "height": 207,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "zephyr-falcon-walk-back-right": {
     "file": "art/zephyr-falcon-walk-back-right.png",
     "kind": "walk",
-    "width": 2072,
+    "width": 1680,
     "height": 207,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "dune-scorpid-walk-front-left": {
     "file": "art/dune-scorpid-walk-front-left.png",
     "kind": "walk",
-    "width": 1680,
-    "height": 198,
-    "frames": 14,
+    "width": 1440,
+    "height": 199,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "dune-scorpid-walk-front-right": {
     "file": "art/dune-scorpid-walk-front-right.png",
     "kind": "walk",
-    "width": 1680,
-    "height": 198,
-    "frames": 14,
+    "width": 1440,
+    "height": 199,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "dune-scorpid-walk-back-left": {
     "file": "art/dune-scorpid-walk-back-left.png",
     "kind": "walk",
-    "width": 1680,
-    "height": 198,
-    "frames": 14,
+    "width": 1440,
+    "height": 199,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "dune-scorpid-walk-back-right": {
     "file": "art/dune-scorpid-walk-back-right.png",
     "kind": "walk",
-    "width": 1680,
-    "height": 198,
-    "frames": 14,
+    "width": 1440,
+    "height": 199,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "sylvan-cervid-walk-front-left": {
     "file": "art/sylvan-cervid-walk-front-left.png",
     "kind": "walk",
-    "width": 1820,
+    "width": 1536,
     "height": 196,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "sylvan-cervid-walk-front-right": {
     "file": "art/sylvan-cervid-walk-front-right.png",
     "kind": "walk",
-    "width": 1820,
+    "width": 1536,
     "height": 196,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "sylvan-cervid-walk-back-left": {
     "file": "art/sylvan-cervid-walk-back-left.png",
     "kind": "walk",
-    "width": 1820,
+    "width": 1536,
     "height": 196,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   },
   "sylvan-cervid-walk-back-right": {
     "file": "art/sylvan-cervid-walk-back-right.png",
     "kind": "walk",
-    "width": 1820,
+    "width": 1536,
     "height": 196,
-    "frames": 14,
+    "frames": 12,
     "cycleSeconds": 0.9
   }
 }

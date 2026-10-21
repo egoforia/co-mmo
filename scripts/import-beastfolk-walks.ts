@@ -69,7 +69,7 @@ function getCellBox(r: number, c: number) {
 }
 
 // Extract standing figures from a 4-way turnaround sheet
-async function extractStandingViews(sheetPath: string): Promise<Record<IsoWay, Buffer>> {
+async function extractStandingViews(sheetPath: string, ways: readonly IsoWay[] = ISO_WAYS): Promise<Record<IsoWay, Buffer>> {
   const im = sharp(sheetPath);
   const meta = await im.metadata();
   const w = meta.width ?? 1680;
@@ -80,7 +80,7 @@ async function extractStandingViews(sheetPath: string): Promise<Record<IsoWay, B
   const views: Record<string, Buffer> = {};
 
   for (let c = 0; c < 4; c++) {
-    const way = ISO_WAYS[c]!;
+    const way = ways[c]!;
     const crop = await sharp(sheetPath)
       .extract({ left: c * segW, top: 0, width: segW, height: h })
       .png()
@@ -91,6 +91,12 @@ async function extractStandingViews(sheetPath: string): Promise<Record<IsoWay, B
   }
   return views as Record<IsoWay, Buffer>;
 }
+
+// Bramble-Ursine turnaround positions 3 and 4 (cols 2 and 3) were generated as back-right and back-left
+const waysForChar = (charId: string): readonly IsoWay[] =>
+  charId === 'bramble-ursine'
+    ? ['front-left', 'front-right', 'back-right', 'back-left']
+    : ['front-left', 'front-right', 'back-left', 'back-right'];
 
 async function main() {
   console.log('=== Starting Beastfolk Walk Animation Import into co-mmo ===');
@@ -115,16 +121,18 @@ async function main() {
   const clientManifestPath = resolve(clientArtDir, 'manifest.json');
   const clientManifest = JSON.parse(await readFile(clientManifestPath, 'utf8').catch(() => '{}'));
 
-  // The seamless 14-frame walk cycle at 15 fps (0.93s period), skipping the static hold frames (1-11)
-  const frameIndices = [18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44];
+  // Seamless 12-frame walk cycle spanning the complete 2 strides [21..48) at ~13.3 fps (0.9s period)
+  // Step sizes [2, 3, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2] wrap smoothly into frame 48 (which mirrors frame 21)
+  const frameIndices = [21, 23, 26, 28, 30, 32, 35, 37, 39, 41, 44, 46];
   console.log(`Using ${frameIndices.length} frames per walk cycle: [${frameIndices.join(', ')}]`);
 
   for (const char of CHARACTERS) {
     console.log(`\nProcessing ${char.name} (${char.id})...`);
+    const ways = waysForChar(char.id);
 
     // 1. Process standing views
     console.log(`  Extracting standing views from ${char.standSheet}...`);
-    const standingViews = await extractStandingViews(char.standSheet);
+    const standingViews = await extractStandingViews(char.standSheet, ways);
     for (const [way, buf] of Object.entries(standingViews)) {
       const viewFile = resolve(VIEWS_DIR, `${char.id}-${way}.png`);
       await writeFile(viewFile, buf);
@@ -133,8 +141,7 @@ async function main() {
     // 2. Extract walk frames for all 4 isometric ways
     const directionsFrames: Buffer[][] = [];
 
-    for (let c = 0; c < ISO_WAYS.length; c++) {
-      const way = ISO_WAYS[c]!;
+    for (let c = 0; c < 4; c++) {
       const box = getCellBox(char.rowIndex, c);
       const wayFrames: Buffer[] = [];
 
@@ -156,8 +163,8 @@ async function main() {
     console.log(`  Normalized: frame size = ${normalized.frameWidth}x${normalized.frameHeight}, scale = ${normalized.scale.toFixed(3)}`);
 
     // 4. Save walk strips, individual frames, and update manifest
-    for (let c = 0; c < ISO_WAYS.length; c++) {
-      const way = ISO_WAYS[c]!;
+    for (let c = 0; c < 4; c++) {
+      const way = ways[c]!;
       const walkId = `${char.id}-walk-${way}`;
       const stripBuf = normalized.strips[c]!;
       const wayFrames = directionsFrames[c]!;

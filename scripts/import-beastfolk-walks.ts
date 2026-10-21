@@ -111,11 +111,12 @@ async function main() {
   const looksPath = resolve(DATA_WALKS_DIR, 'looks.json');
   const looks = JSON.parse(await readFile(looksPath, 'utf8').catch(() => '{}'));
 
-  // The 16 fps video has 32 frames (2 seconds). We take 16 frames (steps of 2) for a 1.0s cycle
-  const frameIndices: number[] = [];
-  for (let i = 1; i <= 31; i += 2) {
-    frameIndices.push(i);
-  }
+  const clientArtDir = resolve('packages/client/public/art');
+  const clientManifestPath = resolve(clientArtDir, 'manifest.json');
+  const clientManifest = JSON.parse(await readFile(clientManifestPath, 'utf8').catch(() => '{}'));
+
+  // The seamless 14-frame walk cycle at 15 fps (0.93s period), skipping the static hold frames (1-11)
+  const frameIndices = [18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44];
   console.log(`Using ${frameIndices.length} frames per walk cycle: [${frameIndices.join(', ')}]`);
 
   for (const char of CHARACTERS) {
@@ -161,9 +162,11 @@ async function main() {
       const stripBuf = normalized.strips[c]!;
       const wayFrames = directionsFrames[c]!;
 
-      // Save strip PNG
+      // Save strip PNG in data/art/walks and client art
       const stripPath = resolve(DATA_WALKS_DIR, `${walkId}.png`);
       await writeFile(stripPath, stripBuf);
+      const clientStripPath = resolve(clientArtDir, `${walkId}.png`);
+      await writeFile(clientStripPath, stripBuf);
 
       // Save individual frames and json index
       const frameNames: string[] = [];
@@ -174,16 +177,26 @@ async function main() {
       }
       await writeFile(resolve(FRAMES_OUT_DIR, `${walkId}.json`), JSON.stringify(frameNames, null, 2));
 
-      // Manifest entry
+      // Manifest entries
       const now = Date.now();
-      manifest[walkId] = {
+      const stripEntry = {
         file: `wished-art/walks/${walkId}.png?v=${now.toString(36)}`,
+        kind: 'walk' as const,
+        width: normalized.frameWidth * wayFrames.length,
+        height: normalized.frameHeight,
+        frames: wayFrames.length,
+        cycleSeconds: 0.9,
+        redone: now,
+      };
+      manifest[walkId] = stripEntry;
+
+      clientManifest[walkId] = {
+        file: `art/${walkId}.png`,
         kind: 'walk',
         width: normalized.frameWidth * wayFrames.length,
         height: normalized.frameHeight,
         frames: wayFrames.length,
-        cycleSeconds: 1.0,
-        redone: now,
+        cycleSeconds: 0.9,
       };
       console.log(`  ✓ Wrote ${walkId}.png (${normalized.frameWidth * wayFrames.length}x${normalized.frameHeight})`);
     }
@@ -195,6 +208,7 @@ async function main() {
   // 5. Save updated manifest.json and looks.json
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
   await writeFile(looksPath, JSON.stringify(looks, null, 2));
+  await writeFile(clientManifestPath, JSON.stringify(clientManifest, null, 2));
 
   console.log('\n=== Beastfolk Walk Import Completed Successfully! ===');
   console.log(`Total active walk entries in manifest: ${Object.keys(manifest).length}`);

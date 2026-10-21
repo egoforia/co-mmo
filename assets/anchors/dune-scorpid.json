@@ -1,0 +1,36 @@
+{
+  "id": "dune-scorpid",
+  "description": {
+    "id": "dune-scorpid",
+    "name": "Dune Scorpid",
+    "kind": "npc",
+    "biome": "sanctum",
+    "silhouetteHook": "segmented brass-and-charcoal chitin pectoral plates, three-pronged pincer-hands, arched stinger tail",
+    "body": "faceted arachnid beastfolk stalker, chitin-plated digitigrade legs",
+    "materials": [
+      "basalt chitin",
+      "amber venom",
+      "desert cloth"
+    ],
+    "colors": {
+      "main": "charcoal basalt",
+      "secondary": "pale brass",
+      "accent": "amber"
+    },
+    "details": [
+      "arched stinger bulb",
+      "desert sash",
+      "pincer thumbs"
+    ],
+    "mood": "patient, alert",
+    "extra": {
+      "role": "sand stalker"
+    }
+  },
+  "prompt": "Stylised low-poly isometric fantasy game character: Dune Scorpid (sand stalker). segmented brass-and-charcoal chitin pectoral plates, three-pronged pincer-hands, arched stinger tail. Body: faceted arachnid beastfolk stalker, chitin-plated digitigrade legs. Palette: charcoal basalt, pale brass, amber. Mood: patient, alert.",
+  "provider": "wan",
+  "model": "wan-3.0",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-21T21:13:20.303Z"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "zephyr-falcon",
+  "description": {
+    "id": "zephyr-falcon",
+    "name": "Zephyr Falcon",
+    "kind": "npc",
+    "biome": "sanctum",
+    "silhouetteHook": "backward-swept feather crest, sharp aquiline beak-lip, layered flight pinions folded along forearms",
+    "body": "lean raptor beastfolk ranger, digitigrade legs with scuted scales and talons",
+    "materials": [
+      "feather pinions",
+      "scuted scales",
+      "silk"
+    ],
+    "colors": {
+      "main": "slate blue-gray",
+      "secondary": "desert ochre",
+      "accent": "falcon yellow"
+    },
+    "details": [
+      "feather crest",
+      "cream-barred chest",
+      "four-toed talons"
+    ],
+    "mood": "vigilant, keen",
+    "extra": {
+      "role": "wind ranger"
+    }
+  },
+  "prompt": "Stylised low-poly isometric fantasy game character: Zephyr Falcon (wind ranger). backward-swept feather crest, sharp aquiline beak-lip, layered flight pinions folded along forearms. Body: lean raptor beastfolk ranger, digitigrade legs with scuted scales and talons. Palette: slate blue-gray, desert ochre, falcon yellow. Mood: vigilant, keen.",
+  "provider": "wan",
+  "model": "wan-3.0",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-21T21:13:20.121Z"
+}

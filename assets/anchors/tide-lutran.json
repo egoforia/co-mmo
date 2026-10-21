@@ -1,0 +1,35 @@
+{
+  "id": "tide-lutran",
+  "description": {
+    "id": "tide-lutran",
+    "name": "Tide Lutran",
+    "kind": "npc",
+    "biome": "sanctum",
+    "silhouetteHook": "small rounded otter ears, stiff whisker planes, faceted mother-of-pearl scaled vest, flattened rudder-tail",
+    "body": "sleek agile beastfolk scout, webbed clawed hands",
+    "materials": [
+      "sea-mink pelt",
+      "mother-of-pearl scales"
+    ],
+    "colors": {
+      "main": "sea-mink brown",
+      "secondary": "kelp green",
+      "accent": "coral salmon"
+    },
+    "details": [
+      "whiskers",
+      "scaled vest",
+      "thick tail"
+    ],
+    "mood": "curious, buoyant",
+    "extra": {
+      "role": "coastal scout"
+    }
+  },
+  "prompt": "Stylised low-poly isometric fantasy game character: Tide Lutran (coastal scout). small rounded otter ears, stiff whisker planes, faceted mother-of-pearl scaled vest, flattened rudder-tail. Body: sleek agile beastfolk scout, webbed clawed hands. Palette: sea-mink brown, kelp green, coral salmon. Mood: curious, buoyant.",
+  "provider": "wan",
+  "model": "wan-3.0",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-21T21:13:19.927Z"
+}

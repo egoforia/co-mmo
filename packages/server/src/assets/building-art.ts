@@ -39,7 +39,7 @@ const MAX_EXTERIOR_PIXELS = 2048;
 /** Art pixels across one tile. */
 const TILE_ART_PIXELS = TILE_PIXELS / PIXEL_ART_SCALE;
 
-const PIXEL_STYLE = STYLE.interior.style;
+const INSIDE_STYLE = STYLE.interior.style;
 const TILE_FRAMING = STYLE.interior.tileFraming;
 const SPRITE_FRAMING = STYLE.interior.spriteFraming;
 
@@ -73,7 +73,7 @@ export function buildingArtJobs(style: BuildingStyle): BuildingArtJob[] {
       references: [exterior],
       aspectRatio: '1:1',
       size: '1K',
-      prompt: [PIXEL_STYLE, TILE_FRAMING, `Subject: inside ${style.name}, ${style[part]}.`, 'Colours: match the reference painting of the same building from outside.'].join('\n'),
+      prompt: [INSIDE_STYLE, TILE_FRAMING, `Subject: inside ${style.name}, ${style[part]}.`, 'Colours: match the reference painting of the same building from outside.'].join('\n'),
     });
   }
   for (const [key, piece] of Object.entries(style.furniture)) {
@@ -84,7 +84,7 @@ export function buildingArtJobs(style: BuildingStyle): BuildingArtJob[] {
       aspectRatio: '1:1',
       size: '1K',
       width: piece.width,
-      prompt: [PIXEL_STYLE, SPRITE_FRAMING, `Subject: the ${piece.name} inside ${style.name}: ${piece.look}.`, 'Colours: match the reference painting of the same building from outside.'].join('\n'),
+      prompt: [INSIDE_STYLE, SPRITE_FRAMING, `Subject: the ${piece.name} inside ${style.name}: ${piece.look}.`, 'Colours: match the reference painting of the same building from outside.'].join('\n'),
     });
   }
   return jobs;
@@ -129,24 +129,30 @@ export async function paintBuildingArt(
   return { image, entry: await processBuildingArt(job, image.data, dirs.outDir) };
 }
 
+/** Shrinks an inside picture to its art pixels and back up to game size: as pixel art when the style's insides are, else smoothly. */
+function shrink(png: Buffer, width: number, height: number, colours: number): Promise<Buffer> {
+  if (STYLE.interior.pixelArt) return pixelate(png, width, height, PIXEL_ART_SCALE, colours);
+  return sharp(png).resize(width * PIXEL_ART_SCALE, height * PIXEL_ART_SCALE, { fit: 'fill', kernel: 'lanczos3' }).png().toBuffer();
+}
+
 /** Turns a provider image into the game copy, and says how big it is. */
 export async function processBuildingArt(job: BuildingArtJob, raw: Buffer, outDir: string): Promise<ArtEntry> {
   const png = await sharp(raw).png().toBuffer();
   let out: Buffer;
   if (job.kind === 'tile') {
-    // The middle of the picture, made to wrap, then turned into pixel art.
+    // The middle of the picture, made to wrap, then shrunk to game size.
     const { width = 0, height = 0 } = await sharp(png).metadata();
     const crop = await sharp(png)
       .extract({ left: Math.round(width / 4), top: Math.round(height / 4), width: Math.round(width / 2), height: Math.round(height / 2) })
       .png()
       .toBuffer();
-    out = await pixelate(await makeSeamless(crop), TILE_ART_PIXELS, TILE_ART_PIXELS, PIXEL_ART_SCALE, 16);
+    out = await shrink(await makeSeamless(crop), TILE_ART_PIXELS, TILE_ART_PIXELS, 16);
   } else if (job.kind === 'furniture') {
     const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
     const trimmed = await sharp(await removeKeySpill(keyed)).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
     const w = Math.round((job.width ?? 1) * TILE_ART_PIXELS);
     const h = Math.max(1, Math.round((w * trimmed.info.height) / trimmed.info.width));
-    out = await pixelate(trimmed.data, w, h, PIXEL_ART_SCALE, 24);
+    out = await shrink(trimmed.data, w, h, 24);
   } else {
     // Keep the full width: the door is painted at the middle of it.
     const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
@@ -162,7 +168,7 @@ export async function processBuildingArt(job: BuildingArtJob, raw: Buffer, outDi
   return { file: `art/${file}`, kind: job.kind === 'exterior' ? 'building' : job.kind, width, height };
 }
 
-/** The game copy's file type: WebP for a building's big outside, PNG for crisp pixel art. */
+/** The game copy's file type: WebP for a building's big outside, PNG for crisp insides. */
 export function artExtension(job: BuildingArtJob): 'webp' | 'png' {
   return job.kind === 'exterior' ? 'webp' : 'png';
 }

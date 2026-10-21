@@ -7,8 +7,8 @@ import sharp from 'sharp';
 import { heldBehind, isWalkDirection, type Facing, type WalkDirection } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
 import { countFigures, cutFigures, type Box } from './walk-frames.ts';
-import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
-import { STYLE } from './style-profile.ts';
+import { KEY_COLOR } from './style.ts';
+import { STYLE, TOP_DOWN_STYLE, type StyleProfile } from './style-profile.ts';
 
 // Walks painted as video: the image model paints a look standing in each
 // direction, a video model makes that picture walk in place and come back to
@@ -78,17 +78,25 @@ export function gearPlacement(gear: Carried[], direction: Facing): string {
   return gear.length ? `In this view: ${gear.map(where).join('; ')}.` : '';
 }
 
+/** The style a way is painted in: the top-down camera's four ways keep their old words until that camera goes. */
+function styleOf(direction: Facing): StyleProfile {
+  return isWalkDirection(direction) ? TOP_DOWN_STYLE : STYLE;
+}
+
 /** The prompt for painting a look standing still facing one way, from its front-facing reference. */
 export function viewPrompt(name: string, gear: Carried[], direction: Facing, references = 1): string {
+  const style = styleOf(direction);
   const from = references > 1
     ? `from the ${references} reference images alone (all of them show ${name}: take every detail from them, such as how clothes hang seen from different sides)`
     : 'from the reference image alone';
   return [
-    BASE_PROMPT,
+    style.base,
     `Paint ${name} ${from}, full body, standing in a relaxed pose, ${SEEN[direction]}. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.`,
+    // Isometric ways are painted from pictures in the older look; who they are carries over, how they were painted does not.
+    style === TOP_DOWN_STYLE ? '' : 'Paint them in the style described above, even where the reference images are painted in another style.',
     gearPlacement(gear, direction),
-    `Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (${KEY_COLOR.hex}), with no floor or shadow. No magenta in the character.`,
-    `Avoid: ${[...NEGATIVE_PROMPT, 'second figure', 'turnaround sheet', 'cast shadow', ...(isWalkDirection(direction) ? [] : [WRONG_CORNER[direction]])].join(', ')}.`,
+    `Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (${style.keyColor.hex}), with no floor or shadow. No magenta in the character.`,
+    `Avoid: ${[...style.negatives, 'second figure', 'turnaround sheet', 'cast shadow', ...(isWalkDirection(direction) ? [] : [WRONG_CORNER[direction]])].join(', ')}.`,
   ].filter(Boolean).join('\n');
 }
 
@@ -105,7 +113,7 @@ export function walkVideoPrompt(gear: Carried[], direction: Facing, body = 'two-
   // A crawler has no arms to swing; its legs move in turns instead.
   const gait = body === 'two-legged' ? 'a brisk, cheerful walk with clear alternating steps and arms swinging' : 'a steady scuttle with its legs stepping in clear alternating sets';
   return [
-    `${STYLE.animation} The character from the image walks in place ${facing}, like on a treadmill: ${gait}.`,
+    `${styleOf(direction).animation} The character from the image walks in place ${facing}, like on a treadmill: ${gait}.`,
     gear.length ? `Everything they carry stays in the same hand and on the same side of the body as in the image, held steady at the same angle. ${gearPlacement(gear, direction)}` : '',
     'The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns.',
     'The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image.',

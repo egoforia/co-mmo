@@ -1,0 +1,266 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`every prompt the game paints with > a building outside, its inside tiles and its furniture > sanctum-arcanum-door 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+A floor or wall texture seen square-on, filling the entire square frame edge to edge.
+Very low contrast, small flat facets spread evenly with no single big feature or object,
+so it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.
+Subject: inside The Sanctum Arcanum, a worn cedar threshold running left to right, a little darker than the floorboards, with small faint violet runes carved along it.
+Colours: match the reference painting of the same building from outside."
+`;
+
+exports[`every prompt the game paints with > a building outside, its inside tiles and its furniture > sanctum-arcanum-exterior 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+The first image is a layout sketch: a dark door arch on a magenta background. Paint finished, richly detailed game art over it:
+the front door of the building is exactly where the dark arch is, at the middle of the bottom edge,
+the same size as the arch. Paint the whole building around that door, filling the frame from side to side and top to bottom, with its natural outline.
+with a few short steps or a threshold leading down from the door to the bottom edge. Nothing else stands in front of the door.
+Biome: the Sanctum; its light and mood.
+Subject: The Sanctum Arcanum, the whole building seen from outside, classic 2:1 isometric view, looking down at about 30 degrees from one corner, standing upright. The Sanctum Arcanum, a whimsical little arcane shop of dark timber beams and grey slate: a steep crooked slate roof with a crooked stone chimney, a wooden front door whose doorframe is etched with softly glowing violet runes, a small round stone step before the door, amethyst-purple lanterns hanging either side of the door, small leaded windows glowing warm gold, weeping willow boughs draping over the roof, a few shimmering pale-blue motes of light drifting in the air.
+Background: one flat solid pure magenta (#FF00FF) filling everything behind the building, with no ground, scenery, gradient, glow or shadow on it. No magenta anywhere in the building. Lanterns and windows have no glow or halo spilling onto the background.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, cast shadow on the background."
+`;
+
+exports[`every prompt the game paints with > a building outside, its inside tiles and its furniture > sanctum-arcanum-floor 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+A floor or wall texture seen square-on, filling the entire square frame edge to edge.
+Very low contrast, small flat facets spread evenly with no single big feature or object,
+so it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.
+Subject: inside The Sanctum Arcanum, aged cedar floorboards in warm reddish-brown, running left to right, with faint grain and a few small knots.
+Colours: match the reference painting of the same building from outside."
+`;
+
+exports[`every prompt the game paints with > a building outside, its inside tiles and its furniture > sanctum-arcanum-furniture-counter 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+A single sprite in classic 2:1 isometric view, looking down at about 30 degrees from one corner, standing upright, centred, with empty margin all around it.
+Background: one flat solid pure magenta (#FF00FF) filling everything behind the subject, with no floor, gradient, glow or shadow on it. No magenta anywhere in the subject.
+Fire and light have no glow or halo spilling outside the object.
+Subject: the counter inside The Sanctum Arcanum: a heavy carved wooden shop counter with polished brass weighing scales and a few small glass vials on it.
+Colours: match the reference painting of the same building from outside."
+`;
+
+exports[`every prompt the game paints with > a building outside, its inside tiles and its furniture > sanctum-arcanum-wall 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+A floor or wall texture seen square-on, filling the entire square frame edge to edge.
+Very low contrast, small flat facets spread evenly with no single big feature or object,
+so it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.
+Subject: inside The Sanctum Arcanum, the top of a thick timber-framed wall: dark oak beams over grey stone, with a thin line of slate along it.
+Colours: match the reference painting of the same building from outside."
+`;
+
+exports[`every prompt the game paints with > normal maps, the style judge and a kit texture sheet > castle-stone 1`] = `
+"This picture is a layout guide for a game texture sheet. Repaint it as the finished sheet: keep the magenta background exactly as it is, and fill every green shape completely, right to its exact edges, with the texture described for it below. Keep every shape exactly where it is and exactly its size and outline; do not move, shrink, enlarge or round any shape. Paint nothing outside the green shapes and leave no green anywhere.
+
+Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top. Built from a few flat facets of solid colour with crisp edges and very low contrast, soft and muted, in the colours each texture below names. No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture. No border, frame or outline round any shape. No writing, letters or symbols.
+
+1. The tall rectangle in the top row, first from the left: one outside wall section of an old forest castle, between two posts: rough grey-green stone blocks with a few soft patches of moss low down.
+
+2. The tall rectangle in the top row, second from the left: the same wall seen from inside the castle hall: grey-green stone blocks on the upper two thirds, and dark oak panelling on the lower third.
+
+3. The round-topped arch in the top row, third from the left: a great castle gate of heavy dark oak planks filling the whole arch, with broad black iron straps across it and big round iron studs.
+
+4. The square in the top row, fourth from the left: a narrow castle window: four small panes of flat even pale blue-grey glass with no reflections, divided by a slim dark iron cross that reaches all four edges; no outer frame.
+
+5. The square in the top row, fifth from the left: plain rough grey-green stone with a few very faint flat facets, nothing else.
+
+6. The square in the bottom row, first from the left: a castle floor of large worn grey flagstones of different sizes, four rows from top to bottom, with thin even joints.
+
+7. The wide rectangle in the bottom row, second from the left: slate roof tiles in rows running from left to right, flat rectangular slates in soft slate blue and blue-grey, six rows from top to bottom, each row overlapping the one below it, joints offset from row to row.
+
+8. The wide rectangle in the bottom row, third from the left, the upper one: a castle wall of big rough grey-green stone blocks, four rows from top to bottom, four or five blocks in each row, joints offset from row to row, thin pale mortar lines all equally thick.
+
+9. The long thin strip in the bottom row, third from the left, the lower one: one dark oak beam: dark brown wood with a long grain running from left to right along the strip.
+
+Textures 5, 6, 7, 8, 9 are repeated side by side and one above another in the game, so keep every shape the same size all over and the lines between rows and shapes the same thickness all over."
+`;
+
+exports[`every prompt the game paints with > normal maps, the style judge and a kit texture sheet > timber-cottage 1`] = `
+"This picture is a layout guide for a game texture sheet. Repaint it as the finished sheet: keep the magenta background exactly as it is, and fill every green shape completely, right to its exact edges, with the texture described for it below. Keep every shape exactly where it is and exactly its size and outline; do not move, shrink, enlarge or round any shape. Paint nothing outside the green shapes and leave no green anywhere.
+
+Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top. Built from a few flat facets of solid colour with crisp edges and very low contrast, soft and muted, in the colours each texture below names. No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture. No border, frame or outline round any shape. No writing, letters or symbols.
+
+1. The tall rectangle in the top row, first from the left: one outside wall section of a timber-framed cottage, between two posts: cream plaster with one slim warm-brown timber brace running diagonally from its lower left corner to its upper right corner.
+
+2. The tall rectangle in the top row, second from the left: the same wall seen from inside the room: plain warm cream plaster on the upper two thirds, and simple upright honey-brown boards on the lower third.
+
+3. The round-topped arch in the top row, third from the left: a front door made of upright sage-green planks filling the whole arch, with two dark iron straps across it and a small iron ring handle on the right.
+
+4. The square in the top row, fourth from the left: a window: four panes of glass, each one flat even pale blue-grey with no reflections, glints or streaks, divided by a slim warm-brown timber cross that reaches all four edges; no outer frame.
+
+5. The square in the top row, fifth from the left: plain cream plaster with a few very faint flat facets, nothing else.
+
+6. The square in the bottom row, first from the left: wooden floor boards running from left to right, honey-brown, six boards from top to bottom, each board split into planks of different lengths, with plank ends staggered from board to board.
+
+7. The wide rectangle in the bottom row, second from the left: roof shingles in rows running from left to right, rectangular flat shingles in dusty rose and terracotta, six rows from top to bottom, each row overlapping the one below it, joints offset from row to row.
+
+8. The wide rectangle in the bottom row, third from the left, the upper one: a stone wall of rounded rectangular blocks in warm grey and sand only (no other colours), four rows of blocks from top to bottom, five or six blocks in each row, with the joints offset from row to row; thin pale mortar lines between the rows and between the blocks, all equally thick.
+
+9. The long thin strip in the bottom row, third from the left, the lower one: one timber beam: warm brown wood with a long grain running from left to right along the strip.
+
+Textures 5, 6, 7, 8, 9 are repeated side by side and one above another in the game, so keep every shape the same size all over and the lines between rows and shapes the same thickness all over."
+`;
+
+exports[`every prompt the game paints with > normal maps, the style judge and a kit texture sheet 1`] = `
+"Make the tangent-space normal map of the attached game picture, for 2D lighting.
+Exactly the same shapes, outline and size as the picture, every detail in the same place, filling the same frame.
+Colours mean the direction each surface faces: flat facing the viewer is lavender blue (128, 128, 255); facing right is pinker, facing left is bluer-green; facing the top of the picture is greener, facing the bottom is more purple.
+Every flat facet is one even colour for the one way it faces, with crisp edges where facets meet; nothing is rounded or bumpy.
+Where the picture is empty or magenta, fill with flat lavender blue (128, 128, 255).
+No shading, no light, no colours of the picture itself, no outlines, no writing.
+The picture shows: Glowing Lantern."
+`;
+
+exports[`every prompt the game paints with > normal maps, the style judge and a kit texture sheet 2`] = `
+"You check game art for a stylised low-poly isometric fantasy RPG.
+The first pictures are approved reference sprites that set the style. The last picture is a new sprite to check.
+Answer two questions about the new sprite:
+1. subject: does it show the thing described (its kind and its most recognisable feature)? Small differences in detail are fine.
+2. style: does it look like it belongs with the references: flat faceted shapes with crisp edges, soft muted pastels, no outlines or texture, no light or shadow painted in, seen from the same isometric corner?
+Fail style only for clear problems: a photo or 3D render look, anime cel shading, flat vector art, writing or letters, several subjects or a sprite sheet, or scenery behind the subject.
+Reply with JSON: {"subject": true or false, "style": true or false, "problem": "one short plain sentence, empty when both are true"}."
+`;
+
+exports[`every prompt the game paints with > sprites and ground tiles 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+A single game sprite in classic 2:1 isometric view, looking down at about 30 degrees from one corner, standing upright, centred, with empty margin all around it.
+Background: one flat solid pure magenta (#FF00FF) filling everything behind the subject,
+with no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.
+Biome: the Sanctum. Palette leans on its key colours; light tint and mood of the Sanctum.
+Subject: Glowing Lantern (item). Most recognisable feature: a round glass belly with a flame inside. Body and shape: a brass lantern with a ring handle. Colours: main brass, small accent of warm flame. Mood: cosy.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background."
+`;
+
+exports[`every prompt the game paints with > sprites and ground tiles 2`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+A ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.
+Not a block, diamond, island or platform: no sides, thickness, border, frame or horizon.
+Even lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.
+Biome: Whispering Woods. Palette leans on its key colours; light tint and mood of Whispering Woods.
+Subject: Mossy ground (tile). Most recognisable feature: soft moss. Body and shape: mossy forest floor. Colours: main sage green. Mood: calm.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, isometric block, diamond shape, floating island, tile sides, drop shadow, perspective horizon."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand back 1`] = `
+"Hand-painted 2D game art in the style of a 1999 storybook RPG.
+Soft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.
+Warm golden key light from the upper left, blue-violet shadows.
+Selective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.
+No writing anywhere: labels, signs and covers are blank or carry simple symbols.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, facing away from the viewer, seen from behind, the face hidden. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand back-left 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder is nearer to us. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Paint them in the style described above, even where the reference images are painted in another style.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow, facing the upper-right corner."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand back-right 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Paint them in the style described above, even where the reference images are painted in another style.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow, facing the upper-left corner."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand front 1`] = `
+"Hand-painted 2D game art in the style of a 1999 storybook RPG.
+Soft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.
+Warm golden key light from the upper left, blue-violet shadows.
+Selective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.
+No writing anywhere: labels, signs and covers are blank or carry simple symbols.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, facing the viewer, seen from the front. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand front-left 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, in a three-quarter view from the front, facing the LOWER-LEFT corner of the picture: the nose, chest and toes point towards the viewer's left, exactly halfway between facing the viewer and a profile facing the left edge of the picture; their LEFT shoulder is nearer to us and their right shoulder further away. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Paint them in the style described above, even where the reference images are painted in another style.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow, facing the lower-right corner."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand front-right 1`] = `
+"Stylised low-poly isometric fantasy game art, light-neutral.
+Flat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.
+NO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.
+A small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Paint them in the style described above, even where the reference images are painted in another style.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow, facing the lower-left corner."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand left 1`] = `
+"Hand-painted 2D game art in the style of a 1999 storybook RPG.
+Soft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.
+Warm golden key light from the upper left, blue-violet shadows.
+Selective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.
+No writing anywhere: labels, signs and covers are blank or carry simple symbols.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, facing left, seen exactly side-on: the face in profile points to the LEFT edge of the picture and we see their right side. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > stand right 1`] = `
+"Hand-painted 2D game art in the style of a 1999 storybook RPG.
+Soft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.
+Warm golden key light from the upper left, blue-violet shadows.
+Selective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.
+No writing anywhere: labels, signs and covers are blank or carry simple symbols.
+Paint Mara from the reference image alone, full body, standing in a relaxed pose, facing right, seen exactly side-on: the face in profile points to the RIGHT edge of the picture and we see their left side. Copy exactly how they look: face, hair, clothes, colours, proportions and what they carry.
+Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (#FF00FF), with no floor or shadow. No magenta in the character.
+Avoid: photorealistic, 3D render, anime cel shading, vector art, flat design, thick black outlines, pure black, pure white, harsh contrast, neon, lens flare, blur, noise, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, second figure, turnaround sheet, cast shadow."
+`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk back 1`] = `"2D hand-painted storybook game character animation. The character from the image walks in place away from the viewer, seen exactly from behind: the back stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways or diagonally, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk back-left 1`] = `"Stylised low-poly isometric game character animation: flat faceted shapes in flat unlit colours that stay the same the whole time. The character from the image walks in place in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder is nearer to us: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk back-right 1`] = `"Stylised low-poly isometric game character animation: flat faceted shapes in flat unlit colours that stay the same the whole time. The character from the image walks in place in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk front 1`] = `"2D hand-painted storybook game character animation. The character from the image walks in place towards the viewer, seen exactly from the front: the body stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk front-left 1`] = `"Stylised low-poly isometric game character animation: flat faceted shapes in flat unlit colours that stay the same the whole time. The character from the image walks in place in a three-quarter view from the front, facing the LOWER-LEFT corner of the picture: the nose, chest and toes point towards the viewer's left, exactly halfway between facing the viewer and a profile facing the left edge of the picture; their LEFT shoulder is nearer to us and their right shoulder further away: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk front-right 1`] = `"Stylised low-poly isometric game character animation: flat faceted shapes in flat unlit colours that stay the same the whole time. The character from the image walks in place in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk left 1`] = `"2D hand-painted storybook game character animation. The character from the image walks in place to the left, seen exactly side-on: a foot that touches the ground stays planted where it lands until it lifts again, with no sliding, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;
+
+exports[`every prompt the game paints with > walkers standing and walking, every way > walk right 1`] = `"2D hand-painted storybook game character animation. The character from the image walks in place to the right, seen exactly side-on: a foot that touches the ground stays planted where it lands until it lifts again, with no sliding, like on a treadmill: a brisk, cheerful walk with clear alternating steps and arms swinging. The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns. The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image."`;

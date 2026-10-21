@@ -27,8 +27,10 @@ Rules from the Owner, all binding:
 Where things are:
 
 - The style is one `StyleProfile` in
-  `packages/server/src/assets/style-profile.ts`, picked by `ART_STYLE`.
-  `assets/style.ts` gives prompt builders its words. Never write style or
+  `packages/server/src/assets/style-profile.ts`, picked by `ART_STYLE`
+  (default `flat-isometric`, Style Bible v3; `storybook` is the old look,
+  kept word for word for the top-down walk directions until that camera is
+  retired). `assets/style.ts` gives prompt builders its words. Never write style or
   framing sentences anywhere else; add a field to the profile instead.
 - Buildings: `BUILDING_STYLES` in `packages/shared/src/buildings.ts`, painted
   whole by `building-art.ts`. Outside art is centred on the south-wall

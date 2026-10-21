@@ -679,6 +679,11 @@ export const NPC_GREETINGS: Record<string, string> = {
   'old-bramble': 'Mind the roots, and mind the mushrooms.',
   marina: 'Shells, salt and stories. Have a look at what I have, or show me what you found.',
   'cactus-elder': 'Slow down, traveller. The desert has time.',
+  'bramble-ursine-npc': 'May the earth cradle your steps, traveller.',
+  'tide-lutran-npc': 'The currents carry tales from distant shores.',
+  'zephyr-falcon-npc': 'Keep your eyes to the wind and your bow strung.',
+  'dune-scorpid-npc': 'Walk softly upon the sands, and fear no venom.',
+  'sylvan-cervid-npc': 'Listen closely: the mycelium whispers of ancient roots.',
 };
 
 /** The quest an NPC can offer this character now, if any. */
@@ -733,6 +738,11 @@ export const NPC_NAMES: Record<string, string> = {
   'old-bramble': 'Old Bramble',
   marina: 'Marina the Trader',
   'cactus-elder': 'the Cactus Elder',
+  'bramble-ursine-npc': 'Bramble Ursine',
+  'tide-lutran-npc': 'Tide Lutran',
+  'zephyr-falcon-npc': 'Zephyr Falcon',
+  'dune-scorpid-npc': 'Dune Scorpid',
+  'sylvan-cervid-npc': 'Sylvan Cervid',
 };
 
 export function npcName(id: string): string {

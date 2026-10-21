@@ -272,6 +272,7 @@ describe('paint requests kept across a restart', () => {
       wish: () => undefined,
       walk: () => undefined,
       view: () => undefined,
+      ways: () => undefined,
       clip: () => undefined,
       sheet: () => undefined,
     });

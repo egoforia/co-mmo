@@ -5,7 +5,7 @@
 // be sent to the AI model and approved it, and every version keeps that same
 // information so an old one can be compared with today's and put back.
 
-import { BUILDING_STYLES, HELD_SIZE, ISO_WAYS, ISO_WAY_BESIDE, heldBehind, isWalkDirection, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
+import { BUILDING_STYLES, HELD_SIZE, ISO_WAYS, heldBehind, isWalkDirection, walkStandArt, type ArtPoint, type ArtPointsManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
 import { lightPreviews } from './light-preview.ts';
@@ -270,9 +270,9 @@ function peoplePage(tab: 'characters' | 'monsters', page?: string): string {
   const chosen = page && names.includes(page) ? page : names[0]!;
   const own = items.filter((i) => i.place.page === chosen);
   const walking = walkers.filter((w) => w.place.page === chosen);
-  const missing = data!.walkers.reduce((n, w) => n + ISO_WAYS.filter((d) => !w.standing[d]?.url).length, 0);
-  const ways = missing ? `<p class="note">The isometric preview shows every walker in four ways of its own. ${missing} of those pictures are not painted yet; until they are, walkers show their top-down walks there.
-    <button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways' }))}">Paint every walker's missing ways · about ${usd(missing * (data!.walkers[0]?.viewUsd ?? 0))}</button></p>` : '';
+  const missing = data!.walkers.filter((w) => ISO_WAYS.some((d) => !w.standing[d]?.url)).length;
+  const ways = missing ? `<p class="note">${missing} walker${missing > 1 ? 's are' : ' is'} missing some of the four isometric ways; until they are painted, those walkers show their top-down walks.
+    <button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways' }))}">Paint their four ways, a sheet each · about ${usd(missing * (data!.walkers[0]?.viewUsd ?? 0))}</button></p>` : '';
   return `
     ${ways}
     ${pagesNav(tab, names, chosen)}
@@ -360,40 +360,25 @@ function walkerHtml(w: WalkerView): string {
     const older = (strip?.versions.length ?? 0) || (w.lost[d]?.length ?? 0);
     const walkVersions = strip || older ? `<button type="button" class="quiet" data-walk-versions="${esc(w.id)}" data-direction="${d}">${older ? `Walk versions (${older + (strip ? 1 : 0)})` : 'What made the walk'}</button>` : '';
     const viewVersions = (view.url && !view.approved) || view.versions.length ? `<button type="button" class="quiet" data-view-versions="${esc(w.id)}" data-direction="${d}">${view.versions.length ? `Picture versions (${view.versions.length + 1})` : 'What made the picture'}</button>` : '';
-    const paintView = `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'view', walker: w.id, direction: d }))}">${view.url && !view.approved ? 'Paint picture again' : 'Paint standing picture'} · about ${usd(w.viewUsd)}</button>`;
-    const clip = view.url
-      ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'clip', walker: w.id, body: 'two-legged', direction: d }))}" data-walker-body>${strip ? 'Make clip again' : 'Make walk clip'} · about ${usd(w.clipUsd)}</button>`
-      : '<small>Paint its standing picture first.</small>';
+    // Top-down walks are no longer painted (the top-down view is retired); they stay to look at and roll back.
     return `
       <div class="direction">
         <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${view.approved ? 'approved picture' : view.url ? 'standing picture' : 'no standing picture'}</small></div>
         ${stripHtml(strip, label, 110)}
-        <div class="card-actions">${paintView}${viewVersions}${clip}${walkVersions}</div>
+        <div class="card-actions">${viewVersions}${walkVersions}</div>
         <div class="card-actions">${view.url ? `<button type="button" class="quiet" data-normal-show="${esc(view.url)}">Standing normal map</button>${lightButton(view.url, undefined, true)}` : ''}${strip ? `<button type="button" class="quiet" data-normal-show="${esc(strip.url)}">Walk normal maps</button>` : ''}</div>
       </div>`;
   };
   return `
     <div class="walker">
-      <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)} · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks yet'}</small></div>
+      <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)}</small></div>
         <form class="form walker-body">${bodyPick}</form></header>
-      <p class="note">Each direction has a standing picture, and a short clip that starts and ends on it. Paint the picture first and look at it (paint it again until you like it), then make the clip from it. Both prompts can be edited before anything is sent.</p>
-      <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
-      ${handsHtml(w)}
       ${waysHtml(w)}
-      ${made < 4 ? `
-        <details><summary>Or make all the missing walks in one go</summary>
-          <form class="form art-walk" data-walker="${esc(w.id)}">
-            <button type="submit">Review ${made ? 'the missing walks' : 'making walks'} · about ${usd(w.estimateUsd)}</button>
-          </form>
-        </details>` : ''}
-      ${made ? `
-        <details><summary>Paint several directions again in one go</summary>
-          <form class="form art-walk" data-walker="${esc(w.id)}" data-redo="yes">
-            <span class="dirs">${DIRECTIONS.map(([d, label]) => `<label class="check"><input type="checkbox" name="dir-${d}"> ${label}</label>`).join('')}</span>
-            <label class="check"><input type="checkbox" name="views"> Paint their standing pictures again too (about ${usd(w.viewUsd)} each)</label>
-            <button type="submit">Review · about ${usd(w.clipUsd)} a direction</button>
-          </form>
-        </details>` : ''}
+      <details class="top-down"><summary>Top-down walks (retired) · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks'}</summary>
+        <p class="note">The top-down view is retired, so these are no longer painted. They are kept so walkers still move while their isometric walks are missing, and so earlier versions can be put back.</p>
+        <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
+        ${handsHtml(w)}
+      </details>
     </div>`;
 }
 
@@ -425,11 +410,11 @@ function waysHtml(w: WalkerView): string {
   };
   const summary = [missing ? `${4 - missing} of 4 painted` : '', walking ? `walks ${walking} of 4` : ''].filter(Boolean).join(', ');
   return `
-    <details class="ways"><summary>The isometric ways${summary ? ` · ${summary}` : ''}</summary>
-      <p class="note">The isometric preview turns walkers four ways of its own, halfway between the front or back and a side. Each way needs its standing picture first; its walk clip is made from that picture, like the other walks. A way with no walk yet glides in its picture.</p>
+    <section class="ways"><h4>The isometric ways${summary ? ` · ${summary}` : ''}</h4>
+      <p class="note">Walkers face four ways, halfway between the front or back and a side. The four are painted together on one sheet from the approved picture, so they keep one look, then cut into a standing picture each; one way can be painted again on its own, from the others. A way's walk clip is made from its picture; until then it glides in it.</p>
+      <p><button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways', walker: w.id }))}">${missing === 4 ? 'Paint the four ways together' : 'Paint all four again, together'} · about ${usd(w.viewUsd)}</button></p>
       <div class="walks">${WAYS.map(way).join('')}</div>
-      ${missing > 1 ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways', walker: w.id }))}">Paint the ${missing} missing ways · about ${usd(missing * w.viewUsd)}</button>` : ''}
-    </details>`;
+    </section>`;
 }
 
 /** Items tried in each hand in the hands preview, by art id; the same for every character while God's View is open. */
@@ -675,11 +660,11 @@ async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void
 function sourcesHtml(ask: Extract<Ask, { what: 'view' }>): string {
   const w = data!.walkers.find((x) => x.id === ask.walker);
   if (!w) return '';
-  // The server's choice when none is made: an isometric way is painted from the ways either side too.
-  const beside = isWalkDirection(ask.direction) ? [] : ISO_WAY_BESIDE[ask.direction].filter((d) => w.standing[d].url && !w.standing[d].approved);
-  const from = ask.from ?? ['approved', ...beside];
+  // The server's choice when none is made: an isometric way is painted from the other isometric ways too, so it matches them.
+  const others = isWalkDirection(ask.direction) ? [] : ISO_WAYS.filter((d) => d !== ask.direction && w.standing[d].url && !w.standing[d].approved);
+  const from = ask.from ?? ['approved', ...others];
   const options: [string, string, string | undefined][] = [['approved', 'The approved picture', w.url]];
-  for (const [d, label] of FACING_WORDS) {
+  for (const [d, label] of WAYS) {
     const view = w.standing[d];
     if (view.url && !view.approved) options.push([d, `Standing, ${label}`, view.url]);
   }
@@ -876,14 +861,5 @@ export function artSubmit(form: HTMLFormElement): boolean {
     void ctx.api('art/hands/question', 'POST', { facing: form.dataset.facing, prompt }).then(() => { ctx.toast('Kept. Use "Find again" to look with these words.'); ctx.rerender(); }, (err: Error) => ctx.toast(err.message));
     return true;
   }
-  if (!form.classList.contains('art-walk')) return false;
-  const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
-  f.body = form.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value ?? 'two-legged';
-  const directions = DIRECTIONS.map(([d]) => d).filter((d) => f[`dir-${d}`] === 'on');
-  if (form.dataset.redo && !directions.length) {
-    ctx.toast('Pick at least one direction.');
-    return true;
-  }
-  void openReview({ what: 'walk', walker: form.dataset.walker!, body: f.body ?? 'two-legged', ...(form.dataset.redo ? { directions, views: f.views === 'on' } : {}) }, false);
-  return true;
+  return false;
 }

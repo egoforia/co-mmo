@@ -268,6 +268,7 @@ export function createApp(options: AppOptions): App {
     repaint: (request) => artStudio.repaint(request.asset, request.note),
     walk: (request) => artStudio.walk(request.walker, request.body, [], false),
     view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt, request.from),
+    ways: (request) => artStudio.paintWays(request.walker),
     clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),
     sheet: (request) => artStudio.paintSheet(request.look, request.textures, request.note),
   });

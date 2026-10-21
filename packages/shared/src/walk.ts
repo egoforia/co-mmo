@@ -45,19 +45,6 @@ export const ISO_WAY_STEPS: Record<IsoWay, { dx: number; dy: number }> = {
   'back-right': { dx: 0, dy: -1 },
 };
 
-/**
- * The top-down ways on either side of each isometric way. Their standing
- * pictures show the walker turned the right way, so an isometric way is
- * painted from them too: the approved picture alone faces us, and the
- * image model then turned the figure the wrong way.
- */
-export const ISO_WAY_BESIDE: Record<IsoWay, readonly WalkDirection[]> = {
-  'front-left': ['front', 'left'],
-  'front-right': ['front', 'right'],
-  'back-left': ['back', 'left'],
-  'back-right': ['back', 'right'],
-};
-
 /** True for the top-down camera's four ways, which every walker walks in. */
 export function isWalkDirection(facing: string): facing is WalkDirection {
   return (WALK_DIRECTIONS as readonly string[]).includes(facing);

@@ -228,7 +228,7 @@ per panel. God's View is
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). `server/test/style-prompts.test.ts` snapshots every prompt, so the change shows word for word. |
-| Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20). Still to come: an isometric style profile, walkers painted straight into the four isometric ways, upright strips for trees and set pieces, every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
+| Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20), painted in the `FLAT_ISOMETRIC` style. Walkers are painted in their four isometric ways together on one sheet (Art tab, `waysSheetPrompt`), and start-up paints no walks. Still to come: upright strips for trees and set pieces, every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |

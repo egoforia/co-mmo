@@ -1,15 +1,14 @@
-import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { BODY_TYPES, FACINGS, WALKING_LOOKS, WALK_DIRECTIONS, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type WalkDirection } from '@co-mmo/shared';
+import { BODY_TYPES, FACINGS, ISO_WAYS, WALK_DIRECTIONS, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type IsoWay, type WalkDirection } from '@co-mmo/shared';
 import { ANCHORS } from './assets/anchors.ts';
 import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { KEY_COLOR } from './assets/style.ts';
 import { DEFAULT_VIDEO_MODEL, videoUsd, type VideoProvider } from './assets/video.ts';
 import { checkWalk } from './assets/walk-checks.ts';
 import { normalizeWalk } from './assets/walk-frames.ts';
-import { LOOK_GEAR, soleFigure, type Carried, startFrame, videoFrames, viewPrompt, walkFromFrames, walkVideoPrompt } from './assets/walk-video.ts';
+import { LOOK_GEAR, soleFigure, type Carried, startFrame, videoFrames, viewPrompt, walkFromFrames, walkVideoPrompt, waysFromSheet, waysSheetPrompt } from './assets/walk-video.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource } from './art-jobs.ts';
 import { ArtHistory, historyFolder, type ArtVersion } from './art-history.ts';
@@ -144,10 +143,15 @@ export class WalkPainter {
     return out;
   }
 
-  /** Paints whatever walks are missing, one look at a time, while the budget allows. */
+  /**
+   * Gets the painted walks ready at start-up: reads them and cuts old walks
+   * again from their clips, for free. Nothing is painted here any more: the
+   * top-down camera is retired (the Owner, 2026-10-20), and walkers are
+   * painted in their isometric ways from the Art tab, after review.
+   */
   start(): Promise<void> {
     this.job ??= this.run()
-      .catch((err) => console.error('Painting walks stopped:', (err as Error).message))
+      .catch((err) => console.error('Getting walks ready stopped:', (err as Error).message))
       .finally(() => (this.job = undefined));
     return this.job;
   }
@@ -160,23 +164,6 @@ export class WalkPainter {
   private async run(): Promise<void> {
     await this.load();
     await this.recut();
-    // Nothing can be painted without an image model; the Art tab says so, so the log stays quiet.
-    if (!this.options.provider()) return;
-    const shipped = await this.options.shipped();
-    const madeFrom = JSON.parse(await readFile(resolve(this.dir, 'looks.json'), 'utf8').catch(() => '{}')) as Record<string, string>;
-    for (const look of WALKING_LOOKS) {
-      const walker = this.anchorWalker(look);
-      // A look whose approved picture changed (say, painted again with empty hands) walks again from the new one.
-      const stamp = createHash('sha1').update(await walker.reference()).digest('hex').slice(0, 12);
-      const painted = WALK_DIRECTIONS.some((d) => this.painted[walkArt(look, d)]);
-      const changed = painted && madeFrom[look] !== stamp;
-      if (changed) await this.forget(walker, WALK_DIRECTIONS, true);
-      else if (WALK_DIRECTIONS.every((d) => shipped[walkArt(look, d)] || this.painted[walkArt(look, d)])) continue;
-      if (!(await this.paintWalker(walker, 'start-up', changed))) return;
-      madeFrom[look] = stamp;
-      await mkdir(this.dir, { recursive: true });
-      await writeFile(resolve(this.dir, 'looks.json'), JSON.stringify(madeFrom, null, 2));
-    }
   }
 
   /**
@@ -340,6 +327,21 @@ export class WalkPainter {
     return { at: Date.now(), steps: [step], notes: ['A picture that shows more than one figure is painted once more, for about the same again.', after] };
   }
 
+  /** Exactly what painting a walker's four isometric ways together on one sheet would send. */
+  async previewWays(walker: Walker): Promise<Recipe> {
+    const image = this.options.provider();
+    if (!image) throw new Error(stopReason(this.options));
+    const step = await this.options.recipes!.imageStep(`${walker.name} standing in the four isometric ways, side by side`, image, await this.waysRequest(walker), estimateImageUsd(image.model));
+    return {
+      at: Date.now(),
+      steps: [step],
+      notes: [
+        'The four ways are painted together on one sheet, so they keep one look, then cut apart into a standing picture each. The pictures they replace are kept as versions.',
+        'A sheet that does not show exactly four figures is painted once more, for about the same again.',
+      ],
+    };
+  }
+
   /**
    * Exactly what making one direction's walk clip would send: the standing
    * picture there now is its first and last frame; `prompt` replaces the
@@ -382,6 +384,40 @@ export class WalkPainter {
     if (!(await this.approvedCopy(walker, direction))) await this.history.keep(viewKey(walker, direction), this.viewPath(walker, direction));
     await this.keepView(walker, direction, painted);
     return true;
+  }
+
+  /**
+   * Paints a walker standing in all four isometric ways together on one
+   * sheet and keeps each as that way's standing picture; the pictures they
+   * replace are kept as versions.
+   */
+  async paintWays(walker: Walker, handle?: ArtJobHandle): Promise<boolean> {
+    handle?.start();
+    let usd = 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const provider = this.options.provider();
+      if (!provider || this.options.overBudget()) return handle?.skip(stopReason(this.options)), false;
+      const request = await this.waysRequest(walker);
+      const image = await watched(provider, handle).generate(request);
+      const cost = imageUsd(provider.model, image);
+      usd += cost;
+      this.options.spend(cost, provider as ImageProvider);
+      const ways = await waysFromSheet(image.data).catch((err) => {
+        console.error(`The ways sheet of ${walker.id} was refused:`, (err as Error).message);
+        return undefined;
+      });
+      if (!ways) continue;
+      for (const way of ISO_WAYS) {
+        if (!(await this.approvedCopy(walker, way))) await this.history.keep(viewKey(walker, way), this.viewPath(walker, way));
+        // Each way's share of the sheet, so the four add up to what it cost.
+        await this.keepView(walker, way, { figure: ways[way], usd: usd / ISO_WAYS.length, request, provider: provider as ImageProvider });
+      }
+      handle?.done(usd);
+      return true;
+    }
+    const reason = `No clean sheet of ${walker.name}'s four ways: it did not show exactly four figures twice.`;
+    handle?.fail(reason);
+    throw new Error(reason);
   }
 
   /**
@@ -552,6 +588,19 @@ export class WalkPainter {
     };
   }
 
+
+  /** What painting the four isometric ways on one sheet sends: the approved picture, and the sheet's words. */
+  private async waysRequest(walker: Walker): Promise<ImageRequest> {
+    return {
+      prompt: waysSheetPrompt(walker.name, walker.gear),
+      references: [{ mimeType: 'image/png', data: await this.onMagenta(walker) }],
+      labels: [`${walker.name}'s approved picture, on magenta`],
+      edit: true,
+      // Four standing figures in a row, with room between them.
+      aspectRatio: '16:9',
+      size: '2K',
+    };
+  }
 
   /** All four walks of one walker; false when painting has to stop (no model, no budget). */
   async paintWalker(walker: Walker, source: ArtJobSource, redone = false, planned?: WalkPlan): Promise<boolean> {

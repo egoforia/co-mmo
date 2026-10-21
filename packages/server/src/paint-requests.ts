@@ -19,6 +19,8 @@ export type PaintRequest =
   | { kind: 'walk'; walker: string; body: string }
   /** The Owner's "Paint standing picture" for one walk direction, with the prompt they approved. */
   | { kind: 'view'; walker: string; direction: string; prompt?: string; from?: string[] }
+  /** The Owner's "Paint the four ways together" for one walker: its isometric ways on one sheet. */
+  | { kind: 'ways'; walker: string }
   /** The Owner's "Make walk clip" for one direction, from the standing picture there. */
   | { kind: 'clip'; walker: string; body: string; direction: string; prompt?: string }
   /** The Owner's "Paint the sheet" for a building look's textures: all of them, or only `textures`, with their note. */

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
-import { heldBehind, isWalkDirection, type Facing, type WalkDirection } from '@co-mmo/shared';
+import { ISO_WAYS, heldBehind, isWalkDirection, type Facing, type IsoWay, type WalkDirection } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
 import { countFigures, cutFigures, type Box } from './walk-frames.ts';
 import { KEY_COLOR } from './style.ts';
@@ -98,6 +98,34 @@ export function viewPrompt(name: string, gear: Carried[], direction: Facing, ref
     `Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (${style.keyColor.hex}), with no floor or shadow. No magenta in the character.`,
     `Avoid: ${[...style.negatives, 'second figure', 'turnaround sheet', 'cast shadow', ...(isWalkDirection(direction) ? [] : [WRONG_CORNER[direction]])].join(', ')}.`,
   ].filter(Boolean).join('\n');
+}
+
+/**
+ * The prompt for painting a look standing in all four isometric ways at
+ * once, side by side in ISO_WAYS order: painted together, the four keep one
+ * look (one picture per way drifted in colours and details).
+ */
+export function waysSheetPrompt(name: string, gear: Carried[], references = 1): string {
+  const from = references > 1 ? `from the ${references} reference images alone (all of them show ${name})` : 'from the reference image alone';
+  return [
+    STYLE.base,
+    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the same size and standing on the same line, evenly spaced with wide empty gaps so no two touch. From left to right:`,
+    ...ISO_WAYS.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
+    `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`,
+    'Paint them in the style described above, even where the reference images are painted in another style.',
+    `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
+    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
+  ].join('\n');
+}
+
+/** The four figures of a painted ways sheet, cut out, by the way each faces; fails, in plain words, unless there are exactly four. */
+export async function waysFromSheet(painted: Buffer): Promise<Record<IsoWay, Buffer>> {
+  const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
+  const clean = await removeKeySpill(png);
+  const count = await countFigures(clean);
+  if (count !== ISO_WAYS.length) throw new Error(`The sheet shows ${count} figures instead of ${ISO_WAYS.length}.`);
+  const figures = (await cutFigures(clean, { count: ISO_WAYS.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
+  return Object.fromEntries(ISO_WAYS.map((way, i) => [way, figures[i]!.png])) as Record<IsoWay, Buffer>;
 }
 
 /** The prompt that makes a standing picture walk in place and come back to the same pose. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BUILDING_STYLES, buildingKit, type Facing } from '@co-mmo/shared';
 import { buildPrompt, type AssetDescription } from '../src/assets/style.ts';
 import { buildingArtJobs } from '../src/assets/building-art.ts';
-import { viewPrompt, walkVideoPrompt } from '../src/assets/walk-video.ts';
+import { viewPrompt, walkVideoPrompt, waysSheetPrompt } from '../src/assets/walk-video.ts';
 import { JUDGE_SYSTEM } from '../src/assets/style-check.ts';
 import { normalPrompt } from '../src/normal-painter.ts';
 import { regions, sheetPrompt } from '../src/assets/building-kit/sheet.ts';
@@ -37,6 +37,7 @@ describe('every prompt the game paints with', () => {
       expect(viewPrompt('Mara', [], f)).toMatchSnapshot(`stand ${f}`);
       expect(walkVideoPrompt([], f)).toMatchSnapshot(`walk ${f}`);
     }
+    expect(waysSheetPrompt('Mara', [])).toMatchSnapshot('the four ways on one sheet');
   });
 
   it('normal maps, the style judge and a kit texture sheet', () => {

@@ -7,7 +7,6 @@ import {
   BUILDING_STYLES,
   FACINGS,
   ISO_WAYS,
-  ISO_WAY_BESIDE,
   WALK_CYCLE_SECONDS,
   WALK_DIRECTIONS,
   WALK_FRAMES,
@@ -414,21 +413,13 @@ export class ArtStudio {
         title = `Paint ${walker.name} standing, facing ${facingWords(direction)}`;
         parts.push({ name: walker.name, recipe: await this.options.walks.previewView(walker, direction, ownPrompt(ask.prompt), await this.sourcesFor(walker, direction, ask.from)) });
       } else if (ask.kind === 'ways') {
-        const todo = await this.missingWays(ask.walker);
-        const one = ask.walker ? this.walker(ask.walker, 'two-legged') : undefined;
-        if (!todo.length) throw new ArtRequestError(one ? `${one.name} already has a standing picture for every isometric way.` : 'Every walker already has a standing picture for every isometric way.');
-        title = one
-          ? `Paint ${one.name} standing in ${todo.length === ISO_WAYS.length ? 'the four isometric ways' : `${todo.length} more isometric way${todo.length > 1 ? 's' : ''}`}`
-          : `Paint every walker standing in the isometric ways: ${todo.length} pictures`;
-        // One part per walker, a picture for each way it lacks.
-        const byWalker = new Map<string, { name: string; recipe: Recipe }>();
-        for (const t of todo) {
-          const recipe = await this.options.walks.previewView(t.walker, t.way, undefined, t.from);
-          const part = byWalker.get(t.walker.id);
-          if (part) part.recipe.steps.push(...recipe.steps);
-          else byWalker.set(t.walker.id, { name: t.walker.name, recipe });
-        }
-        parts.push(...byWalker.values());
+        const todo = await this.waysToPaint(ask.walker);
+        if (!todo.length) throw new ArtRequestError('Every walker already has a standing picture for every isometric way.');
+        title = ask.walker
+          ? `Paint ${todo[0]!.name} standing in the four isometric ways, together on one sheet`
+          : `Paint the four isometric ways of every walker missing some: ${todo.length} sheet${todo.length > 1 ? 's' : ''}`;
+        // One part per walker: one sheet each.
+        for (const walker of todo) parts.push({ name: walker.name, recipe: await this.options.walks.previewWays(walker) });
       } else if (ask.kind === 'clip') {
         const walker = this.walker(ask.walker, ask.body);
         const direction = this.facing(ask.direction);
@@ -657,13 +648,15 @@ export class ArtStudio {
    * picture for, with the pictures each is painted from: the approved
    * picture, and the standing pictures painted for the ways on either side.
    */
-  private async missingWays(walkerId?: string): Promise<{ walker: Walker; way: IsoWay; from: ViewSource[] }[]> {
-    const walkers = walkerId ? [this.walker(walkerId, 'two-legged')] : this.walkerList();
-    const out: { walker: Walker; way: IsoWay; from: ViewSource[] }[] = [];
-    for (const walker of walkers) {
+  /** The walkers whose four ways a ways sheet paints: the one named, or every walker missing a way. */
+  private async waysToPaint(walkerId?: string): Promise<Walker[]> {
+    if (walkerId) return [this.walker(walkerId, 'two-legged')];
+    const out: Walker[] = [];
+    for (const walker of this.walkerList()) {
       for (const way of ISO_WAYS) {
         if ((await this.options.walks.standing(walker, way)).url) continue;
-        out.push({ walker, way, from: await this.besideSources(walker, way) });
+        out.push(walker);
+        break;
       }
     }
     return out;
@@ -671,19 +664,20 @@ export class ArtStudio {
 
   /**
    * What a standing picture is painted from: the pictures chosen, or for an
-   * isometric way, the approved picture and the standing pictures painted
-   * for the ways on either side; otherwise the approved picture alone.
+   * isometric way, the approved picture and the other isometric ways already
+   * painted, so it matches them; otherwise the approved picture alone.
    */
   private async sourcesFor(walker: Walker, direction: Facing, from: string[] | undefined): Promise<ViewSource[] | undefined> {
-    return viewSources(from) ?? (isWalkDirection(direction) ? undefined : this.besideSources(walker, direction));
+    return viewSources(from) ?? (isWalkDirection(direction) ? undefined : this.otherWays(walker, direction));
   }
 
-  /** The approved picture, and the painted standing pictures of the ways either side of an isometric way. */
-  private async besideSources(walker: Walker, way: IsoWay): Promise<ViewSource[]> {
+  /** The approved picture, and the painted standing pictures of the other isometric ways. */
+  private async otherWays(walker: Walker, way: IsoWay): Promise<ViewSource[]> {
     const from: ViewSource[] = ['approved'];
-    for (const beside of ISO_WAY_BESIDE[way]) {
-      const view = await this.options.walks.standing(walker, beside);
-      if (view.url && !view.approved) from.push(beside);
+    for (const other of ISO_WAYS) {
+      if (other === way) continue;
+      const view = await this.options.walks.standing(walker, other);
+      if (view.url && !view.approved) from.push(other);
     }
     return from;
   }
@@ -812,19 +806,19 @@ export class ArtStudio {
   }
 
   /**
-   * Paints the isometric ways one walker, or every walker, has no standing
-   * picture for, each a picture of its own in the painting log.
+   * Paints the four isometric ways of one walker, or of every walker missing
+   * some, together on one sheet a walker, so each walker keeps one look.
    */
   async paintWays(walkerId?: string): Promise<{ estimateUsd: number; count: number }> {
     this.refuseWhenSpent();
     const image = this.options.ai.image('walks');
     if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
-    const todo = await this.missingWays(walkerId);
-    if (!todo.length) throw new ArtRequestError('Every isometric way already has a standing picture.');
+    const todo = await this.waysToPaint(walkerId);
+    if (!todo.length) throw new ArtRequestError('Every walker already has a standing picture for every isometric way.');
     const usd = estimateImageUsd(image.model);
-    for (const { walker, way, from } of todo) {
-      const handle = this.options.jobs.add(`${walker.id}-${way}`, `${walker.name} standing, facing ${facingWords(way)}`, 'picture', 'gods-view', usd);
-      this.enqueue(() => this.options.walks.paintView(walker, way, undefined, handle, from), handle, { kind: 'view', walker: walker.id, direction: way, from: [...from] });
+    for (const walker of todo) {
+      const handle = this.options.jobs.add(`${walker.id}-ways`, `${walker.name} standing in the four isometric ways`, 'picture', 'gods-view', usd);
+      this.enqueue(() => this.options.walks.paintWays(walker, handle), handle, { kind: 'ways', walker: walker.id });
     }
     return { estimateUsd: usd * todo.length, count: todo.length };
   }
@@ -988,6 +982,7 @@ export class ArtStudio {
   private async again(request: PaintRequest): Promise<unknown> {
     if (request.kind === 'walk') return this.walk(request.walker, request.body, [], false);
     if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
+    if (request.kind === 'ways') return this.paintWays(request.walker);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
     if (request.kind === 'repaint') return this.repaint(request.asset, request.note);
     if (request.kind === 'sheet') return this.paintSheet(request.look, request.textures, request.note);

@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { GeminiVideoProvider, videoUsd } from '../src/assets/video.ts';
-import { VIDEO_FRAME, findCycle, gearPlacement, soleFigure, startFrame, walkFromFrames } from '../src/assets/walk-video.ts';
+import { VIDEO_FRAME, findCycle, gearPlacement, soleFigure, startFrame, walkFromFrames, waysFromSheet, waysSheetPrompt } from '../src/assets/walk-video.ts';
 
 // Test pictures: simple shapes on magenta, standing in for painted figures.
 const MAGENTA = '#FF00FF';
@@ -20,6 +20,18 @@ describe('video walks', () => {
     expect(gearPlacement(staff, 'left')).toContain('staff is on the near side, IN FRONT');
     expect(gearPlacement(staff, 'front')).toContain("viewer's left");
     expect(gearPlacement([], 'front')).toBe('');
+  });
+
+  it('paints the four isometric ways in one row, left to right, and cuts the sheet into a picture for each', async () => {
+    const prompt = waysSheetPrompt('Mara', []);
+    const order = ['LOWER-LEFT', 'LOWER-RIGHT', 'UPPER-LEFT', 'UPPER-RIGHT'].map((c) => prompt.indexOf(`facing the ${c} corner`));
+    expect(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1]!))).toBe(true);
+    // Four figures of different widths, so each cut can be told apart; the sheet is read left to right.
+    const sheet = await picture(1200, 300, [150, 450, 750, 1050].map((x, i) => `<rect x="${x - 10 - i * 5}" y="60" width="${20 + i * 10}" height="220" fill="#3060c0"/>`).join(''));
+    const ways = await waysFromSheet(sheet);
+    const widths = await Promise.all(['front-left', 'front-right', 'back-left', 'back-right'].map(async (w) => (await sharp(ways[w as keyof typeof ways]).metadata()).width));
+    expect(widths).toEqual([20, 30, 40, 50]);
+    await expect(waysFromSheet(await picture(900, 300, [150, 450, 750].map((x) => `<rect x="${x - 10}" y="60" width="20" height="220" fill="#3060c0"/>`).join('')))).rejects.toThrow(/3 figures instead of 4/);
   });
 
   it('keeps the one figure, drops a neighbour cut off at the edge, and refuses two whole figures', async () => {

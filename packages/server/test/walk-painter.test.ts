@@ -34,7 +34,9 @@ describe('walk painter', () => {
     let clips = 0;
     const video: VideoProvider = { id: 'gemini', model: 'veo-3.1-lite-generate-preview', generate: async (r) => (clips++, { mimeType: 'video/mp4', data: r.first.data, seconds: r.seconds }) };
     const options = { provider: () => images, video: () => video, overBudget: () => false, spend: () => {}, spendVideo: () => {}, anchorDir, artDir, shipped: async () => ({}), toFrames: frames };
-    await new WalkPainter(options).start();
+    const first = new WalkPainter(options);
+    await first.load();
+    await first.paintWalker(first.anchorWalker('player-mara'), 'gods-view');
     const id = walkArt('player-mara', 'left');
     const names = JSON.parse(await readFile(join(artDir, 'walks', 'frames', `${id}.json`), 'utf8')) as string[];
     const sizes = async () => Promise.all(names.map(async (n) => { const m = await sharp(join(artDir, 'walks', 'frames', n)).metadata(); return `${m.width}x${m.height}`; }));
@@ -57,7 +59,7 @@ describe('walk painter', () => {
     expect(again.manifest()[id]).toMatchObject({ redone: expect.any(Number) });
   }, 180_000);
 
-  it('paints each look standing in every direction, walks it on video, and keeps one cycle of 12 frames per direction', async () => {
+  it('paints a look standing in every direction when asked, walks it on video, and keeps one cycle of 12 frames per direction', async () => {
     const root = await mkdtemp(join(tmpdir(), 'walks-'));
     const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');
     await mkdir(join(anchorDir, 'raw'), { recursive: true });
@@ -90,7 +92,8 @@ describe('walk painter', () => {
       anchorDir, artDir, shipped: async () => ({}), toFrames: frames,
       onPainted: (ids) => told.push(ids),
     });
-    await painter.start();
+    await painter.load();
+    for (const look of ['player-mara', 'player-ilya']) await painter.paintWalker(painter.anchorWalker(look), 'gods-view');
     // Open games are told about each look's walks once they are on disk, and each standing picture as it is painted.
     expect(told.filter((ids) => ids[0]!.includes('-walk-'))).toEqual(['player-mara', 'player-ilya'].map((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d))));
     expect(told.filter((ids) => ids[0]!.includes('-stand-')).flat()).toEqual(['player-mara', 'player-ilya'].flatMap((look) => (['right', 'back', 'left'] as const).map((d) => walkStandArt(look, d))));
@@ -110,7 +113,9 @@ describe('walk painter', () => {
     expect(clips.map((c) => c.prompt).find((p) => p.includes('to the left'))).toBeDefined();
     expect(spent).toHaveLength(15);
 
-    // Everything is kept, so a second start paints nothing.
+    // Everything is kept, and start-up paints nothing, even when an approved picture changed:
+    // the top-down walks are retired, and walkers are painted from the Art tab.
+    await writeFile(join(anchorDir, 'raw', 'player-mara.png'), await picture(300, 300, walker(150, 270)));
     const again = new WalkPainter({
       provider: () => images, video: () => video, overBudget: () => false,
       spend: (usd) => spent.push(usd), spendVideo: (usd) => spent.push(usd),
@@ -119,20 +124,8 @@ describe('walk painter', () => {
     await again.start();
     expect(Object.keys(again.manifest())).toHaveLength(8);
     expect(spent).toHaveLength(15);
+    expect(clips).toHaveLength(8);
     expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))).toEqual(manifest);
-
-    // Mara's approved picture is painted again (say, with empty hands): she walks again from it, Ilya keeps his walks.
-    await writeFile(join(anchorDir, 'raw', 'player-mara.png'), await picture(300, 300, walker(150, 270)));
-    const changed = new WalkPainter({
-      provider: () => images, video: () => video, overBudget: () => false,
-      spend: (usd) => spent.push(usd), spendVideo: (usd) => spent.push(usd),
-      anchorDir, artDir, shipped: async () => ({}), toFrames: frames,
-    });
-    await changed.start();
-    expect(clips).toHaveLength(12);
-    expect(clips.slice(8).every((c) => !c.prompt.includes('Ilya'))).toBe(true);
-    expect(changed.manifest()[walkArt('player-mara', 'front')]!.file).toContain('?v=');
-    expect(changed.manifest()[walkArt('player-ilya', 'front')]!.file).not.toContain('?v=');
   }, 180_000);
 
   it('paints nothing without a video model, and keeps the views it paid for', async () => {
@@ -145,7 +138,8 @@ describe('walk painter', () => {
       provider: () => images, video: () => undefined, overBudget: () => false, spend: () => {}, spendVideo: () => {},
       anchorDir, artDir, shipped: async () => ({}), toFrames: frames,
     });
-    await painter.start();
+    await painter.load();
+    await painter.paintWalker(painter.anchorWalker('player-mara'), 'gods-view');
     expect(painter.manifest()).toEqual({});
     expect(WALK_DIRECTIONS.length).toBe(4);
   }, 60_000);

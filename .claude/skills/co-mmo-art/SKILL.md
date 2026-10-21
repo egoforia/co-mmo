@@ -46,13 +46,15 @@ Where things are:
   the profile's `kitTextures`), and only textures that pass the sheet checks
   are used. Keep the sheet layout: today's paintings are read against it.
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
-- Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`. Start-up
-  makes walks for the four top-down ways (`WALK_DIRECTIONS`). The isometric
-  camera's four ways (`ISO_WAYS`: front-left, front-right, back-left,
-  back-right) each get a standing picture, painted on its own from the
-  pictures of the ways either side (`ISO_WAY_BESIDE`), never a mirror, and a
-  walk clip only when the Owner asks in the Art tab. Name a way by the
-  picture's corner: "turned to the left" is read as the figure's own left.
+- Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`. Walkers are
+  painted only in the isometric camera's four ways (`ISO_WAYS`: front-left,
+  front-right, back-left, back-right), all four together on one sheet from
+  the approved picture (`waysSheetPrompt`, cut apart by `waysFromSheet`), so
+  their details match; never a mirror. One way can be painted again on its
+  own from the others. Start-up paints nothing; the old top-down walks
+  (`WALK_DIRECTIONS`) are kept but not painted again. A walk clip is made
+  only when the Owner asks in the Art tab. Name a way by the picture's
+  corner: "turned to the left" is read as the figure's own left.
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.
 - The camera: every tile-to-screen sum goes through `PROJECTION` in
   `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in

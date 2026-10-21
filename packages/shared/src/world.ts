@@ -422,6 +422,11 @@ const sanctumLayout: Layout = (map, c) => {
   road(map, c, lane, shop.door.x, shop.door.y + 1);
   furnishArcanum(map, left + 1, top + 1);
   map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
+  map.npcs.push({ id: 'bramble-ursine-npc', name: 'Bramble Ursine', asset: 'bramble-ursine', x: c - 3.5, y: c - 2.0 });
+  map.npcs.push({ id: 'tide-lutran-npc', name: 'Tide Lutran', asset: 'tide-lutran', x: c + 4.0, y: c - 1.5 });
+  map.npcs.push({ id: 'zephyr-falcon-npc', name: 'Zephyr Falcon', asset: 'zephyr-falcon', x: c - 4.5, y: c + 1.5 });
+  map.npcs.push({ id: 'dune-scorpid-npc', name: 'Dune Scorpid', asset: 'dune-scorpid', x: c + 3.5, y: c + 3.5 });
+  map.npcs.push({ id: 'sylvan-cervid-npc', name: 'Sylvan Cervid', asset: 'sylvan-cervid', x: c - 1.0, y: c - 4.0 });
   map.spawn = { x: c + 1, y: c + 4 };
 };
 

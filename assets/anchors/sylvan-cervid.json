@@ -1,0 +1,36 @@
+{
+  "id": "sylvan-cervid",
+  "description": {
+    "id": "sylvan-cervid",
+    "name": "Sylvan Cervid",
+    "kind": "npc",
+    "biome": "sanctum",
+    "silhouetteHook": "horizontal velvet deer ears, wide branching velvet bone antlers with sage-lichen facet patches",
+    "body": "slender deer beastfolk shaman, digitigrade legs with cloven hooves",
+    "materials": [
+      "velvet horn",
+      "willow bark",
+      "lichen"
+    ],
+    "colors": {
+      "main": "autumn fawn",
+      "secondary": "sage green",
+      "accent": "pale jade"
+    },
+    "details": [
+      "dappled fawn chest",
+      "lichen patches on antlers",
+      "cloven hooves"
+    ],
+    "mood": "serene, mystical",
+    "extra": {
+      "role": "mycelial seer"
+    }
+  },
+  "prompt": "Stylised low-poly isometric fantasy game character: Sylvan Cervid (mycelial seer). horizontal velvet deer ears, wide branching velvet bone antlers with sage-lichen facet patches. Body: slender deer beastfolk shaman, digitigrade legs with cloven hooves. Palette: autumn fawn, sage green, pale jade. Mood: serene, mystical.",
+  "provider": "wan",
+  "model": "wan-3.0",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-21T21:13:20.480Z"
+}

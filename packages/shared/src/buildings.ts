@@ -24,6 +24,8 @@ export interface FurnitureStyle {
   look: string;
   /** How wide the art is drawn, in tiles. */
   width: number;
+  /** How many tiles deep it stands, front to back; 1 when left out. */
+  depth?: number;
 }
 
 /** What a kind of building looks like, outside and in. */

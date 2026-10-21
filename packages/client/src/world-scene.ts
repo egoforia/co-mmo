@@ -59,7 +59,7 @@ import {
 import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerDiamondTileset, registerKitTileset, registerStoreyTileset, registerTileset, registerWallFace } from './textures.ts';
 import { artSrc, lookArt, sceneArt } from './wished.ts';
 import { PROJECTION } from './projection.ts';
-import { HouseArt, standHouse, type HouseSource } from './kit-house-view.ts';
+import { HouseArt, standHouse, standOnTiles, type HouseSource } from './kit-house-view.ts';
 import { shadePictures } from './normal-maps.ts';
 import { dropLight, lightScene, litFigure, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
@@ -1201,13 +1201,14 @@ export class WorldScene extends Phaser.Scene {
   private placeLandmarks(map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): void {
     for (const l of map.landmarks) {
       if (!this.textures.exists(l.asset)) continue;
-      const feet = landmarkFeet(l, ox, oy);
-      const at = PROJECTION.toScreen(feet.x, feet.y);
-      const img = this.add.image(at.x, at.y, l.asset).setOrigin(0.5, 0.92);
-      img.setDepth(PROJECTION.depth(feet.x, feet.y));
+      const { width, height } = l.footprint;
+      const left = ox + l.x - width / 2;
+      const top = oy + l.y - height;
+      const tiles = { left, top, right: left + width, bottom: top + height };
+      const parts = standOnTiles(this, l.asset, tiles, this.options.art[l.asset]?.view === 'isometric');
       const [tx, ty] = [Math.floor(l.x), Math.floor(l.y - 0.01)];
-      if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(img);
-      else views.find((v) => within(v.building, tx, ty))?.inside.push(img);
+      if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(...parts);
+      else views.find((v) => within(v.building, tx, ty))?.inside.push(...parts);
     }
   }
 

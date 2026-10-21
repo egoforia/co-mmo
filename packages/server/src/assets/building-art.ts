@@ -7,13 +7,15 @@ import {
   TILE_PIXELS,
   buildingArt,
   furnitureArt,
+  isoSpan,
   type ArtEntry,
   type BuildingStyle,
+  type Footprint,
 } from '@co-mmo/shared';
 import { makeSeamless, pixelate, removeKeyBackground, removeKeySpill, trimRows } from './postprocess.ts';
 import { pictureName } from './names.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from './provider.ts';
-import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT } from './style.ts';
+import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT, footprintWords, paintedFootprint } from './style.ts';
 import { STYLE } from './style-profile.ts';
 
 // Paints every picture a building needs with the image model chosen in God's
@@ -32,6 +34,8 @@ export interface BuildingArtJob {
   size: ImageRequest['size'];
   /** Furniture: how wide it is drawn, in tiles. */
   width?: number;
+  /** Furniture painted for the isometric camera: the tiles it stands on, which it is sized to. */
+  footprint?: Footprint;
 }
 
 /** Widest the outside art is kept, in pixels: sharp at the closest camera zoom without huge downloads. */
@@ -77,14 +81,21 @@ export function buildingArtJobs(style: BuildingStyle): BuildingArtJob[] {
     });
   }
   for (const [key, piece] of Object.entries(style.furniture)) {
+    const id = furnitureArt(style.id, key);
+    const footprint = paintedFootprint(id, 'furniture');
     jobs.push({
-      id: furnitureArt(style.id, key),
+      id,
       kind: 'furniture',
       references: [exterior],
       aspectRatio: '1:1',
       size: '1K',
       width: piece.width,
-      prompt: [INSIDE_STYLE, SPRITE_FRAMING, `Subject: the ${piece.name} inside ${style.name}: ${piece.look}.`, 'Colours: match the reference painting of the same building from outside.'].join('\n'),
+      ...(footprint ? { footprint } : {}),
+      prompt: [
+        INSIDE_STYLE, SPRITE_FRAMING, `Subject: the ${piece.name} inside ${style.name}: ${piece.look}.`,
+        footprint ? footprintWords(footprint) : '',
+        'Colours: match the reference painting of the same building from outside.',
+      ].filter(Boolean).join('\n'),
     });
   }
   return jobs;
@@ -150,7 +161,8 @@ export async function processBuildingArt(job: BuildingArtJob, raw: Buffer, outDi
   } else if (job.kind === 'furniture') {
     const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
     const trimmed = await sharp(await removeKeySpill(keyed)).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
-    const w = Math.round((job.width ?? 1) * TILE_ART_PIXELS);
+    // Painted standing on its tiles, as wide as their diamond; else as wide as the tiles it was drawn across top-down.
+    const w = Math.round(job.footprint ? isoSpan(job.footprint.width, job.footprint.height) / PIXEL_ART_SCALE : (job.width ?? 1) * TILE_ART_PIXELS);
     const h = Math.max(1, Math.round((w * trimmed.info.height) / trimmed.info.width));
     out = await shrink(trimmed.data, w, h, 24);
   } else {
@@ -165,7 +177,7 @@ export async function processBuildingArt(job: BuildingArtJob, raw: Buffer, outDi
   await mkdir(outDir, { recursive: true });
   await writeFile(resolve(outDir, file), out);
   const { width = 0, height = 0 } = await sharp(out).metadata();
-  return { file: `art/${file}`, kind: job.kind === 'exterior' ? 'building' : job.kind, width, height };
+  return { file: `art/${file}`, kind: job.kind === 'exterior' ? 'building' : job.kind, width, height, ...(job.footprint ? { view: 'isometric' as const } : {}) };
 }
 
 /** The game copy's file type: WebP for a building's big outside, PNG for crisp insides. */

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, LAND_ITEMS, PIXEL_ART_SCALE, SEA_CAVE_PIECES, TILE_PIXELS, WORLD_REGIONS, buildingArtIds, generateRegion, type ArtManifest } from '@co-mmo/shared';
+import { BUILDING_STYLES, LAND_ITEMS, isoSpan, PIXEL_ART_SCALE, SEA_CAVE_PIECES, TILE_PIXELS, WORLD_REGIONS, buildingArtIds, generateRegion, type ArtManifest } from '@co-mmo/shared';
 import { buildingArtJobs, processBuildingArt } from '../src/assets/building-art.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import { BuildingPainter } from '../src/building-painter.ts';
@@ -66,10 +66,18 @@ describe('processBuildingArt', () => {
     }
   });
 
-  it('fits furniture to its width in tiles, with the background cut away', async () => {
+  it('fits furniture to the tiles it stands on, with the background cut away', async () => {
     const bed = jobs.find((j) => j.id === 'bramble-cottage-furniture-bed')!;
     const entry = await processBuildingArt(bed, (await fakePicture({ prompt: bed.prompt })).data, await dir);
-    expect(entry.width).toBe(cottage.furniture.bed!.width * TILE_PIXELS);
+    if (STYLE.camera === 'isometric') {
+      // Painted standing on its two by two tiles, as wide as their diamond.
+      expect(bed.footprint).toEqual({ width: 2, height: 2 });
+      expect(bed.prompt).toMatch(/Footprint: it stands on a diamond-shaped patch of ground 2 tiles along each side/);
+      expect(entry).toMatchObject({ width: isoSpan(2, 2), view: 'isometric' });
+    } else {
+      expect(entry.width).toBe(cottage.furniture.bed!.width * TILE_PIXELS);
+      expect(entry.view).toBeUndefined();
+    }
     expect(entry.height % PIXEL_ART_SCALE).toBe(0);
   });
 

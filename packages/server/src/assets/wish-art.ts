@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { CHARACTER_HEIGHT, type BiomeId, type PicturedWish } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, isoSpan, type BiomeId, type Footprint, type PicturedWish } from '@co-mmo/shared';
 import { pictureName } from './names.ts';
 import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
@@ -190,4 +190,16 @@ export async function fitToBox(png: Buffer, box: { width: number; height: number
     .composite([{ input: resized, left: Math.floor((box.width - w) / 2), top: box.height - h }])
     .png()
     .toBuffer();
+}
+
+/**
+ * Trims the transparent margin and scales a thing painted standing on its
+ * footprint to the width of that footprint's diamond in the isometric
+ * camera, its height following.
+ */
+export async function fitToFootprint(png: Buffer, footprint: Footprint): Promise<Buffer> {
+  const trimmed = await sharp(png).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
+  const width = Math.round(isoSpan(footprint.width, footprint.height));
+  const height = Math.max(1, Math.round((width * trimmed.info.height) / trimmed.info.width));
+  return sharp(trimmed.data).resize(width, height, { fit: 'fill', kernel: 'lanczos3' }).png().toBuffer();
 }

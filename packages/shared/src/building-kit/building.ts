@@ -4,13 +4,14 @@
 // relies on is recorded, so the shape checks can measure it on the placed solids.
 
 import { Z, add, arch, box, cross, offsetRing, prism, rect, region, scale, solidsOf, type Face, type Mapping, type Paint, type Solid, type Vec2, type Vec3 } from './geometry.ts';
+import { addFlatRoof, addTowers } from './crown.ts';
 import { addRoof, type RoofInfo } from './roof.ts';
 import { CUT_LOW, placeStairs, type Flight } from './stairs.ts';
 import { C30, K, R2, RUNS, S30, SIDES, TILE, tile, type KitSizes, type Side, type TileSizes } from './sizes.ts';
 import { openingsOf, type BuildingSpec, type Opening } from './spec.ts';
 
 /** What a part is, for the checks and for whatever draws it. */
-export type PartRole = 'bay' | 'beam' | 'footing' | 'post' | 'door' | 'window' | 'trim' | 'sill' | 'floor' | 'stair' | 'roof' | 'ridge' | 'gable' | 'chimney';
+export type PartRole = 'bay' | 'beam' | 'footing' | 'post' | 'door' | 'window' | 'trim' | 'sill' | 'floor' | 'stair' | 'roof' | 'ridge' | 'gable' | 'chimney' | 'parapet' | 'merlon' | 'tower' | 'dome';
 
 /** One named part of a building: its faces and the solids they bound. */
 export interface Part {
@@ -119,7 +120,10 @@ export class KitBuilding {
     const top = this.cut === null ? n : this.cut + 1;
     placeStairs(this);
     for (let i = 0; i < top; i++) this.storey(i, this.cut === i);
-    if (this.cut === null && spec.roof !== false) addRoof(this, n * this.k.H);
+    if (this.cut === null && spec.roof === 'flat') addFlatRoof(this, n * this.k.H);
+    else if (this.cut === null && spec.roof !== false) addRoof(this, n * this.k.H);
+    if (spec.dome && spec.roof !== 'flat') this.fits('a dome stands only on a flat roof', false);
+    addTowers(this);
     this.floors(top);
   }
 

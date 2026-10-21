@@ -72,11 +72,12 @@ describe('kit houses on the server', () => {
     let houses: buildingKit.KitHouseInfo[] = [];
     for (let i = 0; i < 50; i++) {
       houses = ((await (await ask(player.token)).json()) as { houses: buildingKit.KitHouseInfo[] }).houses;
-      if (houses[0]?.status !== 'building') break;
+      if (houses.length && houses.every((h) => h.status !== 'building')) break;
       await new Promise((r) => setTimeout(r, 50));
     }
-    expect(houses).toHaveLength(1);
-    expect(houses[0]).toMatchObject({ building: index, status: 'failed' });
-    expect(houses[0]!.failed![0]).toMatch(/not painted yet/);
+    // The Arcanum and the temple, both waiting for their looks to be painted.
+    expect(houses).toHaveLength(2);
+    expect(houses.find((h) => h.building === index)).toMatchObject({ status: 'failed' });
+    for (const h of houses) expect(h.failed![0]).toMatch(/not painted yet/);
   });
 });

@@ -50,4 +50,35 @@ describe('kit houses for the game\'s buildings', () => {
     // A doorway that straddles two bays (the middle of a floor 8 wide is tile 4, an odd tile from the west wall).
     expect(kitHouse(made(8, 8))).toBeUndefined();
   });
+
+  it('builds each land\'s great hall from the kit, crowned with its towers, battlements or dome', () => {
+    const crowns: Record<string, (s: buildingKit.BuildingSpec) => unknown> = {
+      'sanctum-temple': (s) => s.dome,
+      'woods-castle': (s) => s.battlements && s.towers?.length,
+      'shore-coral-palace': (s) => s.dome && s.towers?.length,
+      'desert-palace': (s) => s.dome && s.towers?.length,
+    };
+    const built = new Set<string>();
+    for (const region of WORLD_REGIONS.filter((r) => !r.wild)) {
+      for (const b of generateRegion(region).buildings.filter((x) => crowns[x.style])) {
+        built.add(b.style);
+        const house = kitHouse(b);
+        expect(house, b.style).toBeDefined();
+        expect(house!.spec.roof, b.style).toBe('flat');
+        expect(crowns[b.style]!(house!.spec), b.style).toBeTruthy();
+        for (const cut of [null, 0]) expect(shapeChecks(new KitBuilding(house!.spec, { cut })).filter((c) => !c.ok).map((c) => c.check), `${b.style} cut ${cut}`).toEqual([]);
+      }
+    }
+    expect([...built].sort()).toEqual(Object.keys(crowns).sort());
+  });
+
+  it('keeps no window under a tower, and no house when the door would be under one', () => {
+    const castle = kitHouse(made(26, 16, 'woods-castle'))!;
+    const { left, front } = castle.spec.storeys[0]!;
+    // The front-left tower stands over the front wall's first bay and the south wall's last.
+    expect(front![0]).toBeUndefined();
+    expect(left![castle.spec.D - 1]).toBeUndefined();
+    // A floor two tiles wide is one bay, under the castle's corner towers.
+    expect(kitHouse(made(2, 4, 'woods-castle'))).toBeUndefined();
+  });
 });

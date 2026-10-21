@@ -12,6 +12,9 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     id: 'sanctum-temple',
     name: 'The Temple of the Bell',
     biome: 'sanctum',
+    kit: 'temple-stone',
+    // A flat roof under the great dome; the belfry is its finial for now.
+    kitShape: { roof: 'flat', dome: { finial: true } },
     references: ['sanctum-shrine'],
     exterior:
       'a grand old temple of pale cream stone with a wide flight of steps up to tall arched bronze double doors, ' +
@@ -49,6 +52,18 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     id: 'woods-castle',
     name: 'Mossgate Castle',
     biome: 'whispering-woods',
+    kit: 'castle-stone',
+    // Round towers with pointed roofs either side of the gate (the south wall), square ones behind.
+    kitShape: {
+      roof: 'flat',
+      battlements: true,
+      towers: [
+        { corner: 'front-left', size: 1.5, above: 1.4, round: true, top: 'cone' },
+        { corner: 'back-left', size: 1.5, above: 1.4, round: true, top: 'cone' },
+        { corner: 'front-right', size: 1.5, above: 0.8 },
+        { corner: 'back-right', size: 1.5, above: 0.8 },
+      ],
+    },
     references: ['woods-tree-house'],
     exterior:
       'an old forest castle of grey-green stone, overgrown with ivy and moss: a great arched wooden gate at the bottom middle with an iron portcullis raised, ' +
@@ -68,6 +83,13 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     id: 'shore-coral-palace',
     name: 'The Coral Palace',
     biome: 'sunlit-shore',
+    kit: 'coral-palace',
+    // Tall round towers like seashells at its corners, and a pearly dome.
+    kitShape: {
+      roof: 'flat',
+      dome: { finial: true },
+      towers: (['front-left', 'front-right', 'back-left', 'back-right'] as const).map((corner) => ({ corner, size: 1.2, above: 2, round: true, top: 'cone' as const })),
+    },
     references: ['shore-lighthouse'],
     exterior:
       'a shining palace grown from pink and white coral on a rocky point by the sea: a tall arched doorway of pearl at the bottom middle, ' +
@@ -106,6 +128,16 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     id: 'desert-palace',
     name: "Sultana Zahra's Palace",
     biome: 'mirage-desert',
+    kit: 'desert-sandstone',
+    // A great dome, and two slender minarets at the back.
+    kitShape: {
+      roof: 'flat',
+      dome: { finial: true },
+      towers: [
+        { corner: 'back-left', size: 0.9, above: 2.4, round: true, top: 'cone' },
+        { corner: 'back-right', size: 0.9, above: 2.4, round: true, top: 'cone' },
+      ],
+    },
     references: ['desert-ruin'],
     exterior:
       'a magnificent desert palace of sandstone and white plaster: a tall pointed arch doorway with carved wooden doors at the bottom middle, ' +

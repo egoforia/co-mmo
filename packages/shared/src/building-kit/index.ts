@@ -8,6 +8,7 @@ export * from './sizes.ts';
 export * from './spec.ts';
 export * from './building.ts';
 export * from './roof.ts';
+export * from './crown.ts';
 export * from './stairs.ts';
 export * from './checks.ts';
 export * from './samples.ts';

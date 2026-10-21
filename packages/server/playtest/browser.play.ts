@@ -105,6 +105,14 @@ describe('the robot plays in a browser', () => {
       await gods.screenshot({ path: resolve(shots, `gods-view-${tab}.png`), fullPage: true });
     }
 
+    // The Art tab lists the building kit's looks, each with a button to paint its sheet.
+    await gods.click('nav [data-tab="art"]');
+    await gods.click('a[href="#art/looks"]');
+    await gods.waitForSelector('.look', { timeout: 15_000 });
+    expect.soft(await gods.textContent('.looks'), 'the building looks list the castle\'s stone').toMatch(/castle/i);
+    expect.soft(await gods.locator('.look [data-art-review]').count(), 'each look has a paint button').toBeGreaterThan(3);
+    await gods.screenshot({ path: resolve(shots, 'gods-view-art-looks.png'), fullPage: true });
+
     // A phone-sized screen still shows the game.
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const small = await phone.newPage();

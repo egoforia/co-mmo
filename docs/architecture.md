@@ -34,8 +34,8 @@ adapter) and picking it in the place named under "Chosen in".
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `ISOMETRIC` for everyone; `TOP_DOWN` (retired, the Owner's old view until the lands are repainted) | `chooseCamera` (`client/src/camera.ts`) |
-| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`) | `kitHouse` (a building style's `kit` look), drawn by `KitHouses` for the isometric camera |
-| Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` | `KitSheets` in `app.ts` |
+| Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`), crowns (`crown.ts`) | `kitHouse` (a building style's `kit` look), drawn by `KitHouses` for the isometric camera |
+| Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` and the great halls' looks | `KitSheets` in `app.ts` |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
 
 Every contract has a test a new implementation must pass:
@@ -161,8 +161,9 @@ editor's own marks, seen only while it is open, never game art.
 
 **The building kit.** `shared/src/building-kit/` (exported as `buildingKit`)
 turns a building as data (`BuildingSpec`: footprint in bays, doors and
-windows per wall, stairs) into exact parts on one set of sizes, with each
-storey's blocking lines and a cutaway per storey. `shapeChecks` measures
+windows per wall, stairs, and a crown: a pitched or flat roof,
+battlements, corner towers, a dome; `crown.ts`) into exact parts on one set
+of sizes, with each storey's blocking lines and a cutaway per storey. `shapeChecks` measures
 every recorded joint on the placed solids (rests on, set into, held by,
 clear of, level with) and that walls are complete, nothing floats and the
 stairs fit. On the server, `assets/building-kit/` draws every view (outside
@@ -172,15 +173,17 @@ gaps, no stretched paint, no layout colour, no two surfaces in one place,
 rooms take only inside light, the way down shows. Code makes the shapes; the
 image model paints only their flat textures, all of a look at once on one
 sheet: a magenta guide with a green shape per texture (`sheet.ts`), painted
-through the Art tab's review, the budget and the paint queue
-(`ArtStudio.paintSheet`, route `art/sheet`). `KitSheets` keeps each painting
+through the Art tab's review (Art > Building looks), the budget and the
+paint queue (`ArtStudio.paintSheet`, route `art/sheet`). `KitSheets` keeps each painting
 with its layout and words (shipped ones in `assets/kit-sheets/`, later ones
 in the art folder) and checks them in a worker thread (`sheet-checks.ts`,
 `tiling.ts`): in place, filled, no spill, no baked light, even, no frame, and
 a tile that repeats without slicing shapes. Each texture comes from the
 newest painting where it passed. In play so far: a building style with a
 `kit` look (`BUILDING_STYLES`) whose floor falls on whole bays, two tiles to
-a bay, becomes a kit house on that floor (`kitHouse`); `KitHouses` draws it
+a bay, becomes a kit house on that floor (`kitHouse`), shaped by the
+style's `kitShape`; each land's great hall (temple, castle, coral palace,
+desert palace) is one, in a look of its own; `KitHouses` draws it
 in a worker the first time `GET /api/kit-houses` asks (any signed-in
 player, for the isometric camera), keeps it in the art folder and draws it again when
 its look is painted again. The game's collision is still its wall tiles.

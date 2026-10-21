@@ -33,4 +33,13 @@ export const SAMPLE_BUILDINGS: Record<string, BuildingSpec> = {
       { front: { 0: 'window', 1: 'window' }, back: { 0: 'window' }, right: { 1: 'window' } },
     ],
   },
+  temple: {
+    W: 4, D: 3, roof: 'flat', dome: { finial: true },
+    storeys: [{ left: { 1: 'door' }, front: { 1: 'window', 3: 'window' }, right: { 1: 'window' }, back: { 1: 'window', 3: 'window' } }],
+  },
+  castle: {
+    W: 4, D: 4, roof: 'flat', battlements: true,
+    towers: [{ corner: 'front-left', round: true, top: 'cone' }, { corner: 'back-right' }],
+    storeys: [{ left: { 2: 'door' }, front: { 2: 'window' }, right: { 1: 'window' }, back: { 1: 'window' } }],
+  },
 };

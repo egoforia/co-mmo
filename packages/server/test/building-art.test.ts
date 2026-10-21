@@ -7,6 +7,7 @@ import { BUILDING_STYLES, LAND_ITEMS, PIXEL_ART_SCALE, SEA_CAVE_PIECES, TILE_PIX
 import { buildingArtJobs, processBuildingArt } from '../src/assets/building-art.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import { BuildingPainter } from '../src/building-painter.ts';
+import { STYLE } from '../src/assets/style-profile.ts';
 
 const cottage = BUILDING_STYLES['bramble-cottage']!;
 const raw = async (png: Buffer) => sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -40,7 +41,7 @@ describe('building art jobs', () => {
     expect(jobs[0]!.prompt).toMatch(/front door of the building is exactly where the dark arch is, at the middle of the bottom edge/);
     for (const job of jobs.slice(1)) {
       expect(job.references).toEqual([jobs[0]!.id]);
-      expect(job.prompt).toMatch(/Pixel art/);
+      expect(job.prompt.startsWith(STYLE.interior.style)).toBe(true);
     }
     expect(jobs.filter((j) => j.kind === 'tile').every((j) => /repeats seamlessly/.test(j.prompt))).toBe(true);
   });
@@ -50,11 +51,12 @@ describe('processBuildingArt', () => {
   const dir = mkdtemp(join(tmpdir(), 'building-art-'));
   const jobs = buildingArtJobs(cottage);
 
-  it('turns a tile into a seamless 32 by 32 pixel art tile, 4 game pixels per art pixel', async () => {
+  it('turns a tile into a seamless game-sized tile, as 4 by 4 pixel art when the style asks for pixel-art insides', async () => {
     const floor = jobs.find((j) => j.id === 'bramble-cottage-floor')!;
     const entry = await processBuildingArt(floor, (await fakePicture({ prompt: floor.prompt })).data, await dir);
     expect(entry).toMatchObject({ file: 'art/bramble-cottage-floor.png', width: TILE_PIXELS, height: TILE_PIXELS });
     const { data, info } = await raw(await readFile(join(await dir, 'bramble-cottage-floor.png')));
+    if (!STYLE.interior.pixelArt) return;
     // Every 4 by 4 block is one colour.
     for (let y = 0; y < info.height; y += PIXEL_ART_SCALE) {
       for (let x = 0; x < info.width; x += PIXEL_ART_SCALE) {

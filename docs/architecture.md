@@ -32,7 +32,7 @@ adapter) and picking it in the place named under "Chosen in".
 | Pictures | `ImageProvider` (`assets/provider.ts`) | Gemini image models | `ai/services.ts` |
 | Video (walks) | `VideoProvider` (`assets/video.ts`) | Veo | `ai/services.ts` |
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
-| Art style | `StyleProfile` (`assets/style-profile.ts`) | `STORYBOOK` | `chooseStyle` (`ART_STYLE`) |
+| Art style | `StyleProfile` (`assets/style-profile.ts`) | `FLAT_ISOMETRIC` (`STORYBOOK` for top-down walks) | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `ISOMETRIC` for everyone; `TOP_DOWN` (retired, the Owner's old view until the lands are repainted) | `chooseCamera` (`client/src/camera.ts`) |
 | Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`), crowns (`crown.ts`) | `kitHouse` (a building style's `kit` look), drawn by `KitHouses` for the isometric camera |
 | Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` and the great halls' looks | `KitSheets` in `app.ts` |
@@ -227,7 +227,7 @@ per panel. God's View is
 
 | Change | What to write |
 | --- | --- |
-| New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). |
+| New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). `server/test/style-prompts.test.ts` snapshots every prompt, so the change shows word for word. |
 | Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20). Still to come: an isometric style profile, walkers painted straight into the four isometric ways, upright strips for trees and set pieces, every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |

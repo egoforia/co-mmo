@@ -253,7 +253,7 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `API_LOG_DIR` | `api-log/` next to `DATA_FILE` | Where God's View's API Log keeps every request sent to an outside service |
 | `API_LOG_DAYS` | `14` | Days the API Log keeps; older days are deleted |
 | `API_LOG_MAX_MB` | `200` | Megabytes the API Log may use; the oldest days go first |
-| `ART_STYLE` | `storybook` | The art style every new picture is painted in (`packages/server/src/assets/style-profile.ts`); pictures already painted keep their style until repainted |
+| `ART_STYLE` | `flat-isometric` | The art style every new picture is painted in (`storybook` is the old hand-painted look) (`packages/server/src/assets/style-profile.ts`); pictures already painted keep their style until repainted |
 | `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`), wish art, walks (Veo) and each land's music (Lyria) |
 | `ELEVENLABS_API_KEY` | none | ElevenLabs: the game's sound effects; without it the game plays music only |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |

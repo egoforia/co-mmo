@@ -138,9 +138,10 @@ async function main() {
   const clientManifestPath = resolve(clientArtDir, 'manifest.json');
   const clientManifest = JSON.parse(await readFile(clientManifestPath, 'utf8').catch(() => '{}'));
 
-  // 12-frame single attack cycle with seamless looping:
-  // Neutral (5) -> Anticipation (7-13) -> Snap Impact (15) -> Follow-through (17-19) -> Recovery to Neutral (21-27)
-  const frameIndices = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27];
+  // 24-frame full 2-punch combo animation with seamless looping back to neutral idle:
+  // Punch 1 (frames 6-22) -> Recoil & Punch 2 (frames 24-38) -> Smooth Return to Idle (frames 40-52 -> 6)
+  // 48 raw video frames at 30 fps = 1.6s duration (15 fps uniform cadence)
+  const frameIndices = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52];
   console.log(`Using ${frameIndices.length} frames per attack cycle: [${frameIndices.join(', ')}]`);
 
   const allNormalizedStrips: { charId: string; way: IsoWay; stripBuf: Buffer; width: number; height: number }[] = [];
@@ -212,7 +213,7 @@ async function main() {
         width: normalized.frameWidth * wayFrames.length,
         height: normalized.frameHeight,
         frames: wayFrames.length,
-        cycleSeconds: 0.8,
+        cycleSeconds: 1.6,
         redone: now,
       };
       manifest[attackId] = stripEntry;
@@ -223,7 +224,7 @@ async function main() {
         width: normalized.frameWidth * wayFrames.length,
         height: normalized.frameHeight,
         frames: wayFrames.length,
-        cycleSeconds: 0.8,
+        cycleSeconds: 1.6,
       };
       console.log(`  ✓ Wrote ${attackId}.png (${normalized.frameWidth * wayFrames.length}x${normalized.frameHeight})`);
     }

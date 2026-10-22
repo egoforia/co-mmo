@@ -355,6 +355,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.textures.exists(id)) this.textures.remove(id);
     this.textures.addSpriteSheet(id, img, { frameWidth: entry.width / (entry.frames ?? WALK_FRAMES), frameHeight: entry.height });
     this.figures.delete(id);
+    this.figureMetrics.delete(id);
     this.makeWalk(id, entry);
     for (const a of avatars) {
       if (striding.has(a)) a.body.play(id);
@@ -736,6 +737,7 @@ export class WorldScene extends Phaser.Scene {
       if (a.body.anims.currentAnim?.key !== sheet || !a.body.anims.isPlaying) {
         a.body.play(sheet, true);
         this.fit(a, sheet, !!a.fit);
+        this.alignBaseline(a, sheet);
       }
       a.body.anims.timeScale = a.pace ?? 1;
       return;
@@ -746,6 +748,7 @@ export class WorldScene extends Phaser.Scene {
     else {
       a.body.setTexture(sheet, 0);
       this.fit(a, sheet, !!a.fit);
+      this.alignBaseline(a, sheet);
     }
   }
 
@@ -753,6 +756,7 @@ export class WorldScene extends Phaser.Scene {
   private dress(a: Avatar, key: string): void {
     a.body.setTexture(key);
     this.fit(a, key, true);
+    this.alignBaseline(a, key);
   }
 
   /**
@@ -765,12 +769,12 @@ export class WorldScene extends Phaser.Scene {
     a.body.setScale(own && worn ? (a.scale * own) / worn : a.scale);
   }
 
-  /** Heights of the figures in textures (their first frame), see-through rows left out, by key. */
+  /** Heights and ground contact origins of figures in textures (first frame), by key. */
   private figures = new Map<string, number>();
+  private figureMetrics = new Map<string, { height: number; originY: number }>();
 
-  /** How tall the figure in a texture's first frame is, in pixels, from its see-through edges. */
-  private figureHeight(key: string): number | undefined {
-    const known = this.figures.get(key);
+  private figureInfo(key: string): { height: number; originY: number } | undefined {
+    const known = this.figureMetrics.get(key);
     if (known !== undefined) return known;
     const frame = this.textures.getFrame(key, 0) ?? this.textures.getFrame(key);
     const image = frame?.source.image as CanvasImageSource | undefined;
@@ -790,9 +794,24 @@ export class WorldScene extends Phaser.Scene {
     let bottom = height - 1;
     while (top < height && !solid(top)) top++;
     while (bottom > top && !solid(bottom)) bottom--;
-    const figure = top < height ? bottom - top + 1 : height;
-    this.figures.set(key, figure);
-    return figure;
+    const figHeight = top < height ? bottom - top + 1 : height;
+    // Align ground contact (bottom) so the feet always rest on the shadow baseline
+    const originY = Math.min(1, Math.max(0, (bottom - Math.round(figHeight * 0.03)) / height));
+    const info = { height: figHeight, originY };
+    this.figureMetrics.set(key, info);
+    this.figures.set(key, figHeight);
+    return info;
+  }
+
+  /** How tall the figure in a texture's first frame is, in pixels, from its see-through edges. */
+  private figureHeight(key: string): number | undefined {
+    return this.figureInfo(key)?.height;
+  }
+
+  /** Aligns an avatar's vertical origin so its feet rest firmly on the ground shadow across all textures. */
+  private alignBaseline(a: Avatar, key: string): void {
+    const info = this.figureInfo(key);
+    if (info) a.body.setOrigin(0.5, info.originY);
   }
 
   /** A player's own painted look, or one of the two approved player looks. */
@@ -817,6 +836,7 @@ export class WorldScene extends Phaser.Scene {
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
     if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
     this.figures.delete(key);
+    this.figureMetrics.delete(key);
     for (const a of [...this.creatures.values(), ...this.bodies.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
       if (!a) continue;
       // A walk or standing picture of this look stays on until the walker turns or stops.
@@ -1342,8 +1362,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
+    const key = this.textures.exists(texture) ? texture : fallback;
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = litFigure(this, this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97));
+    const body = litFigure(this, this.add.sprite(0, 0, key).setOrigin(0.5, 0.97));
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -1353,7 +1374,9 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
+    const a: Avatar = { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
+    this.alignBaseline(a, key);
+    return a;
   }
 
   /** Places an avatar at (x, y) in our region, counted from its corner. */
@@ -1363,7 +1386,7 @@ export class WorldScene extends Phaser.Scene {
     a.at = { x, y };
     a.shadow.setPosition(px, py + T / 16);
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
-    const top = py + T / 10 - a.body.displayHeight;
+    const top = py + T / 10 - a.body.displayHeight * a.body.originY;
     a.label.setPosition(px, top - 4);
     if (a.bar) {
       a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);

@@ -150,6 +150,8 @@ export interface WalkerView {
   walks: Partial<Record<Facing, WalkStrip>>;
   /** Each way's run strip, when it has one. */
   runs?: Partial<Record<Facing, WalkStrip>>;
+  /** Each way's attack strip, when it has one. */
+  attacks?: Partial<Record<Facing, WalkStrip>>;
   /** Earlier walks of ways that have none now. */
   lost: Partial<Record<Facing, WalkVersion[]>>;
   /** Each way's standing picture: for the top-down ways, what its walk clip starts and ends on. */
@@ -366,6 +368,7 @@ export class ArtStudio {
     for (const w of this.walkerList()) {
       const walks: WalkerView['walks'] = {};
       const runs: WalkerView['runs'] = {};
+      const attacks: WalkerView['attacks'] = {};
       const lost: WalkerView['lost'] = {};
       for (const d of FACINGS) {
         const id = walkArt(w.id, d);
@@ -383,11 +386,17 @@ export class ArtStudio {
         if (runEntry) {
           runs[d] = { url: slash(runEntry.file), frames: runEntry.frames ?? 10, width: runEntry.width, height: runEntry.height, cycleSeconds: runEntry.cycleSeconds ?? 0.67, versions: [] };
         }
+
+        const attackId = `${w.id}-attack-${d}`;
+        const attackEntry = painted[attackId] ?? shipped[attackId];
+        if (attackEntry) {
+          attacks[d] = { url: slash(attackEntry.file), frames: attackEntry.frames ?? 12, width: attackEntry.width, height: attackEntry.height, cycleSeconds: attackEntry.cycleSeconds ?? 0.8, versions: [] };
+        }
       }
       const needs = await this.options.walks.needs(w);
       const standing = {} as WalkerView['standing'];
       for (const d of FACINGS) standing[d] = await this.options.walks.standing(w, d, w.url);
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
     }
     return views;
   }

@@ -37,7 +37,8 @@ in-game God. TypeScript end to end: `packages/shared` (code both sides run),
   Owner's choice on 2026-10-18): code builds house shapes from plain data,
   the image model paints every surface they show as flat textures, and a
   building is shown only when its shape and picture checks pass. Buildings may be
-  mirrored; characters and anything that walks never are.
+  mirrored; characters and anything that walks never are. The character and beastfolk
+  art pipeline (turnarounds, walk/run/attack cycles, Wan 3.0 generation) is in `docs/art-pipeline.md`.
 - Every wish is a mod a Steward can switch off (`docs/design.md`, Wishes as
   mods). A wish branch `wish/<issue>` puts what it adds behind
   `modOn(engineModId(<issue>))` from `@co-mmo/shared`; with it off, the game

@@ -85,6 +85,19 @@ export interface WishAnswerMessage {
   confirm: boolean;
 }
 
+/** Teleport to a coordinate, floor, or different region/biome. */
+export interface TeleportMessage {
+  t: 'teleport';
+  /** Target region/biome name or id; omitted means current region. */
+  region?: string;
+  /** Target X coordinate. */
+  x?: number;
+  /** Target Y coordinate. */
+  y?: number;
+  /** Target floor (0 for ground, positive for storeys, negative for catacombs). */
+  floor?: number;
+}
+
 /**
  * The Wish Workshop: start a draft in a subcategory, change its fields, ask
  * the God about it or have the God fill in the rest, carry a Talk wish into
@@ -181,6 +194,7 @@ export type ClientMessage =
   | PrayMessage
   | WishAnswerMessage
   | ReportMessage
+  | TeleportMessage
   | PingMessage;
 
 export interface PlayerInfo {
@@ -597,6 +611,14 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     return ['request', 'accept', 'decline', 'offer', 'confirm', 'cancel'].includes(m.action as string) &&
       (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64)) &&
       (m.offer === undefined || (typeof m.offer === 'object' && m.offer !== null));
+  }
+  if (m.t === 'teleport') {
+    return (
+      (m.region === undefined || (typeof m.region === 'string' && m.region.length <= 64)) &&
+      (m.x === undefined || (typeof m.x === 'number' && Number.isFinite(m.x))) &&
+      (m.y === undefined || (typeof m.y === 'number' && Number.isFinite(m.y))) &&
+      (m.floor === undefined || (typeof m.floor === 'number' && Number.isFinite(m.floor)))
+    );
   }
   return false;
 }

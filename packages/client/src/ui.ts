@@ -1,4 +1,4 @@
-import type { ChatChannel, ChatSendMessage, PartyActionMessage, ReportMessage, TradeActionMessage } from '@co-mmo/shared';
+import type { ChatChannel, ChatSendMessage, PartyActionMessage, ReportMessage, TeleportMessage, TradeActionMessage } from '@co-mmo/shared';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -40,7 +40,7 @@ export type ChatLine =
 const PREFIX: Partial<Record<ChatChannel, string>> = { region: '[Region] ', party: '[Party] ', world: '[World] ' };
 
 /** What a line typed in the chat box asks for. */
-export type ChatIntent = ChatSendMessage | PartyActionMessage | ReportMessage | TradeActionMessage | { t: 'help' } | { t: 'problem'; text: string };
+export type ChatIntent = ChatSendMessage | PartyActionMessage | ReportMessage | TradeActionMessage | TeleportMessage | { t: 'help' } | { t: 'problem'; text: string };
 
 /**
  * Reads a chat line: a slash command (/w Name hi, /p, /invite Name, /report
@@ -94,6 +94,34 @@ export function readChat(channel: ChatChannel, raw: string): ChatIntent {
       if (!m?.[2]) return { t: 'problem', text: 'Write /report, their name, and what happened.' };
       return { t: 'report', kind: 'player', target: m[1]!, reason: m[2] };
     }
+    case 'teleport':
+    case 'tp': {
+      if (!rest) return { t: 'problem', text: 'Usage: /teleport [region] <x> <y> [floor] or /teleport <region>' };
+      const tokens = rest.split(/[\s,]+/).filter(Boolean);
+      if (tokens.length === 0) return { t: 'problem', text: 'Usage: /teleport [region] <x> <y> [floor] or /teleport <region>' };
+      const isNum = (s: string) => !Number.isNaN(Number(s)) && Number.isFinite(Number(s));
+
+      if (tokens.length >= 3 && isNum(tokens[tokens.length - 3]!) && isNum(tokens[tokens.length - 2]!) && isNum(tokens[tokens.length - 1]!)) {
+        const x = Number(tokens[tokens.length - 3]);
+        const y = Number(tokens[tokens.length - 2]);
+        const floor = Math.round(Number(tokens[tokens.length - 1]));
+        const reg = tokens.slice(0, -3).join(' ').trim();
+        return { t: 'teleport', ...(reg ? { region: reg } : {}), x, y, floor };
+      }
+      if (tokens.length >= 2 && isNum(tokens[tokens.length - 2]!) && isNum(tokens[tokens.length - 1]!)) {
+        const x = Number(tokens[tokens.length - 2]);
+        const y = Number(tokens[tokens.length - 1]);
+        const reg = tokens.slice(0, -2).join(' ').trim();
+        return { t: 'teleport', ...(reg ? { region: reg } : {}), x, y };
+      }
+      if (tokens.length === 1 && isNum(tokens[0]!)) {
+        return { t: 'problem', text: 'Please provide both X and Y coordinates: /teleport <x> <y> [floor]' };
+      }
+      if (!isNum(tokens[tokens.length - 1]!)) {
+        return { t: 'teleport', region: tokens.join(' ').trim() };
+      }
+      return { t: 'problem', text: 'Usage: /teleport [region] <x> <y> [floor] or /teleport <region>' };
+    }
     case 'help':
       return { t: 'help' };
     default:
@@ -101,7 +129,7 @@ export function readChat(channel: ChatChannel, raw: string): ChatIntent {
   }
 }
 
-export const CHAT_HELP = 'Chat: /s nearby, /region everyone here, /p your party, /w Name to whisper, /r to answer a whisper, /world everyone. Party: /invite Name, /accept, /decline, /leave. /trade Name trades with someone nearby. /report Name what happened tells the Stewards.';
+export const CHAT_HELP = 'Chat: /s nearby, /region everyone here, /p your party, /w Name to whisper, /r to answer a whisper, /world everyone. Party: /invite Name, /accept, /decline, /leave. /trade Name trades with someone nearby. /teleport [region] <x> <y> [floor] or /tp to teleport. /report Name what happened tells the Stewards.';
 
 export class ChatBox {
   private readonly log = $<HTMLOListElement>('chat-log');

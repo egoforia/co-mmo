@@ -476,7 +476,7 @@ export class Region {
     let floor = 0;
     if (at.x !== null && at.y !== null && !outsideSide(this.map, at.x, at.y)) {
       // The floor they were on, while it is still there; else the ground below.
-      const wanted = carry?.floor ?? at.floor ?? 0;
+      const wanted = at.floor !== undefined ? at.floor : (carry?.floor ?? 0);
       floor = wanted && storeyAt(this.map, Math.floor(at.x), Math.floor(at.y), wanted) ? wanted : 0;
       // Something may have been built or planted where they stood (the world editor): the nearest open spot, then.
       const free = collides(this.map, at.x, at.y, floor) ? nearestOpen(this.map, at.x, at.y, floor) : { x: at.x, y: at.y };

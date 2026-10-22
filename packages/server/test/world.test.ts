@@ -119,4 +119,88 @@ describe('World', () => {
     expect(place).toMatchObject({ regionId: 'desert' });
     expect(world.has('a')).toBe(false);
   });
+
+  describe('teleportation', () => {
+    it('teleports to valid coordinates in the same region', () => {
+      const world = new World();
+      const a = fakeConn();
+      world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: 129, y: 132 }, newCharacter());
+      // Cathedral avenue open cobblestone
+      world.handle('a', { t: 'teleport', x: 128, y: 120 });
+      const pos = world.home.position('a')!;
+      expect(pos.x).toBe(128);
+      expect(pos.y).toBe(120);
+      const lastNotice = a.messages.filter((m) => m.t === 'notice').at(-1);
+      expect(lastNotice).toMatchObject({ text: 'Teleported to the Sanctum at (128, 120).' });
+      const lastWelcome = a.messages.filter((m) => m.t === 'welcome').at(-1);
+      expect(lastWelcome).toMatchObject({ x: 128, y: 120 });
+    });
+
+    it('teleports to subterranean catacombs on floor -1', () => {
+      const world = new World();
+      const a = fakeConn();
+      world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: 129, y: 132 }, newCharacter());
+      // Catacombs open hallway
+      world.handle('a', { t: 'teleport', x: 128, y: 105, floor: -1 });
+      const pos = world.home.position('a')!;
+      expect(pos.x).toBe(128);
+      expect(pos.y).toBe(105);
+      expect(pos.floor).toBe(-1);
+      const lastNotice = a.messages.filter((m) => m.t === 'notice').at(-1);
+      expect(lastNotice).toMatchObject({ text: 'Teleported to the Sanctum at (128, 105 · Catacombs B1).' });
+    });
+
+    it('teleports to a different region and biome by id, name, or biome', () => {
+      const world = new World();
+      const a = fakeConn();
+      world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: 129, y: 132 }, newCharacter());
+
+      // Teleport by id to woods spawn
+      world.handle('a', { t: 'teleport', region: 'woods' });
+      expect(world.regionOf('a')!.def.id).toBe('woods');
+
+      // Teleport by biome to shore
+      world.handle('a', { t: 'teleport', region: 'sunlit-shore', x: 128, y: 128 });
+      expect(world.regionOf('a')!.def.id).toBe('shore');
+      expect(world.regionOf('a')!.position('a')!.x).toBe(128);
+      expect(world.regionOf('a')!.position('a')!.y).toBe(128);
+
+      // Teleport by name to desert
+      world.handle('a', { t: 'teleport', region: 'Mirage Desert' });
+      expect(world.regionOf('a')!.def.id).toBe('desert');
+    });
+
+    it('rejects teleporting to blocked or solid coordinates and sends an error', () => {
+      const world = new World();
+      const a = fakeConn();
+      world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: 129, y: 132 }, newCharacter());
+
+      // Tile 0, 0 is outside/blocked water or wall
+      world.handle('a', { t: 'teleport', x: 0, y: 0 });
+      // Mara stayed in place!
+      const pos = world.home.position('a')!;
+      expect(pos.x).toBe(129);
+      expect(pos.y).toBe(132);
+
+      const err = a.messages.filter((m) => m.t === 'error').at(-1);
+      expect(err).toMatchObject({
+        t: 'error',
+        code: 'TELEPORT_BLOCKED',
+      });
+      expect(err && 'message' in err && (err.message as string)).toContain('is outside');
+    });
+
+    it('rejects teleporting to an unknown region', () => {
+      const world = new World();
+      const a = fakeConn();
+      world.join(info('a', 'Mara'), a, { regionId: 'sanctum', x: 129, y: 132 }, newCharacter());
+
+      world.handle('a', { t: 'teleport', region: 'nonexistent-realm' });
+      const err = a.messages.filter((m) => m.t === 'error').at(-1);
+      expect(err).toMatchObject({
+        t: 'error',
+        code: 'TELEPORT_FAILED',
+      });
+    });
+  });
 });

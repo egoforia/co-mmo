@@ -35,7 +35,7 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     name: 'The High Cathedral of the Bell',
     biome: 'sanctum',
     kit: 'temple-stone',
-    kitShape: { roof: 'flat', battlements: true, towers: [{ corner: 'front-left' }, { corner: 'front-right' }] },
+    kitShape: { roof: 'flat', battlements: true, towers: [{ corner: 'front-left' }, { corner: 'front-right' }], numStoreys: 3 },
     references: ['sanctum-shrine'],
     exterior:
       'a magnificent cathedral of gleaming cream marble and white limestone: soaring twin bell towers with golden bells, a grand arched entrance with heavy bronze double doors, ' +
@@ -56,6 +56,7 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     name: "The Clerics' Scriptorium",
     biome: 'sanctum',
     kit: 'timber-cottage',
+    kitShape: { numStoreys: 2 },
     references: ['sanctum-shrine'],
     exterior:
       'a graceful monastic library and scriptorium of cream stone and dark oak timber: arched leaded-glass windows, a steep slate roof with stone dormers, ' +
@@ -75,6 +76,7 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     name: "The Pilgrim's Haven",
     biome: 'sanctum',
     kit: 'timber-cottage',
+    kitShape: { numStoreys: 2 },
     references: ['sanctum-shrine'],
     exterior:
       'a warm, welcoming two-storey coaching inn of whitewashed timber and warm sandstone: a carved wooden hanging sign depicting a golden bell over a foaming tankard, ' +

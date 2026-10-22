@@ -441,7 +441,7 @@ const sanctumLayout: Layout = (map, c) => {
   clearArea(c - 28, c - 18, c - 4, c - 3);
 
   // The High Cathedral of the Bell, north of the Grand Plaza.
-  const cathLeft = c - 8;
+  const cathLeft = c - 9;
   const cathTop = c - 32;
   const cathedral = building(map, cathLeft, cathTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
   map.buildings.push(cathedral);
@@ -593,9 +593,9 @@ const sanctumLayout: Layout = (map, c) => {
 
 /** The Sanctum Arcanum's floor, in tiles, inside the walls. */
 export const ARCANUM_SIZE = { width: 10, height: 8 };
-export const CATHEDRAL_SIZE = { width: 16, height: 12 };
-export const SCRIPTORIUM_SIZE = { width: 12, height: 10 };
-export const INN_SIZE = { width: 12, height: 10 };
+export const CATHEDRAL_SIZE = { width: 18, height: 12 };
+export const SCRIPTORIUM_SIZE = { width: 14, height: 10 };
+export const INN_SIZE = { width: 14, height: 10 };
 
 /** The High Cathedral's furniture: altar, pews, braziers, lectern, and the locked crypt gate. */
 function furnishCathedral(map: RegionMap, fx: number, fy: number): void {
@@ -801,10 +801,9 @@ export function building(map: RegionMap, left: number, top: number, width: numbe
       set(map, x, y, wall ? Tile.Wall : inside ? Tile.Floor : Tile.Ground);
     }
   }
-  // The doorway is in the middle of the south wall, aligned to the kit house bay grid.
-  const numBays = width / 2;
-  const doorBay = Math.floor((numBays - 1) / 2);
-  const door = { x: left + 1 + doorBay * 2, y: bottom };
+  // The doorway is in the middle of the south wall, so the outside art,
+  // centred on it, covers the building evenly on both sides.
+  const door = { x: left + Math.floor(width / 2), y: bottom };
   set(map, door.x, door.y, Tile.Door);
   set(map, door.x + 1, door.y, Tile.Door);
   return {

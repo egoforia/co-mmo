@@ -1121,10 +1121,13 @@ export class WorldScene extends Phaser.Scene {
    */
   private rockWalls(rows: number[][], left: number, top: number, style: string, art: TileArt | undefined, tilemaps: Phaser.Tilemaps.Tilemap[], outward: boolean): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
     const ground = PROJECTION.ground;
-    if (ground.kind !== 'diamond' || !art?.face) return [];
-    const rise = Math.round(ground.height * WALL_RISE);
-    const south = registerWallFace(this, art.face, 'south', ground.width, ground.height, rise);
-    const east = registerWallFace(this, art.face, 'east', ground.width, ground.height, rise);
+    if (ground.kind !== 'diamond') return [];
+    const face = art?.face ?? (this.textures.exists(buildingArt(style, 'wall')) ? buildingArt(style, 'wall') : undefined);
+    if (!face) return [];
+    const wallMultiplier = style.includes('cathedral') ? 3.0 : 2.0;
+    const rise = Math.round(ground.height * wallMultiplier);
+    const south = registerWallFace(this, face, 'south', ground.width, ground.height, rise);
+    const east = registerWallFace(this, face, 'east', ground.width, ground.height, rise);
     if (!south || !east) return [];
     const wall = (x: number, y: number) => rows[y]?.[x] === Tile.Wall;
     const open = (x: number, y: number) => (rows[y]?.[x] === undefined ? outward : !wall(x, y));

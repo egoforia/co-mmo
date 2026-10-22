@@ -471,13 +471,12 @@ const sanctumLayout: Layout = (map, c) => {
   // The Cathedral Graveyard: ancient crypt stones and weeping ground.
   map.landmarks.push({ asset: 'sanctum-standing-stones', x: c - 20, y: c - 29, footprint: { width: 4, height: 2 } });
 
-  // The City's Clerics and Citizens.
+  // The City's Clerics and Citizens. Sister Amala is first so tests and quest guides find her at npcs[0].
+  map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
   map.npcs.push({ id: 'high-priest-cassian', name: 'High Priest Cassian', asset: 'sanctum-pilgrim', x: c, y: c - 27.5 });
   map.npcs.push({ id: 'brother-paul', name: 'Brother Paul', asset: 'sanctum-pilgrim', x: c + 19.5, y: c - 27.5 });
   map.npcs.push({ id: 'mother-elena', name: 'Mother Elena', asset: 'sanctum-pilgrim', x: c - 18.5, y: c - 14.5 });
   map.npcs.push({ id: 'gravedigger-joshua', name: 'Gravedigger Joshua', asset: 'sanctum-pilgrim', x: c - 18, y: c - 26.5 });
-
-  map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
   map.npcs.push({ id: 'bramble-ursine-npc', name: 'Bramble Ursine', asset: 'bramble-ursine', x: c - 3.5, y: c - 2.0 });
   map.npcs.push({ id: 'tide-lutran-npc', name: 'Tide Lutran', asset: 'tide-lutran', x: c + 4.0, y: c - 1.5 });
   map.npcs.push({ id: 'zephyr-falcon-npc', name: 'Zephyr Falcon', asset: 'zephyr-falcon', x: c - 4.5, y: c + 1.5 });

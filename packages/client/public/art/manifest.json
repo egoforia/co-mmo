@@ -1439,12 +1439,6 @@
     "frames": 12,
     "cycleSeconds": 0.8
   },
-  "sanctum-cathedral-exterior": {
-    "file": "art/sanctum-cathedral-exterior.webp",
-    "kind": "building",
-    "width": 1856,
-    "height": 2275
-  },
   "sanctum-cathedral-floor": {
     "file": "art/sanctum-cathedral-floor.png",
     "kind": "tile",
@@ -1493,12 +1487,6 @@
     "width": 640,
     "height": 512
   },
-  "sanctum-scriptorium-exterior": {
-    "file": "art/sanctum-scriptorium-exterior.webp",
-    "kind": "building",
-    "width": 1856,
-    "height": 2275
-  },
   "sanctum-scriptorium-floor": {
     "file": "art/sanctum-scriptorium-floor.png",
     "kind": "tile",
@@ -1540,12 +1528,6 @@
     "kind": "set-piece",
     "width": 384,
     "height": 128
-  },
-  "sanctum-inn-exterior": {
-    "file": "art/sanctum-inn-exterior.webp",
-    "kind": "building",
-    "width": 1856,
-    "height": 2293
   },
   "sanctum-inn-floor": {
     "file": "art/sanctum-inn-floor.png",

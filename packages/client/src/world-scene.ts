@@ -1085,8 +1085,8 @@ export class WorldScene extends Phaser.Scene {
     const views = map.buildings.map((b) => {
       const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
       for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-      // One built from a kit's pieces (the sea cave) has no outside picture: its rock is seen from above.
-      const outside = !b.art && hasExterior(this, b.style) ? [this.exterior(b, ox, oy)] : [];
+      // In the isometric camera, buildings stand as kit houses or open walls; flat 2D exterior pictures are only used in top-down mode.
+      const outside = !b.art && hasExterior(this, b.style) && PROJECTION.ground.kind !== 'diamond' ? [this.exterior(b, ox, oy)] : [];
       const floor = this.groundLayer(inside, ox + b.x, oy + b.y, -0.5, registerKitTileset(this, b.style, b.art));
       tilemaps.push(floor.tilemap);
       const view: BuildingView = { building: b, ox, oy, outside, inside: [floor, ...this.rockWalls(inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true)], open: !outside.length };
@@ -1121,10 +1121,13 @@ export class WorldScene extends Phaser.Scene {
    */
   private rockWalls(rows: number[][], left: number, top: number, style: string, art: TileArt | undefined, tilemaps: Phaser.Tilemaps.Tilemap[], outward: boolean): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
     const ground = PROJECTION.ground;
-    if (ground.kind !== 'diamond' || !art?.face) return [];
-    const rise = Math.round(ground.height * WALL_RISE);
-    const south = registerWallFace(this, art.face, 'south', ground.width, ground.height, rise);
-    const east = registerWallFace(this, art.face, 'east', ground.width, ground.height, rise);
+    if (ground.kind !== 'diamond') return [];
+    const face = art?.face ?? (this.textures.exists(buildingArt(style, 'wall')) ? buildingArt(style, 'wall') : undefined);
+    if (!face) return [];
+    const wallMultiplier = style.includes('cathedral') ? 3.0 : 2.0;
+    const rise = Math.round(ground.height * wallMultiplier);
+    const south = registerWallFace(this, face, 'south', ground.width, ground.height, rise);
+    const east = registerWallFace(this, face, 'east', ground.width, ground.height, rise);
     if (!south || !east) return [];
     const wall = (x: number, y: number) => rows[y]?.[x] === Tile.Wall;
     const open = (x: number, y: number) => (rows[y]?.[x] === undefined ? outward : !wall(x, y));

@@ -441,7 +441,7 @@ const sanctumLayout: Layout = (map, c) => {
   clearArea(c - 28, c - 18, c - 4, c - 3);
 
   // The High Cathedral of the Bell, north of the Grand Plaza.
-  const cathLeft = c - 8;
+  const cathLeft = c - 9;
   const cathTop = c - 32;
   const cathedral = building(map, cathLeft, cathTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
   map.buildings.push(cathedral);
@@ -593,9 +593,9 @@ const sanctumLayout: Layout = (map, c) => {
 
 /** The Sanctum Arcanum's floor, in tiles, inside the walls. */
 export const ARCANUM_SIZE = { width: 10, height: 8 };
-export const CATHEDRAL_SIZE = { width: 16, height: 12 };
-export const SCRIPTORIUM_SIZE = { width: 12, height: 10 };
-export const INN_SIZE = { width: 12, height: 10 };
+export const CATHEDRAL_SIZE = { width: 18, height: 12 };
+export const SCRIPTORIUM_SIZE = { width: 14, height: 10 };
+export const INN_SIZE = { width: 14, height: 10 };
 
 /** The High Cathedral's furniture: altar, pews, braziers, lectern, and the locked crypt gate. */
 function furnishCathedral(map: RegionMap, fx: number, fy: number): void {

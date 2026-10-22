@@ -75,8 +75,8 @@ describe('kit houses on the server', () => {
       if (houses.length && houses.every((h) => h.status !== 'building')) break;
       await new Promise((r) => setTimeout(r, 50));
     }
-    // The Arcanum and the temple, both waiting for their looks to be painted.
-    expect(houses).toHaveLength(2);
+    // Every kit house in the region (Arcanum, Temple, Cathedral, Scriptorium, Inn), waiting for its look to be painted.
+    expect(houses).toHaveLength(5);
     expect(houses.find((h) => h.building === index)).toMatchObject({ status: 'failed' });
     for (const h of houses) expect(h.failed![0]).toMatch(/not painted yet/);
   });

@@ -13,7 +13,7 @@ All characters and creatures in co-MMO adhere to strict visual conventions:
 - **Lighting:** **Unlit flat shading (NO LIGHTING).** Every material facet uses a single flat base color with no specular highlights, no cast shadows, no gradients, and no ambient glow. Facets are delineated only by subtle seam boundaries.
 - **Palette:** Soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass).
 - **Camera:** Orthographic isometric 3/4 turntable projection.
-- **Background:** Solid pure flat magenta (`#FF00FF`) for lossless chroma-keying.
+- **Background:** Solid pure flat magenta (`#FF00FF`) for lossless chroma-keying (characters/creatures ONLY; environmental & architectural wall/floor textures must be 100% full-bleed seamless tiles without magenta backgrounds, see `docs/buildings-and-walls.md`).
 
 ### The Four Canonical Isometric Facings
 Characters never use 2D horizontal mirroring. Every character is modeled/painted across all four distinct isometric directions:

@@ -355,6 +355,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.textures.exists(id)) this.textures.remove(id);
     this.textures.addSpriteSheet(id, img, { frameWidth: entry.width / (entry.frames ?? WALK_FRAMES), frameHeight: entry.height });
     this.figures.delete(id);
+    this.figureMetrics.delete(id);
     this.makeWalk(id, entry);
     for (const a of avatars) {
       if (striding.has(a)) a.body.play(id);
@@ -514,22 +515,43 @@ export class WorldScene extends Phaser.Scene {
     const here = mine ? storeyAt(this.map, Math.floor(this.shown.x), Math.floor(this.shown.y), mine) : undefined;
     for (const [id, region] of this.drawn) {
       const current = id === this.welcome.region.def.id;
-      for (const o of region.objects) setShown(o, !under);
+      const groundDelta = Math.max(0, mine);
+      for (const o of region.objects) {
+        setShown(o, !under);
+        setDepthShade(o, groundDelta);
+      }
       for (const chunk of region.chunks.values()) {
         chunk.layer.setVisible(!under);
-        for (const o of chunk.objects) setShown(o, !under);
+        setDepthShade(chunk.layer, groundDelta);
+        for (const o of chunk.objects) {
+          setShown(o, !under);
+          setDepthShade(o, groundDelta);
+        }
       }
       for (const v of region.buildings) {
         const covered = Boolean(current && here && overlaps(here, v.building));
-        for (const o of [...v.outside, ...v.inside]) o.setVisible(!under && !covered);
+        for (const o of [...v.outside, ...v.inside]) {
+          o.setVisible(!under && !covered);
+          setDepthShade(o, groundDelta);
+        }
       }
-      for (const o of region.stairs) setShown(o, mine === 0);
+      for (const o of region.stairs) {
+        setShown(o, mine === 0);
+        setDepthShade(o, groundDelta);
+      }
       // Lamps burn only on their own floor, and those on the ground show from upstairs unless the floor we stand on covers them.
       for (const lamp of region.lamps) {
         const covered = Boolean(current && here && within(here, lamp.tile.x, lamp.tile.y));
         lamp.hidden = lamp.floor === mine ? false : !(mine > 0 && lamp.floor === 0 && !covered);
       }
-      for (const f of region.floors) for (const o of f.objects) setShown(o, current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open))));
+      for (const f of region.floors) {
+        const delta = mine - f.storey.floor;
+        const visible = current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open)) || (mine > f.storey.floor && !under));
+        for (const o of f.objects) {
+          setShown(o, visible);
+          setDepthShade(o, Math.max(0, delta));
+        }
+      }
     }
   }
 
@@ -652,6 +674,10 @@ export class WorldScene extends Phaser.Scene {
           const seen = sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }
+        const delta = Math.max(0, this.floor - (remote.floor ?? 0));
+        setDepthShade(remote.body, delta);
+        if (remote.held?.image) setDepthShade(remote.held.image, delta);
+        if (remote.offHeld?.image) setDepthShade(remote.offHeld.image, delta);
       }
     }
   }
@@ -736,6 +762,7 @@ export class WorldScene extends Phaser.Scene {
       if (a.body.anims.currentAnim?.key !== sheet || !a.body.anims.isPlaying) {
         a.body.play(sheet, true);
         this.fit(a, sheet, !!a.fit);
+        this.alignBaseline(a, sheet);
       }
       a.body.anims.timeScale = a.pace ?? 1;
       return;
@@ -746,6 +773,7 @@ export class WorldScene extends Phaser.Scene {
     else {
       a.body.setTexture(sheet, 0);
       this.fit(a, sheet, !!a.fit);
+      this.alignBaseline(a, sheet);
     }
   }
 
@@ -753,6 +781,7 @@ export class WorldScene extends Phaser.Scene {
   private dress(a: Avatar, key: string): void {
     a.body.setTexture(key);
     this.fit(a, key, true);
+    this.alignBaseline(a, key);
   }
 
   /**
@@ -768,9 +797,11 @@ export class WorldScene extends Phaser.Scene {
   /** Heights of the figures in textures (their first frame), see-through rows left out, by key. */
   private figures = new Map<string, number>();
 
-  /** How tall the figure in a texture's first frame is, in pixels, from its see-through edges. */
-  private figureHeight(key: string): number | undefined {
-    const known = this.figures.get(key);
+  /** Metrics of the figure in a texture's first frame, see-through edges left out. */
+  private figureMetrics = new Map<string, { height: number; originY: number }>();
+
+  private figureInfo(key: string): { height: number; originY: number } | undefined {
+    const known = this.figureMetrics.get(key);
     if (known !== undefined) return known;
     const frame = this.textures.getFrame(key, 0) ?? this.textures.getFrame(key);
     const image = frame?.source.image as CanvasImageSource | undefined;
@@ -790,9 +821,24 @@ export class WorldScene extends Phaser.Scene {
     let bottom = height - 1;
     while (top < height && !solid(top)) top++;
     while (bottom > top && !solid(bottom)) bottom--;
-    const figure = top < height ? bottom - top + 1 : height;
-    this.figures.set(key, figure);
-    return figure;
+    const figHeight = top < height ? bottom - top + 1 : height;
+    // Align ground contact (bottom) so the feet always rest on the shadow baseline
+    const originY = Math.min(1, Math.max(0, (bottom - Math.round(figHeight * 0.03)) / height));
+    const info = { height: figHeight, originY };
+    this.figureMetrics.set(key, info);
+    this.figures.set(key, figHeight);
+    return info;
+  }
+
+  /** How tall the figure in a texture's first frame is, in pixels, from its see-through edges. */
+  private figureHeight(key: string): number | undefined {
+    return this.figureInfo(key)?.height;
+  }
+
+  /** Aligns an avatar's vertical origin so its feet rest firmly on the ground shadow across all textures. */
+  private alignBaseline(a: Avatar, key: string): void {
+    const info = this.figureInfo(key);
+    if (info) a.body.setOrigin(0.5, info.originY);
   }
 
   /** A player's own painted look, or one of the two approved player looks. */
@@ -817,6 +863,7 @@ export class WorldScene extends Phaser.Scene {
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
     if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
     this.figures.delete(key);
+    this.figureMetrics.delete(key);
     for (const a of [...this.creatures.values(), ...this.bodies.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
       if (!a) continue;
       // A walk or standing picture of this look stays on until the walker turns or stops.
@@ -1236,14 +1283,26 @@ export class WorldScene extends Phaser.Scene {
     for (const s of map.stairways) {
       for (const floor of [s.lower, s.upper]) {
         const parts: Phaser.GameObjects.GameObject[] = [];
-        const art = floor === s.lower ? s.art?.up : s.art?.down;
+        const isUp = floor === s.lower;
+        const defaultArt = isUp ? (s.kind === 'ladder' ? 'ladder-up' : 'stairs-up') : (s.kind === 'ladder' ? 'ladder-down' : 'stairs-down');
+        const art = (isUp ? s.art?.up : s.art?.down) ?? defaultArt;
         const feet = PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
         const at = PROJECTION.toScreen(feet.x, feet.y);
         if (art && this.textures.exists(art)) {
           const img = this.add.image(at.x, at.y, art).setOrigin(0.5, 0.92);
           parts.push(img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1));
         }
-        const label = this.add.text(at.x, at.y - T * 0.6, stairsLabel(s, floor), { fontFamily: 'sans-serif', fontSize: '22px', color: '#fff6dc', stroke: '#1c1830', strokeThickness: 4 });
+        const arrow = isUp ? '▲' : '▼';
+        const label = this.add.text(at.x, at.y - T * 0.75, `${arrow} ${stairsLabel(s, floor)}`, {
+          fontFamily: 'sans-serif',
+          fontSize: '18px',
+          fontStyle: 'bold',
+          color: '#fff6dc',
+          stroke: '#1c1830',
+          strokeThickness: 4,
+          backgroundColor: '#1c1830ee',
+          padding: { x: 8, y: 4 },
+        });
         parts.push(label.setOrigin(0.5, 1).setDepth(LABEL_DEPTH - 2));
         const [tx, ty] = [s.x, s.y];
         if (floor) floorAt(floors, tx, ty, floor)?.objects.push(...parts);
@@ -1342,8 +1401,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
+    const key = this.textures.exists(texture) ? texture : fallback;
     const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = litFigure(this, this.add.sprite(0, 0, this.textures.exists(texture) ? texture : fallback).setOrigin(0.5, 0.97));
+    const body = litFigure(this, this.add.sprite(0, 0, key).setOrigin(0.5, 0.97));
     const label = this.add
       .text(0, 0, name, {
         fontFamily: 'Georgia, "Times New Roman", serif',
@@ -1353,7 +1413,9 @@ export class WorldScene extends Phaser.Scene {
         strokeThickness: Math.round(T / 24),
       })
       .setOrigin(0.5, 1);
-    return { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
+    const a: Avatar = { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
+    this.alignBaseline(a, key);
+    return a;
   }
 
   /** Places an avatar at (x, y) in our region, counted from its corner. */
@@ -1363,7 +1425,7 @@ export class WorldScene extends Phaser.Scene {
     a.at = { x, y };
     a.shadow.setPosition(px, py + T / 16);
     a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
-    const top = py + T / 10 - a.body.displayHeight;
+    const top = py + T / 10 - a.body.displayHeight * a.body.originY;
     a.label.setPosition(px, top - 4);
     if (a.bar) {
       a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
@@ -1573,6 +1635,28 @@ function overlaps(a: TileRect, b: { x: number; y: number; width: number; height:
 /** Shows or hides anything drawn that can be. */
 function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void {
   (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
+}
+
+/**
+ * Dims/darkens a game object when it belongs to a floor below the player's current floor.
+ * deltaFloors: player floor - object floor (e.g. 1 floor below -> 1, 2 floors below -> 2)
+ */
+function setDepthShade(o: Phaser.GameObjects.GameObject, deltaFloors: number): void {
+  const alphaObj = o as Partial<Phaser.GameObjects.Components.Alpha>;
+  const tintObj = o as Partial<Phaser.GameObjects.Components.Tint>;
+  if (deltaFloors <= 0) {
+    alphaObj.setAlpha?.(1.0);
+    tintObj.clearTint?.();
+    return;
+  }
+  // Darken and slightly cool-shift lower floors to create atmospheric aerial depth
+  const factor = deltaFloors === 1 ? 0.55 : 0.35;
+  const r = Math.round(255 * factor * 0.92);
+  const g = Math.round(255 * factor * 0.94);
+  const b = Math.round(255 * factor * 1.05);
+  const tint = (r << 16) | (g << 8) | b;
+  tintObj.setTint?.(tint);
+  alphaObj.setAlpha?.(deltaFloors === 1 ? 0.75 : 0.5);
 }
 
 /** True when tile (x, y) lies within a building's walls (or a floor's rectangle). */

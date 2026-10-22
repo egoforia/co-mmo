@@ -1576,5 +1576,29 @@
     "kind": "set-piece",
     "width": 128,
     "height": 128
+  },
+  "stairs-up": {
+    "file": "art/stairs-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-down": {
+    "file": "art/stairs-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "ladder-up": {
+    "file": "art/ladder-up.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 256
+  },
+  "ladder-down": {
+    "file": "art/ladder-down.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 160
   }
 }

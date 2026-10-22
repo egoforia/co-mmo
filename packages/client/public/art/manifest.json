@@ -1282,160 +1282,160 @@
   "bramble-ursine-attack-front-left": {
     "file": "art/bramble-ursine-attack-front-left.png",
     "kind": "walk",
-    "width": 2136,
-    "height": 219,
+    "width": 2784,
+    "height": 307,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "bramble-ursine-attack-front-right": {
     "file": "art/bramble-ursine-attack-front-right.png",
     "kind": "walk",
-    "width": 2136,
-    "height": 219,
+    "width": 2784,
+    "height": 307,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "bramble-ursine-attack-back-left": {
     "file": "art/bramble-ursine-attack-back-left.png",
     "kind": "walk",
-    "width": 2136,
-    "height": 219,
+    "width": 2784,
+    "height": 307,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "bramble-ursine-attack-back-right": {
     "file": "art/bramble-ursine-attack-back-right.png",
     "kind": "walk",
-    "width": 2136,
-    "height": 219,
+    "width": 2784,
+    "height": 307,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "tide-lutran-attack-front-left": {
     "file": "art/tide-lutran-attack-front-left.png",
     "kind": "walk",
-    "width": 2208,
-    "height": 225,
+    "width": 2856,
+    "height": 314,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "tide-lutran-attack-front-right": {
     "file": "art/tide-lutran-attack-front-right.png",
     "kind": "walk",
-    "width": 2208,
-    "height": 225,
+    "width": 2856,
+    "height": 314,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "tide-lutran-attack-back-left": {
     "file": "art/tide-lutran-attack-back-left.png",
     "kind": "walk",
-    "width": 2208,
-    "height": 225,
+    "width": 2856,
+    "height": 314,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "tide-lutran-attack-back-right": {
     "file": "art/tide-lutran-attack-back-right.png",
     "kind": "walk",
-    "width": 2208,
-    "height": 225,
+    "width": 2856,
+    "height": 314,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "zephyr-falcon-attack-front-left": {
     "file": "art/zephyr-falcon-attack-front-left.png",
     "kind": "walk",
-    "width": 2352,
-    "height": 216,
+    "width": 2616,
+    "height": 289,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "zephyr-falcon-attack-front-right": {
     "file": "art/zephyr-falcon-attack-front-right.png",
     "kind": "walk",
-    "width": 2352,
-    "height": 216,
+    "width": 2616,
+    "height": 289,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "zephyr-falcon-attack-back-left": {
     "file": "art/zephyr-falcon-attack-back-left.png",
     "kind": "walk",
-    "width": 2352,
-    "height": 216,
+    "width": 2616,
+    "height": 289,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "zephyr-falcon-attack-back-right": {
     "file": "art/zephyr-falcon-attack-back-right.png",
     "kind": "walk",
-    "width": 2352,
-    "height": 216,
+    "width": 2616,
+    "height": 289,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "dune-scorpid-attack-front-left": {
     "file": "art/dune-scorpid-attack-front-left.png",
     "kind": "walk",
-    "width": 2112,
-    "height": 197,
+    "width": 2424,
+    "height": 267,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "dune-scorpid-attack-front-right": {
     "file": "art/dune-scorpid-attack-front-right.png",
     "kind": "walk",
-    "width": 2112,
-    "height": 197,
+    "width": 2424,
+    "height": 267,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "dune-scorpid-attack-back-left": {
     "file": "art/dune-scorpid-attack-back-left.png",
     "kind": "walk",
-    "width": 2112,
-    "height": 197,
+    "width": 2424,
+    "height": 267,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "dune-scorpid-attack-back-right": {
     "file": "art/dune-scorpid-attack-back-right.png",
     "kind": "walk",
-    "width": 2112,
-    "height": 197,
+    "width": 2424,
+    "height": 267,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "sylvan-cervid-attack-front-left": {
     "file": "art/sylvan-cervid-attack-front-left.png",
     "kind": "walk",
-    "width": 2088,
-    "height": 196,
+    "width": 2424,
+    "height": 266,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "sylvan-cervid-attack-front-right": {
     "file": "art/sylvan-cervid-attack-front-right.png",
     "kind": "walk",
-    "width": 2088,
-    "height": 196,
+    "width": 2424,
+    "height": 266,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "sylvan-cervid-attack-back-left": {
     "file": "art/sylvan-cervid-attack-back-left.png",
     "kind": "walk",
-    "width": 2088,
-    "height": 196,
+    "width": 2424,
+    "height": 266,
     "frames": 12,
     "cycleSeconds": 0.8
   },
   "sylvan-cervid-attack-back-right": {
     "file": "art/sylvan-cervid-attack-back-right.png",
     "kind": "walk",
-    "width": 2088,
-    "height": 196,
+    "width": 2424,
+    "height": 266,
     "frames": 12,
     "cycleSeconds": 0.8
   }

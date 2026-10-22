@@ -32,13 +32,91 @@ const FRAMES_DIR = resolve(DATA_ATTACKS_DIR, 'raw_frames');
 const FRAMES_OUT_DIR = resolve(DATA_ATTACKS_DIR, 'frames');
 
 // Cell bounds inside the 720x1280 video:
-// 5 rows (256px each), 4 columns (134.4px each with 91.2px left margin)
+// 5 rows (256px each), 4 spacious columns with ample padding:
+// Col 0: [0, 180), Col 1: [180, 360), Col 2: [360, 528), Col 3: [528, 720)
+const COL_BOXES = [
+  { left: 0, width: 180 },
+  { left: 180, width: 180 },
+  { left: 360, width: 168 },
+  { left: 528, width: 192 },
+];
+
 function getCellBox(r: number, c: number) {
-  const left = Math.round(91.2 + c * 134.4);
-  const width = Math.round(134.4);
-  const top = r * 256;
-  const height = 256;
-  return { left, top, width, height };
+  const col = COL_BOXES[c]!;
+  return { left: col.left, top: r * 256, width: col.width, height: 256 };
+}
+
+/**
+ * Connected-component segmentation to isolate the character and reject
+ * any disconnected fragments or thin artifact whiskers touching the cell boundaries.
+ */
+async function isolateCharacterShape(pngBuf: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(pngBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const w = info.width, h = info.height;
+  const cleanData = Buffer.from(data);
+
+  // Prune any thin artifact whiskers directly touching the lateral borders
+  for (let y = 0; y < h; y++) {
+    if ((cleanData[(y * w + 0) * 4 + 3] ?? 0) > 40) {
+      for (let x = 0; x < 6; x++) {
+        cleanData[(y * w + x) * 4 + 3] = 0;
+      }
+    }
+    if ((cleanData[(y * w + (w - 1)) * 4 + 3] ?? 0) > 40) {
+      for (let x = Math.max(0, w - 6); x < w; x++) {
+        cleanData[(y * w + x) * 4 + 3] = 0;
+      }
+    }
+  }
+
+  const label = new Int32Array(w * h).fill(-1);
+  const components: { pixels: number[]; touchesLeft: boolean; touchesRight: boolean }[] = [];
+
+  for (let start = 0; start < w * h; start++) {
+    if (label[start] !== -1 || (cleanData[start * 4 + 3] ?? 0) <= 40) continue;
+    const pixels = [start];
+    label[start] = components.length;
+    let touchesLeft = (start % w) === 0;
+    let touchesRight = (start % w) === w - 1;
+
+    for (let k = 0; k < pixels.length; k++) {
+      const idx = pixels[k]!;
+      const x = idx % w, y = Math.floor(idx / w);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const n = ny * w + nx;
+          if (label[n] !== -1 || (cleanData[n * 4 + 3] ?? 0) <= 40) continue;
+          label[n] = components.length;
+          pixels.push(n);
+          if (nx === 0) touchesLeft = true;
+          if (nx === w - 1) touchesRight = true;
+        }
+      }
+    }
+    components.push({ pixels, touchesLeft, touchesRight });
+  }
+
+  if (components.length <= 1) {
+    return sharp(cleanData, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+  }
+
+  // Largest component is the main figure
+  components.sort((a, b) => b.pixels.length - a.pixels.length);
+  const mainSize = components[0]!.pixels.length;
+
+  // Filter out any disconnected components touching borders or specks smaller than 35% of main body
+  for (let i = 1; i < components.length; i++) {
+    const comp = components[i]!;
+    if ((comp.touchesLeft || comp.touchesRight) && comp.pixels.length < mainSize * 0.35) {
+      for (const p of comp.pixels) {
+        cleanData[p * 4 + 3] = 0;
+      }
+    }
+  }
+
+  return sharp(cleanData, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
 }
 
 async function main() {
@@ -60,9 +138,9 @@ async function main() {
   const clientManifestPath = resolve(clientArtDir, 'manifest.json');
   const clientManifest = JSON.parse(await readFile(clientManifestPath, 'utf8').catch(() => '{}'));
 
-  // 12-frame single attack cycle: Neutral (6) -> Anticipation (8-12) -> Impact (14-15) -> Follow-through (17-21) -> Recovery to Neutral (24-30)
-  // 24 video frames at 30 fps = 0.8s duration
-  const frameIndices = [6, 8, 10, 12, 14, 15, 17, 19, 21, 24, 27, 30];
+  // 12-frame single attack cycle with seamless looping:
+  // Neutral (5) -> Anticipation (7-13) -> Snap Impact (15) -> Follow-through (17-19) -> Recovery to Neutral (21-27)
+  const frameIndices = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27];
   console.log(`Using ${frameIndices.length} frames per attack cycle: [${frameIndices.join(', ')}]`);
 
   const allNormalizedStrips: { charId: string; way: IsoWay; stripBuf: Buffer; width: number; height: number }[] = [];
@@ -84,7 +162,8 @@ async function main() {
 
         const crop = await sharp(framePath).extract(box).png().toBuffer();
         const { png } = await removeKeyBackground(crop, 80, { holes: true });
-        const clean = await removeKeySpill(png);
+        const cleanSpill = await removeKeySpill(png);
+        const clean = await isolateCharacterShape(cleanSpill);
         wayFrames.push(clean);
       }
       directionsFrames.push(wayFrames);

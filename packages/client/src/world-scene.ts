@@ -76,6 +76,8 @@ interface Avatar {
   worn: Facing;
   /** Where it was last placed, in our region's tiles. */
   at?: { x: number; y: number };
+  /** The floor it is on (floors.ts), when not the ground. */
+  floor?: number;
   /** Its size on screen when it wears its own picture. */
   scale: number;
   /**
@@ -523,7 +525,7 @@ export class WorldScene extends Phaser.Scene {
         const covered = Boolean(current && here && within(here, lamp.tile.x, lamp.tile.y));
         lamp.hidden = lamp.floor === mine ? false : !(mine > 0 && lamp.floor === 0 && !covered);
       }
-      for (const f of region.floors) for (const o of f.objects) setShown(o, current && f.storey.floor === mine);
+      for (const f of region.floors) for (const o of f.objects) setShown(o, current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open))));
     }
   }
 
@@ -637,8 +639,12 @@ export class WorldScene extends Phaser.Scene {
         const step = was && (screen.dx || screen.dy) ? { dx: pos.x - was.x, dy: pos.y - was.y } : { dx: 0, dy: 0 };
         this.walk(remote, step, screen);
         // People indoors stay out of sight until we come close enough to see in.
+        // Upstairs on open balconies, terraces or rooftops they remain visible.
         if (group === this.remotes || group === this.npcs) {
-          const seen = !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
+          const floor = remote.floor ?? 0;
+          const sameIndoor = floor !== 0 && floor === this.floor;
+          const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && (s.open || !this.map.buildings.some((b) => within(b, s.x, s.y))) && within(s, Math.floor(this.origin.x + pos.x), Math.floor(this.origin.y + pos.y)));
+          const seen = sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }
       }
@@ -918,7 +924,7 @@ export class WorldScene extends Phaser.Scene {
     a.bar.fill.setFillStyle(health > 0.5 ? 0x63c74d : health > 0.25 ? 0xfeae34 : 0xf6757a);
   }
 
-  private sync<E extends { id: string; x: number; y: number; health?: number }>(
+  private sync<E extends { id: string; x: number; y: number; health?: number; floor?: number }>(
     group: Map<string, Remote>,
     entities: E[],
     now: number,
@@ -932,6 +938,7 @@ export class WorldScene extends Phaser.Scene {
         remote = { ...make(entity), interp: new Interpolator() };
         group.set(entity.id, remote);
       }
+      remote.floor = entity.floor ?? 0;
       remote.interp.push(now, entity.x, entity.y);
       if (entity.health !== undefined) this.setHealth(remote, entity.health);
     }

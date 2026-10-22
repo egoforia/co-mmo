@@ -1,6 +1,7 @@
 import {
   MAX_CHAT_LENGTH,
   SAY_RADIUS,
+  canSeeAcrossFloors,
   type ChatChannel,
   type ChatMessage,
 } from '@co-mmo/shared';
@@ -39,7 +40,7 @@ export class Chat {
       return;
     }
     for (const p of this.s.players.values()) {
-      if (p.floor === from.floor && Math.hypot(p.x - from.x, p.y - from.y) <= SAY_RADIUS) p.conn.send(message);
+      if (canSeeAcrossFloors(this.s.map, from, p) && Math.hypot(p.x - from.x, p.y - from.y) <= SAY_RADIUS) p.conn.send(message);
     }
   }
 }

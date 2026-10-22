@@ -5,6 +5,7 @@ import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
 import { applyEdits, type WorldEdit } from './world-edits.ts';
 import type { Stairway, Storey } from './floors.ts';
+import { addStairs, addStorey, setOn } from './floors.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -444,6 +445,30 @@ const sanctumLayout: Layout = (map, c) => {
   map.buildings.push(cathedral);
   furnishCathedral(map, cathLeft + 1, cathTop + 1);
 
+  // Cathedral Floor 1: The Choir Loft.
+  addStorey(map, cathedral, 1, cathedral.style);
+  addStairs(map, {
+    kind: 'stairs',
+    x: cathLeft + 2,
+    y: cathTop + 5,
+    width: 2,
+    height: 1,
+    from: 0,
+    names: { lower: 'Cathedral Nave', upper: 'Choir Loft' },
+  });
+
+  // Cathedral Floor 2: The High Belfry open rooftop and bell tower.
+  addStorey(map, { x: cathLeft + 3, y: cathTop + 2, width: 10, height: 8 }, 2, cathedral.style, undefined, true);
+  addStairs(map, {
+    kind: 'ladder',
+    x: cathLeft + 11,
+    y: cathTop + 5,
+    width: 1,
+    height: 1,
+    from: 1,
+    names: { lower: 'Choir Loft', upper: 'High Belfry' },
+  });
+
   // The Clerics' Scriptorium, east of the Cathedral.
   const scripLeft = c + 14;
   const scripTop = c - 32;
@@ -451,12 +476,40 @@ const sanctumLayout: Layout = (map, c) => {
   map.buildings.push(scriptorium);
   furnishScriptorium(map, scripLeft + 1, scripTop + 1);
 
+  // Scriptorium Floor 1: Upper Archive & West Observation Terrace overlooking Cathedral Avenue.
+  addStorey(map, { x: scripLeft - 2, y: scripTop, width: scriptorium.width + 2, height: scriptorium.height }, 1, scriptorium.style, undefined, true);
+  setOn(map, 1, scripLeft, scripTop + 5, Tile.Door);
+  setOn(map, 1, scripLeft - 1, scripTop + 5, Tile.Floor);
+  addStairs(map, {
+    kind: 'stairs',
+    x: scripLeft + 6,
+    y: scripTop + 5,
+    width: 2,
+    height: 1,
+    from: 0,
+    names: { lower: 'Scriptorium Hall', upper: 'Upper Archive' },
+  });
+
   // The Pilgrim's Haven Inn, west of the Grand Plaza.
   const innLeft = c - 26;
   const innTop = c - 16;
   const inn = building(map, innLeft, innTop, INN_SIZE.width, INN_SIZE.height, 'sanctum-inn');
   map.buildings.push(inn);
   furnishInn(map, innLeft + 1, innTop + 1);
+
+  // Pilgrim's Haven Floor 1: Guest Quarters with overhanging balcony facing south onto the street.
+  addStorey(map, { x: innLeft, y: innTop, width: inn.width, height: inn.height + 2 }, 1, inn.style);
+  setOn(map, 1, inn.door.x, innTop + 9, Tile.Door);
+  setOn(map, 1, inn.door.x, innTop + 10, Tile.Floor);
+  addStairs(map, {
+    kind: 'stairs',
+    x: innLeft + 7,
+    y: innTop + 7,
+    width: 2,
+    height: 1,
+    from: 0,
+    names: { lower: 'Tavern Common Room', upper: 'Guest Rooms' },
+  });
 
   // The Cathedral Avenue connecting the Grand Plaza to the Cathedral bronze doors.
   road(map, c - 1, c - 18, c - 1, c - 7);

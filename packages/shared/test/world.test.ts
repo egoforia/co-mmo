@@ -23,6 +23,8 @@ import {
   exteriorSpan,
   furnitureArt,
   isBlocking,
+  floorChecks,
+  canSeeAcrossFloors,
   nearBuilding,
   outsideSide,
   step,
@@ -278,6 +280,28 @@ describe('the Sanctum City District', () => {
       expect(npc).toBeDefined();
       expect(seen[Math.floor(npc!.y) * sanctum.width + Math.floor(npc!.x)], id).toBe(1);
     }
+  });
+
+  it('has valid storeys, stairs, and cross-floor vision between streets and balconies', () => {
+    expect(floorChecks(sanctum)).toEqual([]);
+    expect(sanctum.storeys.length).toBeGreaterThanOrEqual(4);
+    expect(sanctum.stairways.length).toBeGreaterThanOrEqual(4);
+
+    // Street outside inn and south overhanging balcony
+    const street = { x: inn.door.x, y: inn.door.y + 4, floor: 0 };
+    const balcony = { x: inn.door.x, y: inn.door.y + 1, floor: 1 };
+    expect(canSeeAcrossFloors(sanctum, street, balcony)).toBe(true);
+    expect(canSeeAcrossFloors(sanctum, balcony, street)).toBe(true);
+
+    // Street in Cathedral Avenue and High Belfry open rooftop
+    const avenue = { x: cathedral.door.x, y: cathedral.door.y + 4, floor: 0 };
+    const belfry = { x: cathedral.door.x, y: cathedral.door.y - 7, floor: 2 };
+    expect(canSeeAcrossFloors(sanctum, avenue, belfry)).toBe(true);
+
+    // Someone inside ground room cannot see upstairs enclosed room across floors
+    const insideGround = { x: inn.x + 2, y: inn.y + 2, floor: 0 };
+    const upstairsEnclosed = { x: inn.x + 2, y: inn.y + 2, floor: 1 };
+    expect(canSeeAcrossFloors(sanctum, insideGround, upstairsEnclosed)).toBe(false);
   });
 });
 

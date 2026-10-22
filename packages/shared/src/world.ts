@@ -421,6 +421,62 @@ const sanctumLayout: Layout = (map, c) => {
   const lane = shop.y + shop.height + 1;
   road(map, c, lane, shop.door.x, shop.door.y + 1);
   furnishArcanum(map, left + 1, top + 1);
+
+  // The Holy City District of the Sanctum
+  // Clear noise water and trees from the city quarters so buildings and streets are open.
+  const clearArea = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const t = map.tiles[y * map.width + x];
+      if (t === Tile.Water || t === Tile.Tree) set(map, x, y, Tile.Ground);
+    }
+  };
+  // Cathedral, avenue and graveyard:
+  clearArea(c - 28, c - 34, c + 2, c - 18);
+  // Scriptorium and lane:
+  clearArea(c + 12, c - 34, c + 28, c - 19);
+  // Inn and street:
+  clearArea(c - 28, c - 18, c - 12, c - 3);
+
+  // The High Cathedral of the Bell, north of the Grand Plaza.
+  const cathLeft = c - 8;
+  const cathTop = c - 32;
+  const cathedral = building(map, cathLeft, cathTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
+  map.buildings.push(cathedral);
+  furnishCathedral(map, cathLeft + 1, cathTop + 1);
+
+  // The Clerics' Scriptorium, east of the Cathedral.
+  const scripLeft = c + 14;
+  const scripTop = c - 32;
+  const scriptorium = building(map, scripLeft, scripTop, SCRIPTORIUM_SIZE.width, SCRIPTORIUM_SIZE.height, 'sanctum-scriptorium');
+  map.buildings.push(scriptorium);
+  furnishScriptorium(map, scripLeft + 1, scripTop + 1);
+
+  // The Pilgrim's Haven Inn, west of the Grand Plaza.
+  const innLeft = c - 26;
+  const innTop = c - 16;
+  const inn = building(map, innLeft, innTop, INN_SIZE.width, INN_SIZE.height, 'sanctum-inn');
+  map.buildings.push(inn);
+  furnishInn(map, innLeft + 1, innTop + 1);
+
+  // The Cathedral Avenue connecting the Grand Plaza to the Cathedral bronze doors.
+  road(map, c - 1, c - 18, c - 1, c - 7);
+  road(map, c, c - 18, c, c - 7);
+  road(map, c + 1, c - 18, c + 1, c - 7);
+
+  // Connecting streets to the Scriptorium, Inn, and Graveyard.
+  road(map, c + 1, c - 20, scriptorium.door.x, scriptorium.door.y + 1);
+  road(map, inn.door.x, inn.door.y + 1, c - 7, inn.door.y + 1);
+  road(map, c - 18, c - 26, c - 1, c - 26);
+
+  // The Cathedral Graveyard: ancient crypt stones and weeping ground.
+  map.landmarks.push({ asset: 'sanctum-standing-stones', x: c - 20, y: c - 29, footprint: { width: 4, height: 2 } });
+
+  // The City's Clerics and Citizens.
+  map.npcs.push({ id: 'high-priest-cassian', name: 'High Priest Cassian', asset: 'sanctum-pilgrim', x: c, y: c - 27.5 });
+  map.npcs.push({ id: 'brother-paul', name: 'Brother Paul', asset: 'sanctum-pilgrim', x: c + 19.5, y: c - 27.5 });
+  map.npcs.push({ id: 'mother-elena', name: 'Mother Elena', asset: 'sanctum-pilgrim', x: c - 18.5, y: c - 14.5 });
+  map.npcs.push({ id: 'gravedigger-joshua', name: 'Gravedigger Joshua', asset: 'sanctum-pilgrim', x: c - 18, y: c - 26.5 });
+
   map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
   map.npcs.push({ id: 'bramble-ursine-npc', name: 'Bramble Ursine', asset: 'bramble-ursine', x: c - 3.5, y: c - 2.0 });
   map.npcs.push({ id: 'tide-lutran-npc', name: 'Tide Lutran', asset: 'tide-lutran', x: c + 4.0, y: c - 1.5 });
@@ -432,6 +488,49 @@ const sanctumLayout: Layout = (map, c) => {
 
 /** The Sanctum Arcanum's floor, in tiles, inside the walls. */
 export const ARCANUM_SIZE = { width: 10, height: 8 };
+export const CATHEDRAL_SIZE = { width: 16, height: 12 };
+export const SCRIPTORIUM_SIZE = { width: 12, height: 10 };
+export const INN_SIZE = { width: 12, height: 10 };
+
+/** The High Cathedral's furniture: altar, pews, braziers, lectern, and the locked crypt gate. */
+function furnishCathedral(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-cathedral', fx, fy);
+  put('high-altar', 8, 2, 4, 1);
+  put('brazier', 3, 2, 1, 1);
+  put('brazier', 13, 2, 1, 1);
+  put('crypt-gate', 14.5, 3, 2, 1);
+  put('lectern', 12, 4, 1.5, 1);
+  put('gold-pew', 3.5, 6, 3, 1);
+  put('gold-pew', 3.5, 9, 3, 1);
+  put('gold-pew', 12.5, 6, 3, 1);
+  put('gold-pew', 12.5, 9, 3, 1);
+}
+
+/** The Scriptorium's furniture: desks, tall bookshelves, reading lecterns, and relic display. */
+function furnishScriptorium(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-scriptorium', fx, fy);
+  put('tall-bookshelf', 1.5, 1, 2, 1);
+  put('tall-bookshelf', 4, 1, 2, 1);
+  put('relic-case', 8, 1, 2, 1);
+  put('tall-bookshelf', 10.5, 1, 2, 1);
+  put('scribe-desk', 2, 4, 2, 1);
+  put('scribe-desk', 10, 4, 2, 1);
+  put('reading-lectern', 2, 7, 1.5, 1);
+  put('tall-bookshelf', 10.5, 7, 2, 1);
+}
+
+/** The Pilgrim's Haven Inn furniture: hearth, counter, ale casks, dining tables, and benches. */
+function furnishInn(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-inn', fx, fy);
+  put('hearth', 2, 1, 3, 1);
+  put('bar-counter', 7.5, 2, 3, 1);
+  put('ale-cask', 10.5, 1, 1, 1);
+  put('dining-table', 2.5, 5, 2.6, 1);
+  put('bench', 2.5, 6.5, 2, 1);
+  put('dining-table', 2.5, 8.5, 2.6, 1);
+  put('dining-table', 9.5, 5, 2.6, 1);
+  put('bench', 9.5, 6.5, 2, 1);
+}
 
 /** The Arcanum's furniture, placed as landmarks from the floor's top-left tile, leaving a way in from the door. */
 function furnishArcanum(map: RegionMap, fx: number, fy: number): void {

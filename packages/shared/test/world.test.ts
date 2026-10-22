@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ARCANUM_SIZE,
   BUILDING_STYLES,
+  CATHEDRAL_SIZE,
   COTTAGE_SIZE,
+  INN_SIZE,
   OPPOSITE,
   PLAYER_SPEED,
   REVEAL_REACH,
+  SCRIPTORIUM_SIZE,
   TICK_SECONDS,
   Tile,
   WORLD_REGIONS,
@@ -237,6 +240,44 @@ describe('the Sanctum Arcanum', () => {
     expect(art.left + art.width / 2).toBe(shop.door.x + 1);
     expect(art.left).toBeLessThanOrEqual(shop.x);
     expect(art.left + art.width).toBeGreaterThanOrEqual(shop.x + shop.width);
+  });
+});
+
+describe('the Sanctum City District', () => {
+  const cathedral = sanctum.buildings.find((b) => b.style === 'sanctum-cathedral')!;
+  const scriptorium = sanctum.buildings.find((b) => b.style === 'sanctum-scriptorium')!;
+  const inn = sanctum.buildings.find((b) => b.style === 'sanctum-inn')!;
+
+  it('stands walled in the city quarter with clear dimensions', () => {
+    expect(cathedral).toMatchObject({ width: CATHEDRAL_SIZE.width + 2, height: CATHEDRAL_SIZE.height + 2 });
+    expect(scriptorium).toMatchObject({ width: SCRIPTORIUM_SIZE.width + 2, height: SCRIPTORIUM_SIZE.height + 2 });
+    expect(inn).toMatchObject({ width: INN_SIZE.width + 2, height: INN_SIZE.height + 2 });
+  });
+
+  it('every city building is furnished and walkable from the Grand Plaza', () => {
+    const seen = reachable(sanctum, sanctum.spawn);
+    for (const b of [cathedral, scriptorium, inn]) {
+      const style = BUILDING_STYLES[b.style]!;
+      const furniture = sanctum.landmarks.filter((l) => l.asset.startsWith(`${style.id}-furniture-`));
+      expect(furniture.length).toBeGreaterThanOrEqual(3);
+      for (const f of furniture) {
+        expect(f.x).toBeGreaterThan(b.x + 1);
+        expect(f.x).toBeLessThan(b.x + b.width - 1);
+        expect(f.y).toBeGreaterThan(b.y + 1);
+        expect(f.y).toBeLessThan(b.y + b.height);
+      }
+      expect(seen[b.door.y * sanctum.width + b.door.x]).toBe(1);
+    }
+  });
+
+  it('houses the city clerics, innkeeper, and gravedigger at their posts', () => {
+    const seen = reachable(sanctum, sanctum.spawn);
+    const people = ['high-priest-cassian', 'brother-paul', 'mother-elena', 'gravedigger-joshua'];
+    for (const id of people) {
+      const npc = sanctum.npcs.find((n) => n.id === id);
+      expect(npc).toBeDefined();
+      expect(seen[Math.floor(npc!.y) * sanctum.width + Math.floor(npc!.x)], id).toBe(1);
+    }
   });
 });
 

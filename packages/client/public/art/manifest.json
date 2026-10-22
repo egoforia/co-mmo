@@ -963,7 +963,7 @@
     "file": "art/bramble-ursine-walk-front-left.png",
     "kind": "walk",
     "width": 1656,
-    "height": 218,
+    "height": 185,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -971,7 +971,7 @@
     "file": "art/bramble-ursine-walk-front-right.png",
     "kind": "walk",
     "width": 1656,
-    "height": 218,
+    "height": 185,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -979,7 +979,7 @@
     "file": "art/bramble-ursine-walk-back-left.png",
     "kind": "walk",
     "width": 1656,
-    "height": 218,
+    "height": 185,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -987,7 +987,7 @@
     "file": "art/bramble-ursine-walk-back-right.png",
     "kind": "walk",
     "width": 1656,
-    "height": 218,
+    "height": 185,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -995,7 +995,7 @@
     "file": "art/tide-lutran-walk-front-left.png",
     "kind": "walk",
     "width": 2232,
-    "height": 223,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1003,7 +1003,7 @@
     "file": "art/tide-lutran-walk-front-right.png",
     "kind": "walk",
     "width": 2232,
-    "height": 223,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1011,7 +1011,7 @@
     "file": "art/tide-lutran-walk-back-left.png",
     "kind": "walk",
     "width": 2232,
-    "height": 223,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1019,7 +1019,7 @@
     "file": "art/tide-lutran-walk-back-right.png",
     "kind": "walk",
     "width": 2232,
-    "height": 223,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1027,7 +1027,7 @@
     "file": "art/zephyr-falcon-walk-front-left.png",
     "kind": "walk",
     "width": 1680,
-    "height": 207,
+    "height": 187,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1035,7 +1035,7 @@
     "file": "art/zephyr-falcon-walk-front-right.png",
     "kind": "walk",
     "width": 1680,
-    "height": 207,
+    "height": 187,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1043,7 +1043,7 @@
     "file": "art/zephyr-falcon-walk-back-left.png",
     "kind": "walk",
     "width": 1680,
-    "height": 207,
+    "height": 187,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1051,7 +1051,7 @@
     "file": "art/zephyr-falcon-walk-back-right.png",
     "kind": "walk",
     "width": 1680,
-    "height": 207,
+    "height": 187,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1059,7 +1059,7 @@
     "file": "art/dune-scorpid-walk-front-left.png",
     "kind": "walk",
     "width": 1440,
-    "height": 199,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1067,7 +1067,7 @@
     "file": "art/dune-scorpid-walk-front-right.png",
     "kind": "walk",
     "width": 1440,
-    "height": 199,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1075,7 +1075,7 @@
     "file": "art/dune-scorpid-walk-back-left.png",
     "kind": "walk",
     "width": 1440,
-    "height": 199,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1083,7 +1083,7 @@
     "file": "art/dune-scorpid-walk-back-right.png",
     "kind": "walk",
     "width": 1440,
-    "height": 199,
+    "height": 184,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1091,7 +1091,7 @@
     "file": "art/sylvan-cervid-walk-front-left.png",
     "kind": "walk",
     "width": 1536,
-    "height": 196,
+    "height": 181,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1099,7 +1099,7 @@
     "file": "art/sylvan-cervid-walk-front-right.png",
     "kind": "walk",
     "width": 1536,
-    "height": 196,
+    "height": 181,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1107,7 +1107,7 @@
     "file": "art/sylvan-cervid-walk-back-left.png",
     "kind": "walk",
     "width": 1536,
-    "height": 196,
+    "height": 181,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1115,7 +1115,7 @@
     "file": "art/sylvan-cervid-walk-back-right.png",
     "kind": "walk",
     "width": 1536,
-    "height": 196,
+    "height": 181,
     "frames": 12,
     "cycleSeconds": 0.9
   },
@@ -1123,7 +1123,7 @@
     "file": "art/bramble-ursine-run-front-left.png",
     "kind": "walk",
     "width": 1520,
-    "height": 219,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1131,7 +1131,7 @@
     "file": "art/bramble-ursine-run-front-right.png",
     "kind": "walk",
     "width": 1520,
-    "height": 219,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1139,7 +1139,7 @@
     "file": "art/bramble-ursine-run-back-left.png",
     "kind": "walk",
     "width": 1520,
-    "height": 219,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1147,7 +1147,7 @@
     "file": "art/bramble-ursine-run-back-right.png",
     "kind": "walk",
     "width": 1520,
-    "height": 219,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1155,7 +1155,7 @@
     "file": "art/tide-lutran-run-front-left.png",
     "kind": "walk",
     "width": 1740,
-    "height": 225,
+    "height": 186,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1163,7 +1163,7 @@
     "file": "art/tide-lutran-run-front-right.png",
     "kind": "walk",
     "width": 1740,
-    "height": 225,
+    "height": 186,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1171,7 +1171,7 @@
     "file": "art/tide-lutran-run-back-left.png",
     "kind": "walk",
     "width": 1740,
-    "height": 225,
+    "height": 186,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1179,7 +1179,7 @@
     "file": "art/tide-lutran-run-back-right.png",
     "kind": "walk",
     "width": 1740,
-    "height": 225,
+    "height": 186,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1187,7 +1187,7 @@
     "file": "art/zephyr-falcon-run-front-left.png",
     "kind": "walk",
     "width": 1560,
-    "height": 216,
+    "height": 191,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1195,7 +1195,7 @@
     "file": "art/zephyr-falcon-run-front-right.png",
     "kind": "walk",
     "width": 1560,
-    "height": 216,
+    "height": 191,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1203,7 +1203,7 @@
     "file": "art/zephyr-falcon-run-back-left.png",
     "kind": "walk",
     "width": 1560,
-    "height": 216,
+    "height": 191,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1211,7 +1211,7 @@
     "file": "art/zephyr-falcon-run-back-right.png",
     "kind": "walk",
     "width": 1560,
-    "height": 216,
+    "height": 191,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1219,7 +1219,7 @@
     "file": "art/dune-scorpid-run-front-left.png",
     "kind": "walk",
     "width": 1480,
-    "height": 201,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1227,7 +1227,7 @@
     "file": "art/dune-scorpid-run-front-right.png",
     "kind": "walk",
     "width": 1480,
-    "height": 201,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1235,7 +1235,7 @@
     "file": "art/dune-scorpid-run-back-left.png",
     "kind": "walk",
     "width": 1480,
-    "height": 201,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1243,7 +1243,7 @@
     "file": "art/dune-scorpid-run-back-right.png",
     "kind": "walk",
     "width": 1480,
-    "height": 201,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1251,7 +1251,7 @@
     "file": "art/sylvan-cervid-run-front-left.png",
     "kind": "walk",
     "width": 1340,
-    "height": 200,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1259,7 +1259,7 @@
     "file": "art/sylvan-cervid-run-front-right.png",
     "kind": "walk",
     "width": 1340,
-    "height": 200,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1267,7 +1267,7 @@
     "file": "art/sylvan-cervid-run-back-left.png",
     "kind": "walk",
     "width": 1340,
-    "height": 200,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1275,7 +1275,7 @@
     "file": "art/sylvan-cervid-run-back-right.png",
     "kind": "walk",
     "width": 1340,
-    "height": 200,
+    "height": 184,
     "frames": 10,
     "cycleSeconds": 0.67
   },
@@ -1283,7 +1283,7 @@
     "file": "art/bramble-ursine-attack-front-left.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 176,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1291,7 +1291,7 @@
     "file": "art/bramble-ursine-attack-front-right.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 176,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1299,7 +1299,7 @@
     "file": "art/bramble-ursine-attack-back-left.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 176,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1307,7 +1307,7 @@
     "file": "art/bramble-ursine-attack-back-right.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 176,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1315,7 +1315,7 @@
     "file": "art/tide-lutran-attack-front-left.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 177,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1323,7 +1323,7 @@
     "file": "art/tide-lutran-attack-front-right.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 177,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1331,7 +1331,7 @@
     "file": "art/tide-lutran-attack-back-left.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 177,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1339,7 +1339,7 @@
     "file": "art/tide-lutran-attack-back-right.png",
     "kind": "walk",
     "width": 3000,
-    "height": 249,
+    "height": 177,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1347,7 +1347,7 @@
     "file": "art/zephyr-falcon-attack-front-left.png",
     "kind": "walk",
     "width": 2976,
-    "height": 247,
+    "height": 175,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1355,7 +1355,7 @@
     "file": "art/zephyr-falcon-attack-front-right.png",
     "kind": "walk",
     "width": 2976,
-    "height": 247,
+    "height": 175,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1363,7 +1363,7 @@
     "file": "art/zephyr-falcon-attack-back-left.png",
     "kind": "walk",
     "width": 2976,
-    "height": 247,
+    "height": 175,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1371,7 +1371,7 @@
     "file": "art/zephyr-falcon-attack-back-right.png",
     "kind": "walk",
     "width": 2976,
-    "height": 247,
+    "height": 175,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1379,7 +1379,7 @@
     "file": "art/dune-scorpid-attack-front-left.png",
     "kind": "walk",
     "width": 2952,
-    "height": 245,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1387,7 +1387,7 @@
     "file": "art/dune-scorpid-attack-front-right.png",
     "kind": "walk",
     "width": 2952,
-    "height": 245,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1395,7 +1395,7 @@
     "file": "art/dune-scorpid-attack-back-left.png",
     "kind": "walk",
     "width": 2952,
-    "height": 245,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1403,7 +1403,7 @@
     "file": "art/dune-scorpid-attack-back-right.png",
     "kind": "walk",
     "width": 2952,
-    "height": 245,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1411,7 +1411,7 @@
     "file": "art/sylvan-cervid-attack-front-left.png",
     "kind": "walk",
     "width": 3000,
-    "height": 248,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1419,7 +1419,7 @@
     "file": "art/sylvan-cervid-attack-front-right.png",
     "kind": "walk",
     "width": 3000,
-    "height": 248,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1427,7 +1427,7 @@
     "file": "art/sylvan-cervid-attack-back-left.png",
     "kind": "walk",
     "width": 3000,
-    "height": 248,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1435,7 +1435,7 @@
     "file": "art/sylvan-cervid-attack-back-right.png",
     "kind": "walk",
     "width": 3000,
-    "height": 248,
+    "height": 174,
     "frames": 12,
     "cycleSeconds": 0.8
   },

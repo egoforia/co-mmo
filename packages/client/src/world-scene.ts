@@ -63,6 +63,7 @@ import { HouseArt, standHouse, type HouseSource } from './kit-house-view.ts';
 import { shadePictures } from './normal-maps.ts';
 import { dropLight, lightScene, litFigure, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
 import { SkyClock } from './sky.ts';
+import { setCoords } from './ui.ts';
 
 interface Avatar {
   body: Phaser.GameObjects.Sprite;
@@ -433,6 +434,9 @@ export class WorldScene extends Phaser.Scene {
     cam.setZoom(cameraZoom());
     cam.setRoundPixels(true);
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
+    setCoords({ x: this.shown.x, y: this.shown.y, floor: this.floor });
+    this.events.once('shutdown', () => setCoords(undefined));
+    this.events.once('destroy', () => setCoords(undefined));
     this.revealBuildings(true);
     cam.startFollow(this.me.body, true, 0.2, 0.2);
     cam.fadeIn(250, 24, 20, 37);
@@ -620,6 +624,7 @@ export class WorldScene extends Phaser.Scene {
       this.shown.y += (target.y - this.shown.y) * 0.5;
     }
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
+    setCoords({ x: this.shown.x, y: this.shown.y, floor: this.floor });
     this.revealBuildings(false);
     this.drawNear();
 

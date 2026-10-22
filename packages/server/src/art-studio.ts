@@ -148,6 +148,8 @@ export interface WalkerView {
   place: ArtPlace;
   /** Each way's walk strip, when it has one: its frames side by side. */
   walks: Partial<Record<Facing, WalkStrip>>;
+  /** Each way's run strip, when it has one. */
+  runs?: Partial<Record<Facing, WalkStrip>>;
   /** Earlier walks of ways that have none now. */
   lost: Partial<Record<Facing, WalkVersion[]>>;
   /** Each way's standing picture: for the top-down ways, what its walk clip starts and ends on. */
@@ -363,22 +365,29 @@ export class ArtStudio {
     const views: WalkerView[] = [];
     for (const w of this.walkerList()) {
       const walks: WalkerView['walks'] = {};
+      const runs: WalkerView['runs'] = {};
       const lost: WalkerView['lost'] = {};
       for (const d of FACINGS) {
         const id = walkArt(w.id, d);
         const entry = painted[id] ?? shipped[id];
         const versions = await this.options.walks.versions(w.id, d);
-        if (!entry) {
-          if (versions.length) lost[d] = versions;
-          continue;
+        if (entry) {
+          const recipe = painted[id] ? await this.options.recipes.current(id) : undefined;
+          walks[d] = { url: slash(entry.file), frames: entry.frames ?? WALK_FRAMES, width: entry.width, height: entry.height, cycleSeconds: entry.cycleSeconds ?? WALK_CYCLE_SECONDS, ...(recipe ? { recipe } : {}), versions };
+        } else if (versions.length) {
+          lost[d] = versions;
         }
-        const recipe = painted[id] ? await this.options.recipes.current(id) : undefined;
-        walks[d] = { url: slash(entry.file), frames: entry.frames ?? WALK_FRAMES, width: entry.width, height: entry.height, cycleSeconds: entry.cycleSeconds ?? WALK_CYCLE_SECONDS, ...(recipe ? { recipe } : {}), versions };
+
+        const runId = `${w.id}-run-${d}`;
+        const runEntry = painted[runId] ?? shipped[runId];
+        if (runEntry) {
+          runs[d] = { url: slash(runEntry.file), frames: runEntry.frames ?? 10, width: runEntry.width, height: runEntry.height, cycleSeconds: runEntry.cycleSeconds ?? 0.67, versions: [] };
+        }
       }
       const needs = await this.options.walks.needs(w);
       const standing = {} as WalkerView['standing'];
       for (const d of FACINGS) standing[d] = await this.options.walks.standing(w, d, w.url);
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
     }
     return views;
   }

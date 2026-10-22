@@ -1118,5 +1118,165 @@
     "height": 196,
     "frames": 12,
     "cycleSeconds": 0.9
+  },
+  "bramble-ursine-run-front-left": {
+    "file": "art/bramble-ursine-run-front-left.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 219,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-run-front-right": {
+    "file": "art/bramble-ursine-run-front-right.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 219,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-run-back-left": {
+    "file": "art/bramble-ursine-run-back-left.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 219,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-run-back-right": {
+    "file": "art/bramble-ursine-run-back-right.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 219,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-front-left": {
+    "file": "art/tide-lutran-run-front-left.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 225,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-front-right": {
+    "file": "art/tide-lutran-run-front-right.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 225,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-back-left": {
+    "file": "art/tide-lutran-run-back-left.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 225,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-back-right": {
+    "file": "art/tide-lutran-run-back-right.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 225,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "zephyr-falcon-run-front-left": {
+    "file": "art/zephyr-falcon-run-front-left.png",
+    "kind": "walk",
+    "width": 1560,
+    "height": 216,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "zephyr-falcon-run-front-right": {
+    "file": "art/zephyr-falcon-run-front-right.png",
+    "kind": "walk",
+    "width": 1560,
+    "height": 216,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "zephyr-falcon-run-back-left": {
+    "file": "art/zephyr-falcon-run-back-left.png",
+    "kind": "walk",
+    "width": 1560,
+    "height": 216,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "zephyr-falcon-run-back-right": {
+    "file": "art/zephyr-falcon-run-back-right.png",
+    "kind": "walk",
+    "width": 1560,
+    "height": 216,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-front-left": {
+    "file": "art/dune-scorpid-run-front-left.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 201,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-front-right": {
+    "file": "art/dune-scorpid-run-front-right.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 201,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-back-left": {
+    "file": "art/dune-scorpid-run-back-left.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 201,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-back-right": {
+    "file": "art/dune-scorpid-run-back-right.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 201,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-front-left": {
+    "file": "art/sylvan-cervid-run-front-left.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 200,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-front-right": {
+    "file": "art/sylvan-cervid-run-front-right.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 200,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-back-left": {
+    "file": "art/sylvan-cervid-run-back-left.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 200,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-back-right": {
+    "file": "art/sylvan-cervid-run-back-right.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 200,
+    "frames": 10,
+    "cycleSeconds": 0.67
   }
 }

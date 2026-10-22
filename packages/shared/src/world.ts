@@ -431,12 +431,14 @@ const sanctumLayout: Layout = (map, c) => {
       if (t === Tile.Water || t === Tile.Tree) set(map, x, y, Tile.Ground);
     }
   };
-  // Cathedral, avenue and graveyard:
-  clearArea(c - 28, c - 34, c + 2, c - 18);
+  // Cathedral, graveyard, and northern plazas:
+  clearArea(c - 28, c - 34, c + 10, c - 18);
+  // Cathedral Avenue to Grand Plaza:
+  clearArea(c - 4, c - 18, c + 4, c - 6);
   // Scriptorium and lane:
-  clearArea(c + 12, c - 34, c + 28, c - 19);
+  clearArea(c + 11, c - 34, c + 28, c - 17);
   // Inn and street:
-  clearArea(c - 28, c - 18, c - 12, c - 3);
+  clearArea(c - 28, c - 18, c - 4, c - 3);
 
   // The High Cathedral of the Bell, north of the Grand Plaza.
   const cathLeft = c - 8;
@@ -601,7 +603,7 @@ function furnishCathedral(map: RegionMap, fx: number, fy: number): void {
   put('high-altar', 8, 2, 4, 1);
   put('brazier', 3, 2, 1, 1);
   put('brazier', 13, 2, 1, 1);
-  put('crypt-gate', 14.5, 3, 2, 1);
+  put('crypt-gate', 14.5, 2, 2, 1);
   put('lectern', 10, 4, 1.5, 1);
   put('gold-pew', 3.5, 6, 3, 1);
   put('gold-pew', 3.5, 9, 3, 1);

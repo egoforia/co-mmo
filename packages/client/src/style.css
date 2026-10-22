@@ -465,6 +465,8 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 
 /* The world editor (Owner and Stewards): beside the world, so what it changes stays in view. */
 #editor { inset: 64px 16px auto auto; margin: 0; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 96px); }
+#editor .hitbox-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent); margin-left: auto; margin-right: 6px; cursor: pointer; text-transform: none; font-weight: normal; }
+#editor .hitbox-toggle input { cursor: pointer; margin: 0; }
 #editor .tools { display: flex; flex-wrap: wrap; gap: 4px; }
 #editor .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 #editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }

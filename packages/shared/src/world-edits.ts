@@ -15,15 +15,15 @@ import { block, building, isBlocking, road, set, Tile, type Building, type Landm
 /** A tile position, x east and y south, from the land's top-left corner. */
 export type TilePoint = [x: number, y: number];
 
-/** What the paint brush can lay. Walls, floors and doors come only with a house. */
-export type PaintTile = 'ground' | 'path' | 'water' | 'tree' | 'rock';
+/** What the paint brush can lay. */
+export type PaintTile = 'ground' | 'path' | 'water' | 'tree' | 'rock' | 'wall';
 
 /** Every kind the brush lays, in the order the editor offers them. */
-export const PAINT_TILES: PaintTile[] = ['ground', 'path', 'water', 'tree', 'rock'];
+export const PAINT_TILES: PaintTile[] = ['ground', 'path', 'water', 'tree', 'rock', 'wall'];
 
 /** The tile a brush kind lays. */
 function paintTile(kind: PaintTile): Tile {
-  return { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock }[kind];
+  return { ground: Tile.Ground, path: Tile.Path, water: Tile.Water, tree: Tile.Tree, rock: Tile.Rock, wall: Tile.Wall }[kind];
 }
 
 /** An edit as the editor sends it, before the server stamps who made it and when. */
@@ -232,8 +232,10 @@ function paint(map: RegionMap, kind: PaintTile, tiles: TilePoint[]): void {
   for (const [x, y] of tiles) {
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
     const here = tileOf(map, [x, y]);
-    // Buildings and the ground under set pieces are left alone: move or remove those instead.
-    if (built(here)) continue;
+    if (here === Tile.Door) continue;
+    // When painting wall, lay a wall; when painting ground, clear walls or blocked tiles.
+    // Other brush kinds leave existing buildings/blocked tiles alone.
+    if (kind !== 'wall' && !(kind === 'ground' && (here === Tile.Wall || here === Tile.Blocked)) && built(here)) continue;
     set(map, x, y, tile === Tile.Path && (here === Tile.Water || here === Tile.Bridge) ? Tile.Bridge : tile);
   }
 }

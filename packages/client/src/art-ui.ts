@@ -82,6 +82,7 @@ interface WalkerView {
   place: Place;
   walks: Partial<Record<Facing, WalkStrip>>;
   runs?: Partial<Record<Facing, WalkStrip>>;
+  attacks?: Partial<Record<Facing, WalkStrip>>;
   lost: Partial<Record<Facing, WalkVersion[]>>;
   standing: Record<Facing, StandingView>;
   estimateUsd: number;
@@ -376,6 +377,7 @@ function walkerHtml(w: WalkerView): string {
         <form class="form walker-body">${bodyPick}</form></header>
       ${waysHtml(w)}
       ${runsHtml(w)}
+      ${attacksHtml(w)}
       <details class="top-down"><summary>Top-down walks (retired) · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks'}</summary>
         <p class="note">The top-down view is retired, so these are no longer painted. They are kept so walkers still move while their isometric walks are missing, and so earlier versions can be put back.</p>
         <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
@@ -436,6 +438,27 @@ function runsHtml(w: WalkerView): string {
   return `
     <section class="ways runs"><h4>Running animations · ${running} of 4</h4>
       <p class="note">Athletic 4-way running cycles, synchronized for isometric movement.</p>
+      <div class="walks">${WAYS.map(way).join('')}</div>
+    </section>`;
+}
+
+/**
+ * Basic attack animations in the four isometric directions.
+ */
+function attacksHtml(w: WalkerView): string {
+  const attacking = WAYS.filter(([d]) => w.attacks?.[d]).length;
+  if (!attacking) return '';
+  const way = ([d, label]: [IsoWay, string]) => {
+    const strip = w.attacks?.[d];
+    return `
+      <div class="direction">
+        ${stripHtml(strip, label, 110)}
+        <small class="note">${strip ? `${strip.frames} frames · ${strip.cycleSeconds}s` : 'no attack yet'}</small>
+      </div>`;
+  };
+  return `
+    <section class="ways attacks"><h4>Basic attack animations · ${attacking} of 4</h4>
+      <p class="note">Unarmed forward claw/fist strike animations in the four isometric directions.</p>
       <div class="walks">${WAYS.map(way).join('')}</div>
     </section>`;
 }

@@ -94,6 +94,18 @@ export const LAND_ITEMS: Record<string, ItemDef> = {
     name: 'Thorn Pelt Cloak', kind: 'equipment', art: 'item-pelt-cloak', slot: 'body', rarity: 'uncommon', bonus: { armor: 4, agility: 1 },
     description: 'A hooded cloak of thorn wolf pelts, thorns picked out. It keeps the night chill off.', value: 40,
   },
+  'holy-water': {
+    name: 'Holy Water', kind: 'consumable', art: 'item-tonic', rarity: 'uncommon', heal: 35,
+    description: 'A crystal vial of consecrated water blessed at the cathedral font. Restores 35 health.', value: 15,
+  },
+  'warding-incense': {
+    name: 'Warding Incense', kind: 'consumable', art: 'item-tonic', rarity: 'uncommon',
+    description: 'A stick of fragrant temple incense blessed by High Priest Cassian.', value: 20,
+  },
+  'pilgrim-bread': {
+    name: 'Pilgrim Bread', kind: 'consumable', art: 'item-goat-horn', rarity: 'common', heal: 20,
+    description: 'A crusty, hearty loaf baked by Mother Elena at the Pilgrim\'s Haven. Restores 20 health.', value: 5,
+  },
 };
 
 /** New ways to make things from the bigger lands' finds. */
@@ -119,6 +131,25 @@ export const LAND_PEOPLE: Record<string, { name: string; greeting: string; shop?
     name: 'Sultana Zahra',
     greeting: 'The Mirage Palace is real enough, traveller, whatever the dunes tell you. Sit, drink, and tell me of the world beyond the sand.',
     shop: { sells: [{ item: 'tonic', price: 12 }, { item: 'scroll-firebolt', price: 45 }], teaches: [], buys: true },
+  },
+  'high-priest-cassian': {
+    name: 'High Priest Cassian',
+    greeting: 'The grace of the divine bell be upon you, child. Walk in righteousness, and the shadows shall not touch you.',
+    shop: { sells: [{ item: 'holy-water', price: 15 }, { item: 'warding-incense', price: 20 }], teaches: [], buys: true },
+  },
+  'brother-paul': {
+    name: 'Brother Paul',
+    greeting: 'Welcome to the Scriptorium. Within these parchment folios lies the lore of ancient blessings.',
+    shop: { sells: [{ item: 'scroll-firebolt', price: 40 }], teaches: [], buys: true },
+  },
+  'mother-elena': {
+    name: 'Mother Elena',
+    greeting: 'Welcome to the Pilgrim\'s Haven! Rest your weary feet, traveller. A bowl of hot stew and fresh bread will do you good.',
+    shop: { sells: [{ item: 'pilgrim-bread', price: 5 }, { item: 'tonic', price: 8 }], teaches: [], buys: true },
+  },
+  'gravedigger-joshua': {
+    name: 'Gravedigger Joshua',
+    greeting: 'Hush now... you feel that chill in the ground? The graves behind the cathedral... something below is stirring them.',
   },
 };
 

@@ -265,20 +265,38 @@ export async function normalizeWalk(directions: Buffer[][], { bodyHeight = CHARA
     // Frames placed where they stood in the clip share one canvas: they keep their places, lined up
     // by the feet of the whole cycle, so the walker does not slide from frame to frame.
     const placed = sized.length > 1 && sized.every((f) => f.width === sized[0]!.width && f.height === sized[0]!.height);
-    if (!placed) return sized.map((f) => ({ ...f, figure: f.height }));
+    if (!placed) return sized.map((f) => ({ ...f, figure: f.height, ground: f.height, top: 0, croppedPng: f.png, activeH: f.height }));
     const feet = [...sized.map((f) => f.feet)].sort((a, b) => a - b)[Math.floor(sized.length / 2)]!;
-    // The scale goes by the figure itself, not the canvas around the whole cycle, so every look keeps one size.
-    return Promise.all(sized.map(async (f) => ({ ...f, feet, figure: (await sharp(f.png).trim().toBuffer({ resolveWithObject: true })).info.height })));
+    const analyzed = await Promise.all(sized.map(async (f) => {
+      const trimmed = await sharp(f.png).trim().toBuffer({ resolveWithObject: true });
+      const top = -(trimmed.info.trimOffsetTop ?? 0);
+      const ground = top + trimmed.info.height;
+      return { ...f, feet, figure: trimmed.info.height, ground, top };
+    }));
+    // Across the cycle, crop excess empty space above and below so the feet land on the ground baseline
+    const cycleGround = Math.max(...analyzed.map((f) => f.ground));
+    const cycleTop = Math.min(...analyzed.map((f) => f.top));
+    const activeH = Math.max(1, cycleGround - cycleTop);
+    return Promise.all(analyzed.map(async (f) => ({
+      ...f,
+      activeH,
+      croppedPng: await sharp(f.png).extract({ left: 0, top: cycleTop, width: f.width, height: activeH }).png().toBuffer(),
+    })));
   }));
   const heights = frames.flat().map((f) => f.figure).sort((a, b) => a - b);
   const scale = bodyHeight / (heights[Math.floor(heights.length / 2)] ?? 1);
-  const sized = frames.map((dir) => dir.map((f) => ({ ...f, w: Math.max(1, Math.round(f.width * scale)), h: Math.max(1, Math.round(f.height * scale)), feet: f.feet * scale })));
+  const sized = frames.map((dir) => dir.map((f) => ({
+    ...f,
+    w: Math.max(1, Math.round(f.width * scale)),
+    h: Math.max(1, Math.round(f.activeH * scale)),
+    feet: f.feet * scale,
+  })));
   const half = Math.max(...sized.flat().map((f) => Math.max(f.feet, f.w - f.feet)));
   const frameWidth = Math.ceil((2 * half + 2) / 2) * 2;
   const frameHeight = Math.max(...sized.flat().map((f) => f.h)) + margin;
   const strips = await Promise.all(sized.map(async (dir) => {
     const layers = await Promise.all(dir.map(async (f, i) => ({
-      input: await sharp(f.png).resize(f.w, f.h, { kernel: 'lanczos3' }).png().toBuffer(),
+      input: await sharp(f.croppedPng).resize(f.w, f.h, { kernel: 'lanczos3' }).png().toBuffer(),
       left: Math.round(i * frameWidth + frameWidth / 2 - f.feet),
       top: frameHeight - margin - f.h,
     })));

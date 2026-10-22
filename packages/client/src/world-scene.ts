@@ -794,8 +794,9 @@ export class WorldScene extends Phaser.Scene {
     a.body.setScale(own && worn ? (a.scale * own) / worn : a.scale);
   }
 
-  /** Heights of the figures in textures (their first frame), see-through rows left out, by key. */
+  /** Heights and ground contact origins of figures in textures (first frame), by key. */
   private figures = new Map<string, number>();
+  private figureMetrics = new Map<string, { height: number; originY: number }>();
 
   /** Metrics of the figure in a texture's first frame, see-through edges left out. */
   private figureMetrics = new Map<string, { height: number; originY: number }>();

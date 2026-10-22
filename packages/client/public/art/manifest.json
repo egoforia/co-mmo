@@ -1438,6 +1438,7 @@
     "height": 248,
     "frames": 12,
     "cycleSeconds": 0.8
+  },
   "sanctum-cathedral-exterior": {
     "file": "art/sanctum-cathedral-exterior.webp",
     "kind": "building",

@@ -7,44 +7,39 @@ import { CHARACTER_HEIGHT, ISO_WAYS, type IsoWay } from '../packages/shared/src/
 import { removeKeyBackground, removeKeySpill } from '../packages/server/src/assets/postprocess.ts';
 import { normalizeWalk } from '../packages/server/src/assets/walk-frames.ts';
 
-// Imports the 5 beastfolk basic attack animations extracted from the Wan 3.0 video
+// Imports the 5 beastfolk basic attack animations extracted from the 5 individual Wan 3.0 videos
 // into co-mmo's art pipeline and generates master spritesheets and previews.
 
 interface CharacterSpec {
   id: string;
   name: string;
-  rowIndex: number;
 }
 
 const ASSETS_DIR = resolve(import.meta.dirname, '../assets/beastfolk');
 
 const CHARACTERS: CharacterSpec[] = [
-  { id: 'bramble-ursine', name: 'Bramble-Ursine', rowIndex: 0 },
-  { id: 'tide-lutran', name: 'Tide-Lutran', rowIndex: 1 },
-  { id: 'zephyr-falcon', name: 'Zephyr-Falcon', rowIndex: 2 },
-  { id: 'dune-scorpid', name: 'Dune-Scorpid', rowIndex: 3 },
-  { id: 'sylvan-cervid', name: 'Sylvan-Cervid', rowIndex: 4 },
+  { id: 'bramble-ursine', name: 'Bramble-Ursine' },
+  { id: 'tide-lutran', name: 'Tide-Lutran' },
+  { id: 'zephyr-falcon', name: 'Zephyr-Falcon' },
+  { id: 'dune-scorpid', name: 'Dune-Scorpid' },
+  { id: 'sylvan-cervid', name: 'Sylvan-Cervid' },
 ];
 
-const VIDEO_PATH = resolve(ASSETS_DIR, 'attack-loop-raw.mp4');
 const DATA_ATTACKS_DIR = resolve('data/art/attacks');
-const FRAMES_DIR = resolve(DATA_ATTACKS_DIR, 'raw_frames');
 const FRAMES_OUT_DIR = resolve(DATA_ATTACKS_DIR, 'frames');
 
-// Cell bounds inside the 720x1280 video:
-// 5 rows (256px each), 4 spacious columns with ample padding:
-// Col 0: [0, 180), Col 1: [180, 360), Col 2: [360, 528), Col 3: [528, 720)
-const COL_BOXES = [
-  { left: 0, width: 180 },
-  { left: 180, width: 180 },
-  { left: 360, width: 168 },
-  { left: 528, width: 192 },
-];
-
-function getCellBox(r: number, c: number) {
-  const col = COL_BOXES[c]!;
-  return { left: col.left, top: r * 256, width: col.width, height: 256 };
-}
+// Cell bounds inside each 1280x720 individual video.
+// Columns in video from left to right:
+// Col 0: front-left
+// Col 1: back-right
+// Col 2: back-left
+// Col 3: front-right
+const WAY_TO_BOX: Record<IsoWay, { left: number; top: number; width: number; height: number }> = {
+  'front-left': { left: 0, top: 0, width: 320, height: 720 },
+  'front-right': { left: 960, top: 0, width: 320, height: 720 },
+  'back-left': { left: 640, top: 0, width: 320, height: 720 },
+  'back-right': { left: 320, top: 0, width: 320, height: 720 },
+};
 
 /**
  * Connected-component segmentation to isolate the character and reject
@@ -55,17 +50,13 @@ async function isolateCharacterShape(pngBuf: Buffer): Promise<Buffer> {
   const w = info.width, h = info.height;
   const cleanData = Buffer.from(data);
 
-  // Prune any thin artifact whiskers directly touching the lateral borders
+  // Prune any thin artifact whiskers directly touching the lateral borders (8px margin)
   for (let y = 0; y < h; y++) {
-    if ((cleanData[(y * w + 0) * 4 + 3] ?? 0) > 40) {
-      for (let x = 0; x < 6; x++) {
-        cleanData[(y * w + x) * 4 + 3] = 0;
-      }
+    for (let x = 0; x < 8; x++) {
+      cleanData[(y * w + x) * 4 + 3] = 0;
     }
-    if ((cleanData[(y * w + (w - 1)) * 4 + 3] ?? 0) > 40) {
-      for (let x = Math.max(0, w - 6); x < w; x++) {
-        cleanData[(y * w + x) * 4 + 3] = 0;
-      }
+    for (let x = Math.max(0, w - 8); x < w; x++) {
+      cleanData[(y * w + x) * 4 + 3] = 0;
     }
   }
 
@@ -106,10 +97,10 @@ async function isolateCharacterShape(pngBuf: Buffer): Promise<Buffer> {
   components.sort((a, b) => b.pixels.length - a.pixels.length);
   const mainSize = components[0]!.pixels.length;
 
-  // Filter out any disconnected components touching borders or specks smaller than 35% of main body
+  // Filter out any disconnected components touching borders or specks smaller than 15% of main body
   for (let i = 1; i < components.length; i++) {
     const comp = components[i]!;
-    if ((comp.touchesLeft || comp.touchesRight) && comp.pixels.length < mainSize * 0.35) {
+    if (comp.pixels.length < mainSize * 0.15 || comp.touchesLeft || comp.touchesRight) {
       for (const p of comp.pixels) {
         cleanData[p * 4 + 3] = 0;
       }
@@ -125,12 +116,6 @@ async function main() {
   await mkdir(DATA_ATTACKS_DIR, { recursive: true });
   await mkdir(FRAMES_OUT_DIR, { recursive: true });
 
-  if (!existsSync(FRAMES_DIR)) {
-    await mkdir(FRAMES_DIR, { recursive: true });
-    console.log(`Extracting raw video frames from ${VIDEO_PATH} to ${FRAMES_DIR}...`);
-    execSync(`ffmpeg -y -i "${VIDEO_PATH}" -vsync 0 "${FRAMES_DIR}/frame_%03d.png"`, { stdio: 'inherit' });
-  }
-
   const manifestPath = resolve(DATA_ATTACKS_DIR, 'manifest.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{}'));
 
@@ -138,10 +123,11 @@ async function main() {
   const clientManifestPath = resolve(clientArtDir, 'manifest.json');
   const clientManifest = JSON.parse(await readFile(clientManifestPath, 'utf8').catch(() => '{}'));
 
-  // 24-frame full 2-punch combo animation with seamless looping back to neutral idle:
-  // Punch 1 (frames 6-22) -> Recoil & Punch 2 (frames 24-38) -> Smooth Return to Idle (frames 40-52 -> 6)
-  // 48 raw video frames at 30 fps = 1.6s duration (15 fps uniform cadence)
-  const frameIndices = [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52];
+  // 12-frame single-hand strike with organic recovery back to neutral idle:
+  // Uniform +4 step cadence across 60 raw video frames:
+  // [6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50]
+  // 12 frames at 15 fps = 0.8s cycle duration (matching attackCooldown and walk frame counts)
+  const frameIndices = [6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50];
   console.log(`Using ${frameIndices.length} frames per attack cycle: [${frameIndices.join(', ')}]`);
 
   const allNormalizedStrips: { charId: string; way: IsoWay; stripBuf: Buffer; width: number; height: number }[] = [];
@@ -149,17 +135,27 @@ async function main() {
   for (const char of CHARACTERS) {
     console.log(`\nProcessing attack animations for ${char.name} (${char.id})...`);
 
-    // Extract attack frames for all 4 isometric ways:
-    // c=0: front-left, c=1: front-right, c=2: back-left, c=3: back-right
+    const charRawFramesDir = resolve(DATA_ATTACKS_DIR, `${char.id}_raw_frames`);
+    const charVideoPath = resolve(ASSETS_DIR, `individual_${char.id}_attack_raw.mp4`);
+
+    if (!existsSync(charRawFramesDir)) {
+      await mkdir(charRawFramesDir, { recursive: true });
+      console.log(`  Extracting raw frames from ${charVideoPath}...`);
+      execSync(`ffmpeg -y -i "${charVideoPath}" -vsync 0 "${charRawFramesDir}/frame_%03d.png"`, { stdio: 'inherit' });
+    }
+
+    // Extract attack frames for all 4 isometric ways in canonical ISO_WAYS order:
+    // [ 'front-left', 'front-right', 'back-left', 'back-right' ]
     const directionsFrames: Buffer[][] = [];
 
-    for (let c = 0; c < 4; c++) {
-      const box = getCellBox(char.rowIndex, c);
+    for (let wayIdx = 0; wayIdx < ISO_WAYS.length; wayIdx++) {
+      const way = ISO_WAYS[wayIdx]!;
+      const box = WAY_TO_BOX[way];
       const wayFrames: Buffer[] = [];
 
       for (const fIdx of frameIndices) {
         const frameFileName = `frame_${String(fIdx).padStart(3, '0')}.png`;
-        const framePath = resolve(FRAMES_DIR, frameFileName);
+        const framePath = resolve(charRawFramesDir, frameFileName);
 
         const crop = await sharp(framePath).extract(box).png().toBuffer();
         const { png } = await removeKeyBackground(crop, 80, { holes: true });
@@ -176,11 +172,11 @@ async function main() {
     console.log(`  Normalized: frame size = ${normalized.frameWidth}x${normalized.frameHeight}, scale = ${normalized.scale.toFixed(3)}`);
 
     // Save attack strips, individual frames, and update manifest
-    for (let c = 0; c < 4; c++) {
-      const way = ISO_WAYS[c]!;
+    for (let wayIdx = 0; wayIdx < ISO_WAYS.length; wayIdx++) {
+      const way = ISO_WAYS[wayIdx]!;
       const attackId = `${char.id}-attack-${way}`;
-      const stripBuf = normalized.strips[c]!;
-      const wayFrames = directionsFrames[c]!;
+      const stripBuf = normalized.strips[wayIdx]!;
+      const wayFrames = directionsFrames[wayIdx]!;
 
       allNormalizedStrips.push({
         charId: char.id,
@@ -213,7 +209,7 @@ async function main() {
         width: normalized.frameWidth * wayFrames.length,
         height: normalized.frameHeight,
         frames: wayFrames.length,
-        cycleSeconds: 1.6,
+        cycleSeconds: 0.8,
         redone: now,
       };
       manifest[attackId] = stripEntry;
@@ -224,7 +220,7 @@ async function main() {
         width: normalized.frameWidth * wayFrames.length,
         height: normalized.frameHeight,
         frames: wayFrames.length,
-        cycleSeconds: 1.6,
+        cycleSeconds: 0.8,
       };
       console.log(`  ✓ Wrote ${attackId}.png (${normalized.frameWidth * wayFrames.length}x${normalized.frameHeight})`);
     }

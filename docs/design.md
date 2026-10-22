@@ -19,7 +19,8 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
   the Style Bible (https://claude.ai/code/artifact/e9e5a8ec-ef6a-4d0b-85fa-c421147ed2d8).
   Assets are colour-graded toward each biome's key palette
   (`packages/shared/src/biomes.ts`). Launch biomes: the Sanctum, Whispering
-  Woods, Sunlit Shore, Mirage Desert.
+  Woods, Sunlit Shore, Mirage Desert. In diamond isometric projection,
+  buildings stand with tall vertical walls and cutaway roofs (`docs/buildings-and-walls.md`).
 - The first item is the Bible: every player has it, and it shows the game's
   documents in-game.
 - Budget ceiling: $50 to $70 a month for AI and assets.

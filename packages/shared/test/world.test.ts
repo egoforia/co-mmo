@@ -303,6 +303,26 @@ describe('the Sanctum City District', () => {
     const upstairsEnclosed = { x: inn.x + 2, y: inn.y + 2, floor: 1 };
     expect(canSeeAcrossFloors(sanctum, insideGround, upstairsEnclosed)).toBe(false);
   });
+
+  it('houses subterranean catacombs and the chained demon vault below ground', () => {
+    const catacombs = sanctum.storeys.find((s) => s.floor === -1);
+    const demonVault = sanctum.storeys.find((s) => s.floor === -2);
+    expect(catacombs).toBeDefined();
+    expect(demonVault).toBeDefined();
+
+    // Skeletons in the catacombs, chained demon in the vault
+    const skeletons = sanctum.creatures.filter((c) => c.kind === 'crypt-skeleton');
+    expect(skeletons.length).toBeGreaterThanOrEqual(3);
+    for (const sk of skeletons) expect(sk.floor).toBe(-1);
+
+    const demon = sanctum.creatures.find((c) => c.kind === 'chained-demon');
+    expect(demon).toBeDefined();
+    expect(demon!.floor).toBe(-2);
+
+    // Underground floors are concealed from the surface
+    const surface = { x: cathedral.door.x, y: cathedral.door.y, floor: 0 };
+    expect(canSeeAcrossFloors(sanctum, surface, { x: demon!.x, y: demon!.y, floor: -2 })).toBe(false);
+  });
 });
 
 describe('step', () => {

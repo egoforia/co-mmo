@@ -524,6 +524,57 @@ const sanctumLayout: Layout = (map, c) => {
   // The Cathedral Graveyard: ancient crypt stones and weeping ground.
   map.landmarks.push({ asset: 'sanctum-standing-stones', x: c - 20, y: c - 29, footprint: { width: 4, height: 2 } });
 
+  // --- Subterranean Catacombs & Chained Demon Vault (Floors -1 & -2) ---
+  // Floor -1: The Catacombs of the Restless spanning beneath the Graveyard and Cathedral.
+  addStorey(map, { x: c - 22, y: c - 34, width: 34, height: 16 }, -1, 'sanctum-cathedral');
+
+  // Entrance 1: Cathedral Crypt Gate down to Catacombs.
+  addStairs(map, {
+    kind: 'ladder',
+    x: cathLeft + 14,
+    y: cathTop + 4,
+    width: 1,
+    height: 1,
+    from: -1,
+    names: { lower: 'Catacombs of the Restless', upper: 'Cathedral Crypt Gate' },
+    climbs: 'south',
+  });
+
+  // Entrance 2: Graveyard Mausoleum down to Catacombs.
+  addStairs(map, {
+    kind: 'ladder',
+    x: c - 16,
+    y: c - 30,
+    width: 1,
+    height: 1,
+    from: -1,
+    names: { lower: 'Catacombs of the Restless', upper: 'Graveyard Mausoleum' },
+    climbs: 'south',
+  });
+
+  // Floor -2: The Chained Demon's Vault.
+  addStorey(map, { x: cathLeft + 2, y: cathTop + 4, width: 12, height: 8 }, -2, 'sanctum-cathedral');
+
+  // Stairs between Floor -1 (Catacombs) and Floor -2 (Demon Vault).
+  addStairs(map, {
+    kind: 'stairs',
+    x: cathLeft + 7,
+    y: cathTop + 7,
+    width: 2,
+    height: 1,
+    from: -2,
+    names: { lower: "The Demon's Vault", upper: 'Catacombs of the Restless' },
+    climbs: 'north',
+  });
+
+  // Skeletons roaming the Catacombs (Floor -1).
+  map.creatures.push({ kind: 'crypt-skeleton', name: 'Crypt Skeleton', asset: 'desert-mummy-guard', x: c - 12.5, y: c - 28.5, floor: -1 });
+  map.creatures.push({ kind: 'crypt-skeleton', name: 'Crypt Skeleton', asset: 'desert-mummy-guard', x: c - 4.5, y: c - 25.5, floor: -1 });
+  map.creatures.push({ kind: 'crypt-skeleton', name: 'Crypt Skeleton', asset: 'desert-mummy-guard', x: c + 3.5, y: c - 28.5, floor: -1 });
+
+  // The Imprisoned Demon in the deep Vault (Floor -2).
+  map.creatures.push({ kind: 'chained-demon', name: 'Chained Demon', asset: 'desert-sand-wyrm', x: cathLeft + 8.0, y: cathTop + 9.0, floor: -2 });
+
   // The City's Clerics and Citizens. Sister Amala is first so tests and quest guides find her at npcs[0].
   map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
   map.npcs.push({ id: 'high-priest-cassian', name: 'High Priest Cassian', asset: 'sanctum-pilgrim', x: c, y: c - 27.5 });
@@ -551,7 +602,7 @@ function furnishCathedral(map: RegionMap, fx: number, fy: number): void {
   put('brazier', 3, 2, 1, 1);
   put('brazier', 13, 2, 1, 1);
   put('crypt-gate', 14.5, 3, 2, 1);
-  put('lectern', 12, 4, 1.5, 1);
+  put('lectern', 10, 4, 1.5, 1);
   put('gold-pew', 3.5, 6, 3, 1);
   put('gold-pew', 3.5, 9, 3, 1);
   put('gold-pew', 12.5, 6, 3, 1);

@@ -36,6 +36,8 @@ export interface Storey extends TileRect {
   style: string;
   /** Picture ids drawn instead of the style's tiles (a kit's own pieces). */
   art?: TileArt;
+  /** True when this storey is an open outdoor balcony, terrace, or rooftop visible from the ground below. */
+  open?: boolean;
 }
 
 /** Stairs anyone can take; a ladder only those with hands to climb it (players and people, not creatures). */
@@ -66,7 +68,7 @@ export function floorName(floor: number): string {
  * Adds a floor over a rectangle (a building's walls, usually): wall all round
  * its edge and floor inside. Returns it so stairs and furniture can follow.
  */
-export function addStorey(map: RegionMap, rect: TileRect, floor: number, style: string, art?: Storey['art']): Storey {
+export function addStorey(map: RegionMap, rect: TileRect, floor: number, style: string, art?: Storey['art'], open?: boolean): Storey {
   if (floor === 0 || !Number.isInteger(floor)) throw new Error(`A storey is a floor above or below the ground, not ${floor}.`);
   const { x, y, width, height } = rect;
   if (x < 0 || y < 0 || x + width > map.width || y + height > map.height || width < 3 || height < 3) {
@@ -79,9 +81,42 @@ export function addStorey(map: RegionMap, rect: TileRect, floor: number, style: 
       tiles[ty * width + tx] = edge ? Tile.Wall : Tile.Floor;
     }
   }
-  const storey: Storey = { x, y, width, height, floor, tiles, style, ...(art ? { art } : {}) };
+  const storey: Storey = { x, y, width, height, floor, tiles, style, ...(art ? { art } : {}), ...(open ? { open: true } : {}) };
   map.storeys.push(storey);
   return storey;
+}
+
+/**
+ * True when two positions on different floors have line of sight to each other:
+ * between the open ground outside (floor 0) and an open outdoor balcony, terrace
+ * or rooftop (floor > 0). Underground floors are subterranean and never visible.
+ */
+export function canSeeAcrossFloors(
+  map: RegionMap,
+  a: { x: number; y: number; floor?: number },
+  b: { x: number; y: number; floor?: number },
+): boolean {
+  const fa = a.floor ?? 0;
+  const fb = b.floor ?? 0;
+  if (fa === fb) return true;
+  if (fa < 0 || fb < 0) return false;
+
+  const isOpenOutdoors = (pos: { x: number; y: number; floor?: number }): boolean => {
+    const f = pos.floor ?? 0;
+    if (f === 0) {
+      return !map.buildings.some((bld) =>
+        pos.x >= bld.x && pos.x < bld.x + bld.width && pos.y >= bld.y && pos.y < bld.y + bld.height
+      );
+    }
+    const storey = storeyAt(map, Math.floor(pos.x), Math.floor(pos.y), f);
+    if (!storey) return false;
+    if (storey.open) return true;
+    return !map.buildings.some((bld) =>
+      pos.x >= bld.x && pos.x < bld.x + bld.width && pos.y >= bld.y && pos.y < bld.y + bld.height
+    );
+  };
+
+  return isOpenOutdoors(a) && isOpenOutdoors(b);
 }
 
 /** Sets one tile on a floor; off the ground, only where a storey of that floor lies. */

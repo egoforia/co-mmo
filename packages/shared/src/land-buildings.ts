@@ -30,6 +30,66 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       pew: { name: 'pew', look: 'a long dark wooden pew with a carved back, seen from behind', width: 3 },
     },
   },
+  'sanctum-cathedral': {
+    id: 'sanctum-cathedral',
+    name: 'The High Cathedral of the Bell',
+    biome: 'sanctum',
+    kit: 'temple-stone',
+    kitShape: { roof: 'flat', battlements: true, towers: [{ corner: 'front-left' }, { corner: 'front-right' }] },
+    references: ['sanctum-shrine'],
+    exterior:
+      'a magnificent cathedral of gleaming cream marble and white limestone: soaring twin bell towers with golden bells, a grand arched entrance with heavy bronze double doors, ' +
+      'a rose stained-glass window glowing with radiant golden light, stone gargoyles and flying buttresses along the flanks, braziers flickering on the wide marble steps',
+    floor: 'polished cream marble flagstones in an intricate mosaic pattern with gold grout and faint violet veins',
+    wall: 'the top of a thick cathedral wall of fluted marble columns and gold-trimmed pale limestone',
+    door: 'a grand double-width bronze threshold with intricate celestial engravings and a polished gold step',
+    furniture: {
+      'high-altar': { name: 'high altar', look: 'a grand white marble altar draped with violet and gold brocade, topped with golden candelabras and a sanctified chime', width: 4 },
+      'gold-pew': { name: 'golden pew', look: 'a polished dark cedar church pew with carved seraph wings and plush violet velvet cushions', width: 3 },
+      brazier: { name: 'brazier', look: 'a tall bronze brazier on three legs with a bright flickering fire in its bowl', width: 1 },
+      lectern: { name: 'eagle lectern', look: 'a sculpted brass eagle lectern bearing a heavy illuminated prayer book', width: 1.5 },
+      'crypt-gate': { name: 'crypt gate', look: 'a heavy wrought iron gate barred with silver chains and a glowing warding seal', width: 2 },
+    },
+  },
+  'sanctum-scriptorium': {
+    id: 'sanctum-scriptorium',
+    name: "The Clerics' Scriptorium",
+    biome: 'sanctum',
+    kit: 'timber-cottage',
+    references: ['sanctum-shrine'],
+    exterior:
+      'a graceful monastic library and scriptorium of cream stone and dark oak timber: arched leaded-glass windows, a steep slate roof with stone dormers, ' +
+      'carved stone arches framing a studded wooden door, and warm lantern light glowing from within',
+    floor: 'honey-waxed oak parquet floorboards laid in a tight herringbone pattern',
+    wall: 'the top of an ashlar limestone wall lined with dark polished oak wainscoting',
+    door: 'a sturdy oak threshold reinforced with dark iron studs and a worn central groove',
+    furniture: {
+      'scribe-desk': { name: 'scribe desk', look: 'a slanted oak desk with ink pots, parchment sheets, quill stands, and a magnifying lens', width: 2 },
+      'tall-bookshelf': { name: 'tall bookshelf', look: 'a high wooden library bookshelf packed with leather-bound holy tomes and rolled scrolls', width: 2 },
+      'reading-lectern': { name: 'reading lectern', look: 'a standing wooden reading lectern with an open illuminated scroll and a brass oil lamp', width: 1.5 },
+      'relic-case': { name: 'relic case', look: 'a glass and polished brass reliquary display case holding sacred silver talismans and incense censer', width: 2 },
+    },
+  },
+  'sanctum-inn': {
+    id: 'sanctum-inn',
+    name: "The Pilgrim's Haven",
+    biome: 'sanctum',
+    kit: 'timber-cottage',
+    references: ['sanctum-shrine'],
+    exterior:
+      'a warm, welcoming two-storey coaching inn of whitewashed timber and warm sandstone: a carved wooden hanging sign depicting a golden bell over a foaming tankard, ' +
+      'smoke curling from a sturdy chimney, flowering windowboxes, and a heavy wooden tavern door',
+    floor: 'wide pine floorboards in a warm amber tone, worn smooth by generations of travelers',
+    wall: 'the top of a sturdy timber-and-plaster wall with dark exposed oak beams',
+    door: 'a heavy weathered oak door threshold with a cozy welcome rug texture',
+    furniture: {
+      hearth: { name: 'hearth', look: 'a massive stone tavern fireplace with a roaring log fire and a bubbling iron stew cauldron hanging from an iron crane', width: 3 },
+      'bar-counter': { name: 'bar counter', look: 'a long polished dark wood tavern bar counter with brass beer taps, ceramic mugs, and a bowl of roasted nuts', width: 3 },
+      'dining-table': { name: 'dining table', look: 'a sturdy rectangular wooden tavern table with clay bowls, fresh bread loaves, and tankards', width: 2.6 },
+      bench: { name: 'wooden bench', look: 'a long sturdy wooden dining bench with iron brackets', width: 2 },
+      'ale-cask': { name: 'ale cask', look: 'a large wooden barrel of spiced honey ale on a carved wooden cradle', width: 1 },
+    },
+  },
   'woods-cave': {
     id: 'woods-cave',
     name: 'The Thornwolf Cave',

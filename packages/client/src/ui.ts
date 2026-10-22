@@ -165,6 +165,17 @@ export function setHud(name: string, online: number, region: string, sky = ''): 
   $('hud-sky').hidden = !sky;
 }
 
+export function setCoords(coords: { x: number; y: number; floor?: number } | undefined): void {
+  const el = $('hud-coords');
+  if (!coords) {
+    el.hidden = true;
+    return;
+  }
+  const f = coords.floor ? (coords.floor > 0 ? ` · Floor ${coords.floor}` : ` · Catacombs B${Math.abs(coords.floor)}`) : '';
+  el.textContent = `📍 ${Math.round(coords.x)}, ${Math.round(coords.y)}${f}`;
+  el.hidden = false;
+}
+
 export function onInviteClick(handler: () => void): void {
   $('invite-button').addEventListener('click', handler);
 }

@@ -5,6 +5,7 @@ import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
 import { applyEdits, type WorldEdit } from './world-edits.ts';
 import type { Stairway, Storey } from './floors.ts';
+import { addStairs, addStorey, setOn } from './floors.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -421,7 +422,165 @@ const sanctumLayout: Layout = (map, c) => {
   const lane = shop.y + shop.height + 1;
   road(map, c, lane, shop.door.x, shop.door.y + 1);
   furnishArcanum(map, left + 1, top + 1);
+
+  // The Holy City District of the Sanctum
+  // Clear noise water and trees from the city quarters so buildings and streets are open.
+  const clearArea = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const t = map.tiles[y * map.width + x];
+      if (t === Tile.Water || t === Tile.Tree) set(map, x, y, Tile.Ground);
+    }
+  };
+  // Cathedral, avenue and graveyard:
+  clearArea(c - 28, c - 34, c + 2, c - 18);
+  // Scriptorium and lane:
+  clearArea(c + 12, c - 34, c + 28, c - 19);
+  // Inn and street:
+  clearArea(c - 28, c - 18, c - 12, c - 3);
+
+  // The High Cathedral of the Bell, north of the Grand Plaza.
+  const cathLeft = c - 8;
+  const cathTop = c - 32;
+  const cathedral = building(map, cathLeft, cathTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
+  map.buildings.push(cathedral);
+  furnishCathedral(map, cathLeft + 1, cathTop + 1);
+
+  // Cathedral Floor 1: The Choir Loft.
+  addStorey(map, cathedral, 1, cathedral.style);
+  addStairs(map, {
+    kind: 'stairs',
+    x: cathLeft + 2,
+    y: cathTop + 5,
+    width: 2,
+    height: 1,
+    from: 0,
+    names: { lower: 'Cathedral Nave', upper: 'Choir Loft' },
+  });
+
+  // Cathedral Floor 2: The High Belfry open rooftop and bell tower.
+  addStorey(map, { x: cathLeft + 3, y: cathTop + 2, width: 10, height: 8 }, 2, cathedral.style, undefined, true);
+  addStairs(map, {
+    kind: 'ladder',
+    x: cathLeft + 11,
+    y: cathTop + 5,
+    width: 1,
+    height: 1,
+    from: 1,
+    names: { lower: 'Choir Loft', upper: 'High Belfry' },
+  });
+
+  // The Clerics' Scriptorium, east of the Cathedral.
+  const scripLeft = c + 14;
+  const scripTop = c - 32;
+  const scriptorium = building(map, scripLeft, scripTop, SCRIPTORIUM_SIZE.width, SCRIPTORIUM_SIZE.height, 'sanctum-scriptorium');
+  map.buildings.push(scriptorium);
+  furnishScriptorium(map, scripLeft + 1, scripTop + 1);
+
+  // Scriptorium Floor 1: Upper Archive & West Observation Terrace overlooking Cathedral Avenue.
+  addStorey(map, { x: scripLeft - 2, y: scripTop, width: scriptorium.width + 2, height: scriptorium.height }, 1, scriptorium.style, undefined, true);
+  setOn(map, 1, scripLeft, scripTop + 5, Tile.Door);
+  setOn(map, 1, scripLeft - 1, scripTop + 5, Tile.Floor);
+  addStairs(map, {
+    kind: 'stairs',
+    x: scripLeft + 6,
+    y: scripTop + 5,
+    width: 2,
+    height: 1,
+    from: 0,
+    names: { lower: 'Scriptorium Hall', upper: 'Upper Archive' },
+  });
+
+  // The Pilgrim's Haven Inn, west of the Grand Plaza.
+  const innLeft = c - 26;
+  const innTop = c - 16;
+  const inn = building(map, innLeft, innTop, INN_SIZE.width, INN_SIZE.height, 'sanctum-inn');
+  map.buildings.push(inn);
+  furnishInn(map, innLeft + 1, innTop + 1);
+
+  // Pilgrim's Haven Floor 1: Guest Quarters with overhanging balcony facing south onto the street.
+  addStorey(map, { x: innLeft, y: innTop, width: inn.width, height: inn.height + 2 }, 1, inn.style);
+  setOn(map, 1, inn.door.x, innTop + 9, Tile.Door);
+  setOn(map, 1, inn.door.x, innTop + 10, Tile.Floor);
+  addStairs(map, {
+    kind: 'stairs',
+    x: innLeft + 7,
+    y: innTop + 7,
+    width: 2,
+    height: 1,
+    from: 0,
+    names: { lower: 'Tavern Common Room', upper: 'Guest Rooms' },
+  });
+
+  // The Cathedral Avenue connecting the Grand Plaza to the Cathedral bronze doors.
+  road(map, c - 1, c - 18, c - 1, c - 7);
+  road(map, c, c - 18, c, c - 7);
+  road(map, c + 1, c - 18, c + 1, c - 7);
+
+  // Connecting streets to the Scriptorium, Inn, and Graveyard.
+  road(map, c + 1, c - 20, scriptorium.door.x, scriptorium.door.y + 1);
+  road(map, inn.door.x, inn.door.y + 1, c - 7, inn.door.y + 1);
+  road(map, c - 18, c - 26, c - 1, c - 26);
+
+  // The Cathedral Graveyard: ancient crypt stones and weeping ground.
+  map.landmarks.push({ asset: 'sanctum-standing-stones', x: c - 20, y: c - 29, footprint: { width: 4, height: 2 } });
+
+  // --- Subterranean Catacombs & Chained Demon Vault (Floors -1 & -2) ---
+  // Floor -1: The Catacombs of the Restless spanning beneath the Graveyard and Cathedral.
+  addStorey(map, { x: c - 22, y: c - 34, width: 34, height: 16 }, -1, 'sanctum-cathedral');
+
+  // Entrance 1: Cathedral Crypt Gate down to Catacombs.
+  addStairs(map, {
+    kind: 'ladder',
+    x: cathLeft + 14,
+    y: cathTop + 4,
+    width: 1,
+    height: 1,
+    from: -1,
+    names: { lower: 'Catacombs of the Restless', upper: 'Cathedral Crypt Gate' },
+    climbs: 'south',
+  });
+
+  // Entrance 2: Graveyard Mausoleum down to Catacombs.
+  addStairs(map, {
+    kind: 'ladder',
+    x: c - 16,
+    y: c - 30,
+    width: 1,
+    height: 1,
+    from: -1,
+    names: { lower: 'Catacombs of the Restless', upper: 'Graveyard Mausoleum' },
+    climbs: 'south',
+  });
+
+  // Floor -2: The Chained Demon's Vault.
+  addStorey(map, { x: cathLeft + 2, y: cathTop + 4, width: 12, height: 8 }, -2, 'sanctum-cathedral');
+
+  // Stairs between Floor -1 (Catacombs) and Floor -2 (Demon Vault).
+  addStairs(map, {
+    kind: 'stairs',
+    x: cathLeft + 7,
+    y: cathTop + 7,
+    width: 2,
+    height: 1,
+    from: -2,
+    names: { lower: "The Demon's Vault", upper: 'Catacombs of the Restless' },
+    climbs: 'north',
+  });
+
+  // Skeletons roaming the Catacombs (Floor -1).
+  map.creatures.push({ kind: 'crypt-skeleton', name: 'Crypt Skeleton', asset: 'desert-mummy-guard', x: c - 12.5, y: c - 28.5, floor: -1 });
+  map.creatures.push({ kind: 'crypt-skeleton', name: 'Crypt Skeleton', asset: 'desert-mummy-guard', x: c - 4.5, y: c - 25.5, floor: -1 });
+  map.creatures.push({ kind: 'crypt-skeleton', name: 'Crypt Skeleton', asset: 'desert-mummy-guard', x: c + 3.5, y: c - 28.5, floor: -1 });
+
+  // The Imprisoned Demon in the deep Vault (Floor -2).
+  map.creatures.push({ kind: 'chained-demon', name: 'Chained Demon', asset: 'desert-sand-wyrm', x: cathLeft + 8.0, y: cathTop + 9.0, floor: -2 });
+
+  // The City's Clerics and Citizens. Sister Amala is first so tests and quest guides find her at npcs[0].
   map.npcs.push({ id: 'sister-amala', name: 'Sister Amala', asset: 'sanctum-pilgrim', x: c - 2.5, y: c + 4.5 });
+  map.npcs.push({ id: 'high-priest-cassian', name: 'High Priest Cassian', asset: 'sanctum-pilgrim', x: c, y: c - 27.5 });
+  map.npcs.push({ id: 'brother-paul', name: 'Brother Paul', asset: 'sanctum-pilgrim', x: c + 19.5, y: c - 27.5 });
+  map.npcs.push({ id: 'mother-elena', name: 'Mother Elena', asset: 'sanctum-pilgrim', x: c - 18.5, y: c - 14.5 });
+  map.npcs.push({ id: 'gravedigger-joshua', name: 'Gravedigger Joshua', asset: 'sanctum-pilgrim', x: c - 18, y: c - 26.5 });
   map.npcs.push({ id: 'bramble-ursine-npc', name: 'Bramble Ursine', asset: 'bramble-ursine', x: c - 3.5, y: c - 2.0 });
   map.npcs.push({ id: 'tide-lutran-npc', name: 'Tide Lutran', asset: 'tide-lutran', x: c + 4.0, y: c - 1.5 });
   map.npcs.push({ id: 'zephyr-falcon-npc', name: 'Zephyr Falcon', asset: 'zephyr-falcon', x: c - 4.5, y: c + 1.5 });
@@ -432,6 +591,49 @@ const sanctumLayout: Layout = (map, c) => {
 
 /** The Sanctum Arcanum's floor, in tiles, inside the walls. */
 export const ARCANUM_SIZE = { width: 10, height: 8 };
+export const CATHEDRAL_SIZE = { width: 16, height: 12 };
+export const SCRIPTORIUM_SIZE = { width: 12, height: 10 };
+export const INN_SIZE = { width: 12, height: 10 };
+
+/** The High Cathedral's furniture: altar, pews, braziers, lectern, and the locked crypt gate. */
+function furnishCathedral(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-cathedral', fx, fy);
+  put('high-altar', 8, 2, 4, 1);
+  put('brazier', 3, 2, 1, 1);
+  put('brazier', 13, 2, 1, 1);
+  put('crypt-gate', 14.5, 3, 2, 1);
+  put('lectern', 10, 4, 1.5, 1);
+  put('gold-pew', 3.5, 6, 3, 1);
+  put('gold-pew', 3.5, 9, 3, 1);
+  put('gold-pew', 12.5, 6, 3, 1);
+  put('gold-pew', 12.5, 9, 3, 1);
+}
+
+/** The Scriptorium's furniture: desks, tall bookshelves, reading lecterns, and relic display. */
+function furnishScriptorium(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-scriptorium', fx, fy);
+  put('tall-bookshelf', 1.5, 1, 2, 1);
+  put('tall-bookshelf', 4, 1, 2, 1);
+  put('relic-case', 8, 1, 2, 1);
+  put('tall-bookshelf', 10.5, 1, 2, 1);
+  put('scribe-desk', 2, 4, 2, 1);
+  put('scribe-desk', 10, 4, 2, 1);
+  put('reading-lectern', 2, 7, 1.5, 1);
+  put('tall-bookshelf', 10.5, 7, 2, 1);
+}
+
+/** The Pilgrim's Haven Inn furniture: hearth, counter, ale casks, dining tables, and benches. */
+function furnishInn(map: RegionMap, fx: number, fy: number): void {
+  const put = placer(map, 'sanctum-inn', fx, fy);
+  put('hearth', 2, 1, 3, 1);
+  put('bar-counter', 7.5, 2, 3, 1);
+  put('ale-cask', 10.5, 1, 1, 1);
+  put('dining-table', 2.5, 5, 2.6, 1);
+  put('bench', 2.5, 6.5, 2, 1);
+  put('dining-table', 2.5, 8.5, 2.6, 1);
+  put('dining-table', 9.5, 5, 2.6, 1);
+  put('bench', 9.5, 6.5, 2, 1);
+}
 
 /** The Arcanum's furniture, placed as landmarks from the floor's top-left tile, leaving a way in from the door. */
 function furnishArcanum(map: RegionMap, fx: number, fy: number): void {

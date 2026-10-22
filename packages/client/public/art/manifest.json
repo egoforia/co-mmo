@@ -1438,5 +1438,160 @@
     "height": 248,
     "frames": 12,
     "cycleSeconds": 0.8
+  "sanctum-cathedral-exterior": {
+    "file": "art/sanctum-cathedral-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2275
+  },
+  "sanctum-cathedral-floor": {
+    "file": "art/sanctum-cathedral-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-wall": {
+    "file": "art/sanctum-cathedral-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-door": {
+    "file": "art/sanctum-cathedral-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-high-altar": {
+    "file": "art/sanctum-cathedral-furniture-high-altar.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-gold-pew": {
+    "file": "art/sanctum-cathedral-furniture-gold-pew.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-brazier": {
+    "file": "art/sanctum-cathedral-furniture-brazier.png",
+    "kind": "set-piece",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-lectern": {
+    "file": "art/sanctum-cathedral-furniture-lectern.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-crypt-gate": {
+    "file": "art/sanctum-cathedral-furniture-crypt-gate.png",
+    "kind": "set-piece",
+    "width": 640,
+    "height": 512
+  },
+  "sanctum-scriptorium-exterior": {
+    "file": "art/sanctum-scriptorium-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2275
+  },
+  "sanctum-scriptorium-floor": {
+    "file": "art/sanctum-scriptorium-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-scriptorium-wall": {
+    "file": "art/sanctum-scriptorium-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-scriptorium-door": {
+    "file": "art/sanctum-scriptorium-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-tall-bookshelf": {
+    "file": "art/sanctum-scriptorium-furniture-tall-bookshelf.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-scribe-desk": {
+    "file": "art/sanctum-scriptorium-furniture-scribe-desk.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-reading-lectern": {
+    "file": "art/sanctum-scriptorium-furniture-reading-lectern.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-relic-case": {
+    "file": "art/sanctum-scriptorium-furniture-relic-case.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-inn-exterior": {
+    "file": "art/sanctum-inn-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2293
+  },
+  "sanctum-inn-floor": {
+    "file": "art/sanctum-inn-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-inn-wall": {
+    "file": "art/sanctum-inn-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-inn-door": {
+    "file": "art/sanctum-inn-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-inn-furniture-hearth": {
+    "file": "art/sanctum-inn-furniture-hearth.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-inn-furniture-bar-counter": {
+    "file": "art/sanctum-inn-furniture-bar-counter.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-inn-furniture-dining-table": {
+    "file": "art/sanctum-inn-furniture-dining-table.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-inn-furniture-bench": {
+    "file": "art/sanctum-inn-furniture-bench.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-inn-furniture-ale-cask": {
+    "file": "art/sanctum-inn-furniture-ale-cask.png",
+    "kind": "set-piece",
+    "width": 128,
+    "height": 128
   }
 }

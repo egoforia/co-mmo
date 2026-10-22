@@ -12,6 +12,7 @@ import {
   outsideSide,
   regenPerSecond,
   climbWords,
+  canSeeAcrossFloors,
   storeyAt,
   walkOn,
   wayTaken,
@@ -295,7 +296,7 @@ export class Region {
     const p = this.s.players.get(id);
     if (!p) return [];
     const lines: string[] = [];
-    const near = (o: { x: number; y: number; floor: number }, r: number) => o.floor === p.floor && Math.hypot(o.x - p.x, o.y - p.y) <= r;
+    const near = (o: { x: number; y: number; floor: number }, r: number) => canSeeAcrossFloors(this.map, p, o) && Math.hypot(o.x - p.x, o.y - p.y) <= r;
     if (p.floor) lines.push(`They are on ${floorName(p.floor)}.`);
     for (const other of this.s.players.values()) if (other !== p && near(other, 10)) lines.push(`${other.info.name} (player)`);
     for (const n of this.s.townsfolk) if (near(n, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
@@ -615,8 +616,8 @@ export class Region {
         this.s.flush(p);
         continue;
       }
-      // Only what is on their own floor: the floors above and below are out of sight.
-      const near = (o: { x: number; y: number; floor?: number }) => (o.floor ?? 0) === p.floor && Math.abs(o.x - p.x) <= VIEW_RADIUS && Math.abs(o.y - p.y) <= VIEW_RADIUS;
+      // What is on their own floor, or across open outdoor balconies/terraces.
+      const near = (o: { x: number; y: number; floor?: number }) => canSeeAcrossFloors(this.map, p, o) && Math.abs(o.x - p.x) <= VIEW_RADIUS && Math.abs(o.y - p.y) <= VIEW_RADIUS;
       const players: EntityState[] = [];
       for (const other of all) {
         if (other === p || !near(other)) continue;

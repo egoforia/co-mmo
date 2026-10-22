@@ -10,6 +10,8 @@ import {
   MAX_STROKE,
   PAINT_TILES,
   Tile,
+  isBlocking,
+  tileAt,
   houseCorner,
   landmarkAt,
   setPiece,
@@ -33,7 +35,7 @@ type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'floors' | 'piece' | 
 
 const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'look', name: 'Look', hint: 'Point at the world to see what is there.' },
-  { id: 'paint', name: 'Paint', hint: 'Click or drag to lay ground, paths, water, trees or rocks. A path over water becomes a bridge.' },
+  { id: 'paint', name: 'Paint', hint: 'Click or drag to lay ground, paths, water, trees, rocks or walls. A path over water becomes a bridge.' },
   { id: 'move', name: 'Move', hint: 'Click a tree, rock, water or set piece to pick it up, then click where it goes.' },
   { id: 'road', name: 'Road', hint: 'Click where the road starts, then where it ends. It runs across, then down.' },
   { id: 'house', name: 'House', hint: 'Click the doorstep: the house stands just north of it, its doorway on that spot.' },
@@ -44,7 +46,7 @@ const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'clear', name: 'Clear', hint: 'Click to send away every monster living near that spot.' },
 ];
 
-const PAINT_NAMES: Record<PaintTile, string> = { ground: 'Ground', path: 'Path', water: 'Water', tree: 'Tree', rock: 'Rock' };
+const PAINT_NAMES: Record<PaintTile, string> = { ground: 'Ground', path: 'Path', water: 'Water', tree: 'Tree', rock: 'Rock', wall: 'Wall' };
 const TILE_NAMES: Partial<Record<Tile, string>> = {
   [Tile.Ground]: 'open ground', [Tile.Path]: 'a path', [Tile.Water]: 'water', [Tile.Tree]: 'a tree', [Tile.Rock]: 'a rock',
   [Tile.Wall]: 'a wall', [Tile.Floor]: 'a floor', [Tile.Door]: 'a doorway', [Tile.Bridge]: 'a bridge', [Tile.Blocked]: 'under a set piece',
@@ -88,6 +90,8 @@ export class EditorUi {
   private busy = false;
   private status = '';
   private outline?: Phaser.GameObjects.Graphics;
+  private hitboxGraphics?: Phaser.GameObjects.Graphics;
+  private showHitboxes = true;
   private attached?: WorldScene;
 
   constructor(private readonly options: EditorOptions) {
@@ -115,6 +119,7 @@ export class EditorUi {
     this.cancel();
     if (!open) {
       this.outline?.clear();
+      this.hitboxGraphics?.clear();
       return;
     }
     this.attach();
@@ -150,6 +155,7 @@ export class EditorUi {
     if (!scene || this.attached === scene || !scene.sys.isActive()) return;
     this.attached = scene;
     this.outline = scene.add.graphics().setDepth(OUTLINE_DEPTH);
+    this.hitboxGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 5);
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => this.pointer(p, p.isDown ? 'drag' : 'hover'));
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.pointer(p, 'down'));
     scene.input.on('pointerup', (p: Phaser.Input.Pointer) => this.pointer(p, 'up'));
@@ -240,6 +246,7 @@ export class EditorUi {
     if (!stroke?.tiles.size) return;
     const tiles = [...stroke.tiles.values()].filter(([x, y]) => x >= 0 && y >= 0);
     await this.act({ edit: { kind: 'paint', tile: this.paint, tiles } }, stroke.region);
+    this.drawHitboxes();
   }
 
   /** Sends a change (or undo, redo, remove) and shows the land's edits as they now are. */
@@ -264,8 +271,43 @@ export class EditorUi {
     return this.attached?.landName(region) ?? 'that land';
   }
 
+  /** Draws collision hitboxes for the current floor around the player. */
+  drawHitboxes(): void {
+    const scene = this.attached;
+    const g = this.hitboxGraphics;
+    if (!scene || !g) return;
+    g.clear();
+    if (!this.open || !this.showHitboxes) return;
+
+    const map = scene.currentMap;
+    if (!map) return;
+    const floor = scene.currentFloor;
+    const playerPos = scene.playerPosition;
+    const cx = Math.floor(playerPos.x);
+    const cy = Math.floor(playerPos.y);
+    const radius = 28;
+    const x0 = Math.max(0, cx - radius);
+    const x1 = Math.min(map.width - 1, cx + radius);
+    const y0 = Math.max(0, cy - radius);
+    const y1 = Math.min(map.height - 1, cy + radius);
+
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const t = tileAt(map, tx, ty, floor);
+        if (!isBlocking(t)) continue;
+        const pts = scene.tileCorners(map, tx, ty, 1, 1);
+        const colour = (t === Tile.Wall || t === Tile.Blocked) ? 0xf6757a : 0xf2a06b;
+        g.fillStyle(colour, 0.35);
+        g.fillPoints(pts, true);
+        g.lineStyle(1.5, colour, 0.9);
+        g.strokePoints(pts, true);
+      }
+    }
+  }
+
   /** Outlines what the tool would touch at the pointer. */
   private mark(region: string, map: RegionMap, at: TilePoint): void {
+    this.drawHitboxes();
     const scene = this.attached;
     const g = this.outline;
     if (!scene || !g) return;
@@ -365,6 +407,10 @@ export class EditorUi {
     else if (input.name === 'creature') this.creature = value;
     else if (input.name === 'count') this.count = Math.max(1, Math.min(MAX_SPAWN, Number(value) || 1));
     else if (input.name === 'radius') this.radius = Math.max(1, Math.min(MAX_CLEAR_RADIUS, Number(value) || 1));
+    else if (input.name === 'hitboxes') {
+      this.showHitboxes = (input as HTMLInputElement).checked;
+      this.drawHitboxes();
+    }
     // Hand the keys back to walking.
     input.blur();
   }
@@ -399,7 +445,7 @@ export class EditorUi {
     const edits = [...this.log.edits].reverse().map((e) => `<li><span>${escapeHtml(editWords(e))}</span><span class="by">${escapeHtml(e.by)}</span>
       <button type="button" class="quiet" data-remove="${escapeHtml(e.id)}" aria-label="Take this edit out" title="Take this edit out">×</button></li>`).join('');
     this.box.innerHTML = `
-      <h2>World editor <button type="button" class="close" aria-label="Close">×</button></h2>
+      <h2>World editor <label class="hitbox-toggle"><input type="checkbox" name="hitboxes" ${this.showHitboxes ? 'checked' : ''} /> Hitboxes</label><button type="button" class="close" aria-label="Close">×</button></h2>
       <div class="tools">${tools.map((t) => `<button type="button" data-tool="${t.id}" class="${t.id === this.tool ? '' : 'quiet'}">${t.name}</button>`).join('')}</div>
       <p class="note">${escapeHtml(tool.hint)}</p>
       <div class="settings">${settings[this.tool]}</div>
@@ -408,6 +454,7 @@ export class EditorUi {
         <span><button type="button" class="quiet" data-undo ${this.log.edits.length && !this.busy ? '' : 'disabled'}>Undo</button>
         <button type="button" class="quiet" data-redo ${this.log.undone && !this.busy ? '' : 'disabled'}>Redo</button></span></h3>
       <ol class="edits">${edits || '<li class="note">No edits here yet.</li>'}</ol>`;
+    this.drawHitboxes();
   }
 }
 

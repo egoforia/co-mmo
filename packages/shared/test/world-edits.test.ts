@@ -117,7 +117,8 @@ describe('world edits', () => {
     const map = generateRegion(def);
     const arcanum = map.buildings[0]!;
     expect(checkEdit(map, { kind: 'paint', tile: 'tree', tiles: [[-1, 4]] }, CREATURES)).toMatch(/edge/);
-    expect(checkEdit(map, { kind: 'paint', tile: 'wall' as 'tree', tiles: [spot] }, CREATURES)).toMatch(/cannot lay/);
+    expect(checkEdit(map, { kind: 'paint', tile: 'lava' as 'tree', tiles: [spot] }, CREATURES)).toMatch(/cannot lay/);
+    expect(checkEdit(map, { kind: 'paint', tile: 'wall', tiles: [spot] }, CREATURES)).toBeUndefined();
     expect(checkEdit(map, { kind: 'move', from: spot, to: null }, CREATURES)).toMatch(/nothing there/);
     expect(checkEdit(map, { kind: 'house', at: [arcanum.x + 1, arcanum.y], floor: [6, 6], style: 'sanctum-arcanum' }, CREATURES)).toMatch(/Another building/);
     expect(checkEdit(map, { kind: 'house', at: spot, floor: [6, 6], style: 'nope' }, CREATURES)).toMatch(/no house/);

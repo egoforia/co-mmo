@@ -1405,6 +1405,18 @@ export class WorldScene extends Phaser.Scene {
     return this.drawn.get(region)?.map.def.name;
   }
 
+  get currentMap(): RegionMap {
+    return this.map;
+  }
+
+  get currentFloor(): number {
+    return this.floor;
+  }
+
+  get playerPosition(): { x: number; y: number } {
+    return { ...this.shown };
+  }
+
   /** The screen corners of a rectangle of tiles in a land, for the world editor's outlines. */
   tileCorners(map: RegionMap, x: number, y: number, width = 1, height = 1): Phaser.Math.Vector2[] {
     const ox = map.def.at.x * map.width;

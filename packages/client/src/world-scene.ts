@@ -1085,8 +1085,8 @@ export class WorldScene extends Phaser.Scene {
     const views = map.buildings.map((b) => {
       const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
       for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-      // One built from a kit's pieces (the sea cave) has no outside picture: its rock is seen from above.
-      const outside = !b.art && hasExterior(this, b.style) ? [this.exterior(b, ox, oy)] : [];
+      // In the isometric camera, buildings stand as kit houses or open walls; flat 2D exterior pictures are only used in top-down mode.
+      const outside = !b.art && hasExterior(this, b.style) && PROJECTION.ground.kind !== 'diamond' ? [this.exterior(b, ox, oy)] : [];
       const floor = this.groundLayer(inside, ox + b.x, oy + b.y, -0.5, registerKitTileset(this, b.style, b.art));
       tilemaps.push(floor.tilemap);
       const view: BuildingView = { building: b, ox, oy, outside, inside: [floor, ...this.rockWalls(inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true)], open: !outside.length };

@@ -515,22 +515,43 @@ export class WorldScene extends Phaser.Scene {
     const here = mine ? storeyAt(this.map, Math.floor(this.shown.x), Math.floor(this.shown.y), mine) : undefined;
     for (const [id, region] of this.drawn) {
       const current = id === this.welcome.region.def.id;
-      for (const o of region.objects) setShown(o, !under);
+      const groundDelta = Math.max(0, mine);
+      for (const o of region.objects) {
+        setShown(o, !under);
+        setDepthShade(o, groundDelta);
+      }
       for (const chunk of region.chunks.values()) {
         chunk.layer.setVisible(!under);
-        for (const o of chunk.objects) setShown(o, !under);
+        setDepthShade(chunk.layer, groundDelta);
+        for (const o of chunk.objects) {
+          setShown(o, !under);
+          setDepthShade(o, groundDelta);
+        }
       }
       for (const v of region.buildings) {
         const covered = Boolean(current && here && overlaps(here, v.building));
-        for (const o of [...v.outside, ...v.inside]) o.setVisible(!under && !covered);
+        for (const o of [...v.outside, ...v.inside]) {
+          o.setVisible(!under && !covered);
+          setDepthShade(o, groundDelta);
+        }
       }
-      for (const o of region.stairs) setShown(o, mine === 0);
+      for (const o of region.stairs) {
+        setShown(o, mine === 0);
+        setDepthShade(o, groundDelta);
+      }
       // Lamps burn only on their own floor, and those on the ground show from upstairs unless the floor we stand on covers them.
       for (const lamp of region.lamps) {
         const covered = Boolean(current && here && within(here, lamp.tile.x, lamp.tile.y));
         lamp.hidden = lamp.floor === mine ? false : !(mine > 0 && lamp.floor === 0 && !covered);
       }
-      for (const f of region.floors) for (const o of f.objects) setShown(o, current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open))));
+      for (const f of region.floors) {
+        const delta = mine - f.storey.floor;
+        const visible = current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open)) || (mine > f.storey.floor && !under));
+        for (const o of f.objects) {
+          setShown(o, visible);
+          setDepthShade(o, Math.max(0, delta));
+        }
+      }
     }
   }
 
@@ -653,6 +674,10 @@ export class WorldScene extends Phaser.Scene {
           const seen = sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }
+        const delta = Math.max(0, this.floor - (remote.floor ?? 0));
+        setDepthShade(remote.body, delta);
+        if (remote.held?.image) setDepthShade(remote.held.image, delta);
+        if (remote.offHeld?.image) setDepthShade(remote.offHeld.image, delta);
       }
     }
   }
@@ -1256,14 +1281,26 @@ export class WorldScene extends Phaser.Scene {
     for (const s of map.stairways) {
       for (const floor of [s.lower, s.upper]) {
         const parts: Phaser.GameObjects.GameObject[] = [];
-        const art = floor === s.lower ? s.art?.up : s.art?.down;
+        const isUp = floor === s.lower;
+        const defaultArt = isUp ? (s.kind === 'ladder' ? 'ladder-up' : 'stairs-up') : (s.kind === 'ladder' ? 'ladder-down' : 'stairs-down');
+        const art = (isUp ? s.art?.up : s.art?.down) ?? defaultArt;
         const feet = PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
         const at = PROJECTION.toScreen(feet.x, feet.y);
         if (art && this.textures.exists(art)) {
           const img = this.add.image(at.x, at.y, art).setOrigin(0.5, 0.92);
           parts.push(img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1));
         }
-        const label = this.add.text(at.x, at.y - T * 0.6, stairsLabel(s, floor), { fontFamily: 'sans-serif', fontSize: '22px', color: '#fff6dc', stroke: '#1c1830', strokeThickness: 4 });
+        const arrow = isUp ? '▲' : '▼';
+        const label = this.add.text(at.x, at.y - T * 0.75, `${arrow} ${stairsLabel(s, floor)}`, {
+          fontFamily: 'sans-serif',
+          fontSize: '18px',
+          fontStyle: 'bold',
+          color: '#fff6dc',
+          stroke: '#1c1830',
+          strokeThickness: 4,
+          backgroundColor: '#1c1830ee',
+          padding: { x: 8, y: 4 },
+        });
         parts.push(label.setOrigin(0.5, 1).setDepth(LABEL_DEPTH - 2));
         const [tx, ty] = [s.x, s.y];
         if (floor) floorAt(floors, tx, ty, floor)?.objects.push(...parts);
@@ -1596,6 +1633,28 @@ function overlaps(a: TileRect, b: { x: number; y: number; width: number; height:
 /** Shows or hides anything drawn that can be. */
 function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void {
   (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
+}
+
+/**
+ * Dims/darkens a game object when it belongs to a floor below the player's current floor.
+ * deltaFloors: player floor - object floor (e.g. 1 floor below -> 1, 2 floors below -> 2)
+ */
+function setDepthShade(o: Phaser.GameObjects.GameObject, deltaFloors: number): void {
+  const alphaObj = o as Partial<Phaser.GameObjects.Components.Alpha>;
+  const tintObj = o as Partial<Phaser.GameObjects.Components.Tint>;
+  if (deltaFloors <= 0) {
+    alphaObj.setAlpha?.(1.0);
+    tintObj.clearTint?.();
+    return;
+  }
+  // Darken and slightly cool-shift lower floors to create atmospheric aerial depth
+  const factor = deltaFloors === 1 ? 0.55 : 0.35;
+  const r = Math.round(255 * factor * 0.92);
+  const g = Math.round(255 * factor * 0.94);
+  const b = Math.round(255 * factor * 1.05);
+  const tint = (r << 16) | (g << 8) | b;
+  tintObj.setTint?.(tint);
+  alphaObj.setAlpha?.(deltaFloors === 1 ? 0.75 : 0.5);
 }
 
 /** True when tile (x, y) lies within a building's walls (or a floor's rectangle). */

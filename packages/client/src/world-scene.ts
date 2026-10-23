@@ -798,9 +798,6 @@ export class WorldScene extends Phaser.Scene {
   private figures = new Map<string, number>();
   private figureMetrics = new Map<string, { height: number; originY: number }>();
 
-  /** Metrics of the figure in a texture's first frame, see-through edges left out. */
-  private figureMetrics = new Map<string, { height: number; originY: number }>();
-
   private figureInfo(key: string): { height: number; originY: number } | undefined {
     const known = this.figureMetrics.get(key);
     if (known !== undefined) return known;

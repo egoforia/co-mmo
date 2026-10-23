@@ -1451,6 +1451,12 @@
     "width": 128,
     "height": 128
   },
+  "sanctum-cathedral-wall-face": {
+    "file": "art/sanctum-cathedral-wall-face.png",
+    "kind": "face",
+    "width": 256,
+    "height": 256
+  },
   "sanctum-cathedral-door": {
     "file": "art/sanctum-cathedral-door.png",
     "kind": "tile",
@@ -1499,6 +1505,12 @@
     "width": 128,
     "height": 128
   },
+  "sanctum-scriptorium-wall-face": {
+    "file": "art/sanctum-scriptorium-wall-face.png",
+    "kind": "face",
+    "width": 256,
+    "height": 256
+  },
   "sanctum-scriptorium-door": {
     "file": "art/sanctum-scriptorium-door.png",
     "kind": "tile",
@@ -1541,6 +1553,12 @@
     "width": 128,
     "height": 128
   },
+  "sanctum-inn-wall-face": {
+    "file": "art/sanctum-inn-wall-face.png",
+    "kind": "face",
+    "width": 256,
+    "height": 256
+  },
   "sanctum-inn-door": {
     "file": "art/sanctum-inn-door.png",
     "kind": "tile",
@@ -1576,5 +1594,29 @@
     "kind": "set-piece",
     "width": 128,
     "height": 128
+  },
+  "stairs-up": {
+    "file": "art/stairs-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-down": {
+    "file": "art/stairs-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "ladder-up": {
+    "file": "art/ladder-up.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 256
+  },
+  "ladder-down": {
+    "file": "art/ladder-down.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 160
   }
 }

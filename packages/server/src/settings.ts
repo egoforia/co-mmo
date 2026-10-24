@@ -10,6 +10,18 @@ export interface ModelChoice {
   model: string;
 }
 
+export interface ImageChoice {
+  provider: 'gemini' | 'none' | string;
+  model: string;
+  uses?: Partial<Record<ArtUse, string>>;
+}
+
+export interface VideoChoice {
+  provider: 'gemini' | 'none' | string;
+  model: string;
+  dailyClips?: number;
+}
+
 export interface Settings {
   ai: {
     /** The in-character God conversation, which also compiles wishes. */
@@ -19,9 +31,9 @@ export interface Settings {
     /** Drafts scripted rules for Major wishes; null uses the God's model. */
     compiler?: ModelChoice | null;
     /** Paints wished things; 'none' keeps tinted placeholders. `uses` picks another model for some kinds of art. */
-    image: { provider: 'gemini' | 'none'; model: string; uses?: Partial<Record<ArtUse, string>> };
-    /** Makes walk clips (missing in older saves: Veo whenever the images come from Gemini). */
-    video?: { provider: 'gemini' | 'none'; model: string; dailyClips?: number };
+    image: ImageChoice;
+    /** Makes animation clips (missing in older saves: default video provider whenever images come from Gemini). */
+    video?: VideoChoice;
     /** Makes sound effects and music (missing in older saves: see soundSettings). */
     sound?: SoundSettings;
     /** Checks painted pictures and looks for one to reuse (missing in older saves: see styleCheckSettings). */
@@ -51,15 +63,14 @@ export const DEFAULT_DAILY_USD = 10;
 export type ArtUse = 'wishes' | 'buildings' | 'scenery' | 'walks';
 export const ART_USES: ArtUse[] = ['wishes', 'buildings', 'scenery', 'walks'];
 
-/** The video model in use: the saved choice, or Veo Lite when the Gemini key is set (as walks worked before the choice existed). */
-export function videoSettings(settings: Settings, env: NodeJS.ProcessEnv): { provider: 'gemini' | 'none'; model: string } {
+/** The video model in use: the saved choice, or the default video provider when the Gemini key is set. */
+export function videoSettings(settings: Settings, env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env): { provider: string; model: string; dailyClips?: number } {
   return settings.ai.video ?? (env.GEMINI_API_KEY ? { provider: 'gemini', model: 'veo-3.1-lite-generate-preview' } : { provider: 'none', model: '' });
 }
 
 /**
- * Veo clips a day unless the Owner sets another number. Google refused the
- * eighth clip of the day on this key (15 October 2026) without saying it was
- * a daily limit, so the game counts its own and stops first.
+ * Daily video clips limit unless the Owner sets another number. Providers enforce
+ * daily rate and quota limits, so the game counts its own and stops first.
  */
 export const DEFAULT_DAILY_CLIPS = 7;
 

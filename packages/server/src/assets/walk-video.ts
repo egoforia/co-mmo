@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
-import { ISO_WAYS, heldBehind, isWalkDirection, type Facing, type IsoWay, type WalkDirection } from '@co-mmo/shared';
+import { ISO_WAYS, TURNTABLE_WAYS, heldBehind, isWalkDirection, type Facing, type IsoWay, type WalkDirection } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
 import { countFigures, cutFigures, type Box } from './walk-frames.ts';
 import { KEY_COLOR } from './style.ts';
@@ -111,15 +111,17 @@ export function waysSheetPrompt(name: string, gear: Carried[], references = 1): 
   ].join('\n');
 }
 
-/** The four figures of a painted ways sheet, cut out, by the way each faces; fails, in plain words, unless there are exactly four. */
-export async function waysFromSheet(painted: Buffer): Promise<Record<IsoWay, Buffer>> {
+/** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to ISO_WAYS or custom order such as TURNTABLE_WAYS). */
+export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = ISO_WAYS): Promise<Record<IsoWay, Buffer>> {
   const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
   const clean = await removeKeySpill(png);
-  const count = await countFigures(clean);
-  if (count !== ISO_WAYS.length) throw new Error(`The sheet shows ${count} figures instead of ${ISO_WAYS.length}.`);
-  const figures = (await cutFigures(clean, { count: ISO_WAYS.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
-  return Object.fromEntries(ISO_WAYS.map((way, i) => [way, figures[i]!.png])) as Record<IsoWay, Buffer>;
+  const count = await countFigures(clean, { dropEdgeBits: true });
+  if (count !== order.length) throw new Error(`The sheet shows ${count} figures instead of ${order.length}.`);
+  const figures = (await cutFigures(clean, { count: order.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
+  return Object.fromEntries(order.map((way, i) => [way, figures[i]!.png])) as Record<IsoWay, Buffer>;
 }
+
+export { TURNTABLE_WAYS };
 
 /** The prompt that makes a standing picture walk in place and come back to the same pose. */
 export function walkVideoPrompt(gear: Carried[], direction: Facing, body = 'two-legged'): string {
@@ -154,7 +156,7 @@ export async function soleFigure(painted: Buffer): Promise<Buffer> {
 async function soleFigureAt(painted: Buffer): Promise<{ png: Buffer; box: Box }> {
   const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
   const clean = await removeKeySpill(png);
-  const count = await countFigures(clean);
+  const count = await countFigures(clean, { dropEdgeBits: true });
   if (count !== 1) throw new Error(`The picture shows ${count} figures instead of one.`);
   const [figure] = await cutFigures(clean, { count: 1, dropEdgeBits: true });
   return { png: figure!.png, box: figure!.box };
@@ -195,13 +197,71 @@ export interface Cycle {
   picks: number[];
 }
 
+export interface FindCycleOptions {
+  /** Frames to skip at each end (still poses). Default scales proportionally (~12.5% of total, 24 for 192f). */
+  skip?: number;
+  /** Shortest cycle to test. Default scales proportionally (~6% of total, 12 for 192f). */
+  shortest?: number;
+  /** Longest cycle to test. Default scales proportionally (~25% of total, 48 for 192f). */
+  longest?: number;
+  /** Frame rate of the clip, if known. */
+  fps?: number;
+}
+
 /**
  * Finds one walk cycle in a clip of `total` frames: the gap after which the
  * pictures come back the closest (`difference` between two frames), skipping
  * the still pose at both ends, then `count` frames spread evenly through it.
+ * Adapts proportionally when clip frame count differs from 24–30fps 8s clips.
  */
-export function findCycle(total: number, difference: (a: number, b: number) => number, count: number, { skip = 24, shortest = 12, longest = 48 } = {}): Cycle {
-  const lo = Math.min(skip, Math.floor(total / 4)), hi = total - lo;
+export function findCycle(
+  total: number,
+  difference: (a: number, b: number) => number,
+  count: number,
+  options: FindCycleOptions = {},
+): Cycle {
+  let { skip, shortest, longest } = options;
+
+  if (skip === undefined) {
+    if (total >= 96 && total <= 250) {
+      skip = 24;
+    } else if (options.fps) {
+      skip = Math.max(1, Math.round(options.fps));
+    } else {
+      skip = Math.max(1, Math.min(Math.floor(total / 6), Math.round((24 * total) / 192)));
+    }
+  }
+
+  let lo = Math.min(skip, Math.floor(total / 4));
+  let hi = total - lo;
+
+  if (shortest === undefined) {
+    if (total >= 96 && total <= 250) {
+      shortest = 12;
+    } else if (options.fps) {
+      shortest = Math.max(3, Math.round(0.5 * options.fps));
+    } else {
+      shortest = Math.max(3, Math.round((12 * total) / 192));
+    }
+  }
+
+  if (longest === undefined) {
+    if (total >= 96 && total <= 250) {
+      longest = 48;
+    } else if (options.fps) {
+      longest = Math.max(shortest + 2, Math.round(2.0 * options.fps));
+    } else {
+      longest = Math.max(shortest + 2, Math.round((48 * total) / 192));
+    }
+  }
+
+  if (hi - lo - 1 < shortest) {
+    lo = Math.max(0, Math.floor((total - shortest - 1) / 2));
+    hi = total - lo;
+    shortest = Math.min(shortest, Math.max(2, hi - lo - 1));
+  }
+  longest = Math.min(longest, Math.max(shortest, hi - lo - 1));
+
   let period = shortest, best = Infinity;
   for (let p = shortest; p <= Math.min(longest, hi - lo - 1); p++) {
     let sum = 0, n = 0;
@@ -220,7 +280,12 @@ export function findCycle(total: number, difference: (a: number, b: number) => n
 async function thumbs(frames: Buffer[]): Promise<Buffer[]> {
   return Promise.all(frames.map(async (f) => {
     const { width = 0, height = 0 } = await sharp(f).metadata();
-    const middle = { left: Math.round(width / 4), top: 0, width: Math.round(width / 2), height };
+    const ratio = width > 0 && height > 0 ? width / height : 16 / 9;
+    const middle = ratio > 1.3
+      ? { left: Math.round(width / 4), top: 0, width: Math.round(width / 2), height }
+      : ratio > 0.8
+        ? { left: Math.round(width * 0.15), top: 0, width: Math.round(width * 0.7), height }
+        : { left: Math.round(width * 0.1), top: 0, width: Math.round(width * 0.8), height };
     return sharp(f).extract(middle).resize(64, 72, { fit: 'fill' }).greyscale().raw().toBuffer();
   }));
 }
@@ -232,14 +297,18 @@ async function thumbs(frames: Buffer[]): Promise<Buffer[]> {
  * keeps the feet where they really were; trimming each frame on its own and
  * lining frames up by their feet made the walker slide as the legs moved.
  */
-export async function walkFromFrames(frames: Buffer[], count: number): Promise<{ figures: Buffer[]; placed: Buffer[]; cycle: Cycle }> {
+export async function walkFromFrames(
+  frames: Buffer[],
+  count: number,
+  options?: FindCycleOptions,
+): Promise<{ figures: Buffer[]; placed: Buffer[]; cycle: Cycle }> {
   const small = await thumbs(frames);
   const difference = (a: number, b: number) => {
     let sum = 0;
     for (let k = 0; k < small[a]!.length; k++) sum += Math.abs(small[a]![k]! - small[b]![k]!);
     return sum / small[a]!.length;
   };
-  const cycle = findCycle(frames.length, difference, count);
+  const cycle = findCycle(frames.length, difference, count, options);
   const cut = await Promise.all(cycle.picks.map((i) => soleFigureAt(frames[i]!)));
   const all = cut.reduce((u, c) => ({ left: Math.min(u.left, c.box.left), top: Math.min(u.top, c.box.top), right: Math.max(u.right, c.box.right), bottom: Math.max(u.bottom, c.box.bottom) }), cut[0]!.box);
   // Each cut figure is exactly its box, so it goes back at the box's place.

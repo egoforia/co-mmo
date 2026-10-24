@@ -195,10 +195,55 @@ export async function cutFigures(png: Buffer, options: CutOptions): Promise<CutF
 }
 
 /** How many figures a transparent picture holds: shapes at least a fifth the size of the biggest. */
-export async function countFigures(png: Buffer): Promise<number> {
-  const all = shapes(await toRaw(png));
-  const biggest = Math.max(0, ...all.map((s) => s.pixels.length));
+export async function countFigures(png: Buffer, options: { dropEdgeBits?: boolean } = {}): Promise<number> {
+  const img = await toRaw(png);
+  let all = shapes(img).sort((a, b) => b.pixels.length - a.pixels.length);
+  if (!all.length) return 0;
+  const biggest = all[0]!.pixels.length;
+  if (options.dropEdgeBits && all.length > 1) {
+    const onEdge = (b: Box) => b.left === 0 || b.top === 0 || b.right === img.width - 1 || b.bottom === img.height - 1;
+    all = [all[0]!, ...all.slice(1).filter((s) => !onEdge(s.box))];
+  }
   return all.filter((s) => s.pixels.length >= biggest * 0.2).length;
+}
+
+/**
+ * Isolates the main character figure using connected-component island segmentation.
+ * Keeps the largest connected component (and any nearby components like carried items or accessories),
+ * rejecting small disconnected background specks (< 15% of body) and edge artifacts.
+ * Never performs hardcoded coordinate clipping, preserving extending fingertips, claws, and limbs.
+ */
+export async function isolateFigure(png: Buffer, { speckThreshold = 0.15, dropEdgeBits = true } = {}): Promise<Buffer> {
+  const img = await toRaw(png);
+  const all = shapes(img).sort((a, b) => b.pixels.length - a.pixels.length);
+  if (all.length <= 1) return png;
+
+  const biggest = all[0]!.pixels.length;
+  const onEdge = (b: Box) => b.left === 0 || b.top === 0 || b.right === img.width - 1 || b.bottom === img.height - 1;
+  const reach = img.width * 0.05;
+
+  const main = all[0]!;
+  const kept = [main];
+  let unionBox = { ...main.box };
+
+  for (let i = 1; i < all.length; i++) {
+    const s = all[i]!;
+    if (dropEdgeBits && onEdge(s.box) && s.pixels.length < biggest * 0.5) continue;
+    if (s.pixels.length < biggest * speckThreshold && gap(s.box, unionBox) > reach) continue;
+    if (gap(s.box, unionBox) <= reach) {
+      kept.push(s);
+      unionBox = union(unionBox, s.box);
+    }
+  }
+
+  const cleanData = Buffer.alloc(img.data.length);
+  for (const s of kept) {
+    for (const p of s.pixels) {
+      img.data.copy(cleanData, p * 4, p * 4, p * 4 + 4);
+    }
+  }
+
+  return fromRaw({ width: img.width, height: img.height, data: cleanData });
 }
 
 function nextToFigure(r: Raw, x: number, y: number): boolean {
@@ -262,34 +307,57 @@ export async function normalizeWalk(directions: Buffer[][], { bodyHeight = CHARA
       const meta = await sharp(png).metadata();
       return { png, width: meta.width!, height: meta.height!, feet: await feetCentre(png) };
     }));
+    const analyzed = await Promise.all(sized.map(async (f) => {
+      const trimmed = await sharp(f.png).trim().toBuffer({ resolveWithObject: true }).catch(() => null);
+      const top = trimmed ? -(trimmed.info.trimOffsetTop ?? 0) : 0;
+      const height = trimmed ? trimmed.info.height : f.height;
+      const left = trimmed ? -(trimmed.info.trimOffsetLeft ?? 0) : 0;
+      const width = trimmed ? trimmed.info.width : f.width;
+      const ground = top + height;
+      const right = left + width;
+      return { ...f, figure: height, ground, top, left, right };
+    }));
+
     // Frames placed where they stood in the clip share one canvas: they keep their places, lined up
     // by the feet of the whole cycle, so the walker does not slide from frame to frame.
     const placed = sized.length > 1 && sized.every((f) => f.width === sized[0]!.width && f.height === sized[0]!.height);
-    if (!placed) return sized.map((f) => ({ ...f, figure: f.height, ground: f.height, top: 0, croppedPng: f.png, activeH: f.height }));
+    if (!placed) {
+      return analyzed.map((f) => ({
+        ...f,
+        activeH: f.figure,
+        activeW: f.right - f.left,
+        cycleFeet: f.feet - f.left,
+        croppedPng: f.png,
+      }));
+    }
+
     const feet = [...sized.map((f) => f.feet)].sort((a, b) => a - b)[Math.floor(sized.length / 2)]!;
-    const analyzed = await Promise.all(sized.map(async (f) => {
-      const trimmed = await sharp(f.png).trim().toBuffer({ resolveWithObject: true });
-      const top = -(trimmed.info.trimOffsetTop ?? 0);
-      const ground = top + trimmed.info.height;
-      return { ...f, feet, figure: trimmed.info.height, ground, top };
-    }));
     // Across the cycle, crop excess empty space above and below so the feet land on the ground baseline
     const cycleGround = Math.max(...analyzed.map((f) => f.ground));
     const cycleTop = Math.min(...analyzed.map((f) => f.top));
     const activeH = Math.max(1, cycleGround - cycleTop);
+
+    // Crop excess horizontal empty margin across the entire cycle, keeping foot coordinates aligned
+    const cycleLeft = Math.min(...analyzed.map((f) => f.left));
+    const cycleRight = Math.max(...analyzed.map((f) => f.right));
+    const activeW = Math.max(1, cycleRight - cycleLeft);
+    const cycleFeet = feet - cycleLeft;
+
     return Promise.all(analyzed.map(async (f) => ({
       ...f,
       activeH,
-      croppedPng: await sharp(f.png).extract({ left: 0, top: cycleTop, width: f.width, height: activeH }).png().toBuffer(),
+      activeW,
+      cycleFeet,
+      croppedPng: await sharp(f.png).extract({ left: cycleLeft, top: cycleTop, width: activeW, height: activeH }).png().toBuffer(),
     })));
   }));
   const heights = frames.flat().map((f) => f.figure).sort((a, b) => a - b);
   const scale = bodyHeight / (heights[Math.floor(heights.length / 2)] ?? 1);
   const sized = frames.map((dir) => dir.map((f) => ({
     ...f,
-    w: Math.max(1, Math.round(f.width * scale)),
+    w: Math.max(1, Math.round(f.activeW * scale)),
     h: Math.max(1, Math.round(f.activeH * scale)),
-    feet: f.feet * scale,
+    feet: f.cycleFeet * scale,
   })));
   const half = Math.max(...sized.flat().map((f) => Math.max(f.feet, f.w - f.feet)));
   const frameWidth = Math.ceil((2 * half + 2) / 2) * 2;

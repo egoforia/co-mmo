@@ -27,6 +27,7 @@ import {
 import { dropLight, litFigure, makeLight, placeLight } from '../lights.ts';
 import { PROJECTION } from '../projection.ts';
 import { playerArt } from '../textures.ts';
+import { figureRows, groundFrame, standingMetrics } from './figure-ground.ts';
 import { artSrc, lookArt } from '../wished.ts';
 import {
   type Avatar,
@@ -40,44 +41,36 @@ import {
 
 /**
  * Caches opaque pixel heights and ground-contact vertical origins of figures
- * in textures (first frame), by texture key.
+ * in textures, by texture key. A walk strip is measured on the frame it
+ * stands on (`groundFrame`), not its first, so feet stay on the shadow.
  */
 export class FigureMetricsCache {
-  private readonly figures = new Map<string, number>();
   private readonly metrics = new Map<string, { height: number; originY: number }>();
 
   invalidate(key: string): void {
-    this.figures.delete(key);
     this.metrics.delete(key);
   }
 
   info(textures: Phaser.Textures.TextureManager, key: string): { height: number; originY: number } | undefined {
     const known = this.metrics.get(key);
     if (known !== undefined) return known;
-    const frame = textures.getFrame(key, 0) ?? textures.getFrame(key);
-    const image = frame?.source.image as CanvasImageSource | undefined;
-    if (!frame || !image) return undefined;
+    const texture = textures.exists(key) ? textures.get(key) : undefined;
+    const names = texture?.getFrameNames() ?? [];
+    const frames = (names.length ? names.map((n) => texture!.get(n)) : [texture?.get()]).filter((f): f is Phaser.Textures.Frame => !!f);
+    const image = frames[0]?.source.image as CanvasImageSource | undefined;
+    if (!frames.length || !image) return undefined;
+    const { width, height } = frames[0]!.source;
     const canvas = document.createElement('canvas');
-    canvas.width = frame.cutWidth;
-    canvas.height = frame.cutHeight;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return undefined;
-    ctx.drawImage(image, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight, 0, 0, frame.cutWidth, frame.cutHeight);
-    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const solid = (y: number) => {
-      for (let x = 0; x < width; x++) if (data[(y * width + x) * 4 + 3]! > 16) return true;
-      return false;
-    };
-    let top = 0;
-    let bottom = height - 1;
-    while (top < height && !solid(top)) top++;
-    while (bottom > top && !solid(bottom)) bottom--;
-    const figHeight = top < height ? bottom - top + 1 : height;
-    // Align ground contact (bottom) so the feet always rest on the shadow baseline
-    const originY = Math.min(1, Math.max(0, (bottom - Math.round(figHeight * 0.03)) / height));
-    const entry = { height: figHeight, originY };
+    ctx.drawImage(image, 0, 0);
+    const { data } = ctx.getImageData(0, 0, width, height);
+    const rows = frames.map((f) => figureRows(data, width, { x: f.cutX, y: f.cutY, width: f.cutWidth, height: f.cutHeight }));
+    const at = groundFrame(rows);
+    const entry = standingMetrics(rows[at], frames[at]!.cutHeight);
     this.metrics.set(key, entry);
-    this.figures.set(key, figHeight);
     return entry;
   }
 

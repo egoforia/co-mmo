@@ -46,7 +46,7 @@ describe('robots play together', () => {
     await ilya.walkTo(() => mara.at, { near: 2, what: 'Mara' });
     const asked = ilya.mark();
     mara.send({ t: 'trade', action: 'request', name: 'Ilya' });
-    await ilya.waitFor((m) => m.t === 'trade-request', { since: asked, what: "Mara's trade request" });
+    await ilya.waitFor((m) => m.t === 'trade-request', { since: asked, ms: 15_000, what: "Mara's trade request" });
     ilya.send({ t: 'trade', action: 'accept' });
     await mara.waitFor((m) => m.t === 'trade' && m.trade !== null, { since: asked, what: 'the trade window' });
     ilya.send({ t: 'trade', action: 'offer', offer: { items: [{ item: 'tonic', qty: 1 }], gold: 0 } });

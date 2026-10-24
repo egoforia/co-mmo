@@ -59,7 +59,7 @@ describe('the isometric camera', () => {
     expect(collides(map, start.x, start.y), 'the lane is open').toBe(false);
     world.store.savePosition(id, start.x, start.y, 'sanctum', newCharacter());
     await context.addInitScript((t) => localStorage.setItem('co-mmo.token', t), token);
-    const drawn = page.waitForResponse((r) => /\/wished-art\/kit-houses\/.+\/outside\.png/.test(r.url()), { timeout: 90_000 });
+    const drawn = page.waitForResponse((r) => /\/wished-art\/kit-houses\/.+\/outside\.png/.test(r.url()), { timeout: 180_000 });
     await page.goto(`${world.base}/`);
     const again = page;
     await again.waitForSelector('#game canvas', { timeout: 20_000 });

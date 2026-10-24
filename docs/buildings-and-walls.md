@@ -128,8 +128,21 @@ Before merging or committing new buildings or biomes, verify:
 - [ ] **Sufficient Height:** The wall height multiplier in `world-scene/regions.ts` (`rockWalls` in `world-scene/walls.ts`) is $\ge 2.0$ ($128\text{px}$) for multi-storey buildings and $\ge 1.0$ ($64\text{px}$) for cottages.
 - [ ] **Full-Bleed Textures:** `*-wall.png` and `*-floor.png` have 0 magenta pixels and fill the entire 128×128 image rectangle.
 - [ ] **Bay Grid Alignment:** Floor width in tiles is an even number resulting in an odd number of bays (e.g. 10, 14, 18).
+- [ ] **Kit Look:** The style has a `kit` look from `building-kit/looks.ts` (add a new look there when none fits), unless it is one of `WALLED_STYLES` in `buildings.ts`. `kit-houses.test.ts` fails for any other style without one, or for a building whose floor or doorway is off the bays.
 - [ ] **Tests Pass:** `npm test` and `npm run typecheck` pass with 0 errors.
 - [ ] **Visual Playtest:** An in-game screenshot confirms that characters and furniture are visually enclosed by tall, opaque isometric walls.
+
+## Wished buildings
+
+An Engine wish for a building adds a style to `BUILDING_STYLES` and places
+it, behind `modOn(engineModId(<issue>))` like any wish. It stands as a kit
+house: give the style a `kit` look (an existing one, or a new `KitLook` in
+`building-kit/looks.ts` with its own words) and, for a hall, a `kitShape`;
+give it a floor from `KIT_HOUSE_FLOORS` or any width of an odd number of
+bays. Only the caves and Old Bramble's hollow tree (`WALLED_STYLES`) stand as
+tall walls; a wish never adds to that list. A house in an existing look
+shares that look's painted sheet; a new look's sheet is painted by the
+Owner in Art > Building looks.
 
 ## Checking buildings in the Art tab
 

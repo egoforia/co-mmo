@@ -56,6 +56,9 @@ Where things are:
   sheet per look (`sheet.ts`; a look's words in `KIT_LOOKS`, the style's in
   the profile's `kitTextures`), and only textures that pass the sheet checks
   are used. Keep the sheet layout: today's paintings are read against it.
+  Every building style, a wished one too, has a `kit` look unless it is in
+  `WALLED_STYLES` (caves, Old Bramble's tree); `kit-houses.test.ts` checks it
+  (`docs/buildings-and-walls.md`, Wished buildings).
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
 - Things that stand on tiles (set pieces, props with a footprint, furniture)
   are painted, in an isometric style, standing on exactly their footprint

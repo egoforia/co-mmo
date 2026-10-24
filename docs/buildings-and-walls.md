@@ -31,7 +31,7 @@ co-MMO uses a 2.5D diamond isometric camera projection (`ISOMETRIC`, 45° angle,
 
 ### Mistake 2: The "Billboard Facade" Trap
 - **The Problem:** Pasting a 2D painted exterior illustration over the building footprint works in 2D top-down mode, but severely clashes with diamond isometric projection. It creates an awkward cardboard cutout that cannot properly occlude isometric entities or blend with 45° ground paths.
-- **The Rule:** In [`packages/client/src/world-scene.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene.ts), 2D exterior pictures are disabled when `PROJECTION.ground.kind === 'diamond'`. Buildings stand exclusively as 3D kit houses (`KitHouse`) or tall cutaway isometric wall structures.
+- **The Rule:** In [`packages/client/src/world-scene/regions.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/regions.ts) (via [`packages/client/src/world-scene.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene.ts)), 2D exterior pictures are disabled when `PROJECTION.ground.kind === 'diamond'`. Buildings stand exclusively as 3D kit houses (`KitHouse`) or tall cutaway isometric wall structures.
 
 ### Mistake 3: The "Chroma-Key Magenta" Asset Generation Trap
 - **The Problem:** Beastfolk and character sprites use a solid pure magenta (`#FF00FF`) background for chroma-keying video and walk frames (`docs/art-pipeline.md`). Prompting the image generator with *"on neutral magenta background"* for **wall or floor textures** causes the AI model to generate a cutout sprite surrounded by magenta padding, resulting in bright pink outlines and transparent holes along building edges!
@@ -39,9 +39,9 @@ co-MMO uses a 2.5D diamond isometric camera projection (`ISOMETRIC`, 45° angle,
 
 ---
 
-## 3. Rendering Pipeline in `world-scene.ts` & `textures.ts`
+## 3. Rendering Pipeline in `world-scene/` & `textures.ts`
 
-Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`packages/client/src/world-scene.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene.ts) and `registerWallFace()` / `registerDiamondTileset()` in [`packages/client/src/textures.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/textures.ts):
+Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`packages/client/src/world-scene/walls.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/walls.ts), region/floor assembly in [`packages/client/src/world-scene/regions.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/regions.ts), depth helpers in [`packages/client/src/world-scene/types.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/types.ts), and `registerWallFace()` / `registerDiamondTileset()` in [`packages/client/src/textures.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/textures.ts):
 
 ### 1. Single Wall Asset Rule (`<style>-wall.png`)
 - Every building style uses **1 seamless $128\times 128$ texture (`<style>-wall.png`)** for both the top coping cap and vertical wall faces (no separate `*-wall-face.png` assets).
@@ -126,7 +126,7 @@ When extending `KitShape` with `numStoreys`:
 
 Before merging or committing new buildings or biomes, verify:
 - [ ] **No Flat Billboards:** In diamond isometric mode, the building does not display a flat 2D exterior picture.
-- [ ] **Sufficient Height:** The wall height multiplier in `world-scene.ts` is $\ge 2.0$ ($128\text{px}$) for multi-storey buildings and $\ge 1.0$ ($64\text{px}$) for cottages.
+- [ ] **Sufficient Height:** The wall height multiplier in `world-scene/regions.ts` (`rockWalls` in `world-scene/walls.ts`) is $\ge 2.0$ ($128\text{px}$) for multi-storey buildings and $\ge 1.0$ ($64\text{px}$) for cottages.
 - [ ] **Full-Bleed Textures:** `*-wall.png` and `*-floor.png` have 0 magenta pixels and fill the entire 128×128 image rectangle.
 - [ ] **Bay Grid Alignment:** Floor width in tiles is an even number resulting in an odd number of bays (e.g. 10, 14, 18).
 - [ ] **Tests Pass:** `npm test` and `npm run typecheck` pass with 0 errors.

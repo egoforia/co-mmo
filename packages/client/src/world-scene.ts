@@ -1,249 +1,82 @@
+// The main Phaser scene as a thin facade over world-scene/:
+// - world-scene/types.ts: shared interfaces, constants, and floor/depth/spatial math
+// - world-scene/walls.ts: isometric cutaway walls (rockWalls), roof/half caps, diamondLayer
+// - world-scene/regions.ts: region & chunk streaming, landmarks, stairs, lamps, kit houses, floor visibility
+// - world-scene/avatars.ts: avatars, walk cycles, FigureMetricsCache, and vision-mapped held items
+// - world-scene/combat.ts: hit numbers, slash arcs, Firebolt projectiles, lunges, and fade-outs
+// Put new domain logic in the matching world-scene/* module rather than growing this facade.
+
 import Phaser from 'phaser';
 import {
-  ABILITIES,
-  CREATURES,
-  FLAME_LIGHT,
-  WINDOW_LIGHT,
-  glowOf,
-  ITEMS,
-  Interpolator,
-  HELD_SIZE,
-  heldBehind,
-  heldItem,
-  ISO_WAY_STEPS,
-  facingSide,
-  isWalkDirection,
-  offHandItem,
   Predictor,
   TICK_SECONDS,
-  TILE_PIXELS,
-  Tile,
-  PLAYER_SPEED,
   WALK_FRAMES,
   generateRegion,
-  buildingArt,
-  exteriorSpan,
-  nearBuilding,
-  rand2,
-  biomeLook,
-  stairsLabel,
-  storeyAt,
-  buildingKit,
+  heldItem,
+  offHandItem,
   type ArtEntry,
   type ArtManifest,
-  type ArtPoint,
   type ArtPointsManifest,
-  type BodyState,
-  type Building,
-  type ClientMessage,
-  type CreatureState,
-  type Facing,
   type HitMessage,
-  type Light,
-  type NpcState,
   type RegionMap,
   type Side,
   type SnapshotMessage,
-  type Storey,
-  type TileArt,
-  type TileRect,
-  type WalkDirection,
-  type WelcomeMessage,
   type Weather,
-  walkArt,
-  walkStandArt,
-  walkDirection,
-  walkFrameRate,
-  wishArtKey,
+  type WelcomeMessage,
 } from '@co-mmo/shared';
-import { DIAMOND_PAD, TILE_MARGIN, hasExterior, lightTint, playerArt, propTexture, registerDiamondTileset, registerKitTileset, registerStoreyTileset, registerTileset, registerWallFace } from './textures.ts';
-import { artSrc, lookArt, sceneArt } from './wished.ts';
-import { PROJECTION } from './projection.ts';
-import { HouseArt, standHouse, type HouseSource } from './kit-house-view.ts';
+import { HouseArt } from './kit-house-view.ts';
+import { lightScene, setSkyLight } from './lights.ts';
 import { shadePictures } from './normal-maps.ts';
-import { dropLight, lightScene, litFigure, makeLight, placeLight, setSkyLight, type LitPoint } from './lights.ts';
+import { PROJECTION } from './projection.ts';
 import { SkyClock } from './sky.ts';
+import { lightTint } from './textures.ts';
 import { setCoords } from './ui.ts';
+import { sceneArt } from './wished.ts';
+import {
+  FigureMetricsCache,
+  bodyLabel,
+  creatureLabel,
+  destroyAvatar,
+  dress,
+  makeAvatar,
+  makeBody,
+  makeCreature,
+  makeNpc,
+  makeWalk,
+  makeWalks,
+  placeAvatar,
+  playerTexture,
+  setHeld,
+  syncAvatars,
+  walkAvatar,
+} from './world-scene/avatars.ts';
+import { showHit, swingSlash } from './world-scene/combat.ts';
+import {
+  applyFloorView,
+  drawNearChunks,
+  drawRegion,
+  lightLamps,
+  raiseHouses,
+  revealBuildings,
+  undrawRegion,
+} from './world-scene/regions.ts';
+import {
+  type Avatar,
+  type BuildingView,
+  type DrawnRegion,
+  LABEL_DEPTH,
+  type MapFigure,
+  type MiniMapView,
+  type Remote,
+  type SceneCounts,
+  type WorldSceneOptions,
+  cameraZoom,
+  floorLift,
+  setDepthShade,
+  within,
+} from './world-scene/types.ts';
 
-interface Avatar {
-  body: Phaser.GameObjects.Sprite;
-  /** The texture this avatar should wear, once it has loaded. */
-  art: string;
-  /** The way it faces, among the camera's ways. */
-  facing: Facing;
-  /** The way it last walked on screen, for the walks and standing pictures painted for the top-down camera. */
-  turn: WalkDirection;
-  /** The way the picture it wears now faces, for which hand is in front. */
-  worn: Facing;
-  /** Where it was last placed, in our region's tiles. */
-  at?: { x: number; y: number };
-  /** The floor it is on (floors.ts), when not the ground. */
-  floor?: number;
-  /** Its size on screen when it wears its own picture. */
-  scale: number;
-  /**
-   * Walks and standing pictures are sized to the figure in its own picture
-   * (creatures, whose pictures are not all one height); otherwise only
-   * standing pictures are, and walks are drawn as painted.
-   */
-  fit?: boolean;
-  /** How fast it walks, as a share of a player's speed, so its feet keep up with the ground. */
-  pace?: number;
-  shadow: Phaser.GameObjects.Ellipse;
-  label: Phaser.GameObjects.Text;
-  /** Health bar, shown once hurt. */
-  bar?: { bg: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle };
-  /** Offset for lunges and recoils, in pixels; tweened. */
-  nudge: { x: number; y: number };
-  /** The weapon or charm shown in its right hand, drawn once its hand and the item's grip are known. */
-  held?: Held;
-  /** The shield or other off-hand item shown in its left hand, the same way. */
-  offHeld?: Held;
-}
-
-interface Held {
-  item: string;
-  image?: Phaser.GameObjects.Image;
-  /** The light it casts, when it burns or glows. */
-  lit?: LitPoint;
-}
-
-/** Which hand an item is held in. */
-type Hand = 'right' | 'left';
-
-interface Remote extends Avatar {
-  interp: Interpolator;
-}
-
-/** A building drawn as its exterior art until we come close, then its inside. */
-interface BuildingView {
-  building: Building;
-  /** The region's top-left corner in the world, in tiles. */
-  ox: number;
-  oy: number;
-  /** Its outside: empty until the building's outside is painted, and then its inside always shows. A kit house's comes in strips. */
-  outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[];
-  /** Floor, walls and furniture: hidden while the outside shows. */
-  inside: (Phaser.GameObjects.Image | Phaser.GameObjects.Text | Phaser.Tilemaps.TilemapLayer)[];
-  open: boolean;
-  /** True once a kit house stands in place of its painted picture. */
-  kit?: boolean;
-}
-
-/** A region drawn into the world: its layout and everything that pictures it. */
-interface DrawnRegion {
-  /** The layout it was drawn from, to tell when it changed. */
-  layout: string;
-  objects: Phaser.GameObjects.GameObject[];
-  tilemaps: Phaser.Tilemaps.Tilemap[];
-  buildings: BuildingView[];
-  /** Art ids of its biome kit: when one is painted, it is drawn again. */
-  kit: Set<string>;
-  map: RegionMap;
-  /** The ground tiles to draw, buildings and landmarks taken out. */
-  ground: number[][];
-  /** Its ground and scenery near us, in chunks, by chunk index. */
-  chunks: Map<number, Chunk>;
-  /** Fires, lanterns, shrines and lit windows standing in it. */
-  lamps: Lamp[];
-  /** Its floors above and below the ground, each shown only while we are on it. */
-  floors: FloorView[];
-  /** Stair pictures and labels on the ground out in the open, shown while we are on the ground. */
-  stairs: Phaser.GameObjects.GameObject[];
-}
-
-/** A storey drawn over its rectangle: its tiles, its furniture, and its stairs' pictures and labels. */
-interface FloorView {
-  storey: Storey;
-  objects: Phaser.GameObjects.GameObject[];
-}
-
-/** A light standing in the world, at a screen point; windows light up only after dark. */
-interface Lamp {
-  lit: LitPoint;
-  x: number;
-  y: number;
-  window: boolean;
-  /** The floor it burns on and the tile it stands on, so it is out of sight from other floors. */
-  floor: number;
-  tile: { x: number; y: number };
-  /** True while we are on a floor it cannot be seen from. */
-  hidden?: boolean;
-}
-
-/** A square of a region's ground and its trees and rocks, drawn only while we are near. */
-interface Chunk {
-  tilemap: Phaser.Tilemaps.Tilemap;
-  layer: Phaser.Tilemaps.TilemapLayer;
-  objects: Phaser.GameObjects.GameObject[];
-}
-
-/**
- * Lands are big (256 tiles a side), so their ground, trees and rocks are
- * drawn in chunks this many tiles across, only those near us: chunks within
- * DRAW_REACH tiles are drawn and those beyond FORGET_REACH let go.
- */
-const CHUNK = 32;
-const DRAW_REACH = 36;
-const FORGET_REACH = 60;
-
-export interface WorldSceneOptions {
-  welcome: WelcomeMessage;
-  art: ArtManifest;
-  /** Where hands and grips are in painted pictures, for held items. */
-  points: ArtPointsManifest;
-  send: (message: ClientMessage) => void;
-  /** True while the player is typing, so keys go to the chat box. */
-  typing: () => boolean;
-  /** The kit houses of a region, for the isometric camera. */
-  houses?: HouseSource;
-}
-
-const T = TILE_PIXELS;
-/** A Firebolt's flame, smaller than a torch's. */
-const BOLT_LIGHT: Light = { ...FLAME_LIGHT, radius: 2 };
-const LABEL_DEPTH = 1_000_000;
-/** Depth offset between stacked upper storeys so upper floors always draw in front of lower floors. */
-const FLOOR_DEPTH = 50_000;
-/** How high low-cut cutaway walls stand in the isometric camera, as a share of a ground diamond's height (~20px). */
-const WALL_RISE = 0.25;
-/** Subtle cool-grey directional shade applied to east-facing walls so 90° corners read clearly. */
-const EAST_WALL_TINT = 0xd4d4dc;
-
-/** Someone the mini map shows: where they stand in our region's tiles, and the picture they wear. */
-export interface MapFigure {
-  x: number;
-  y: number;
-  art: string;
-  kind: 'me' | 'player' | 'creature' | 'npc';
-}
-
-/** What the mini map needs to draw our floor and look at the others. */
-export interface MiniMapView {
-  /** The scene whose painted pictures the map is put together from. */
-  scene: Phaser.Scene;
-  map: RegionMap;
-  /** Grows as more art is painted and loaded, so the map is put together again (as it is when `map` is laid out anew). */
-  artLoaded: number;
-  /** The floor we are on. */
-  floor: number;
-  /** Us first, then everyone near us on our floor. */
-  figures: MapFigure[];
-}
-
-/** What the world scene holds right now, for the performance overlay. */
-export interface SceneCounts {
-  players: number;
-  creatures: number;
-  npcs: number;
-  bodies: number;
-  /** Regions drawn (ours and those beside it), and their chunks of ground and scenery drawn near us. */
-  regions: number;
-  chunks: number;
-  lamps: number;
-  /** The tile we stand on. */
-  tile?: { x: number; y: number };
-}
+export type { MapFigure, MiniMapView, SceneCounts, WorldSceneOptions } from './world-scene/types.ts';
 
 export class WorldScene extends Phaser.Scene {
   private welcome: WelcomeMessage;
@@ -289,6 +122,8 @@ export class WorldScene extends Phaser.Scene {
   private houseArt!: HouseArt;
   /** Counts pictures loaded since we started, so the mini map knows when to put its floors together again. */
   private artLoaded = 0;
+  /** Cached figure heights and ground-contact vertical origins. */
+  private readonly metrics = new FigureMetricsCache();
 
   constructor(private readonly options: WorldSceneOptions) {
     super('world');
@@ -304,23 +139,6 @@ export class WorldScene extends Phaser.Scene {
       if (entry.kind === 'walk') this.load.spritesheet(id, entry.file, { frameWidth: entry.width / (entry.frames ?? WALK_FRAMES), frameHeight: entry.height });
       else this.load.image(id, entry.file);
     }
-  }
-
-  /**
-   * A looping walk for every walk strip that loaded, named after its strip.
-   * Players all move at the same speed, so the rate that keeps their feet in
-   * step with the ground is fixed here.
-   */
-  private makeWalks(): void {
-    for (const [id, entry] of Object.entries(this.options.art)) {
-      if (entry.kind !== 'walk' || !this.textures.exists(id) || this.anims.exists(id)) continue;
-      this.makeWalk(id, entry);
-    }
-  }
-
-  private makeWalk(id: string, entry: ArtEntry): void {
-    const frames = entry.frames ?? WALK_FRAMES;
-    this.anims.create({ key: id, frames: this.anims.generateFrameNumbers(id, { start: 0, end: frames - 1 }), frameRate: walkFrameRate(frames, PLAYER_SPEED, entry.cycleSeconds), repeat: -1 });
   }
 
   /**
@@ -358,9 +176,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.anims.exists(id)) this.anims.remove(id);
     if (this.textures.exists(id)) this.textures.remove(id);
     this.textures.addSpriteSheet(id, img, { frameWidth: entry.width / (entry.frames ?? WALK_FRAMES), frameHeight: entry.height });
-    this.figures.delete(id);
-    this.figureMetrics.delete(id);
-    this.makeWalk(id, entry);
+    this.metrics.invalidate(id);
+    makeWalk(this, id, entry);
     for (const a of avatars) {
       if (striding.has(a)) a.body.play(id);
       else a.body.setTexture(id, 0);
@@ -418,15 +235,15 @@ export class WorldScene extends Phaser.Scene {
     this.accumulator = 0;
     this.painted = new Set();
     this.showRegion(welcome);
-    this.makeWalks();
+    makeWalks(this, this.options.art);
 
     this.predictor = new Predictor(this.map, { x: welcome.x, y: welcome.y, floor: welcome.floor }, this.lastSeq);
     this.floor = this.predictor.position.floor;
     this.shown = { x: welcome.x, y: welcome.y };
     this.applyFloor();
-    this.me = this.makeAvatar(this.playerTexture(welcome.you.id), welcome.you.name, true);
-    this.setHeld(this.me, heldItem(welcome.character), 'right');
-    this.setHeld(this.me, offHandItem(welcome.character), 'left');
+    this.me = makeAvatar(this, this.metrics, playerTexture(welcome.you.id), welcome.you.name, true);
+    setHeld(this, this.me, heldItem(welcome.character), 'right', (k, u) => this.loadArt(k, u));
+    setHeld(this, this.me, offHandItem(welcome.character), 'left', (k, u) => this.loadArt(k, u));
     this.refreshWishes();
 
     const kb = this.input.keyboard!;
@@ -474,15 +291,19 @@ export class WorldScene extends Phaser.Scene {
     const around = [def, ...welcome.neighbours.filter((n) => Math.max(Math.abs(n.at.x - def.at.x), Math.abs(n.at.y - def.at.y)) === 1)];
     const wanted = new Set(around.map((d) => d.id));
     for (const [id, region] of this.drawn) {
-      if (!wanted.has(id)) this.undraw(id, region);
+      if (!wanted.has(id)) undrawRegion(this, id, region, this.drawn);
     }
     for (const d of around) {
       const layout = JSON.stringify(d);
       const region = this.drawn.get(d.id);
       if (region?.layout === layout) continue;
-      if (region) this.undraw(d.id, region);
-      this.drawn.set(d.id, this.drawRegion(d.id === def.id ? this.map : generateRegion(d, size), layout));
-      void this.raiseHouses(d.id);
+      if (region) undrawRegion(this, d.id, region, this.drawn);
+      this.drawn.set(d.id, drawRegion(this, d.id === def.id ? this.map : generateRegion(d, size), layout));
+      this.nearAt = '';
+      void raiseHouses(this, d.id, this.drawn, this.options.houses, this.houseArt, () => {
+        this.revealBuildings(true);
+        this.applyFloor();
+      });
     }
     // Roads lead only into the regions beside us, so the camera stops at the others.
     const bounds = { left: this.origin.x, top: this.origin.y, right: this.origin.x + size, bottom: this.origin.y + size };
@@ -506,73 +327,8 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(200, 24, 20, 37);
   }
 
-  /**
-   * Shows what can be seen from the floor we are on. On the ground, the land
-   * as ever. Upstairs in the isometric camera, upper storeys stand elevated
-   * above the dimmed ground floor and street below; in top-down mode, our
-   * floor hides the building beneath it. Underground, only our floor shows.
-   */
   private applyFloor(): void {
-    const mine = this.floor;
-    const under = mine < 0;
-    const iso = PROJECTION.ground.kind === 'diamond';
-    const here = mine ? storeyAt(this.map, Math.floor(this.shown.x), Math.floor(this.shown.y), mine) : undefined;
-    for (const [id, region] of this.drawn) {
-      const current = id === this.welcome.region.def.id;
-      const groundDelta = Math.max(0, mine);
-      const managed = new Set<Phaser.GameObjects.GameObject>();
-      for (const v of region.buildings) {
-        for (const o of v.outside) managed.add(o);
-        for (const o of v.inside) managed.add(o);
-      }
-      for (const f of region.floors) for (const o of f.objects) managed.add(o);
-      for (const o of region.stairs) managed.add(o);
-      for (const o of region.objects) {
-        if (managed.has(o)) continue;
-        setShown(o, !under);
-        setDepthShade(o, groundDelta);
-      }
-      for (const chunk of region.chunks.values()) {
-        chunk.layer.setVisible(!under);
-        setDepthShade(chunk.layer, groundDelta);
-        for (const o of chunk.objects) {
-          setShown(o, !under);
-          setDepthShade(o, groundDelta);
-        }
-      }
-      for (const v of region.buildings) {
-        const covered = Boolean(current && here && overlaps(here, v.building));
-        const showUnder = iso && mine > 0 && !under && (covered || v.open);
-        for (const o of v.outside) {
-          o.setVisible(!under && !covered && !showUnder);
-          setDepthShade(o, groundDelta, true);
-          if (!this.tweens.isTweening(o)) o.setAlpha(v.open ? 0 : 1);
-        }
-        for (const o of v.inside) {
-          o.setVisible(!under && (!covered || showUnder));
-          setDepthShade(o, groundDelta, !showUnder);
-          if (!showUnder && !this.tweens.isTweening(o)) o.setAlpha(v.open ? 1 : 0);
-        }
-      }
-      for (const o of region.stairs) {
-        setShown(o, mine === 0);
-        setDepthShade(o, groundDelta);
-      }
-      // Lamps burn only on their own floor, and those on the ground show from upstairs unless the floor we stand on covers them.
-      for (const lamp of region.lamps) {
-        const covered = Boolean(current && here && within(here, lamp.tile.x, lamp.tile.y));
-        lamp.hidden = lamp.floor === mine ? false : !(mine > 0 && lamp.floor === 0 && !covered);
-      }
-      for (const f of region.floors) {
-        const delta = mine - f.storey.floor;
-        const overOpenBuilding = iso && mine === 0 && f.storey.floor > 0 && region.buildings.some((v) => v.open && overlaps(f.storey, v.building));
-        const visible = current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open) && !overOpenBuilding) || (mine > f.storey.floor && f.storey.floor > 0 && !under));
-        for (const o of f.objects) {
-          setShown(o, visible);
-          setDepthShade(o, Math.max(0, delta));
-        }
-      }
-    }
+    applyFloorView(this, this.drawn, this.welcome.region.def.id, this.map, this.shown, this.floor);
   }
 
   /** The weather over our land turned. */
@@ -617,19 +373,20 @@ export class WorldScene extends Phaser.Scene {
     if (!this.predictor || !this.sys.isActive()) return;
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
     const now = performance.now();
-    this.sync(this.remotes, snapshot.players, now, (e) => this.makeAvatar(this.playerTexture(e.id), e.name, false));
+    const load = (k: string, u: string) => this.loadArt(k, u);
+    syncAvatars(this, this.remotes, snapshot.players, now, (e) => makeAvatar(this, this.metrics, playerTexture(e.id), e.name, false));
     for (const p of snapshot.players) {
       const remote = this.remotes.get(p.id);
       if (!remote) continue;
-      this.setHeld(remote, p.held, 'right');
-      this.setHeld(remote, p.offHeld, 'left');
+      setHeld(this, remote, p.held, 'right', load);
+      setHeld(this, remote, p.offHeld, 'left', load);
     }
-    this.sync(this.creatures, snapshot.creatures ?? [], now, (c) => this.makeCreature(c));
+    syncAvatars(this, this.creatures, snapshot.creatures ?? [], now, (c) => makeCreature(this, this.metrics, c));
     for (const c of snapshot.creatures ?? []) this.creatures.get(c.id)?.label.setText(creatureLabel(c));
-    this.sync(this.npcs, snapshot.npcs ?? [], now, (n) => this.makeNpc(n));
+    syncAvatars(this, this.npcs, snapshot.npcs ?? [], now, (n) => makeNpc(this, this.metrics, n));
     for (const n of snapshot.npcs ?? []) this.npcs.get(n.id)?.label.setText(n.asleep ? `${n.name} (asleep)` : n.name);
     const bodies = snapshot.bodies ?? [];
-    this.sync(this.bodies, bodies, now, (b) => this.makeBody(b));
+    syncAvatars(this, this.bodies, bodies, now, (b) => makeBody(this, this.metrics, b));
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
   }
 
@@ -640,7 +397,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.lit) {
       const { sun, fill } = this.sky.sun(deltaMs);
       setSkyLight(this, sky, sun, fill);
-      this.lightLamps();
+      lightLamps(this, this.drawn, this.sky.darkness());
     } else this.tint?.setFillStyle(sky);
     // Fixed-rate input: one input per server tick, however fast we render.
     this.accumulator += Math.min(deltaMs, 250) / 1000;
@@ -655,7 +412,7 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     const held = this.readInput();
-    this.walk(this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
+    walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);
@@ -684,7 +441,7 @@ export class WorldScene extends Phaser.Scene {
         // Under half a pixel is standing still, not a step.
         const screen = { dx: Math.abs(dx) > 0.5 ? dx : 0, dy: Math.abs(dy) > 0.5 ? dy : 0 };
         const step = was && (screen.dx || screen.dy) ? { dx: pos.x - was.x, dy: pos.y - was.y } : { dx: 0, dy: 0 };
-        this.walk(remote, step, screen);
+        walkAvatar(this, this.metrics, remote, step, screen);
         // People indoors stay out of sight until we come close enough to see in.
         // Upstairs on open balconies, terraces or rooftops they remain visible.
         if (group === this.remotes || group === this.npcs) {
@@ -714,154 +471,12 @@ export class WorldScene extends Phaser.Scene {
     // A look described, painted or rolled back: players change clothes.
     const players: [string, Avatar][] = [[this.welcome.you.id, this.me], ...this.remotes];
     for (const [id, a] of players) {
-      const art = this.playerTexture(id);
+      const art = playerTexture(id);
       if (!a || a.art === art) continue;
       a.art = art;
       a.body.stop();
       if (this.textures.exists(art)) a.body.setTexture(art);
     }
-  }
-
-  /**
-   * Plays an avatar's walk for its step, `step` along the grid and `screen`
-   * on screen, and stands it still facing that way when it stops. A camera
-   * with ways of its own (the isometric one) shows the walk made for the way
-   * it faces, else the standing picture painted for it, gliding. Until that
-   * is painted, and in the top-down camera, each way on its own: its walk
-   * when one is made, else its standing picture facing that way, else its
-   * own picture, turned to face left or right.
-   */
-  private walk(a: Avatar, step: { dx: number; dy: number }, screen: { dx: number; dy: number }): void {
-    a.facing = PROJECTION.face(step.dx, step.dy, a.facing);
-    a.turn = walkDirection(screen.dx, screen.dy, a.turn);
-    const moving = screen.dx !== 0 || screen.dy !== 0;
-    if (!isWalkDirection(a.facing)) {
-      const way = walkStandArt(a.art, a.facing);
-      const walking = walkArt(a.art, a.facing);
-      if (this.anims.exists(walking)) {
-        a.worn = a.facing;
-        // Standing still since it came into view: show the way it faces, not whatever it wore before.
-        if (!moving && !a.body.anims.isPlaying && this.textures.exists(way) && a.body.texture.key !== way && a.body.texture.key !== walking) this.dress(a, way);
-        else this.stride(a, walking, moving, way);
-        return;
-      }
-      if (this.textures.exists(way)) {
-        if (a.body.anims.isPlaying) a.body.stop();
-        a.body.setFlipX(false);
-        if (a.body.texture.key !== way) this.dress(a, way);
-        a.worn = a.facing;
-        return;
-      }
-    }
-    a.worn = a.turn;
-    const sheet = walkArt(a.art, a.turn);
-    if (this.anims.exists(sheet)) {
-      // Facing us, the approved standing pose; any other way, the walk's first step.
-      this.stride(a, sheet, moving, a.turn === 'front' ? a.art : undefined);
-      return;
-    }
-    // No walk painted this way: another way's walk stops.
-    if (a.body.anims.isPlaying) a.body.stop();
-    const stand = walkStandArt(a.art, a.turn);
-    if (this.textures.exists(stand)) {
-      a.body.setFlipX(false);
-      if (a.body.texture.key !== stand) this.dress(a, stand);
-      return;
-    }
-    if (this.textures.exists(a.art) && a.body.texture.key !== a.art) this.dress(a, a.art);
-    if (screen.dx !== 0) a.body.setFlipX(screen.dx < 0);
-  }
-
-  /**
-   * Plays the walk strip `sheet` while moving; on stopping, stands in
-   * `standing` when that picture is there, else the walk's first step.
-   */
-  private stride(a: Avatar, sheet: string, moving: boolean, standing: string | undefined): void {
-    a.body.setFlipX(false);
-    if (moving) {
-      if (a.body.anims.currentAnim?.key !== sheet || !a.body.anims.isPlaying) {
-        a.body.play(sheet, true);
-        this.fit(a, sheet, !!a.fit);
-        this.alignBaseline(a, sheet);
-      }
-      a.body.anims.timeScale = a.pace ?? 1;
-      return;
-    }
-    if (!a.body.anims.isPlaying) return;
-    a.body.stop();
-    if (standing && this.textures.exists(standing)) this.dress(a, standing);
-    else {
-      a.body.setTexture(sheet, 0);
-      this.fit(a, sheet, !!a.fit);
-      this.alignBaseline(a, sheet);
-    }
-  }
-
-  /** Puts a picture on an avatar, at the size its own picture is shown at. */
-  private dress(a: Avatar, key: string): void {
-    a.body.setTexture(key);
-    this.fit(a, key, true);
-    this.alignBaseline(a, key);
-  }
-
-  /**
-   * Sizes an avatar wearing `key` so its figure stands as tall as the figure
-   * in its own picture; with `fitting` false, at its usual size.
-   */
-  private fit(a: Avatar, key: string, fitting: boolean): void {
-    const own = fitting && key !== a.art && this.textures.exists(a.art) ? this.figureHeight(a.art) : undefined;
-    const worn = own ? this.figureHeight(key) : undefined;
-    a.body.setScale(own && worn ? (a.scale * own) / worn : a.scale);
-  }
-
-  /** Heights and ground contact origins of figures in textures (first frame), by key. */
-  private figures = new Map<string, number>();
-  private figureMetrics = new Map<string, { height: number; originY: number }>();
-
-  private figureInfo(key: string): { height: number; originY: number } | undefined {
-    const known = this.figureMetrics.get(key);
-    if (known !== undefined) return known;
-    const frame = this.textures.getFrame(key, 0) ?? this.textures.getFrame(key);
-    const image = frame?.source.image as CanvasImageSource | undefined;
-    if (!frame || !image) return undefined;
-    const canvas = document.createElement('canvas');
-    canvas.width = frame.cutWidth;
-    canvas.height = frame.cutHeight;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return undefined;
-    ctx.drawImage(image, frame.cutX, frame.cutY, frame.cutWidth, frame.cutHeight, 0, 0, frame.cutWidth, frame.cutHeight);
-    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const solid = (y: number) => {
-      for (let x = 0; x < width; x++) if (data[(y * width + x) * 4 + 3]! > 16) return true;
-      return false;
-    };
-    let top = 0;
-    let bottom = height - 1;
-    while (top < height && !solid(top)) top++;
-    while (bottom > top && !solid(bottom)) bottom--;
-    const figHeight = top < height ? bottom - top + 1 : height;
-    // Align ground contact (bottom) so the feet always rest on the shadow baseline
-    const originY = Math.min(1, Math.max(0, (bottom - Math.round(figHeight * 0.03)) / height));
-    const info = { height: figHeight, originY };
-    this.figureMetrics.set(key, info);
-    this.figures.set(key, figHeight);
-    return info;
-  }
-
-  /** How tall the figure in a texture's first frame is, in pixels, from its see-through edges. */
-  private figureHeight(key: string): number | undefined {
-    return this.figureInfo(key)?.height;
-  }
-
-  /** Aligns an avatar's vertical origin so its feet rest firmly on the ground shadow across all textures. */
-  private alignBaseline(a: Avatar, key: string): void {
-    const info = this.figureInfo(key);
-    if (info) a.body.setOrigin(0.5, info.originY);
-  }
-
-  /** A player's own painted look, or one of the two approved player looks. */
-  private playerTexture(id: string): string {
-    return lookArt(id) ?? playerArt(id);
   }
 
   private async loadArt(key: string, url: string): Promise<void> {
@@ -880,143 +495,32 @@ export class WorldScene extends Phaser.Scene {
     this.artLoaded++;
     // A wished biome's ground, water, trees or rocks were painted: draw the land again.
     if ([...this.drawn.values()].some((r) => r.kit.has(key))) this.redraw(key);
-    this.figures.delete(key);
-    this.figureMetrics.delete(key);
+    this.metrics.invalidate(key);
     for (const a of [...this.creatures.values(), ...this.bodies.values(), ...this.npcs.values(), ...this.remotes.values(), this.me]) {
       if (!a) continue;
       // A walk or standing picture of this look stays on until the walker turns or stops.
       const shown = a.body.texture.key;
-      if (a.art === key && (shown === key || !shown.startsWith(`${key}-`))) this.dress(a, key);
-      else if (shown === key) this.dress(a, key);
+      if (a.art === key && (shown === key || !shown.startsWith(`${key}-`))) dress(this, this.metrics, a, key);
+      else if (shown === key) dress(this, this.metrics, a, key);
     }
   }
 
   /** A strike landed: number, flash and recoil, or a defeat. */
   onHit(hit: HitMessage): void {
     if (!this.predictor) return;
-    const myId = this.welcome.you.id;
-    const target = hit.target === myId ? this.me : this.remotes.get(hit.target) ?? this.creatures.get(hit.target);
-    const attacker = hit.by === myId ? this.me : this.remotes.get(hit.by) ?? this.creatures.get(hit.by);
-    const bolt = hit.ability && ABILITIES[hit.ability]?.effect === 'bolt';
-    if (attacker && target && bolt) this.bolt(attacker, target);
-    else if (attacker && attacker !== this.me && target) this.lunge(attacker, this.toward(attacker, target));
-    if (!target) return;
-    const hurtMe = target === this.me;
-    const number = this.add
-      .text(target.body.x + (Math.random() - 0.5) * T * 0.3, target.body.y - target.body.displayHeight * 0.8, `${hit.amount}`, {
-        fontFamily: 'Georgia, "Times New Roman", serif',
-        fontStyle: 'bold',
-        fontSize: `${Math.round(T * 0.46)}px`,
-        color: hurtMe ? '#f6757a' : '#ffffff',
-        stroke: '#181425',
-        strokeThickness: Math.round(T / 20),
-      })
-      .setOrigin(0.5)
-      .setDepth(LABEL_DEPTH + 1);
-    this.tweens.add({ targets: number, y: number.y - T * 0.6, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => number.destroy() });
-    target.body.setTintFill(0xffffff);
-    this.time.delayedCall(80, () => target.body.active && target.body.clearTint());
-    if (hurtMe) this.cameras.main.shake(120, 0.004);
-    if (hit.defeated && target !== this.me) this.fadeOut(target);
+    showHit(this, hit, this.welcome.you.id, this.me, this.remotes, this.creatures, () => this.sky.darkness());
   }
 
   /** Our own strike: a lunge and a slash, whether or not it lands. */
   swing(): void {
     if (!this.predictor) return;
-    // Along the isometric way we face, or left or right as we last walked.
-    const aim = isWalkDirection(this.me.facing) ? { x: this.facing, y: 0 } : wayOnScreen(this.me.facing);
-    this.lunge(this.me, aim);
-    if (!this.textures.exists('fx-slash')) return;
-    // The painted slash curves like a C; mirror it so it bulges the way we face, tilted along the way.
-    const right = aim.x > 0;
-    const slash = this.add.image(this.me.body.x + aim.x * T * 0.45, this.me.body.y - this.me.body.displayHeight * 0.45 + aim.y * T * 0.45, 'fx-slash');
-    slash.setDisplaySize(T * 0.9, T * 0.9).setFlipX(right).setRotation(right ? Math.atan2(aim.y, aim.x) : Math.atan2(-aim.y, -aim.x)).setDepth(this.me.body.depth + 1);
-    this.tweens.add({ targets: slash, alpha: 0, duration: 220, onComplete: () => slash.destroy() });
-  }
-
-  /**
-   * Which way an attacker lunges at whom it strikes, as a step on screen:
-   * left or right in the top-down camera; in the isometric one, along the
-   * way nearest them, which it turns to face.
-   */
-  private toward(a: Avatar, target: Avatar): { x: number; y: number } {
-    if (isWalkDirection(a.facing) || !a.at || !target.at) return { x: Math.sign(target.body.x - a.body.x || 1), y: 0 };
-    a.facing = PROJECTION.face(target.at.x - a.at.x, target.at.y - a.at.y, a.facing);
-    return wayOnScreen(a.facing);
-  }
-
-  /** The painted Firebolt spark flies from the caster to the target. */
-  private bolt(from: Avatar, to: Avatar): void {
-    if (!this.textures.exists('item-firebolt')) return;
-    const y = (a: Avatar) => a.body.y - a.body.displayHeight * 0.5;
-    const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
-    const spark = this.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
-    // The flame lights the ground it flies over.
-    const lit = makeLight(this, BOLT_LIGHT);
-    const follow = () => lit && placeLight(lit, spark.x, spark.y, this.time.now, spark.alpha > 0.2, this.sky.darkness());
-    follow();
-    this.tweens.add({
-      targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
-      onComplete: () => this.tweens.add({
-        targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onUpdate: follow,
-        onComplete: () => { spark.destroy(); dropLight(this, lit); },
-      }),
-    });
-  }
-
-  /** A short jab and back along `aim`, a step on screen one long. */
-  private lunge(a: Avatar, aim: { x: number; y: number }): void {
-    this.tweens.add({ targets: a.nudge, x: aim.x * T * 0.18, y: aim.y * T * 0.18, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
-  }
-
-  /** A defeated creature sinks away; the real sprite is removed by the next snapshot. */
-  private fadeOut(a: Avatar): void {
-    const ghost = litFigure(this, this.add.image(a.body.x, a.body.y, a.body.texture.key).setOrigin(0.5, 0.97));
-    ghost.setScale(a.body.scaleX, a.body.scaleY).setFlipX(a.body.flipX).setDepth(a.body.depth);
-    a.body.setVisible(false);
-    this.tweens.add({ targets: ghost, alpha: 0, scaleY: 0.1, duration: 450, ease: 'Quad.easeIn', onComplete: () => ghost.destroy() });
+    swingSlash(this, this.me, this.facing);
   }
 
   /** Greys our sprite while Weakened after falling. */
   setWeakened(weakened: boolean): void {
     if (!this.me?.body.active) return;
     this.me.body.setAlpha(weakened ? 0.7 : 1);
-  }
-
-  private setHealth(a: Avatar, health: number): void {
-    if (health >= 1 && !a.bar) return;
-    if (!a.bar) {
-      const bg = this.add.rectangle(0, 0, T * 0.6, T * 0.07, 0x181425, 0.8).setOrigin(0, 0.5);
-      const fill = this.add.rectangle(0, 0, T * 0.6, T * 0.05, 0xf6757a).setOrigin(0, 0.5);
-      a.bar = { bg, fill };
-    }
-    a.bar.fill.width = T * 0.6 * Math.max(0, Math.min(1, health));
-    a.bar.fill.setFillStyle(health > 0.5 ? 0x63c74d : health > 0.25 ? 0xfeae34 : 0xf6757a);
-  }
-
-  private sync<E extends { id: string; x: number; y: number; health?: number; floor?: number }>(
-    group: Map<string, Remote>,
-    entities: E[],
-    now: number,
-    make: (e: E) => Avatar,
-  ): void {
-    const seen = new Set<string>();
-    for (const entity of entities) {
-      seen.add(entity.id);
-      let remote = group.get(entity.id);
-      if (!remote) {
-        remote = { ...make(entity), interp: new Interpolator() };
-        group.set(entity.id, remote);
-      }
-      remote.floor = entity.floor ?? 0;
-      remote.interp.push(now, entity.x, entity.y);
-      if (entity.health !== undefined) this.setHealth(remote, entity.health);
-    }
-    for (const [id, remote] of group) {
-      if (seen.has(id)) continue;
-      destroyAvatar(this, remote);
-      group.delete(id);
-    }
   }
 
   /** Draws again, once the art that arrived together has loaded, every region whose biome kit was painted. */
@@ -1026,7 +530,7 @@ export class WorldScene extends Phaser.Scene {
     if (waiting || !this.predictor) return;
     this.time.delayedCall(500, () => {
       for (const [id, region] of this.drawn) {
-        if ([...region.kit].some((k) => this.painted.has(k))) this.undraw(id, region);
+        if ([...region.kit].some((k) => this.painted.has(k))) undrawRegion(this, id, region, this.drawn);
       }
       this.painted.clear();
       this.showRegion(this.welcome);
@@ -1039,17 +543,6 @@ export class WorldScene extends Phaser.Scene {
     return [...this.drawn.values()].flatMap((r) => r.buildings);
   }
 
-  private undraw(id: string, region: DrawnRegion): void {
-    for (const o of region.objects) {
-      this.tweens.killTweensOf(o);
-      o.destroy();
-    }
-    for (const m of region.tilemaps) m.destroy();
-    for (const lamp of region.lamps) dropLight(this, lamp.lit);
-    for (const chunk of region.chunks.values()) dropChunk(chunk);
-    this.drawn.delete(id);
-  }
-
   /** Draws the ground and scenery near us and lets go of what is far, when we have moved a little. */
   private drawNear(force = false): void {
     const x = this.origin.x + this.shown.x;
@@ -1057,459 +550,14 @@ export class WorldScene extends Phaser.Scene {
     const at = `${Math.floor(x / 8)},${Math.floor(y / 8)}`;
     if (at === this.nearAt && !force) return;
     this.nearAt = at;
-    for (const region of this.drawn.values()) {
-      const { map } = region;
-      const ox = map.def.at.x * map.width;
-      const oy = map.def.at.y * map.height;
-      const across = Math.ceil(map.width / CHUNK);
-      for (let cy = 0; cy < Math.ceil(map.height / CHUNK); cy++) {
-        for (let cx = 0; cx < across; cx++) {
-          const left = ox + cx * CHUNK;
-          const top = oy + cy * CHUNK;
-          const dx = Math.max(left - x, 0, x - (left + CHUNK));
-          const dy = Math.max(top - y, 0, y - (top + CHUNK));
-          const far = Math.hypot(dx, dy);
-          const index = cy * across + cx;
-          const chunk = region.chunks.get(index);
-          if (!chunk && far <= DRAW_REACH) region.chunks.set(index, this.drawChunk(region, cx * CHUNK, cy * CHUNK));
-          else if (chunk && far > FORGET_REACH) {
-            dropChunk(chunk);
-            region.chunks.delete(index);
-          }
-        }
-      }
-    }
-  }
-
-  /** One chunk of a region's ground, with the trees and rocks standing on it. */
-  private drawChunk(region: DrawnRegion, x0: number, y0: number): Chunk {
-    const { map } = region;
-    const ox = map.def.at.x * map.width;
-    const oy = map.def.at.y * map.height;
-    const rows = region.ground.slice(y0, y0 + CHUNK).map((row) => row.slice(x0, x0 + CHUNK));
-    const groundDelta = Math.max(0, this.floor);
-    const layer = this.groundLayer(rows, ox + x0, oy + y0, -1, registerTileset(this, map.def)).setVisible(this.floor >= 0);
-    setDepthShade(layer, groundDelta);
-    const tilemap = layer.tilemap;
-    const objects: Phaser.GameObjects.GameObject[] = [];
-    const biome = map.def.biome;
-    for (let y = y0; y < Math.min(y0 + CHUNK, map.height); y++) {
-      for (let x = x0; x < Math.min(x0 + CHUNK, map.width); x++) {
-        const tile = map.tiles[y * map.width + x];
-        if (tile !== Tile.Tree && tile !== Tile.Rock) continue;
-        const variant = Math.floor(rand2(x, y, 5) * 3);
-        const key = propTexture(this, biome, tile === Tile.Tree ? 'tree' : 'rock', variant);
-        if (!key) continue;
-        const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
-        const feet = PROJECTION.stand(ox + x, oy + y, 1, 1);
-        const at = PROJECTION.toScreen(feet.x, feet.y);
-        const img = this.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
-        img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
-        img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1);
-        setDepthShade(img, groundDelta);
-        objects.push(img.setVisible(this.floor >= 0));
-      }
-    }
-    return { tilemap, layer, objects };
-  }
-
-  /** A tile layer of the rows given, its top-left tile at world (x, y), from the square tile strip `key`. */
-  private groundLayer(tiles: number[][], x: number, y: number, depth: number, key: string): Phaser.Tilemaps.TilemapLayer {
-    const at = PROJECTION.toScreen(x, y);
-    const ground = PROJECTION.ground;
-    if (ground.kind === 'diamond') return diamondLayer(this, tiles, at, registerDiamondTileset(this, key, ground.width, ground.height), ground).setDepth(depth);
-    const tilemap = this.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
-    const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-    return tilemap.createLayer(0, tileset, at.x, at.y)!.setDepth(depth);
-  }
-
-  /**
-   * Draws a region at its square in the world: its buildings and landmarks
-   * now, its ground, trees and rocks in chunks as we come near (drawNear).
-   */
-  private drawRegion(map: RegionMap, layout: string): DrawnRegion {
-    const ox = map.def.at.x * map.width;
-    const oy = map.def.at.y * map.height;
-    const before = new Set(this.children.list);
-    const tilemaps: Phaser.Tilemaps.Tilemap[] = [];
-    const kit = new Set<string>();
-    const look = biomeLook(map.def.biome);
-    for (const id of [look.ground, look.path, look.water, ...look.trees, ...look.rocks]) kit.add(id);
-    const data: number[][] = [];
-    for (let y = 0; y < map.height; y++) {
-      data.push(Array.from(map.tiles.subarray(y * map.width, (y + 1) * map.width)));
-    }
-    // Under landmarks, paint whatever ground surrounds them (indoors, the floor).
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        if (data[y]![x] !== Tile.Blocked) continue;
-        const around = [data[y - 1]?.[x], data[y + 1]?.[x], data[y]![x - 1], data[y]![x + 1]];
-        data[y]![x] = around.includes(Tile.Floor) ? Tile.Floor : around.filter((t) => t === Tile.Path).length >= 2 ? Tile.Path : Tile.Ground;
-      }
-    }
-    // Each building keeps its floor and walls on a layer of its own, just its
-    // size, in its own painted tiles, hidden behind its outside art until we
-    // come close; the ground runs on underneath.
-    const views = map.buildings.map((b) => {
-      const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
-      for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-      const iso = PROJECTION.ground.kind === 'diamond';
-      const hasWall = iso && Boolean(this.wallFaceKey(b.style, b.art));
-      // With 0.5-tile walls, the inner half of each wall tile exposes the room's floor seamlessly.
-      const floorRows = hasWall ? inside.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : inside;
-      const floor = this.groundLayer(floorRows, ox + b.x, oy + b.y, -0.5, registerKitTileset(this, b.style, b.art)).setData('shell', true);
-      tilemaps.push(floor.tilemap);
-      // In the isometric camera, modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
-      const closedUpper = iso ? map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor) : [];
-      const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = !b.art && hasExterior(this, b.style) && !iso
-        ? [this.exterior(b, ox, oy)]
-        : hasWall
-          ? [
-            ...this.rockWalls(inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0),
-            ...closedUpper.flatMap((s, idx) => {
-              const sRows: number[][] = [];
-              for (let y = 0; y < s.height; y++) sRows.push(Array.from(s.tiles.subarray(y * s.width, (y + 1) * s.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
-              return this.rockWalls(sRows, ox + s.x, oy + s.y, s.style, s.art, tilemaps, true, false, idx === closedUpper.length - 1, s.floor);
-            }),
-          ]
-          : [];
-      const view: BuildingView = {
-        building: b,
-        ox,
-        oy,
-        outside,
-        inside: [floor, ...this.rockWalls(inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, true, false, 0)],
-        open: !outside.length,
-      };
-      return view;
-    });
-    // Each floor off the ground on a layer of its own over its rectangle, furniture drawn as floor beneath it.
-    const floors: FloorView[] = map.storeys.map((storey) => {
-      const rows: number[][] = [];
-      for (let y = 0; y < storey.height; y++) {
-        rows.push(Array.from(storey.tiles.subarray(y * storey.width, (y + 1) * storey.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
-      }
-      const hasWall = PROJECTION.ground.kind === 'diamond' && Boolean(this.wallFaceKey(storey.style, storey.art));
-      const floorRows = hasWall ? rows.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : rows;
-      const lift = floorLift(storey.floor);
-      const depthOff = floorDepthOffset(storey.floor);
-      const layer = this.groundLayer(floorRows, ox + storey.x, oy + storey.y, depthOff - 0.5, registerStoreyTileset(this, storey));
-      layer.y -= lift;
-      tilemaps.push(layer.tilemap);
-      return {
-        storey,
-        objects: [layer, ...this.rockWalls(rows, ox + storey.x, oy + storey.y, storey.style, storey.art, tilemaps, storey.floor > 0 || Boolean(storey.open), true, false, storey.floor)],
-      };
-    });
-    this.placeLandmarks(map, ox, oy, views, floors);
-    const stairs = this.placeStairs(map, ox, oy, views, floors);
-    const objects = this.children.list.filter((o) => !before.has(o));
-    const lamps = this.placeLamps(map, ox, oy, views);
-    const region: DrawnRegion = { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs };
-    this.nearAt = '';
-    return region;
-  }
-
-  /** Resolves the single seamless wall texture key for a building style or kit art override. */
-  private wallFaceKey(style: string, art?: TileArt): string | undefined {
-    const key = art?.face ?? art?.wall ?? buildingArt(style, 'wall');
-    return this.textures.exists(key) ? key : undefined;
-  }
-
-  /**
-   * Builds 0.5-tile thick isometric walls from a single seamless wall texture:
-   * - When `cutaway` is false (exterior shell), all perimeter walls stand at full storey height (`storeyRise`),
-   *   and `roofCap` closes the top across the building footprint.
-   * - When `cutaway` is true (interior cutaway or active storey), far North/West back walls (and far North/West
-   *   corridor flanks) stand at full storey height (`storeyRise`), while camera-facing South/East walls and near
-   *   South/East corridor flanks cut low (`cutRise` ~20px) so the player and floor are never occluded.
-   */
-  private rockWalls(
-    rows: number[][],
-    left: number,
-    top: number,
-    style: string,
-    art: TileArt | undefined,
-    tilemaps: Phaser.Tilemaps.Tilemap[],
-    outward: boolean,
-    cutaway = true,
-    roofCap = false,
-    floor = 0,
-  ): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
-    const ground = PROJECTION.ground;
-    if (ground.kind !== 'diamond') return [];
-    const face = this.wallFaceKey(style, art);
-    if (!face) return [];
-    const storeyRise = Math.round(ground.height * 2.0);
-    const cutRise = Math.round(ground.height * WALL_RISE);
-    const lift = floorLift(floor);
-    const depthOff = floorDepthOffset(floor);
-    const fullSouth = registerWallFace(this, face, 'south', ground.width, ground.height, storeyRise);
-    const fullEast = registerWallFace(this, face, 'east', ground.width, ground.height, storeyRise);
-    const lowSouth = cutaway ? registerWallFace(this, face, 'south', ground.width, ground.height, cutRise) : fullSouth;
-    const lowEast = cutaway ? registerWallFace(this, face, 'east', ground.width, ground.height, cutRise) : fullEast;
-    if (!fullSouth || !fullEast || !lowSouth || !lowEast) return [];
-
-    const wall = (x: number, y: number) => rows[y]?.[x] === Tile.Wall;
-    const open = (x: number, y: number) => (rows[y]?.[x] === undefined ? outward : !wall(x, y));
-    const indoor = (x: number, y: number) => rows[y]?.[x] !== undefined && rows[y]![x] !== Tile.Wall;
-    // Far North/West walls (with no indoor floor to their North/West, and indoor floor to their South/East) stand tall;
-    // near South/East walls and South/East corridor flanks cut low.
-    const isFull = (x: number, y: number) =>
-      !cutaway ||
-      (!indoor(x, y - 1) && !indoor(x - 1, y) && !indoor(x - 1, y - 1) && (indoor(x, y + 1) || indoor(x + 1, y) || indoor(x + 1, y + 1)));
-
-    const parts: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = [];
-    const tilesetKey = registerKitTileset(this, style, art);
-    const halfGround = { width: ground.width / 2, height: ground.height / 2 };
-    const halfTileset = registerDiamondTileset(this, tilesetKey, halfGround.width, halfGround.height);
-    const atTop = PROJECTION.toScreen(left, top);
-    const h = rows.length;
-    const w = rows[0]?.length ?? 0;
-
-    if (roofCap && !cutaway) {
-      const roof = rows.map((row) => row.map((t) => (t >= 0 ? Tile.Wall : -1)));
-      const roofLayer = this.groundLayer(roof, left, top, depthOff + PROJECTION.depth(left + w, top + h) + 1, tilesetKey).setData('shell', true);
-      roofLayer.y -= lift + storeyRise;
-      tilemaps.push(roofLayer.tilemap);
-      parts.push(roofLayer);
-    } else {
-      const makeHalfCap = (wantFull: boolean, rise: number, depth: number) => {
-        const halfRows: number[][] = Array.from({ length: h * 2 }, () => Array<number>(w * 2).fill(-1));
-        let any = false;
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            if (!wall(x, y) || isFull(x, y) !== wantFull) continue;
-            any = true;
-            halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
-            if (open(x, y + 1) || wall(x - 1, y) || rows[y]?.[x - 1] === Tile.Door || (!wall(x, y - 1) && !wall(x, y + 1))) {
-              halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
-            }
-            if (open(x + 1, y) || wall(x, y - 1) || rows[y - 1]?.[x] === Tile.Door || (!wall(x - 1, y) && !wall(x + 1, y))) {
-              halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
-            }
-          }
-        }
-        if (!any) return;
-        const cap = diamondLayer(this, halfRows, atTop, halfTileset, halfGround).setDepth(depth).setData('shell', true);
-        cap.y -= lift + rise;
-        tilemaps.push(cap.tilemap);
-        parts.push(cap);
-      };
-      makeHalfCap(true, storeyRise, depthOff - 0.3);
-      if (cutaway) makeHalfCap(false, cutRise, depthOff - 0.4);
-    }
-
-    rows.forEach((row, y) => row.forEach((_, x) => {
-      if (!wall(x, y)) return;
-      const [tx, ty] = [left + x, top + y];
-      const full = isFull(x, y);
-      const rise = full ? storeyRise : cutRise;
-      const southKey = full ? fullSouth : lowSouth;
-      const eastKey = full ? fullEast : lowEast;
-      if (open(x, y + 1) || (full && wall(x, y + 1) && !isFull(x, y + 1))) {
-        const at = PROJECTION.toScreen(tx, ty + 1);
-        const img = this.add.image(at.x, at.y - lift - rise, southKey).setOrigin(0, 0).setDepth(depthOff + PROJECTION.depth(tx + 0.5, ty + 1)).setData('shell', true);
-        parts.push(img);
-      }
-      if (open(x + 1, y) || (full && wall(x + 1, y) && !isFull(x + 1, y))) {
-        const at = PROJECTION.toScreen(tx + 1, ty);
-        const img = this.add
-          .image(at.x - ground.width / 2, at.y - lift - rise, eastKey)
-          .setOrigin(0, 0)
-          .setDepth(depthOff + PROJECTION.depth(tx + 1, ty + 0.5))
-          .setTint(EAST_WALL_TINT)
-          .setData('baseTint', EAST_WALL_TINT)
-          .setData('shell', true);
-        parts.push(img);
-      }
-    }));
-    return parts;
-  }
-
-  /**
-   * A building's outside art. Its door is painted at the middle of its bottom
-   * edge, so it is drawn centred on the doorway, standing on the south wall.
-   */
-  private exterior(b: Building, ox: number, oy: number): Phaser.GameObjects.Image {
-    const span = exteriorSpan(b);
-    // The middle of the doorway's outer edge, where the painted door stands.
-    const door = { x: ox + b.door.x + 1, y: oy + span.bottom };
-    const at = PROJECTION.toScreen(door.x, door.y);
-    const img = this.add.image(at.x, at.y, buildingArt(b.style, 'exterior')).setOrigin(0.5, 1);
-    const w = span.width * T;
-    img.setDisplaySize(w, (w * img.height) / img.width);
-    return img.setDepth(PROJECTION.depth(door.x, door.y));
-  }
-
-  /**
-   * The isometric camera shows a kit house in place of a building's painted
-   * picture once the server has drawn it, which it does the first time it is
-   * asked; meanwhile the painted picture stays and the server is asked again
-   * now and then.
-   */
-  private async raiseHouses(id: string, tries = 0): Promise<void> {
-    const source = this.options.houses;
-    const region = this.drawn.get(id);
-    if (!source || !region || PROJECTION.ground.kind !== 'diamond') return;
-    if (!region.map.buildings.some((b) => buildingKit.kitHouse(b))) return;
-    const houses = await source(id).catch(() => []);
-    for (const info of houses) {
-      const view = region.buildings[info.building];
-      if (info.status !== 'ready' || !info.frame || !view || view.kit) continue;
-      const [outside, inside] = await Promise.all([this.houseArt.view(info, 'outside'), this.houseArt.view(info, 'storey-1')]);
-      // Drawn again or let go while the pictures loaded.
-      if (!outside || !inside || this.drawn.get(id) !== region) continue;
-      this.standHouse(region, view, info.frame, outside, inside);
-    }
-    // By the wall clock: the server's drawing does not wait for our frames.
-    if (houses.some((h) => h.status === 'building') && tries < HOUSE_TRIES) {
-      setTimeout(() => void (this.sys.isActive() && this.raiseHouses(id, tries + 1)), HOUSE_RETRY_MS);
-    }
-  }
-
-  /** Stands a kit house on a building's floor: its outside from afar, its cutaway close by, with the furniture inside. */
-  private standHouse(region: DrawnRegion, v: BuildingView, frame: NonNullable<buildingKit.KitHouseInfo['frame']>, outside: string, inside: string): void {
-    const house = buildingKit.kitHouse(v.building);
-    if (!house) return;
-    const floor = { left: v.ox + house.floor.left, top: v.oy + house.floor.top, right: v.ox + house.floor.right, bottom: v.oy + house.floor.bottom };
-    const dropped = new Set<Phaser.GameObjects.GameObject>(v.outside);
-    for (const o of v.outside) {
-      this.tweens.killTweensOf(o);
-      o.destroy();
-    }
-    // The house brings its own floor and cutaway walls; hide and drop the fallback shell.
-    const furniture = v.inside.filter((o) => {
-      const isShell = o instanceof Phaser.Tilemaps.TilemapLayer || Boolean(o.getData('shell'));
-      if (isShell) {
-        dropped.add(o);
-        this.tweens.killTweensOf(o);
-        o.destroy();
-      }
-      return !isShell;
-    });
-    region.objects = region.objects.filter((o) => !dropped.has(o));
-    const cutaway = standHouse(this, inside, frame, floor, false);
-    v.outside = standHouse(this, outside, frame, floor, true);
-    v.inside = [...cutaway, ...furniture];
-    v.kit = true;
-    region.objects.push(...v.outside, ...cutaway);
-    this.revealBuildings(true);
-    this.applyFloor();
-  }
-
-  /** Landmarks: set pieces out in the land, furniture inside buildings, and furniture on the floors above and below. */
-  private placeLandmarks(map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): void {
-    for (const l of map.landmarks) {
-      if (!this.textures.exists(l.asset)) continue;
-      const feet = landmarkFeet(l, ox, oy);
-      const at = PROJECTION.toScreen(feet.x, feet.y);
-      const floor = l.floor ?? 0;
-      const img = this.add.image(at.x, at.y - floorLift(floor), l.asset).setOrigin(0.5, 0.92);
-      img.setDepth(floorDepthOffset(floor) + PROJECTION.depth(feet.x, feet.y));
-      const [tx, ty] = [Math.floor(l.x), Math.floor(l.y - 0.01)];
-      if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(img);
-      else views.find((v) => within(v.building, tx, ty))?.inside.push(img);
-    }
-  }
-
-  /**
-   * Each flight of stairs and ladder, on both floors it joins: its painted
-   * picture going up or down once there is one, and always a label saying
-   * where it goes, since nothing about it is drawn in code.
-   */
-  private placeStairs(map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): Phaser.GameObjects.GameObject[] {
-    const open: Phaser.GameObjects.GameObject[] = [];
-    for (const s of map.stairways) {
-      for (const floor of [s.lower, s.upper]) {
-        const parts: Phaser.GameObjects.GameObject[] = [];
-        const isUp = floor === s.lower;
-        const defaultArt = isUp ? (s.kind === 'ladder' ? 'ladder-up' : 'stairs-up') : (s.kind === 'ladder' ? 'ladder-down' : 'stairs-down');
-        const art = (isUp ? s.art?.up : s.art?.down) ?? defaultArt;
-        const feet = PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
-        const at = PROJECTION.toScreen(feet.x, feet.y);
-        const lift = floorLift(floor);
-        const depthOff = floorDepthOffset(floor);
-        if (art && this.textures.exists(art)) {
-          const img = this.add.image(at.x, at.y - lift, art).setOrigin(0.5, 0.92);
-          parts.push(img.setDepth(depthOff + PROJECTION.depth(feet.x, feet.y) - 1));
-        }
-        const arrow = isUp ? '▲' : '▼';
-        const label = this.add.text(at.x, at.y - lift - T * 0.75, `${arrow} ${stairsLabel(s, floor)}`, {
-          fontFamily: 'sans-serif',
-          fontSize: '18px',
-          fontStyle: 'bold',
-          color: '#fff6dc',
-          stroke: '#1c1830',
-          strokeThickness: 4,
-          backgroundColor: '#1c1830ee',
-          padding: { x: 8, y: 4 },
-        });
-        parts.push(label.setOrigin(0.5, 1).setDepth(LABEL_DEPTH - 2));
-        const [tx, ty] = [s.x, s.y];
-        if (floor) floorAt(floors, tx, ty, floor)?.objects.push(...parts);
-        else {
-          const inside = views.find((v) => within(v.building, tx, ty));
-          if (inside) inside.inside.push(...(parts as Phaser.GameObjects.Image[]));
-          else open.push(...parts);
-        }
-      }
-    }
-    return open;
-  }
-
-  /** Burns the world's lamps for this frame: brighter after dark, windows only then. */
-  private lightLamps(): void {
-    const dark = this.sky.darkness();
-    for (const region of this.drawn.values()) {
-      for (const lamp of region.lamps) {
-        placeLight(lamp.lit, lamp.x, lamp.y, this.time.now, !lamp.hidden && (!lamp.window || dark > 0), dark);
-        if (lamp.window) lamp.lit.point.intensity *= dark;
-      }
-    }
-  }
-
-  /** Lights for a region's fires, lanterns and shrines, and its buildings' windows. */
-  private placeLamps(map: RegionMap, ox: number, oy: number, views: BuildingView[]): Lamp[] {
-    const lamps: Lamp[] = [];
-    const add = (light: Light, x: number, y: number, window: boolean, floor: number, tile: { x: number; y: number }) => {
-      const lit = makeLight(this, light);
-      if (lit) lamps.push({ lit, x, y, window, floor, tile });
-    };
-    for (const l of map.landmarks) {
-      const light = glowOf(l.asset);
-      // The flame sits a little above where the piece stands.
-      const feet = landmarkFeet(l, ox, oy);
-      const at = PROJECTION.toScreen(feet.x, feet.y);
-      const floor = l.floor ?? 0;
-      if (light) add(light, at.x, at.y - floorLift(floor) - T * 0.6, false, floor, { x: Math.floor(l.x), y: Math.floor(l.y - 0.01) });
-    }
-    for (const v of views) {
-      if (!v.outside.length) continue;
-      const b = v.building;
-      const at = PROJECTION.toScreen(ox + b.x + b.width / 2, oy + b.y + b.height);
-      add(WINDOW_LIGHT, at.x, at.y - T * 0.8, true, 0, { x: b.door.x, y: b.door.y });
-    }
-    return lamps;
+    drawNearChunks(this, this.drawn, x, y, this.floor);
   }
 
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
-    let changed = false;
-    for (const v of this.buildings()) {
-      if (!v.outside.length) continue;
-      const open = nearBuilding(v.building, this.origin.x + this.shown.x - v.ox, this.origin.y + this.shown.y - v.oy);
-      if (open === v.open && !instant) continue;
-      if (open !== v.open) changed = true;
-      v.open = open;
-      const fades = [...v.outside.map((target) => ({ target, alpha: open ? 0 : 1 })), ...v.inside.map((target) => ({ target, alpha: open ? 1 : 0 }))];
-      for (const { target, alpha } of fades) {
-        this.tweens.killTweensOf(target);
-        if (instant) target.setAlpha(alpha);
-        else this.tweens.add({ targets: target, alpha, duration: 350, ease: 'Sine.easeInOut' });
-      }
+    if (revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant)) {
+      this.applyFloor();
     }
-    if (changed) this.applyFloor();
   }
 
   private readInput(): { dx: number; dy: number } {
@@ -1520,72 +568,8 @@ export class WorldScene extends Phaser.Scene {
     return { dx, dy };
   }
 
-  private makeCreature(c: CreatureState): Avatar {
-    const a = this.makeAvatar(c.asset, c.name, false, 'woods-mushroom');
-    a.label.setColor('#f6b48a').setFontSize(Math.round(T * 0.2));
-    a.scale = 0.8;
-    a.fit = true;
-    // Creatures walk slower than players: their walks play slower so their feet keep up.
-    const speed = CREATURES[c.kind]?.speed;
-    if (speed) a.pace = speed / PLAYER_SPEED;
-    a.body.setScale(0.8);
-    return a;
-  }
-
-  /** A body is the creature's own painted picture, laid on its side and faded a little. */
-  private makeBody(b: BodyState): Avatar {
-    const a = this.makeAvatar(b.asset, bodyLabel(b), false, 'woods-mushroom');
-    a.label.setColor('#c0cbdc').setFontSize(Math.round(T * 0.18));
-    a.body.setScale(0.8).setOrigin(0.5, 0.5).setAngle(90).setAlpha(0.75);
-    return a;
-  }
-
-  private makeNpc(n: NpcState): Avatar {
-    const a = this.makeAvatar(n.asset, n.name, false, 'sanctum-pilgrim');
-    a.label.setColor('#bfe0f2');
-    return a;
-  }
-
-  private makeAvatar(texture: string, name: string, self: boolean, fallback = 'player-mara'): Avatar {
-    const key = this.textures.exists(texture) ? texture : fallback;
-    const shadow = this.add.ellipse(0, 0, T * 0.56, T * 0.19, 0x181425, 0.3);
-    const body = litFigure(this, this.add.sprite(0, 0, key).setOrigin(0.5, 0.97));
-    const label = this.add
-      .text(0, 0, name, {
-        fontFamily: 'Georgia, "Times New Roman", serif',
-        fontSize: `${Math.round(T * 0.24)}px`,
-        color: self ? '#feae34' : '#ffffff',
-        stroke: '#181425',
-        strokeThickness: Math.round(T / 24),
-      })
-      .setOrigin(0.5, 1);
-    const a: Avatar = { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
-    this.alignBaseline(a, key);
-    return a;
-  }
-
-  /** Places an avatar at (x, y) in our region, counted from its corner. */
   private placeAvatar(a: Avatar, x: number, y: number): void {
-    const floor = a === this.me ? this.floor : (a.floor ?? 0);
-    const { x: px, y: py0 } = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
-    const py = py0 - floorLift(floor);
-    const depth = floorDepthOffset(floor) + PROJECTION.depth(this.origin.x + x, this.origin.y + y);
-    a.at = { x, y };
-    a.shadow.setPosition(px, py + T / 16);
-    a.body.setPosition(px + a.nudge.x, py + T / 10 + a.nudge.y);
-    const top = py + T / 10 - a.body.displayHeight * a.body.originY;
-    a.label.setPosition(px, top - 4);
-    if (a.bar) {
-      a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
-      a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
-    }
-    // Lower on screen draws in front.
-    a.shadow.setDepth(depth - 2);
-    a.body.setDepth(depth);
-    a.label.setDepth(LABEL_DEPTH);
-    // After the body's depth is set, or the item lags a step behind it and slips behind the body while walking down.
-    this.placeHeld(a, 'right');
-    this.placeHeld(a, 'left');
+    placeAvatar(this, a, a === this.me, this.floor, this.origin, this.options.points, this.sky.darkness(), x, y);
   }
 
   /**
@@ -1644,8 +628,9 @@ export class WorldScene extends Phaser.Scene {
   /** Our own weapon or charm (right hand) and off-hand item (left hand). */
   setMyHeld(item: string | undefined, offHand: string | undefined): void {
     if (!this.me) return;
-    this.setHeld(this.me, item, 'right');
-    this.setHeld(this.me, offHand, 'left');
+    const load = (k: string, u: string) => this.loadArt(k, u);
+    setHeld(this, this.me, item, 'right', load);
+    setHeld(this, this.me, offHand, 'left', load);
   }
 
   /** Newly found hands and grips. */
@@ -1653,213 +638,8 @@ export class WorldScene extends Phaser.Scene {
     this.options.points = points;
   }
 
-  /** Puts an item in an avatar's hand, or takes it away. */
-  private setHeld(a: Avatar, item: string | undefined, hand: Hand): void {
-    const slot = hand === 'right' ? 'held' : 'offHeld';
-    if (a[slot]?.item === item) return;
-    a[slot]?.image?.destroy();
-    dropLight(this, a[slot]?.lit);
-    const light = item ? ITEMS[item]?.light : undefined;
-    a[slot] = item ? { item, lit: light ? makeLight(this, light) : undefined } : undefined;
-    const key = item ? ITEMS[item]?.art : undefined;
-    if (key && !this.textures.exists(key)) void this.loadArt(key, artSrc(key));
-  }
-
-  /**
-   * Draws a held item with its grip on the holder's right or left hand in
-   * the frame showing now: in front of the body when that hand is nearer us
-   * (facing us, or walking to the right for the right hand and to the left
-   * for the left), behind it otherwise. Nothing shows until a vision model
-   * has found both points: no guessing.
-   */
-  private placeHeld(a: Avatar, side: Hand): void {
-    const held = side === 'right' ? a.held : a.offHeld;
-    if (!held) return;
-    const key = ITEMS[held.item]?.art;
-    const b = a.body;
-    const hand = this.handOf(a, side);
-    const grip = key ? this.options.points[key]?.grip : undefined;
-    if (held.lit) {
-      // The light shines from the hand, or from the holder's middle until the hand is found.
-      const [hx, hy] = hand ?? [b.originX, b.originY - 0.5];
-      const lx = b.x + (b.flipX ? b.originX - hx : hx - b.originX) * b.displayWidth;
-      placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, this.time.now, b.visible, this.sky.darkness());
-    }
-    if (!key || !hand || !grip || !this.textures.exists(key)) {
-      held.image?.setVisible(false);
-      return;
-    }
-    if (!held.image || held.image.texture.key !== key) {
-      held.image?.destroy();
-      held.image = litFigure(this, this.add.image(0, 0, key));
-    }
-    const mirrored = b.flipX;
-    const x = b.x + (mirrored ? b.originX - hand[0] : hand[0] - b.originX) * b.displayWidth;
-    const y = b.y + (hand[1] - b.originY) * b.displayHeight;
-    const flip = mirrored || facingSide(a.worn) === 'left';
-    const image = held.image;
-    image
-      .setFlipX(flip)
-      .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
-      .setScale((b.displayHeight * HELD_SIZE) / Math.max(image.width, image.height))
-      .setPosition(x, y)
-      .setDepth(b.depth + (heldBehind(a.worn, side) ? -1 : 1))
-      .setVisible(b.visible);
-  }
-
-  /**
-   * Where the avatar's right (or left) hand is in the picture or walk frame
-   * it shows now; in a frame where it was not found, the nearest frame's, so
-   * the item does not blink out for a step.
-   */
-  private handOf(a: Avatar, side: Hand): ArtPoint | undefined {
-    const points = this.options.points[a.body.texture.key];
-    const hands = side === 'right' ? points?.hands : points?.leftHands;
-    if (!hands?.length) return undefined;
-    const name = Number(a.body.frame.name);
-    const frame = hands.length > 1 && Number.isInteger(name) ? name : 0;
-    for (let k = 0; k < hands.length; k++) {
-      const hand = hands[(frame + k) % hands.length] ?? hands[(frame - k + hands.length) % hands.length];
-      if (hand) return hand;
-    }
-    return undefined;
-  }
-
   private fitTint(): void {
     const cam = this.cameras.main;
     this.tint?.setPosition(cam.width / 2, cam.height / 2).setSize(cam.width / cam.zoom + 8, cam.height / cam.zoom + 8);
   }
-}
-
-/** How often the isometric camera asks for kit houses the server is still drawing, and how many times. */
-const HOUSE_RETRY_MS = 5000;
-const HOUSE_TRIES = 36;
-
-/** An isometric way as a step on screen, one long. */
-function wayOnScreen(way: Facing): { x: number; y: number } {
-  const step = isWalkDirection(way) ? { dx: 0, dy: 1 } : ISO_WAY_STEPS[way];
-  const from = PROJECTION.toScreen(0, 0);
-  const to = PROJECTION.toScreen(step.dx, step.dy);
-  const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-  return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
-}
-
-/** Where a landmark stands: its footprint's bottom row is centred under (l.x, l.y). */
-function landmarkFeet(l: { x: number; y: number; footprint: { width: number; height: number } }, ox: number, oy: number): { x: number; y: number } {
-  const { width, height } = l.footprint;
-  return PROJECTION.stand(ox + l.x - width / 2, oy + l.y - height, width, height);
-}
-
-/**
- * A ground layer of diamond tiles for the isometric camera, from a strip
- * made by registerDiamondTileset: the tile in row y, column x has its top
- * corner `(x - y) * width / 2` across and `(x + y) * height / 2` down from `top`.
- */
-function diamondLayer(scene: Phaser.Scene, tiles: number[][], top: { x: number; y: number }, key: string, size: { width: number; height: number }): Phaser.Tilemaps.TilemapLayer {
-  const { width: w, height: h } = size;
-  const iso = Phaser.Tilemaps.Orientation.ISOMETRIC;
-  const rows = tiles.length;
-  const columns = tiles[0]?.length ?? 0;
-  const layer = new Phaser.Tilemaps.LayerData({ name: 'ground', width: columns, height: rows, tileWidth: w, tileHeight: h });
-  // Before the tiles, which work out where they stand from it.
-  layer.orientation = iso;
-  layer.data = tiles.map((row, y) => row.map((index, x) => new Phaser.Tilemaps.Tile(layer, index, x, y, w, h, w, h)));
-  const data = new Phaser.Tilemaps.MapData({ name: key, width: columns, height: rows, tileWidth: w, tileHeight: h, orientation: iso, format: Phaser.Tilemaps.Formats.ARRAY_2D, layers: [layer] });
-  const tilemap = new Phaser.Tilemaps.Tilemap(scene, data);
-  const tileset = tilemap.addTilesetImage(key, key, w, h, DIAMOND_PAD, DIAMOND_PAD * 2)!;
-  // Phaser stands each diamond's box, not its top corner, at the tile's place.
-  return tilemap.createLayer(0, tileset, top.x - w / 2, top.y)!;
-}
-
-/** The drawn storey of a floor over a tile. */
-function floorAt(floors: FloorView[], x: number, y: number, floor: number): FloorView | undefined {
-  return floors.find(({ storey: s }) => s.floor === floor && x >= s.x && y >= s.y && x < s.x + s.width && y < s.y + s.height);
-}
-
-/** True when two tile rectangles share a tile. */
-function overlaps(a: TileRect, b: { x: number; y: number; width: number; height: number }): boolean {
-  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-}
-
-/** Shows or hides anything drawn that can be. */
-function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void {
-  (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
-}
-
-/** Vertical screen lift (in pixels) for an upper floor (`floor > 0`) in the isometric camera. */
-function floorLift(floor: number): number {
-  const ground = PROJECTION.ground;
-  if (ground.kind !== 'diamond' || floor <= 0) return 0;
-  return Math.round(ground.height * 2.0) * floor;
-}
-
-/** Depth offset for an upper floor (`floor > 0`) so upper storeys sort cleanly above lower storeys. */
-function floorDepthOffset(floor: number): number {
-  if (PROJECTION.ground.kind !== 'diamond' || floor <= 0) return 0;
-  return floor * FLOOR_DEPTH;
-}
-
-/**
- * Dims/darkens a game object when it belongs to a floor below the player's current floor.
- * deltaFloors: player floor - object floor (e.g. 1 floor below -> 1, 2 floors below -> 2)
- */
-function setDepthShade(o: Phaser.GameObjects.GameObject, deltaFloors: number, keepAlpha = false): void {
-  if (!o.scene) return;
-  if (o instanceof Phaser.Tilemaps.TilemapLayer && !o.layer) return;
-  const alphaObj = o as Partial<Phaser.GameObjects.Components.Alpha>;
-  const tintObj = o as Partial<Phaser.GameObjects.Components.Tint>;
-  const baseTint = typeof o.getData === 'function' ? (o.getData('baseTint') as number | undefined) : undefined;
-  if (deltaFloors <= 0) {
-    if (!keepAlpha) alphaObj.setAlpha?.(1.0);
-    if (baseTint !== undefined) tintObj.setTint?.(baseTint);
-    else if (typeof tintObj.clearTint === 'function') tintObj.clearTint();
-    else tintObj.setTint?.(0xffffff);
-    return;
-  }
-  // Darken and slightly cool-shift lower floors to create atmospheric aerial depth
-  const factor = deltaFloors === 1 ? 0.55 : 0.35;
-  const r = Math.round(255 * factor * 0.92);
-  const g = Math.round(255 * factor * 0.94);
-  const b = Math.round(255 * factor * 1.05);
-  const tint = (r << 16) | (g << 8) | b;
-  tintObj.setTint?.(tint);
-  if (!keepAlpha) alphaObj.setAlpha?.(deltaFloors === 1 ? 0.75 : 0.5);
-}
-
-/** True when tile (x, y) lies within a building's walls (or a floor's rectangle). */
-function within(b: Pick<Building, 'x' | 'y' | 'width' | 'height'>, x: number, y: number): boolean {
-  return x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height;
-}
-
-/** A creature's name tag says when it is asleep or running away. */
-function creatureLabel(c: CreatureState): string {
-  return c.mood === 'asleep' ? `${c.name} (asleep)` : c.mood === 'fleeing' ? `${c.name} (running away)` : c.name;
-}
-
-/** A body's name tag says when there is something on it for us. */
-function bodyLabel(b: BodyState): string {
-  return b.loot ? `${b.name} (E for loot)` : b.name;
-}
-
-function dropChunk(chunk: Chunk): void {
-  for (const o of chunk.objects) o.destroy();
-  chunk.tilemap.destroy();
-}
-
-function destroyAvatar(scene: Phaser.Scene, a: Avatar): void {
-  a.held?.image?.destroy();
-  a.offHeld?.image?.destroy();
-  dropLight(scene, a.held?.lit);
-  dropLight(scene, a.offHeld?.lit);
-  a.body.destroy();
-  a.shadow.destroy();
-  a.label.destroy();
-  a.bar?.bg.destroy();
-  a.bar?.fill.destroy();
-}
-
-/** About 64 px per tile on a laptop or desktop screen, smaller on phones. */
-function cameraZoom(): number {
-  if (window.innerWidth < 700) return 0.3;
-  return window.innerWidth < 1280 ? 0.4 : 0.5;
 }

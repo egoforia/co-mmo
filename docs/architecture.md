@@ -99,7 +99,10 @@ prompts), `workshop.ts` (Wish Workshop), `compiler.ts` + `rules.ts` +
 **Art and sound.** `assets/` holds the providers, the style profile and every
 prompt builder; `art-jobs.ts` (the painting log), `art-recipes.ts` (what was
 sent for each picture), `art-history.ts` (versions), `art-studio.ts` (Art
-tab API), `building-painter.ts`, `walk-painter.ts`, `hand-finder.ts` +
+tab API facade) + `art-studio/`: `types.ts` (studio interfaces), `catalog.ts`
+(asset scanning, prompt builders, hand/ways sheet assembly and overview) and
+`review.ts` (dry-run review preview registry `REVIEW_HANDLERS`, single-item
+review and missing-art batch estimator), `building-painter.ts`, `walk-painter.ts`, `hand-finder.ts` +
 `hand-sources.ts`, `sound-maker.ts`, `normal-painter.ts` (painted normal
 maps), `paint-requests.ts` (resume after restart). `assets/style.ts` names the active profile's words for the
 prompt builders; never write style sentences anywhere else.
@@ -193,10 +196,16 @@ https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 ## Client modules
 
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
-`world-scene.ts` (the Phaser scene; positions go through `PROJECTION`, and
+`world-scene.ts` (the Phaser scene facade; positions go through `PROJECTION`, and
 walkers face its `ways`: the four isometric ways show standing pictures
 until walks are made for them; the
-ground, trees and rocks are drawn in chunks near the player), `sky.ts` (the
+ground, trees and rocks are drawn in chunks near the player) + `world-scene/`:
+`types.ts` (view interfaces, floor depth and shade helpers), `walls.ts`
+(`rockWalls` half-tile coping and vertical wall extrusion), `regions.ts`
+(terrain chunks, building shells, `KitHouse` upgrade and `applyFloorView`),
+`avatars.ts` (player, NPC, creature and loot views, `FigureMetricsCache` for
+opaque bounds and hand grips, walk animations and speech bubbles) and `combat.ts`
+(hit sparks, floating numbers, screen shake, sound cues and mini-map view), `sky.ts` (the
 light of the hour and the weather),
 `textures.ts` (tilesets from painted art, and the same tiles turned into
 diamonds for the isometric camera), `camera.ts` (isometric for everyone; the Owner's
@@ -220,7 +229,10 @@ shrunk, with zoom and a look at the other floors where you stand;
 minimized or closed it draws nothing; the
 scene hands it `miniMapView()`), and one `*-ui.ts`
 per panel. God's View is
-`gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts`, `loot-tab.ts` and
+`gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts` (Art tab shell and
+`BUTTON_ACTIONS` dispatch table) + `art-ui/` (`state.ts` shared `artState`,
+`pages.ts` sub-tab renderers, `walkers.ts` character/ways/hand-point editors,
+`dialogs.ts` review and history modals), `loot-tab.ts` and
 `api-log-ui.ts`.
 
 ## Changing something big
@@ -232,6 +244,7 @@ per panel. God's View is
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |
+| New Art studio review action | An entry in `REVIEW_HANDLERS` (`server/src/art-studio/review.ts`) and `BUTTON_ACTIONS` (`client/src/art-ui.ts`). |
 
 ## The robot playtester
 
@@ -242,6 +255,10 @@ play; a new feature adds one. See `playtest.md`.
 ## Rules every module keeps
 
 - A short doc comment on each export; comments say why.
+- When a module grows past ~500 lines or mixes distinct domains, split it into
+  a thin facade (`<module>.ts`) and focused submodules (`<module>/*.ts`, like
+  `wishes/`, `region/`, `art-studio/`, `world-scene/`, `art-ui/`, `gods-view/`).
+  Add new domain logic to the matching submodule, never by growing the facade.
 - Paid calls go through the paint queue and the budget, and are reviewable
   before they are sent (the Art tab shows the exact prompt).
 - No art drawn in code (the building kit's shapes are the one exception:

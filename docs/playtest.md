@@ -63,31 +63,12 @@ what a robot sees (`unreachable`).
 A wish may add a playtest file, but the harness, the bot and the test
 settings are core files for the wish guard.
 
-## In CI
+## On a pull request
 
-The proposed `playtest` job for `.github/workflows/ci.yml`:
-
-```yaml
-  playtest:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: npm run playtest -- --reporter=default --reporter=github-actions
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playtest-screenshots
-          path: playtest-results/
-          if-no-files-found: ignore
-```
+Put the **playtest** label on a pull request to have it played
+(`.github/workflows/playtest.yml`). It plays again on every push while the
+label stays; take the label off to stop. The screenshots are kept with the
+run as `playtest-screenshots`.
 
 In a cloud session Chromium is already installed; do not run
 `playwright install` there.

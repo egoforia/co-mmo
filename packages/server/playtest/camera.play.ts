@@ -64,10 +64,11 @@ describe('the isometric camera', () => {
     const again = page;
     await again.waitForSelector('#game canvas', { timeout: 20_000 });
     await again.waitForTimeout(1500);
-    await again.screenshot({ path: resolve(shots, 'camera-world.png') });
+    // A runner without a graphics card can take a while to draw a frame for the picture.
+    await again.screenshot({ path: resolve(shots, 'camera-world.png'), timeout: 90_000 });
     expect((await drawn).status()).toBe(200);
     await again.waitForTimeout(3000);
-    await again.screenshot({ path: resolve(shots, 'camera-house.png') });
+    await again.screenshot({ path: resolve(shots, 'camera-house.png'), timeout: 90_000 });
 
     // The keys walk along the grid: D is due east, along the lane towards the doorstep.
     await again.locator('#game canvas').click();
@@ -87,7 +88,7 @@ describe('the isometric camera', () => {
     await inside.waitForSelector('#game canvas', { timeout: 20_000 });
     await inside.waitForResponse((r) => /\/wished-art\/kit-houses\/.+\/storey-1\.png/.test(r.url()), { timeout: 30_000 });
     await inside.waitForTimeout(3000);
-    await inside.screenshot({ path: resolve(shots, 'camera-inside.png') });
+    await inside.screenshot({ path: resolve(shots, 'camera-inside.png'), timeout: 90_000 });
     expect(at().y, 'standing in the shop').toBeLessThan(shop.door.y);
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

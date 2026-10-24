@@ -298,7 +298,7 @@ export class WorldScene extends Phaser.Scene {
       const region = this.drawn.get(d.id);
       if (region?.layout === layout) continue;
       if (region) undrawRegion(this, d.id, region, this.drawn);
-      this.drawn.set(d.id, drawRegion(this, d.id === def.id ? this.map : generateRegion(d, size), layout));
+      this.drawn.set(d.id, drawRegion(this, d.id === def.id ? this.map : generateRegion(d, size), layout, this.options.art));
       this.nearAt = '';
       void raiseHouses(this, d.id, this.drawn, this.options.houses, this.houseArt, () => {
         this.revealBuildings(true);

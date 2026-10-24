@@ -32,7 +32,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: npm run playtest -- --reporter=default --reporter=github-actions
+      # Robots play side by side; browsers play one at a time, since several
+      # Chromiums at once leave a small runner too slow to keep up with the keys.
+      - name: Robots play
+        run: npm run playtest -- --reporter=default --reporter=github-actions $(grep -L "from 'playwright'" packages/server/playtest/*.play.ts)
+      - name: Browsers play
+        if: success() || failure()
+        run: npm run playtest -- --no-file-parallelism --reporter=default --reporter=github-actions $(grep -l "from 'playwright'" packages/server/playtest/*.play.ts)
       - uses: actions/upload-artifact@v4
         if: always()
         with:

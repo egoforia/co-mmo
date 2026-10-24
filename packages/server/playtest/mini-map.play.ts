@@ -52,8 +52,11 @@ describe('the mini map', () => {
     const problems: string[] = [];
     const map = generateRegion(regionDef('sanctum')!);
     const shop = map.buildings.find((b) => b.style === 'sanctum-arcanum')!;
+    // The Sanctum has stairs of its own (the cathedral, the catacombs); the shop's are added after them.
+    const own = map.stairways.length;
     expect(buildFloors(map, shop, 1, 1)).toBe(true);
-    const up = map.stairways.find((s) => s.lower === 0)!;
+    const shopStairs = map.stairways.slice(own);
+    const up = shopStairs.find((s) => s.lower === 0)!;
     const start = { x: up.bottom.x, y: up.bottom.y + 1 };
     const { id, token } = account(world.store, 'Robo', 'owner');
     world.store.savePosition(id, start.x, start.y, 'sanctum', newCharacter());

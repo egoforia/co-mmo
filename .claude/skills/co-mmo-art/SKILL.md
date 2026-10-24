@@ -46,6 +46,12 @@ Where things are:
   the profile's `kitTextures`), and only textures that pass the sheet checks
   are used. Keep the sheet layout: today's paintings are read against it.
 - Scenery: the biome kit (`assets/kit.ts`, `assets/wild-kit.ts`).
+- Things that stand on tiles (set pieces, props with a footprint, furniture)
+  are painted, in an isometric style, standing on exactly their footprint
+  (`artFootprint` in shared, `footprintWords` in `assets/style.ts`) and sized
+  to its diamond (`isoSpan`); their manifest entry says `view: 'isometric'`
+  and the game stands them on those tiles (`client/src/tile-stand.ts`), in
+  upright strips when wider than a tile. Trees and rocks stand on one tile.
 - Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`. Walkers are
   painted only in the isometric camera's four ways (`ISO_WAYS`: front-left,
   front-right, back-left, back-right), all four together on one sheet from

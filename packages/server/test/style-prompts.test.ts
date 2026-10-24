@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDING_STYLES, buildingKit, type Facing } from '@co-mmo/shared';
-import { buildPrompt, type AssetDescription } from '../src/assets/style.ts';
+import { buildPrompt, paintedFootprint, type AssetDescription } from '../src/assets/style.ts';
 import { buildingArtJobs } from '../src/assets/building-art.ts';
 import { viewPrompt, walkVideoPrompt, waysSheetPrompt } from '../src/assets/walk-video.ts';
 import { JUDGE_SYSTEM } from '../src/assets/style-check.ts';
@@ -22,10 +22,19 @@ const MOSS: AssetDescription = {
   body: 'mossy forest floor', colors: { main: 'sage green' }, mood: 'calm',
 };
 
+const STONES: AssetDescription = {
+  name: 'Ring of standing stones', kind: 'set-piece', biome: 'sanctum', silhouetteHook: 'a broken ring of tall stones',
+  body: 'weathered standing stones in a ring', colors: { main: 'grey stone' }, mood: 'ancient',
+};
+
 describe('every prompt the game paints with', () => {
   it('sprites and ground tiles', () => {
     expect(buildPrompt(LANTERN)).toMatchSnapshot();
     expect(buildPrompt(MOSS)).toMatchSnapshot();
+  });
+
+  it('a set piece standing on its tiles', () => {
+    expect(buildPrompt(STONES, paintedFootprint('sanctum-standing-stones'))).toMatchSnapshot();
   });
 
   it('a building outside, its inside tiles and its furniture', () => {

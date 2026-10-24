@@ -1,29 +1,20 @@
 import Phaser from 'phaser';
 import { buildingKit } from '@co-mmo/shared';
 import { PROJECTION } from './projection.ts';
+import { STRIP, depthAt, standing, type Floor } from './tile-stand.ts';
 
 // Kit houses in the world, for the isometric camera: the server draws each
 // view of a house (its outside, and a cutaway per storey) on one frame, with
 // a normal map so the game's light falls on it. Here those pictures are
 // loaded and stood on the house's floor, cut into upright strips so a walker
-// can pass behind the house and in front of it.
+// can pass behind the house and in front of it. Set pieces and furniture
+// wider than a tile stand the same way on their footprints.
 
 type KitHouseInfo = buildingKit.KitHouseInfo;
 type Frame = NonNullable<KitHouseInfo['frame']>;
 
 /** A region's kit houses, as the server offers them. */
 export type HouseSource = (region: string) => Promise<KitHouseInfo[]>;
-
-/** A house's floor in world tiles: the kit house's footprint. */
-export interface Floor {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-/** How wide each upright strip of a house picture is, in its own pixels. */
-const STRIP = 32;
 
 /** Loads the pictures and normal maps of kit house views, each once, by the URL it came from. */
 export class HouseArt {
@@ -59,25 +50,6 @@ export class HouseArt {
 }
 
 /**
- * Where along a run of world points the screen x `x` falls, and the depth
- * there: whatever stands on that spot sorts against the house as it would
- * against that point of its walls. Past the ends, the end's depth.
- */
-function depthAt(x: number, run: [number, number][]): number {
-  const pts = run.map(([wx, wy]) => ({ s: PROJECTION.toScreen(wx, wy).x, wx, wy }));
-  const first = pts[0]!;
-  const last = pts[pts.length - 1]!;
-  if (x <= first.s) return PROJECTION.depth(first.wx, first.wy);
-  for (let i = 1; i < pts.length; i++) {
-    const [a, b] = [pts[i - 1]!, pts[i]!];
-    if (x > b.s) continue;
-    const t = (x - a.s) / (b.s - a.s || 1);
-    return PROJECTION.depth(a.wx + (b.wx - a.wx) * t, a.wy + (b.wy - a.wy) * t);
-  }
-  return PROJECTION.depth(last.wx, last.wy);
-}
-
-/**
  * Stands a house view on its floor as upright strips. Each strip sorts by
  * the house's edge at its place on screen: an outside by its near walls
  * (south and east), so whoever is behind the house is hidden by it all, roof
@@ -99,4 +71,18 @@ export function standHouse(scene: Phaser.Scene, texture: string, frame: Frame, f
     strips.push(strip);
   }
   return strips;
+}
+
+/**
+ * Stands a picture of a thing on the tiles it covers, as `standing` plans
+ * it: one picture, or upright strips sorted by the near edges of its tiles.
+ */
+export function standOnTiles(scene: Phaser.Scene, texture: string, floor: Floor, fitted: boolean): Phaser.GameObjects.Image[] {
+  const frame = scene.textures.getFrame(texture);
+  const plan = standing(floor, { width: frame.width, height: frame.height }, fitted);
+  return plan.strips.map((s) => {
+    const img = scene.add.image(plan.x, plan.y, texture).setOrigin(0.5, plan.originY).setScale(plan.scale);
+    if (plan.strips.length > 1) img.setCrop(s.x0, 0, s.width, frame.height);
+    return img.setDepth(s.depth);
+  });
 }

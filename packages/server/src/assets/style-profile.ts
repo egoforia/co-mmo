@@ -20,6 +20,8 @@ export interface StyleProfile {
   negatives: string[];
   /** Where the camera stands for sprites and buildings, in words (the game's projection). */
   view: string;
+  /** The camera its pictures are painted for: isometric pictures of things that stand on tiles are fitted to them. */
+  camera: 'top-down' | 'isometric';
   /** How a lone sprite is framed on the key colour. */
   sprite: { framing: string; negatives: string[] };
   /** How a seamless ground tile is framed. */
@@ -58,6 +60,7 @@ export const STORYBOOK: StyleProfile = {
     'text', 'letters', 'words', 'labels with writing', 'watermark', 'signature', 'frame', 'border', 'vignette',
   ],
   view: VIEW,
+  camera: 'top-down',
   sprite: {
     framing: [
       `A single game sprite in ${VIEW}, centred, with empty margin all around it.`,
@@ -139,6 +142,7 @@ export const FLAT_ISOMETRIC: StyleProfile = {
     'text', 'letters', 'words', 'labels with writing', 'watermark', 'signature', 'frame', 'border', 'vignette',
   ],
   view: ISO_VIEW,
+  camera: 'isometric',
   sprite: {
     framing: [
       `A single game sprite in ${ISO_VIEW}, centred, with empty margin all around it.`,

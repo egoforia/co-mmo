@@ -211,7 +211,10 @@ light of the hour and the weather),
 diamonds for the isometric camera), `camera.ts` (isometric for everyone; the Owner's
 switch to the old top-down view, kept in the browser), `kit-house-view.ts` (kit
 houses stood on their floors in upright strips, so walkers pass behind and in
-front of them), `wished.ts` (wished content),
+front of them), `tile-stand.ts` (how a picture stands on its tiles: set pieces
+and furniture wider than a tile in the same upright strips, and a picture
+painted for the isometric camera, `view: 'isometric'` in the manifest, as
+wide as its footprint's diamond), `wished.ts` (wished content),
 `lights.ts` + `lit-pipeline.ts` (pictures are lit by the sky's colour, the
 sun or moon of the hour from shared `lighting.ts`, and lamps at fires,
 lanterns, shrines and windows; characters get a rim light; `light-preview.ts`
@@ -240,7 +243,7 @@ per panel. God's View is
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). `server/test/style-prompts.test.ts` snapshots every prompt, so the change shows word for word. |
-| Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20), painted in the `FLAT_ISOMETRIC` style. Walkers are painted in their four isometric ways together on one sheet (Art tab, `waysSheetPrompt`), and start-up paints no walks. Still to come: upright strips for trees and set pieces, every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
+| Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20), painted in the `FLAT_ISOMETRIC` style. Walkers are painted in their four isometric ways together on one sheet (Art tab, `waysSheetPrompt`), and start-up paints no walks. Set pieces and furniture stand in upright strips on their footprints, and those painted from now on are painted standing on their tiles (`artFootprint`, `footprintWords`) and sized to them. Still to come: every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |

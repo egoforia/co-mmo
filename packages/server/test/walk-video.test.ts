@@ -1,7 +1,22 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { GeminiVideoProvider, videoUsd } from '../src/assets/video.ts';
-import { VIDEO_FRAME, findCycle, gearPlacement, soleFigure, startFrame, walkFromFrames, waysFromSheet, waysSheetPrompt } from '../src/assets/walk-video.ts';
+import {
+  GeminiVideoProvider,
+  knownVideoModels,
+  registerVideoPricing,
+  videoRatesPerSecond,
+  videoUsd,
+} from '../src/assets/video.ts';
+import {
+  VIDEO_FRAME,
+  findCycle,
+  gearPlacement,
+  soleFigure,
+  startFrame,
+  walkFromFrames,
+  waysFromSheet,
+  waysSheetPrompt,
+} from '../src/assets/walk-video.ts';
 
 // Test pictures: simple shapes on magenta, standing in for painted figures.
 const MAGENTA = '#FF00FF';
@@ -65,6 +80,22 @@ describe('video walks', () => {
     expect(new Set(cycle.picks.map(pose)).size).toBe(12);
   });
 
+  it('finds cycle proportionally in clips of different lengths and frame rates', () => {
+    // A 60-frame clip (e.g. 2s @ 30fps) with cycle period 10
+    const pose60 = (i: number) => (i < 8 || i >= 52 ? -1 : (i - 8) % 10);
+    const diff60 = (a: number, b: number) => (pose60(a) === pose60(b) ? 0 : 1 + Math.abs(pose60(a) - pose60(b)) / 10);
+    const cycle60 = findCycle(60, diff60, 10);
+    expect(cycle60.period).toBe(10);
+    expect(cycle60.picks).toHaveLength(10);
+
+    // A 150-frame clip (5s @ 30fps) with explicit fps hint and period 15
+    const pose150 = (i: number) => (i < 30 || i >= 120 ? -1 : (i - 30) % 15);
+    const diff150 = (a: number, b: number) => (pose150(a) === pose150(b) ? 0 : 1 + Math.abs(pose150(a) - pose150(b)) / 15);
+    const cycle150 = findCycle(150, diff150, 12, { fps: 30 });
+    expect(cycle150.period).toBe(15);
+    expect(cycle150.picks).toHaveLength(12);
+  });
+
   it('cuts one cycle of walk frames out of a clip', async () => {
     const strideOf = (i: number) => Math.round(10 * Math.sin((2 * Math.PI * i) / 16));
     const frames = await Promise.all(Array.from({ length: 96 }, (_, i) => picture(1280, 720, walker(640, 640, strideOf(i)))));
@@ -73,6 +104,18 @@ describe('video walks', () => {
     expect(figures).toHaveLength(8);
     // Spread through the cycle, so the legs are apart by different amounts.
     expect(new Set(figures.map((f) => f.toString('base64'))).size).toBeGreaterThan(4);
+  }, 30_000);
+
+  it('cuts walk cycle from 1:1 square video format', async () => {
+    const strideOf = (i: number) => Math.round(8 * Math.sin((2 * Math.PI * i) / 12));
+    const frames = await Promise.all(Array.from({ length: 48 }, (_, i) => picture(720, 720, walker(360, 600, strideOf(i)))));
+    const { figures, placed, cycle } = await walkFromFrames(frames, 6, { shortest: 6, longest: 18, skip: 4 });
+    expect(cycle.period).toBe(12);
+    expect(figures).toHaveLength(6);
+    expect(placed).toHaveLength(6);
+    const meta = await sharp(placed[0]!).metadata();
+    expect(meta.width).toBeGreaterThan(0);
+    expect(meta.height).toBeGreaterThan(0);
   }, 30_000);
 
   it('starts a Veo job, waits for it and downloads the clip', async () => {
@@ -99,5 +142,25 @@ describe('video walks', () => {
     const provider = new GeminiVideoProvider('key', undefined, fake, async () => {});
     const first = { mimeType: 'image/png', data: Buffer.from('png') };
     await expect(provider.generate({ prompt: 'walk', first, seconds: 4 })).rejects.toThrow('not supported');
+  });
+
+  it('supports model-agnostic video models and configurable pricing', () => {
+    const models = knownVideoModels();
+    expect(models).toContain('veo-3.1-lite-generate-preview');
+    expect(models).toContain('wan-2.1');
+
+    // Rates lookup with provider prefix
+    expect(videoRatesPerSecond('gemini/veo-3.1-lite-generate-preview')).toEqual([0.05, 0.08]);
+    expect(videoRatesPerSecond('replicate/wan-2.1')).toEqual([0.05, 0.08]);
+
+    // Custom model registration
+    registerVideoPricing('custom-open-diffusion', [0.03, 0.06]);
+    expect(knownVideoModels()).toContain('custom-open-diffusion');
+    const customClip = { mimeType: 'video/mp4', data: Buffer.alloc(0), seconds: 5, resolution: '720p' as const };
+    expect(videoUsd('custom-open-diffusion', customClip)).toBeCloseTo(0.15);
+
+    // Fallback safe pricing for unknown models
+    const unknownClip = { mimeType: 'video/mp4', data: Buffer.alloc(0), seconds: 10, resolution: '1080p' as const };
+    expect(videoUsd('completely-unknown-model-xyz', unknownClip)).toBeCloseTo(4.0);
   });
 });

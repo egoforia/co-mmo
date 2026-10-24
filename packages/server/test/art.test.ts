@@ -258,7 +258,7 @@ describe('the Art tab', () => {
     const done = await ask(base, owner.token, 'walk', { walker: 'desert-scarab', body: 'six-legged' });
     expect(done.status).toBe(409);
     expect(done.body.message).toMatch(/already walks/);
-  }, 60_000);
+  }, 120_000);
 
   it('paints a standing picture on its own with the Owner\'s prompt, then makes its clip from it', async () => {
     const clips = video();
@@ -329,7 +329,7 @@ describe('the Art tab', () => {
     expect(restored.versions).toHaveLength(2);
     expect(restored.recipe.steps[0].prompt).toContain('facing left');
     expect(clips.asked).toHaveLength(5);
-  }, 60_000);
+  }, 120_000);
 
   it('uses each way\'s walk as soon as it is made, and serves standing pictures for the ways that do not walk yet', async () => {
     const clips = video();

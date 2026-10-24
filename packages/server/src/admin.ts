@@ -314,16 +314,16 @@ export async function handleAdmin(
     const fallback = body?.fallback ? modelChoice(body.fallback) : null;
     const compiler = body?.compiler ? modelChoice(body.compiler) : null;
     const img = body?.image as Record<string, unknown> | undefined;
-    const image: Settings['ai']['image'] = img?.provider === 'gemini'
-      ? { provider: 'gemini', model: typeof img.model === 'string' && img.model ? img.model.slice(0, 80) : 'gemini-2.5-flash-image' }
+    const image: Settings['ai']['image'] = img?.provider && img.provider !== 'none'
+      ? { provider: String(img.provider), model: typeof img.model === 'string' && img.model.trim() ? img.model.trim().slice(0, 80) : 'gemini-2.5-flash-image' }
       : { provider: 'none', model: '' };
     // Each kind of art may name its own image model; blank uses the main one.
     const uses = (img?.uses ?? {}) as Record<string, unknown>;
     const chosen = Object.fromEntries(ART_USES.flatMap((u) => (typeof uses[u] === 'string' && (uses[u] as string).trim() ? [[u, (uses[u] as string).trim().slice(0, 80)]] : [])));
-    if (image.provider === 'gemini' && Object.keys(chosen).length) image.uses = chosen;
+    if (image.provider !== 'none' && Object.keys(chosen).length) image.uses = chosen;
     const vid = body?.video as Record<string, unknown> | undefined;
     const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings, ctx.env)
-      : vid.provider === 'gemini' ? { provider: 'gemini', model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
+      : vid?.provider && vid.provider !== 'none' ? { provider: String(vid.provider), model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
       : { provider: 'none', model: '' };
     // Google's daily clip cap for the key, which the game stops at rather than finding out from refusals.
     const clipsADay = vid?.dailyClips === undefined || vid.dailyClips === '' ? dailyClips(store.settings) : Number(vid.dailyClips);

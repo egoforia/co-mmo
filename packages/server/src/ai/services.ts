@@ -125,17 +125,25 @@ export class AiServices {
     const settings = this.options.settings();
     const { env, overrides } = this.options;
     if (overrides?.imageProvider) return overrides.imageProvider(settings, use);
-    if (settings.ai.image.provider !== 'gemini' || !env.GEMINI_API_KEY) return undefined;
+    const provider = settings.ai.image.provider;
+    if (!provider || provider === 'none') return undefined;
     const model = (use && settings.ai.image.uses?.[use]) || settings.ai.image.model;
-    return new GeminiImageProvider(env.GEMINI_API_KEY, model || undefined);
+    if (provider === 'gemini') {
+      return env.GEMINI_API_KEY ? new GeminiImageProvider(env.GEMINI_API_KEY, model || undefined) : undefined;
+    }
+    return undefined;
   }
 
-  // Walks use Google's Veo on the Gemini key, with the model chosen on the AI models tab.
+  // Video clips use the provider and model chosen in AI settings (defaults to Gemini/Veo).
   private chosenVideo(): VideoProvider | undefined {
     const { env, overrides } = this.options;
     if (overrides?.videoProvider) return overrides.videoProvider();
     const v = videoSettings(this.options.settings(), env);
-    return v.provider === 'gemini' && env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
+    if (!v || v.provider === 'none') return undefined;
+    if (v.provider === 'gemini') {
+      return env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
+    }
+    return undefined;
   }
 
   private chosenEffects(): SoundProvider | undefined {

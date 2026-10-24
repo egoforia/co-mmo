@@ -1,14 +1,15 @@
-import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import sharp from 'sharp';
-import { CHARACTER_HEIGHT, ISO_WAYS, type IsoWay } from '../packages/shared/src/walk.ts';
-import { removeKeyBackground, removeKeySpill } from '../packages/server/src/assets/postprocess.ts';
-import { normalizeWalk } from '../packages/server/src/assets/walk-frames.ts';
+import { CHARACTER_HEIGHT, ISO_WAYS, TURNTABLE_WAYS, type IsoWay } from '../packages/shared/src/walk.ts';
+import {
+  extractTurnaroundViews,
+  extractVideoFrames,
+  processFrame,
+  saveAnimationOutputs,
+} from './import-animation-utils.ts';
 
-// Imports the 5 beastfolk walk animations extracted from the Wan 3.0 video
-// into co-mmo's data-driven art pipeline without modifying any core game code.
+// Imports the 5 beastfolk walk animations into co-mmo's model-agnostic art pipeline.
 
 interface CharacterSpec {
   id: string;
@@ -20,46 +21,19 @@ interface CharacterSpec {
 const ASSETS_DIR = resolve(import.meta.dirname, '../assets/beastfolk');
 
 const CHARACTERS: CharacterSpec[] = [
-  {
-    id: 'bramble-ursine',
-    name: 'Bramble-Ursine',
-    rowIndex: 0,
-    standSheet: resolve(ASSETS_DIR, 'bramble-ursine-turnaround.png'),
-  },
-  {
-    id: 'tide-lutran',
-    name: 'Tide-Lutran',
-    rowIndex: 1,
-    standSheet: resolve(ASSETS_DIR, 'tide-lutran-turnaround.png'),
-  },
-  {
-    id: 'zephyr-falcon',
-    name: 'Zephyr-Falcon',
-    rowIndex: 2,
-    standSheet: resolve(ASSETS_DIR, 'zephyr-falcon-turnaround.png'),
-  },
-  {
-    id: 'dune-scorpid',
-    name: 'Dune-Scorpid',
-    rowIndex: 3,
-    standSheet: resolve(ASSETS_DIR, 'dune-scorpid-turnaround.png'),
-  },
-  {
-    id: 'sylvan-cervid',
-    name: 'Sylvan-Cervid',
-    rowIndex: 4,
-    standSheet: resolve(ASSETS_DIR, 'sylvan-cervid-turnaround.png'),
-  },
+  { id: 'bramble-ursine', name: 'Bramble-Ursine', rowIndex: 0, standSheet: resolve(ASSETS_DIR, 'bramble-ursine-turnaround.png') },
+  { id: 'tide-lutran', name: 'Tide-Lutran', rowIndex: 1, standSheet: resolve(ASSETS_DIR, 'tide-lutran-turnaround.png') },
+  { id: 'zephyr-falcon', name: 'Zephyr-Falcon', rowIndex: 2, standSheet: resolve(ASSETS_DIR, 'zephyr-falcon-turnaround.png') },
+  { id: 'dune-scorpid', name: 'Dune-Scorpid', rowIndex: 3, standSheet: resolve(ASSETS_DIR, 'dune-scorpid-turnaround.png') },
+  { id: 'sylvan-cervid', name: 'Sylvan-Cervid', rowIndex: 4, standSheet: resolve(ASSETS_DIR, 'sylvan-cervid-turnaround.png') },
 ];
 
 const VIDEO_PATH = resolve(ASSETS_DIR, 'walk-loop-16fps.mp4');
-const FRAMES_DIR = resolve('data/art/walks/raw_frames');
 const DATA_WALKS_DIR = resolve('data/art/walks');
+const FRAMES_DIR = resolve(DATA_WALKS_DIR, 'raw_frames');
 const VIEWS_DIR = resolve(DATA_WALKS_DIR, 'views');
-const FRAMES_OUT_DIR = resolve(DATA_WALKS_DIR, 'frames');
 
-// Cell bounds inside the 1080x1920 video
-// Grid was scaled by 0.48 from 2250x4000 (left margin 136.8, cell_w 201.6, cell_h 384)
+// Cell bounds inside the 1080x1920 video grid
 function getCellBox(r: number, c: number) {
   const left = Math.round(136.8 + c * 201.6);
   const width = Math.round(201.6);
@@ -68,48 +42,18 @@ function getCellBox(r: number, c: number) {
   return { left, top, width, height };
 }
 
-// Extract standing figures from a 4-way turnaround sheet
-async function extractStandingViews(sheetPath: string, ways: readonly IsoWay[] = ISO_WAYS): Promise<Record<IsoWay, Buffer>> {
-  const im = sharp(sheetPath);
-  const meta = await im.metadata();
-  const w = meta.width ?? 1680;
-  const h = meta.height ?? 800;
-
-  // Standalone sheet has 4 figures evenly distributed across 1680x800
-  const segW = Math.round(w / 4);
-  const views: Record<string, Buffer> = {};
-
-  for (let c = 0; c < 4; c++) {
-    const way = ways[c]!;
-    const crop = await sharp(sheetPath)
-      .extract({ left: c * segW, top: 0, width: segW, height: h })
-      .png()
-      .toBuffer();
-    const { png } = await removeKeyBackground(crop, 80, { holes: true });
-    const clean = await removeKeySpill(png);
-    views[way] = await sharp(clean).trim().png().toBuffer();
-  }
-  return views as Record<IsoWay, Buffer>;
-}
-
-// Bramble-Ursine turnaround positions 3 and 4 (cols 2 and 3) were generated as back-right and back-left
+// Turntable turnaround sheets order positions 3 and 4 as back-right and back-left
 const waysForChar = (charId: string): readonly IsoWay[] =>
-  charId === 'bramble-ursine'
-    ? ['front-left', 'front-right', 'back-right', 'back-left']
-    : ['front-left', 'front-right', 'back-left', 'back-right'];
+  charId === 'bramble-ursine' ? TURNTABLE_WAYS : ISO_WAYS;
 
 async function main() {
   console.log('=== Starting Beastfolk Walk Animation Import into co-mmo ===');
 
   await mkdir(DATA_WALKS_DIR, { recursive: true });
   await mkdir(VIEWS_DIR, { recursive: true });
-  await mkdir(FRAMES_OUT_DIR, { recursive: true });
 
-  if (!existsSync(FRAMES_DIR)) {
-    await mkdir(FRAMES_DIR, { recursive: true });
-    console.log(`Extracting raw video frames from ${VIDEO_PATH} to ${FRAMES_DIR}...`);
-    execSync(`ffmpeg -y -i "${VIDEO_PATH}" -vsync 0 "${FRAMES_DIR}/frame_%03d.png"`, { stdio: 'inherit' });
-  }
+  const frameFiles = await extractVideoFrames({ videoPath: VIDEO_PATH, framesDir: FRAMES_DIR, pattern: 'frame_%03d.png' });
+  console.log(`Video frames ready: ${frameFiles.length} frames in ${FRAMES_DIR}`);
 
   const manifestPath = resolve(DATA_WALKS_DIR, 'manifest.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8').catch(() => '{}'));
@@ -121,8 +65,7 @@ async function main() {
   const clientManifestPath = resolve(clientArtDir, 'manifest.json');
   const clientManifest = JSON.parse(await readFile(clientManifestPath, 'utf8').catch(() => '{}'));
 
-  // Seamless 12-frame walk cycle spanning the complete 2 strides [21..48) at ~13.3 fps (0.9s period)
-  // Step sizes [2, 3, 2, 2, 2, 3, 2, 2, 2, 3, 2, 2] wrap smoothly into frame 48 (which mirrors frame 21)
+  // 12-frame walk cycle spanning 2 strides [21..48)
   const frameIndices = [21, 23, 26, 28, 30, 32, 35, 37, 39, 41, 44, 46];
   console.log(`Using ${frameIndices.length} frames per walk cycle: [${frameIndices.join(', ')}]`);
 
@@ -130,17 +73,17 @@ async function main() {
     console.log(`\nProcessing ${char.name} (${char.id})...`);
     const ways = waysForChar(char.id);
 
-    // 1. Process standing views
-    console.log(`  Extracting standing views from ${char.standSheet}...`);
-    const standingViews = await extractStandingViews(char.standSheet, ways);
-    for (const [way, buf] of Object.entries(standingViews)) {
-      const viewFile = resolve(VIEWS_DIR, `${char.id}-${way}.png`);
-      await writeFile(viewFile, buf);
+    // 1. Process standing views from turnaround sheet
+    if (existsSync(char.standSheet)) {
+      console.log(`  Extracting standing views from ${char.standSheet}...`);
+      const standingViews = await extractTurnaroundViews(char.standSheet, ways);
+      for (const [way, buf] of Object.entries(standingViews)) {
+        await writeFile(resolve(VIEWS_DIR, `${char.id}-${way}.png`), buf);
+      }
     }
 
     // 2. Extract walk frames for all 4 isometric ways
     const directionsFrames: Buffer[][] = [];
-
     for (let c = 0; c < 4; c++) {
       const box = getCellBox(char.rowIndex, c);
       const wayFrames: Buffer[] = [];
@@ -148,71 +91,33 @@ async function main() {
       for (const fIdx of frameIndices) {
         const frameFileName = `frame_${String(fIdx).padStart(3, '0')}.png`;
         const framePath = resolve(FRAMES_DIR, frameFileName);
-
-        const crop = await sharp(framePath).extract(box).png().toBuffer();
-        const { png } = await removeKeyBackground(crop, 80, { holes: true });
-        const clean = await removeKeySpill(png);
+        const clean = await processFrame(framePath, box, { isolate: true });
         wayFrames.push(clean);
       }
       directionsFrames.push(wayFrames);
     }
 
-    // 3. Normalize walk strips to CHARACTER_HEIGHT (168px) and align baselines
-    console.log(`  Normalizing walk strips to CHARACTER_HEIGHT (${CHARACTER_HEIGHT}px)...`);
-    const normalized = await normalizeWalk(directionsFrames, { bodyHeight: CHARACTER_HEIGHT });
+    // 3. Normalize walk strips and save outputs
+    console.log(`  Normalizing walk strips to canonical height (${CHARACTER_HEIGHT}px)...`);
+    const { normalized } = await saveAnimationOutputs({
+      charId: char.id,
+      kind: 'walk',
+      directionsFrames,
+      ways,
+      bodyHeight: CHARACTER_HEIGHT,
+      cycleSeconds: 0.9,
+      dataDir: DATA_WALKS_DIR,
+      clientArtDir,
+      manifest,
+      clientManifest,
+    });
     console.log(`  Normalized: frame size = ${normalized.frameWidth}x${normalized.frameHeight}, scale = ${normalized.scale.toFixed(3)}`);
-
-    // 4. Save walk strips, individual frames, and update manifest
-    for (let c = 0; c < 4; c++) {
-      const way = ways[c]!;
-      const walkId = `${char.id}-walk-${way}`;
-      const stripBuf = normalized.strips[c]!;
-      const wayFrames = directionsFrames[c]!;
-
-      // Save strip PNG in data/art/walks and client art
-      const stripPath = resolve(DATA_WALKS_DIR, `${walkId}.png`);
-      await writeFile(stripPath, stripBuf);
-      const clientStripPath = resolve(clientArtDir, `${walkId}.png`);
-      await writeFile(clientStripPath, stripBuf);
-
-      // Save individual frames and json index
-      const frameNames: string[] = [];
-      for (let i = 0; i < wayFrames.length; i++) {
-        const frameName = `${walkId}-${String(i + 1).padStart(2, '0')}.png`;
-        frameNames.push(frameName);
-        await writeFile(resolve(FRAMES_OUT_DIR, frameName), wayFrames[i]!);
-      }
-      await writeFile(resolve(FRAMES_OUT_DIR, `${walkId}.json`), JSON.stringify(frameNames, null, 2));
-
-      // Manifest entries
-      const now = Date.now();
-      const stripEntry = {
-        file: `wished-art/walks/${walkId}.png?v=${now.toString(36)}`,
-        kind: 'walk' as const,
-        width: normalized.frameWidth * wayFrames.length,
-        height: normalized.frameHeight,
-        frames: wayFrames.length,
-        cycleSeconds: 0.9,
-        redone: now,
-      };
-      manifest[walkId] = stripEntry;
-
-      clientManifest[walkId] = {
-        file: `art/${walkId}.png`,
-        kind: 'walk',
-        width: normalized.frameWidth * wayFrames.length,
-        height: normalized.frameHeight,
-        frames: wayFrames.length,
-        cycleSeconds: 0.9,
-      };
-      console.log(`  ✓ Wrote ${walkId}.png (${normalized.frameWidth * wayFrames.length}x${normalized.frameHeight})`);
-    }
 
     // Record look id hash in looks.json
     looks[char.id] = Buffer.from(char.id).toString('hex').slice(0, 12);
   }
 
-  // 5. Save updated manifest.json and looks.json
+  // 4. Save updated manifest.json and looks.json
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
   await writeFile(looksPath, JSON.stringify(looks, null, 2));
   await writeFile(clientManifestPath, JSON.stringify(clientManifest, null, 2));

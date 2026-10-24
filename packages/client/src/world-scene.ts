@@ -73,6 +73,7 @@ import {
   cameraZoom,
   floorLift,
   setDepthShade,
+  overlaps,
   within,
 } from './world-scene/types.ts';
 
@@ -443,11 +444,12 @@ export class WorldScene extends Phaser.Scene {
         const step = was && (screen.dx || screen.dy) ? { dx: pos.x - was.x, dy: pos.y - was.y } : { dx: 0, dy: 0 };
         walkAvatar(this, this.metrics, remote, step, screen);
         // People indoors stay out of sight until we come close enough to see in.
-        // Upstairs on open balconies, terraces or rooftops they remain visible.
+        // Upstairs on a terrace or rooftop over no building they remain visible;
+        // a building's upper floors are hidden from outside, and so is whoever is on them.
         if (group === this.remotes || group === this.npcs) {
           const floor = remote.floor ?? 0;
           const sameIndoor = floor !== 0 && floor === this.floor;
-          const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && (s.open || !this.map.buildings.some((b) => within(b, s.x, s.y))) && within(s, Math.floor(this.origin.x + pos.x), Math.floor(this.origin.y + pos.y)));
+          const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && !this.map.buildings.some((b) => overlaps(s, b)) && within(s, Math.floor(this.origin.x + pos.x), Math.floor(this.origin.y + pos.y)));
           const seen = sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }

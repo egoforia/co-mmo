@@ -12,6 +12,19 @@ import { WALK_VIEWS, type WalkView } from './walk-rig.ts';
  */
 export const CHARACTER_HEIGHT = 168;
 
+/**
+ * Canonical height tiers for creatures relative to player CHARACTER_HEIGHT (168px),
+ * from docs/art-pipeline.md and Style Bible v3.
+ */
+export const CREATURE_HEIGHTS = {
+  tiny: 64,
+  small: 112,
+  medium: 168,
+  high: 224,
+  colossal: 320,
+} as const;
+export type CreatureSizeTier = keyof typeof CREATURE_HEIGHTS;
+
 /** Frames kept from one walk cycle when a body type does not say. */
 export const WALK_FRAMES = 12;
 
@@ -32,6 +45,12 @@ export type WalkDirection = WalkView;
  */
 export const ISO_WAYS = ['front-left', 'front-right', 'back-left', 'back-right'] as const;
 export type IsoWay = (typeof ISO_WAYS)[number];
+
+/**
+ * Clockwise rotational turntable order used by diffusion turnaround models:
+ * Col 0: front-left (-135°), Col 1: front-right (-45°), Col 2: back-right (+45°), Col 3: back-left (+135°).
+ */
+export const TURNTABLE_WAYS = ['front-left', 'front-right', 'back-right', 'back-left'] as const;
 
 /** Every way a walker can be painted standing: the four cardinal ways, then the isometric ones. */
 export const FACINGS = [...WALK_DIRECTIONS, ...ISO_WAYS] as const;

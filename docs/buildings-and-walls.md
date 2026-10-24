@@ -39,38 +39,33 @@ co-MMO uses a 2.5D diamond isometric camera projection (`ISOMETRIC`, 45° angle,
 
 ---
 
-## 3. Rendering Pipeline in `world-scene.ts`
+## 3. Rendering Pipeline in `world-scene.ts` & `textures.ts`
 
-Vertical wall extrusion is handled by `rockWalls()` in `packages/client/src/world-scene.ts`:
+Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`packages/client/src/world-scene.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene.ts) and `registerWallFace()` / `registerDiamondTileset()` in [`packages/client/src/textures.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/textures.ts):
 
-```ts
-private rockWalls(
-  rows: number[][],
-  left: number,
-  top: number,
-  style: string,
-  art: TileArt | undefined,
-  tilemaps: Phaser.Tilemaps.Tilemap[],
-  outward: boolean,
-): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[]
-```
+### 1. Single Wall Asset Rule (`<style>-wall.png`)
+- Every building style uses **1 seamless $128\times 128$ texture (`<style>-wall.png`)** for both the top coping cap and vertical wall faces (no separate `*-wall-face.png` assets).
+- `registerWallFace()` tiles the texture vertically per storey (`storeys = Math.max(1, Math.round(rise / (height * 2)))`) so multi-storey walls keep uniform stone/timber courses without stretching.
+- East-facing wall segments receive a subtle cool-grey tint (`EAST_WALL_TINT = 0xd4d4dc`, stored in `baseTint`) so $90^\circ$ corners read clearly in 3D space.
 
-### How It Works:
-1. **Wall Face Selection:**
-   - Reads `art?.face` or falls back to `buildingArt(style, 'wall')`.
-2. **Rise Calculation:**
-   - Multiplies `ground.height` ($64\text{px}$) by the storey height multiplier ($3.0$ for cathedrals $\rightarrow 192\text{px}$, $2.0$ for standard buildings $\rightarrow 128\text{px}$).
-3. **Elevated Top Surface (`lifted`):**
-   - An isometric tilemap layer of wall tops is created and raised vertically:
-     ```ts
-     lifted.y -= rise;
-     ```
-   - This caps the top of the wall with diamond masonry tiles at the true wall height.
-4. **Vertical Faces (`registerWallFace`):**
-   - For every wall edge open to the camera:
-     - **South edge (open to $y + 1$):** `registerWallFace(scene, face, 'south', width, height, rise)`
-     - **East edge (open to $x + 1$):** `registerWallFace(scene, face, 'east', width, height, rise)`
-   - The face image is placed at screen depth `PROJECTION.depth(tx, ty + 1)` and anchored at `(at.x, at.y - rise)`.
+### 2. Half-Tile ($0.5\times$) Wall Thickness (`80×40px` Sub-Diamonds)
+- Full ground tiles are $160\times 80\text{px}$ diamonds (`PROJECTION.ground`).
+- Wall top coping caps are rendered on a $2W \times 2H$ half-tile diamond grid (`halfGround = { width: 80, height: 40 }`) via `registerDiamondTileset(scene, tilesetKey, 80, 40)`.
+- The inner half of each wall tile exposes the room's floor tile seamlessly (`floorRows` maps `Tile.Wall` to `Tile.Floor` on the base layer), giving walls a realistic $0.5\text{m}$ thickness and opening up interior floor space.
+
+### 3. Asymmetric Cutaway & 4-Direction Corridor Rule
+- **Closed Exterior Shell (`v.outside`, `cutaway = false`):**
+  - When the player is outside and far from a building (`v.open === false`), all 4 perimeter walls stand at full storey height (`storeyRise`: $160\text{px}$ for standard buildings, $240\text{px}$ for cathedrals), stacked across closed storeys and capped by a roof layer.
+- **Interior Cutaway (`v.inside`, `cutaway = true`):**
+  - When the player approaches (`v.open === true`), `v.outside` fades out (`alpha = 0`) and `v.inside` fades in (`alpha = 1`).
+  - **Far Back Walls (North / West perimeter & Far North/West corridor flanks):** Any wall tile with no indoor floor to its North/West and indoor floor to its South/East (`isFull(x, y) === true`) stands at **Full Storey Height (`storeyRise`)**.
+  - **Near Camera-Facing Walls (South / East perimeter, interior dividers, & Near South/East corridor flanks):** Any wall tile with indoor floor to its North/West (`isFull(x, y) === false`) cuts low to **Knee-High Cutaway (`WALL_RISE = 0.25`, `~20px`)** so the player, furniture, and narrow corridors in all 4 isometric directions (`Top-Right`, `Bottom-Left`, `Top-Left`, `Bottom-Right`) are never occluded.
+- **KitHouse Compatibility (`standHouse`):**
+  - Fallback `floor` and `rockWalls` objects are tagged with `.setData('shell', true)`. When a `KitHouse` (`outside.png` + `storey-1.png`) finishes loading, `standHouse()` hides and removes all `shell` objects so fallback walls never cover the `KitHouse` cutaway.
+
+### 4. Multi-Floor Vertical Stacking (`floorLift` & `floorDepthOffset`)
+- Upper storeys (`floor > 0`) are vertically elevated on screen by `floorLift(floor) = floor * Math.round(ground.height * 2.0)` ($160\text{px}$ per storey) and sorted above lower storeys via `floorDepthOffset(floor) = floor * 50_000`.
+- When standing on an upper floor (`mine > 0`), lower storeys (`0 .. mine - 1`, including the building's `v.inside` cutaway and surrounding ground) remain visible and dimmed underneath via `setDepthShade()`.
 
 ---
 

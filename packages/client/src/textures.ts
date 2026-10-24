@@ -122,9 +122,13 @@ export function registerWallFace(scene: Phaser.Scene, face: string, side: 'south
   ctx.imageSmoothingEnabled = false;
   // Across the picture runs along the edge; down it runs straight down the screen.
   const [w, h] = [source.width, source.height];
-  if (side === 'south') ctx.setTransform(width / 2 / w, height / 2 / w, 0, rise / h, 0, 0);
-  else ctx.setTransform(-width / 2 / w, height / 2 / w, 0, rise / h, width / 2, 0);
-  ctx.drawImage(source, 0, 0);
+  const storeys = Math.max(1, Math.round(rise / (height * 2)));
+  const stepRise = rise / storeys;
+  for (let s = 0; s < storeys; s++) {
+    if (side === 'south') ctx.setTransform(width / 2 / w, height / 2 / w, 0, stepRise / h, 0, s * stepRise);
+    else ctx.setTransform(-width / 2 / w, height / 2 / w, 0, stepRise / h, width / 2, s * stepRise);
+    ctx.drawImage(source, 0, 0);
+  }
   scene.textures.addCanvas(key, canvas);
   return key;
 }
@@ -178,7 +182,7 @@ export const DIAMOND_PAD = 8;
  * down to the left. Nothing new is painted: these are the same tiles, turned.
  */
 export function registerDiamondTileset(scene: Phaser.Scene, square: string, width: number, height: number): string {
-  const key = `${square}-diamond`;
+  const key = width === 160 && height === 80 ? `${square}-diamond` : `${square}-diamond-${width}x${height}`;
   if (scene.textures.exists(key)) return key;
   const source = scene.textures.get(square).getSourceImage() as HTMLCanvasElement;
   const step = T + TILE_MARGIN * 2;

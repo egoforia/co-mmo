@@ -53,7 +53,7 @@ export interface BuildingStyle {
 export type KitShape = Pick<BuildingSpec, 'roof' | 'battlements' | 'towers' | 'dome'> & { numStoreys?: number };
 
 /** The parts of a building that get their own picture. */
-export type BuildingPart = 'exterior' | 'floor' | 'wall' | 'door' | 'wall-face';
+export type BuildingPart = 'exterior' | 'floor' | 'wall' | 'door';
 
 /** Every building style in the world, by id. */
 export const BUILDING_STYLES: Record<string, BuildingStyle> = {

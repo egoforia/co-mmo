@@ -21,7 +21,7 @@ export interface StyleProfile {
   /** Where the camera stands for sprites and buildings, in words (the game's projection). */
   view: string;
   /** The camera its pictures are painted for: isometric pictures of things that stand on tiles are fitted to them. */
-  camera: 'top-down' | 'isometric';
+  camera: 'isometric';
   /** How a lone sprite is framed on the key colour. */
   sprite: { framing: string; negatives: string[] };
   /** How a seamless ground tile is framed. */
@@ -39,85 +39,6 @@ export interface StyleProfile {
 }
 
 const MAGENTA = { r: 255, g: 0, b: 255, hex: '#FF00FF' };
-const VIEW = 'three-quarter top-down view';
-
-/** The launch style: hand-painted storybook art in the spirit of Legend of Mana, with pixel-art building insides. Kept for the top-down camera's pictures and as ART_STYLE=storybook. */
-export const STORYBOOK: StyleProfile = {
-  id: 'storybook',
-  name: 'Hand-painted storybook',
-  version: 2,
-  keyColor: MAGENTA,
-  base: [
-    'Hand-painted 2D game art in the style of a 1999 storybook RPG.',
-    'Soft watercolour and gouache shading with visible brush texture and 3 to 5 value steps per colour.',
-    'Warm golden key light from the upper left, blue-violet shadows.',
-    'Selective coloured outlines, rounded organic shapes, whimsical fairy-tale mood. Softened saturation.',
-    'No writing anywhere: labels, signs and covers are blank or carry simple symbols.',
-  ].join('\n'),
-  negatives: [
-    'photorealistic', '3D render', 'anime cel shading', 'vector art', 'flat design', 'thick black outlines',
-    'pure black', 'pure white', 'harsh contrast', 'neon', 'lens flare', 'blur', 'noise',
-    'text', 'letters', 'words', 'labels with writing', 'watermark', 'signature', 'frame', 'border', 'vignette',
-  ],
-  view: VIEW,
-  camera: 'top-down',
-  sprite: {
-    framing: [
-      `A single game sprite in ${VIEW}, centred, with empty margin all around it.`,
-      `Background: one flat solid pure magenta (${MAGENTA.hex}) filling everything behind the subject,`,
-      'with no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.',
-    ].join('\n'),
-    negatives: ['background scenery', 'floor', 'ground shadow', 'cast shadow', 'gradient background'],
-  },
-  tile: {
-    framing: [
-      'A ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.',
-      'Not a block, diamond, island or platform: no sides, thickness, border, frame or horizon.',
-      'Even lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.',
-    ].join('\n'),
-    negatives: ['isometric block', 'diamond shape', 'floating island', 'tile sides', 'drop shadow', 'perspective horizon'],
-  },
-  interior: {
-    style: [
-      'Pixel art game graphics in the style of a 16-bit SNES / PS1 Legend of Mana RPG interior.',
-      'Every art pixel is a crisp, hard-edged square block: no anti-aliasing, no smooth gradients, no blur.',
-      'A limited palette of about 16 colours taken from the reference painting, warm light from the upper left. No writing anywhere.',
-    ].join('\n'),
-    tileFraming: [
-      'A texture tile seen from directly above, filling the entire square frame edge to edge, drawn as if 32 by 32 pixels scaled up.',
-      'Even lighting and low contrast, small details spread evenly with no single big feature, no moss clumps, mushrooms or objects,',
-      'so it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.',
-    ].join('\n'),
-    spriteFraming: [
-      `A single sprite in ${VIEW}, centred, with empty margin all around it, with a darker coloured outline.`,
-      `Background: one flat solid pure magenta (${MAGENTA.hex}) filling everything behind the subject, with no floor, gradient, glow or shadow on it. No magenta anywhere in the subject.`,
-      'Fire and light have no glow or halo spilling outside the object.',
-    ].join('\n'),
-    pixelArt: true,
-  },
-  animation: '2D hand-painted storybook game character animation.',
-  judge: {
-    game: 'a hand-painted 2D fantasy RPG',
-    look: 'hand-painted with soft brush shading, warm light, the same kind of view and outline',
-  },
-  normalMap: [
-    'Make the tangent-space normal map of the attached game picture, for 2D lighting.',
-    'Exactly the same shapes, outline and size as the picture, every detail in the same place, filling the same frame.',
-    'Colours mean the direction each surface faces: flat facing the viewer is lavender blue (128, 128, 255); facing right is pinker, facing left is bluer-green; facing the top of the picture is greener, facing the bottom is more purple.',
-    'Smooth rounded forms for bodies, cloth and leaves; crisp edges for stone, wood and metal; small bumps for texture.',
-    'Where the picture is empty or magenta, fill with flat lavender blue (128, 128, 255).',
-    'No shading, no light, no colours of the picture itself, no outlines, no writing.',
-  ].join('\n'),
-  // The words the first kit sheets were painted with, kept exactly so their
-  // prompts still match (FLAT_ISOMETRIC's leave each look's colours to the look).
-  kitTextures: [
-    'Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top.',
-    'Built from a few flat facets of solid colour with crisp edges and very low contrast, in one small palette of soft muted warm pastels: cream, sand, warm honey-brown timber, terracotta, dusty rose, sage green.',
-    'No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture.',
-    'No border, frame or outline round any shape. No writing, letters or symbols.',
-  ].join(' '),
-};
-
 const ISO_VIEW = 'classic 2:1 isometric view, looking down at about 30 degrees from one corner, standing upright';
 
 /** House style text of Style Bible v3: every picture is painted unlit, and the game lights it. */
@@ -152,7 +73,14 @@ export const FLAT_ISOMETRIC: StyleProfile = {
     negatives: ['background scenery', 'floor', 'ground shadow', 'cast shadow', 'gradient background'],
   },
   // Ground is painted as square textures; the game turns the tiled plane into diamonds.
-  tile: STORYBOOK.tile,
+  tile: {
+    framing: [
+      'A ground texture tile: flat ground seen from directly above, filling the entire square frame edge to edge.',
+      'Not a block, diamond, island or platform: no sides, thickness, border, frame or horizon.',
+      'Even lighting and low contrast across the whole tile; small details spread evenly with no clumps, patches or single large feature, so it repeats seamlessly on all four edges.',
+    ].join('\n'),
+    negatives: ['isometric block', 'diamond shape', 'floating island', 'tile sides', 'drop shadow', 'perspective horizon'],
+  },
   interior: {
     // Insides follow the outside look (Style Bible v3 retires the pixel-art insides); the game lights them with their own lamps.
     style: FLAT_BASE,
@@ -174,9 +102,12 @@ export const FLAT_ISOMETRIC: StyleProfile = {
     look: 'flat faceted shapes with crisp edges, soft muted pastels, no outlines or texture, no light or shadow painted in, seen from the same isometric corner',
   },
   normalMap: [
-    STORYBOOK.normalMap.split('\n').slice(0, 3).join('\n'),
+    'Make the tangent-space normal map of the attached game picture, for 2D lighting.',
+    'Exactly the same shapes, outline and size as the picture, every detail in the same place, filling the same frame.',
+    'Colours mean the direction each surface faces: flat facing the viewer is lavender blue (128, 128, 255); facing right is pinker, facing left is bluer-green; facing the top of the picture is greener, facing the bottom is more purple.',
     'Every flat facet is one even colour for the one way it faces, with crisp edges where facets meet; nothing is rounded or bumpy.',
-    STORYBOOK.normalMap.split('\n').slice(4).join('\n'),
+    'Where the picture is empty or magenta, fill with flat lavender blue (128, 128, 255).',
+    'No shading, no light, no colours of the picture itself, no outlines, no writing.',
   ].join('\n'),
   // Each kit look names its own colours, so these words set only how a texture is painted, not its palette.
   kitTextures: [
@@ -188,17 +119,10 @@ export const FLAT_ISOMETRIC: StyleProfile = {
 };
 
 /** Every style the game knows, by id. A new style is one more entry. */
-export const STYLE_PROFILES: Record<string, StyleProfile> = { [FLAT_ISOMETRIC.id]: FLAT_ISOMETRIC, [STORYBOOK.id]: STORYBOOK };
+export const STYLE_PROFILES: Record<string, StyleProfile> = { [FLAT_ISOMETRIC.id]: FLAT_ISOMETRIC };
 
 /** The style new pictures are painted in when ART_STYLE names none: the isometric camera's. */
 export const DEFAULT_STYLE = FLAT_ISOMETRIC;
-
-/**
- * The words for pictures only the old top-down camera uses (its four walk
- * directions). They stay exactly as they were until that camera is retired,
- * so a top-down picture painted again still matches the rest.
- */
-export const TOP_DOWN_STYLE = STORYBOOK;
 
 /** The style ART_STYLE names, or the default style (with a warning when the name is unknown). */
 export function chooseStyle(env: Record<string, string | undefined> = process.env): StyleProfile {

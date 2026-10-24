@@ -56,12 +56,12 @@ export function mapCaption(looking: number, mine: number): string {
  * How tiles lie on the mini map, as a canvas transform (a, b, c, d, e, f):
  * tile (x, y) is drawn at (a x + c y + e, b x + d y + f). `step` pixels a
  * tile, centred on (cx, cy) in the middle of a map `size` pixels across.
- * Top-down, north is up; in the isometric preview the map turns as the
- * world does on screen, north up and to the right, east down and to the right.
+ * In the isometric view the map turns as the world does on screen, north up
+ * and to the right, east down and to the right.
  */
-export function mapTransform(camera: 'square' | 'diamond', step: number, cx: number, cy: number, size: number): [number, number, number, number, number, number] {
+export function mapTransform(_camera: 'diamond', step: number, cx: number, cy: number, size: number): [number, number, number, number, number, number] {
   // Turned, a tile's diamond is as wide as its square's diagonal, and half as tall.
-  const [a, b, c, d] = camera === 'square' ? [step, 0, 0, step] : [step * Math.SQRT1_2, step * Math.SQRT1_2 / 2, -step * Math.SQRT1_2, step * Math.SQRT1_2 / 2];
+  const [a, b, c, d] = [step * Math.SQRT1_2, step * Math.SQRT1_2 / 2, -step * Math.SQRT1_2, step * Math.SQRT1_2 / 2];
   const half = size / 2;
   return [a, b, c, d, half - (a * cx + c * cy), half - (b * cx + d * cy)];
 }

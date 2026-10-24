@@ -8,7 +8,7 @@ The approved design lives in the project's design doc ("co-MMO: Initial
 Design Document"); [docs/design.md](docs/design.md) summarises it and tracks
 which milestone the code is at.
 
-## Status: milestones 2 to 7 done (first versions)
+## Status: milestones 2 to 10 done (first versions), milestone 11 in progress
 
 - Invite-only accounts. The first run prints a one-time link that creates the
   Owner; any player can then make invite links. Players confirm they are 18+.
@@ -195,9 +195,7 @@ Wishes that change the game (milestone 6, first version):
   pull request, not with Roll back.
 - Set up once: see [docs/building-wishes.md](docs/building-wishes.md).
 
-Not yet: abilities, equipment, shops and crafting, parties, Postgres,
-multiple region servers. See the milestone list in
-[docs/design.md](docs/design.md).
+See the full milestone list in [docs/design.md](docs/design.md).
 
 ## Run it
 
@@ -253,7 +251,7 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `API_LOG_DIR` | `api-log/` next to `DATA_FILE` | Where God's View's API Log keeps every request sent to an outside service |
 | `API_LOG_DAYS` | `14` | Days the API Log keeps; older days are deleted |
 | `API_LOG_MAX_MB` | `200` | Megabytes the API Log may use; the oldest days go first |
-| `ART_STYLE` | `flat-isometric` | The art style every new picture is painted in (`storybook` is the old hand-painted look) (`packages/server/src/assets/style-profile.ts`); pictures already painted keep their style until repainted |
+| `ART_STYLE` | `flat-isometric` | The art style every new picture is painted in (`packages/server/src/assets/style-profile.ts`); pictures already painted keep their style until repainted |
 | `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`), wish art, walks (Veo) and each land's music (Lyria) |
 | `ELEVENLABS_API_KEY` | none | ElevenLabs: the game's sound effects; without it the game plays music only |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |
@@ -342,5 +340,6 @@ The server and the client generate the map from the same seed with the same
 code, and run the same `step()` movement function, so prediction matches the
 server exactly unless something else (another wish, lag) intervenes.
 
-Storage is a JSON file for now behind the `Store` class, so local
-development needs no database. It will move to Postgres before hosting.
+Storage uses a JSON file (`data/world.json`) by default behind the `Store`
+class so local development needs no database, or Postgres when `DATABASE_URL`
+is set ([docs/scale.md](docs/scale.md)).

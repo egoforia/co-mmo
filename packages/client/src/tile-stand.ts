@@ -59,11 +59,10 @@ export function standing(floor: Floor, size: { width: number; height: number }, 
   const { left: L, top: T, right: R, bottom: B } = floor;
   const feet = PROJECTION.stand(L, T, R - L, B - T);
   const middle = PROJECTION.toScreen(feet.x, feet.y);
-  const iso = PROJECTION.ground.kind === 'diamond';
-  const plan: StandingPlan = fitted && iso
+  const plan: StandingPlan = fitted
     ? { x: middle.x, y: PROJECTION.toScreen(R, B).y, originY: 1, scale: isoSpan(R - L, B - T) / size.width, strips: [] }
     : { x: middle.x, y: middle.y, originY: 0.92, scale: 1, strips: [] };
-  if ((R - L) * (B - T) <= 1 || !iso) {
+  if ((R - L) * (B - T) <= 1) {
     plan.strips.push({ x0: 0, width: size.width, depth: PROJECTION.depth(feet.x, feet.y) });
     return plan;
   }

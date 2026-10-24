@@ -20,7 +20,6 @@ import {
   type WalkerView,
   artState,
   esc,
-  lightButton,
   pagesNav,
   stripHtml,
   usd,
@@ -39,7 +38,7 @@ export function peoplePage(tab: 'characters' | 'monsters', page?: string): strin
   const own = items.filter((i) => i.place.page === chosen);
   const walking = walkers.filter((w) => w.place.page === chosen);
   const missing = data.walkers.filter((w) => ISO_WAYS.some((d) => !w.standing[d]?.url)).length;
-  const ways = missing ? `<p class="note">${missing} walker${missing > 1 ? 's are' : ' is'} missing some of the four isometric ways; until they are painted, those walkers show their top-down walks.
+  const ways = missing ? `<p class="note">${missing} walker${missing > 1 ? 's are' : ' is'} missing some of the four isometric ways; until they are painted, those walkers show their standing pictures.
     <button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways' }))}">Paint their four ways, a sheet each · about ${usd(missing * (data.walkers[0]?.viewUsd ?? 0))}</button></p>` : '';
   return `
     ${ways}
@@ -51,23 +50,7 @@ export function peoplePage(tab: 'characters' | 'monsters', page?: string): strin
 
 export function walkerHtml(w: WalkerView): string {
   const data = artState.data!;
-  const made = DIRECTIONS.filter(([d]) => w.walks[d]).length;
   const bodyPick = `<label>Body<span><select name="body">${data.bodies.map((b) => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')}</select></span></label>`;
-  const direction = ([d, label]: [Direction, string]) => {
-    const strip = w.walks[d];
-    const view = w.standing[d];
-    const older = (strip?.versions.length ?? 0) || (w.lost[d]?.length ?? 0);
-    const walkVersions = strip || older ? `<button type="button" class="quiet" data-walk-versions="${esc(w.id)}" data-direction="${d}">${older ? `Walk versions (${older + (strip ? 1 : 0)})` : 'What made the walk'}</button>` : '';
-    const viewVersions = (view.url && !view.approved) || view.versions.length ? `<button type="button" class="quiet" data-view-versions="${esc(w.id)}" data-direction="${d}">${view.versions.length ? `Picture versions (${view.versions.length + 1})` : 'What made the picture'}</button>` : '';
-    // Top-down walks are no longer painted (the top-down view is retired); they stay to look at and roll back.
-    return `
-      <div class="direction">
-        <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${view.approved ? 'approved picture' : view.url ? 'standing picture' : 'no standing picture'}</small></div>
-        ${stripHtml(strip, label, 110)}
-        <div class="card-actions">${viewVersions}${walkVersions}</div>
-        <div class="card-actions">${view.url ? `<button type="button" class="quiet" data-normal-show="${esc(view.url)}">Standing normal map</button>${lightButton(view.url, undefined, true)}` : ''}${strip ? `<button type="button" class="quiet" data-normal-show="${esc(strip.url)}">Walk normal maps</button>` : ''}</div>
-      </div>`;
-  };
   return `
     <div class="walker">
       <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)}</small></div>
@@ -75,11 +58,7 @@ export function walkerHtml(w: WalkerView): string {
       ${waysHtml(w)}
       ${runsHtml(w)}
       ${attacksHtml(w)}
-      <details class="top-down"><summary>Top-down walks (retired) · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks'}</summary>
-        <p class="note">The top-down view is retired, so these are no longer painted. They are kept so walkers still move while their isometric walks are missing, and so earlier versions can be put back.</p>
-        <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
-        ${handsHtml(w)}
-      </details>
+      ${handsHtml(w)}
     </div>`;
 }
 

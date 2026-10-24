@@ -161,7 +161,7 @@ export async function processBuildingArt(job: BuildingArtJob, raw: Buffer, outDi
   } else if (job.kind === 'furniture') {
     const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
     const trimmed = await sharp(await removeKeySpill(keyed)).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
-    // Painted standing on its tiles, as wide as their diamond; else as wide as the tiles it was drawn across top-down.
+    // Painted standing on its tiles, as wide as their diamond; else as wide as its tile count.
     const w = Math.round(job.footprint ? isoSpan(job.footprint.width, job.footprint.height) / PIXEL_ART_SCALE : (job.width ?? 1) * TILE_ART_PIXELS);
     const h = Math.max(1, Math.round((w * trimmed.info.height) / trimmed.info.width));
     out = await shrink(trimmed.data, w, h, 24);

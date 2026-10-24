@@ -30,7 +30,7 @@ export interface Avatar {
   art: string;
   /** The way it faces, among the camera's ways. */
   facing: Facing;
-  /** The way it last walked on screen, for the walks and standing pictures painted for the top-down camera. */
+  /** The way it last walked on screen, for cardinal walks and standing pictures. */
   turn: WalkDirection;
   /** The way the picture it wears now faces, for which hand is in front. */
   worn: Facing;

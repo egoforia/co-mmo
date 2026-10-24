@@ -145,9 +145,8 @@ export class WalkPainter {
 
   /**
    * Gets the painted walks ready at start-up: reads them and cuts old walks
-   * again from their clips, for free. Nothing is painted here any more: the
-   * top-down camera is retired (the Owner, 2026-10-20), and walkers are
-   * painted in their isometric ways from the Art tab, after review.
+   * again from their clips, for free. Nothing is painted here any more;
+   * walkers are painted in their isometric ways from the Art tab, after review.
    */
   start(): Promise<void> {
     this.job ??= this.run()

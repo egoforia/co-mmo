@@ -17,7 +17,7 @@ export interface ArtEntry {
   /**
    * Painted for the isometric camera: seen from its corner, its base filling
    * the diamond of the tiles it stands on, so the game stands it on them at
-   * the footprint's width. Pictures without it were painted top-down.
+   * the footprint's width.
    */
   view?: 'isometric';
 }

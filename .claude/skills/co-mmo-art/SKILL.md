@@ -15,9 +15,19 @@ Rules from the Owner, all binding:
   code builds and the image model paints (the Owner, 2026-10-18). The wish
   guard refuses drawing code.
 - **No left/right mirroring of characters.** Each direction of anything
-  that walks is painted on its own. Buildings may be mirrored.
-- **Size consistency.** Things of a kind are the same size in game (all
-  people 168 px tall).
+  that walks is painted on its own across the four isometric ways
+  (`front-left`, `front-right`, `back-left`, `back-right`). Buildings may be
+  mirrored.
+- **Size consistency & height tiers.** Players and humanoids always stand at
+  the same canonical height (`CHARACTER_HEIGHT = 168 px`). Creatures are
+  normalized to one of five canonical height tiers relative to players:
+  `tiny` (`64 px`), `small` (`112 px`), `medium` (`168 px`), `high` (`224 px`),
+  or `colossal` (`320 px`).
+- **Model- and API-agnostic pipeline.** Prompts, reference sheets,
+  post-processing (chroma-keying, island segmentation, baseline and height
+  normalization), and style checks must remain AI model and API agnostic so
+  that visual, geometric, and anatomical coherence is preserved regardless of
+  which model generated the image or video (`docs/art-pipeline.md`).
 - **Reviewable before paying.** Anything that costs money shows the exact
   prompt and references in the Art tab and waits for approval; paid calls go
   through the paint queue and `budget.ts`.
@@ -26,15 +36,16 @@ Rules from the Owner, all binding:
 
 Where things are:
 
-- The style is one `StyleProfile` in
-  `packages/server/src/assets/style-profile.ts`, picked by `ART_STYLE`
-  (default `flat-isometric`, Style Bible v3; `storybook` is the old look,
-  kept word for word for the top-down walk directions until that camera is
-  retired). `assets/style.ts` gives prompt builders its words. Never write style or
-  framing sentences anywhere else; add a field to the profile instead.
-- Buildings: `BUILDING_STYLES` in `packages/shared/src/buildings.ts`, painted
-  whole by `building-art.ts`. Outside art is centred on the south-wall
-  doorway and covers the walls; the inside matches it.
+- The style is `FLAT_ISOMETRIC` (Style Bible v3) in
+  `packages/server/src/assets/style-profile.ts`. `assets/style.ts` gives prompt
+  builders its words. Never write style or framing sentences anywhere else;
+  add a field to the profile instead.
+- Buildings: `BUILDING_STYLES` in `packages/shared/src/buildings.ts`. In
+  diamond isometric projection (`ISOMETRIC`), buildings never use flat 2D
+  exterior billboard pictures (`docs/buildings-and-walls.md`); they stand as
+  3D kit houses (`KitHouse`) or tall vertical cutaway walls (`rockWalls`).
+  `building-art.ts` paints interior/surface textures (`floor`, `wall`, `door`
+  — 100% full-bleed seamless tiles with zero magenta) and `furniture`.
 - Kit buildings: `packages/shared/src/building-kit/` builds a house from a
   `BuildingSpec` (bays, storeys, doors, windows, stairs) into exact parts,
   and `shapeChecks` measures every joint. `server/src/assets/building-kit/`
@@ -52,23 +63,22 @@ Where things are:
   to its diamond (`isoSpan`); their manifest entry says `view: 'isometric'`
   and the game stands them on those tiles (`client/src/tile-stand.ts`), in
   upright strips when wider than a tile. Trees and rocks stand on one tile.
-- Walks: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`. Walkers are
-  painted only in the isometric camera's four ways (`ISO_WAYS`: front-left,
-  front-right, back-left, back-right), all four together on one sheet from
-  the approved picture (`waysSheetPrompt`, cut apart by `waysFromSheet`), so
-  their details match; never a mirror. One way can be painted again on its
-  own from the others. Start-up paints nothing; the old top-down walks
-  (`WALK_DIRECTIONS`) are kept but not painted again. A walk clip is made
-  only when the Owner asks in the Art tab. Name a way by the picture's
-  corner: "turned to the left" is read as the figure's own left.
+- Walks and animations: `walk-video.ts`, `walk-frames.ts`, `walk-painter.ts`,
+  and `docs/art-pipeline.md`. Walkers are painted in the isometric camera's
+  four ways (`ISO_WAYS`: `front-left`, `front-right`, `back-left`,
+  `back-right`), all four together on one turnaround sheet from the approved
+  picture (`waysSheetPrompt`, cut apart by `waysFromSheet` in clockwise
+  turntable order: Col 0 `front-left`, Col 1 `front-right`, Col 2 `back-right`,
+  Col 3 `back-left`), so their details match; never a mirror. One way can be
+  painted again on its own from the others. Start-up paints nothing; a walk
+  clip is made only when the Owner asks in the Art tab. Name a way by the
+  picture's corner: "turned to the left" is read as the figure's own left.
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.
-- The camera: every tile-to-screen sum goes through `PROJECTION` in
-  `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in
+- The camera: every tile-to-screen sum goes through `PROJECTION` (`ISOMETRIC`)
+  in `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in
   the scene. Everyone plays through `ISOMETRIC`: the painted ground tiles
-  turned into diamonds, kit houses in place of painted buildings. The
-  top-down view is retired (2026-10-20); `TOP_DOWN` stays only as the
-  Owner's old view (Account window) until the lands are repainted, so keep
-  it working but paint nothing new for it.
+  turned into diamonds, kit houses and tall cutaway walls in place of flat
+  building pictures.
 
 Changing a prompt changes what is paid for. Show that prompts you did not
 mean to change stay byte for byte the same (snapshot them before and after),

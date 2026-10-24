@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { isoSpan } from '@co-mmo/shared';
-import { ISOMETRIC, TOP_DOWN, setProjection } from '../src/projection.ts';
+import { ISOMETRIC } from '../src/projection.ts';
 import { standing, type Floor } from '../src/tile-stand.ts';
 
 /** The depth a picture sorts at in the screen column of a walker at world (x, y). */
@@ -14,7 +14,6 @@ function depthUnder(plan: ReturnType<typeof standing>, x: number, y: number): nu
 }
 
 describe('standing on tiles', () => {
-  afterEach(() => setProjection(ISOMETRIC));
   // A bench four tiles long and one deep, its tiles from (10, 20) to (14, 21).
   const bench: Floor = { left: 10, top: 20, right: 14, bottom: 21 };
   const picture = { width: 400, height: 200 };
@@ -41,12 +40,8 @@ describe('standing on tiles', () => {
     expect(older.originY).toBe(0.92);
   });
 
-  it('keeps one picture sorted by its middle on one tile, and in the top-down camera', () => {
+  it('keeps one picture sorted by its middle on one tile', () => {
     const one = standing({ left: 3, top: 4, right: 4, bottom: 5 }, picture, true);
     expect(one.strips).toEqual([{ x0: 0, width: 400, depth: ISOMETRIC.depth(3.5, 4.5) }]);
-    setProjection(TOP_DOWN);
-    const flat = standing(bench, picture, true);
-    expect(flat.strips).toHaveLength(1);
-    expect(flat.scale).toBe(1);
   });
 });

@@ -121,7 +121,7 @@ export interface WalkerView {
   attacks?: Partial<Record<Facing, WalkStrip>>;
   /** Earlier walks of ways that have none now. */
   lost: Partial<Record<Facing, WalkVersion[]>>;
-  /** Each way's standing picture: for the top-down ways, what its walk clip starts and ends on. */
+  /** Each way's standing picture: what its walk clip starts and ends on. */
   standing: Record<Facing, StandingView>;
   /** About what making the missing walks costs. */
   estimateUsd: number;

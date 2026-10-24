@@ -50,13 +50,6 @@ describe('the mini map', () => {
     expect(nextZoom(2, 1)).toBe(3);
   });
 
-  it('keeps you in the middle, top-down with north up', () => {
-    const t = mapTransform('square', 4, 10, 20, 200);
-    expect(onMap(t, 10, 20)).toEqual({ x: 100, y: 100 });
-    expect(onMap(t, 11, 20)).toEqual({ x: 104, y: 100 });
-    expect(onMap(t, 10, 19)).toEqual({ x: 100, y: 96 });
-  });
-
   it('turns with the isometric camera, so each way on the map is the same way on screen', () => {
     const t = mapTransform('diamond', 4, 10, 20, 200);
     const mid = onMap(t, 10, 20);

@@ -44,7 +44,7 @@ export interface BuildingStyle {
   references?: string[];
   /**
    * The kit look (building-kit/looks.ts) the building kit builds it in, for
-   * the isometric camera. Its painted pictures stay for the top-down view.
+   * the isometric camera.
    */
   kit?: string;
   /** What the kit builds over its walls besides a gable roof: a flat roof, battlements, towers, a dome. */

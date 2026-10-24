@@ -1,4 +1,4 @@
-import { ISO_TILE, ISO_WAYS, TILE_PIXELS, WALK_DIRECTIONS, facingSide, isWalkDirection, walkDirection, type Facing, type IsoWay } from '@co-mmo/shared';
+import { ISO_TILE, ISO_WAYS, facingSide, type Facing, type IsoWay } from '@co-mmo/shared';
 
 /** A point or step on screen, in game pixels before the camera's zoom. */
 export interface ScreenPoint {
@@ -9,9 +9,7 @@ export interface ScreenPoint {
 /**
  * How the world is seen. The server and shared rules only know tiles (x to
  * the east, y to the south); this is the one place that turns a tile
- * position into a place on screen and an order to draw in. Swapping the
- * camera is a new Projection plus art painted for it (the view words in the
- * server's style profile), not a rewrite of the scene.
+ * position into a place on screen and an order to draw in.
  */
 export interface Projection {
   readonly id: string;
@@ -26,10 +24,10 @@ export interface Projection {
   /** The world step for the arrow keys held (each -1, 0 or 1): each key walks towards its side of the screen. */
   inputToWorld(dx: number, dy: number): { dx: number; dy: number };
   /**
-   * How the ground's tiles are laid: the painted square tiles as they are,
-   * or turned 45 degrees and squashed into diamonds `width` by `height`.
+   * How the ground's tiles are laid: turned 45 degrees and squashed into
+   * diamonds `width` by `height`.
    */
-  readonly ground: { kind: 'square' | 'diamond'; width: number; height: number };
+  readonly ground: { kind: 'diamond'; width: number; height: number };
   /**
    * Where a tree, rock or set piece standing on the tiles from (left, top),
    * `width` by `height`, has its feet: the world point it is drawn at and
@@ -41,21 +39,6 @@ export interface Projection {
   /** Which of its ways someone stepping (dx, dy) along the grid faces; standing still keeps `before`. */
   face(dx: number, dy: number, before: Facing): Facing;
 }
-
-/** The launch camera, retired on 2026-10-20: looking straight down at the ground, with sprites painted in three-quarter view. Kept only for the Owner's comparisons until the lands are repainted. */
-export const TOP_DOWN: Projection = {
-  id: 'top-down',
-  tile: TILE_PIXELS,
-  toScreen: (x, y) => ({ x: x * TILE_PIXELS, y: y * TILE_PIXELS }),
-  depth: (_x, y) => y * TILE_PIXELS,
-  bounds: (left, top, right, bottom) => ({ x: left * TILE_PIXELS, y: top * TILE_PIXELS, width: (right - left) * TILE_PIXELS, height: (bottom - top) * TILE_PIXELS }),
-  inputToWorld: (dx, dy) => ({ dx, dy }),
-  ground: { kind: 'square', width: TILE_PIXELS, height: TILE_PIXELS },
-  // Seen from above, a thing's feet are on the south edge of the tiles it stands on.
-  stand: (left, top, width, height) => ({ x: left + width / 2, y: top + height }),
-  ways: WALK_DIRECTIONS,
-  face: (dx, dy, before) => walkDirection(dx, dy, isWalkDirection(before) ? before : 'front'),
-};
 
 /** Half a ground diamond across and down: each tile is drawn 160 by 80 pixels (ISO_TILE). */
 const HALF_W = ISO_TILE.width / 2;
@@ -112,12 +95,9 @@ function isoFace(dx: number, dy: number, before: Facing): Facing {
 }
 
 /** Every camera, by id. */
-export const PROJECTIONS: Record<string, Projection> = { [TOP_DOWN.id]: TOP_DOWN, [ISOMETRIC.id]: ISOMETRIC };
+export const PROJECTIONS: Record<string, Projection> = { [ISOMETRIC.id]: ISOMETRIC };
 
-/**
- * The camera the game is drawn with: isometric for everyone. The Owner may
- * still look through the old top-down camera until its code is taken out.
- */
+/** The camera the game is drawn with: isometric. */
 export let PROJECTION: Projection = ISOMETRIC;
 
 /** Chooses the camera before the world is drawn; the scene reads it as it draws. */

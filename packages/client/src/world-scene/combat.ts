@@ -68,8 +68,7 @@ export function swingSlash(scene: Phaser.Scene, me: Avatar, facingSign: number):
 
 /**
  * Which way an attacker lunges at whom it strikes, as a step on screen:
- * left or right in the top-down camera; in the isometric one, along the
- * way nearest them, which it turns to face.
+ * along the isometric way nearest them, which it turns to face.
  */
 export function toward(a: Avatar, target: Avatar): { x: number; y: number } {
   if (isWalkDirection(a.facing) || !a.at || !target.at) return { x: Math.sign(target.body.x - a.body.x || 1), y: 0 };

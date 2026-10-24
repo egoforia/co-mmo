@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDING_STYLES, WALK_DIRECTIONS, ISO_WAYS } from '@co-mmo/shared';
-import { FLAT_ISOMETRIC, STORYBOOK, TOP_DOWN_STYLE, chooseStyle } from '../src/assets/style-profile.ts';
+import { FLAT_ISOMETRIC, chooseStyle } from '../src/assets/style-profile.ts';
 import { buildingArtJobs } from '../src/assets/building-art.ts';
 import { viewPrompt, walkVideoPrompt } from '../src/assets/walk-video.ts';
 import { JUDGE_SYSTEM } from '../src/assets/style-check.ts';
 
 describe('the art style profile', () => {
-  it('is the flat isometric style unless ART_STYLE names another, and falls back from an unknown name', () => {
+  it('is the flat isometric style, and falls back from an unknown name', () => {
     expect(chooseStyle({})).toBe(FLAT_ISOMETRIC);
-    expect(chooseStyle({ ART_STYLE: 'storybook' })).toBe(STORYBOOK);
     expect(chooseStyle({ ART_STYLE: 'flat-isometric' })).toBe(FLAT_ISOMETRIC);
     expect(chooseStyle({ ART_STYLE: 'no-such-style' })).toBe(FLAT_ISOMETRIC);
   });
@@ -23,15 +22,11 @@ describe('the art style profile', () => {
     expect(JUDGE_SYSTEM).toContain(FLAT_ISOMETRIC.judge.look);
   });
 
-  it('paints the isometric ways in the new look, and keeps the top-down ways in their old words', () => {
-    expect(TOP_DOWN_STYLE).toBe(STORYBOOK);
-    for (const d of WALK_DIRECTIONS) {
-      expect(viewPrompt('Mara', [], d).startsWith(STORYBOOK.base)).toBe(true);
-      expect(walkVideoPrompt([], d).startsWith(STORYBOOK.animation)).toBe(true);
-    }
-    for (const w of ISO_WAYS) {
-      expect(viewPrompt('Mara', [], w).startsWith(FLAT_ISOMETRIC.base)).toBe(true);
-      expect(viewPrompt('Mara', [], w)).toContain('Paint them in the style described above');
+  it('paints every standing and walking way in the flat isometric look', () => {
+    for (const d of [...WALK_DIRECTIONS, ...ISO_WAYS]) {
+      expect(viewPrompt('Mara', [], d).startsWith(FLAT_ISOMETRIC.base)).toBe(true);
+      expect(viewPrompt('Mara', [], d)).toContain('Paint them in the style described above');
+      expect(walkVideoPrompt([], d).startsWith(FLAT_ISOMETRIC.animation)).toBe(true);
     }
   });
 

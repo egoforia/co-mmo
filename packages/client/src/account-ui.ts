@@ -1,6 +1,5 @@
 import { MAX_LOOK_LENGTH } from '@co-mmo/shared';
 import { accountInfo, describeLook, emailSignIn, linkUrl, setEmail, signInOptions, signOut, type AccountInfo } from './api.ts';
-import { oldViewOn, switchOldView } from './camera.ts';
 import type { PerfOverlay } from './perf-overlay.ts';
 import { escapeHtml, showPanel } from './ui.ts';
 
@@ -39,14 +38,12 @@ export async function showSignIn(message = ''): Promise<void> {
   });
 }
 
-/** The Account window: sign-in email, linked Google and GitHub, your look, signing out, for the Owner the old top-down view, and for Stewards and the Owner the performance overlay. */
+/** The Account window: sign-in email, linked Google and GitHub, your look, signing out, and for Stewards and the Owner the performance overlay. */
 export class AccountWindow {
   private readonly el = document.getElementById('account')!;
 
   constructor(
     private readonly token: string,
-    /** The Owner may look through the old top-down camera. */
-    private readonly owner = false,
     /** Stewards and the Owner may show the performance overlay. */
     private readonly perf?: () => PerfOverlay | null,
   ) {
@@ -94,9 +91,6 @@ export class AccountWindow {
       ${providers.map((p) => info.logins.includes(p)
         ? `<p>✓ ${PROVIDER_NAME[p]} is linked.</p>`
         : `<button type="button" class="quiet" data-link="${p}">Link ${PROVIDER_NAME[p]}</button>`).join('')}
-      ${this.owner ? `<h3>Camera</h3>
-      <p>Everyone plays in the isometric view. The old top-down view is kept for a while, only for you and in this browser, to compare a land before and after it is repainted.</p>
-      <button type="button" class="quiet" id="old-view">${oldViewOn() ? 'Back to the isometric view' : 'Look through the old top-down view'}</button>` : ''}
       ${this.perf ? `<h3>Performance</h3>
       <p>Frame rate, memory, the network and the server, on top of the game. F3 shows and hides it too.</p>
       <button type="button" class="quiet" id="perf-overlay">${this.perf()?.open ? 'Hide the performance numbers' : 'Show the performance numbers'}</button>` : ''}
@@ -134,7 +128,6 @@ export class AccountWindow {
         }
       });
     }
-    this.el.querySelector('#old-view')?.addEventListener('click', () => switchOldView(!oldViewOn()));
     this.el.querySelector<HTMLButtonElement>('#perf-overlay')?.addEventListener('click', (event) => {
       const overlay = this.perf?.();
       if (!overlay) return;

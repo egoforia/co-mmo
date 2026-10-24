@@ -20,7 +20,6 @@ import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../ki
 import { dropLight, makeLight, placeLight } from '../lights.ts';
 import { PROJECTION } from '../projection.ts';
 import {
-  hasExterior,
   propTexture,
   registerKitTileset,
   registerStoreyTileset,
@@ -48,7 +47,7 @@ import {
   setShown,
   within,
 } from './types.ts';
-import { exterior, groundLayer, rockWalls, wallFaceKey } from './walls.ts';
+import { groundLayer, rockWalls, wallFaceKey } from './walls.ts';
 
 export function dropChunk(chunk: Chunk): void {
   for (const o of chunk.objects) o.destroy();
@@ -160,26 +159,23 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
   const views = map.buildings.map((b) => {
     const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
     for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
-    const iso = PROJECTION.ground.kind === 'diamond';
-    const hasWall = iso && Boolean(wallFaceKey(scene, b.style, b.art));
+    const hasWall = Boolean(wallFaceKey(scene, b.style, b.art));
     // With 0.5-tile walls, the inner half of each wall tile exposes the room's floor seamlessly.
     const floorRows = hasWall ? inside.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : inside;
     const floor = groundLayer(scene, floorRows, ox + b.x, oy + b.y, -0.5, registerKitTileset(scene, b.style, b.art)).setData('shell', true);
     tilemaps.push(floor.tilemap);
-    // In the isometric camera, modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
-    const closedUpper = iso ? map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor) : [];
-    const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = !b.art && hasExterior(scene, b.style) && !iso
-      ? [exterior(scene, b, ox, oy)]
-      : hasWall
-        ? [
-          ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0),
-          ...closedUpper.flatMap((s, idx) => {
-            const sRows: number[][] = [];
-            for (let y = 0; y < s.height; y++) sRows.push(Array.from(s.tiles.subarray(y * s.width, (y + 1) * s.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
-            return rockWalls(scene, sRows, ox + s.x, oy + s.y, s.style, s.art, tilemaps, true, false, idx === closedUpper.length - 1, s.floor);
-          }),
-        ]
-        : [];
+    // Modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
+    const closedUpper = map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor);
+    const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = hasWall
+      ? [
+        ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0),
+        ...closedUpper.flatMap((s, idx) => {
+          const sRows: number[][] = [];
+          for (let y = 0; y < s.height; y++) sRows.push(Array.from(s.tiles.subarray(y * s.width, (y + 1) * s.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
+          return rockWalls(scene, sRows, ox + s.x, oy + s.y, s.style, s.art, tilemaps, true, false, idx === closedUpper.length - 1, s.floor);
+        }),
+      ]
+      : [];
     const view: BuildingView = {
       building: b,
       ox,
@@ -196,7 +192,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
     for (let y = 0; y < storey.height; y++) {
       rows.push(Array.from(storey.tiles.subarray(y * storey.width, (y + 1) * storey.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
     }
-    const hasWall = PROJECTION.ground.kind === 'diamond' && Boolean(wallFaceKey(scene, storey.style, storey.art));
+    const hasWall = Boolean(wallFaceKey(scene, storey.style, storey.art));
     const floorRows = hasWall ? rows.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : rows;
     const lift = floorLift(storey.floor);
     const depthOff = floorDepthOffset(storey.floor);
@@ -414,8 +410,7 @@ export function revealBuildings(
 /**
  * Shows what can be seen from the floor we are on. On the ground, the land
  * as ever. Upstairs in the isometric camera, upper storeys stand elevated
- * above the dimmed ground floor and street below; in top-down mode, our
- * floor hides the building beneath it. Underground, only our floor shows.
+ * above the dimmed ground floor and street below. Underground, only our floor shows.
  */
 export function applyFloorView(
   scene: Phaser.Scene,
@@ -426,7 +421,6 @@ export function applyFloorView(
   mine: number,
 ): void {
   const under = mine < 0;
-  const iso = PROJECTION.ground.kind === 'diamond';
   const here = mine ? storeyAt(map, Math.floor(shown.x), Math.floor(shown.y), mine) : undefined;
   for (const [id, region] of drawn) {
     const current = id === currentRegionId;
@@ -453,7 +447,7 @@ export function applyFloorView(
     }
     for (const v of region.buildings) {
       const covered = Boolean(current && here && overlaps(here, v.building));
-      const showUnder = iso && mine > 0 && !under && (covered || v.open);
+      const showUnder = mine > 0 && !under && (covered || v.open);
       for (const o of v.outside) {
         o.setVisible(!under && !covered && !showUnder);
         setDepthShade(o, groundDelta, true);
@@ -476,7 +470,7 @@ export function applyFloorView(
     }
     for (const f of region.floors) {
       const delta = mine - f.storey.floor;
-      const overOpenBuilding = iso && mine === 0 && f.storey.floor > 0 && region.buildings.some((v) => v.open && overlaps(f.storey, v.building));
+      const overOpenBuilding = mine === 0 && f.storey.floor > 0 && region.buildings.some((v) => v.open && overlaps(f.storey, v.building));
       const visible = current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open) && !overOpenBuilding) || (mine > f.storey.floor && f.storey.floor > 0 && !under));
       for (const o of f.objects) {
         setShown(o, visible);

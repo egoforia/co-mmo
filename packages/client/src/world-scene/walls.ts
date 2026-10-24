@@ -1,25 +1,21 @@
 // Tilemap layers, isometric cutaway walls (0.5-tile thick with tall North/West
-// back walls and low South/East near walls), roof/coping caps, and 2D exteriors.
+// back walls and low South/East near walls), and roof/coping caps.
 
 import Phaser from 'phaser';
 import {
   Tile,
   buildingArt,
-  exteriorSpan,
-  type Building,
   type TileArt,
 } from '@co-mmo/shared';
 import { PROJECTION } from '../projection.ts';
 import {
   DIAMOND_PAD,
-  TILE_MARGIN,
   registerDiamondTileset,
   registerKitTileset,
   registerWallFace,
 } from '../textures.ts';
 import {
   EAST_WALL_TINT,
-  T,
   WALL_RISE,
   floorDepthOffset,
   floorLift,
@@ -52,7 +48,7 @@ export function diamondLayer(
   return tilemap.createLayer(0, tileset, top.x - w / 2, top.y)!;
 }
 
-/** A tile layer of the rows given, its top-left tile at world (x, y), from the square tile strip `key`. */
+/** A tile layer of the rows given, its top-left tile at world (x, y), from the tile strip `key`. */
 export function groundLayer(
   scene: Phaser.Scene,
   tiles: number[][],
@@ -63,10 +59,7 @@ export function groundLayer(
 ): Phaser.Tilemaps.TilemapLayer {
   const at = PROJECTION.toScreen(x, y);
   const ground = PROJECTION.ground;
-  if (ground.kind === 'diamond') return diamondLayer(scene, tiles, at, registerDiamondTileset(scene, key, ground.width, ground.height), ground).setDepth(depth);
-  const tilemap = scene.make.tilemap({ data: tiles, tileWidth: T, tileHeight: T });
-  const tileset = tilemap.addTilesetImage(key, key, T, T, TILE_MARGIN, TILE_MARGIN * 2)!;
-  return tilemap.createLayer(0, tileset, at.x, at.y)!.setDepth(depth);
+  return diamondLayer(scene, tiles, at, registerDiamondTileset(scene, key, ground.width, ground.height), ground).setDepth(depth);
 }
 
 /** Resolves the single seamless wall texture key for a building style or kit art override. */
@@ -97,7 +90,6 @@ export function rockWalls(
   floor = 0,
 ): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
   const ground = PROJECTION.ground;
-  if (ground.kind !== 'diamond') return [];
   const face = wallFaceKey(scene, style, art);
   if (!face) return [];
   const storeyRise = Math.round(ground.height * 2.0);
@@ -185,19 +177,4 @@ export function rockWalls(
     }
   }));
   return parts;
-}
-
-/**
- * A building's outside art. Its door is painted at the middle of its bottom
- * edge, so it is drawn centred on the doorway, standing on the south wall.
- */
-export function exterior(scene: Phaser.Scene, b: Building, ox: number, oy: number): Phaser.GameObjects.Image {
-  const span = exteriorSpan(b);
-  // The middle of the doorway's outer edge, where the painted door stands.
-  const door = { x: ox + b.door.x + 1, y: oy + span.bottom };
-  const at = PROJECTION.toScreen(door.x, door.y);
-  const img = scene.add.image(at.x, at.y, buildingArt(b.style, 'exterior')).setOrigin(0.5, 1);
-  const w = span.width * T;
-  img.setDisplaySize(w, (w * img.height) / img.width);
-  return img.setDepth(PROJECTION.depth(door.x, door.y));
 }

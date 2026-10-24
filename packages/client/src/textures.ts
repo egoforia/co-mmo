@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import {
   BIOMES,
-  BUILDING_STYLES,
   FALLBACK_BUILDING_STYLE,
   TILE_PIXELS,
   Tile,
@@ -137,11 +136,6 @@ export function registerWallFace(scene: Phaser.Scene, face: string, side: 'south
 function buildingTiles(scene: Phaser.Scene, style: string): Partial<Record<Tile, string>> {
   const part = (p: BuildingPart) => loaded(scene, buildingArt(style, p), buildingArt(FALLBACK_BUILDING_STYLE, p));
   return { [Tile.Floor]: part('floor'), [Tile.Wall]: part('wall'), [Tile.Door]: part('door') };
-}
-
-/** True when a building style's own outside has been painted and loaded. */
-export function hasExterior(scene: Phaser.Scene, style: string): boolean {
-  return Boolean(BUILDING_STYLES[style]) && scene.textures.exists(buildingArt(style, 'exterior'));
 }
 
 /** Copies art tiles into one strip texture, each extruded so filtered tiles never show seams. */

@@ -114,7 +114,7 @@ describe('walk painter', () => {
     expect(spent).toHaveLength(15);
 
     // Everything is kept, and start-up paints nothing, even when an approved picture changed:
-    // the top-down walks are retired, and walkers are painted from the Art tab.
+    // walkers are painted from the Art tab.
     await writeFile(join(anchorDir, 'raw', 'player-mara.png'), await picture(300, 300, walker(150, 270)));
     const again = new WalkPainter({
       provider: () => images, video: () => video, overBudget: () => false,

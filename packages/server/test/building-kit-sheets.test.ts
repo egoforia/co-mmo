@@ -10,7 +10,14 @@ import { checkSheet, type CheckedSheet } from '../src/assets/building-kit/sheet-
 import { GREEN, MAGENTA, regions, sheetPrompt, type SheetLayout } from '../src/assets/building-kit/sheet.ts';
 import { joints, makeSeamless, rowLines, rowsTile, shapesCheck } from '../src/assets/building-kit/tiling.ts';
 import { buildingViews } from '../src/assets/building-kit/views.ts';
-import { STORYBOOK } from '../src/assets/style-profile.ts';
+import { FLAT_ISOMETRIC } from '../src/assets/style-profile.ts';
+
+const FIRST_SHEET_STYLE = [
+  'Every texture is flat and seen square-on, like a scan of a flat surface held straight in front of the camera: no perspective, no isometric view, no 3D, no depth, no objects drawn on top.',
+  'Built from a few flat facets of solid colour with crisp edges and very low contrast, in one small palette of soft muted warm pastels: cream, sand, warm honey-brown timber, terracotta, dusty rose, sage green.',
+  'No lighting at all: no shading, no shadows, no highlights, no gradients, no darker edges or corners, no glow; the same brightness all over each texture.',
+  'No border, frame or outline round any shape. No writing, letters or symbols.',
+].join(' ');
 
 const repo = resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const SHIPPED = join(repo, 'assets/kit-sheets');
@@ -82,7 +89,7 @@ function stones(rows: number, seed = 1): Img {
 
 describe('building kit texture sheets', () => {
   it('takes every texture the renderer needs from the sheets shipped with the game', async () => {
-    const sheets = new KitSheets({ shippedDir: SHIPPED, dir: await mkdtemp(join(tmpdir(), 'co-mmo-sheets-')), style: STORYBOOK.kitTextures });
+    const sheets = new KitSheets({ shippedDir: SHIPPED, dir: await mkdtemp(join(tmpdir(), 'co-mmo-sheets-')), style: FLAT_ISOMETRIC.kitTextures });
     expect((await sheets.paintings('timber-cottage')).map((p) => p.id)).toEqual(['shipped/sheet-4', 'shipped/sheet-2']);
     const { textures, tiles, report, missing } = await sheets.textures('timber-cottage');
     expect(missing).toEqual([]);
@@ -102,11 +109,11 @@ describe('building kit texture sheets', () => {
   it('sends exactly the words the stones and window were painted from', async () => {
     const layout = JSON.parse(await readFile(join(COTTAGE, 'sheet-4.layout.json'), 'utf8')) as SheetLayout;
     expect(layout).toEqual({ window: R.window, stone: R.stone });
-    expect(sheetPrompt(layout, buildingKit.TIMBER_COTTAGE, STORYBOOK.kitTextures, { edit: true })).toBe(await readFile(join(COTTAGE, 'sheet-4.prompt.txt'), 'utf8'));
+    expect(sheetPrompt(layout, buildingKit.TIMBER_COTTAGE, FIRST_SHEET_STYLE, { edit: true })).toBe(await readFile(join(COTTAGE, 'sheet-4.prompt.txt'), 'utf8'));
   });
 
   it('paints only the textures asked for over the newest whole painting, keeping the rest of it', async () => {
-    const sheets = new KitSheets({ shippedDir: SHIPPED, dir: await mkdtemp(join(tmpdir(), 'co-mmo-sheets-')), style: STORYBOOK.kitTextures });
+    const sheets = new KitSheets({ shippedDir: SHIPPED, dir: await mkdtemp(join(tmpdir(), 'co-mmo-sheets-')), style: FLAT_ISOMETRIC.kitTextures });
     const guide = await sheets.guide('timber-cottage', ['window']);
     expect(Object.keys(guide.layout)).toEqual(['window']);
     const g = await readImg(guide.picture);

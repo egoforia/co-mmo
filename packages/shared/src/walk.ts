@@ -33,7 +33,7 @@ export type WalkDirection = WalkView;
 export const ISO_WAYS = ['front-left', 'front-right', 'back-left', 'back-right'] as const;
 export type IsoWay = (typeof ISO_WAYS)[number];
 
-/** Every way a walker can be painted standing: the top-down camera's four, then the isometric ones. */
+/** Every way a walker can be painted standing: the four cardinal ways, then the isometric ones. */
 export const FACINGS = [...WALK_DIRECTIONS, ...ISO_WAYS] as const;
 export type Facing = WalkDirection | IsoWay;
 
@@ -45,7 +45,7 @@ export const ISO_WAY_STEPS: Record<IsoWay, { dx: number; dy: number }> = {
   'back-right': { dx: 0, dy: -1 },
 };
 
-/** True for the top-down camera's four ways, which every walker walks in. */
+/** True for the four cardinal ways, which every walker walks in. */
 export function isWalkDirection(facing: string): facing is WalkDirection {
   return (WALK_DIRECTIONS as readonly string[]).includes(facing);
 }
@@ -65,7 +65,7 @@ export function facingSide(facing: Facing): 'left' | 'right' | undefined {
 /** The approved player looks that have walks. */
 export const WALKING_LOOKS = ['player-mara', 'player-ilya'] as const;
 
-/** Art id of a look's walk strip for one way: the top-down ways, or an isometric one once its walk is made. */
+/** Art id of a look's walk strip for one way: a cardinal way, or an isometric one once its walk is made. */
 export function walkArt(look: string, direction: Facing): string {
   return `${look}-walk-${direction}`;
 }

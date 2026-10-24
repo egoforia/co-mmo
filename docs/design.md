@@ -1,8 +1,9 @@
 # Design summary
 
-The full, approved design is the Claude Doc "co-MMO: Initial Design
-Document" (approved by egoforia on 2026-10-14):
-https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
+This document summarises the approved design of **co-MMO** (approved by
+egoforia on 2026-10-14) and tracks every milestone. The in-repository docs
+(`docs/*.md`, `.claude/skills/*/SKILL.md`) and contract tests are authoritative
+and self-contained.
 
 ## Decisions that shape the code
 
@@ -14,13 +15,19 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
   undone for good (see Wishes as mods).
 - Mature content rating with no content-rating limits; players must be 18+.
 - AI and asset providers sit behind adapters and are chosen in settings
-  (God's View), never hard-coded.
-- Art: Legend of Mana-inspired hand-painted 2D on 128×128 tiles, defined by
-  the Style Bible (https://claude.ai/code/artifact/e9e5a8ec-ef6a-4d0b-85fa-c421147ed2d8).
-  Assets are colour-graded toward each biome's key palette
-  (`packages/shared/src/biomes.ts`). Launch biomes: the Sanctum, Whispering
-  Woods, Sunlit Shore, Mirage Desert. In diamond isometric projection,
-  buildings stand with tall vertical walls and cutaway roofs (`docs/buildings-and-walls.md`).
+  (God's View), never hard-coded. The art and animation pipeline is AI model
+  and API agnostic, keeping coherent results across generators.
+- Art: Style Bible v3 (`FLAT_ISOMETRIC` in `packages/server/src/assets/style-profile.ts`)
+  — stylised low-poly isometric fantasy game art built from flat, unlit faceted
+  planes in soft muted pastels, lit dynamically by the game's lighting pipeline
+  on 128×128 tiles (`ISOMETRIC` diamond projection).
+  Players always stand at `CHARACTER_HEIGHT = 168px`; creatures use five
+  canonical height tiers (`tiny` = 64px, `small` = 112px, `medium` = 168px,
+  `high` = 224px, `colossal` = 320px). Assets are colour-graded toward each
+  biome's key palette (`packages/shared/src/biomes.ts`). Launch biomes: the
+  Sanctum, Whispering Woods, Sunlit Shore, Mirage Desert. In diamond isometric
+  projection, buildings stand as 3D kit houses or with tall vertical cutaway
+  walls and roofs (`docs/buildings-and-walls.md`).
 - The first item is the Bible: every player has it, and it shows the game's
   documents in-game.
 - Budget ceiling: $50 to $70 a month for AI and assets.
@@ -31,8 +38,7 @@ https://claude.ai/code/artifact/65b5a6f3-1463-4a85-b0ac-d0d25cda8224
 
 Approved on 2026-10-15: a "Shape a wish" tab in the Prayer window where
 players pick a category, talk the details through with the God and preview
-the card, the numbers and the exact image prompt before sending. Design:
-https://claude.ai/code/artifact/ac5a156b-c297-464b-ac19-006f41e3d310. Done so
+the card, the numbers and the exact image prompt before sending. Done so
 far: prompts in the open (painting goes through `artRequest` in
 `packages/server/src/assets/wish-art.ts`, and God's View shows each
 picture's prompt) and the Workshop itself without the God's help: the

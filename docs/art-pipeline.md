@@ -1,19 +1,30 @@
-# Beastfolk & Character Art Pipeline
+# Character & Creature Art Pipeline
 
-This document defines the architecture, specifications, prompting formulas, and processing pipeline for generating, animating, and importing characters into co-MMO.
+This document defines the model- and API-agnostic architecture, visual standards, prompting formulas, and post-processing pipeline for generating, animating, and importing characters and creatures into co-MMO.
 
 ---
 
-## 1. Visual Style & Canonical Standards
+## 1. Visual Style, Height Tiers & Canonical Standards
 
-All characters and creatures in co-MMO adhere to strict visual conventions:
+All characters and creatures in co-MMO adhere to strict visual conventions (`FLAT_ISOMETRIC` in `packages/server/src/assets/style-profile.ts`) so that assets remain visually coherent regardless of which AI model or API generated the raw image or video:
 
-- **Style:** Stylised low-poly isometric fantasy game art, light-neutral.
+- **Style:** Stylised low-poly isometric fantasy game art, light-neutral (`FLAT_ISOMETRIC`, Style Bible v3).
 - **Geometry:** Flat faceted shapes built from large flat geometric planes with crisp hard edges (vector / cut-paper aesthetic).
 - **Lighting:** **Unlit flat shading (NO LIGHTING).** Every material facet uses a single flat base color with no specular highlights, no cast shadows, no gradients, and no ambient glow. Facets are delineated only by subtle seam boundaries.
 - **Palette:** Soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass).
-- **Camera:** Orthographic isometric 3/4 turntable projection.
+- **Camera:** Orthographic isometric 3/4 turntable projection (`ISOMETRIC`).
 - **Background:** Solid pure flat magenta (`#FF00FF`) for lossless chroma-keying (characters/creatures ONLY; environmental & architectural wall/floor textures must be 100% full-bleed seamless tiles without magenta backgrounds, see `docs/buildings-and-walls.md`).
+
+### Canonical Height Standards (Players vs. Creature Size Tiers)
+- **Players & Humanoids:** Always normalized to **`CHARACTER_HEIGHT = 168px`** (`1.0×`).
+- **Creatures:** Normalized to one of **five canonical height tiers** relative to player height:
+  | Size Tier | Canonical Height | Scale vs. Player (`168px`) | Typical Examples |
+  | :--- | :---: | :---: | :--- |
+  | **`tiny`** | `64px` | `~0.38×` | Small critters, scarabs, lantern moths |
+  | **`small`** | `112px` | `~0.67×` | Walking mushrooms, hermit crabs, gull raiders |
+  | **`medium`** | `168px` | `1.00×` | Humanoids, beastfolk, thorn wolves, deckhands |
+  | **`high`** | `224px` | `~1.33×` | Large guardians, bark golems, mounted foes |
+  | **`colossal`** | `320px` | `~1.90×` | World bosses, ancient wyrms, towering colossi |
 
 ### The Four Canonical Isometric Facings
 Characters never use 2D horizontal mirroring. Every character is modeled/painted across all four distinct isometric directions:
@@ -72,26 +83,31 @@ Diffusion turntable generators order the 4 figures in clockwise rotational turnt
 
 ---
 
-## 5. Video Generation with Alibaba Wan 3.0 (Replicate)
+## 5. Model- & API-Agnostic Video Generation Contract
 
-Video generation uses model `alibaba/wan-3` via the Replicate API:
+The animation pipeline is **AI model and API agnostic**. Whether a video clip is generated in-game via the `VideoProvider` interface (`packages/server/src/assets/video.ts`, chosen in `ai/services.ts`) or through an offline batch adapter (e.g., Google Veo, Alibaba Wan, or any future video diffusion API), the pipeline guarantees coherent results by enforcing strict input invariants before generation and deterministic normalization after generation:
 
-```python
-payload = {
-    'input': {
-        'image': data_uri,              # Base64 data URI of the master 1:1 image
-        'prompt': prompt,                # View-specific prompt (see section 6)
-        'negative_prompt': neg_prompt,  # Strict negative constraints
-        'duration': 5,                   # 5-second video (150 frames @ 30 fps)
-        'resolution': '720p',
-        'aspect_ratio': '1:1',
-        'enable_prompt_expansion': False # MUST BE FALSE: prevents prompt hallucination
-    }
-}
+### Required Provider & Request Invariants
+1. **Reference Image Input:** A master `1:1` square (`720×720` or `960×960`) or turnaround frame pre-padded on pure `#FF00FF` magenta so extending limbs never clip the canvas border.
+2. **Fixed Camera & Background:** The prompt and provider settings must lock the camera (zero pan, zoom, or tilt) and preserve the flat `#FF00FF` background throughout all frames.
+3. **Disable Automatic Prompt Rewriting / Expansion:** If the underlying video API has an internal LLM prompt rewriter (such as `enable_prompt_expansion` on Wan/Replicate or prompt enhancement flags on other providers), it **must be disabled (`false`)**. Prompt expansion causes models to hallucinate two-handed gestures, spellcasting auras, or weapons.
+4. **Negative Constraints:** When supported by the provider, pass the negative prompt template below (otherwise append as an explicit `Avoid:` clause in the prompt).
+
+```ts
+// Example provider-agnostic request shape:
+const request = {
+  image: dataUriOrBuffer,          // 1:1 padded master image on #FF00FF
+  prompt: viewSpecificPrompt,      // Base style prefix + facing choreography (Section 6)
+  negativePrompt: NEGATIVE_PROMPT, // Strict negative constraints
+  durationSeconds: 5,              // Enough frames to sample a clean 10–12 frame cycle
+  resolution: '720p',
+  aspectRatio: '1:1',
+  promptExpansion: false,          // MUST BE FALSE whenever the API offers prompt rewriting
+};
 ```
 
 > [!IMPORTANT]
-> Always set `'enable_prompt_expansion': False`. Enabling prompt expansion causes the internal LLM to hallucinate two-handed gestures, spellcasting auras, or weapons on beastfolk characters.
+> Always disable provider-side prompt expansion/rewriting so the choreography and single-handed strike rules in Section 6 are followed word for word.
 
 ### Negative Prompt Template:
 ```text
@@ -181,9 +197,10 @@ The import tool (`scripts/import-all-beastfolk-attacks.ts`) executes the followi
    - Rejects small disconnected background specks ($<15\%$ of main body).
    - **Never use hardcoded coordinate border pruning** (e.g. `x < 8`), as it clips extending fingertips or claws.
 4. **Standard Height Normalization:**
-   - Calls `normalizeWalk(directionsFrames, { bodyHeight: CHARACTER_HEIGHT })` from `packages/server/src/assets/walk-frames.ts`.
-   - `CHARACTER_HEIGHT = 168px` (from `@co-mmo/shared`).
-   - Scales the median figure height across all 4 facings to 168px and centers feet on the ground baseline.
+   - Calls `normalizeWalk(directionsFrames, { bodyHeight })` from `packages/server/src/assets/walk-frames.ts`.
+   - For players and humanoids, `bodyHeight = CHARACTER_HEIGHT` (`168px` from `@co-mmo/shared`).
+   - For creatures, `bodyHeight` is set to the creature's canonical size tier height (`tiny` = `64px`, `small` = `112px`, `medium` = `168px`, `high` = `224px`, `colossal` = `320px`).
+   - Scales the median figure height across all 4 facings to the target `bodyHeight` and centers feet on the ground baseline, ensuring visual coherence independent of the source video model's framing.
 5. **Asset Output:**
    - Strips written to `packages/client/public/art/${charId}-attack-${way}.png`.
    - Manifest entry written to `packages/client/public/art/manifest.json`:

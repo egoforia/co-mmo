@@ -166,12 +166,11 @@ export function stride(
 
 /**
  * Plays an avatar's walk for its step, `step` along the grid and `screen`
- * on screen, and stands it still facing that way when it stops. A camera
- * with ways of its own (the isometric one) shows the walk made for the way
- * it faces, else the standing picture painted for it, gliding. Until that
- * is painted, and in the top-down camera, each way on its own: its walk
- * when one is made, else its standing picture facing that way, else its
- * own picture, turned to face left or right.
+ * on screen, and stands it still facing that way when it stops. In the
+ * isometric camera it shows the walk made for the way it faces, else the
+ * standing picture painted for it, gliding; until that is painted, it
+ * falls back to any cardinal walk or standing picture, turned to face
+ * left or right.
  */
 export function walkAvatar(
   scene: Phaser.Scene,

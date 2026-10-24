@@ -62,7 +62,7 @@ export interface BodyType {
 const half = (track: readonly number[]) => track.map((_, i) => track[(i + WALK_STEPS / 2) % WALK_STEPS]!);
 const scaled = (track: readonly number[], k: number) => track.map((v) => v * k);
 
-// A storybook hero's left leg through one cycle: contact, down, passing, up
+// A walker's left leg through one cycle: contact, down, passing, up
 // while it carries the weight, then push off, lift, swing through, reach.
 const LEG_SWING = [25, 15, 0, -15, -25, -10, 10, 25];
 const LEG_BEND = [5, 20, 10, 5, 15, 50, 60, 25];
@@ -172,7 +172,7 @@ export function poseAt(body: BodyType, step: number): { parts: RigPart[]; limbs:
   return { parts, limbs };
 }
 
-/** How much a top-down three-quarter view tilts depth into screen height. */
+/** How much a three-quarter view tilts depth into screen height. */
 const TILT = 0.35;
 
 /**

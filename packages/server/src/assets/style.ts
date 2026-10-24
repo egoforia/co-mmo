@@ -47,12 +47,11 @@ export interface AssetDescription {
 }
 
 /**
- * The tiles a picture is painted standing on: in an isometric style, the
- * footprint of a set piece, prop or piece of furniture that has one; never in
- * a top-down style, whose pictures are not fitted to their tiles.
+ * The tiles a picture is painted standing on: in the isometric style, the
+ * footprint of a set piece, prop or piece of furniture that has one.
  */
 export function paintedFootprint(id: string, kind = 'set-piece'): Footprint | undefined {
-  if (STYLE.camera !== 'isometric' || kind === 'tile' || kind === 'effect') return undefined;
+  if (kind === 'tile' || kind === 'effect') return undefined;
   return artFootprint(id);
 }
 

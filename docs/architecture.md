@@ -32,8 +32,8 @@ adapter) and picking it in the place named under "Chosen in".
 | Pictures | `ImageProvider` (`assets/provider.ts`) | Gemini image models | `ai/services.ts` |
 | Video (walks) | `VideoProvider` (`assets/video.ts`) | Veo | `ai/services.ts` |
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
-| Art style | `StyleProfile` (`assets/style-profile.ts`) | `FLAT_ISOMETRIC` (`STORYBOOK` for top-down walks) | `chooseStyle` (`ART_STYLE`) |
-| Camera | `Projection` (`client/src/projection.ts`) | `ISOMETRIC` for everyone; `TOP_DOWN` (retired, the Owner's old view until the lands are repainted) | `chooseCamera` (`client/src/camera.ts`) |
+| Art style | `StyleProfile` (`assets/style-profile.ts`) | `FLAT_ISOMETRIC` | `chooseStyle` (`ART_STYLE`) |
+| Camera | `Projection` (`client/src/projection.ts`) | `ISOMETRIC` | `chooseCamera` (`client/src/camera.ts`) |
 | Building shapes | `BuildingSpec` in, `KitBuilding` parts out, judged by `shapeChecks` (`shared/src/building-kit/`) and `pictureChecks` (`server/src/assets/building-kit/`) | timber-frame kit (`K`), crowns (`crown.ts`) | `kitHouse` (a building style's `kit` look), drawn by `KitHouses` for the isometric camera |
 | Building textures | a `KitLook`'s words in, a sheet painted to `regions()` out, judged by `checkSheet` (`server/src/assets/building-kit/`) | `TIMBER_COTTAGE` and the great halls' looks | `KitSheets` in `app.ts` |
 | God's View tab | `Tab` (`client/src/gods-view/core.ts`) | one file per tab in `gods-view/` | `TABS` in `gods-view.ts` |
@@ -190,8 +190,6 @@ desert palace) is one, in a look of its own; `KitHouses` draws it
 in a worker the first time `GET /api/kit-houses` asks (any signed-in
 player, for the isometric camera), keeps it in the art folder and draws it again when
 its look is painted again. The game's collision is still its wall tiles.
-The plan for bringing the rest into play is
-https://claude.ai/code/artifact/af5911b7-a8b9-4041-885f-06f237ad7d99.
 
 ## Client modules
 
@@ -208,8 +206,7 @@ opaque bounds and hand grips, walk animations and speech bubbles) and `combat.ts
 (hit sparks, floating numbers, screen shake, sound cues and mini-map view), `sky.ts` (the
 light of the hour and the weather),
 `textures.ts` (tilesets from painted art, and the same tiles turned into
-diamonds for the isometric camera), `camera.ts` (isometric for everyone; the Owner's
-switch to the old top-down view, kept in the browser), `kit-house-view.ts` (kit
+diamonds for the isometric camera), `camera.ts` (isometric projection for everyone), `kit-house-view.ts` (kit
 houses stood on their floors in upright strips, so walkers pass behind and in
 front of them), `tile-stand.ts` (how a picture stands on its tiles: set pieces
 and furniture wider than a tile in the same upright strips, and a picture
@@ -243,7 +240,7 @@ per panel. God's View is
 | Change | What to write |
 | --- | --- |
 | New art style | A `StyleProfile` in `style-profile.ts`, `ART_STYLE=<id>` in `.env`, then repaint from the Art tab (old versions stay for rollback). `server/test/style-prompts.test.ts` snapshots every prompt, so the change shows word for word. |
-| Retiring the top-down camera | Everyone plays through `ISOMETRIC` (2026-10-20), painted in the `FLAT_ISOMETRIC` style. Walkers are painted in their four isometric ways together on one sheet (Art tab, `waysSheetPrompt`), and start-up paints no walks. Set pieces and furniture stand in upright strips on their footprints, and those painted from now on are painted standing on their tiles (`artFootprint`, `footprintWords`) and sized to them. Still to come: every building standing in the kit, the repaint, then `TOP_DOWN` and its code taken out: https://claude.ai/artifact/7tzQN8n31RxZN6e6ECDHmk |
+| Isometric camera & kit buildings | Everyone plays through `ISOMETRIC`, painted in the `FLAT_ISOMETRIC` style. Walkers are painted in their four isometric ways together on one turnaround sheet (Art tab, `waysSheetPrompt`), and start-up paints no walks. Set pieces and furniture stand in upright strips on their footprints (`artFootprint`, `footprintWords`) and are sized to them (`isoSpan`). Buildings stand as 3D `KitHouse` structures or tall vertical cutaway walls (`docs/buildings-and-walls.md`). |
 | New AI service | An adapter implementing the provider interface, and one branch in `ai/services.ts`. |
 | New database | A `StoreBackend` class and its choice in `main.ts`. |
 | New God's View tab | A file in `gods-view/` exporting a `Tab`, and one line in `TABS`. |
@@ -258,10 +255,11 @@ play; a new feature adds one. See `playtest.md`.
 ## Rules every module keeps
 
 - A short doc comment on each export; comments say why.
-- When a module grows past ~500 lines or mixes distinct domains, split it into
-  a thin facade (`<module>.ts`) and focused submodules (`<module>/*.ts`, like
-  `wishes/`, `region/`, `art-studio/`, `world-scene/`, `art-ui/`, `gods-view/`).
-  Add new domain logic to the matching submodule, never by growing the facade.
+- Keep new or freshly split modules under ~400 lines. When an existing module
+  grows past ~500 lines or mixes distinct domains, split it into a thin facade
+  (`<module>.ts`) and focused submodules (`<module>/*.ts`, like `wishes/`,
+  `region/`, `art-studio/`, `world-scene/`, `art-ui/`, `gods-view/`). Add new
+  domain logic to the matching submodule, never by growing the facade.
 - Paid calls go through the paint queue and the budget, and are reviewable
   before they are sent (the Art tab shows the exact prompt).
 - No art drawn in code (the building kit's shapes are the one exception:

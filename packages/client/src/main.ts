@@ -298,7 +298,7 @@ function play(token: string): void {
     chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     party.start(myId);
-    const account = new AccountWindow(token, welcome.you.role === 'owner', welcome.you.role !== 'player' ? () => perf : undefined);
+    const account = new AccountWindow(token, welcome.you.role !== 'player' ? () => perf : undefined);
     onAccountClick(() => void account.toggle());
     void accountInfo(token).then((info) => {
       if (!info.look) chat?.add({ kind: 'system', text: '✦ You have not described your look yet. Open Account to make your first wish, free: the God paints you as you describe.' });
@@ -346,16 +346,15 @@ function play(token: string): void {
       trade: (m) => connection.send(m),
       typing: isTyping,
     });
-    // Before the scene, which draws through whichever camera is chosen.
-    const iso = chooseCamera(welcome.you.role);
-    if (!iso) chat.add({ kind: 'system', text: 'You are looking through the old top-down view, which only you can see. Switch back to the isometric view in Account.' });
+    // Set the isometric camera before creating the scene.
+    chooseCamera(welcome.you.role);
     scene = new WorldScene({
       welcome,
       art: manifest,
       points: found,
       send: (m) => connection.send(m),
       // Kit houses stand in the isometric camera, drawn on the server the first time they are asked for.
-      ...(iso ? { houses: (region: string) => kitHouses(token, region) } : {}),
+      houses: (region: string) => kitHouses(token, region),
       // The arrow keys choose loot while its window is open, so the player stands still.
       typing: () => isTyping() || !!loot?.open,
     });
@@ -371,7 +370,7 @@ function play(token: string): void {
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });
-    // The mini map of your floor, in both cameras.
+    // The mini map of your floor.
     new MiniMap({ view: () => scene?.miniMapView() });
     // The performance overlay, for Stewards and the Owner checking where the game is slow.
     if (welcome.you.role !== 'player') {
@@ -382,7 +381,7 @@ function play(token: string): void {
         received: connection.received,
         ping: (n) => connection.send({ t: 'ping', n }),
         server: () => perfStats(token),
-        camera: iso ? 'isometric' : 'old top-down view',
+        camera: 'isometric',
         region: () => region,
       });
     }

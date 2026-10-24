@@ -22,8 +22,12 @@ description: Use when adding a feature to co-MMO, splitting a file, or replacing
 3. Pass dependencies in through the constructor or options; never set a
    field on another service after it is built. `app.ts` is the one place
    that wires services together.
-4. Each export gets a short doc comment; comments say why. Keep files small:
-   when one passes about 400 lines, split it along a concern.
+4. Each export gets a short doc comment; comments say why. Keep files small
+   (~400 lines target ceiling for new or split modules): when a module grows
+   past ~500 lines or mixes distinct domains, split it into a thin facade
+   (`<module>.ts`) and focused submodules (`<module>/*.ts`, like `wishes/`,
+   `region/`, `art-studio/`, `world-scene/`, `art-ui/`, `gods-view/`). Add new
+   domain logic to the matching submodule, never by growing the facade.
 5. Add or extend a test in `packages/<pkg>/test/`. A new implementation of a
    contract must pass that contract's test (see the map).
 6. If you moved or added a core file (sign-in, roles, settings, budget, keys,

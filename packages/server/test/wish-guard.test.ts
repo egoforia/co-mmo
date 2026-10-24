@@ -10,8 +10,16 @@ describe('wish guard', () => {
   });
 
   it('refuses core files unless the Owner allowed them', () => {
-    const files = [file('packages/server/src/store.ts'), file('packages/server/package.json')];
-    expect(checkChanges(files)).toHaveLength(2);
+    const files = [
+      file('packages/server/src/store.ts'),
+      file('packages/server/src/store-postgres.ts'),
+      file('packages/server/src/account-routes.ts'),
+      file('packages/server/src/api-log.ts'),
+      file('packages/server/src/compiler.ts'),
+      file('packages/server/src/region-main.ts'),
+      file('packages/server/package.json'),
+    ];
+    expect(checkChanges(files)).toHaveLength(7);
     expect(checkChanges(files)[0]).toMatch(/accounts, roles/);
     expect(checkChanges(files, { allowCore: true })).toEqual([]);
   });
@@ -40,15 +48,18 @@ describe('wish guard on art', () => {
       add('packages/client/src/textures.ts', "  const ctx = canvas.getContext('2d')!;"),
       add('packages/client/src/textures.ts', '  ctx.fillRect(0, 0, 8, 8);'),
       add('packages/client/src/world-scene.ts', '    const slash = this.add.graphics();'),
+      add('packages/client/src/world-scene/walls.ts', '    const box = scene.add.graphics();'),
     ]);
-    expect(problems).toHaveLength(2);
+    expect(problems).toHaveLength(3);
     expect(problems[0]).toMatch(/draws art in code.*image model chosen in God's View/);
   });
 
   it('lets through art loading, tests and God\'s View charts', () => {
     expect(checkArt([
       add('packages/client/src/world-scene.ts', "    this.add.image(x, y, 'fx-slash');"),
+      add('packages/client/src/world-scene/regions.ts', "    scene.add.image(x, y, 'woods-rock');"),
       add('packages/client/src/gods-view.ts', '      ctx.arc(x, y, size, 0, Math.PI * 2);'),
+      add('packages/client/src/gods-view/servers.ts', '      ctx.fillRect(0, 0, 10, 10);'),
       add('packages/server/test/x.test.ts', '  ctx.fillRect(0, 0, 1, 1);'),
       add('packages/shared/src/rpg.ts', '  const filled = items.fill(0);'),
     ])).toEqual([]);

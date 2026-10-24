@@ -97,8 +97,8 @@ export const CHAPTERS: Chapter[] = [
       <h2>The Style Bible</h2>
       <p>How the world looks, so everything made for it belongs together.</p>
       <ul>
-        <li><b>Hand-painted 2D</b>, inspired by Legend of Mana: soft brushwork, warm light, storybook shapes.</li>
-        <li><b>128 by 128 pixel tiles.</b> Ground tiles are flat, top-down and seamless, with even light.</li>
+        <li><b>Flat-faceted 2D isometric art</b>: crisp geometric planes, clean shapes, and warm dynamic light.</li>
+        <li><b>128 by 128 pixel tiles.</b> Ground tiles are flat and seamless, projected onto isometric diamonds with even light.</li>
         <li><b>Each biome has its own colours</b> and light: the pale gold Sanctum, the deep green Whispering Woods, the turquoise Sunlit Shore, the amber Mirage Desert.</li>
         <li><b>Characters and creatures</b> are drawn three-quarter view, a little round and friendly, with a clear silhouette.</li>
         <li><b>No writing</b> appears inside the art.</li>

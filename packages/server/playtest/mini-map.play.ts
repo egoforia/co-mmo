@@ -2,8 +2,8 @@
 // floor up and a cellar, and the map in the corner shows the ground floor
 // around them, zooms in and out, looks at the floor above and the cellar
 // without moving them, follows them up the stairs, maximizes, minimizes
-// (drawing nothing) and closes, turned with the isometric camera, and still
-// square in the Owner's old top-down view. Screenshots land in playtest-results/.
+// (drawing nothing) and closes, turned with the isometric camera.
+// Screenshots land in playtest-results/.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -140,16 +140,6 @@ describe('the mini map', () => {
     expect(await page.locator('#mini-map').isHidden()).toBe(true);
     await page.click('#map-button');
     expect(await page.locator('#mini-map').isVisible()).toBe(true);
-
-    // The Owner's old top-down view keeps the map square, north up.
-    await page.evaluate(() => localStorage.setItem('co-mmo.camera', 'top-down'));
-    await page.reload();
-    await page.waitForSelector('#mini-map:not([hidden])', { timeout: 20_000 });
-    await expect.poll(() => caption(page), { timeout: 10_000 }).toBe('Floor 1');
-    await page.click('#mini-map [data-act="down"]');
-    await page.waitForTimeout(500);
-    await page.locator('#mini-map').screenshot({ path: resolve(shots, 'mini-map-old-view.png') });
-    await page.screenshot({ path: resolve(shots, 'mini-map-old-view-game.png') });
 
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

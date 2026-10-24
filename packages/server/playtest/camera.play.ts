@@ -1,8 +1,7 @@
 // The isometric camera, in a real browser: a player sees the world through
 // it, and the Sanctum Arcanum stands as a kit house, drawn on the server from
-// the shipped texture sheets. The robot walks up to it, and inside. The
-// Owner can still look through the old top-down view in the Account window,
-// and come back. Screenshots land in playtest-results/ to look at afterwards.
+// the shipped texture sheets. The robot walks up to it, and inside.
+// Screenshots land in playtest-results/ to look at afterwards.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
@@ -90,35 +89,6 @@ describe('the isometric camera', () => {
     await inside.waitForTimeout(3000);
     await inside.screenshot({ path: resolve(shots, 'camera-inside.png') });
     expect(at().y, 'standing in the shop').toBeLessThan(shop.door.y);
-    expect(problems).toEqual([]);
-    expect(world.problems()).toEqual([]);
-    await context.close();
-  });
-
-  it('lets the Owner look through the old top-down view, and come back', async () => {
-    const world = await playWorld({ clientDir });
-    const problems: string[] = [];
-    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    const page = await context.newPage();
-    page.on('pageerror', (err) => problems.push(`The page threw: ${err.message}`));
-    const { token } = account(world.store, 'Ego', 'owner');
-    await context.addInitScript((t) => localStorage.setItem('co-mmo.token', t), token);
-    await page.goto(`${world.base}/`);
-    await page.waitForSelector('#game canvas', { timeout: 20_000 });
-
-    // Switched in the Account window; the page reloads through the other camera.
-    await page.click('#account-button');
-    expect(await page.locator('#old-view').textContent()).toBe('Look through the old top-down view');
-    await page.click('#old-view');
-    await page.waitForEvent('load');
-    expect(await page.evaluate(() => localStorage.getItem('co-mmo.camera'))).toBe('top-down');
-    await page.waitForSelector('#game canvas', { timeout: 20_000 });
-    await page.waitForTimeout(1500);
-    await page.screenshot({ path: resolve(shots, 'camera-old-view.png') });
-    await page.click('#account-button');
-    await page.click('#old-view');
-    await page.waitForEvent('load');
-    expect(await page.evaluate(() => localStorage.getItem('co-mmo.camera'))).toBeNull();
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);
     await context.close();

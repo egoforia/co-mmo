@@ -22,16 +22,16 @@ co-MMO uses a 2.5D diamond isometric camera projection (`ISOMETRIC`, 45° angle,
 ## 2. The Three Common Mistakes & How to Avoid Them
 
 ### Mistake 1: The "Flat Curb / Knee-High Wall" Trap
-- **The Problem:** In isometric view, rendering walls only as flat diamond tiles on the ground layer (or with a tiny multiplier like $0.4 \times 64 = 25.6\text{px}$) produces walls that look like floor curbs, doormats, or knee-high curbs that players can seemingly step over. Characters are $80\text{--}90\text{px}$ tall; walls lower than characters destroy spatial immersion.
-- **The Rule:** Walls in isometric view must have genuine vertical rise:
-  - **Cathedrals & Monumental Buildings (3 storeys):** `wallMultiplier = 3.0` $\rightarrow$ **$192\text{px}$ rise** (`ground.height * 3.0`).
-  - **Standard Buildings (Taverns, Scriptoriums, 2-storey houses):** `wallMultiplier = 2.0` $\rightarrow$ **$128\text{px}$ rise** (`ground.height * 2.0`).
-  - **Cottages & Single-Storey Enclosures:** Minimum `wallMultiplier = 1.0\text{--}1.5` $\rightarrow$ **$64\text{--}96\text{px}$ rise**.
+- **The Problem:** In isometric view, rendering walls only as flat diamond tiles on the ground layer (or with a tiny multiplier like $0.4 \times 64 = 25.6\text{px}$) produces walls that look like floor curbs, doormats, or knee-high curbs that players can seemingly step over. Players are always **`168px` tall (`CHARACTER_HEIGHT`)** and creatures range from `64px` (`tiny`) to `320px` (`colossal`); walls lower than a storey destroy spatial immersion.
+- **The Rule:** Walls in isometric view must have genuine vertical rise (`ground.height = 80px` per diamond tile):
+  - **Cathedrals & Monumental Buildings (3 storeys):** `wallMultiplier = 3.0` $\rightarrow$ **$240\text{px}$ rise** (`ground.height * 3.0`).
+  - **Standard Buildings (Taverns, Scriptoriums, 2-storey houses):** `wallMultiplier = 2.0` $\rightarrow$ **$160\text{px}$ rise** (`ground.height * 2.0`, matching the `168px` canonical player height).
+  - **Cottages & Single-Storey Enclosures:** Minimum `wallMultiplier = 1.0\text{--}1.5` $\rightarrow$ **$80\text{--}120\text{px}$ rise**.
   - **NEVER** leave a building without vertical wall face extrusion (`rockWalls`).
 
 ### Mistake 2: The "Billboard Facade" Trap
-- **The Problem:** Pasting a 2D painted exterior illustration over the building footprint works in 2D top-down mode, but severely clashes with diamond isometric projection. It creates an awkward cardboard cutout that cannot properly occlude isometric entities or blend with 45° ground paths.
-- **The Rule:** In [`packages/client/src/world-scene/regions.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/regions.ts) (via [`packages/client/src/world-scene.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene.ts)), 2D exterior pictures are disabled when `PROJECTION.ground.kind === 'diamond'`. Buildings stand exclusively as 3D kit houses (`KitHouse`) or tall cutaway isometric wall structures.
+- **The Problem:** Pasting a flat 2D painted exterior illustration over a building footprint severely clashes with diamond isometric projection. It creates an awkward cardboard cutout that cannot properly occlude isometric entities or blend with 45° ground paths.
+- **The Rule:** co-MMO runs exclusively in diamond isometric projection (`ISOMETRIC`). Flat 2D exterior pictures are never displayed for buildings. Buildings stand exclusively as 3D kit houses (`KitHouse`) or tall cutaway isometric wall structures (`rockWalls`).
 
 ### Mistake 3: The "Chroma-Key Magenta" Asset Generation Trap
 - **The Problem:** Beastfolk and character sprites use a solid pure magenta (`#FF00FF`) background for chroma-keying video and walk frames (`docs/art-pipeline.md`). Prompting the image generator with *"on neutral magenta background"* for **wall or floor textures** causes the AI model to generate a cutout sprite surrounded by magenta padding, resulting in bright pink outlines and transparent holes along building edges!
@@ -69,30 +69,29 @@ Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`
 
 ---
 
-## 4. Asset Specifications & AI Prompting Formulas
+## 4. Asset Specifications & AI Prompting (`FLAT_ISOMETRIC`)
 
-All architectural textures adhere to **Style Bible v3** (`FLAT_ISOMETRIC`):
-- Soft, unlit low-contrast pixel art / vector-like planar aesthetic.
-- Subtle bevels and facet seams; no harsh cast shadows or dramatic lighting.
-- Muted warm pastel palette aligned with the biome (Sanctum: cream marble, gold filigree, white limestone, polished dark oak).
+All architectural textures adhere strictly to **Style Bible v3** (`FLAT_ISOMETRIC` in [`packages/server/src/assets/style-profile.ts`](file:///home/egoforia/dev/co-mmo/packages/server/src/assets/style-profile.ts)):
+- **Style:** Stylised low-poly / flat-faceted planar aesthetic built from clean geometric planes with crisp edges (`FLAT_ISOMETRIC.interior.pixelArt === false`; never pixel art).
+- **Lighting:** **Unlit flat shading (`NO LIGHTING AT ALL`).** Every material facet uses a flat base color with thin seam boundaries—no baked cast shadows, no specular highlights, no gradients, and no ambient glow (the game's dynamic lighting pipeline lights all surfaces at runtime).
+- **Palette:** Muted warm pastel palette aligned with the biome (e.g., Sanctum: cream marble, gold filigree, white limestone, polished dark oak).
+- **Single Source of Style Words:** Never hardcode ad-hoc style or framing sentences outside [`style-profile.ts`](file:///home/egoforia/dev/co-mmo/packages/server/src/assets/style-profile.ts) (`FLAT_ISOMETRIC.interior.style`, `FLAT_ISOMETRIC.interior.tileFraming`, and `FLAT_ISOMETRIC.kitTextures`).
 
 ### Texture Specifications
 | Asset | File Name Format | Canvas Dimensions | Type | Mode |
 | :--- | :--- | :---: | :--- | :--- |
-| **Wall Texture** | `<style>-wall.png` | 128×128 px | Seamless tileable masonry | 100% opaque RGB/RGBA (NO magenta) |
-| **Floor Texture** | `<style>-floor.png` | 128×128 px | Seamless tileable flagstones | 100% opaque RGB/RGBA (NO magenta) |
-| **Door Texture** | `<style>-door.png` | 128×128 px | Seamless threshold / archway | 100% opaque RGB/RGBA (NO magenta) |
+| **Wall Texture** | `<style>-wall.png` | 128×128 px | Seamless square-on flat-faceted masonry | 100% opaque RGB/RGBA (NO magenta) |
+| **Floor Texture** | `<style>-floor.png` | 128×128 px | Seamless square-on flat-faceted flooring | 100% opaque RGB/RGBA (NO magenta) |
+| **Door Texture** | `<style>-door.png` | 128×128 px | Seamless square-on threshold / archway | 100% opaque RGB/RGBA (NO magenta) |
 
-### AI Generation Prompt Templates
+### Prompt Construction (`building-art.ts` & `style-profile.ts`)
+Prompt builders combine `FLAT_ISOMETRIC.interior.style` and `FLAT_ISOMETRIC.interior.tileFraming` with the building style's material description in `BUILDING_STYLES` ([`packages/shared/src/buildings.ts`](file:///home/egoforia/dev/co-mmo/packages/shared/src/buildings.ts)):
 
-#### For Wall Textures:
 ```text
-"<style>-wall: top-down / isometric wall texture for a <building description>. Thick wall block of <materials, e.g. gleaming pale cream marble with ornate carved gold-leaf filigree border along top>, pristine masonry, seamless edge-to-edge tileable pixel art 128x128 style, clean RPG game asset, full-bleed texture filling entire frame, no background, no borders."
-```
-
-#### For Floor Textures:
-```text
-"<style>-floor: top-down floor tile for a <building description>. Polished <materials, e.g. cream marble flagstones in intricate geometric pattern with thin gold grout lines>, elegant flooring, seamless edge-to-edge tileable pixel art 128x128 style, clean RPG game asset, full-bleed texture filling entire frame, no background."
+<FLAT_ISOMETRIC.interior.style>
+<FLAT_ISOMETRIC.interior.tileFraming>
+Subject: inside <building style name>, <wall / floor / door material description>.
+Colours: match the reference painting of the same building from outside.
 ```
 
 ---

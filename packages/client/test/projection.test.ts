@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ISO_WAY_STEPS, TILE_PIXELS, type IsoWay } from '@co-mmo/shared';
-import { ISOMETRIC, PROJECTION, PROJECTIONS, TOP_DOWN, type Projection } from '../src/projection.ts';
+import { ISO_WAY_STEPS, type IsoWay } from '@co-mmo/shared';
+import { ISOMETRIC, PROJECTION, PROJECTIONS, type Projection } from '../src/projection.ts';
 
 /** What every projection must keep true, whatever the camera. */
 function contract(p: Projection): void {
@@ -42,13 +42,6 @@ describe('the camera projection', () => {
   it('keeps the projection contract', () => contract(PROJECTION));
   for (const p of Object.values(PROJECTIONS)) it(`keeps the contract for the ${p.id} camera`, () => contract(p));
 
-  it('draws top-down one tile per TILE_PIXELS, with keys walking the way they point', () => {
-    expect(TOP_DOWN.toScreen(1.5, 2)).toEqual({ x: 1.5 * TILE_PIXELS, y: 2 * TILE_PIXELS });
-    expect(TOP_DOWN.inputToWorld(1, -1)).toEqual({ dx: 1, dy: -1 });
-    // Trees and set pieces stand on the south edge of their tiles, as they always have.
-    expect(TOP_DOWN.stand(3, 4, 1, 1)).toEqual({ x: 3.5, y: 5 });
-  });
-
   it('is isometric for everyone', () => {
     expect(PROJECTION).toBe(ISOMETRIC);
   });
@@ -79,12 +72,6 @@ describe('the camera projection', () => {
     expect(ISOMETRIC.face(1, 0, 'back-right')).toBe('front-right');
     expect(ISOMETRIC.face(0, -1, 'front-left')).toBe('back-right');
     expect(ISOMETRIC.face(-1, 0, 'front-left')).toBe('back-left');
-  });
-
-  it('faces the top-down ways as the arrow keys point, as it always has', () => {
-    expect(TOP_DOWN.ways).toEqual(['front', 'right', 'back', 'left']);
-    expect(TOP_DOWN.face(1, 1, 'front')).toBe('right');
-    expect(TOP_DOWN.face(0, -1, 'left')).toBe('back');
   });
 
   it('faces the four isometric ways along the grid, keeping the nearest one walking straight up, down or sideways', () => {

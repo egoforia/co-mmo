@@ -167,7 +167,7 @@ describe('the hand finder', () => {
     expect(heldBehind('back-right', 'right')).toBe(false);
     expect(heldBehind('back-right', 'left')).toBe(true);
     expect(heldBehind('back-left', 'left')).toBe(false);
-    // The top-down ways as before.
+    // The four cardinal ways as before.
     expect(['front', 'back', 'left', 'right'].map((f) => heldBehind(f as 'front', 'right'))).toEqual([false, true, true, false]);
   });
 

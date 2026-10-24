@@ -31,19 +31,20 @@ export const FORBIDDEN = [
 
 /** Changed only when the Owner's approval allows core changes. */
 export const CORE = [
-  { pattern: /^packages\/server\/src\/store\.ts$/, what: 'accounts, roles and saved settings' },
+  { pattern: /^packages\/server\/src\/store(-postgres)?\.ts$/, what: 'accounts, roles and saved settings' },
+  { pattern: /^packages\/server\/src\/account-routes\.ts$/, what: 'accounts, invites and sign-in routes' },
   { pattern: /^packages\/server\/src\/auth\.ts$/, what: 'sign-in by email, Google and GitHub' },
   { pattern: /^packages\/server\/src\/settings\.ts$/, what: 'saved settings, AI model choices and budget limits' },
   { pattern: /^packages\/server\/src\/budget\.ts$/, what: 'the budget' },
   { pattern: /^packages\/server\/src\/admin\.ts$/, what: "God's View permissions, keys and the budget" },
+  { pattern: /^packages\/server\/src\/api-log\.ts$/, what: 'the API log and secret masking' },
   { pattern: /^packages\/server\/src\/kit-house-routes\.ts$/, what: 'who may have kit houses drawn' },
   { pattern: /^packages\/server\/src\/world-edit-routes\.ts$/, what: 'who may edit the world' },
   { pattern: /^packages\/server\/src\/ai\//, what: 'AI providers and their keys' },
-  { pattern: /^packages\/server\/src\/rules\.ts$/, what: 'the script sandbox' },
-  { pattern: /^packages\/server\/src\/live-rules\.ts$/, what: 'the script sandbox' },
+  { pattern: /^packages\/server\/src\/(rules|live-rules|compiler|rule-test)\.ts$/, what: 'the script sandbox' },
   { pattern: /^packages\/server\/src\/builds\.ts$/, what: 'the build pipeline' },
   { pattern: /^packages\/server\/src\/updates\.ts$/, what: 'updates and restarts' },
-  { pattern: /^packages\/server\/src\/main\.ts$/, what: 'server start-up and secrets' },
+  { pattern: /^packages\/server\/src\/(region-)?main\.ts$/, what: 'server start-up and secrets' },
   { pattern: /(^|\/)package(-lock)?\.json$/, what: 'package dependencies' },
   { pattern: /^Dockerfile$/, what: 'the server image' },
   // A wish adds buildings as data (a BuildingSpec), never by changing how the kit builds or checks them.
@@ -56,7 +57,7 @@ export const CORE = [
 const UNCOUNTED = /(^|\/)package-lock\.json$/;
 
 /** Game code, where drawing calls would mean art made by code. God's View's charts are not game art. */
-const GAME_CODE = /^packages\/(client|shared)\/src\/(?!gods-view)[^/]+\.ts$/;
+const GAME_CODE = /^packages\/(client|shared)\/src\/(?!gods-view(?:\.ts$|\/)).+\.ts$/;
 /** Canvas and Phaser calls that draw shapes or colour pixels. */
 const DRAWING = /\b(getContext\s*\(|fillRect|strokeRect|beginPath|quadraticCurveTo|bezierCurveTo|roundRect|createLinearGradient|createRadialGradient|add\.graphics|generateTexture)\b|\.(arc|ellipse)\s*\(/;
 

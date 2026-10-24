@@ -108,6 +108,14 @@ export const BUILDING_STYLES: Record<string, BuildingStyle> = {
   ...LAND_BUILDING_STYLES,
 };
 
+/**
+ * The styles that stand as tall cutaway walls instead of a kit house: the
+ * caves, and Old Bramble's hollow tree (the Owner's choice, 2026-10-24).
+ * Every other style, a wished building's too, is built by the kit, so it
+ * needs a kit look and a floor of whole bays (tests check both).
+ */
+export const WALLED_STYLES: readonly string[] = ['bramble-cottage', 'woods-cave', 'shore-sea-cave', 'desert-tomb'];
+
 /** The style whose inside tiles stand in for a building whose own are not painted yet. */
 export const FALLBACK_BUILDING_STYLE = 'bramble-cottage';
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ARCANUM_SIZE, BUILDING_STYLES, WORLD_REGIONS, buildingKit, building, generateRegion, type Building, type RegionMap } from '../src/index.ts';
+import { ARCANUM_SIZE, BUILDING_STYLES, WALLED_STYLES, WORLD_REGIONS, buildingKit, building, generateRegion, type Building, type RegionMap } from '../src/index.ts';
 
-const { kitHouse, BAY_TILES, KitBuilding, shapeChecks } = buildingKit;
+const { kitHouse, BAY_TILES, KitBuilding, KIT_LOOKS, shapeChecks } = buildingKit;
 
 /** An empty map to build on. */
 function blank(size = 64): RegionMap {
@@ -80,5 +80,22 @@ describe('kit houses for the game\'s buildings', () => {
     expect(left![castle.spec.D - 1]).toBeUndefined();
     // A floor two tiles wide is one bay, under the castle's corner towers.
     expect(kitHouse(made(2, 4, 'woods-castle'))).toBeUndefined();
+  });
+
+  it('gives every building style a kit look, wished ones too, except the caves and Old Bramble\'s tree', () => {
+    for (const [id, style] of Object.entries(BUILDING_STYLES)) {
+      if (WALLED_STYLES.includes(id)) expect(style.kit, `${id} stands as tall walls`).toBeUndefined();
+      else expect(KIT_LOOKS[style.kit ?? ''], `${id} needs a kit look from building-kit/looks.ts`).toBeDefined();
+    }
+  });
+
+  it('stands every building in every land as a kit house that passes its checks, unless it stands as walls', () => {
+    for (const region of WORLD_REGIONS) {
+      for (const b of generateRegion(region).buildings.filter((x) => !WALLED_STYLES.includes(x.style))) {
+        const house = kitHouse(b);
+        expect(house, `${region.id} ${b.style}: its floor and doorway must fall on the kit's two-tile bays`).toBeDefined();
+        expect(shapeChecks(new KitBuilding(house!.spec)).filter((c) => !c.ok).map((c) => c.check), `${region.id} ${b.style}`).toEqual([]);
+      }
+    }
   });
 });

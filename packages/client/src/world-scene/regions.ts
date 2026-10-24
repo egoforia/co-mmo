@@ -12,10 +12,11 @@ import {
   rand2,
   stairsLabel,
   storeyAt,
+  type ArtManifest,
   type Light,
   type RegionMap,
 } from '@co-mmo/shared';
-import { type HouseArt, type HouseSource, standHouse } from '../kit-house-view.ts';
+import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../kit-house-view.ts';
 import { dropLight, makeLight, placeLight } from '../lights.ts';
 import { PROJECTION } from '../projection.ts';
 import {
@@ -133,7 +134,7 @@ export function drawNearChunks(
  * Draws a region at its square in the world: its buildings and landmarks
  * now, its ground, trees and rocks in chunks as we come near (drawNearChunks).
  */
-export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string): DrawnRegion {
+export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, art: ArtManifest): DrawnRegion {
   const ox = map.def.at.x * map.width;
   const oy = map.def.at.y * map.height;
   const before = new Set(scene.children.list);
@@ -207,7 +208,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string):
       objects: [layer, ...rockWalls(scene, rows, ox + storey.x, oy + storey.y, storey.style, storey.art, tilemaps, storey.floor > 0 || Boolean(storey.open), true, false, storey.floor)],
     };
   });
-  placeLandmarks(scene, map, ox, oy, views, floors);
+  placeLandmarks(scene, map, ox, oy, views, floors, art);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);
   const objects = scene.children.list.filter((o) => !before.has(o));
   const lamps = placeLamps(scene, map, ox, oy, views);
@@ -215,17 +216,24 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string):
 }
 
 /** Landmarks: set pieces out in the land, furniture inside buildings, and furniture on the floors above and below. */
-export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): void {
+export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[], art: ArtManifest): void {
   for (const l of map.landmarks) {
     if (!scene.textures.exists(l.asset)) continue;
-    const feet = landmarkFeet(l, ox, oy);
-    const at = PROJECTION.toScreen(feet.x, feet.y);
+    const { width, height } = l.footprint;
+    const left = ox + l.x - width / 2;
+    const top = oy + l.y - height;
+    const tiles = { left, top, right: left + width, bottom: top + height };
     const floor = l.floor ?? 0;
-    const img = scene.add.image(at.x, at.y - floorLift(floor), l.asset).setOrigin(0.5, 0.92);
-    img.setDepth(floorDepthOffset(floor) + PROJECTION.depth(feet.x, feet.y));
+    const lift = floorLift(floor);
+    const depthOff = floorDepthOffset(floor);
+    const parts = standOnTiles(scene, l.asset, tiles, art[l.asset]?.view === 'isometric');
+    for (const part of parts) {
+      part.y -= lift;
+      part.setDepth(part.depth + depthOff);
+    }
     const [tx, ty] = [Math.floor(l.x), Math.floor(l.y - 0.01)];
-    if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(img);
-    else views.find((v) => within(v.building, tx, ty))?.inside.push(img);
+    if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(...parts);
+    else views.find((v) => within(v.building, tx, ty))?.inside.push(...parts);
   }
 }
 

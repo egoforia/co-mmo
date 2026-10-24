@@ -81,6 +81,8 @@ interface WalkerView {
   url?: string;
   place: Place;
   walks: Partial<Record<Facing, WalkStrip>>;
+  runs?: Partial<Record<Facing, WalkStrip>>;
+  attacks?: Partial<Record<Facing, WalkStrip>>;
   lost: Partial<Record<Facing, WalkVersion[]>>;
   standing: Record<Facing, StandingView>;
   estimateUsd: number;
@@ -278,7 +280,7 @@ function peoplePage(tab: 'characters' | 'monsters', page?: string): string {
     ${pagesNav(tab, names, chosen)}
     <h2>${esc(chosen)}</h2>
     ${own.length ? `<h3>Pictures</h3><div class="art-grid">${own.map(itemHtml).join('')}</div>` : ''}
-    ${walking.map((w) => `<h3>Walking animations</h3>${walkerHtml(w)}`).join('')}`;
+    ${walking.map((w) => `<h3>Animations</h3>${walkerHtml(w)}`).join('')}`;
 }
 
 function itemsPage(page?: string): string {
@@ -374,6 +376,8 @@ function walkerHtml(w: WalkerView): string {
       <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)}</small></div>
         <form class="form walker-body">${bodyPick}</form></header>
       ${waysHtml(w)}
+      ${runsHtml(w)}
+      ${attacksHtml(w)}
       <details class="top-down"><summary>Top-down walks (retired) · ${made === 4 ? 'walks every way' : made ? `walks ${made} of 4 ways` : 'no walks'}</summary>
         <p class="note">The top-down view is retired, so these are no longer painted. They are kept so walkers still move while their isometric walks are missing, and so earlier versions can be put back.</p>
         <div class="walks">${DIRECTIONS.map(direction).join('')}</div>
@@ -413,6 +417,48 @@ function waysHtml(w: WalkerView): string {
     <section class="ways"><h4>The isometric ways${summary ? ` · ${summary}` : ''}</h4>
       <p class="note">Walkers face four ways, halfway between the front or back and a side. The four are painted together on one sheet from the approved picture, so they keep one look, then cut into a standing picture each; one way can be painted again on its own, from the others. A way's walk clip is made from its picture; until then it glides in it.</p>
       <p><button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways', walker: w.id }))}">${missing === 4 ? 'Paint the four ways together' : 'Paint all four again, together'} · about ${usd(w.viewUsd)}</button></p>
+      <div class="walks">${WAYS.map(way).join('')}</div>
+    </section>`;
+}
+
+/**
+ * Running animations in the four isometric directions.
+ */
+function runsHtml(w: WalkerView): string {
+  const running = WAYS.filter(([d]) => w.runs?.[d]).length;
+  if (!running) return '';
+  const way = ([d, label]: [IsoWay, string]) => {
+    const strip = w.runs?.[d];
+    return `
+      <div class="direction">
+        ${stripHtml(strip, label, 110)}
+        <small class="note">${strip ? `${strip.frames} frames · ${strip.cycleSeconds}s` : 'no run yet'}</small>
+      </div>`;
+  };
+  return `
+    <section class="ways runs"><h4>Running animations · ${running} of 4</h4>
+      <p class="note">Athletic 4-way running cycles, synchronized for isometric movement.</p>
+      <div class="walks">${WAYS.map(way).join('')}</div>
+    </section>`;
+}
+
+/**
+ * Basic attack animations in the four isometric directions.
+ */
+function attacksHtml(w: WalkerView): string {
+  const attacking = WAYS.filter(([d]) => w.attacks?.[d]).length;
+  if (!attacking) return '';
+  const way = ([d, label]: [IsoWay, string]) => {
+    const strip = w.attacks?.[d];
+    return `
+      <div class="direction">
+        ${stripHtml(strip, label, 110)}
+        <small class="note">${strip ? `${strip.frames} frames · ${strip.cycleSeconds}s` : 'no attack yet'}</small>
+      </div>`;
+  };
+  return `
+    <section class="ways attacks"><h4>Basic attack animations · ${attacking} of 4</h4>
+      <p class="note">Unarmed forward claw/fist strike animations in the four isometric directions.</p>
       <div class="walks">${WAYS.map(way).join('')}</div>
     </section>`;
 }

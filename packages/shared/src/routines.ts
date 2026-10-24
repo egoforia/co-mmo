@@ -39,6 +39,30 @@ export const NPC_ROUTINES: Record<string, Partial<Routine>> = {
   'cactus-elder': {
     night: { place: 'work', words: 'The Cactus Elder is watching the stars.' },
   },
+  'high-priest-cassian': {
+    dawn: { place: 'work', words: 'High Priest Cassian is offering the morning prayers for the city.' },
+    day: { place: 'work', words: 'High Priest Cassian traces a blessing over you: "May the divine bell shield you from harm."' },
+    dusk: { place: 'square', words: 'High Priest Cassian walks the plaza, sprinkling holy water upon travelers.' },
+    night: { place: 'work', words: 'High Priest Cassian stands before the crypt gate in anxious vigil.' },
+  },
+  'brother-paul': {
+    dawn: { place: 'work', words: 'Brother Paul is grinding fresh ink for the holy scrolls.' },
+    day: { place: 'work', words: 'Brother Paul looks up from his parchment: "Knowledge of the heavens is our greatest fortress."' },
+    dusk: { place: 'square', words: 'Brother Paul stretches his arms and takes in the evening air in the square.' },
+    night: { place: 'work', sleep: true, words: 'Brother Paul nods off over an illuminated manuscript.' },
+  },
+  'mother-elena': {
+    dawn: { place: 'work', words: 'Mother Elena is baking warm loaves and stoking the tavern hearth.' },
+    day: { place: 'work', words: 'Mother Elena welcomes you warmly: "Rest your feet, traveller! A bowl of stew will do you good."' },
+    dusk: { place: 'work', words: 'Mother Elena pours foaming mugs for the weary pilgrims.' },
+    night: { place: 'work', words: 'Mother Elena whispers nervously: "Did you hear that low groan? It sounded like it came from beneath the cellar stones..."' },
+  },
+  'gravedigger-joshua': {
+    dawn: { place: 'work', words: 'Joshua leans on his spade, examining the morning mist over the headstones.' },
+    day: { place: 'work', words: 'Joshua shakes his head: "The ground feels uneasy these days... the roots are turning black."' },
+    dusk: { place: 'square', words: 'Joshua joins the gathering in the square, eager for company away from the graveyard.' },
+    night: { place: 'work', words: 'Joshua clutches a lantern with trembling hands, watching the sealed mausoleum door.' },
+  },
 };
 
 /** What someone does in each part of the day. */

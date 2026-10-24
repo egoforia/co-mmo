@@ -52,7 +52,7 @@ export interface BuildingStyle {
 }
 
 /** The parts of a kit building's spec a building style may choose. */
-export type KitShape = Pick<BuildingSpec, 'roof' | 'battlements' | 'towers' | 'dome'>;
+export type KitShape = Pick<BuildingSpec, 'roof' | 'battlements' | 'towers' | 'dome'> & { numStoreys?: number };
 
 /** The parts of a building that get their own picture. */
 export type BuildingPart = 'exterior' | 'floor' | 'wall' | 'door';

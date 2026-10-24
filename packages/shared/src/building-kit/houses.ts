@@ -4,7 +4,7 @@ import type { Building } from '../world.ts';
 import { KIT_LOOKS } from './looks.ts';
 import type { Corner } from './crown.ts';
 import type { Side } from './sizes.ts';
-import type { BuildingSpec, Opening } from './spec.ts';
+import type { BuildingSpec, Opening, StoreyLayout } from './spec.ts';
 
 // The game's buildings the kit builds. In the game a building's walls are a
 // ring of wall tiles round its floor; its kit house stands on that floor, its
@@ -64,19 +64,29 @@ export function kitHouse(b: Building): KitHouse | undefined {
   const south: Record<number, Opening> = { [door]: 'door' };
   for (let j = door % 2; j < D; j += 2) if (j !== door) south[j] = 'window';
   const shape = style.kitShape ?? {};
-  const storey = { left: south, front: everyOther(W), right: everyOther(D), back: everyOther(W) };
-  // A tower stands over the end bays of the two walls at its corner: no window there, and no house if the door is.
-  for (const t of shape.towers ?? []) {
-    for (const [side, end] of TOWER_ENDS[t.corner]) {
-      const bay = end === 'start' ? 0 : (side === 'front' || side === 'back' ? W : D) - 1;
-      if (storey[side][bay] === 'door') return undefined;
-      delete storey[side][bay];
+  const numStoreys = shape.numStoreys ?? 1;
+  const storeys: StoreyLayout[] = [];
+  for (let s = 0; s < numStoreys; s++) {
+    const isGround = s === 0;
+    const curStorey = {
+      left: isGround ? { ...south } : everyOther(D),
+      front: everyOther(W),
+      right: everyOther(D),
+      back: everyOther(W),
+    };
+    for (const t of shape.towers ?? []) {
+      for (const [side, end] of TOWER_ENDS[t.corner]) {
+        const bay = end === 'start' ? 0 : (side === 'front' || side === 'back' ? W : D) - 1;
+        if (isGround && curStorey[side][bay] === 'door') return undefined;
+        delete curStorey[side][bay];
+      }
     }
+    storeys.push(curStorey);
   }
   const spec: BuildingSpec = {
     W,
     D,
-    storeys: [storey],
+    storeys,
     ...shape,
     // Beside the ridge, which runs along the longer side, towards the back; a flat roof has none.
     ...(shape.roof === 'flat' ? {} : { chimney: W >= D ? [Math.round(W * 7) / 10, D / 2 + 0.25] : [W / 2 + 0.25, Math.round(D * 7) / 10] }),

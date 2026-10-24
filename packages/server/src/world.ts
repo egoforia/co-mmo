@@ -11,6 +11,8 @@ import {
   cellBeyond,
   linkRegions,
   nearestOpenSide,
+  collides,
+  outsideSide,
   type RegionDef,
   type Side,
   maxHp,
@@ -18,6 +20,7 @@ import {
   type ChatMessage,
   type CreatorCredit,
   type ClientMessage,
+  type TeleportMessage,
   type ContentEntry,
   type NpcPlacement,
   type PartyActionMessage,
@@ -468,7 +471,129 @@ export class World {
     if (message.t === 'party') return this.partyAction(playerId, message);
     // On the way to another region: the step is dropped, and the player's own screen catches up from the last one applied.
     if (this.moving.has(playerId)) return;
+    if (message.t === 'teleport') return this.teleport(playerId, message);
     this.regionOf(playerId)?.handle(playerId, message);
+  }
+
+  /** Finds a region by id, biome, or name (case-insensitive, exact then partial). */
+  findRegion(query: string): RegionHandle | undefined {
+    const q = query.trim().toLowerCase();
+    if (!q) return undefined;
+    const direct = this.regions.get(q);
+    if (direct) return direct;
+
+    for (const r of this.regions.values()) {
+      if (r.def.id.toLowerCase() === q) return r;
+      if (r.def.biome.toLowerCase() === q) return r;
+      if (r.def.name.toLowerCase() === q) return r;
+      if (r.def.name.toLowerCase().replace(/^the\s+/, '') === q) return r;
+    }
+
+    for (const r of this.regions.values()) {
+      if (r.def.id.toLowerCase().includes(q)) return r;
+      if (r.def.biome.toLowerCase().includes(q)) return r;
+      if (r.def.name.toLowerCase().includes(q)) return r;
+    }
+    return undefined;
+  }
+
+  /** Teleports a player to a coordinate, floor, or different region/biome. */
+  teleport(playerId: string, message: TeleportMessage): void {
+    const fromRegion = this.regionOf(playerId);
+    if (!fromRegion) return;
+
+    let targetRegion = fromRegion;
+    if (message.region) {
+      const found = this.findRegion(message.region);
+      if (!found) {
+        const available = [...this.regions.values()].map((r) => `${r.def.name} (${r.def.id})`).join(', ');
+        this.sendTo(playerId, {
+          t: 'error',
+          code: 'TELEPORT_FAILED',
+          message: `Unknown region or biome "${message.region}". Available: ${available}`,
+        });
+        return;
+      }
+      targetRegion = found;
+    }
+
+    const hasCoords = message.x !== undefined && message.y !== undefined;
+    const targetX = hasCoords ? message.x! : targetRegion.map.spawn.x;
+    const targetY = hasCoords ? message.y! : targetRegion.map.spawn.y;
+    const targetFloor = message.floor ?? 0;
+
+    // Bounds check
+    if (
+      outsideSide(targetRegion.map, targetX, targetY) ||
+      targetX < 0.5 ||
+      targetY < 0.5 ||
+      targetX >= targetRegion.map.width - 0.5 ||
+      targetY >= targetRegion.map.height - 0.5
+    ) {
+      this.sendTo(playerId, {
+        t: 'error',
+        code: 'TELEPORT_BLOCKED',
+        message: `Cannot teleport: coordinate (${targetX}, ${targetY}) is outside ${targetRegion.def.name}.`,
+      });
+      return;
+    }
+
+    // Collision check
+    if (collides(targetRegion.map, targetX, targetY, targetFloor)) {
+      const floorDesc =
+        targetFloor > 0
+          ? ` on Floor ${targetFloor}`
+          : targetFloor < 0
+            ? ` in Catacombs B${Math.abs(targetFloor)}`
+            : '';
+      this.sendTo(playerId, {
+        t: 'error',
+        code: 'TELEPORT_BLOCKED',
+        message: `Cannot teleport: coordinate (${targetX}, ${targetY})${floorDesc} is blocked.`,
+      });
+      return;
+    }
+
+    // Execute teleport
+    const name = fromRegion.nameOf(playerId) ?? 'Someone';
+    const isDifferentRegion = targetRegion.def.id !== fromRegion.def.id;
+    const leaveAnnounce = isDifferentRegion ? `${name} teleported to ${targetRegion.def.name}.` : '';
+    const arriveAnnounce = isDifferentRegion ? `${name} arrived in ${targetRegion.def.name}.` : '';
+
+    this.moving.add(playerId);
+    this.track(
+      settle(fromRegion.remove(playerId, leaveAnnounce), (moving) => {
+        this.moving.delete(playerId);
+        if (!moving || this.where.get(playerId) !== fromRegion.def.id) return;
+        const dest = this.regions.get(targetRegion.def.id) ?? this.home;
+        if (isDifferentRegion) {
+          this.where.set(playerId, dest.def.id);
+        }
+        dest.join(
+          moving.info,
+          moving.conn,
+          { x: targetX, y: targetY, floor: targetFloor },
+          moving.character,
+          arriveAnnounce,
+          { ...moving.carry, inputs: [], floor: targetFloor }
+        );
+        if (isDifferentRegion) {
+          this.onEvent?.('enter', playerId, { region: dest.def.id });
+          this.creatorCredit(dest.def.id, playerId, 'visit');
+          this.partyChanged(playerId);
+        }
+        const floorDesc =
+          targetFloor > 0
+            ? ` · Floor ${targetFloor}`
+            : targetFloor < 0
+              ? ` · Catacombs B${Math.abs(targetFloor)}`
+              : '';
+        this.sendTo(playerId, {
+          t: 'notice',
+          text: `Teleported to ${dest.def.name} at (${Math.round(targetX)}, ${Math.round(targetY)}${floorDesc}).`,
+        });
+      })
+    );
   }
 
   /** A change to an online player's character, wherever they are; false when they are not online. */

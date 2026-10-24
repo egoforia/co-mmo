@@ -28,6 +28,41 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[] })
     colors: { main: 'cream', secondary: 'pale gold', accent: 'rose' }, details: ['prayer beads', 'a small lantern'],
     mood: 'serene, kind', extra: { role: 'shrine keeper' },
   },
+  {
+    id: 'bramble-ursine', name: 'Bramble Ursine', kind: 'npc', biome: 'sanctum',
+    silhouetteHook: 'broad heavy-set torso, rounded furry bear ears atop a human crown, faceted bark pauldrons',
+    body: 'sturdy beastfolk warrior, digitigrade paws, clawed hands', materials: ['petrified bark', 'fur', 'leather'],
+    colors: { main: 'bark brown', secondary: 'peat', accent: 'burnt umber' }, details: ['thick shaggy pelt', 'living bark spine plates'],
+    mood: 'steadfast, grounded', extra: { role: 'earth guardian' },
+  },
+  {
+    id: 'tide-lutran', name: 'Tide Lutran', kind: 'npc', biome: 'sanctum',
+    silhouetteHook: 'small rounded otter ears, stiff whisker planes, faceted mother-of-pearl scaled vest, rudder-tail',
+    body: 'sleek agile beastfolk scout, webbed clawed hands', materials: ['sea-mink pelt', 'mother-of-pearl scales'],
+    colors: { main: 'sea-mink brown', secondary: 'kelp green', accent: 'coral salmon' }, details: ['whiskers', 'scaled vest', 'thick tail'],
+    mood: 'curious, buoyant', extra: { role: 'coastal scout' },
+  },
+  {
+    id: 'zephyr-falcon', name: 'Zephyr Falcon', kind: 'npc', biome: 'sanctum',
+    silhouetteHook: 'backward-swept feather crest, sharp aquiline beak-lip, layered flight pinions along forearms',
+    body: 'lean raptor beastfolk ranger, digitigrade legs with scuted scales and talons', materials: ['feather pinions', 'scuted scales', 'silk'],
+    colors: { main: 'slate blue-gray', secondary: 'desert ochre', accent: 'falcon yellow' }, details: ['feather crest', 'cream-barred chest', 'four-toed talons'],
+    mood: 'vigilant, keen', extra: { role: 'wind ranger' },
+  },
+  {
+    id: 'dune-scorpid', name: 'Dune Scorpid', kind: 'npc', biome: 'sanctum',
+    silhouetteHook: 'segmented brass-and-charcoal chitin pectoral plates, three-pronged pincer-hands, arched stinger tail',
+    body: 'faceted arachnid beastfolk stalker, chitin-plated digitigrade legs', materials: ['basalt chitin', 'amber venom', 'desert cloth'],
+    colors: { main: 'charcoal basalt', secondary: 'pale brass', accent: 'amber' }, details: ['arched stinger bulb', 'desert sash', 'pincer thumbs'],
+    mood: 'patient, alert', extra: { role: 'sand stalker' },
+  },
+  {
+    id: 'sylvan-cervid', name: 'Sylvan Cervid', kind: 'npc', biome: 'sanctum',
+    silhouetteHook: 'horizontal velvet deer ears, wide branching velvet bone antlers with sage-lichen facet patches',
+    body: 'slender deer beastfolk shaman, digitigrade legs with cloven hooves', materials: ['velvet horn', 'willow bark', 'lichen'],
+    colors: { main: 'autumn fawn', secondary: 'sage green', accent: 'pale jade' }, details: ['dappled fawn chest', 'lichen patches on antlers', 'cloven hooves'],
+    mood: 'serene, mystical', extra: { role: 'mycelial seer' },
+  },
   // Whispering Woods
   {
     id: 'woods-moss', name: 'Mossy forest floor', kind: 'tile', biome: 'whispering-woods',

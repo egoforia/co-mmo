@@ -186,6 +186,14 @@ export class KitSheets {
       const tile = checked.tiles[name];
       textures[name] = await prefilter(T, tile ?? R[name]!.world, Boolean(tile));
     }
+    if (look !== 'timber-cottage') {
+      const fallback = await this.textures('timber-cottage');
+      for (const t of KIT_TEXTURES) {
+        if (!textures[t] && fallback.textures[t]) {
+          textures[t] = fallback.textures[t];
+        }
+      }
+    }
     return { textures, tiles: { ...TILE, ...checked.tiles }, report: checked.report, missing: KIT_TEXTURES.filter((t) => !textures[t]) };
   }
 

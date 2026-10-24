@@ -1,0 +1,35 @@
+{
+  "id": "bramble-ursine",
+  "description": {
+    "id": "bramble-ursine",
+    "name": "Bramble Ursine",
+    "kind": "npc",
+    "biome": "sanctum",
+    "silhouetteHook": "broad heavy-set torso, rounded furry bear ears atop a human crown, faceted bark pauldrons",
+    "body": "sturdy beastfolk warrior, digitigrade paws, clawed hands",
+    "materials": [
+      "petrified bark",
+      "fur",
+      "leather"
+    ],
+    "colors": {
+      "main": "bark brown",
+      "secondary": "peat",
+      "accent": "burnt umber"
+    },
+    "details": [
+      "thick shaggy pelt",
+      "living bark spine plates"
+    ],
+    "mood": "steadfast, grounded",
+    "extra": {
+      "role": "earth guardian"
+    }
+  },
+  "prompt": "Stylised low-poly isometric fantasy game character: Bramble Ursine (earth guardian). broad heavy-set torso, rounded furry bear ears atop a human crown, faceted bark pauldrons. Body: sturdy beastfolk warrior, digitigrade paws, clawed hands. Palette: bark brown, peat, burnt umber. Mood: steadfast, grounded.",
+  "provider": "wan",
+  "model": "wan-3.0",
+  "styleVersion": 2,
+  "mimeType": "image/png",
+  "createdAt": "2026-10-21T21:13:19.720Z"
+}

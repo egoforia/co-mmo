@@ -14,6 +14,12 @@ export interface ArtEntry {
    * over the art shipped with the game; other painted art never does.
    */
   redone?: number;
+  /**
+   * Painted for the isometric camera: seen from its corner, its base filling
+   * the diamond of the tiles it stands on, so the game stands it on them at
+   * the footprint's width. Pictures without it were painted top-down.
+   */
+  view?: 'isometric';
 }
 
 export type ArtManifest = Record<string, ArtEntry>;

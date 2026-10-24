@@ -1,4 +1,4 @@
-import { ISO_WAYS, TILE_PIXELS, WALK_DIRECTIONS, facingSide, isWalkDirection, walkDirection, type Facing, type IsoWay } from '@co-mmo/shared';
+import { ISO_TILE, ISO_WAYS, TILE_PIXELS, WALK_DIRECTIONS, facingSide, isWalkDirection, walkDirection, type Facing, type IsoWay } from '@co-mmo/shared';
 
 /** A point or step on screen, in game pixels before the camera's zoom. */
 export interface ScreenPoint {
@@ -57,9 +57,9 @@ export const TOP_DOWN: Projection = {
   face: (dx, dy, before) => walkDirection(dx, dy, isWalkDirection(before) ? before : 'front'),
 };
 
-/** Half a ground diamond across and down: each tile is drawn 160 by 80 pixels. */
-const HALF_W = 80;
-const HALF_H = 40;
+/** Half a ground diamond across and down: each tile is drawn 160 by 80 pixels (ISO_TILE). */
+const HALF_W = ISO_TILE.width / 2;
+const HALF_H = ISO_TILE.height / 2;
 
 /**
  * The isometric camera (the camera plan of 2026-10-18): turned 45 degrees

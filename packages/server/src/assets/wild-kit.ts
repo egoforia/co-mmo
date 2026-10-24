@@ -6,8 +6,8 @@ import type { KitAsset } from './kit.ts';
 import { pictureName } from './names.ts';
 import { makeSeamless, removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
-import { buildPrompt } from './style.ts';
-import { fitToBox } from './wish-art.ts';
+import { buildPrompt, paintedFootprint } from './style.ts';
+import { fitToBox, fitToFootprint } from './wish-art.ts';
 
 // The biome kit for biomes no launch region uses: the ground, water, trees
 // and rocks a wished region is built from. Each biome's kit is painted once,
@@ -152,7 +152,8 @@ export async function paintKitAsset(
       break;
     }
   }
-  const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${buildPrompt(asset)}\nAlso: ${extra.note.trim()}` : buildPrompt(asset);
+  const words = buildPrompt(asset, paintedFootprint(asset.id, asset.kind));
+  const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${words}\nAlso: ${extra.note.trim()}` : words;
   const image = await provider.generate({ prompt, references, labels: sent.map(pictureName) });
   // The untouched picture is kept, so it can be processed again for free.
   await mkdir(resolve(outDir, 'raw'), { recursive: true });
@@ -166,18 +167,28 @@ export async function processKitAsset(asset: KitAsset, raw: Buffer, outDir: stri
   const png = await sharp(raw).png().toBuffer();
   let out: Buffer;
   let size: { width: number; height: number };
+  let view: ArtEntry['view'];
   if (asset.kind === 'tile') {
     const cropped = asset.centerCrop ? await cropCenter(png, asset.centerCrop) : png;
     out = await sharp(await makeSeamless(cropped)).resize(128, 128, { fit: 'cover', kernel: 'lanczos3' }).png().toBuffer();
     size = { width: 128, height: 128 };
   } else {
     const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
-    size = fit;
-    out = await fitToBox(keyed, size);
+    // Painted standing on its tiles, it is sized to them, not to its old box.
+    const footprint = paintedFootprint(asset.id, asset.kind);
+    if (footprint) {
+      out = await fitToFootprint(keyed, footprint);
+      const { width = 0, height = 0 } = await sharp(out).metadata();
+      size = { width, height };
+      view = 'isometric';
+    } else {
+      size = fit;
+      out = await fitToBox(keyed, size);
+    }
   }
   await mkdir(outDir, { recursive: true });
   await writeFile(resolve(outDir, `${asset.id}.png`), out);
-  return { file: `${asset.id}.png`, kind: asset.kind, ...size };
+  return { file: `${asset.id}.png`, kind: asset.kind, ...size, ...(view ? { view } : {}) };
 }
 
 async function cropCenter(png: Buffer, share: number): Promise<Buffer> {

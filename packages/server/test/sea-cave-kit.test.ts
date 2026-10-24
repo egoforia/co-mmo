@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SEA_CAVE_MOD, SEA_CAVE_PIECES, switchMod } from '@co-mmo/shared';
+import { SEA_CAVE_MOD, SEA_CAVE_PIECES, isoSpan, switchMod } from '@co-mmo/shared';
 import { BIOME_KIT } from '../src/assets/kit.ts';
 import { pictureName } from '../src/assets/names.ts';
 import { SEA_CAVE_KIT, kitPieces, seaCaveBox } from '../src/assets/sea-cave-kit.ts';
 import type { ImageRequest } from '../src/assets/provider.ts';
-import { TILE_FRAMING, buildPrompt } from '../src/assets/style.ts';
+import { TILE_FRAMING, buildPrompt, footprintWords } from '../src/assets/style.ts';
+import { STYLE } from '../src/assets/style-profile.ts';
 import { paintKitAsset } from '../src/assets/wild-kit.ts';
 
 describe("the Smugglers' Sea Cave Art Kit pictures", () => {
@@ -58,5 +59,23 @@ describe("the Smugglers' Sea Cave Art Kit pictures", () => {
     const { references } = await paintKitAsset(face, provider, anchors, painted);
     expect(references).toEqual(['sea-cave-wall', 'sea-cave-floor']);
     expect(asked[0]!.references).toHaveLength(2);
+  });
+
+  it('paints a prop standing on its tiles in the isometric style, sized to their diamond', async () => {
+    const boulder = SEA_CAVE_KIT.find((a) => a.id === 'sea-cave-boulder')!;
+    const dir = await mkdtemp(join(tmpdir(), 'painted-'));
+    // A grey boulder on magenta, as the model paints it.
+    const rock = await sharp({ create: { width: 300, height: 150, channels: 3, background: '#7a7a80' } }).png().toBuffer();
+    const png = await sharp({ create: { width: 512, height: 512, channels: 3, background: '#ff00ff' } }).composite([{ input: rock, left: 106, top: 200 }]).png().toBuffer();
+    const asked: ImageRequest[] = [];
+    const provider = { id: 'gemini', model: 'gemini-3.1-flash-image', generate: async (r: ImageRequest) => (asked.push(r), { mimeType: 'image/png', data: png }) };
+    const { entry } = await paintKitAsset(boulder, provider, dir, dir);
+    if (STYLE.camera !== 'isometric') {
+      expect(asked[0]!.prompt).not.toContain('Footprint:');
+      expect(entry.view).toBeUndefined();
+      return;
+    }
+    expect(asked[0]!.prompt).toContain(footprintWords({ width: 2, height: 1 }));
+    expect(entry).toMatchObject({ width: isoSpan(2, 1), height: 120, view: 'isometric' });
   });
 });

@@ -1,4 +1,4 @@
-import { BIOMES, type BiomeId } from '@co-mmo/shared';
+import { BIOMES, artFootprint, type BiomeId, type Footprint } from '@co-mmo/shared';
 
 import { STYLE } from './style-profile.ts';
 
@@ -46,8 +46,25 @@ export interface AssetDescription {
   framing?: string;
 }
 
-/** Builds the full text prompt: base style, biome signatures, subject, things to avoid. */
-export function buildPrompt(d: AssetDescription): string {
+/**
+ * The tiles a picture is painted standing on: in an isometric style, the
+ * footprint of a set piece, prop or piece of furniture that has one; never in
+ * a top-down style, whose pictures are not fitted to their tiles.
+ */
+export function paintedFootprint(id: string, kind = 'set-piece'): Footprint | undefined {
+  if (STYLE.camera !== 'isometric' || kind === 'tile' || kind === 'effect') return undefined;
+  return artFootprint(id);
+}
+
+/** How a thing is painted standing on its footprint, so the game can stand it on those tiles. */
+export function footprintWords(fp: Footprint): string {
+  const tiles = (n: number) => (n === 1 ? 'one tile' : `${n} tiles`);
+  const sides = fp.width === fp.height ? `${tiles(fp.width)} along each side` : `${tiles(fp.width)} from the left corner down to the front corner, and ${tiles(fp.height)} from the front corner up to the right corner`;
+  return `Footprint: it stands on a diamond-shaped patch of ground ${sides}. Its base fills that patch exactly, from the patch's left corner to its right corner, and nothing on the ground reaches past it.`;
+}
+
+/** Builds the full text prompt: base style, biome signatures, subject, the tiles it stands on, things to avoid. */
+export function buildPrompt(d: AssetDescription, footprint?: Footprint): string {
   const tile = d.kind === 'tile';
   const lines = [BASE_PROMPT, d.framing ?? (tile ? TILE_FRAMING : SPRITE_FRAMING)];
   if (d.biome !== 'any') {
@@ -66,6 +83,7 @@ export function buildPrompt(d: AssetDescription): string {
     `Mood: ${d.mood}.`,
   ].filter(Boolean);
   lines.push(`Subject: ${subject.join(' ')}`);
+  if (footprint) lines.push(footprintWords(footprint));
   lines.push(`Avoid: ${[...NEGATIVE_PROMPT, ...(tile ? TILE_NEGATIVE : SPRITE_NEGATIVE)].join(', ')}.`);
   return lines.join('\n');
 }

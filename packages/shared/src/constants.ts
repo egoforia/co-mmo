@@ -21,3 +21,15 @@ export const MIN_NAME_LENGTH = 2;
  * tiles). The camera shows tiles at about half size on a 1080p screen.
  */
 export const TILE_PIXELS = 128;
+
+/**
+ * One ground tile in the isometric camera: a diamond 160 by 80 pixels. A
+ * thing standing on a footprint W tiles by D tiles is (W + D) half-diamonds
+ * across on screen.
+ */
+export const ISO_TILE = { width: 160, height: 80 } as const;
+
+/** How wide a footprint of `width` by `depth` tiles is on screen in the isometric camera, in pixels. */
+export function isoSpan(width: number, depth: number): number {
+  return ((width + depth) * ISO_TILE.width) / 2;
+}

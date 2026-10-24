@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
-import { ISO_WAYS, TURNTABLE_WAYS, heldBehind, isWalkDirection, type Facing, type IsoWay, type WalkDirection } from '@co-mmo/shared';
+import { ISO_WAYS, TURNTABLE_WAYS, heldBehind, type IsoWay } from '@co-mmo/shared';
 import { removeKeyBackground, removeKeySpill } from './postprocess.ts';
 import { countFigures, cutFigures, type Box } from './walk-frames.ts';
 import { KEY_COLOR } from './style.ts';
@@ -32,11 +32,7 @@ export const LOOK_GEAR: Record<string, Carried[]> = {
   // The walking looks carry nothing: their weapon or charm is drawn in hand by the game (held items).
 };
 
-const SEEN: Record<Facing, string> = {
-  front: 'facing the viewer, seen from the front',
-  right: 'facing right, seen exactly side-on: the face in profile points to the RIGHT edge of the picture and we see their left side',
-  back: 'facing away from the viewer, seen from behind, the face hidden',
-  left: 'facing left, seen exactly side-on: the face in profile points to the LEFT edge of the picture and we see their right side',
+const SEEN: Record<IsoWay, string> = {
   // The isometric camera's ways: turned exactly halfway, which the model drifts away from unless told both ends.
   // "Turned to the left" reads as the figure's own left (the picture's right), so each is named by the
   // picture's corner and the nearer shoulder instead.
@@ -47,7 +43,7 @@ const SEEN: Record<Facing, string> = {
 };
 
 /** The mirror of each isometric way, which the image model kept painting instead. */
-const WRONG_CORNER: Record<Exclude<Facing, WalkDirection>, string> = {
+const WRONG_CORNER: Record<IsoWay, string> = {
   'front-left': 'facing the lower-right corner',
   'front-right': 'facing the lower-left corner',
   'back-left': 'facing the upper-right corner',
@@ -59,27 +55,19 @@ const WRONG_CORNER: Record<Exclude<Facing, WalkDirection>, string> = {
  * left side" in general fail; naming each item and saying in front of or
  * behind the body works.
  */
-export function gearPlacement(gear: Carried[], direction: Facing): string {
+export function gearPlacement(gear: Carried[], direction: IsoWay): string {
   const where = (g: Carried): string => {
-    if (g.side === 'back') return direction === 'back' || direction === 'back-left' || direction === 'back-right' ? `the ${g.item} is fully seen on the back` : `the ${g.item} peeks out behind the body`;
-    if (direction === 'front') return `the ${g.item} is on the viewer's ${g.side === 'right' ? 'left' : 'right'}`;
-    if (direction === 'back') return `the ${g.item} is on the viewer's ${g.side}`;
+    if (g.side === 'back') return direction.startsWith('back-') ? `the ${g.item} is fully seen on the back` : `the ${g.item} peeks out behind the body`;
     // Turned halfway, the side turned towards the way they face is the far one, as the game draws held items.
-    if (!isWalkDirection(direction)) {
-      return heldBehind(direction, g.side)
-        ? `the ${g.item} is on the far side, BEHIND the body, partly hidden`
-        : `the ${g.item} is on the near side, IN FRONT of the body, fully visible`;
-    }
-    const near = (direction === 'right') === (g.side === 'left');
-    return near
-      ? `the ${g.item} is on the near side, IN FRONT of the body, fully visible`
-      : `the ${g.item} is on the far side, BEHIND the body, mostly hidden`;
+    return heldBehind(direction, g.side)
+      ? `the ${g.item} is on the far side, BEHIND the body, partly hidden`
+      : `the ${g.item} is on the near side, IN FRONT of the body, fully visible`;
   };
   return gear.length ? `In this view: ${gear.map(where).join('; ')}.` : '';
 }
 
 /** The prompt for painting a look standing still facing one way, from its front-facing reference. */
-export function viewPrompt(name: string, gear: Carried[], direction: Facing, references = 1): string {
+export function viewPrompt(name: string, gear: Carried[], direction: IsoWay, references = 1): string {
   const from = references > 1
     ? `from the ${references} reference images alone (all of them show ${name}: take every detail from them, such as how clothes hang seen from different sides)`
     : 'from the reference image alone';
@@ -89,7 +77,7 @@ export function viewPrompt(name: string, gear: Carried[], direction: Facing, ref
     'Paint them in the style described above, even where the reference images are painted in another style.',
     gearPlacement(gear, direction),
     `Exactly one figure, centred, with wide empty margin all around. Background: one flat pure magenta (${STYLE.keyColor.hex}), with no floor or shadow. No magenta in the character.`,
-    `Avoid: ${[...STYLE.negatives, 'second figure', 'turnaround sheet', 'cast shadow', ...(isWalkDirection(direction) ? [] : [WRONG_CORNER[direction]])].join(', ')}.`,
+    `Avoid: ${[...STYLE.negatives, 'second figure', 'turnaround sheet', 'cast shadow', WRONG_CORNER[direction]].join(', ')}.`,
   ].filter(Boolean).join('\n');
 }
 
@@ -124,15 +112,9 @@ export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = 
 export { TURNTABLE_WAYS };
 
 /** The prompt that makes a standing picture walk in place and come back to the same pose. */
-export function walkVideoPrompt(gear: Carried[], direction: Facing, body = 'two-legged'): string {
-  // Clips walking away drifted into a diagonal three-quarter view, and side walks slid their feet, so each is spelled out.
-  const facing = !isWalkDirection(direction)
-    ? `${SEEN[direction]}: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`
-    : direction === 'front'
-    ? 'towards the viewer, seen exactly from the front: the body stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways'
-    : direction === 'back'
-      ? 'away from the viewer, seen exactly from behind: the back stays square to the camera the whole time, never turning to a three-quarter view and never drifting sideways or diagonally'
-      : `to the ${direction}, seen exactly side-on: a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`;
+export function walkVideoPrompt(gear: Carried[], direction: IsoWay, body = 'two-legged'): string {
+  // Clips drifted out of the three-quarter turn and slid their feet, so both are spelled out.
+  const facing = `${SEEN[direction]}: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`;
   // A crawler has no arms to swing; its legs move in turns instead.
   const gait = body === 'two-legged' ? 'a brisk, cheerful walk with clear alternating steps and arms swinging' : 'a steady scuttle with its legs stepping in clear alternating sets';
   return [

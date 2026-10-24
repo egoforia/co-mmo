@@ -270,7 +270,6 @@ describe('paint requests kept across a restart', () => {
         requests.hold(r, new Promise<void>((done) => (finish = done)));
       },
       wish: () => undefined,
-      walk: () => undefined,
       view: () => undefined,
       ways: () => undefined,
       clip: () => undefined,

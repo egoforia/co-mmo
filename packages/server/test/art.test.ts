@@ -198,68 +198,66 @@ describe('the Art tab', () => {
     expect((await ask(base, owner.token, 'paint', { asset: 'no-such-thing' })).body.message).toMatch(/no picture/);
   });
 
-  it('makes a creature walk with the chosen body, and paints one direction again on its own', async () => {
+  it('makes a creature walk with the chosen body, makes one way again, and paints no top-down walks', async () => {
     const clips = video();
     const anchors = await tmp();
     await mkdir(join(anchors, 'raw'), { recursive: true });
     await writeFile(join(anchors, 'raw', 'desert-scarab.png'), await figure(300, 300, 150, 280));
     const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter: figurePainter(), video: clips, frames });
     const owner = account(store, 'Ego', 'owner');
-    const made = await ask(base, owner.token, 'walk', { walker: 'desert-scarab', body: 'six-legged' });
-    expect(made.status).toBe(202);
+    const way = { walker: 'desert-scarab', body: 'six-legged', direction: 'front-left' };
+    expect((await ask(base, owner.token, 'view', { walker: 'desert-scarab', direction: 'front-left' })).status).toBe(202);
     await app!.art.idle();
-    expect(clips.asked).toHaveLength(4);
+    expect((await ask(base, owner.token, 'clip', way)).status).toBe(202);
+    await app!.art.idle();
+    expect(clips.asked).toHaveLength(1);
     expect(clips.asked[0]!.prompt).toContain('scuttle');
     const { body: art } = await api(base, '/api/art', owner.token);
-    for (const d of WALK_DIRECTIONS) expect(art[walkArt('desert-scarab', d)]).toMatchObject({ kind: 'walk', frames: 12 });
+    expect(art[walkArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'walk', frames: 12 });
     const { body: jobs } = await api(base, '/api/admin/art/jobs', owner.token);
-    expect(jobs.jobs.filter((j: any) => j.media === 'clip' && j.status === 'done')).toHaveLength(4);
+    expect(jobs.jobs.filter((j: any) => j.media === 'clip' && j.status === 'done')).toHaveLength(1);
 
-    // Before painting the left walk again, the Owner sees the left standing picture it starts from and the prompt.
-    const review = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'walk', walker: 'desert-scarab', body: 'six-legged', directions: ['left'] });
+    // Before making the walk again, the Owner sees the standing picture it starts from and the prompt.
+    const review = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', ...way });
     expect(review.status).toBe(200);
     const [clip] = review.body.parts[0].recipe.steps;
-    expect(review.body.parts[0].recipe.steps).toHaveLength(1);
-    expect(clip).toMatchObject({ media: 'clip', model: clips.model, prompt: expect.stringContaining('to the left'), pictures: [{ name: 'First and last frame: Sun Scarab standing, facing left', url: expect.stringMatching(/^\/wished-art\/recipes\/pictures\//) }] });
+    expect(clip).toMatchObject({ media: 'clip', model: clips.model, prompt: expect.stringContaining('LOWER-LEFT corner'), pictures: [{ name: 'First and last frame: Sun Scarab standing, facing towards us and to the left', url: expect.stringMatching(/^\/wished-art\/recipes\/pictures\//) }] });
     expect((await fetch(`${base}${clip.pictures[0].url}`)).status).toBe(200);
-    // With its standing picture painted again too, that picture comes first and the clip starts from it.
-    const both = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'walk', walker: 'desert-scarab', body: 'six-legged', directions: ['left'], views: true });
-    expect(both.body.parts[0].recipe.steps.map((x: any) => x.media)).toEqual(['picture', 'clip']);
-    expect(both.body.parts[0].recipe.steps[0]).toMatchObject({ prompt: expect.stringContaining('facing left'), pictures: [{ name: "Sun Scarab's approved picture, on magenta" }] });
-    expect(both.body.parts[0].recipe.steps[1].pictures[0]).toMatchObject({ later: true });
-    expect(both.body.fingerprint).not.toBe(review.body.fingerprint);
     // An approval holds only for what was reviewed.
-    const stale = await api(base, '/api/admin/art/walk', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', directions: ['left'], approved: both.body.fingerprint });
+    const stale = await api(base, '/api/admin/art/clip', owner.token, 'POST', { ...way, prompt: 'It scuttles off.', approved: review.body.fingerprint });
     expect(stale.body.message).toMatch(/changed since you reviewed/);
-    expect(clips.asked).toHaveLength(4);
+    expect(clips.asked).toHaveLength(1);
 
-    const strip = join(artDir, 'walks', `${walkArt('desert-scarab', 'left')}.png`);
-    const firstLeft = await readFile(strip);
-    const again = await api(base, '/api/admin/art/walk', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', directions: ['left'], approved: review.body.fingerprint });
+    const strip = join(artDir, 'walks', `${walkArt('desert-scarab', 'front-left')}.png`);
+    const first = await readFile(strip);
+    const again = await api(base, '/api/admin/art/clip', owner.token, 'POST', { ...way, approved: review.body.fingerprint });
     expect(again.status).toBe(202);
     await app!.art.idle();
-    expect(clips.asked).toHaveLength(5);
-    expect(clips.asked[4]!.prompt).toContain('to the left');
-    expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))[walkArt('desert-scarab', 'left')].file).toContain('?v=');
+    expect(clips.asked).toHaveLength(2);
+    expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))[walkArt('desert-scarab', 'front-left')].file).toContain('?v=');
 
-    // The first left walk is kept with what made it, and goes back for free.
-    const left = async () => (await api(base, '/api/admin/art', owner.token)).body.walkers.find((w: any) => w.id === 'desert-scarab').walks.left;
-    const now = await left();
-    expect(now.recipe.steps.at(-1)).toMatchObject({ media: 'clip', prompt: expect.stringContaining('to the left') });
+    // The first walk is kept with what made it, and goes back for free.
+    const walk = async () => (await api(base, '/api/admin/art', owner.token)).body.walkers.find((w: any) => w.id === 'desert-scarab').walks['front-left'];
+    const now = await walk();
+    expect(now.recipe.steps.at(-1)).toMatchObject({ media: 'clip', prompt: expect.stringContaining('LOWER-LEFT corner') });
     expect(now.versions).toHaveLength(1);
     expect(now.versions[0]).toMatchObject({ frames: 12 });
     expect(now.versions[0].recipe.steps.map((x: any) => x.media)).toEqual(['picture', 'clip']);
     expect((await fetch(`${base}${now.versions[0].url}`)).status).toBe(200);
-    expect((await api(base, '/api/admin/art/restore-walk', owner.token, 'POST', { walker: 'desert-scarab', direction: 'left', version: now.versions[0].id })).status).toBe(200);
-    expect(clips.asked).toHaveLength(5);
-    expect((await left()).versions).toHaveLength(2);
-    expect(Buffer.compare(await readFile(strip), firstLeft)).toBe(0);
+    expect((await api(base, '/api/admin/art/restore-walk', owner.token, 'POST', { walker: 'desert-scarab', direction: 'front-left', version: now.versions[0].id })).status).toBe(200);
+    expect(clips.asked).toHaveLength(2);
+    expect((await walk()).versions).toHaveLength(2);
+    expect(Buffer.compare(await readFile(strip), first)).toBe(0);
 
-    const done = await ask(base, owner.token, 'walk', { walker: 'desert-scarab', body: 'six-legged' });
-    expect(done.status).toBe(409);
-    expect(done.body.message).toMatch(/already walks/);
+    // Walkers are painted in the isometric ways only: no top-down walks, pictures or clips.
+    expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'walk', walker: 'desert-scarab', body: 'six-legged' })).status).toBe(400);
+    for (const what of ['view', 'clip']) {
+      const topDown = await api(base, '/api/admin/art/review', owner.token, 'POST', { what, ...way, direction: 'left' });
+      expect(topDown.status).toBe(409);
+      expect(topDown.body.message).toMatch(/four isometric ways/);
+    }
+    expect(clips.asked).toHaveLength(2);
   }, 120_000);
-
   it('paints a standing picture on its own with the Owner\'s prompt, then makes its clip from it', async () => {
     const clips = video();
     const painted: string[] = [];
@@ -270,67 +268,64 @@ describe('the Art tab', () => {
     await writeFile(join(anchors, 'raw', 'desert-scarab.png'), await figure(300, 300, 150, 280));
     const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter, video: clips, frames });
     const owner = account(store, 'Ego', 'owner');
-    expect((await ask(base, owner.token, 'walk', { walker: 'desert-scarab', body: 'six-legged' })).status).toBe(202);
+    expect((await ask(base, owner.token, 'view', { walker: 'desert-scarab', direction: 'front-left' })).status).toBe(202);
     await app!.art.idle();
-    expect(clips.asked).toHaveLength(4);
     const scarab = async () => (await api(base, '/api/admin/art', owner.token)).body.walkers.find((w: any) => w.id === 'desert-scarab');
-    const before = (await scarab()).standing.left;
-    expect(before).toMatchObject({ approved: false, url: expect.stringMatching(/^\/wished-art\/walks\/views\/desert-scarab-left\.png/), versions: [] });
-    expect((await scarab()).standing.front).toMatchObject({ approved: true });
+    const before = (await scarab()).standing['front-left'];
+    expect(before).toMatchObject({ approved: false, url: expect.stringMatching(/^\/wished-art\/walks\/views\/desert-scarab-front-left\.png/), versions: [] });
 
     // The standing picture alone, with the Owner's own words: no clip is made.
-    const view = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'left', prompt: 'The scarab facing left, shell gleaming.' });
+    const words = 'The scarab facing the lower left, shell gleaming.';
+    const view = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left', prompt: words });
     expect(view.status).toBe(200);
     expect(view.body.parts[0].recipe.steps).toHaveLength(1);
-    expect(view.body.parts[0].recipe.steps[0]).toMatchObject({ media: 'picture', prompt: 'The scarab facing left, shell gleaming.', pictures: [{ name: "Sun Scarab's approved picture, on magenta" }] });
+    expect(view.body.parts[0].recipe.steps[0]).toMatchObject({ media: 'picture', prompt: words });
+    expect(view.body.parts[0].recipe.steps[0].pictures[0]).toMatchObject({ name: "Sun Scarab's approved picture, on magenta" });
     // The picture sent is the scarab itself, so the note against copying the pictures' subjects is left out.
     expect(view.body.parts[0].recipe.steps[0].note).toBeUndefined();
     expect(view.body.parts[0].recipe.steps[0].settings).toContain('the pictures show the subject itself, not only the style');
-    const usual = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'left' });
-    expect(usual.body.parts[0].recipe.steps[0].prompt).toContain('facing left');
+    const usual = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left' });
+    expect(usual.body.parts[0].recipe.steps[0].prompt).toContain('LOWER-LEFT corner');
     // The approval is for those words only.
-    const other = await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'left', approved: view.body.fingerprint });
+    const other = await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'front-left', approved: view.body.fingerprint });
     expect(other.status).toBe(409);
-    const painting = await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'left', prompt: 'The scarab facing left, shell gleaming.', approved: view.body.fingerprint });
+    const painting = await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'front-left', prompt: words, approved: view.body.fingerprint });
     expect(painting.status).toBe(202);
     await app!.art.idle();
-    expect(painted.at(-1)).toBe('The scarab facing left, shell gleaming.');
-    expect(clips.asked).toHaveLength(4);
-    const after = (await scarab()).standing.left;
-    expect(after.recipe.steps[0].prompt).toBe('The scarab facing left, shell gleaming.');
+    expect(painted.at(-1)).toBe(words);
+    expect(clips.asked).toHaveLength(0);
+    const after = (await scarab()).standing['front-left'];
+    expect(after.recipe.steps[0].prompt).toBe(words);
     expect(after.versions).toHaveLength(1);
     expect((await fetch(`${base}${after.url}`)).status).toBe(200);
 
-    // Another direction can be painted from several pictures: the approved one and the new left one.
-    const two = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'back', from: ['approved', 'left'] });
+    // Another way can be painted from the pictures chosen: the approved one and the new front-left one.
+    const two = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'back-left', from: ['approved', 'front-left'] });
     expect(two.status).toBe(200);
-    expect(two.body.parts[0].recipe.steps[0].pictures.map((p: any) => p.name)).toEqual(["Sun Scarab's approved picture, on magenta", 'Sun Scarab standing, facing left, on magenta']);
+    expect(two.body.parts[0].recipe.steps[0].pictures.map((p: any) => p.name)).toEqual(["Sun Scarab's approved picture, on magenta", 'Sun Scarab standing, facing towards us and to the left, on magenta']);
     expect(two.body.parts[0].recipe.steps[0].prompt).toContain('2 reference images');
-    expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'back', approved: two.body.fingerprint })).status).toBe(409);
-    expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'back', from: ['right'] })).status).toBe(200);
+    expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'back-left', from: ['approved'], approved: two.body.fingerprint })).status).toBe(409);
 
     // The clip starts and ends on that new picture, with its own edited words.
-    const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'left', prompt: 'It scuttles left, slowly.' });
+    const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'front-left', prompt: 'It scuttles along, slowly.' });
     expect(clip.status).toBe(200);
     const step = clip.body.parts[0].recipe.steps[0];
-    expect(step).toMatchObject({ media: 'clip', prompt: 'It scuttles left, slowly.', pictures: [{ name: 'First and last frame: Sun Scarab standing, facing left', url: expect.any(String) }] });
-    expect((await api(base, '/api/admin/art/clip', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', direction: 'left', prompt: 'It scuttles left, slowly.', approved: clip.body.fingerprint })).status).toBe(202);
+    expect(step).toMatchObject({ media: 'clip', prompt: 'It scuttles along, slowly.', pictures: [{ name: 'First and last frame: Sun Scarab standing, facing towards us and to the left', url: expect.any(String) }] });
+    expect((await api(base, '/api/admin/art/clip', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', direction: 'front-left', prompt: 'It scuttles along, slowly.', approved: clip.body.fingerprint })).status).toBe(202);
     await app!.art.idle();
-    expect(clips.asked).toHaveLength(5);
-    expect(clips.asked[4]!.prompt).toBe('It scuttles left, slowly.');
-    const walked = (await scarab()).walks.left;
-    expect(walked.recipe.steps.map((x: any) => x.prompt)).toEqual(['The scarab facing left, shell gleaming.', 'It scuttles left, slowly.']);
-    expect(walked.versions).toHaveLength(1);
-    expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))[walkArt('desert-scarab', 'left')].redone).toBeGreaterThan(0);
+    expect(clips.asked).toHaveLength(1);
+    expect(clips.asked[0]!.prompt).toBe('It scuttles along, slowly.');
+    const walked = (await scarab()).walks['front-left'];
+    expect(walked.recipe.steps.map((x: any) => x.prompt)).toEqual([words, 'It scuttles along, slowly.']);
+    expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))[walkArt('desert-scarab', 'front-left')].redone).toBeGreaterThan(0);
 
     // The earlier standing picture goes back for free, and the walk stays as it is.
-    expect((await api(base, '/api/admin/art/restore-view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'left', version: after.versions[0].id })).status).toBe(200);
-    const restored = (await scarab()).standing.left;
+    expect((await api(base, '/api/admin/art/restore-view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'front-left', version: after.versions[0].id })).status).toBe(200);
+    const restored = (await scarab()).standing['front-left'];
     expect(restored.versions).toHaveLength(2);
-    expect(restored.recipe.steps[0].prompt).toContain('facing left');
-    expect(clips.asked).toHaveLength(5);
+    expect(restored.recipe.steps[0].prompt).toContain('LOWER-LEFT corner');
+    expect(clips.asked).toHaveLength(1);
   }, 120_000);
-
   it('uses each way\'s walk as soon as it is made, and serves standing pictures for the ways that do not walk yet', async () => {
     const clips = video();
     const anchors = await tmp();
@@ -338,23 +333,23 @@ describe('the Art tab', () => {
     await writeFile(join(anchors, 'raw', 'desert-scarab.png'), await figure(300, 300, 150, 280));
     const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter: figurePainter(), video: clips, frames });
     const owner = account(store, 'Ego', 'owner');
-    const view = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'left' });
-    expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'left', approved: view.body.fingerprint })).status).toBe(202);
+    const view = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'view', walker: 'desert-scarab', direction: 'front-left' });
+    expect((await api(base, '/api/admin/art/view', owner.token, 'POST', { walker: 'desert-scarab', direction: 'front-left', approved: view.body.fingerprint })).status).toBe(202);
     await app!.art.idle();
-    // Standing facing left, with no walk anywhere yet: the game is given the standing picture.
+    // Standing facing to the front-left, with no walk anywhere yet: the game is given the standing picture.
     let art = (await api(base, '/api/art', owner.token)).body;
-    expect(art[walkStandArt('desert-scarab', 'left')]).toMatchObject({ kind: 'stand', file: expect.stringMatching(/^wished-art\/walks\/views\/desert-scarab-left\.png\?v=/) });
-    expect(art[walkArt('desert-scarab', 'left')]).toBeUndefined();
-    expect((await fetch(`${base}/${art[walkStandArt('desert-scarab', 'left')].file}`)).status).toBe(200);
+    expect(art[walkStandArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'stand', file: expect.stringMatching(/^wished-art\/walks\/views\/desert-scarab-front-left\.png\?v=/) });
+    expect(art[walkArt('desert-scarab', 'front-left')]).toBeUndefined();
+    expect((await fetch(`${base}/${art[walkStandArt('desert-scarab', 'front-left')].file}`)).status).toBe(200);
 
     // One clip, and that way walks at once; the others stand.
-    const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'left' });
-    expect((await api(base, '/api/admin/art/clip', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', direction: 'left', approved: clip.body.fingerprint })).status).toBe(202);
+    const clip = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'clip', walker: 'desert-scarab', body: 'six-legged', direction: 'front-left' });
+    expect((await api(base, '/api/admin/art/clip', owner.token, 'POST', { walker: 'desert-scarab', body: 'six-legged', direction: 'front-left', approved: clip.body.fingerprint })).status).toBe(202);
     await app!.art.idle();
     art = (await api(base, '/api/art', owner.token)).body;
-    expect(art[walkArt('desert-scarab', 'left')]).toMatchObject({ kind: 'walk', frames: expect.any(Number) });
-    expect(art[walkArt('desert-scarab', 'right')]).toBeUndefined();
-    expect(Object.keys(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8')))).toEqual([walkArt('desert-scarab', 'left')]);
+    expect(art[walkArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'walk', frames: expect.any(Number) });
+    expect(art[walkArt('desert-scarab', 'front-right')]).toBeUndefined();
+    expect(Object.keys(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8')))).toEqual([walkArt('desert-scarab', 'front-left')]);
   }, 60_000);
 
   it('paints the four isometric ways together on one sheet, one way again from the others, and makes their walks only when asked', async () => {
@@ -447,12 +442,14 @@ describe('the Art tab', () => {
     await writeFile(join(anchors, 'raw', 'desert-scarab.png'), await figure(300, 300, 150, 280));
     const { base, store, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir: anchors, painter: figurePainter(), video: clips, frames });
     const owner = account(store, 'Ego', 'owner');
+    expect((await ask(base, owner.token, 'view', { walker: 'desert-scarab', direction: 'front-left' })).status).toBe(202);
+    await app!.art.idle();
     store.updateSettings({ ...store.settings, ai: { ...store.settings.ai, video: { provider: 'gemini', model: clips.model, dailyClips: 0 } } });
-    expect((await ask(base, owner.token, 'walk', { walker: 'desert-scarab', body: 'six-legged' })).status).toBe(202);
+    expect((await ask(base, owner.token, 'clip', { walker: 'desert-scarab', body: 'six-legged', direction: 'front-left' })).status).toBe(202);
     await app!.art.idle();
     expect(clips.asked).toHaveLength(0);
     const { body: jobs } = await api(base, '/api/admin/art/jobs', owner.token);
-    expect(jobs.jobs.filter((j: any) => j.media === 'clip' && j.status === 'skipped')).toHaveLength(4);
+    expect(jobs.jobs.filter((j: any) => j.media === 'clip' && j.status === 'skipped')).toHaveLength(1);
     // Kept, so a restart meanwhile still asks for it.
     const kept = await until(async () => JSON.parse(await readFile(join(artDir, 'paint-requests.json'), 'utf8').catch(() => '[]')).length);
     expect(kept).toBe(1);
@@ -461,11 +458,10 @@ describe('the Art tab', () => {
     expect((await api(base, '/api/admin/ai', owner.token, 'PUT', { ...body.ai, video: { ...body.ai.video, dailyClips: 7 } })).status).toBe(200);
     await until(async () => app!.art.pending.size > 0);
     await app!.art.idle();
-    expect(clips.asked).toHaveLength(4);
+    expect(clips.asked).toHaveLength(1);
     const { body: art } = await api(base, '/api/art', owner.token);
-    for (const d of WALK_DIRECTIONS) expect(art[walkArt('desert-scarab', d)]).toMatchObject({ kind: 'walk' });
+    expect(art[walkArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'walk' });
   }, 60_000);
-
   it('refuses to paint once the month\'s budget is spent', async () => {
     const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
     const owner = account(store, 'Ego', 'owner');

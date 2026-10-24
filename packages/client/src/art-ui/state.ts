@@ -131,7 +131,6 @@ export interface KitSheetView {
 export type Ask =
   | { what: 'paint'; asset: string }
   | { what: 'paint-group'; group: string }
-  | { what: 'walk'; walker: string; body: string; directions?: Direction[]; views?: boolean }
   | { what: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   | { what: 'ways'; walker?: string }
   | { what: 'clip'; walker: string; body: string; direction: Facing; prompt?: string }

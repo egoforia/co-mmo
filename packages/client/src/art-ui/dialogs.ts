@@ -118,7 +118,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
     try {
       await ctx.api(`art/${ask.what}`, 'POST', { ...ask, ...(note ? { note } : {}), approved: review.fingerprint });
       d.close();
-      ctx.toast(ask.what === 'walk' || ask.what === 'clip' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : ask.what === 'view' ? 'Approved. The picture shows here once it is painted; then make the clip from it.' : ask.what === 'ways' ? 'Approved. Each picture shows here as it is painted; follow them under Painting now.' : 'Approved. Follow it under Painting now.');
+      ctx.toast(ask.what === 'clip' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : ask.what === 'view' ? 'Approved. The picture shows here once it is painted; then make the clip from it.' : ask.what === 'ways' ? 'Approved. Each picture shows here as it is painted; follow them under Painting now.' : 'Approved. Follow it under Painting now.');
       ctx.rerender();
     } catch (err) {
       button.disabled = false;

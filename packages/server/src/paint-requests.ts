@@ -15,8 +15,6 @@ export type PaintRequest =
   | { kind: 'wish'; record: string; force: boolean; only?: string; prompts?: Record<string, string> }
   /** The Owner's "Paint again" on a building or shipped picture. */
   | { kind: 'repaint'; asset: string; note: string }
-  /** The Owner's "Make it walk"; the directions to redo were already cleared, so it paints what is missing. */
-  | { kind: 'walk'; walker: string; body: string }
   /** The Owner's "Paint standing picture" for one walk direction, with the prompt they approved. */
   | { kind: 'view'; walker: string; direction: string; prompt?: string; from?: string[] }
   /** The Owner's "Paint the four ways together" for one walker: its isometric ways on one sheet. */

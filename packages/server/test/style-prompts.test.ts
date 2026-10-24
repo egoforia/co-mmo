@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, buildingKit, type Facing } from '@co-mmo/shared';
+import { BUILDING_STYLES, ISO_WAYS, buildingKit } from '@co-mmo/shared';
 import { buildPrompt, paintedFootprint, type AssetDescription } from '../src/assets/style.ts';
 import { buildingArtJobs } from '../src/assets/building-art.ts';
 import { viewPrompt, walkVideoPrompt, waysSheetPrompt } from '../src/assets/walk-video.ts';
@@ -10,8 +10,6 @@ import { STYLE } from '../src/assets/style-profile.ts';
 
 // Every kind of prompt the game paints with, word for word, so a change to the
 // art style shows exactly what it changes (the snapshot file is the record).
-
-const FACINGS: Facing[] = ['front', 'right', 'back', 'left', 'front-left', 'front-right', 'back-left', 'back-right'];
 
 const LANTERN: AssetDescription = {
   name: 'Glowing Lantern', kind: 'item', biome: 'sanctum', silhouetteHook: 'a round glass belly with a flame inside',
@@ -42,7 +40,7 @@ describe('every prompt the game paints with', () => {
   });
 
   it('walkers standing and walking, every way', () => {
-    for (const f of FACINGS) {
+    for (const f of ISO_WAYS) {
       expect(viewPrompt('Mara', [], f)).toMatchSnapshot(`stand ${f}`);
       expect(walkVideoPrompt([], f)).toMatchSnapshot(`walk ${f}`);
     }

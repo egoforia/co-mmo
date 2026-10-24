@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, WALK_DIRECTIONS, ISO_WAYS } from '@co-mmo/shared';
+import { BUILDING_STYLES, ISO_WAYS } from '@co-mmo/shared';
 import { FLAT_ISOMETRIC, chooseStyle } from '../src/assets/style-profile.ts';
 import { buildingArtJobs } from '../src/assets/building-art.ts';
 import { viewPrompt, walkVideoPrompt } from '../src/assets/walk-video.ts';
@@ -23,7 +23,7 @@ describe('the art style profile', () => {
   });
 
   it('paints every standing and walking way in the flat isometric look', () => {
-    for (const d of [...WALK_DIRECTIONS, ...ISO_WAYS]) {
+    for (const d of ISO_WAYS) {
       expect(viewPrompt('Mara', [], d).startsWith(FLAT_ISOMETRIC.base)).toBe(true);
       expect(viewPrompt('Mara', [], d)).toContain('Paint them in the style described above');
       expect(walkVideoPrompt([], d).startsWith(FLAT_ISOMETRIC.animation)).toBe(true);

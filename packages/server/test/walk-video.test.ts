@@ -31,10 +31,10 @@ const walker = (x: number, y: number, step = 0) =>
 describe('video walks', () => {
   it('names each carried item in front of or behind the body, by which way the walker faces', () => {
     const staff = [{ item: 'staff', side: 'right' as const }];
-    expect(gearPlacement(staff, 'right')).toContain('staff is on the far side, BEHIND');
-    expect(gearPlacement(staff, 'left')).toContain('staff is on the near side, IN FRONT');
-    expect(gearPlacement(staff, 'front')).toContain("viewer's left");
-    expect(gearPlacement([], 'front')).toBe('');
+    expect(gearPlacement(staff, 'front-left')).toContain('staff is on the far side, BEHIND');
+    expect(gearPlacement(staff, 'front-right')).toContain('staff is on the near side, IN FRONT');
+    expect(gearPlacement([{ item: 'pack', side: 'back' }], 'back-left')).toContain('pack is fully seen on the back');
+    expect(gearPlacement([], 'front-left')).toBe('');
   });
 
   it('paints the four isometric ways in one row, left to right, and cuts the sheet into a picture for each', async () => {

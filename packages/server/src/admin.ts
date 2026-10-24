@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, WALK_DIRECTIONS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
+import { ITEMS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { buildingsOverview } from './art-buildings.ts';
 import type { KitHouses } from './assets/building-kit/kit-houses.ts';
@@ -403,13 +403,11 @@ export async function handleAdmin(
     const walker = typeof body?.walker === 'string' && body.walker ? body.walker : undefined;
     // A building sheet's textures to paint again; none paints the whole sheet.
     const textures = Array.isArray(body?.textures) ? body.textures.filter((t): t is string => typeof t === 'string').slice(0, 20) : [];
-    const directions = Array.isArray(body?.directions) ? body.directions.filter((d): d is WalkDirection => typeof d === 'string' && (WALK_DIRECTIONS as readonly string[]).includes(d)) : [];
     // Each paid request is one of these; the Owner reviews it, then approves exactly that.
     const asks: Record<string, () => ArtAsk> = {
       'art/paint': () => ({ kind: 'paint', asset: String(body?.asset ?? ''), note }),
       'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
       'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
-      'art/walk': () => ({ kind: 'walk', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), directions, views: body?.views === true }),
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
       'art/ways': () => ({ kind: 'ways', ...(walker ? { walker } : {}) }),
       'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}) }),
@@ -502,10 +500,6 @@ export async function handleAdmin(
       }
       if (route === 'art/sound' && method === 'POST') {
         const done = await ctx.art.sound(String(body?.sound ?? ''), note);
-        return json(res, 202, { ok: true, ...done }), true;
-      }
-      if (route === 'art/walk' && method === 'POST') {
-        const done = await ctx.art.walk(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), directions, body?.views === true);
         return json(res, 202, { ok: true, ...done }), true;
       }
     } catch (err) {

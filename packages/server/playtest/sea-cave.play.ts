@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
-import { generateRegion, newCharacter, regionDef } from '@co-mmo/shared';
+import { generateRegion, maxHp, newCharacter, regionDef } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
 import { playWorld } from './harness.ts';
 
@@ -48,7 +48,9 @@ describe('the sea cave', () => {
     const map = generateRegion(regionDef('shore')!);
     const way = (lower: number) => map.stairways.find((s) => s.lower === lower)!;
     const { id, token } = account(world.store, 'Robo', 'owner');
-    world.store.savePosition(id, way(0).bottom.x, way(0).bottom.y, 'shore', newCharacter());
+    // Tough enough that the shore's creatures can't knock them back to the shrine mid-climb.
+    const hardy = { ...newCharacter(), level: 30 };
+    world.store.savePosition(id, way(0).bottom.x, way(0).bottom.y, 'shore', { ...hardy, hp: maxHp(hardy) });
 
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();

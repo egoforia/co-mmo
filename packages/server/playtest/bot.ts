@@ -141,6 +141,11 @@ export class Bot {
     return this.waitFor<T>(pred, { since, ms, what });
   }
 
+  /** Waits until the server has applied every step sent, so it stands where the bot thinks it does. */
+  async caughtUp(ms = 5000): Promise<boolean> {
+    return Boolean(await this.until(() => this.pending.length === 0, ms));
+  }
+
   /** Stands still for a moment, still listening. */
   async idle(ms: number): Promise<void> {
     await new Promise((r) => setTimeout(r, ms));

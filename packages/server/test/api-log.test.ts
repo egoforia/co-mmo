@@ -71,7 +71,10 @@ describe('the API Log', () => {
       method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code: 'oauth-code-1234567890', client_id: 'id', client_secret: 'very-secret-client-value' }).toString(),
     });
     await settled();
-    const [oauth, mail] = log.query().calls;
+    // Both calls can land in the same millisecond, so pick each by its service, not its place in the list.
+    const { calls } = log.query();
+    const mail = calls.find((c) => c.service === 'Resend');
+    const oauth = calls.find((c) => c.service === 'GitHub');
     expect(mail).toMatchObject({ service: 'Resend', kind: 'Email' });
     expect(oauth).toMatchObject({ service: 'GitHub', kind: 'Sign-in' });
     const sentMail = (await log.get(mail!.id))!;

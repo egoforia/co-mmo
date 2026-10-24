@@ -478,6 +478,7 @@ export function editWords(e: WorldEdit): string {
     case 'spawn': return `${e.count} ${e.name ?? e.creature} at ${e.at.join(', ')}`;
     case 'clear': return `Cleared monsters within ${e.radius} of ${e.at.join(', ')}`;
     case 'piece': return `${setPiece(e.piece)?.name ?? 'A set piece'} at ${e.at.join(', ')}`;
+    case 'footprint': return `Footprint of what stands at ${e.at.join(', ')} set to ${e.footprint[0]} × ${e.footprint[1]}`;
     case 'floors': return e.up || e.down ? `${e.up} floor${e.up === 1 ? '' : 's'} up and ${e.down} down by ${e.ladders ? 'ladders' : 'stairs'}, at ${e.at.join(', ')}` : `Took the floors off the building at ${e.at.join(', ')}`;
   }
 }

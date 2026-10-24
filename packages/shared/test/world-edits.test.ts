@@ -79,6 +79,26 @@ describe('world edits', () => {
     expect(landmarkAt(map, to)?.asset).toBe('sanctum-fountain');
   });
 
+  it("gives a set piece a new footprint under its picture, and frees the tiles it left", () => {
+    const fountain = plain.landmarks.find((l) => l.asset === 'sanctum-fountain')!;
+    const at: TilePoint = [Math.floor(fountain.x), Math.floor(fountain.y - 0.01)];
+    const blocked = (map: RegionMap) => map.tiles.filter((t) => t === Tile.Blocked).length;
+    expect(checkEdit(plain, { kind: 'footprint', at, footprint: [4, 2] }, CREATURES)).toBeUndefined();
+    const wider = edited(stamp({ kind: 'footprint', at, footprint: [4, 2] }));
+    const grown = wider.landmarks.find((l) => l.asset === 'sanctum-fountain')!;
+    // The picture stays where it was; only the tiles under it change.
+    expect([grown.x, grown.y, grown.footprint]).toEqual([fountain.x, fountain.y, { width: 4, height: 2 }]);
+    expect(blocked(wider) - blocked(plain)).toBe(8 - 2);
+    const smaller = edited(stamp({ kind: 'footprint', at, footprint: [1, 1] }));
+    expect(blocked(plain) - blocked(smaller)).toBe(1);
+    expect(checkEdit(plain, { kind: 'footprint', at, footprint: [9, 1] }, CREATURES)).toMatch(/1 to 8/);
+    expect(checkEdit(plain, { kind: 'footprint', at: openGround(plain, at), footprint: [2, 2] }, CREATURES)).toMatch(/no set piece/);
+    // Furniture against a wall cannot grow into it.
+    const counter = plain.landmarks.find((l) => l.asset === 'sanctum-arcanum-furniture-counter')!;
+    const against: TilePoint = [Math.floor(counter.x), Math.floor(counter.y - 0.01)];
+    expect(checkEdit(plain, { kind: 'footprint', at: against, footprint: [3, 6] }, CREATURES)).toMatch(/wall/);
+  });
+
   it('lays a road and a kit house at its end, with a doorway on the road', () => {
     const floor = KIT_HOUSE_FLOORS[1]!.floor;
     const doorstep: TilePoint = [spot[0] + 20, spot[1]];

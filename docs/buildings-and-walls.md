@@ -130,3 +130,12 @@ Before merging or committing new buildings or biomes, verify:
 - [ ] **Bay Grid Alignment:** Floor width in tiles is an even number resulting in an odd number of bays (e.g. 10, 14, 18).
 - [ ] **Tests Pass:** `npm test` and `npm run typecheck` pass with 0 errors.
 - [ ] **Visual Playtest:** An in-game screenshot confirms that characters and furniture are visually enclosed by tall, opaque isometric walls.
+
+## Checking buildings in the Art tab
+
+Art > Buildings lists every building in every land: whether it stands as a
+kit house or as tall walls (and why), the kit house's views as the game
+shows them, and each piece of furniture with its footprint. On the ground
+floor the Owner can change a footprint; it is saved as a world edit
+(`footprint`), so the picture stays where it is and only the tiles it
+blocks change. A footprint cannot grow into a wall or another piece.

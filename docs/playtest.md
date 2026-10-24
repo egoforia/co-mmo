@@ -27,7 +27,7 @@ alongside the others.
 | `mini-map.play.ts` | In Chromium: the Owner gives the Sanctum Arcanum a floor up and a cellar; the mini map shows the ground floor, zooms in and out, looks at the floor above and the cellar without moving them, follows them upstairs, maximizes, minimizes (drawing nothing) and closes, and comes back with M or the Map button. |
 | `sea-cave.play.ts` | In Chromium: a player stands in the Smugglers' Sea Cave's mouth, walks up the stairs to the Smugglers' Loft, and is carried to the Gallery, the Lookout, the Tide Grotto and the Drowned Hoard, each floor drawn on its own, then sees its walls stand up with their faces (shipped pictures stand in for the kit's). |
 | `camera.play.ts` | In Chromium: a player sees the Sanctum Arcanum as a kit house through the isometric camera, walks east along the lane with two keys and stands inside its cutaway. |
-| `browser.play.ts` | In Chromium: join by invite link, walk with the arrow keys, pray and grant a wish from its card, open the bag, open every God's View tab, and open the game on a phone-sized screen. Screenshots go to `playtest-results/`. |
+| `browser.play.ts` | In Chromium: join by invite link, walk with the arrow keys, pray and grant a wish from its card, open the bag, open every God's View tab and the Art tab's Buildings page, and open the game on a phone-sized screen. Screenshots go to `playtest-results/`. |
 | `perf.play.ts` | In Chromium: a Steward shows the performance overlay with F3 and sees frames, a ping and the server running their region; it stays on across a reload and hides from Account. A player's F3 shows nothing. |
 
 A run fails when a robot notes a problem (it could not walk somewhere, a

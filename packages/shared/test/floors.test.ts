@@ -12,6 +12,7 @@ import {
   climbWords,
   collides,
   floorChecks,
+  seenFromGround,
   stairsLabel,
   stairsToward,
   stairwayAt,
@@ -121,6 +122,25 @@ describe('floors', () => {
     expect(problems.some((p) => p.includes('not next to each other'))).toBe(true);
     expect(problems.some((p) => p.includes('past the edge of the land'))).toBe(true);
     expect(() => addStorey(map, { x: 30, y: 30, width: 5, height: 5 }, 2, 'sanctum-arcanum')).toThrow(/does not fit/);
+  });
+});
+
+describe('seen from the ground', () => {
+  it('never shows a building\'s upper floors, even an open terrace over it', () => {
+    const map = land();
+    const b = map.buildings[0]!;
+    const archive = addStorey(map, { x: b.x - 2, y: b.y, width: b.width + 2, height: b.height }, 1, b.style, undefined, true);
+    const closed = addStorey(map, b, 2, b.style);
+    expect(seenFromGround(map, archive)).toBe(false);
+    expect(seenFromGround(map, closed)).toBe(false);
+  });
+
+  it('shows an open rooftop standing over no building', () => {
+    const map = land();
+    const roof = addStorey(map, { x: 20, y: 20, width: 4, height: 4 }, 1, 'sanctum-arcanum', undefined, true);
+    expect(seenFromGround(map, roof)).toBe(true);
+    const cellar = addStorey(map, { x: 20, y: 20, width: 4, height: 4 }, -1, 'sanctum-arcanum', undefined, true);
+    expect(seenFromGround(map, cellar)).toBe(false);
   });
 });
 

@@ -119,6 +119,16 @@ export function canSeeAcrossFloors(
   return isOpenOutdoors(a) && isOpenOutdoors(b);
 }
 
+/**
+ * True when someone outside on the ground sees a floor above it: only an open
+ * terrace or rooftop standing over no building. A building's upper floors
+ * stay hidden from outside, even open ones, so its roof is all that shows.
+ */
+export function seenFromGround(map: RegionMap, storey: Storey): boolean {
+  if (storey.floor <= 0 || !storey.open) return false;
+  return !map.buildings.some((b) => storey.x < b.x + b.width && b.x < storey.x + storey.width && storey.y < b.y + b.height && b.y < storey.y + storey.height);
+}
+
 /** Sets one tile on a floor; off the ground, only where a storey of that floor lies. */
 export function setOn(map: RegionMap, floor: number, x: number, y: number, tile: Tile): void {
   if (floor === 0) return set(map, x, y, tile);

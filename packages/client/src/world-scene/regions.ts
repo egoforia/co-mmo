@@ -10,6 +10,7 @@ import {
   glowOf,
   nearBuilding,
   rand2,
+  seenFromGround,
   stairsLabel,
   storeyAt,
   type ArtManifest,
@@ -470,8 +471,8 @@ export function applyFloorView(
     }
     for (const f of region.floors) {
       const delta = mine - f.storey.floor;
-      const overOpenBuilding = mine === 0 && f.storey.floor > 0 && region.buildings.some((v) => v.open && overlaps(f.storey, v.building));
-      const visible = current && (f.storey.floor === mine || (mine === 0 && f.storey.floor > 0 && Boolean(f.storey.open) && !overOpenBuilding) || (mine > f.storey.floor && f.storey.floor > 0 && !under));
+      // From the ground a building's upper floors never show, near or far: outside only its roof, close by only its ground-floor cutaway.
+      const visible = current && (f.storey.floor === mine || (mine === 0 && seenFromGround(region.map, f.storey)) || (mine > f.storey.floor && f.storey.floor > 0 && !under));
       for (const o of f.objects) {
         setShown(o, visible);
         setDepthShade(o, Math.max(0, delta));

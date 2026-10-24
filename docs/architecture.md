@@ -66,7 +66,8 @@ God's View's Server health tab shows every host, and `perf.ts` gives the
 performance overlay the host running a player's region.
 
 **HTTP and the socket.** `http.ts` (JSON, files, bearer tokens),
-`account-routes.ts`, `auth.ts`, `admin.ts` (God's View API), `art-files.ts`
+`account-routes.ts`, `auth.ts`, `admin.ts` (God's View API; `art-buildings.ts` lists
+every building for the Art tab's Buildings page), `art-files.ts`
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
 
 **The world.** `world.ts` (regions, travel, hosting), `region.ts` (one
@@ -151,7 +152,8 @@ off the painted one-floor cave stands as before.
 trees or rocks; move or take away a tree, rock, water or set piece; a road;
 a house of any building style (kit-friendly floor sizes, so it stands as a
 kit house in the isometric camera); floors above and below a building, by
-stairs or ladders; a monster spawn; clearing monsters
+stairs or ladders; a set piece's or furniture's footprint (the tiles it
+blocks, from the Art tab's Buildings page); a monster spawn; clearing monsters
 away. `generateRegion` lays the edits over the land in order, so the server,
 every region server and every browser lay out the same map, and a browser
 draws a land again when its definition changes. `world-editor.ts` keeps
@@ -232,7 +234,8 @@ per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts` (Art tab shell and
 `BUTTON_ACTIONS` dispatch table) + `art-ui/` (`state.ts` shared `artState`,
 `pages.ts` sub-tab renderers, `walkers.ts` character/ways/hand-point editors,
-`dialogs.ts` review and history modals), `loot-tab.ts` and
+`dialogs.ts` review and history modals, `buildings.ts` the Buildings page:
+each building's kit views and furniture hit boxes), `loot-tab.ts` and
 `api-log-ui.ts`.
 
 ## Changing something big

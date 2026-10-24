@@ -1,6 +1,7 @@
 // Shared types, constants, formatters and view-state store (artState) for
 // God's View's Art tab (art-ui.ts and art-ui/*).
 
+import type { BuildingView } from './buildings.ts';
 import {
   type ArtPointsManifest,
   type Facing,
@@ -151,7 +152,7 @@ export interface HandQuestion { facing: Direction; prompt: string; usual: string
 /** One version in a comparison: how it looks and what made it. */
 export interface Shown { id: string; label: string; look: string; recipe?: Recipe }
 
-export const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monsters', 'Monsters'], ['items', 'Items'], ['biomes', 'Biomes'], ['looks', 'Building looks'], ['sounds', 'Sounds and music']] as const;
+export const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monsters', 'Monsters'], ['items', 'Items'], ['biomes', 'Biomes'], ['looks', 'Building looks'], ['buildings', 'Buildings'], ['sounds', 'Sounds and music']] as const;
 export type Subtab = (typeof SUBTABS)[number][0];
 export const ITEM_ORDER = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
 export const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']];
@@ -187,6 +188,8 @@ export const artState: {
   sizes: Map<string, [number, number]>;
   /** Hand panels left open, so they stay open when the page is drawn again after a look. */
   openHands: Set<string>;
+  /** Every building, for the Buildings page; loaded when it is opened. */
+  buildings?: BuildingView[];
 } = {
   data: null,
   points: {},

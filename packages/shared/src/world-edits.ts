@@ -43,7 +43,9 @@ export type WorldEditDraft =
   /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */
   | { kind: 'piece'; piece: string; at: TilePoint }
   /** Gives the building over `at` floors above and below the ground (floors.ts), joined by stairs or ladders; 0 and 0 takes them off. */
-  | { kind: 'floors'; at: TilePoint; up: number; down: number; ladders?: boolean };
+  | { kind: 'floors'; at: TilePoint; up: number; down: number; ladders?: boolean }
+  /** Gives the set piece or piece of furniture over `at` the tiles it blocks and stands on, still centred under its picture (the Art tab's hit boxes). */
+  | { kind: 'footprint'; at: TilePoint; footprint: [width: number, height: number] };
 
 /** Who made an edit and when, plus a spawn's name and picture, filled in by the server. */
 export interface EditStamp {
@@ -63,6 +65,8 @@ export const MAX_STROKE = 400;
 export const MAX_SPAWN = 12;
 /** Widest area the clear tool may empty, in tiles. */
 export const MAX_CLEAR_RADIUS = 24;
+/** Widest and deepest a set piece's footprint may be, in tiles. */
+export const MAX_FOOTPRINT = 8;
 /** Smallest and largest floor a house may have, in tiles. */
 export const HOUSE_FLOOR = { min: 2, max: 30 };
 
@@ -111,6 +115,8 @@ export function applyEdit(map: RegionMap, edit: WorldEdit): void {
       if (b) buildFloors(map, b, edit.up, edit.down, edit.ladders ? 'ladder' : 'stairs');
       return;
     }
+    case 'footprint':
+      return refit(map, edit.at, edit.footprint);
   }
 }
 
@@ -181,6 +187,23 @@ export function checkEdit(map: RegionMap, edit: WorldEditDraft, creatures: Recor
       // Tried on a copy: the stairs need room on every floor they join.
       const copy = { ...map, storeys: [...map.storeys], stairways: [...map.stairways] };
       return buildFloors(copy, b, edit.up, edit.down, edit.ladders ? 'ladder' : 'stairs') ? undefined : 'There is no room for the stairs in this building. Move some furniture, or try a bigger one.';
+    }
+    case 'footprint': {
+      if (!inside(edit.at)) return off;
+      const piece = landmarkAt(map, edit.at);
+      if (!piece) return 'There is no set piece or furniture there.';
+      const [w, h] = Array.isArray(edit.footprint) ? edit.footprint : [NaN, NaN];
+      if (![w, h].every((n) => Number.isInteger(n) && n >= 1 && n <= MAX_FOOTPRINT)) return `A footprint is 1 to ${MAX_FOOTPRINT} tiles a side.`;
+      const old = footprint(piece);
+      const next = footprint({ ...piece, footprint: { width: w, height: h } });
+      for (let y = next.top; y < next.top + h; y++) {
+        for (let x = next.left; x < next.left + w; x++) {
+          if (!inside([x, y])) return 'It would reach off the edge of this land.';
+          const mine = x >= old.left && x < old.left + old.width && y >= old.top && y < old.top + old.height;
+          if (!mine && !open(tileOf(map, [x, y]))) return 'Something else stands there, or a wall. Make it smaller or move it first.';
+        }
+      }
+      return undefined;
     }
     default:
       return 'The editor does not know that kind of change.';
@@ -284,6 +307,26 @@ function move(map: RegionMap, from: TilePoint, to: TilePoint | null): void {
   if (!movable(tile)) return;
   set(map, from[0], from[1], Tile.Ground);
   if (to && !built(tileOf(map, to))) set(map, to[0], to[1], tile);
+}
+
+/** Gives the piece over `at` a new footprint, centred under its picture as before, unless something took the tiles since. */
+function refit(map: RegionMap, at: TilePoint, [width, height]: [number, number]): void {
+  const piece = landmarkAt(map, at);
+  if (!piece) return;
+  const old = footprint(piece);
+  const next = footprint({ ...piece, footprint: { width, height } });
+  const mine = (x: number, y: number) => x >= old.left && x < old.left + old.width && y >= old.top && y < old.top + old.height;
+  for (let y = next.top; y < next.top + height; y++) {
+    for (let x = next.left; x < next.left + width; x++) {
+      if (x < 0 || y < 0 || x >= map.width || y >= map.height || (!mine(x, y) && !open(tileOf(map, [x, y])))) return;
+    }
+  }
+  // What lies under a set piece is open ground, or floor indoors.
+  for (let y = old.top; y < old.top + old.height; y++) {
+    for (let x = old.left; x < old.left + old.width; x++) set(map, x, y, onFloor(map, x, y) ? Tile.Floor : Tile.Ground);
+  }
+  piece.footprint = { width, height };
+  block(map, piece.x, piece.y, width, height);
 }
 
 function house(map: RegionMap, at: TilePoint, floor: [number, number], style: string): void {

@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ITEMS, WALK_DIRECTIONS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role, type WalkDirection } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
+import { buildingsOverview } from './art-buildings.ts';
+import type { KitHouses } from './assets/building-kit/kit-houses.ts';
 import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
 import { knownVideoModels, videoUsd } from './assets/video.ts';
@@ -40,6 +42,8 @@ export interface AdminContext {
   art?: ArtStudio;
   /** Where hands and grips are found in pictures, for held items (Owner). */
   hands?: HandFinder;
+  /** The kit houses drawn for buildings, for the Art tab's Buildings page (Owner). */
+  houses?: KitHouses;
   /** Paints and makes what is missing, now that a limit was raised. */
   resumeArt?(): void;
   /** Video clips made since Google's daily reset, against the day's cap. */
@@ -387,6 +391,7 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
     if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [], mirrored: (await ctx.hands?.mirrored()) ?? {} }), true;
+    if (route === 'art/buildings' && method === 'GET') return json(res, 200, { buildings: await buildingsOverview(world, ctx.houses) }), true;
     if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: ctx.budget.state() }), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;
     const note = typeof body?.note === 'string' ? body.note : '';

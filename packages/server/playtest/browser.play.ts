@@ -113,6 +113,13 @@ describe('the robot plays in a browser', () => {
     expect.soft(await gods.locator('.look [data-art-review]').count(), 'each look has a paint button').toBeGreaterThan(3);
     await gods.screenshot({ path: resolve(shots, 'gods-view-art-looks.png'), fullPage: true });
 
+    // The Buildings page lists every building with how it stands, and furniture footprints to change.
+    await gods.click('a[href="#art/buildings"]');
+    await gods.waitForSelector('.building', { timeout: 15_000 });
+    expect.soft(await gods.textContent('.buildings'), 'the buildings list the Arcanum').toMatch(/Arcanum/);
+    expect.soft(await gods.locator('form.footprint').count(), 'furniture footprints can be changed').toBeGreaterThan(3);
+    await gods.screenshot({ path: resolve(shots, 'gods-view-art-buildings.png'), fullPage: true });
+
     // A phone-sized screen still shows the game.
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const small = await phone.newPage();

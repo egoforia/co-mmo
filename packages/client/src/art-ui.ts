@@ -2,6 +2,7 @@
 // - art-ui/state.ts: shared interfaces, constants, formatters, and artState store
 // - art-ui/pages.ts: Painting now (jobs), Items, Biomes, Building looks, and Sounds & music sub-tabs
 // - art-ui/walkers.ts: Characters & Monsters sub-tabs, 4-way isometric views, and hand-finder / held-item try-on UI
+// - art-ui/buildings.ts: Buildings sub-tab (how each building stands, its kit views, furniture footprints)
 // - art-ui/dialogs.ts: recipe diff formatter, review/approval modal, and side-by-side version comparison modal
 // Put new sub-tab markup or dialog logic in the matching art-ui/* module rather than growing this file.
 
@@ -35,6 +36,7 @@ import {
   openCount,
   where,
 } from './art-ui/state.ts';
+import { buildingsPage, footprintSubmit, loadBuildings } from './art-ui/buildings.ts';
 import { holdable, peoplePage, redrawHands } from './art-ui/walkers.ts';
 import { lightPreviews } from './light-preview.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
@@ -54,6 +56,7 @@ export async function artPage(context: ArtContext): Promise<string> {
   artState.mirrored = asked.mirrored ?? {};
   const o = artState.data;
   const { sub, page } = where();
+  if (sub === 'buildings') await loadBuildings();
   const pages: Record<Subtab, () => string> = {
     now: nowPage,
     characters: () => peoplePage('characters', page),
@@ -61,6 +64,7 @@ export async function artPage(context: ArtContext): Promise<string> {
     items: () => itemsPage(page),
     biomes: () => biomesPage(page),
     looks: looksPage,
+    buildings: buildingsPage,
     sounds: soundsPage,
   };
   return `
@@ -186,6 +190,7 @@ export function artChange(target: HTMLElement): boolean {
 
 /** Handles the walk forms; false when the form was not one of the Art tab's. */
 export function artSubmit(form: HTMLFormElement): boolean {
+  if (footprintSubmit(form)) return true;
   if (form.classList.contains('hand-question')) {
     const panel = form.closest<HTMLElement>('details.hands');
     if (panel?.dataset.walker) artState.openHands.add(panel.dataset.walker);

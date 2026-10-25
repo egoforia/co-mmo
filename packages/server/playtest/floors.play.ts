@@ -47,8 +47,11 @@ describe('floors', () => {
     // Where the stairs will go, worked out the way the editor lays them.
     const map = generateRegion(regionDef('sanctum')!);
     const shop = map.buildings.find((b) => b.style === 'sanctum-arcanum')!;
+    // The Sanctum has stairs of its own (the cathedral, the catacombs); the shop's are added after them.
+    const own = map.stairways.length;
     expect(buildFloors(map, shop, 1, 1)).toBe(true);
-    const up = map.stairways.find((s) => s.lower === 0)!;
+    const shopStairs = map.stairways.slice(own);
+    const up = shopStairs.find((s) => s.lower === 0)!;
     const start = { x: up.bottom.x, y: up.bottom.y + 1 };
     expect(collides(map, start.x, start.y), 'room to stand south of the stairs').toBe(false);
     const { id, token } = account(world.store, 'Robo', 'owner');
@@ -92,7 +95,7 @@ describe('floors', () => {
     expect(floor(), 'back down').toBe(0);
 
     // Into the cellar.
-    const cellar = app!.world.home.map.stairways.find((s) => s.upper === 0)!;
+    const cellar = app!.world.home.map.stairways.slice(own).find((s) => s.upper === 0)!;
     app!.world.local('sanctum')!.placePlayer(id, cellar.bottom.x, cellar.bottom.y, -1);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: resolve(shots, 'floors-cellar.png') });

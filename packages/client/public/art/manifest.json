@@ -521,12 +521,6 @@
     "width": 128,
     "height": 128
   },
-  "sanctum-temple-exterior": {
-    "file": "art/sanctum-temple-exterior.webp",
-    "kind": "building",
-    "width": 1856,
-    "height": 2275
-  },
   "sanctum-temple-floor": {
     "file": "art/sanctum-temple-floor.png",
     "kind": "tile",

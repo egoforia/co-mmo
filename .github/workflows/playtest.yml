@@ -1,0 +1,47 @@
+# The robot playtester (docs/playtest.md) on the pull requests the Owner picks:
+# put the "playtest" label on a pull request and bots and a browser play the
+# real game with fake AI, so nothing is paid for. It runs again on every push
+# while the label stays. Screenshots are kept with the run.
+name: Playtest
+
+on:
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playtest-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  playtest:
+    # Another label being added is no reason to play again.
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'playtest') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'playtest')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      # Robots play side by side; browsers play one at a time, since several
+      # Chromiums at once leave a small runner too slow to keep up with the keys.
+      - name: Robots play
+        run: npm run playtest -- --reporter=default --reporter=github-actions $(grep -L "from 'playwright'" packages/server/playtest/*.play.ts)
+      - name: Browsers play
+        if: success() || failure()
+        run: npm run playtest -- --no-file-parallelism --reporter=default --reporter=github-actions $(grep -l "from 'playwright'" packages/server/playtest/*.play.ts)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playtest-screenshots
+          path: playtest-results/
+          if-no-files-found: ignore

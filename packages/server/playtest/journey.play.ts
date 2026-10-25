@@ -66,8 +66,15 @@ describe('the robot plays the first quests', () => {
     if (hunted.result !== 'none') {
       const target = bot.snapshot?.creatures.find((c) => c.kind === 'walking-mushroom');
       if (target) {
-        await bot.walkTo(() => bot.snapshot?.creatures.find((c) => c.id === target.id), { near: 1.2, what: 'a mushroom', quiet: true });
-        const struck = await bot.ask({ t: 'ability', ability: 'power-strike', target: target.id }, (m) => (m.t === 'hit' && m.ability === 'power-strike') || m.t === 'notice', 'Power Strike to land').catch(() => null);
+        // Mushrooms wander, so one may step out of reach as the strike goes off: close in and try again.
+        let struck = null;
+        for (let tries = 0; tries < 5 && struck?.t !== 'hit'; tries++) {
+          if (!bot.snapshot?.creatures.some((c) => c.id === target.id)) break;
+          await bot.walkTo(() => bot.snapshot?.creatures.find((c) => c.id === target.id), { near: 1.2, what: 'a mushroom', quiet: true });
+          // A slow server may still be applying the last steps; strike from where it has us.
+          await bot.caughtUp();
+          struck = await bot.ask({ t: 'ability', ability: 'power-strike', target: target.id }, (m) => (m.t === 'hit' && m.ability === 'power-strike') || m.t === 'notice', 'Power Strike to land').catch(() => null);
+        }
         expect.soft(struck?.t === 'hit' ? 'hit' : struck, 'Power Strike lands').toBe('hit');
       }
     }

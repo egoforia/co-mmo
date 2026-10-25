@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { BODY_TYPES, FACINGS, ISO_WAYS, WALK_DIRECTIONS, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type IsoWay, type WalkDirection } from '@co-mmo/shared';
+import { BODY_TYPES, FACINGS, ISO_WAYS, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { ANCHORS } from './assets/anchors.ts';
 import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { KEY_COLOR } from './assets/style.ts';
@@ -41,12 +41,6 @@ export interface Walker {
   gear: Carried[];
   /** A key of BODY_TYPES. */
   body: string;
-}
-
-/** A walker's pictures and clips waiting in the painting log, by direction. */
-export interface WalkPlan {
-  views: Map<WalkDirection, ArtJobHandle | undefined>;
-  clips: Map<WalkDirection, ArtJobHandle | undefined>;
 }
 
 /** An earlier walk in one direction, kept so it can be put back. */
@@ -90,11 +84,11 @@ export function estimateClipUsd(model: string): number {
 const SHARP_ENOUGH = 256;
 
 /**
- * Paints the walking looks' walks that are missing, when the server starts:
- * each look standing in every direction (image model), then each of those
- * walking in place (video model), cut down to one cycle. Every step is kept
- * on disk, so a run stopped by the budget picks up where it left off. Until a
- * look has all four walks, it glides in its standing pose as before.
+ * Paints walkers in the four isometric ways when the Owner asks in the Art
+ * tab: standing pictures (image model), then each way walking in place
+ * (video model), cut down to one cycle. Walks painted before in the
+ * top-down directions are still served, put back and cut again, so walkers
+ * keep them until their isometric ways are painted.
  */
 export class WalkPainter {
   private painted: ArtManifest = {};
@@ -186,7 +180,7 @@ export class WalkPainter {
         const { figures, placed } = await walkFromFrames(await (this.options.toFrames ?? videoFrames)(clip), names.length);
         if (!(await sameSizes(figures, old))) continue;
         await Promise.all(placed.map((f, i) => writeFile(resolve(this.dir, 'frames', names[i]!), f)));
-        walkers.add(id.replace(/-walk-(front|right|back|left)$/, ''));
+        walkers.add(id.slice(0, id.lastIndexOf('-walk-')));
       } catch (err) {
         console.error(`Cutting ${id} again from its clip failed:`, (err as Error).message);
       }
@@ -194,7 +188,7 @@ export class WalkPainter {
     await mkdir(this.dir, { recursive: true });
     await writeFile(path, JSON.stringify([...done], null, 2));
     for (const walkerId of walkers) {
-      const entry = WALK_DIRECTIONS.map((d) => this.painted[walkArt(walkerId, d)]).find(Boolean);
+      const entry = FACINGS.map((d) => this.painted[walkArt(walkerId, d)]).find(Boolean);
       const body = Object.keys(BODY_TYPES).find((k) => BODY_TYPES[k]!.frames === entry?.frames && BODY_TYPES[k]!.cycleSeconds === entry?.cycleSeconds) ?? 'two-legged';
       await this.writeKept({ id: walkerId, name: walkerId, gear: [], body, reference: async () => Buffer.alloc(0) }, true);
     }
@@ -231,94 +225,11 @@ export class WalkPainter {
   }
 
   /**
-   * Forgets a walker's walks in some directions, so the next painting makes
-   * them again: their clips, and their standing views too when `views` is
-   * set. Every other direction's frames are kept and reused for free.
-   */
-  async forget(walker: Walker, directions: readonly WalkDirection[], views: boolean): Promise<void> {
-    for (const direction of directions) {
-      await this.keepVersion(walker, direction);
-      await rm(resolve(this.dir, 'frames', `${walkArt(walker.id, direction)}.json`), { force: true });
-      if (views) {
-        if (!(await this.approvedCopy(walker, direction))) await this.history.keep(viewKey(walker, direction), this.viewPath(walker, direction));
-        await rm(this.viewPath(walker, direction), { force: true });
-      }
-    }
-  }
-
-  /** Adds what a walker still needs to the painting log, as waiting its turn. */
-  async plan(walker: Walker, source: ArtJobSource): Promise<WalkPlan> {
-    const { views, clips } = await this.needs(walker);
-    const imageModel = this.options.provider()?.model ?? '';
-    const videoModel = this.options.video()?.model ?? '';
-    const jobs = this.options.jobs;
-    return {
-      views: new Map(views.map((d) => [d, jobs?.add(`${walker.id}-${d}`, `${walker.name} standing, facing ${facingWords(d)}`, 'picture', source, estimateImageUsd(imageModel))])),
-      clips: new Map(clips.map((d) => [d, jobs?.add(walkArt(walker.id, d), `${walker.name} walking ${facingWords(d)}`, 'clip', source, estimateClipUsd(videoModel))])),
-    };
-  }
-
-  /**
-   * What making a walker's missing walks will ask for: pictures to paint and
-   * clips to make; `redo` counts those directions as missing (their standing
-   * pictures too with `views`), as forget() would leave them.
-   */
-  async needs(walker: Walker, redo: readonly WalkDirection[] = [], views = false): Promise<{ views: WalkDirection[]; clips: WalkDirection[] }> {
-    const clips: WalkDirection[] = [];
-    const paint: WalkDirection[] = [];
-    const sharpFront = await this.sharpReference(walker);
-    for (const direction of WALK_DIRECTIONS) {
-      const again = redo.includes(direction);
-      if (!again && (await this.cached(`frames/${walkArt(walker.id, direction)}.json`))) continue;
-      clips.push(direction);
-      const kept = !(again && views) && (await this.keptView(walker, direction));
-      if (!kept && (direction !== 'front' || !sharpFront)) paint.push(direction);
-    }
-    return { views: paint, clips };
-  }
-
-  /**
-   * Exactly what making a walker's walks would send, without making them:
-   * each standing picture to paint and each clip, with the pictures they
-   * start from. Arguments are as for needs().
-   */
-  async preview(walker: Walker, redo: readonly WalkDirection[] = [], views = false): Promise<Recipe> {
-    const image = this.options.provider();
-    const video = this.options.video();
-    if (!image || !video) throw new Error(stopReason(this.options));
-    const recipes = this.options.recipes!;
-    const need = await this.needs(walker, redo, views);
-    const steps: RecipeStep[] = [];
-    for (const direction of need.clips) {
-      // As view() will find it: painted below, kept from before, or the approved picture itself.
-      let view: Buffer | undefined;
-      let approved = false;
-      if (need.views.includes(direction)) {
-        steps.push(await recipes.imageStep(`${walker.name} standing, facing ${facingWords(direction)}`, image, await this.viewRequest(walker, direction), estimateImageUsd(image.model)));
-      } else {
-        view = redo.includes(direction) && views ? undefined : await this.keptView(walker, direction);
-        if (view) approved = await this.approvedCopy(walker, direction);
-        else {
-          view = await soleFigure(await this.onMagenta(walker));
-          approved = true;
-        }
-      }
-      const first = view && { mimeType: 'image/png', data: await startFrame(view) };
-      steps.push(await recipes.clipStep(`${walker.name} walking ${facingWords(direction)}`, video, { prompt: walkVideoPrompt(walker.gear, direction, walker.body), seconds: CLIP_SECONDS, ...(first ? { first } : {}) }, estimateClipUsd(video.model), this.startName(walker, direction, approved)));
-    }
-    const notes = [
-      ...(need.views.length ? ['A standing picture that shows more than one figure is painted once more, for about the same again.'] : []),
-      ...(need.clips.length ? [`A clip whose walk fails the free checks is made once more, for about ${estimateClipUsd(video.model).toFixed(2)} dollars. Each clip is cut down to one cycle of ${BODY_TYPES[walker.body]?.frames ?? 12} frames.`] : []),
-    ];
-    return { at: Date.now(), steps, ...(notes.length ? { notes } : {}) };
-  }
-
-  /**
    * Exactly what painting a walker standing in one direction would send, on
    * its own so the Owner can look at the picture before any clip is made
    * from it; `prompt` replaces the usual words.
    */
-  async previewView(walker: Walker, direction: Facing, prompt?: string, from?: readonly ViewSource[]): Promise<Recipe> {
+  async previewView(walker: Walker, direction: IsoWay, prompt?: string, from?: readonly ViewSource[]): Promise<Recipe> {
     const image = this.options.provider();
     if (!image) throw new Error(stopReason(this.options));
     const step = await this.options.recipes!.imageStep(`${walker.name} standing, facing ${facingWords(direction)}`, image, await this.viewRequest(walker, direction, prompt, from), estimateImageUsd(image.model));
@@ -346,7 +257,7 @@ export class WalkPainter {
    * picture there now is its first and last frame; `prompt` replaces the
    * usual words. Refused when there is no standing picture yet.
    */
-  async previewClip(walker: Walker, direction: Facing, prompt?: string): Promise<Recipe> {
+  async previewClip(walker: Walker, direction: IsoWay, prompt?: string): Promise<Recipe> {
     const video = this.options.video();
     if (!video) throw new Error(stopReason(this.options));
     const start = await this.startView(walker, direction);
@@ -375,7 +286,7 @@ export class WalkPainter {
    * Paints a walker standing in one direction, and nothing else: the clip is
    * made later from it, when the Owner asks. The picture it replaces is kept.
    */
-  async paintView(walker: Walker, direction: Facing, prompt: string | undefined, handle?: ArtJobHandle, from?: readonly ViewSource[]): Promise<boolean> {
+  async paintView(walker: Walker, direction: IsoWay, prompt: string | undefined, handle?: ArtJobHandle, from?: readonly ViewSource[]): Promise<boolean> {
     handle?.start();
     const painted = await this.paintStanding(walker, direction, handle, prompt, from);
     if (!painted) return handle?.skip(stopReason(this.options)), false;
@@ -424,7 +335,7 @@ export class WalkPainter {
    * nothing else. The walk it replaces is kept; when it fails twice, the walk
    * stays as it was. The walk strips of every way that walks are made again.
    */
-  async makeClip(walker: Walker, direction: Facing, prompt: string | undefined, handle?: ArtJobHandle): Promise<boolean> {
+  async makeClip(walker: Walker, direction: IsoWay, prompt: string | undefined, handle?: ArtJobHandle): Promise<boolean> {
     const body = BODY_TYPES[walker.body] ?? BODY_TYPES['two-legged']!;
     const start = await this.startView(walker, direction);
     if (!start) {
@@ -562,7 +473,7 @@ export class WalkPainter {
    * the front alone does not show everything, such as how a scarf hangs at
    * the back. Refused when a chosen standing picture is not there.
    */
-  private async viewRequest(walker: Walker, direction: Facing, prompt?: string, from: readonly ViewSource[] = ['approved']): Promise<ImageRequest> {
+  private async viewRequest(walker: Walker, direction: IsoWay, prompt?: string, from: readonly ViewSource[] = ['approved']): Promise<ImageRequest> {
     const chosen = [...new Set(from.length ? from : ['approved' as const])];
     const references: ImageRequest['references'] = [];
     const labels: string[] = [];
@@ -599,34 +510,6 @@ export class WalkPainter {
       aspectRatio: '16:9',
       size: '2K',
     };
-  }
-
-  /** All four walks of one walker; false when painting has to stop (no model, no budget). */
-  async paintWalker(walker: Walker, source: ArtJobSource, redone = false, planned?: WalkPlan): Promise<boolean> {
-    const body = BODY_TYPES[walker.body] ?? BODY_TYPES['two-legged']!;
-    const { views: viewJobs, clips: clipJobs } = planned ?? (await this.plan(walker, source));
-    const skipRest = (reason: string) => {
-      for (const handle of [...viewJobs.values(), ...clipJobs.values()]) handle?.skip(reason);
-    };
-    // Each way that walks is used in the game as soon as it is made, even when another way fails.
-    let made = false;
-    try {
-      for (const direction of WALK_DIRECTIONS) {
-        if (await this.cached(`frames/${walkArt(walker.id, direction)}.json`)) continue;
-        const view = await this.view(walker, direction, viewJobs.get(direction));
-        if (!view) return skipRest(stopReason(this.options)), false;
-        const cut = await this.walk(walker, direction, view, body.frames, clipJobs.get(direction));
-        if (cut && 'stop' in cut) return skipRest(cut.stop), false;
-        if (!cut) return skipRest(`Another of ${walker.name}'s walks failed twice, so the rest wait.`), true;
-        made = true;
-      }
-    } catch (err) {
-      skipRest(`Painting ${walker.name} stopped: ${plain(err)}`);
-      throw err;
-    } finally {
-      if (made || redone) await this.writeKept(walker, redone).catch((err) => console.error(`Writing ${walker.name}'s walks failed:`, (err as Error).message));
-    }
-    return true;
   }
 
   /** Writes the walk strips of every way a walker has frames for. */
@@ -674,32 +557,11 @@ export class WalkPainter {
     return height >= SHARP_ENOUGH;
   }
 
-  /** The walker standing in one direction: its approved picture for the front, painted for the rest. */
-  private async view(walker: Walker, direction: WalkDirection, handle?: ArtJobHandle): Promise<Buffer | undefined> {
-    const kept = await this.keptView(walker, direction);
-    if (kept) return kept;
-    if (direction === 'front' && (await this.sharpReference(walker))) {
-      handle?.start();
-      handle?.done(0);
-      await this.options.recipes?.forget(viewKey(walker, direction));
-      const figure = await soleFigure(await this.onMagenta(walker));
-      await mkdir(resolve(this.dir, 'views'), { recursive: true });
-      await writeFile(this.viewPath(walker, direction), figure);
-      return figure;
-    }
-    handle?.start();
-    const painted = await this.paintStanding(walker, direction, handle);
-    if (!painted) return undefined;
-    handle?.done(painted.usd);
-    await this.keepView(walker, direction, painted);
-    return painted.figure;
-  }
-
   /**
    * Paints the walker standing in one direction, tried twice when the
    * picture shows more than one figure; undefined when painting has to stop.
    */
-  private async paintStanding(walker: Walker, direction: Facing, handle?: ArtJobHandle, prompt?: string, from?: readonly ViewSource[]): Promise<{ figure: Buffer; usd: number; request: ImageRequest; provider: ImageProvider } | undefined> {
+  private async paintStanding(walker: Walker, direction: IsoWay, handle?: ArtJobHandle, prompt?: string, from?: readonly ViewSource[]): Promise<{ figure: Buffer; usd: number; request: ImageRequest; provider: ImageProvider } | undefined> {
     let usd = 0;
     for (let attempt = 0; attempt < 2; attempt++) {
       const provider = this.options.provider();
@@ -729,7 +591,7 @@ export class WalkPainter {
   }
 
   /** One direction's walk cut from a clip, tried twice; `stop` says why when painting has to stop. */
-  private async walk(walker: Walker, direction: Facing, view: Buffer, count: number, handle?: ArtJobHandle, prompt = walkVideoPrompt(walker.gear, direction, walker.body)): Promise<Buffer[] | { stop: string } | undefined> {
+  private async walk(walker: Walker, direction: IsoWay, view: Buffer, count: number, handle?: ArtJobHandle, prompt = walkVideoPrompt(walker.gear, direction, walker.body)): Promise<Buffer[] | { stop: string } | undefined> {
     const id = walkArt(walker.id, direction);
     const first = { mimeType: 'image/png', data: await startFrame(view) };
     let usd = 0;
@@ -775,11 +637,11 @@ export class WalkPainter {
   }
 
   /** Keeps what made one direction's walk: its standing picture's recipe, if it was painted, then the clip's. */
-  private async keepRecipe(walker: Walker, direction: Facing, provider: VideoProvider | undefined, prompt: string, first: { mimeType: string; data: Buffer }, usd: number): Promise<void> {
+  private async keepRecipe(walker: Walker, direction: IsoWay, provider: VideoProvider | undefined, prompt: string, first: { mimeType: string; data: Buffer }, usd: number): Promise<void> {
     const recipes = this.options.recipes;
     if (!recipes || !provider) return;
     const view = await recipes.current(viewKey(walker, direction));
-    const clip = await recipes.clipStep(`${walker.name} walking ${facingWords(direction)}`, provider, { prompt, seconds: CLIP_SECONDS, first }, usd, this.startName(walker, direction, !view && direction === 'front'));
+    const clip = await recipes.clipStep(`${walker.name} walking ${facingWords(direction)}`, provider, { prompt, seconds: CLIP_SECONDS, first }, usd, this.startName(walker, direction, false));
     await recipes.record(walkArt(walker.id, direction), { at: Date.now(), steps: [...(view?.steps ?? []), clip] });
   }
 

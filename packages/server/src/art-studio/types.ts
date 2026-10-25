@@ -6,7 +6,6 @@ import {
   isFacing,
   type ArtManifest,
   type Facing,
-  type WalkDirection,
 } from '@co-mmo/shared';
 import type { AiServices } from '../ai/services.ts';
 import type { ArtVersion } from '../art-history.ts';
@@ -86,7 +85,6 @@ export interface WalkStrip {
 export type ArtAsk =
   | { kind: 'paint'; asset: string; note?: string }
   | { kind: 'group'; group: string }
-  | { kind: 'walk'; walker: string; body: string; directions?: WalkDirection[]; views?: boolean }
   | { kind: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   /** The isometric ways one walker, or every walker, has no standing picture for yet. */
   | { kind: 'ways'; walker?: string }

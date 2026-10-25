@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { WALK_DIRECTIONS, walkArt, walkStandArt } from '@co-mmo/shared';
+import { ISO_WAYS, walkArt, walkStandArt } from '@co-mmo/shared';
 import type { ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
 import { WalkPainter } from '../src/walk-painter.ts';
@@ -36,8 +36,10 @@ describe('walk painter', () => {
     const options = { provider: () => images, video: () => video, overBudget: () => false, spend: () => {}, spendVideo: () => {}, anchorDir, artDir, shipped: async () => ({}), toFrames: frames };
     const first = new WalkPainter(options);
     await first.load();
-    await first.paintWalker(first.anchorWalker('player-mara'), 'gods-view');
-    const id = walkArt('player-mara', 'left');
+    const mara = first.anchorWalker('player-mara');
+    await first.paintView(mara, 'front-left', undefined);
+    await first.makeClip(mara, 'front-left', undefined);
+    const id = walkArt('player-mara', 'front-left');
     const names = JSON.parse(await readFile(join(artDir, 'walks', 'frames', `${id}.json`), 'utf8')) as string[];
     const sizes = async () => Promise.all(names.map(async (n) => { const m = await sharp(join(artDir, 'walks', 'frames', n)).metadata(); return `${m.width}x${m.height}`; }));
     // Every frame shares one canvas, so the striding legs keep their places instead of being centred one by one.
@@ -59,7 +61,7 @@ describe('walk painter', () => {
     expect(again.manifest()[id]).toMatchObject({ redone: expect.any(Number) });
   }, 180_000);
 
-  it('paints a look standing in every direction when asked, walks it on video, and keeps one cycle of 12 frames per direction', async () => {
+  it('paints a look standing in each isometric way when asked, walks it on video, and keeps one cycle of 12 frames per way', async () => {
     const root = await mkdtemp(join(tmpdir(), 'walks-'));
     const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');
     await mkdir(join(anchorDir, 'raw'), { recursive: true });
@@ -93,25 +95,32 @@ describe('walk painter', () => {
       onPainted: (ids) => told.push(ids),
     });
     await painter.load();
-    for (const look of ['player-mara', 'player-ilya']) await painter.paintWalker(painter.anchorWalker(look), 'gods-view');
+    for (const look of ['player-mara', 'player-ilya']) {
+      const w = painter.anchorWalker(look);
+      for (const way of ISO_WAYS) {
+        await painter.paintView(w, way, undefined);
+        await painter.makeClip(w, way, undefined);
+      }
+    }
     // Open games are told about each look's walks once they are on disk, and each standing picture as it is painted.
-    expect(told.filter((ids) => ids[0]!.includes('-walk-'))).toEqual(['player-mara', 'player-ilya'].map((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d))));
-    expect(told.filter((ids) => ids[0]!.includes('-stand-')).flat()).toEqual(['player-mara', 'player-ilya'].flatMap((look) => (['right', 'back', 'left'] as const).map((d) => walkStandArt(look, d))));
-    expect(Object.keys(await painter.standingManifest())).toEqual(expect.arrayContaining([walkStandArt('player-mara', 'left')]));
+    const walksTold = told.filter((ids) => ids[0]!.includes('-walk-'));
+    expect(walksTold.at(-1)).toEqual(ISO_WAYS.map((d) => walkArt('player-ilya', d)));
+    expect(told.filter((ids) => ids[0]!.includes('-stand-')).flat()).toEqual(['player-mara', 'player-ilya'].flatMap((look) => ISO_WAYS.map((d) => walkStandArt(look, d))));
+    expect(Object.keys(await painter.standingManifest())).toEqual(expect.arrayContaining([walkStandArt('player-mara', 'front-left')]));
 
     const manifest = painter.manifest();
     expect(Object.keys(manifest)).toHaveLength(8);
-    const entry = manifest[walkArt('player-mara', 'left')]!;
-    expect(entry).toMatchObject({ file: 'wished-art/walks/player-mara-walk-left.png', kind: 'walk', frames: 12, cycleSeconds: 0.6 });
-    const strip = await sharp(join(artDir, 'walks', 'player-mara-walk-left.png')).metadata();
+    const entry = manifest[walkArt('player-mara', 'front-left')]!;
+    expect(entry).toMatchObject({ file: expect.stringMatching(/^wished-art\/walks\/player-mara-walk-front-left\.png/), kind: 'walk', frames: 12, cycleSeconds: 0.6 });
+    const strip = await sharp(join(artDir, 'walks', 'player-mara-walk-front-left.png')).metadata();
     expect([strip.width, strip.height]).toEqual([entry.width, entry.height]);
     expect(entry.width % 12).toBe(0);
-    // Three painted views a look (the front is the approved picture), plus one repaint; four looping clips a look.
-    expect(asked).toHaveLength(7);
+    // Four painted views a look, plus one repaint; four looping clips a look.
+    expect(asked).toHaveLength(9);
     expect(clips).toHaveLength(8);
     expect(clips.every((c) => c.last === c.first && c.seconds === 8)).toBe(true);
-    expect(clips.map((c) => c.prompt).find((p) => p.includes('to the left'))).toBeDefined();
-    expect(spent).toHaveLength(15);
+    expect(clips.map((c) => c.prompt).find((p) => p.includes('LOWER-LEFT corner'))).toBeDefined();
+    expect(spent).toHaveLength(17);
 
     // Everything is kept, and start-up paints nothing, even when an approved picture changed:
     // walkers are painted from the Art tab.
@@ -123,7 +132,7 @@ describe('walk painter', () => {
     });
     await again.start();
     expect(Object.keys(again.manifest())).toHaveLength(8);
-    expect(spent).toHaveLength(15);
+    expect(spent).toHaveLength(17);
     expect(clips).toHaveLength(8);
     expect(JSON.parse(await readFile(join(artDir, 'walks', 'manifest.json'), 'utf8'))).toEqual(manifest);
   }, 180_000);
@@ -139,8 +148,10 @@ describe('walk painter', () => {
       anchorDir, artDir, shipped: async () => ({}), toFrames: frames,
     });
     await painter.load();
-    await painter.paintWalker(painter.anchorWalker('player-mara'), 'gods-view');
+    const mara = painter.anchorWalker('player-mara');
+    expect(await painter.paintView(mara, 'front-left', undefined)).toBe(true);
+    expect(await painter.makeClip(mara, 'front-left', undefined)).toBe(false);
     expect(painter.manifest()).toEqual({});
-    expect(WALK_DIRECTIONS.length).toBe(4);
+    expect(Object.keys(await painter.standingManifest())).toEqual([walkStandArt('player-mara', 'front-left')]);
   }, 60_000);
 });

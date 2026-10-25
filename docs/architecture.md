@@ -198,7 +198,8 @@ its look is painted again. The game's collision is still its wall tiles.
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
 `world-scene.ts` (the Phaser scene facade; positions go through `PROJECTION`, and
 walkers face its `ways`: the four isometric ways show standing pictures
-until walks are made for them; the
+until walks are made for them, and a walker with no isometric pictures yet
+shows its old top-down ones; the
 ground, trees and rocks are drawn in chunks near the player) + `world-scene/`:
 `types.ts` (view interfaces, floor depth and shade helpers), `walls.ts`
 (`rockWalls` half-tile coping and vertical wall extrusion), `regions.ts`

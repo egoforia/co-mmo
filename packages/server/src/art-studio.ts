@@ -10,10 +10,8 @@ import sharp from 'sharp';
 import {
   BODY_TYPES,
   BUILDING_STYLES,
-  WALK_DIRECTIONS,
   walkArt,
   type ArtManifest,
-  type WalkDirection,
 } from '@co-mmo/shared';
 import { ArtHistory } from './art-history.ts';
 import { plain, type ArtJob, type ArtJobHandle } from './art-jobs.ts';
@@ -258,34 +256,13 @@ export class ArtStudio {
   }
 
   /**
-   * Makes something walk, or walk again: `directions` are painted afresh
-   * (their standing views too when `views` is set); with none, only what is
-   * missing is painted. Directions already made are kept for free.
-   */
-  async walk(walkerId: string, body: string, directions: WalkDirection[], views: boolean): Promise<{ estimateUsd: number }> {
-    this.refuseWhenSpent();
-    const walker = this.catalog.walker(walkerId, body);
-    const image = this.options.ai.image('walks');
-    const video = this.options.ai.video();
-    if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
-    if (!video) throw new ArtRequestError("Walks are made with Google's video model, which needs Google AI Studio as the image model and its key.");
-    const redo = directions.filter((d) => WALK_DIRECTIONS.includes(d));
-    await this.options.walks.forget(walker, redo, views);
-    const plan = await this.options.walks.plan(walker, 'gods-view');
-    const estimateUsd = plan.views.size * estimateImageUsd(image.model) + plan.clips.size * estimateClipUsd(video.model);
-    if (!plan.views.size && !plan.clips.size) throw new ArtRequestError(`${walker.name} already walks every way. Pick a direction to paint again.`);
-    this.enqueue(() => this.options.walks.paintWalker(walker, 'gods-view', true, plan), undefined, { kind: 'walk', walker: walkerId, body });
-    return { estimateUsd };
-  }
-
-  /**
    * Paints a walker standing in one direction, and only that, so the Owner
    * can look at it (and paint it again) before a walk clip is made from it.
    */
   async paintView(walkerId: string, direction: string, prompt?: string, from?: string[]): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.catalog.walker(walkerId, 'two-legged');
-    const d = this.catalog.facing(direction);
+    const d = this.catalog.way(direction);
     const image = this.options.ai.image('walks');
     if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
     const estimateUsd = estimateImageUsd(image.model);
@@ -318,7 +295,7 @@ export class ArtStudio {
   async makeClip(walkerId: string, body: string, direction: string, prompt?: string): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     const walker = this.catalog.walker(walkerId, body);
-    const d = this.catalog.facing(direction);
+    const d = this.catalog.way(direction);
     const video = this.options.ai.video();
     if (!video) throw new ArtRequestError("Walks are made with Google's video model, which needs Google AI Studio as the image model and its key.");
     const estimateUsd = estimateClipUsd(video.model);
@@ -448,7 +425,6 @@ export class ArtStudio {
   }
 
   private async again(request: PaintRequest): Promise<unknown> {
-    if (request.kind === 'walk') return this.walk(request.walker, request.body, [], false);
     if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
     if (request.kind === 'ways') return this.paintWays(request.walker);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);

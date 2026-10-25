@@ -11,7 +11,6 @@ import {
   WALK_CYCLE_SECONDS,
   WALK_FRAMES,
   isFacing,
-  isWalkDirection,
   regionPictures,
   ruleItemId,
   walkArt,
@@ -199,10 +198,12 @@ export class ArtCatalog {
           attacks[d] = { url: slash(attackEntry.file), frames: attackEntry.frames ?? 12, width: attackEntry.width, height: attackEntry.height, cycleSeconds: attackEntry.cycleSeconds ?? 0.8, versions: [] };
         }
       }
-      const needs = await this.options.walks.needs(w);
       const standing = {} as WalkerView['standing'];
       for (const d of FACINGS) standing[d] = await this.options.walks.standing(w, d, w.url);
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd: needs.views.length * picture + needs.clips.length * clip, clipUsd: clip, viewUsd: picture });
+      // What its isometric ways still need: one sheet for the missing pictures, and a clip for each way that does not walk.
+      const sheet = ISO_WAYS.some((d) => !standing[d].url) ? picture : 0;
+      const estimateUsd = sheet + ISO_WAYS.filter((d) => !walks[d]).length * clip;
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd, clipUsd: clip, viewUsd: picture });
     }
     return views;
   }
@@ -225,10 +226,16 @@ export class ArtCatalog {
     return { ...found, body };
   }
 
-  /** A way a standing picture can face: one a walk can face, or an isometric way. */
+  /** A way a walk painted before can face: a top-down direction or an isometric way. */
   facing(facing: string): Facing {
     if (!isFacing(facing)) throw new ArtRequestError('That is not a direction.');
     return facing;
+  }
+
+  /** A way a walker is painted facing now: one of the four isometric ways. */
+  way(facing: string): IsoWay {
+    if (!(ISO_WAYS as readonly string[]).includes(facing)) throw new ArtRequestError('Walkers are painted facing one of the four isometric ways.');
+    return facing as IsoWay;
   }
 
   /** The walkers whose four ways a ways sheet paints: the one named, or every walker missing a way. */
@@ -246,12 +253,12 @@ export class ArtCatalog {
   }
 
   /**
-   * What a standing picture is painted from: the pictures chosen, or for an
-   * isometric way, the approved picture and the other isometric ways already
-   * painted, so it matches them; otherwise the approved picture alone.
+   * What a standing picture is painted from: the pictures chosen, or the
+   * approved picture and the other isometric ways already painted, so it
+   * matches them.
    */
-  async sourcesFor(walker: Walker, direction: Facing, from: string[] | undefined): Promise<ViewSource[] | undefined> {
-    return viewSources(from) ?? (isWalkDirection(direction) ? undefined : this.otherWays(walker, direction));
+  async sourcesFor(walker: Walker, direction: IsoWay, from: string[] | undefined): Promise<ViewSource[] | undefined> {
+    return viewSources(from) ?? this.otherWays(walker, direction);
   }
 
   /** The approved picture, and the painted standing pictures of the other isometric ways. */

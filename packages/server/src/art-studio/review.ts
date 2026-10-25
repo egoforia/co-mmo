@@ -3,8 +3,6 @@
 
 import {
   BUILDING_STYLES,
-  WALK_DIRECTIONS,
-  isWalkDirection,
 } from '@co-mmo/shared';
 import { plain } from '../art-jobs.ts';
 import { Previewed, dryImage, recipeUsd, type Recipe } from '../art-recipes.ts';
@@ -133,17 +131,9 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
       parts,
     };
   },
-  walk: async (ask, options, catalog) => {
-    const walker = catalog.walker(ask.walker, ask.body);
-    const redo = (ask.directions ?? []).filter((d) => WALK_DIRECTIONS.includes(d));
-    const title = redo.length ? `Paint ${walker.name} walking ${redo.length === 1 ? 'one way' : `${redo.length} ways`} again` : `Make ${walker.name} walk`;
-    const recipe = await options.walks.preview(walker, redo, ask.views === true);
-    if (!recipe.steps.length) throw new ArtRequestError(`${walker.name} already walks every way. Pick a direction to paint again.`);
-    return { title, parts: [{ name: walker.name, recipe }] };
-  },
   view: async (ask, options, catalog) => {
     const walker = catalog.walker(ask.walker, 'two-legged');
-    const direction = catalog.facing(ask.direction);
+    const direction = catalog.way(ask.direction);
     return {
       title: `Paint ${walker.name} standing, facing ${facingWords(direction)}`,
       parts: [{ name: walker.name, recipe: await options.walks.previewView(walker, direction, ownPrompt(ask.prompt), await catalog.sourcesFor(walker, direction, ask.from)) }],
@@ -161,8 +151,8 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
   },
   clip: async (ask, options, catalog) => {
     const walker = catalog.walker(ask.walker, ask.body);
-    const direction = catalog.facing(ask.direction);
-    const title = `Make ${walker.name}'s walk clip, ${direction === 'front' ? 'walking towards us' : direction === 'back' ? 'walking away' : isWalkDirection(direction) ? `facing ${direction}` : `walking ${facingWords(direction)}`}`;
+    const direction = catalog.way(ask.direction);
+    const title = `Make ${walker.name}'s walk clip, walking ${facingWords(direction)}`;
     return {
       title,
       parts: [{ name: walker.name, recipe: await options.walks.previewClip(walker, direction, ownPrompt(ask.prompt)) }],

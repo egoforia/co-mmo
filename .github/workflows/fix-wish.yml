@@ -118,7 +118,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.plan.outputs.go == 'yes'
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - if: steps.plan.outputs.go == 'yes'
         run: npm ci

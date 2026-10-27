@@ -15,7 +15,7 @@ describe('joining', () => {
     const { base, store } = await start({ mailer });
     const owner = account(store, 'Owner', 'owner');
     const invite = store.createInvite(owner.id);
-    const res = await post(base, '/api/accept', { code: invite.code, name: 'Mara', adult: true, email: 'Mara@Example.com', look: 'A tall elf in a green hood with a lantern.' });
+    const res = await post(base, '/api/accept', { code: invite.code, name: 'Mara', adult: true, email: 'Mara@Example.com', look: 'A tall elf in a green hood with a lantern.', race: 'falcon', calling: 'ranger' });
     expect(res.status).toBe(200);
     expect(res.body.notes[0]).toMatch(/mara@example.com/);
 
@@ -43,7 +43,7 @@ describe('joining', () => {
     const mara = account(store, 'Mara');
     store.setEmail(mara.id, 'mara@example.com');
     const invite = store.createInvite(null);
-    const res = await post(base, '/api/accept', { code: invite.code, name: 'Ilya', adult: true, email: 'mara@example.com' });
+    const res = await post(base, '/api/accept', { code: invite.code, name: 'Ilya', adult: true, email: 'mara@example.com', race: 'scorpid', calling: 'duelist' });
     expect(res.body.error).toBe('email_taken');
     expect(store.findInvite(invite.code)!.usedBy).toBeNull();
   });

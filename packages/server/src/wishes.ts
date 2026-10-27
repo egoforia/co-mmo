@@ -1,4 +1,4 @@
-import type { BiomeId, ContentEntry, PicturedWish, PlayerInfo, WishDefinition, WishTier } from '@co-mmo/shared';
+import type { BiomeId, ContentEntry, PicturedWish, PlayerInfo, RaceId, WishDefinition, WishTier } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
 import type { AiServices, ServiceOverrides } from './ai/services.ts';
 import type { Budget } from './budget.ts';
@@ -149,8 +149,8 @@ export class Wishes {
   }
 
   /** A new player's free first wish: how they look. Throws a WishError. */
-  grantLook(player: { id: string; name: string }, words: string): ContentRecord {
-    return this.granting.grantLook(player, words);
+  grantLook(player: { id: string; name: string }, words: string, race?: RaceId): ContentRecord {
+    return this.granting.grantLook(player, words, race);
   }
 
   /** Sets a creature's whole loot from God's View. Throws a WishError. */

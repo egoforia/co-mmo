@@ -1,8 +1,10 @@
 import {
   ABILITIES,
+  CALLINGS,
   EQUIP_SLOTS,
   ITEMS,
   QUESTS,
+  RACES,
   SLOT_NAMES,
   attackCooldown,
   armor,
@@ -20,6 +22,7 @@ import {
   type Character,
   type DialogueMessage,
   type EquipSlot,
+  type Stats,
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
 import { itemLabel } from './kit-ui.ts';
@@ -48,6 +51,8 @@ export interface RpgActions {
   typing(): boolean;
   /** Opens the prayer window. */
   prayer(): void;
+  /** Places a free attribute point. */
+  spendPoint(stat: keyof Stats): void;
 }
 
 /** Health, XP, quests, dialogue, the bag and the Bible: everything in DOM. */
@@ -68,7 +73,9 @@ export class RpgUi {
       const target = e.target as HTMLElement;
       const item = target.closest<HTMLElement>('[data-item]')?.dataset.item;
       const slot = target.closest<HTMLElement>('[data-slot]')?.dataset.slot as EquipSlot | undefined;
-      if (item === 'bible') this.toggle('bible', true);
+      const stat = target.closest<HTMLElement>('[data-stat]')?.dataset.stat as keyof Stats | undefined;
+      if (stat) actions.spendPoint(stat);
+      else if (item === 'bible') this.toggle('bible', true);
       else if (item) actions.use(item);
       else if (slot) actions.unequip(slot);
       if (target.closest('[data-close]')) this.toggle('inventory', false);
@@ -233,7 +240,11 @@ export class RpgUi {
     }).join('');
     const s = c.stats;
     const t = totalStats(c);
-    const stat = (name: string, k: keyof typeof s) => `<div><dt>${name}</dt><dd>${t[k]}${t[k] > s[k] ? `<small>+${t[k] - s[k]}</small>` : ''}</dd></div>`;
+    const free = c.calling ? c.freePoints : 0;
+    const place = (k: keyof Stats) => free > 0 ? `<button type="button" class="place" data-stat="${k}" title="Place a free point here">+</button>` : '';
+    const stat = (name: string, k: keyof typeof s) => `<div><dt>${name}</dt><dd>${t[k]}${t[k] > s[k] ? `<small>+${t[k] - s[k]}</small>` : ''}${place(k)}</dd></div>`;
+    const who = c.race && c.calling ? `${RACES[c.race].name} ${CALLINGS[c.calling].name}` : '';
+    const calling = who ? `<p class="calling">${escapeHtml(who)}${free > 0 ? ` · <b>${free} free point${free > 1 ? 's' : ''}</b> to place with +` : ''}</p>` : '';
     const abilities = c.abilities.filter((a) => ABILITIES[a]).map((a, i) => `<li><kbd>${i + 1}</kbd> <b>${escapeHtml(ABILITIES[a]!.name)}</b> ${escapeHtml(ABILITIES[a]!.description)}</li>`).join('');
     $('inventory').innerHTML = `
       <h2>Your bag <button type="button" class="close" data-close aria-label="Close">×</button></h2>
@@ -241,6 +252,7 @@ export class RpgUi {
       <div class="slots gear">${worn}</div>
       <h3>Carried</h3>
       <div class="slots">${slots}</div>
+      ${calling}
       <dl class="sheet">
         ${stat('Might', 'might')}${stat('Agility', 'agility')}${stat('Wit', 'wit')}${stat('Spirit', 'spirit')}${stat('Vigor', 'vigor')}
         <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Armour</dt><dd>${one(armor(c))}</dd></div><div><dt>Ward</dt><dd>${one(ward(c))}</dd></div>

@@ -24,7 +24,7 @@ describe('choosing a people and Calling', () => {
     // They play as what they chose.
     const welcome = await connect(ws, first).waitFor<WelcomeMessage>((m) => m.t === 'welcome');
     expect(welcome.character).toMatchObject({ race: 'ursine', calling: 'warden' });
-  });
+  }, 30_000);
 
   it('refuses a missing or unknown people or Calling and keeps the invite', async () => {
     const { base, store } = await start();

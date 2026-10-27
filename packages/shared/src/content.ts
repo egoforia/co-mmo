@@ -7,6 +7,7 @@ import { BIOMES, type BiomeId } from './biomes.ts';
 import { RECIPES } from './kit.ts';
 import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
+import { RACES, isRace, type RaceId } from './races.ts';
 import { applyLoot, removeLoot } from './loot.ts';
 import { cleanLight, type Light } from './light.ts';
 import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
@@ -116,6 +117,8 @@ export interface PlayerLookWish {
   /** Their words, as written. */
   description: string;
   look: WishLook;
+  /** Their people, which decides the body the painter draws (docs/races.md). */
+  race?: RaceId;
 }
 
 /** A creature a wished region brings: one that already exists, or a new one. */
@@ -854,17 +857,19 @@ const LOOK_COLORS: [RegExp, string][] = [
  * Turns a player's own words about how they look into their look wish.
  * Throws a WishError with a friendly message when there is nothing to draw.
  */
-export function lookFromWords(name: string, raw: string): PlayerLookWish {
+export function lookFromWords(name: string, raw: string, race?: RaceId): PlayerLookWish {
   const description = text(raw, MAX_LOOK_LENGTH);
   if (description.length < 3) throw new WishError('Tell the God a little about how you look.');
   const lower = description.toLowerCase();
   const color = LOOK_COLORS.find(([re]) => re.test(lower))?.[1] ?? '#c8a2c8';
   const first = description.split(/[.!?;]/)[0]!.trim();
+  const who = race ? `A ${RACES[race].name} adventurer, ${RACES[race].animal}folk` : 'An adventurer';
   return {
     kind: 'player',
     name: text(name, 40),
     description,
-    look: { hook: first.slice(0, 120) || description.slice(0, 120), body: `An adventurer: ${description}`.slice(0, 200), color, mood: 'warm and adventurous' },
+    look: { hook: first.slice(0, 120) || description.slice(0, 120), body: `${who}: ${description}`.slice(0, 200), color, mood: 'warm and adventurous' },
+    ...(race ? { race } : {}),
   };
 }
 
@@ -878,7 +883,7 @@ export function validateLookWish(raw: unknown): PlayerLookWish {
   const description = text(d.description, MAX_LOOK_LENGTH);
   if (!name) throw new WishError('It needs a name.');
   if (description.length < 3) throw new WishError('Tell the God a little about how you look.');
-  return { kind: 'player', name, description, look: cleanLook(d.look) };
+  return { kind: 'player', name, description, look: cleanLook(d.look), ...(isRace(d.race) ? { race: d.race } : {}) };
 }
 
 function cleanLook(raw: unknown): WishLook {

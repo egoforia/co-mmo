@@ -5,9 +5,13 @@
 import type { Light } from './light.ts';
 import { SLEEPING_ABILITIES } from './mods.ts';
 import type { Active } from './sky.ts';
+import type { CallingId } from './classes.ts';
+import type { RaceId } from './races.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
+import { levelUpStats } from './rpg/callings.ts';
 
 export * from './rpg/attributes.ts';
+export * from './rpg/callings.ts';
 
 export interface Stats {
   /** Heavy weapon damage and a little health. */
@@ -71,6 +75,14 @@ export interface Character {
   /** Creator XP: earned when others use, fight or visit what this player wished for. */
   creatorXp: number;
   creatorLevel: number;
+  /** Their people (docs/races.md); missing on characters from before peoples, until they choose. */
+  race?: RaceId;
+  /** Their Calling (docs/classes.md); without one, levels raise all five attributes. */
+  calling?: CallingId;
+  /** The Path chosen after the Calling's level-10 trial. */
+  path?: string;
+  /** Attribute points gained by levelling and not yet placed. */
+  freePoints: number;
 }
 
 /** Favor a new character starts with: enough for a first small wish or two. */
@@ -105,6 +117,7 @@ export function newCharacter(): Character {
     abilities: [],
     creatorXp: 0,
     creatorLevel: 1,
+    freePoints: 0,
   };
   c.hp = maxHp(c);
   c.energy = maxEnergy(c);
@@ -165,10 +178,6 @@ export function xpToNext(level: number): number {
   return Math.round(20 * level ** 1.5);
 }
 
-/**
- * Adds XP, levelling up as many times as it covers. Each level raises every
- * stat by one and restores health. Returns the number of levels gained.
- */
 /** A party's tuning default, not a server limit (design doc, Social play). */
 export const PARTY_SIZE = 6;
 /** Each extra party member sharing a defeat adds this much to the XP shared out. */
@@ -184,6 +193,11 @@ export function partyXp(xp: number, sharers: number): number {
   return Math.ceil((xp * (1 + PARTY_XP_BONUS * (sharers - 1))) / sharers);
 }
 
+/**
+ * Adds XP, levelling up as many times as it covers. Each level raises the
+ * Calling's two attributes and gives a free point (levelUpStats), and
+ * restores health. Returns the number of levels gained.
+ */
 export function gainXp(c: Character, amount: number): number {
   c.xp += amount;
   let levels = 0;
@@ -191,7 +205,7 @@ export function gainXp(c: Character, amount: number): number {
     c.xp -= xpToNext(c.level);
     c.level++;
     levels++;
-    for (const k of Object.keys(c.stats) as (keyof Stats)[]) c.stats[k]++;
+    levelUpStats(c);
   }
   if (levels) {
     c.hp = maxHp(c);

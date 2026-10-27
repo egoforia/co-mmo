@@ -8,6 +8,8 @@ import {
   equip,
   readScroll,
   sell,
+  spendPoint,
+  STAT_NAMES,
   train,
   unequip,
   TALK_RANGE,
@@ -17,6 +19,7 @@ import {
   takeItem,
   type EquipSlot,
   type ShopMessage,
+  type Stats,
 } from '@co-mmo/shared';
 import type { PlayerState, RegionState } from './state.ts';
 
@@ -39,6 +42,14 @@ export class Kit {
     } else if (slot && !unequip(p.character, slot)) {
       return;
     }
+    p.dirty = true;
+  }
+
+  /** Places a free attribute point; the server checks there is one to place. */
+  placePoint(p: PlayerState, stat: keyof Stats): void {
+    const why = spendPoint(p.character, stat);
+    if (why) return this.s.notice(p, why);
+    this.s.notice(p, `${STAT_NAMES[stat]} rises to ${p.character.stats[stat]}.`);
     p.dirty = true;
   }
 

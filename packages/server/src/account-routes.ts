@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { WishError, validateName, type PlayerInfo } from '@co-mmo/shared';
+import { WishError, isCalling, isRace, startCharacter, validateName, type PlayerInfo } from '@co-mmo/shared';
 import { cleanEmail, type Auth } from './auth.ts';
 import { json, readJson, type Authenticate } from './http.ts';
 import { StoreError, type Account, type Store } from './store.ts';
@@ -50,10 +50,14 @@ export async function handleAccount(req: IncomingMessage, res: ServerResponse, p
     const email = rawEmail ? cleanEmail(rawEmail) : '';
     if (rawEmail && !email) return json(res, 400, { error: 'email_invalid', message: 'That does not look like an email address.' }), true;
     if (email && store.accountByEmail(email)) return json(res, 400, { error: 'email_taken', message: 'Another player already signs in with that email.' }), true;
+    // Every new Wishbearer is one of the five peoples and takes a Calling (docs/races.md, docs/classes.md).
+    if (!isRace(body?.race)) return json(res, 400, { error: 'race_invalid', message: 'Choose which of the five peoples you belong to.' }), true;
+    if (!isCalling(body?.calling)) return json(res, 400, { error: 'calling_invalid', message: 'Choose your Calling: how you will fight and help others.' }), true;
+    const race = body.race;
     const look = typeof body?.look === 'string' ? body.look.trim() : '';
     let created: ReturnType<Store['acceptInvite']>;
     try {
-      created = store.acceptInvite(code, name, ctx.homeRegion());
+      created = store.acceptInvite(code, name, ctx.homeRegion(), startCharacter(race, body.calling));
     } catch (err) {
       if (err instanceof StoreError) return json(res, 400, { error: err.code, message: err.message }), true;
       throw err;
@@ -64,7 +68,7 @@ export async function handleAccount(req: IncomingMessage, res: ServerResponse, p
     const notes: string[] = [];
     if (look) {
       try {
-        wishes.grantLook(account, look);
+        wishes.grantLook(account, look, race);
       } catch (err) {
         if (!(err instanceof WishError)) throw err;
         notes.push(err.message);
@@ -114,7 +118,7 @@ export async function handleAccount(req: IncomingMessage, res: ServerResponse, p
     if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) }), true;
     const body = await readJson(req);
     try {
-      wishes.grantLook(account, typeof body?.look === 'string' ? body.look : '');
+      wishes.grantLook(account, typeof body?.look === 'string' ? body.look : '', account.character?.race);
     } catch (err) {
       if (err instanceof WishError) return json(res, 400, { error: 'look_invalid', message: err.message }), true;
       throw err;

@@ -11,6 +11,7 @@ import {
   validateLoot,
   wishArtKey,
   type ContentEntry,
+  type RaceId,
 } from '@co-mmo/shared';
 import type { LiveRules } from '../live-rules.ts';
 import type { ContentRecord, Store } from '../store.ts';
@@ -67,11 +68,12 @@ export class Granting {
   /**
    * A new player describes how they look: their first wish, free, granted at
    * once and painted like any wished thing. A Steward can roll it back, and
-   * then the player may describe themself again. Throws a WishError.
+   * then the player may describe themself again. The people, when given,
+   * decides the body the painter draws. Throws a WishError.
    */
-  grantLook(player: { id: string; name: string }, words: string): ContentRecord {
+  grantLook(player: { id: string; name: string }, words: string, race?: RaceId): ContentRecord {
     if (this.lookOf(player.id)) throw new WishError('Your look is already chosen. Changing it later will be a wish of its own.');
-    const definition = lookFromWords(player.name, words);
+    const definition = lookFromWords(player.name, words, race);
     const record: ContentRecord = {
       id: newWishId(this.now()),
       wisher: { id: player.id, name: player.name },

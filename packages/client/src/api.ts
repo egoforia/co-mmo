@@ -44,6 +44,9 @@ export interface Joining {
   email?: string;
   /** Optional: how the player looks, in their own words. */
   look?: string;
+  /** Their people and Calling ids; the server checks them. */
+  race: string;
+  calling: string;
 }
 
 /** Accepts an invite; `notes` are things to tell the player (an email was sent). */

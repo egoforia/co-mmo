@@ -249,8 +249,8 @@ export class Store {
     return this.data.accounts.some((a) => a.name.toLowerCase() === lower);
   }
 
-  /** Redeems an invite and returns the new account plus its session token. */
-  acceptInvite(code: string, name: string, regionId: string): { account: Account; token: string } {
+  /** Redeems an invite and returns the new account plus its session token; `character` is the one made at sign-up. */
+  acceptInvite(code: string, name: string, regionId: string, character?: Character): { account: Account; token: string } {
     const invite = this.findInvite(code);
     if (!invite || invite.usedBy) throw new StoreError('invite_invalid', 'This invite is not valid or was already used.');
     if (this.nameTaken(name)) throw new StoreError('name_taken', 'That name is already taken.');
@@ -266,6 +266,7 @@ export class Store {
       regionId,
       x: null,
       y: null,
+      ...(character ? { character: structuredClone(character) } : {}),
     };
     invite.usedBy = account.id;
     this.data.accounts.push(account);

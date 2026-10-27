@@ -63,20 +63,20 @@ describe('invites and sign-in', () => {
     expect(noAdult.status).toBe(400);
     expect(noAdult.body.error).toBe('adult_required');
 
-    const owner = await post(`${base}/api/accept`, { code: ownerInvite.code, name: 'egoforia', adult: true });
+    const owner = await post(`${base}/api/accept`, { code: ownerInvite.code, name: 'egoforia', adult: true, race: 'ursine', calling: 'warden' });
     expect(owner.status).toBe(200);
     expect(owner.body.player.role).toBe('owner');
 
-    const reused = await post(`${base}/api/accept`, { code: ownerInvite.code, name: 'Other', adult: true });
+    const reused = await post(`${base}/api/accept`, { code: ownerInvite.code, name: 'Other', adult: true, race: 'ursine', calling: 'warden' });
     expect(reused.body.error).toBe('invite_invalid');
 
     const invite = await post(`${base}/api/invites`, {}, owner.body.token);
     expect(invite.body.url).toMatch(/^http:\/\/game\.test\/\?invite=/);
 
-    const dupe = await post(`${base}/api/accept`, { code: invite.body.code, name: 'EGOFORIA', adult: true });
+    const dupe = await post(`${base}/api/accept`, { code: invite.body.code, name: 'EGOFORIA', adult: true, race: 'ursine', calling: 'warden' });
     expect(dupe.body.error).toBe('name_taken');
 
-    const mara = await post(`${base}/api/accept`, { code: invite.body.code, name: 'Mara', adult: true });
+    const mara = await post(`${base}/api/accept`, { code: invite.body.code, name: 'Mara', adult: true, race: 'cervid', calling: 'bellkeeper' });
     expect(mara.body.player).toMatchObject({ name: 'Mara', role: 'player' });
 
     expect((await post(`${base}/api/invites`, {})).status).toBe(401);

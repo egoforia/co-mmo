@@ -87,7 +87,10 @@ clock and the region alone, so every server, cell and browser agrees
 without being told; people's days are in shared `routines.ts`.
 Character rules are shared `rpg.ts`, a face over `rpg/`: `attributes.ts`
 holds the five attributes' numbers (health, Energy, regeneration, crits,
-dodge, cooldowns, Armor and Ward; `docs/attributes.md`).
+dodge, cooldowns, Armor and Ward; `docs/attributes.md`) and `callings.ts`
+how a people and Calling build them (creation, level-ups, free points,
+changing Calling). The peoples and Callings themselves are plain data in
+shared `races.ts` and `classes.ts` (`docs/races.md`, `docs/classes.md`).
 
 **Wishes.** `wishes.ts` is one face over the parts in `wishes/`:
 `prayers.ts` (talking to the God, its limits and cost), `cards.ts` (wish

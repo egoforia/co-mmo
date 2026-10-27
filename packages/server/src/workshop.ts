@@ -206,7 +206,7 @@ export class Workshop {
       {
         shaped: { category: `${category.name}: ${sub.name}`, ...(checked.brief ? { brief: checked.brief } : {}) },
         ...(draft.sample ? { sample: paintedSample(player.id, draft.sample) } : {}),
-        look: sub.makes === 'player',
+        look: sub.makes === 'player' || sub.makes === 'calling',
       },
     );
     if (cardId) this.store.saveDraft(player.id, { ...draft, card: cardId });
@@ -291,7 +291,7 @@ export class Workshop {
     const problems = [...checked.problems];
     // An unfinished draft has no definition yet, so its card shows only the tier and price it will have.
     const made = region && !checked.problems.length && checked.tier !== 'refused'
-      ? this.wishes.cardFor(playerId, { tier: checked.tier, title: checked.title, summary: checked.summary, definition: checked.definition }, region.def.name, checked.makes === 'player')
+      ? this.wishes.cardFor(playerId, { tier: checked.tier, title: checked.title, summary: checked.summary, definition: checked.definition }, region.def.name, checked.makes === 'player' || checked.makes === 'calling')
       : undefined;
     if (made && 'note' in made) problems.push(made.note);
     const instant = checked.tier === 'minor' || checked.tier === 'moderate';
@@ -305,13 +305,13 @@ export class Workshop {
         card,
         world: checked.definition ? worldLines(checked.definition) : [],
         ...(checked.brief ? { plan: reviewPlan(checked.tier) } : {}),
-        ...(checked.definition && checked.definition.kind !== 'recipe' && checked.definition.kind !== 'loot' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
+        ...(checked.definition && checked.definition.kind !== 'recipe' && checked.definition.kind !== 'loot' && checked.definition.kind !== 'calling' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
       },
     };
   }
 
   /** What the image model would be asked for, built by the same code that paints. */
-  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' | 'loot' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
+  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' | 'loot' | 'calling' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
     const provider = this.options.ai.image('wishes');
     const pictures: PicturePreview[] = [];
     const picture = (label: string, prompt: string, wanted: string[], withRaw = false): void => {

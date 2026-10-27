@@ -15,7 +15,7 @@ export function awayFeed(store: Store, account: Account): AwayMessage | undefine
   if (since === undefined) return undefined;
   const items: { at: number; text: string }[] = [];
   for (const c of store.content) {
-    if (c.at <= since || c.wisher.id === account.id || c.definition?.kind === 'player') continue;
+    if (c.at <= since || c.wisher.id === account.id || c.definition?.kind === 'player' || c.definition?.kind === 'calling') continue;
     const where = c.placements ? regionDef(c.regionId)?.name : undefined;
     if (c.status === 'granted') items.push({ at: c.at, text: `${c.wisher.name} wished for "${c.title}"${where ? ` in ${where}` : ''}.` });
     else if (c.status === 'pending') items.push({ at: c.at, text: `${c.wisher.name} made a big wish, "${c.title}". It waits for the Stewards.` });

@@ -14,6 +14,7 @@ const SAMPLES: Record<string, Record<string, unknown>> = {
   loot: { creature: 'crab-knight', drops: ['tonic'], chance: 30, qty: 1 },
   person: { name: 'Old Wren', description: 'A birdwatcher.', greeting: 'Shh, the wrens!', ...look },
   look: { description: 'A tall fox-eared ranger in a moss-green cloak.', ...look },
+  calling: { race: 'lutran', calling: 'wishweaver' },
   gathering: { name: 'Fishing', what: 'cast a line', where: 'water', reward: 'fish' },
   'item-magic': { name: 'Gull Whistle', item: 'a seashell', what: 'a gull brings a fish' },
   hunting: { name: 'Scarab Gems', which: 'sun scarabs', reward: 'a gem sometimes' },

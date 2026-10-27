@@ -1,5 +1,5 @@
 import { CALLINGS, CALLING_IDS, RACES, RACE_IDS, STAT_NAMES, type CallingId, type RaceId } from '@co-mmo/shared';
-import { escapeHtml } from './ui.ts';
+import { escapeHtml, showPanel } from './ui.ts';
 
 // Choosing a people and a Calling (docs/races.md, docs/classes.md): two
 // lists with a line under each that says what the choice gives. Used by the
@@ -39,4 +39,34 @@ export function pickedCalling(root: HTMLElement): { race: string; calling: strin
     race: root.querySelector<HTMLSelectElement>('#race')!.value,
     calling: root.querySelector<HTMLSelectElement>('#calling')!.value,
   };
+}
+
+/**
+ * The screen a character from before Callings sees on joining: they keep
+ * their level, things and Favor, and their attributes are rebuilt for the
+ * chosen people and Calling with free points to place.
+ */
+export function showCallingChoice(level: number, choose: (race: RaceId, calling: CallingId) => void): void {
+  const free = level - 1;
+  const panel = showPanel(`
+    <h1>Choose your people and Calling</h1>
+    <p>The world has learned of the five peoples and the five Callings. You keep your level, your things and your Favor.
+    Your attributes are set again for what you choose${free > 0 ? `, with ${free} free point${free > 1 ? 's' : ''} for you to place` : ''}.</p>
+    <form id="calling-form">
+      ${callingPickerHtml()}
+      <button type="submit">Enter the world</button>
+      <p class="error" id="calling-error"></p>
+    </form>`);
+  const form = panel.querySelector<HTMLFormElement>('#calling-form')!;
+  wireCallingPicker(form);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const { race, calling } = pickedCalling(form);
+    if (!race || !calling) {
+      form.querySelector('#calling-error')!.textContent = 'Choose both your people and your Calling.';
+      return;
+    }
+    showPanel('<h1>co-MMO</h1><p>Entering the world...</p>');
+    choose(race as RaceId, calling as CallingId);
+  });
 }

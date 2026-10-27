@@ -69,6 +69,33 @@ export function changePeople(c: Character, race: RaceId): void {
   settle(c);
 }
 
+/**
+ * Why a character cannot change to this people and/or Calling (a Moderate
+ * wish), in words, or undefined when they can.
+ */
+export function callingChangeProblem(c: Character, race?: RaceId, calling?: CallingId): string | undefined {
+  if (!race && !calling) return 'Choose a new people, a new Calling, or both.';
+  if (!(race ?? c.race)) return 'Choose your people too.';
+  if (!(calling ?? c.calling)) return 'Choose your Calling too.';
+  if ((race ?? c.race) === c.race && (calling ?? c.calling) === c.calling) {
+    return `You are already ${calling ? `a ${CALLINGS[calling].name}` : `one of the ${RACES[race!].name}`}.`;
+  }
+  return undefined;
+}
+
+/**
+ * Changes people, Calling or both (docs/classes.md, Changing Calling). A new
+ * Calling rebuilds the attributes with every free point back and clears the
+ * Path; a new people alone moves only the lift. Returns why not, in words.
+ */
+export function changeCalling(c: Character, race?: RaceId, calling?: CallingId): string | undefined {
+  const why = callingChangeProblem(c, race, calling);
+  if (why) return why;
+  if (calling && calling !== c.calling) chooseCalling(c, (race ?? c.race)!, calling);
+  else if (race) changePeople(c, race);
+  return undefined;
+}
+
 /** Places one free point; returns why not in words, or undefined when done. */
 export function spendPoint(c: Character, stat: keyof Stats): string | undefined {
   if (!c.calling) return 'Choose your Calling first.';

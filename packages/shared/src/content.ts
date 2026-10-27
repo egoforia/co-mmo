@@ -8,6 +8,7 @@ import { RECIPES } from './kit.ts';
 import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
 import { RACES, isRace, type RaceId } from './races.ts';
+import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
 import { cleanLight, type Light } from './light.ts';
 import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
@@ -135,6 +136,19 @@ export interface PlayerLookWish {
   race?: RaceId;
 }
 
+/**
+ * A player changes their own people or Calling, or both (docs/classes.md,
+ * Changing Calling): a Moderate wish made in the Workshop, never by prayer,
+ * like a new look. It changes only the wisher's character.
+ */
+export interface CallingWish {
+  kind: 'calling';
+  name: string;
+  description: string;
+  race?: RaceId;
+  calling?: CallingId;
+}
+
 /** A creature a wished region brings: one that already exists, or a new one. */
 export type RegionCreature =
   | { existing: string; count: number }
@@ -176,14 +190,14 @@ export interface LootWish {
   mode: 'add' | 'set';
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | RecipeWish | AbilityWish | RegionWish | LootWish;
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | CallingWish | RecipeWish | AbilityWish | RegionWish | LootWish;
 
-/** Wished things that have one picture of their own (not recipes, regions or loot). */
-export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish>;
+/** Wished things that have one picture of their own (not recipes, regions, loot or a Calling). */
+export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish | CallingWish>;
 
 /** Whether a wish paints a picture of its own (recipes and loot use pictures that exist; regions paint their parts). */
 export function isPictured(def: Definition): def is PicturedWish {
-  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'rule';
+  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'rule' && def.kind !== 'calling';
 }
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
@@ -492,7 +506,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   if (def.kind === 'item') return itemArt(def.itemKind);
   if (def.kind === 'ability' || def.kind === 'recipe') return 'item-scroll';
   if (def.kind === 'npc') return 'sanctum-pilgrim';
-  if (def.kind === 'player') return 'player-mara';
+  if (def.kind === 'player' || def.kind === 'calling') return 'player-mara';
   if (def.kind === 'region') return 'sanctum-shrine';
   if (def.kind === 'loot') return CREATURES[def.creature]?.art ?? 'woods-mushroom';
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';
@@ -810,7 +824,7 @@ export function applyContent(entry: ContentEntry): void {
   if (!d) return;
   if (entry.status !== 'granted') return removeContent(entry);
   if (entry.off) return sleepContent(entry);
-  if (d.kind === 'player') return;
+  if (d.kind === 'player' || d.kind === 'calling') return;
   WISHERS.set(entry.id, entry.wisher.id);
   if (d.kind === 'rule') {
     for (const [key, item] of Object.entries(d.items)) {
@@ -918,6 +932,25 @@ export function lookFromWords(name: string, raw: string, race?: RaceId): PlayerL
     description,
     look: { hook: first.slice(0, 120) || description.slice(0, 120), body: `${who}: ${description}`.slice(0, 200), color, mood: 'warm and adventurous' },
     ...(race ? { race } : {}),
+  };
+}
+
+/**
+ * Checks a change of people or Calling a player shaped in the Wish Workshop.
+ * Kept apart from validateDefinition so a prayer can never make one.
+ */
+export function validateCallingWish(raw: unknown): CallingWish {
+  const d = (raw ?? {}) as Record<string, unknown>;
+  const race = isRace(d.race) ? d.race : undefined;
+  const calling = isCalling(d.calling) ? d.calling : undefined;
+  if (!race && !calling) throw new WishError('Choose a new people, a new Calling, or both.');
+  const what = [race && `one of the ${RACES[race].name}`, calling && `a ${CALLINGS[calling].name}`].filter(Boolean).join(' and ');
+  return {
+    kind: 'calling',
+    name: calling ? `Called as a ${CALLINGS[calling].name}` : `Born again as a ${RACES[race!].name}`,
+    description: `Become ${what}.`,
+    ...(race ? { race } : {}),
+    ...(calling ? { calling } : {}),
   };
 }
 

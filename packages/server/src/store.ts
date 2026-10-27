@@ -391,6 +391,14 @@ export class Store {
     this.persist();
   }
 
+  /** Saves a character for a player who is not in the world (one choosing their Calling). */
+  saveCharacter(id: string, character: Character): void {
+    const account = this.accountById(id);
+    if (!account) return;
+    account.character = structuredClone(character);
+    this.persist();
+  }
+
   get accounts(): readonly Account[] {
     return this.data.accounts;
   }

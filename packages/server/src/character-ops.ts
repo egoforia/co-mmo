@@ -1,4 +1,4 @@
-import { addItem, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type Character } from '@co-mmo/shared';
+import { addItem, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
 
 /**
  * A change to a player's character made from outside the simulation: Favor
@@ -19,6 +19,8 @@ export type CharacterOp =
   /** XP; the region adds its level-up messages. */
   | { op: 'xp'; amount: number }
   | { op: 'creatorXp'; amount: number }
+  /** A new people and/or Calling, by wish; fails, changing nothing, when it changes nothing. */
+  | { op: 'calling'; race?: RaceId; calling?: CallingId }
   /** Drops items and abilities whose wish was rolled back. */
   | { op: 'forget' };
 
@@ -56,6 +58,8 @@ export function applyOp(c: Character, op: CharacterOp): OpResult {
       return { ok: true, levels: gainXp(c, op.amount) };
     case 'creatorXp':
       return { ok: true, levels: gainCreatorXp(c, op.amount) };
+    case 'calling':
+      return { ok: !changeCalling(c, op.race, op.calling) };
     case 'forget':
       forgetVanished(c);
       return { ok: true };

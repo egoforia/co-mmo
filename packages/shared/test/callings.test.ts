@@ -5,7 +5,10 @@ import {
   RACES,
   RACE_IDS,
   callingStats,
+  changeCalling,
   changePeople,
+  checkDraft,
+  draftCost,
   chooseCalling,
   gainXp,
   isClientMessage,
@@ -15,6 +18,7 @@ import {
   spendPoint,
   startCharacter,
   upgradeCharacter,
+  validateCallingWish,
   xpToNext,
   type Stats,
 } from '../src/index.ts';
@@ -111,5 +115,23 @@ describe('peoples and Callings', () => {
   it('checks spendPoint messages', () => {
     expect(isClientMessage({ t: 'spendPoint', stat: 'wit' })).toBe(true);
     expect(isClientMessage({ t: 'spendPoint', stat: 'luck' })).toBe(false);
+  });
+});
+
+describe('changing people or Calling', () => {
+  it('checks the wish and refuses one that changes nothing', () => {
+    expect(() => validateCallingWish({ kind: 'calling' })).toThrow(/Choose/);
+    expect(validateCallingWish({ kind: 'calling', race: 'falcon', calling: 'nope' })).toMatchObject({ kind: 'calling', race: 'falcon', name: 'Born again as a Falcon' });
+    const c = startCharacter('falcon', 'ranger');
+    expect(changeCalling(c, undefined, 'ranger')).toMatch(/already a Ranger/);
+    expect(changeCalling(newCharacter(), 'falcon')).toMatch(/Calling too/);
+    expect(changeCalling(c, 'cervid')).toBeUndefined();
+    expect(c).toMatchObject({ race: 'cervid', calling: 'ranger' });
+  });
+
+  it('is a Moderate wish in the Workshop', () => {
+    const checked = checkDraft({ category: 'living', sub: 'calling', fields: { calling: 'warden' } }, 'Mara');
+    expect(checked).toMatchObject({ tier: 'moderate', problems: [], definition: { kind: 'calling', calling: 'warden' } });
+    expect(draftCost(checked)).toBe(6);
   });
 });

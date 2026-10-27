@@ -1,7 +1,9 @@
 // Messages exchanged over the game WebSocket. JSON for now; can move to a
 // binary encoding later without changing these shapes.
 
+import { isCalling, type CallingId } from './classes.ts';
 import type { ContentEntry, WishCard } from './content.ts';
+import { isRace, type RaceId } from './races.ts';
 import type { TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
@@ -135,6 +137,13 @@ export interface EquipMessage {
   slot?: EquipSlot;
 }
 
+/** A character from before Callings answers the "Choose your people and Calling" screen. */
+export interface ChooseCallingMessage {
+  t: 'chooseCalling';
+  race: RaceId;
+  calling: CallingId;
+}
+
 /** Place one free attribute point (docs/attributes.md, How attributes grow). */
 export interface SpendPointMessage {
   t: 'spendPoint';
@@ -188,6 +197,7 @@ export type ClientMessage =
   | DraftMessage
   | EquipMessage
   | SpendPointMessage
+  | ChooseCallingMessage
   | AbilityMessage
   | CraftMessage
   | ShopMessage
@@ -438,6 +448,15 @@ export interface HitMessage {
   ranged?: boolean;
 }
 
+/**
+ * Sent instead of joining to a character from before Callings: they choose
+ * a people and Calling first (docs/classes.md, Migration).
+ */
+export interface CallingNeededMessage {
+  t: 'callingNeeded';
+  level: number;
+}
+
 /** The player's own character changed (XP, items, quests, level...). */
 export interface CharacterMessage {
   t: 'character';
@@ -561,6 +580,7 @@ export type ServerMessage =
   | ContentMessage
   | HitMessage
   | CharacterMessage
+  | CallingNeededMessage
   | NoticeMessage
   | ArtMessage
   | DialogueMessage
@@ -614,6 +634,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     return (typeof m.item === 'string' && m.item.length <= 64) || EQUIP_SLOTS.includes(m.slot as EquipSlot);
   }
   if (m.t === 'spendPoint') return isStat(m.stat);
+  if (m.t === 'chooseCalling') return isRace(m.race) && isCalling(m.calling);
   if (m.t === 'ability') return isId(m.ability) && (m.target === undefined || isId(m.target));
   if (m.t === 'craft') return isId(m.recipe);
   if (m.t === 'shop') {

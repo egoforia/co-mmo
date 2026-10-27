@@ -3,7 +3,7 @@ import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView
 import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
-import { callingPickerHtml, pickedCalling, wireCallingPicker } from './calling-picker.ts';
+import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
 import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
 import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
@@ -168,6 +168,9 @@ function play(token: string): void {
 
   function onMessage(message: ServerMessage): void {
     switch (message.t) {
+      case 'callingNeeded':
+        showCallingChoice(message.level, (race, calling) => connection.send({ t: 'chooseCalling', race, calling }));
+        break;
       case 'welcome':
         region = message.region.name;
         regionId = message.region.id;

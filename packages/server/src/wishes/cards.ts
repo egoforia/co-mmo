@@ -5,6 +5,8 @@ import {
   WishError,
   contentTier,
   validateDefinition,
+  callingChangeProblem,
+  validateCallingWish,
   validateLookWish,
   wishCost,
   type PlayerInfo,
@@ -112,7 +114,10 @@ export class WishCards {
     if (tier === 'minor' || tier === 'moderate') {
       try {
         const raw = wish.definition as { kind?: unknown } | undefined;
-        definition = look && raw?.kind === 'player' ? validateLookWish(raw) : validateDefinition(raw);
+        // A new look is painted as one of the player's people.
+        const race = this.world.regionOf(playerId)?.character(playerId)?.race;
+        definition = look && raw?.kind === 'player' ? validateLookWish({ ...raw, ...(race ? { race } : {}) })
+          : look && raw?.kind === 'calling' ? validateCallingWish(raw) : validateDefinition(raw);
       } catch (err) {
         if (!(err instanceof WishError)) throw err;
         // Not buildable as content: a person will have to build it.
@@ -137,6 +142,7 @@ export class WishCards {
       where: !instant
         ? tier === 'engine' ? 'Set before the Owner for the next game update' : 'Set before the Stewards for review'
         : definition?.kind === 'player' ? 'Your look, painted for everyone to see'
+        : definition?.kind === 'calling' ? 'You yourself: your attributes, and your look for a new people'
         : definition?.kind === 'item' ? 'In your bag'
           : definition?.kind === 'ability' ? 'A scroll in your bag'
             : definition?.kind === 'recipe' ? 'Known to everyone, in the crafting book (C)'
@@ -190,6 +196,12 @@ export class WishCards {
     if (def.kind === 'creature') placements = region.findSpots(at.x, at.y, def.count);
     if (def.kind === 'npc') placements = region.findSpots(at.x, at.y, 1, 1.2, 2);
     if (placements && placements.length === 0) return this.news.say(player.id, 'There is no room here. Find open ground and ask again.');
+    // The people before the wish: changing it repaints the look.
+    const race = character.race;
+    if (def.kind === 'calling') {
+      const why = callingChangeProblem(character, def.race, def.calling);
+      if (why) return this.news.say(player.id, why);
+    }
     if (def.kind === 'loot' && !CREATURES[def.creature]) return this.news.say(player.id, 'That creature is no longer in the world. Choose another and ask again.');
     if (def.kind === 'region' && (!open.edge || !this.world.cellFree(open.edge.cell))) {
       return this.news.say(player.id, 'Another land has grown there since you asked. Find an open edge of the world and wish again.');
@@ -200,12 +212,17 @@ export class WishCards {
     this.granting.place(record);
     void this.world.change(player.id, { op: 'favor', amount: -open.card.cost });
     if (def.kind === 'item' || def.kind === 'ability') void this.world.change(player.id, { op: 'give', item: record.id, qty: 1 });
+    if (def.kind === 'calling') {
+      void this.world.change(player.id, { op: 'calling', ...(def.race ? { race: def.race } : {}), ...(def.calling ? { calling: def.calling } : {}) });
+      if (def.race && def.race !== race) this.granting.repaintLook(player, def.race);
+    }
     this.news.broadcast(record);
     this.world.broadcast({ t: 'system', text: `✦ The God granted ${player.name}'s wish: ${record.title}.`, at: this.now() });
     this.news.say(player.id, def.kind === 'item' || def.kind === 'ability' ? 'It is done. Look in your bag.'
       : def.kind === 'recipe' ? 'It is done. Anyone can make it now: press C to open the crafting book.'
         : def.kind === 'region' ? `It is done. A road now leads ${open.edge!.side} to ${def.name}.`
           : def.kind === 'player' ? 'It is done. Everyone will see your new look.'
+          : def.kind === 'calling' ? `It is done. ${def.calling ? 'Your free points are back for you to place: open your bag (I) to place them.' : 'Your new people will be painted soon.'}`
             : def.kind === 'loot' ? `It is done. Defeat a ${CREATURES[def.creature]?.name ?? 'creature'} and press E beside its body to see.`
             : 'It is done. Look around you.');
     if (!open.sample) this.painter.paint(record);

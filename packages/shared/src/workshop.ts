@@ -6,6 +6,8 @@
 import { BIOMES, type BiomeId } from './biomes.ts';
 import { CREATURES, ITEMS, bonusText } from './rpg.ts';
 import { chanceText, lootTable } from './loot.ts';
+import { RACES, RACE_IDS } from './races.ts';
+import { CALLINGS, CALLING_IDS } from './classes.ts';
 import { OFFHAND_FAMILIES, WEAPON_FAMILIES, WEAPON_FAMILY_IDS, type OffhandFamily } from './weapons.ts';
 import {
   REGION_WISH_COST,
@@ -19,6 +21,7 @@ import {
   MAX_WISHED_CHANCE,
   MAX_WISHED_DROP_QTY,
   validateDefinition,
+  validateCallingWish,
   validateLookWish,
   wishCost,
   type WishCard,
@@ -132,6 +135,11 @@ export const WISH_CATEGORIES: WishCategory[] = [
         fields: [NAME, DESCRIPTION, { key: 'greeting', label: 'What they say when spoken to', kind: 'long', length: 280 }, ...LOOK] },
       { id: 'look', name: 'Your look', blurb: 'Change how you look. Your new picture replaces the old one.', tier: 'minor', makes: 'player',
         fields: [{ key: 'description', label: 'How you look, in your own words', kind: 'long', length: MAX_LOOK_LENGTH, hint: 'a tall fox-eared ranger in a moss-green cloak' }, ...LOOK] },
+      { id: 'calling', name: 'Your people or Calling', blurb: 'Become one of another people, or take another Calling. You keep your level and your things.', tier: 'moderate', makes: 'calling',
+        fields: [
+          choice('race', 'Your new people', RACE_IDS.map((id) => [id, RACES[id].name]), true),
+          choice('calling', 'Your new Calling', CALLING_IDS.map((id) => [id, `${CALLINGS[id].name} (${CALLINGS[id].role})`]), true),
+        ] },
     ],
   },
   {
@@ -267,7 +275,7 @@ function readDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>, who: s
     if (field.kind === 'creature' && str(f.creatureName)) continue;
     if (field.kind === 'materials' ? !materials(f[field.key]).length : !str(f[field.key])) problems.push(missing(field));
   }
-  const title = sub.makes === 'player' ? 'Your new look' : str(f.name) || sub.name;
+  const title = sub.makes === 'player' ? 'Your new look' : sub.makes === 'calling' ? 'Your new people or Calling' : str(f.name) || sub.name;
   if (sub.makes === 'rule' || sub.makes === 'engine') {
     const lines = sub.fields.filter((x) => x.key !== 'name' && str(f[x.key])).map((x) => `${x.label}: ${str(f[x.key])}`);
     const first = sub.fields.find((x) => x.key !== 'name' && str(f[x.key]));
@@ -277,7 +285,8 @@ function readDraft(draft: Pick<WishDraft, 'category' | 'sub' | 'fields'>, who: s
   if (problems.length) return { tier: sub.tier, title, summary: str(f.description), problems };
   try {
     const raw = rawDefinition(sub, f);
-    const definition = sub.makes === 'player' ? validateLookWish({ ...raw, name: who }) : validateDefinition(raw);
+    const definition = sub.makes === 'player' ? validateLookWish({ ...raw, name: who })
+      : sub.makes === 'calling' ? validateCallingWish(raw) : validateDefinition(raw);
     return { tier: contentTier(definition), title: definition.kind === 'player' ? title : definition.name, summary: definition.description || definition.name, definition, problems };
   } catch (err) {
     if (!(err instanceof WishError)) throw err;
@@ -303,6 +312,7 @@ function rawDefinition(sub: WishSubcategory, f: DraftFields): Record<string, unk
     case 'npc': return { ...base, greeting: str(f.greeting), look };
     case 'loot': return { ...base, creature: str(f.creature), drops: list(f.drops).map((item) => ({ item, chance: (num(f.chance) ?? 25) / 100, qty: num(f.qty) ?? 1 })) };
     case 'player': return { ...base, look };
+    case 'calling': return { kind: 'calling', race: str(f.race), calling: str(f.calling) };
     case 'region': {
       const creature = str(f.creatureName)
         ? { name: str(f.creatureName), description: `${str(f.creatureName)}, living in ${str(f.name)}.`, behavior: 'wander', look: { hook: str(f.creatureHook) } }
@@ -424,6 +434,7 @@ export function draftFromDefinition(def: WishDefinition): { category: string; su
     case 'npc': return pick('living', 'person', { greeting: def.greeting });
     case 'loot': return pick('living', 'loot', { creature: def.creature, drops: def.drops.map((d) => d.item), chance: Math.round((def.drops[0]?.chance ?? 0.25) * 100), qty: def.drops[0]?.qty ?? 1 });
     case 'player': return pick('living', 'look', {});
+    case 'calling': return pick('living', 'calling', { race: def.race, calling: def.calling });
     case 'region': {
       const first = def.creatures[0];
       const creature = first?.existing !== undefined ? { creature: first.existing } : { creatureName: first?.name, creatureHook: first?.look?.hook };
@@ -541,6 +552,12 @@ export function worldLines(def: WishDefinition): string[] {
     }
     case 'player':
       return ['Your look, painted from your words.'];
+    case 'calling':
+      return [
+        ...(def.calling ? [`Your attributes are set again for a ${CALLINGS[def.calling].name}, every free point back to place. Your Path is cleared until you do the new trial.`] : []),
+        ...(def.race ? [`The ${RACES[def.race].name} lift moves to your attributes, and the God paints your look again as one of them.`] : []),
+        'You keep your level, your things, your Favor and your common techniques.',
+      ];
     case 'loot': {
       const creature = CREATURES[def.creature]?.name ?? def.creature;
       const now = lootTable(def.creature).filter((l) => !def.drops.some((d) => d.item === l.item));

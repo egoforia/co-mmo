@@ -95,6 +95,38 @@ export class Granting {
   }
 
   /**
+   * A changed people repaints the player's look as one of them (docs/races.md,
+   * Choosing): a new look entry from the same words, replacing the old one as
+   * a Workshop look does. Nothing happens for a player with no look yet.
+   */
+  repaintLook(player: { id: string; name: string }, race: RaceId): ContentRecord | undefined {
+    const old = this.lookOf(player.id);
+    if (old?.definition?.kind !== 'player') return undefined;
+    const before = old.definition;
+    // A look made from words gets new words about the body; a Workshop look keeps its own and carries the people.
+    const fromWords = lookFromWords(player.name, before.description, before.race).look.body === before.look.body;
+    const definition = fromWords ? lookFromWords(player.name, before.description, race) : { ...before, race };
+    const record: ContentRecord = {
+      id: newWishId(this.now()),
+      wisher: { id: player.id, name: player.name },
+      regionId: old.regionId,
+      at: this.now(),
+      tier: 'minor',
+      title: `${player.name}'s look`,
+      summary: definition.description,
+      status: 'granted',
+      favor: 0,
+      definition,
+      conversation: [],
+      usd: 0,
+    };
+    this.store.addContent(record);
+    this.news.broadcast(record);
+    this.painter.paint(record);
+    return record;
+  }
+
+  /**
    * Sets a creature's whole loot from God's View. It is kept as a content
    * entry like a wish, made by `by`, so it is saved, reaches every region
    * server and can be rolled back. Throws a WishError.

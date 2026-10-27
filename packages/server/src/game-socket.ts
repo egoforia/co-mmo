@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { isClientMessage, upgradeCharacter } from '@co-mmo/shared';
+import { chooseCalling, isClientMessage, needsCalling, upgradeCharacter } from '@co-mmo/shared';
 import { publicInfo, suspendedText } from './account-routes.ts';
 import type { Builds } from './builds.ts';
 import { awayFeed } from './feed.ts';
@@ -62,9 +62,29 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
 
   wss.on('connection', (socket: WebSocket) => {
     let account: Account | undefined;
+    // Signed in but still choosing a people and Calling: not in the world yet.
+    let choosing = false;
+    let entered = false;
     alive.add(socket);
     socket.on('pong', () => alive.add(socket));
     const authTimer = setTimeout(() => socket.close(4001, 'Sign-in timed out.'), 5000);
+
+    /** Puts the signed-in player into the world. */
+    const enter = (account: Account): void => {
+      entered = true;
+      const away = awayFeed(store, account);
+      world.join(publicInfo(account), {
+        send: (m) => {
+          if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
+        },
+        close: (reason) => socket.close(4000, reason),
+      }, { regionId: account.regionId, x: account.x, y: account.y, floor: account.floor }, upgradeCharacter(account.character));
+      world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
+      if (away) world.sendTo(account.id, away);
+      rules.fire('join', account.id);
+      builds.greet(account.id);
+      void workshop.greet(account.id);
+    };
 
     socket.on('message', (raw) => {
       let parsed: unknown;
@@ -90,18 +110,22 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
           return;
         }
         sockets.set(account.id, socket);
-        const away = awayFeed(store, account);
-        world.join(publicInfo(account), {
-          send: (m) => {
-            if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
-          },
-          close: (reason) => socket.close(4000, reason),
-        }, { regionId: account.regionId, x: account.x, y: account.y, floor: account.floor }, upgradeCharacter(account.character));
-        world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
-        if (away) world.sendTo(account.id, away);
-        rules.fire('join', account.id);
-        builds.greet(account.id);
-        void workshop.greet(account.id);
+        // A character from before Callings chooses a people and Calling before entering (docs/classes.md, Migration).
+        if (needsCalling(account.character)) {
+          choosing = true;
+          socket.send(JSON.stringify({ t: 'callingNeeded', level: account.character?.level ?? 1 }));
+          return;
+        }
+        enter(account);
+        return;
+      }
+      if (choosing) {
+        if (!isClientMessage(parsed) || parsed.t !== 'chooseCalling') return;
+        const character = upgradeCharacter(account.character);
+        chooseCalling(character, parsed.race, parsed.calling);
+        store.saveCharacter(account.id, character);
+        choosing = false;
+        enter(store.accountById(account.id) ?? account);
         return;
       }
       if (!isClientMessage(parsed)) return;
@@ -138,6 +162,7 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
       // A replaced connection must not remove the newer session.
       if (sockets.get(account.id) !== socket) return;
       sockets.delete(account.id);
+      if (!entered) return;
       const id = account.id;
       void settle(world.leave(id), (place) => {
         if (place) store.savePosition(id, place.x, place.y, place.regionId, place.character, place.floor);

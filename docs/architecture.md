@@ -91,6 +91,9 @@ dodge, cooldowns, Armor and Ward; `docs/attributes.md`) and `callings.ts`
 how a people and Calling build them (creation, level-ups, free points,
 changing Calling). The peoples and Callings themselves are plain data in
 shared `races.ts` and `classes.ts` (`docs/races.md`, `docs/classes.md`).
+A character saved before Callings is held at `game-socket.ts` with a
+`callingNeeded` message until it answers `chooseCalling`; changing people or
+Calling later is a `calling` wish made only in the Workshop, like a new look.
 
 **Wishes.** `wishes.ts` is one face over the parts in `wishes/`:
 `prayers.ts` (talking to the God, its limits and cost), `cards.ts` (wish

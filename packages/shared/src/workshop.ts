@@ -93,7 +93,7 @@ export const WISH_CATEGORIES: WishCategory[] = [
         fields: [NAME, DESCRIPTION,
           choice('itemKind', 'Where it is worn', [['weapon', 'Weapon'], ['offhand', 'Shield or off-hand item'], ['head', 'Hat or helmet'], ['body', 'Armour or clothes'], ['charm', 'Charm']]),
           choice('rarity', 'How rare', [['common', 'Common'], ['uncommon', 'Uncommon'], ['rare', 'Rare']]),
-          choice('focus', 'The stat it helps', [['might', 'Might'], ['agility', 'Agility'], ['wit', 'Wit'], ['spirit', 'Spirit']], true),
+          choice('focus', 'The stat it helps', [['might', 'Might'], ['agility', 'Agility'], ['wit', 'Wit'], ['spirit', 'Spirit'], ['vigor', 'Vigor']], true),
           ...LOOK] },
     ],
   },

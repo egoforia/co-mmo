@@ -8,6 +8,9 @@ import {
   VIEW_RADIUS,
   attackCooldown,
   attackPower,
+  cooldownFactor,
+  critChance,
+  CRIT_MULTIPLIER,
   discover,
   gainXp,
   maxHp,
@@ -34,7 +37,7 @@ export class Combat {
     p.lastAttack = now;
     const target = this.creatureInReach(p, ATTACK_RANGE);
     if (!target) return;
-    this.strike(p, target, attackPower(p.character) * (0.8 + this.s.random() * 0.4));
+    this.strike(p, target, this.critical(p, attackPower(p.character) * (0.8 + this.s.random() * 0.4)));
   }
 
   /** The nearest live creature within reach, or the one asked for if it is in reach. */
@@ -50,6 +53,11 @@ export class Combat {
       }
     }
     return target;
+  }
+
+  /** A hit made critical by chance (Agility raises it) does half again as much. */
+  private critical(p: PlayerState, amount: number): number {
+    return this.s.random() < critChance(p.character) ? amount * CRIT_MULTIPLIER : amount;
   }
 
   /** Damages a creature (halved while Weakened); a defeat pays the rewards. */
@@ -82,11 +90,13 @@ export class Combat {
       if (!target) return this.s.notice(p, a.effect === 'bolt' ? `No creature within ${a.range} steps.` : 'Nothing in reach to strike.');
     }
     ch.energy -= a.energy;
-    p.readyAt.set(id, now + a.cooldown * 1000);
-    p.conn.send({ t: 'cooldown', ability: id, seconds: a.cooldown });
+    // Wit shortens the rest; the client shows the rest it is told.
+    const rest = Math.round(a.cooldown * cooldownFactor(ch) * 10) / 10;
+    p.readyAt.set(id, now + rest * 1000);
+    p.conn.send({ t: 'cooldown', ability: id, seconds: rest });
     p.dirty = true;
     const amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2);
-    if (target) this.strike(p, target, amount, id);
+    if (target) this.strike(p, target, this.critical(p, amount), id);
     else {
       const healed = Math.min(max - ch.hp, Math.round(amount));
       ch.hp += healed;

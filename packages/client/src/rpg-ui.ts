@@ -5,14 +5,17 @@ import {
   QUESTS,
   SLOT_NAMES,
   attackCooldown,
+  armor,
   attackPower,
   bonusText,
   creatorXpToNext,
-  gearBonus,
+  critChance,
+  dodgeChance,
   maxEnergy,
   maxHp,
   questProgressText,
   totalStats,
+  ward,
   xpToNext,
   type Character,
   type DialogueMessage,
@@ -22,6 +25,11 @@ import { CHAPTERS } from './bible.ts';
 import { itemLabel } from './kit-ui.ts';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
+
+/** A defence value with at most one decimal (half of Vigor can be 1.5). */
+const one = (n: number): string => String(Math.round(n * 10) / 10);
+/** A chance as a whole percent. */
+const percent = (n: number): string => `${Math.round(n * 100)}%`;
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -234,8 +242,9 @@ export class RpgUi {
       <h3>Carried</h3>
       <div class="slots">${slots}</div>
       <dl class="sheet">
-        ${stat('Might', 'might')}${stat('Agility', 'agility')}${stat('Wit', 'wit')}${stat('Spirit', 'spirit')}
-        <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Armour</dt><dd>${gearBonus(c, 'armor')}</dd></div>
+        ${stat('Might', 'might')}${stat('Agility', 'agility')}${stat('Wit', 'wit')}${stat('Spirit', 'spirit')}${stat('Vigor', 'vigor')}
+        <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Armour</dt><dd>${one(armor(c))}</dd></div><div><dt>Ward</dt><dd>${one(ward(c))}</dd></div>
+        <div><dt>Critical hit</dt><dd>${percent(critChance(c))}</dd></div><div><dt>Dodge</dt><dd>${percent(dodgeChance(c))}</dd></div>
         <div class="wide"><dt>Creator level</dt><dd>${c.creatorLevel}<small>${c.creatorXp} / ${creatorXpToNext(c.creatorLevel)}</small></dd></div>
       </dl>
       ${abilities ? `<h3>Abilities</h3><ul class="abilities">${abilities}</ul>` : '<p class="note">No abilities yet. Trainers, scrolls and quests teach them.</p>'}`;

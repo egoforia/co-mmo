@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ABILITIES,
+  cooldownFactor,
   CREATOR_LEVEL_FAVOR,
   CREATOR_XP,
   ITEMS,
@@ -77,7 +78,7 @@ describe('shops and trainers', () => {
     region.handle('a', { t: 'ability', ability: 'mend' });
     expect(ch.hp).toBeGreaterThan(5);
     expect(ch.energy).toBe(energy - ABILITIES.mend!.energy);
-    expect(of(conn, 'cooldown').at(-1)).toMatchObject({ ability: 'mend', seconds: ABILITIES.mend!.cooldown });
+    expect(of(conn, 'cooldown').at(-1)).toMatchObject({ ability: 'mend', seconds: Math.round(ABILITIES.mend!.cooldown * cooldownFactor(ch) * 10) / 10 });
     const healed = ch.hp;
     ch.hp = 5;
     region.handle('a', { t: 'ability', ability: 'mend' });

@@ -1,4 +1,4 @@
-import { ITEMS, TALK_RANGE, afterArmor, gearBonus, heldItem, offHandItem, type Weather } from '@co-mmo/shared';
+import { ITEMS, TALK_RANGE, afterArmor, armor, dodgeChance, heldItem, offHandItem, type Weather } from '@co-mmo/shared';
 import { giveUp, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { PlayerState, RegionState } from './state.ts';
@@ -49,7 +49,9 @@ export class Minds {
   }
 
   private hurt(p: PlayerState, c: Creature, now: number): void {
-    const amount = afterArmor(c.def.damage * (0.8 + this.s.random() * 0.4), gearBonus(p.character, 'armor'));
+    // A creature's bite is physical: Agility may dodge it, Armour (gear and Vigor) softens it.
+    if (this.s.random() < dodgeChance(p.character)) return;
+    const amount = afterArmor(c.def.damage * (0.8 + this.s.random() * 0.4), armor(p.character));
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
     const defeated = p.character.hp === 0;

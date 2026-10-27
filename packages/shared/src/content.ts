@@ -500,7 +500,7 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const heal = itemKind === 'consumable' ? clamp(Math.round(Number(d.heal) || 20), 5, MAX_WISHED_HEAL) : undefined;
     if (!slot) return { kind: 'item', name, description, itemKind, ...(heal ? { heal } : {}), look };
     const rarity = RARITIES.slice(0, RARITIES.indexOf(MAX_WISHED_RARITY) + 1).find((r) => r === d.rarity) ?? 'common';
-    const focus = (['might', 'agility', 'wit', 'spirit'] as const).find((k) => k === d.focus);
+    const focus = (['might', 'agility', 'wit', 'spirit', 'vigor'] as const).find((k) => k === d.focus);
     const light = cleanLight(d.light);
     return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(light ? { light } : {}), look };
   }

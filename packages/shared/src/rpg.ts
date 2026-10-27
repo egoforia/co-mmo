@@ -5,16 +5,21 @@
 import type { Light } from './light.ts';
 import { SLEEPING_ABILITIES } from './mods.ts';
 import type { Active } from './sky.ts';
+import { maxEnergy, maxHp } from './rpg/attributes.ts';
+
+export * from './rpg/attributes.ts';
 
 export interface Stats {
-  /** Melee damage and health. */
+  /** Heavy weapon damage and a little health. */
   might: number;
-  /** Attack speed. */
+  /** Attack speed, critical hits and dodging. */
   agility: number;
-  /** Magic, Energy and crafting. */
+  /** Magic, Energy, shorter cooldowns and crafting. */
   wit: number;
-  /** Healing: health and Energy come back faster. */
+  /** Healing, Energy and health regeneration, and Ward. */
   spirit: number;
+  /** Health (the main source), Armor, and shorter harmful statuses. */
+  vigor: number;
 }
 
 /** Where equipment is worn (design doc, Items: equipment slots). */
@@ -74,7 +79,7 @@ export const STARTING_FAVOR_POINTS = 10;
 export const QUEST_FAVOR = 3;
 export const LEVEL_FAVOR = 2;
 
-export const STARTING_STATS: Stats = { might: 3, agility: 3, wit: 3, spirit: 3 };
+export const STARTING_STATS: Stats = { might: 3, agility: 3, wit: 3, spirit: 3, vigor: 3 };
 export const WEAKENED_MS = 30_000;
 /** A player must be this close to a creature to hit it, in tiles. */
 export const ATTACK_RANGE = 1.6;
@@ -111,6 +116,8 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   const fresh = newCharacter();
   if (!saved) return fresh;
   const c: Character = { ...fresh, ...saved, stats: { ...fresh.stats, ...saved.stats } };
+  // Vigor came after Might held health: a saved character starts as tough as they were strong.
+  if (saved.stats && saved.stats.vigor === undefined) c.stats.vigor = c.stats.might;
   if (!c.inventory.some((s) => s.item === 'bible')) c.inventory.unshift({ item: 'bible', qty: 1 });
   c.equipment = { ...c.equipment };
   c.abilities = [...c.abilities];
@@ -153,43 +160,9 @@ export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: 'attack
 
 type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>>;
 
-export function maxHp(c: Gear): number {
-  return 20 + c.level * 10 + totalStats(c).might * 2;
-}
-
-/** Energy for abilities: Wit raises it. */
-export function maxEnergy(c: Gear): number {
-  return 20 + c.level * 2 + totalStats(c).wit * 2;
-}
-
-/** Energy regained per second, always (Spirit speeds it up). */
-export function energyPerSecond(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): number {
-  return 1.5 + totalStats(c).spirit * 0.1;
-}
-
-/** Damage left after armour: each point of armour takes off a little, never all of it. */
-export function afterArmor(amount: number, armor: number): number {
-  return Math.max(1, Math.round((amount * 12) / (12 + Math.max(0, armor))));
-}
-
 /** XP needed to go from this level to the next. */
 export function xpToNext(level: number): number {
   return Math.round(20 * level ** 1.5);
-}
-
-/** Damage before randomness and debuffs. */
-export function attackPower(c: Gear): number {
-  return 3 + totalStats(c).might + c.level + gearBonus(c, 'attack');
-}
-
-/** Seconds between attacks. */
-export function attackCooldown(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): number {
-  return Math.max(0.35, 0.8 - totalStats(c).agility * 0.03);
-}
-
-/** Health regained per second once out of combat. */
-export function regenPerSecond(c: Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>): number {
-  return 1 + totalStats(c).spirit * 0.25;
 }
 
 /**
@@ -483,7 +456,7 @@ function clampVitals(c: Character): void {
 /** A short line of what an item adds, e.g. "+2 damage, +1 Spirit". */
 export function bonusText(bonus: Bonus | undefined): string {
   if (!bonus) return '';
-  const names: Record<string, string> = { attack: 'damage', armor: 'armour', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit' };
+  const names: Record<string, string> = { attack: 'damage', armor: 'armour', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor' };
   return Object.entries(bonus).filter(([, v]) => v).map(([k, v]) => `+${v} ${names[k] ?? k}`).join(', ');
 }
 

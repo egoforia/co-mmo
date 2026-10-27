@@ -19,6 +19,7 @@ import {
   staggerChance,
   trainedIn,
   validateDefinition,
+  type CallingId,
   type Character,
   type ItemWish,
   type WeaponFamily,
@@ -27,9 +28,9 @@ import {
 const look = { hook: 'a test', body: 'b', color: '#808080', mood: 'calm' };
 
 /** A level-1 character holding a plain item of this family (no bonus of its own). */
-function wielding(family: WeaponFamily, calling?: string): Character & { calling?: string } {
+function wielding(family: WeaponFamily, calling?: CallingId): Character {
   ITEMS[`test-${family}`] = { name: family, kind: 'equipment', art: 'x', description: '', slot: 'weapon', weapon: family };
-  const c: Character & { calling?: string } = newCharacter();
+  const c = newCharacter();
   c.equipment.weapon = `test-${family}`;
   if (calling) c.calling = calling;
   return c;

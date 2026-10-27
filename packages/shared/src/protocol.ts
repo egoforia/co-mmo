@@ -6,7 +6,7 @@ import type { TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
 import type { SkyConfig, Weather } from './sky.ts';
-import { EQUIP_SLOTS, type Character, type EquipSlot, type InventorySlot } from './rpg.ts';
+import { EQUIP_SLOTS, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
 import type { DamageType } from './weapons.ts';
 
 /**
@@ -135,6 +135,12 @@ export interface EquipMessage {
   slot?: EquipSlot;
 }
 
+/** Place one free attribute point (docs/attributes.md, How attributes grow). */
+export interface SpendPointMessage {
+  t: 'spendPoint';
+  stat: keyof Stats;
+}
+
 /** Use a learned ability; bolts aim at `target` (a creature id) or the nearest creature. */
 export interface AbilityMessage {
   t: 'ability';
@@ -181,6 +187,7 @@ export type ClientMessage =
   | LootActionMessage
   | DraftMessage
   | EquipMessage
+  | SpendPointMessage
   | AbilityMessage
   | CraftMessage
   | ShopMessage
@@ -606,6 +613,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'equip') {
     return (typeof m.item === 'string' && m.item.length <= 64) || EQUIP_SLOTS.includes(m.slot as EquipSlot);
   }
+  if (m.t === 'spendPoint') return isStat(m.stat);
   if (m.t === 'ability') return isId(m.ability) && (m.target === undefined || isId(m.target));
   if (m.t === 'craft') return isId(m.recipe);
   if (m.t === 'shop') {

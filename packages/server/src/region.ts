@@ -539,6 +539,9 @@ export class Region {
       case 'equip':
         this.kit.wear(p, message.item, message.slot);
         break;
+      case 'spendPoint':
+        this.kit.placePoint(p, message.stat);
+        break;
       case 'ability':
         this.combat.useAbility(p, message.ability, message.target);
         break;

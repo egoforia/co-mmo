@@ -55,6 +55,8 @@ describe('the robot plays in a browser', () => {
     const invite = world.store.createInvite(null, 'owner');
     await page.goto(`${world.base}/?invite=${invite.code}`);
     await page.fill('#name', 'Robo');
+    await page.selectOption('#race', 'lutran');
+    await page.selectOption('#calling', 'ranger');
     await page.check('#adult');
     await page.click('#accept-form button[type=submit]');
     await page.waitForSelector('#hud:not([hidden])', { timeout: 20_000 });

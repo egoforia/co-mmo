@@ -3,6 +3,7 @@ import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView
 import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
+import { callingPickerHtml, pickedCalling, wireCallingPicker } from './calling-picker.ts';
 import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
 import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
@@ -61,8 +62,9 @@ async function showInvite(code: string): Promise<void> {
     <form id="accept-form">
       <label for="name">Character name</label>
       <input id="name" type="text" maxlength="${MAX_NAME_LENGTH}" required autofocus />
-      <label for="look">How do you look? <span class="hint">Your first wish, free: the God paints you.</span></label>
-      <textarea id="look" maxlength="${MAX_LOOK_LENGTH}" rows="3" placeholder="A stout dwarf with a braided red beard and a copper helmet"></textarea>
+      ${callingPickerHtml()}
+      <label for="look">How do you look? <span class="hint">Your first wish, free: the God paints you as one of your people.</span></label>
+      <textarea id="look" maxlength="${MAX_LOOK_LENGTH}" rows="3" placeholder="Broad-shouldered, with a braided red mane and a copper helmet"></textarea>
       <label for="email">Email <span class="hint">(optional) to sign in from other devices</span></label>
       <input id="email" type="email" autocomplete="email" />
       <label class="check"><input id="adult" type="checkbox" required /> I am 18 or older. This game has mature content.</label>
@@ -70,6 +72,7 @@ async function showInvite(code: string): Promise<void> {
       <p class="error" id="accept-error"></p>
     </form>`);
   const form = panel.querySelector<HTMLFormElement>('#accept-form')!;
+  wireCallingPicker(form);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const field = (id: string) => panel.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)!.value;
@@ -77,7 +80,7 @@ async function showInvite(code: string): Promise<void> {
     const error = panel.querySelector<HTMLElement>('#accept-error')!;
     error.textContent = '';
     try {
-      const { token, notes } = await acceptInvite(code, { name: field('name'), adult, email: field('email'), look: field('look') });
+      const { token, notes } = await acceptInvite(code, { name: field('name'), adult, email: field('email'), look: field('look'), ...pickedCalling(form) });
       saveToken(token);
       if (notes?.length) toast(notes.join(' '), 12000);
       play(token);
@@ -334,6 +337,7 @@ function play(token: string): void {
       report: (kind, target, reason) => connection.send({ t: 'report', kind, target, reason }),
       typing: isTyping,
       prayer: () => prayer?.toggle(true),
+      spendPoint: (stat) => connection.send({ t: 'spendPoint', stat }),
     });
     loot = new LootUi({ send: (m) => connection.send(m), typing: isTyping });
     kit = new KitUi(welcome.character, {

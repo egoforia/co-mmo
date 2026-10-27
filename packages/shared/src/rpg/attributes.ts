@@ -3,11 +3,12 @@
 // Ward (docs/attributes.md). Re-exported from rpg.ts.
 
 import { gearBonus, totalStats, type Character, type Stats } from '../rpg.ts';
+import type { CallingId } from '../classes.ts';
 import { UNTRAINED_DAMAGE, trainedShield, wieldedFamily, wieldsTrained } from '../weapons.ts';
 
 /** What a formula needs: the character's level, attributes, what they wear and (once chosen) their Calling. */
-type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>> & { calling?: string | null };
-type Worn = Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>> & { calling?: string | null };
+type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>> & { calling?: CallingId | null };
+type Worn = Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>> & { calling?: CallingId | null };
 
 /** Health: mostly from Vigor, a little from Might. */
 export function maxHp(c: Gear): number {

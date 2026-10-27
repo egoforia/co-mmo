@@ -2,6 +2,7 @@
 // speed, reach, scaling and extra; the item sets its damage and bonuses.
 // Slower families scale harder, so damage per second evens out.
 
+import { CALLINGS, type CallingId } from './classes.ts';
 import { ITEMS, RARITIES, type Character, type CreatureDef, type ItemDef, type Rarity, type Stats } from './rpg.ts';
 
 /** The fourteen weapon families. */
@@ -18,13 +19,8 @@ export type OffhandFamily = 'shield' | 'tome' | 'orb' | 'lantern';
 /** Physical hits are softened by Armor, arcane ones by Ward. */
 export type DamageType = 'physical' | 'arcane';
 
-/** The Callings that train weapons (docs/classes.md). */
-export type CallingId = 'warden' | 'duelist' | 'ranger' | 'wishweaver' | 'bellkeeper';
-
 export interface WeaponFamilyDef {
   name: string;
-  /** The Calling trained in it. */
-  calling: CallingId;
   hands: 1 | 2;
   /** Seconds between attacks before Agility. */
   speed: number;
@@ -57,33 +53,33 @@ export interface WeaponFamilyDef {
 
 /** Every weapon family, from docs/classes.md#weapons. */
 export const WEAPON_FAMILIES: Record<WeaponFamily, WeaponFamilyDef> = {
-  hammer: { name: 'Hammer', calling: 'warden', hands: 1, speed: 1.2, reach: 1.6, damage: 4, scale: { might: 0.7, vigor: 0.3 }, damageType: 'physical', heavy: true, held: 1, extra: 'Heavy: can stagger' },
-  axe: { name: 'Axe', calling: 'warden', hands: 1, speed: 1.0, reach: 1.6, damage: 3, scale: { might: 0.6, vigor: 0.2 }, damageType: 'physical', bleed: 0.1, held: 1, extra: 'Can cause Bleeding' },
-  spear: { name: 'Spear', calling: 'warden', hands: 1, speed: 1.1, reach: 2.2, damage: 3, scale: { might: 0.55, vigor: 0.3 }, damageType: 'physical', heavy: true, held: 1.25, extra: 'Long reach; heavy' },
-  sword: { name: 'Sword', calling: 'duelist', hands: 1, speed: 0.8, reach: 1.6, damage: 3, scale: { might: 0.6, agility: 0.5 }, damageType: 'physical', held: 1, extra: 'The all-rounder' },
-  'twin-blades': { name: 'Twin blades', calling: 'duelist', hands: 2, speed: 0.55, reach: 1.4, damage: 2, scale: { agility: 0.5, might: 0.25 }, damageType: 'physical', crit: 0.05, held: 0.8, extra: '+5% critical hits' },
-  greatsword: { name: 'Greatsword', calling: 'duelist', hands: 2, speed: 1.3, reach: 2.0, damage: 6, scale: { might: 1.1, agility: 0.3 }, damageType: 'physical', heavy: true, targets: 2, held: 1.3, extra: 'Heavy; hits up to two creatures' },
-  bow: { name: 'Bow', calling: 'ranger', hands: 2, speed: 1.0, reach: 6, ranged: true, damage: 3, scale: { agility: 0.8, wit: 0.3 }, damageType: 'physical', held: 1.1, extra: 'Long range' },
-  sling: { name: 'Sling', calling: 'ranger', hands: 1, speed: 0.7, reach: 5, ranged: true, damage: 2, scale: { agility: 0.5, wit: 0.2 }, damageType: 'physical', held: 0.7, extra: 'Off hand stays free' },
-  javelins: { name: 'Javelins', calling: 'ranger', hands: 1, speed: 1.3, reach: 4.5, ranged: true, damage: 5, scale: { agility: 0.9, wit: 0.3 }, damageType: 'physical', heavy: true, slow: 0.2, held: 1.1, extra: 'Slows the creature hit' },
-  staff: { name: 'Staff', calling: 'wishweaver', hands: 2, speed: 1.1, reach: 5, ranged: true, damage: 3, scale: { wit: 0.8, spirit: 0.2 }, damageType: 'arcane', held: 1.25, extra: 'Arcane bolt' },
-  wand: { name: 'Wand', calling: 'wishweaver', hands: 1, speed: 0.8, reach: 5.5, ranged: true, damage: 2, scale: { wit: 0.55, spirit: 0.1 }, damageType: 'arcane', held: 0.6, extra: 'Arcane bolt; off hand stays free' },
-  'bell-mace': { name: 'Bell-mace', calling: 'bellkeeper', hands: 1, speed: 1.1, reach: 1.6, damage: 3, scale: { spirit: 0.45, vigor: 0.25 }, damageType: 'physical', heavy: true, allyHeal: 0.3, held: 1, extra: 'Each hit heals the most hurt ally nearby' },
-  censer: { name: 'Censer', calling: 'bellkeeper', hands: 2, speed: 1.0, reach: 2.5, damage: 2, scale: { spirit: 0.4, vigor: 0.15 }, damageType: 'arcane', splash: 1, held: 1, extra: 'Arcane; hits everything close to the target' },
-  'hand-bell': { name: 'Hand bell', calling: 'bellkeeper', hands: 1, speed: 0.9, reach: 4, ranged: true, damage: 2, scale: { spirit: 0.4, vigor: 0.1 }, damageType: 'arcane', held: 0.6, extra: 'Arcane ranged chime' },
+  hammer: { name: 'Hammer', hands: 1, speed: 1.2, reach: 1.6, damage: 4, scale: { might: 0.7, vigor: 0.3 }, damageType: 'physical', heavy: true, held: 1, extra: 'Heavy: can stagger' },
+  axe: { name: 'Axe', hands: 1, speed: 1.0, reach: 1.6, damage: 3, scale: { might: 0.6, vigor: 0.2 }, damageType: 'physical', bleed: 0.1, held: 1, extra: 'Can cause Bleeding' },
+  spear: { name: 'Spear', hands: 1, speed: 1.1, reach: 2.2, damage: 3, scale: { might: 0.55, vigor: 0.3 }, damageType: 'physical', heavy: true, held: 1.25, extra: 'Long reach; heavy' },
+  sword: { name: 'Sword', hands: 1, speed: 0.8, reach: 1.6, damage: 3, scale: { might: 0.6, agility: 0.5 }, damageType: 'physical', held: 1, extra: 'The all-rounder' },
+  'twin-blades': { name: 'Twin blades', hands: 2, speed: 0.55, reach: 1.4, damage: 2, scale: { agility: 0.5, might: 0.25 }, damageType: 'physical', crit: 0.05, held: 0.8, extra: '+5% critical hits' },
+  greatsword: { name: 'Greatsword', hands: 2, speed: 1.3, reach: 2.0, damage: 6, scale: { might: 1.1, agility: 0.3 }, damageType: 'physical', heavy: true, targets: 2, held: 1.3, extra: 'Heavy; hits up to two creatures' },
+  bow: { name: 'Bow', hands: 2, speed: 1.0, reach: 6, ranged: true, damage: 3, scale: { agility: 0.8, wit: 0.3 }, damageType: 'physical', held: 1.1, extra: 'Long range' },
+  sling: { name: 'Sling', hands: 1, speed: 0.7, reach: 5, ranged: true, damage: 2, scale: { agility: 0.5, wit: 0.2 }, damageType: 'physical', held: 0.7, extra: 'Off hand stays free' },
+  javelins: { name: 'Javelins', hands: 1, speed: 1.3, reach: 4.5, ranged: true, damage: 5, scale: { agility: 0.9, wit: 0.3 }, damageType: 'physical', heavy: true, slow: 0.2, held: 1.1, extra: 'Slows the creature hit' },
+  staff: { name: 'Staff', hands: 2, speed: 1.1, reach: 5, ranged: true, damage: 3, scale: { wit: 0.8, spirit: 0.2 }, damageType: 'arcane', held: 1.25, extra: 'Arcane bolt' },
+  wand: { name: 'Wand', hands: 1, speed: 0.8, reach: 5.5, ranged: true, damage: 2, scale: { wit: 0.55, spirit: 0.1 }, damageType: 'arcane', held: 0.6, extra: 'Arcane bolt; off hand stays free' },
+  'bell-mace': { name: 'Bell-mace', hands: 1, speed: 1.1, reach: 1.6, damage: 3, scale: { spirit: 0.45, vigor: 0.25 }, damageType: 'physical', heavy: true, allyHeal: 0.3, held: 1, extra: 'Each hit heals the most hurt ally nearby' },
+  censer: { name: 'Censer', hands: 2, speed: 1.0, reach: 2.5, damage: 2, scale: { spirit: 0.4, vigor: 0.15 }, damageType: 'arcane', splash: 1, held: 1, extra: 'Arcane; hits everything close to the target' },
+  'hand-bell': { name: 'Hand bell', hands: 1, speed: 0.9, reach: 4, ranged: true, damage: 2, scale: { spirit: 0.4, vigor: 0.1 }, damageType: 'arcane', held: 0.6, extra: 'Arcane ranged chime' },
 };
 
 /** Bare hands: what you strike with when no weapon is worn. */
 export const FISTS: WeaponFamilyDef = {
-  name: 'Bare hands', calling: 'duelist', hands: 1, speed: 0.8, reach: 1.6, damage: 2, scale: { might: 0.6, agility: 0.2 }, damageType: 'physical', held: 1, extra: '',
+  name: 'Bare hands', hands: 1, speed: 0.8, reach: 1.6, damage: 2, scale: { might: 0.6, agility: 0.2 }, damageType: 'physical', held: 1, extra: '',
 };
 
-/** Off-hand families and the Callings trained in them. */
-export const OFFHAND_FAMILIES: Record<OffhandFamily, { name: string; callings: CallingId[] }> = {
-  shield: { name: 'Shield', callings: ['warden', 'bellkeeper'] },
-  tome: { name: 'Tome', callings: ['wishweaver'] },
-  orb: { name: 'Orb', callings: ['wishweaver'] },
-  lantern: { name: 'Lantern', callings: ['bellkeeper'] },
+/** Off-hand families (which Callings are trained in them is in classes.ts). */
+export const OFFHAND_FAMILIES: Record<OffhandFamily, { name: string }> = {
+  shield: { name: 'Shield' },
+  tome: { name: 'Tome' },
+  orb: { name: 'Orb' },
+  lantern: { name: 'Lantern' },
 };
 
 /** Armor and Ward from a level (docs/attributes.md#defence); `tough` trades ward for armour, `undead` armour for ward. */
@@ -102,17 +98,17 @@ export const WEAPON_FAMILY_IDS = Object.keys(WEAPON_FAMILIES) as WeaponFamily[];
 /** Untrained weapons deal this share of their damage, and their extra does not work. */
 export const UNTRAINED_DAMAGE = 0.7;
 
-/** Who can be trained: anyone with or (until step 2 of the Callings build) without a Calling. */
-type Trainee = { calling?: string | null };
+/** Who can be trained: a character with or without a Calling. */
+type Trainee = { calling?: CallingId | null };
 
 /**
- * Whether a character is trained in this family. A character with no Calling
- * yet (everyone before Callings arrive) counts as trained in everything.
+ * Whether a character is trained in this family, by their Calling's list in
+ * classes.ts. A character with no Calling yet counts as trained in everything.
  */
 export function trainedIn(c: Trainee, family: WeaponFamily | OffhandFamily): boolean {
-  if (!c.calling) return true;
-  if (family in OFFHAND_FAMILIES) return OFFHAND_FAMILIES[family as OffhandFamily].callings.includes(c.calling as CallingId);
-  return WEAPON_FAMILIES[family as WeaponFamily].calling === c.calling;
+  const calling = c.calling ? CALLINGS[c.calling] : undefined;
+  if (!calling) return true;
+  return family in OFFHAND_FAMILIES ? calling.offhands.includes(family as OffhandFamily) : calling.weapons.includes(family as WeaponFamily);
 }
 
 type Wielder = Partial<Pick<Character, 'equipment'>> & Trainee;

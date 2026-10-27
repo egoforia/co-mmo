@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { CHARACTER_HEIGHT, isoSpan, type BiomeId, type Footprint, type PicturedWish } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, RACES, isoSpan, type BiomeId, type Footprint, type PicturedWish } from '@co-mmo/shared';
 import { pictureName } from './names.ts';
 import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
@@ -88,7 +88,8 @@ export function describeWish(def: PicturedWish, biome: BiomeId): AssetDescriptio
     silhouetteHook: def.kind === 'ability' ? `a rolled spell scroll with a seal showing ${def.look.hook}` : def.look.hook,
     body: def.look.body,
     colors: { main: def.look.color },
-    details: [def.description],
+    // The people decides the body; the player's words decide the rest (docs/races.md).
+    details: def.kind === 'player' && def.race ? [`one of the ${RACES[def.race].name}, ${RACES[def.race].animal}folk`, def.description] : [def.description],
     mood: def.look.mood,
   };
 }

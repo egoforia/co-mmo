@@ -6,6 +6,8 @@ import type { Light } from './light.ts';
 import { SLEEPING_ABILITIES } from './mods.ts';
 import type { Active } from './sky.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
+import type { OffhandFamily, WeaponFamily } from './weapons.ts';
+import { twoHanded } from './weapons.ts';
 
 export * from './rpg/attributes.ts';
 
@@ -31,8 +33,8 @@ export const SLOT_NAMES: Record<EquipSlot, string> = { weapon: 'Weapon', offhand
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
-/** What a piece of equipment adds while worn: stats, weapon damage and armour. */
-export type Bonus = Partial<Stats> & { attack?: number; armor?: number };
+/** What a piece of equipment adds while worn: stats, weapon damage, armour and ward. */
+export type Bonus = Partial<Stats> & { attack?: number; armor?: number; ward?: number };
 
 export interface InventorySlot {
   item: string;
@@ -151,8 +153,8 @@ export function totalStats(c: Pick<Character, 'stats'> & Partial<Pick<Character,
   return total;
 }
 
-/** Weapon damage or armour from everything worn. */
-export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: 'attack' | 'armor'): number {
+/** Weapon damage, armour or ward from everything worn. */
+export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: 'attack' | 'armor' | 'ward'): number {
   let sum = 0;
   for (const id of Object.values(c.equipment ?? {})) sum += (id ? ITEMS[id]?.bonus?.[key] : 0) ?? 0;
   return sum;
@@ -240,6 +242,13 @@ export interface ItemDef {
   slot?: EquipSlot;
   bonus?: Bonus;
   rarity?: Rarity;
+  /** Weapons: their family, which sets speed, reach and scaling (weapons.ts). */
+  weapon?: WeaponFamily;
+  /** Off-hand items: shield, tome, orb or lantern. */
+  offhand?: OffhandFamily;
+  /** Shields: chance (0 to 0.4) to block a hit, and how much a block takes off. */
+  block?: number;
+  blockAmount?: number;
   /** Scrolls: the ability reading it teaches. */
   teaches?: string;
   /** What a shop pays for it is half of this, in gold. */
@@ -296,6 +305,7 @@ export const ITEMS: Record<string, ItemDef> = {
     kind: 'equipment',
     art: 'item-wooden-sword',
     slot: 'weapon',
+    weapon: 'sword',
     rarity: 'common',
     bonus: { attack: 2 },
     description: 'A carved practice sword with a twine grip. Better than bare hands.',
@@ -306,6 +316,7 @@ export const ITEMS: Record<string, ItemDef> = {
     kind: 'equipment',
     art: 'item-crab-lance',
     slot: 'weapon',
+    weapon: 'spear',
     rarity: 'uncommon',
     bonus: { attack: 5, agility: 1 },
     description: 'A driftwood lance tipped with a needle of crab shell, light and quick.',
@@ -433,6 +444,9 @@ export function equip(c: Character, item: string): string | undefined {
   const old = c.equipment[def.slot];
   c.equipment[def.slot] = item;
   if (old) addItem(c, old);
+  // A two-handed weapon and an off-hand item cannot be held together.
+  const freed = def.slot === 'weapon' && twoHanded(item) ? 'offhand' : def.slot === 'offhand' && twoHanded(c.equipment.weapon) ? 'weapon' : undefined;
+  if (freed) unequip(c, freed);
   clampVitals(c);
   return undefined;
 }
@@ -456,7 +470,7 @@ function clampVitals(c: Character): void {
 /** A short line of what an item adds, e.g. "+2 damage, +1 Spirit". */
 export function bonusText(bonus: Bonus | undefined): string {
   if (!bonus) return '';
-  const names: Record<string, string> = { attack: 'damage', armor: 'armour', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor' };
+  const names: Record<string, string> = { attack: 'damage', armor: 'armour', ward: 'ward', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor' };
   return Object.entries(bonus).filter(([, v]) => v).map(([k, v]) => `+${v} ${names[k] ?? k}`).join(', ');
 }
 
@@ -506,6 +520,9 @@ export interface CreatureDef {
   level: number;
   hp: number;
   damage: number;
+  /** Defence against physical hits (weapons) and arcane ones (spells); none when missing. */
+  armor?: number;
+  ward?: number;
   /** Seconds between its attacks. */
   cooldown: number;
   /** Tiles per second when chasing. */
@@ -543,6 +560,8 @@ export const CREATURES: Record<string, CreatureDef> = {
     level: 1,
     hp: 18,
     damage: 3,
+    armor: 1,
+    ward: 0,
     cooldown: 1.4,
     speed: 2,
     notice: 0,
@@ -559,6 +578,8 @@ export const CREATURES: Record<string, CreatureDef> = {
     level: 2,
     hp: 34,
     damage: 5,
+    armor: 3,
+    ward: 1,
     cooldown: 1.3,
     speed: 2.5,
     notice: 2.5,
@@ -576,6 +597,8 @@ export const CREATURES: Record<string, CreatureDef> = {
     level: 3,
     hp: 30,
     damage: 6,
+    armor: 3,
+    ward: 1,
     cooldown: 1.2,
     speed: 3,
     notice: 4,

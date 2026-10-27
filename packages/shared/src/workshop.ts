@@ -6,6 +6,7 @@
 import { BIOMES, type BiomeId } from './biomes.ts';
 import { CREATURES, ITEMS, bonusText } from './rpg.ts';
 import { chanceText, lootTable } from './loot.ts';
+import { OFFHAND_FAMILIES, WEAPON_FAMILIES, WEAPON_FAMILY_IDS, type OffhandFamily } from './weapons.ts';
 import {
   REGION_WISH_COST,
   WISH_COSTS,
@@ -78,6 +79,12 @@ const choice = (key: string, label: string, options: [string, string][], optiona
 const brief = (key: string, label: string, hint: string, optional = false): WorkshopField =>
   ({ key, label, kind: 'long', length: 400, hint, ...(optional ? { optional } : {}) });
 
+/** Kinds of weapon and off-hand item a wished piece of gear can be. */
+const FAMILY_CHOICES: [string, string][] = [
+  ...WEAPON_FAMILY_IDS.map((f) => [f, `${WEAPON_FAMILIES[f].name} (weapon)`] as [string, string]),
+  ...(Object.keys(OFFHAND_FAMILIES) as OffhandFamily[]).map((f) => [f, `${OFFHAND_FAMILIES[f].name} (off hand)`] as [string, string]),
+];
+
 const BIOME_CHOICES = (Object.keys(BIOMES) as BiomeId[]).filter((b) => b !== 'sanctum').map((b) => [b, BIOMES[b].name] as [string, string]);
 
 /** Every kind of wish the Workshop offers, in the order players see them. */
@@ -93,6 +100,7 @@ export const WISH_CATEGORIES: WishCategory[] = [
         fields: [NAME, DESCRIPTION,
           choice('itemKind', 'Where it is worn', [['weapon', 'Weapon'], ['offhand', 'Shield or off-hand item'], ['head', 'Hat or helmet'], ['body', 'Armour or clothes'], ['charm', 'Charm']]),
           choice('rarity', 'How rare', [['common', 'Common'], ['uncommon', 'Uncommon'], ['rare', 'Rare']]),
+          choice('family', 'What kind of weapon or off-hand item', FAMILY_CHOICES, true),
           choice('focus', 'The stat it helps', [['might', 'Might'], ['agility', 'Agility'], ['wit', 'Wit'], ['spirit', 'Spirit'], ['vigor', 'Vigor']], true),
           ...LOOK] },
     ],
@@ -288,7 +296,7 @@ function rawDefinition(sub: WishSubcategory, f: DraftFields): Record<string, unk
   const base = { kind: sub.makes, name: str(f.name), description: str(f.description), ...sub.fixed };
   const look = { hook: str(f.hook), body: str(f.body), color: str(f.color), mood: str(f.mood) };
   switch (sub.makes) {
-    case 'item': return { ...base, itemKind: sub.fixed?.itemKind ?? str(f.itemKind), heal: num(f.heal), rarity: str(f.rarity), focus: str(f.focus), look };
+    case 'item': return { ...base, itemKind: sub.fixed?.itemKind ?? str(f.itemKind), heal: num(f.heal), rarity: str(f.rarity), focus: str(f.focus), family: str(f.family), look };
     case 'recipe': return { ...base, materials: materials(f.materials), result: { item: str(f.result), qty: num(f.qty) ?? 1 } };
     case 'ability': return { ...base, effect: str(f.effect), look };
     case 'creature': return { ...base, behavior: str(f.behavior), active: str(f.active), level: num(f.level), count: num(f.count), drops: list(f.drops), look };
@@ -408,7 +416,7 @@ export function draftFromDefinition(def: WishDefinition): { category: string; su
       if (kind === 'consumable') return pick('carry', 'potion', { heal: def.heal });
       if (kind === 'trinket') return pick('carry', 'keepsake', {});
       if (kind === 'material') return pick('carry', 'material', {});
-      return pick('carry', 'gear', { itemKind: kind, rarity: def.rarity, focus: def.focus });
+      return pick('carry', 'gear', { itemKind: kind, rarity: def.rarity, focus: def.focus, family: def.family });
     }
     case 'recipe': return pick('know', 'recipe', { materials: def.materials, result: def.result.item, qty: def.result.qty });
     case 'ability': return pick('know', 'ability', { effect: def.effect });

@@ -4,6 +4,8 @@
 import Phaser from 'phaser';
 import {
   ABILITIES,
+  ITEMS,
+  WEAPON_FAMILIES,
   isWalkDirection,
   type HitMessage,
 } from '@co-mmo/shared';
@@ -30,7 +32,8 @@ export function showHit(
 ): void {
   const target = hit.target === myId ? me : remotes.get(hit.target) ?? creatures.get(hit.target);
   const attacker = hit.by === myId ? me : remotes.get(hit.by) ?? creatures.get(hit.by);
-  const isBolt = hit.ability && ABILITIES[hit.ability]?.effect === 'bolt';
+  // Firebolt, and plain attacks of wands, staves and bells, fly as a painted spark.
+  const isBolt = (hit.ability && ABILITIES[hit.ability]?.effect === 'bolt') || (hit.ranged && hit.damage === 'arcane');
   if (attacker && target && isBolt) fireBolt(scene, attacker, target, darkness);
   else if (attacker && attacker !== me && target) lunge(scene, attacker, toward(attacker, target));
   if (!target) return;
@@ -53,12 +56,13 @@ export function showHit(
   if (hit.defeated && target !== me) fadeOut(scene, target);
 }
 
-/** Our own strike: a lunge and a slash, whether or not it lands. */
+/** Our own strike: a lunge and a slash, whether or not it lands (no slash for bows, wands and other ranged weapons). */
 export function swingSlash(scene: Phaser.Scene, me: Avatar, facingSign: number): void {
   // Along the isometric way we face, or left or right as we last walked.
   const aim = isWalkDirection(me.facing) ? { x: facingSign, y: 0 } : wayOnScreen(me.facing);
   lunge(scene, me, aim);
-  if (!scene.textures.exists('fx-slash')) return;
+  const family = me.held ? ITEMS[me.held.item]?.weapon : undefined;
+  if (!scene.textures.exists('fx-slash') || (family && WEAPON_FAMILIES[family].ranged)) return;
   // The painted slash curves like a C; mirror it so it bulges the way we face, tilted along the way.
   const right = aim.x > 0;
   const slash = scene.add.image(me.body.x + aim.x * T * 0.45, me.body.y - me.body.displayHeight * 0.45 + aim.y * T * 0.45, 'fx-slash');

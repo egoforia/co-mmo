@@ -7,6 +7,7 @@ import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
 import type { SkyConfig, Weather } from './sky.ts';
 import { EQUIP_SLOTS, type Character, type EquipSlot, type InventorySlot } from './rpg.ts';
+import type { DamageType } from './weapons.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -424,6 +425,10 @@ export interface HitMessage {
   defeated: boolean;
   /** The ability that struck, when it was one (bolts fly across the screen). */
   ability?: string;
+  /** Physical (softened by Armor) or arcane (softened by Ward); physical when missing. */
+  damage?: DamageType;
+  /** A plain attack fired from a distance (bow, wand...), not struck in reach. */
+  ranged?: boolean;
 }
 
 /** The player's own character changed (XP, items, quests, level...). */

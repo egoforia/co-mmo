@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   BODY_SECONDS,
   CREATURES,
+  ITEMS,
+  afterArmor,
+  attackPower,
   QUESTS,
   itemCount,
   maxHp,
@@ -167,6 +170,58 @@ describe('combat', () => {
     region.handle('a', { t: 'attack' });
     region.handle('a', { t: 'attack' });
     expect(of(conn, 'hit')).toHaveLength(1);
+  });
+
+  it('weapons reach as far as their family: a bow fires across the glade, an arcane wand meets Ward instead of Armor', () => {
+    ITEMS['test-bow'] = { name: 'Test Bow', kind: 'equipment', art: 'x', description: '', slot: 'weapon', weapon: 'bow' };
+    ITEMS['test-wand'] = { name: 'Test Wand', kind: 'equipment', art: 'x', description: '', slot: 'weapon', weapon: 'wand' };
+    try {
+      const { region, clock } = setup('woods');
+      const conn = fakeConn();
+      const c = newCharacter();
+      region.join(info('a'), conn, { x: null, y: null }, c);
+      const id = region.creatureIds().find((k) => k.includes('walking-mushroom'))!;
+      const me = region.position('a')!;
+      region.placeCreature(id, me.x + 4, me.y);
+      // Bare hands do not reach four steps.
+      region.handle('a', { t: 'attack' });
+      expect(of(conn, 'hit')).toHaveLength(0);
+      const ch = region.character('a')!;
+      ch.equipment.weapon = 'test-bow';
+      clock.now += 2000;
+      region.handle('a', { t: 'attack' });
+      const shot = of(conn, 'hit')[0]!;
+      // The mushroom's Armor of 1 softens the physical arrow.
+      expect(shot).toMatchObject({ target: id, ranged: true, damage: 'physical', amount: afterArmor(attackPower(ch), CREATURES['walking-mushroom']!.armor!) });
+      ch.equipment.weapon = 'test-wand';
+      clock.now += 2000;
+      region.handle('a', { t: 'attack' });
+      // It has no Ward, so the arcane bolt lands whole.
+      expect(of(conn, 'hit')[1]).toMatchObject({ ranged: true, damage: 'arcane', amount: attackPower(ch) });
+    } finally {
+      delete ITEMS['test-bow'];
+      delete ITEMS['test-wand'];
+    }
+  });
+
+  it('a greatsword swing hits the two nearest creatures in reach', () => {
+    ITEMS['test-greatsword'] = { name: 'Test Greatsword', kind: 'equipment', art: 'x', description: '', slot: 'weapon', weapon: 'greatsword' };
+    try {
+      const { region } = setup('woods');
+      const conn = fakeConn();
+      const c = newCharacter();
+      c.equipment.weapon = 'test-greatsword';
+      region.join(info('a'), conn, { x: null, y: null }, c);
+      const me = region.position('a')!;
+      const [one, two, three] = region.creatureIds();
+      region.placeCreature(one!, me.x + 1, me.y);
+      region.placeCreature(two!, me.x, me.y + 1.5);
+      region.placeCreature(three!, me.x + 5, me.y);
+      region.handle('a', { t: 'attack' });
+      expect(of(conn, 'hit').map((h) => h.target).sort()).toEqual([one, two].sort());
+    } finally {
+      delete ITEMS['test-greatsword'];
+    }
   });
 
   it('a mushroom hit back fights back; a crab knight attacks when you come close', () => {

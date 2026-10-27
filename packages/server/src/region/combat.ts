@@ -1,13 +1,14 @@
 import {
   ABILITIES,
-  ATTACK_RANGE,
   abilityAmount,
+  afterArmor,
   lootTable,
   rollDrops,
   BODY_SECONDS,
   VIEW_RADIUS,
   attackCooldown,
   attackPower,
+  attackReach,
   cooldownFactor,
   critChance,
   CRIT_MULTIPLIER,
@@ -15,6 +16,10 @@ import {
   gainXp,
   maxHp,
   partyXp,
+  staggerChance,
+  wieldedFamily,
+  wieldsTrained,
+  type DamageType,
 } from '@co-mmo/shared';
 import { provoke } from '../creature-brain.ts';
 import type { Quests } from './quests.ts';
@@ -30,14 +35,48 @@ export class Combat {
     private readonly quests: Quests,
   ) {}
 
-  /** A plain attack (Space) on the nearest creature in reach, once the weapon is ready. */
+  /**
+   * A plain attack (Space) on the nearest creature in the weapon's reach, once
+   * it is ready: bows, wands and the like fire across the room. A trained
+   * greatsword also hits the next creature in reach, a censer everything
+   * close to its target, and a heavy weapon may stagger what it hits.
+   */
   attack(p: PlayerState): void {
     const now = this.s.now();
-    if (p.character.hp <= 0 || now - p.lastAttack < attackCooldown(p.character) * 1000 - 1) return;
+    const ch = p.character;
+    if (ch.hp <= 0 || now - p.lastAttack < attackCooldown(ch) * 1000 - 1) return;
     p.lastAttack = now;
-    const target = this.creatureInReach(p, ATTACK_RANGE);
+    const reach = attackReach(ch);
+    const target = this.creatureInReach(p, reach);
     if (!target) return;
-    this.strike(p, target, this.critical(p, attackPower(p.character) * (0.8 + this.s.random() * 0.4)));
+    const family = wieldedFamily(ch);
+    const trained = wieldsTrained(ch);
+    const hits = [target];
+    if (trained && family.targets) {
+      for (const c of this.creaturesNear(p, p, reach)) if (hits.length < family.targets && !hits.includes(c)) hits.push(c);
+    }
+    if (trained && family.splash) {
+      for (const c of this.creaturesNear(p, target, family.splash)) if (!hits.includes(c)) hits.push(c);
+    }
+    const power = attackPower(ch);
+    const stagger = staggerChance(ch);
+    for (const c of hits) {
+      if (stagger && this.s.random() < stagger) this.stagger(c);
+      this.strike(p, c, this.critical(p, power * (0.9 + this.s.random() * 0.2)), { type: family.damageType, ranged: family.ranged });
+    }
+  }
+
+  /** Live creatures on the player's floor within `range` of a point, nearest first. */
+  private creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[] {
+    return this.s.creatures
+      .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) <= range)
+      .sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
+  }
+
+  /** A heavy blow cancels the creature's next attack: it waits a whole rest from now. */
+  private stagger(c: Creature): void {
+    const rest = c.def.cooldown * 1000;
+    c.lastAttack = Math.max(c.lastAttack, this.s.now() - rest) + rest;
   }
 
   /** The nearest live creature within reach, or the one asked for if it is in reach. */
@@ -60,13 +99,18 @@ export class Combat {
     return this.s.random() < critChance(p.character) ? amount * CRIT_MULTIPLIER : amount;
   }
 
-  /** Damages a creature (halved while Weakened); a defeat pays the rewards. */
-  private strike(p: PlayerState, target: Creature, raw: number, ability?: string): void {
+  /**
+   * Damages a creature (halved while Weakened): its Armor softens physical
+   * hits and its Ward arcane ones. A defeat pays the rewards.
+   */
+  private strike(p: PlayerState, target: Creature, raw: number, how: { type: DamageType; ability?: string; ranged?: boolean }): void {
     const weakened = this.s.now() < p.character.weakenedUntil ? 0.5 : 1;
-    const amount = Math.max(1, Math.round(raw * weakened));
+    const defence = how.type === 'arcane' ? target.def.ward : target.def.armor;
+    const amount = afterArmor(raw * weakened, defence ?? 0);
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
-    this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, ...(ability ? { ability } : {}) });
+    const { ability, ranged, type } = how;
+    this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, damage: type, ...(ability ? { ability } : {}), ...(ranged ? { ranged } : {}) });
     if (!defeated) return provoke(target, p.info.id, { creatures: this.s.creatures, now: this.s.now() });
     target.respawnAt = this.s.now() + target.def.respawnSeconds * 1000;
     target.aggro = null;
@@ -96,7 +140,8 @@ export class Combat {
     p.conn.send({ t: 'cooldown', ability: id, seconds: rest });
     p.dirty = true;
     const amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2);
-    if (target) this.strike(p, target, this.critical(p, amount), id);
+    // Bolts are arcane; strikes are blows of the weapon, so physical.
+    if (target) this.strike(p, target, this.critical(p, amount), { type: a.effect === 'bolt' ? 'arcane' : 'physical', ability: id });
     else {
       const healed = Math.min(max - ch.hp, Math.round(amount));
       ch.hp += healed;

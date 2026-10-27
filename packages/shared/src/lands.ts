@@ -1,18 +1,24 @@
 import { FLAME_LIGHT } from './light.ts';
 import { CREATURES, ITEMS, NPC_GREETINGS, NPC_NAMES, QUESTS, type CreatureDef, type ItemDef, type QuestDef } from './rpg.ts';
 import { RECIPES, SHOPS, type RecipeDef, type ShopDef } from './kit.ts';
+import { creatureDefence } from './weapons.ts';
 
 // What lives in the great places of the bigger lands (places.ts): their
 // creatures, the people who keep them, what can be found there and the
 // quests that send players out to them. Added to the shared tables when the
 // game loads, in the same shapes as the first content and as wishes.
 
-/** Stats from a level, the way wished creatures get theirs, with a little more for the hardiest. */
-function creature(def: Omit<CreatureDef, 'hp' | 'damage' | 'cooldown' | 'xp' | 'gold' | 'respawnSeconds'> & { tough?: number }): CreatureDef {
+/**
+ * Stats from a level, the way wished creatures get theirs, with a little more
+ * for the hardiest. Armor is the level and Ward half of it; tough creatures
+ * wear more armour and less ward, and the undead the other way round.
+ */
+function creature(def: Omit<CreatureDef, 'hp' | 'damage' | 'cooldown' | 'xp' | 'gold' | 'respawnSeconds'> & { tough?: number; undead?: boolean }): CreatureDef {
   const l = def.level;
   const tough = def.tough ?? 1;
-  const { tough: _t, ...rest } = def;
+  const { tough: _t, undead, ...rest } = def;
   return {
+    ...creatureDefence(l, undead ? 'undead' : tough > 1 ? 'tough' : undefined),
     ...rest,
     hp: Math.round((14 + l * 9) * tough),
     damage: Math.round((2 + l * 1.6) * Math.sqrt(tough)),
@@ -47,7 +53,7 @@ export const LAND_CREATURES: Record<string, CreatureDef> = {
   }),
   'drowned-deckhand': creature({
     name: 'Drowned Deckhand', art: 'shore-drowned-deckhand', description: 'A sailor of seaweed and old rope who still walks the rounds of a ship long sunk. It wakes when the moon is up.',
-    behavior: 'patrol', active: 'night', level: 4, speed: 2.2, notice: 3.5, drops: [{ item: 'pearl', chance: 0.35 }, { item: 'coral-spear', chance: 0.08 }],
+    behavior: 'patrol', active: 'night', level: 4, speed: 2.2, notice: 3.5, undead: true, drops: [{ item: 'pearl', chance: 0.35 }, { item: 'coral-spear', chance: 0.08 }],
   }),
   'dune-jackal': creature({
     name: 'Dune Jackal', art: 'desert-dune-jackal', description: 'A sand-coloured jackal with a turquoise collar. They lope out of the dunes after dark and hunt in packs.',
@@ -55,7 +61,7 @@ export const LAND_CREATURES: Record<string, CreatureDef> = {
   }),
   'mummy-guard': creature({
     name: 'Mummy Guard', art: 'desert-mummy-guard', description: 'A tall guard wrapped in old linen with a golden mask, still walking its rounds for a king long gone.',
-    behavior: 'patrol', active: 'night', level: 4, speed: 2, notice: 3.5, tough: 1.3, drops: [{ item: 'ancient-linen', chance: 0.6 }, { item: 'sunstone-amulet', chance: 0.05 }],
+    behavior: 'patrol', active: 'night', level: 4, speed: 2, notice: 3.5, tough: 1.3, undead: true, drops: [{ item: 'ancient-linen', chance: 0.6 }, { item: 'sunstone-amulet', chance: 0.05 }],
   }),
   'sand-wyrm': creature({
     name: 'Sand Wyrm', art: 'desert-sand-wyrm', description: 'A great armoured worm that sleeps under the old bones and rises at anyone who comes too near.',
@@ -63,7 +69,7 @@ export const LAND_CREATURES: Record<string, CreatureDef> = {
   }),
   'crypt-skeleton': creature({
     name: 'Crypt Skeleton', art: 'desert-mummy-guard', description: 'Restless bones awakened in the cold dark catacombs beneath the High Cathedral.',
-    behavior: 'patrol', level: 3, speed: 2.1, notice: 3.5, drops: [{ item: 'ancient-bone', chance: 0.6 }, { item: 'holy-water', chance: 0.2 }],
+    behavior: 'patrol', level: 3, speed: 2.1, notice: 3.5, undead: true, drops: [{ item: 'ancient-bone', chance: 0.6 }, { item: 'holy-water', chance: 0.2 }],
   }),
   'chained-demon': creature({
     name: 'Chained Demon', art: 'desert-sand-wyrm', description: 'An ancient terror imprisoned in the subterranean depths by celestial runes and heavy iron chains.',
@@ -75,20 +81,20 @@ export const LAND_CREATURES: Record<string, CreatureDef> = {
 export const LAND_ITEMS: Record<string, ItemDef> = {
   'moth-dust': { name: 'Moth Dust', kind: 'material', art: 'item-moth-dust', description: 'A pinch of softly glowing powder shaken from a lantern moth\'s wings.', value: 6 },
   'temple-lantern': {
-    name: 'Temple Lantern', kind: 'equipment', art: 'item-temple-lantern', slot: 'offhand', rarity: 'common', bonus: { armor: 1, spirit: 1 },
+    name: 'Temple Lantern', kind: 'equipment', art: 'item-temple-lantern', slot: 'offhand', offhand: 'lantern', rarity: 'common', bonus: { armor: 1, spirit: 1 },
     description: 'A brass lantern from the Temple of the Hundred Bells. Carry it at night and creatures will see you coming, but so will you.', value: 20,
     light: { ...FLAME_LIGHT, color: '#ffd27a' },
   },
   'wolf-pelt': { name: 'Thorn Wolf Pelt', kind: 'material', art: 'item-wolf-pelt', description: 'A grey pelt still prickly with little thorns. Warm, once you pick them out.', value: 10 },
   heartwood: { name: 'Golem Heartwood', kind: 'material', art: 'item-heartwood', description: 'A knot of glowing amber wood from a bark golem\'s chest. It hums faintly.', value: 14 },
   'golem-club': {
-    name: 'Golem Club', kind: 'equipment', art: 'item-golem-club', slot: 'weapon', rarity: 'rare', bonus: { attack: 8, might: 2 },
+    name: 'Golem Club', kind: 'equipment', art: 'item-golem-club', slot: 'weapon', weapon: 'hammer', rarity: 'rare', bonus: { attack: 8, might: 2 },
     description: 'A heavy club of mossy bark that still puts out a leaf now and then.', value: 70,
   },
   'gull-feather': { name: 'Gull Feather', kind: 'material', art: 'item-gull-feather', description: 'A long grey and white feather. Fletchers and hat makers want it.', value: 5 },
   pearl: { name: 'Pearl', kind: 'material', art: 'item-pearl', description: 'A round pearl with a pink shimmer. Traders pay well for it.', value: 30 },
   'coral-spear': {
-    name: 'Coral Spear', kind: 'equipment', art: 'item-coral-spear', slot: 'weapon', rarity: 'rare', bonus: { attack: 7, agility: 2 },
+    name: 'Coral Spear', kind: 'equipment', art: 'item-coral-spear', slot: 'weapon', weapon: 'spear', rarity: 'rare', bonus: { attack: 7, agility: 2 },
     description: 'A spear of pink coral with a pearl set where the shaft meets the point.', value: 75,
   },
   'jackal-fang': { name: 'Jackal Fang', kind: 'material', art: 'item-jackal-fang', description: 'A long curved fang on a scrap of turquoise cord.', value: 9 },

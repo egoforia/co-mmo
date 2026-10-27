@@ -81,6 +81,8 @@ export const LEVEL_FAVOR = 2;
 
 export const STARTING_STATS: Stats = { might: 3, agility: 3, wit: 3, spirit: 3, vigor: 3 };
 export const WEAKENED_MS = 30_000;
+/** How long a player at 0 HP lies Fallen, where a friend may raise them, before waking at the shrine. */
+export const FALLEN_MS = 10_000;
 /** A player must be this close to a creature to hit it, in tiles. */
 export const ATTACK_RANGE = 1.6;
 /** ...and this close to an NPC to talk. */

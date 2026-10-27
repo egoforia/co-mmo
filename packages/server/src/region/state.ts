@@ -46,6 +46,8 @@ export interface PlayerState {
   phase: number;
   /** The body whose loot window is open, if any. */
   looting?: string;
+  /** While Fallen at 0 HP (region/fallen.ts): when they wake at the shrine, epoch ms. */
+  fallenUntil?: number;
 }
 
 /** A defeated creature's body: what it dropped waits there for anyone to take. */

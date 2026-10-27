@@ -50,7 +50,8 @@ export function showHit(
   target.body.setTintFill(0xffffff);
   scene.time.delayedCall(80, () => target.body.active && target.body.clearTint());
   if (hurtMe) scene.cameras.main.shake(120, 0.004);
-  if (hit.defeated && target !== me) fadeOut(scene, target);
+  // Fallen players lie where they fell; only creatures sink away.
+  if (hit.defeated && target !== me && !remotes.has(hit.target)) fadeOut(scene, target);
 }
 
 /** Our own strike: a lunge and a slash, whether or not it lands. */

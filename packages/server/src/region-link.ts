@@ -73,6 +73,7 @@ export interface CarryData {
   lastHurt: number;
   readyAt: [string, number][];
   floor?: number;
+  fallenUntil?: number;
 }
 
 export function carryData(carry: Carry): CarryData {

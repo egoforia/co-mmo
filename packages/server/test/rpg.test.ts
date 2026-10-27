@@ -193,7 +193,7 @@ describe('combat', () => {
     expect(shore.region.character('b')!.hp).toBeLessThan(maxHp(newCharacter()));
   });
 
-  it('a player who falls wakes at the Sanctum shrine, Weakened, with nothing lost', () => {
+  it('a player who falls wakes at the Sanctum shrine, Weakened, with nothing lost, once no friend raises them', () => {
     let now = 5_000_000;
     const world = new World(() => now, () => 0.5);
     const conn = fakeConn();
@@ -205,7 +205,8 @@ describe('combat', () => {
     const scarab = desert.creatureIds()[0]!;
     const me = desert.position('a')!;
     desert.placeCreature(scarab, me.x + 1, me.y);
-    for (let i = 0; i < 5 && world.regionOf('a')!.def.id === 'desert'; i++) {
+    // Fallen first, for up to 10 s, then the shrine.
+    for (let i = 0; i < 12 && world.regionOf('a')!.def.id === 'desert'; i++) {
       now += 2000;
       world.tick();
     }

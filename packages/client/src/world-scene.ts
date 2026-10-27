@@ -79,6 +79,9 @@ import {
 
 export type { MapFigure, MiniMapView, SceneCounts, WorldSceneOptions } from './world-scene/types.ts';
 
+/** How faint a Fallen player shows, lying where they fell. */
+const FALLEN_ALPHA = 0.45;
+
 export class WorldScene extends Phaser.Scene {
   private welcome: WelcomeMessage;
   private map!: RegionMap;
@@ -106,6 +109,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly sky = new SkyClock();
   /** Which way we face: 1 right, -1 left. */
   private facing = 1;
+  /** We lie Fallen, so our steps wait until we are raised or wake at the shrine. */
+  private fallen = false;
   /**
    * The world is one map: every region is drawn at its square on the world
    * grid, and walking between them only moves us along it. This is the
@@ -381,6 +386,8 @@ export class WorldScene extends Phaser.Scene {
       if (!remote) continue;
       setHeld(this, remote, p.held, 'right', load);
       setHeld(this, remote, p.offHeld, 'left', load);
+      remote.label.setText(p.fallen ? `${p.name} (Fallen)` : p.name);
+      remote.body.setAlpha(p.fallen ? FALLEN_ALPHA : 1);
     }
     syncAvatars(this, this.creatures, snapshot.creatures ?? [], now, (c) => makeCreature(this, this.metrics, c));
     for (const c of snapshot.creatures ?? []) this.creatures.get(c.id)?.label.setText(creatureLabel(c));
@@ -519,10 +526,11 @@ export class WorldScene extends Phaser.Scene {
     swingSlash(this, this.me, this.facing);
   }
 
-  /** Greys our sprite while Weakened after falling. */
-  setWeakened(weakened: boolean): void {
+  /** Greys our sprite while Weakened after falling, and more while we lie Fallen (when we cannot walk). */
+  setWeakened(weakened: boolean, fallen = false): void {
+    this.fallen = fallen;
     if (!this.me?.body.active) return;
-    this.me.body.setAlpha(weakened ? 0.7 : 1);
+    this.me.body.setAlpha(fallen ? FALLEN_ALPHA : weakened ? 0.7 : 1);
   }
 
   /** Draws again, once the art that arrived together has loaded, every region whose biome kit was painted. */
@@ -563,7 +571,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private readInput(): { dx: number; dy: number } {
-    if (this.options.typing()) return { dx: 0, dy: 0 };
+    if (this.fallen || this.options.typing()) return { dx: 0, dy: 0 };
     const k = this.keys;
     const dx = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
     const dy = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);

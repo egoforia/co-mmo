@@ -44,6 +44,11 @@ export interface AttackMessage {
   t: 'attack';
 }
 
+/** While Fallen: stop waiting for a friend and wake at the shrine now. */
+export interface WakeMessage {
+  t: 'wake';
+}
+
 /** Talk to the nearest NPC in reach, or search the nearest body, or act on the land. */
 export interface InteractMessage {
   t: 'interact';
@@ -188,6 +193,7 @@ export type ClientMessage =
   | InputMessage
   | ChatSendMessage
   | AttackMessage
+  | WakeMessage
   | InteractMessage
   | UseItemMessage
   | AcceptQuestMessage
@@ -267,6 +273,8 @@ export interface EntityState {
   held?: string;
   /** The item shown in their left hand (see offHandItem), when they wear one. */
   offHeld?: string;
+  /** Lying Fallen at 0 HP, waiting for a friend to raise them or to wake at the shrine. */
+  fallen?: true;
 }
 
 export interface CreatureState {
@@ -320,6 +328,8 @@ export interface SnapshotMessage {
   floor?: number;
   hp: number;
   energy: number;
+  /** While you lie Fallen: whole seconds left before you wake at the shrine. */
+  fallen?: number;
   /** Other players inside the view radius. */
   players: EntityState[];
   /** Creatures inside the view radius. */
@@ -576,7 +586,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     return ['invite', 'accept', 'decline', 'leave'].includes(m.action as string) &&
       (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64));
   }
-  if (m.t === 'attack' || m.t === 'interact') return true;
+  if (m.t === 'attack' || m.t === 'interact' || m.t === 'wake') return true;
   if (m.t === 'ping') return Number.isSafeInteger(m.n);
   if (m.t === 'loot') {
     return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&

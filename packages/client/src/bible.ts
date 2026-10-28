@@ -1,6 +1,7 @@
 import { CREATURES, ITEMS, RARITIES, REGION_WISH_COST, bonusText, regionDef, ruleItemId, standing, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
+import { LORE_CHAPTERS } from './bible/lore.ts';
 
 // The Bible's chapters. The docs stay the source of truth; these are the
 // in-game editions until God's View can publish new versions to everyone.
@@ -90,6 +91,7 @@ export const CHAPTERS: Chapter[] = [
         <li>The Stewards read every report.</li>
       </ul>`,
   },
+  ...LORE_CHAPTERS,
   {
     id: 'style',
     title: 'The Style Bible',

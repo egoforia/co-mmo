@@ -33,6 +33,18 @@ import {
   type Rarity,
   type Stats,
 } from './rpg.ts';
+import {
+  OFFHAND_FAMILIES,
+  UNDEAD_WORDS,
+  WEAPON_FAMILIES,
+  WEAPON_FAMILY_IDS,
+  creatureDefence,
+  familyFromWords,
+  offhandFromWords,
+  shieldBlock,
+  type OffhandFamily,
+  type WeaponFamily,
+} from './weapons.ts';
 
 export type WishTier = 'minor' | 'moderate' | 'major' | 'engine' | 'refused';
 
@@ -57,6 +69,8 @@ export interface ItemWish {
   /** Equipment: how rare it is (Common to Rare for wishes) and which stat it helps. */
   rarity?: Rarity;
   focus?: keyof Stats;
+  /** Weapons: their family (sword, bow, staff...); off-hand items: shield, tome, orb or lantern. */
+  family?: WeaponFamily | OffhandFamily;
   /** Gear that burns or glows: the light it casts while held. */
   light?: Light;
   look: WishLook;
@@ -519,7 +533,8 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const rarity = RARITIES.slice(0, RARITIES.indexOf(MAX_WISHED_RARITY) + 1).find((r) => r === d.rarity) ?? 'common';
     const focus = (['might', 'agility', 'wit', 'spirit', 'vigor'] as const).find((k) => k === d.focus);
     const light = cleanLight(d.light);
-    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(light ? { light } : {}), look };
+    const family = slot === 'weapon' ? weaponFamily(d.family, `${name} ${description}`) : slot === 'offhand' ? offhandFamily(d.family, `${name} ${description}`) : undefined;
+    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(family ? { family } : {}), ...(light ? { light } : {}), look };
   }
   if (d.kind === 'ability') {
     const effect: AbilityEffect = d.effect === 'bolt' || d.effect === 'heal' ? d.effect : 'strike';
@@ -689,6 +704,24 @@ export function validateRule(raw: unknown): RuleWish {
 
 export class WishError extends Error {}
 
+/**
+ * A wished weapon's family: the one it names, or else the one its words
+ * name ("Coral Spear"), or a sword. A family that does not exist is refused.
+ */
+function weaponFamily(raw: unknown, words: string): WeaponFamily {
+  if (raw !== undefined && raw !== null && raw !== '') {
+    const family = WEAPON_FAMILY_IDS.find((f) => f === raw);
+    if (!family) throw new WishError(`A weapon must be one of these kinds: ${WEAPON_FAMILY_IDS.map((f) => WEAPON_FAMILIES[f].name.toLowerCase()).join(', ')}.`);
+    return family;
+  }
+  return familyFromWords(words) ?? 'sword';
+}
+
+/** A wished off-hand item's family, when it names one or its words do; none otherwise. */
+function offhandFamily(raw: unknown, words: string): OffhandFamily | undefined {
+  return (Object.keys(OFFHAND_FAMILIES) as OffhandFamily[]).find((f) => f === raw) ?? offhandFromWords(words);
+}
+
 /** Stats for a wished creature come from its level, never from the wish itself. */
 export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
   const l = w.level;
@@ -701,6 +734,7 @@ export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
     level: l,
     hp: 14 + l * 8,
     damage: Math.round(2 + l * 1.5),
+    ...creatureDefence(l, UNDEAD_WORDS.test(`${w.name} ${w.description}`) ? 'undead' : undefined),
     cooldown: 1.3,
     // Hunters are quicker, and the timid quickest of all at running away.
     speed: w.behavior === 'chase' || w.behavior === 'pack' ? 2.8 : w.behavior === 'timid' ? 3 : 2.2,
@@ -724,6 +758,7 @@ export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
       slot,
       rarity,
       bonus: equipmentBonus(slot, rarity, w.focus),
+      ...gearFamily(slot, rarity, w),
       value: 10 * (RARITIES.indexOf(rarity) + 1),
       ...(w.light ? { light: w.light } : {}),
     };
@@ -735,6 +770,19 @@ export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
     description: w.description,
     ...(w.heal ? { heal: w.heal } : {}),
   };
+}
+
+/** A wished weapon's family (older wishes get theirs from their words), or a shield's block. */
+function gearFamily(slot: EquipSlot, rarity: Rarity, w: ItemWish | RuleItem): Partial<ItemDef> {
+  const words = `${w.name} ${w.description}`;
+  if (slot === 'weapon') {
+    const named = WEAPON_FAMILY_IDS.find((f) => f === w.family);
+    return { weapon: named ?? familyFromWords(words) ?? 'sword' };
+  }
+  if (slot !== 'offhand') return {};
+  const offhand = (Object.keys(OFFHAND_FAMILIES) as OffhandFamily[]).find((f) => f === w.family) ?? offhandFromWords(words);
+  if (!offhand) return {};
+  return offhand === 'shield' ? { offhand, ...shieldBlock(rarity) } : { offhand };
 }
 
 /** Numbers for a wished ability come from its effect, a little below the built-in ones. */

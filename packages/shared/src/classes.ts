@@ -2,10 +2,10 @@
 // class. Each has two neighbouring attributes on the pentagon, three trained
 // weapon families, a signature gauge, five core skills and two Paths. Plain
 // data; skills are ability ids that arrive in ABILITIES with the skills step
-// (docs/callings-build-plan.md, step 7), and weapon families are plain ids
-// until weapons.ts (step 3) names them.
+// (docs/callings-build-plan.md, step 7); weapon families are in weapons.ts.
 
 import type { Stats } from './rpg.ts';
+import type { OffhandFamily, WeaponFamily } from './weapons.ts';
 
 export type CallingId = 'warden' | 'duelist' | 'ranger' | 'wishweaver' | 'bellkeeper';
 
@@ -28,10 +28,10 @@ export interface CallingDef {
   role: string;
   /** One line for the creation screen. */
   blurb: string;
-  /** Weapon families it is trained in (ids from weapons.ts once it exists). */
-  weapons: string[];
+  /** Weapon families it is trained in (weapons.ts). */
+  weapons: WeaponFamily[];
   /** Off-hand families it is trained in. */
-  offhands: string[];
+  offhands: OffhandFamily[];
   gauge: { id: string; name: string };
   /** Learned automatically at levels 1, 2, 4, 6 and 8. */
   core: { level: number; skill: string }[];

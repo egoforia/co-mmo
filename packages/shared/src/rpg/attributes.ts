@@ -1,12 +1,14 @@
 // The five attributes and every number built on them: health, Energy,
-// regeneration, attack, crits, dodge, cooldowns, Armor and Ward
-// (docs/attributes.md). Re-exported from rpg.ts.
+// regeneration, attack, crits, stagger, dodge, block, cooldowns, Armor and
+// Ward (docs/attributes.md). Re-exported from rpg.ts.
 
-import { gearBonus, totalStats, type Character } from '../rpg.ts';
+import { gearBonus, totalStats, type Character, type Stats } from '../rpg.ts';
+import type { CallingId } from '../classes.ts';
+import { UNTRAINED_DAMAGE, trainedShield, wieldedFamily, wieldsTrained } from '../weapons.ts';
 
-/** What a formula needs: the character's level, attributes and what they wear. */
-type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>>;
-type Worn = Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>>;
+/** What a formula needs: the character's level, attributes, what they wear and (once chosen) their Calling. */
+type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>> & { calling?: CallingId | null };
+type Worn = Pick<Character, 'stats'> & Partial<Pick<Character, 'equipment'>> & { calling?: CallingId | null };
 
 /** Health: mostly from Vigor, a little from Might. */
 export function maxHp(c: Gear): number {
@@ -34,25 +36,49 @@ export function afterArmor(amount: number, armor: number): number {
   return Math.max(1, Math.round((amount * 12) / (12 + Math.max(0, armor))));
 }
 
-// Weapon families (build plan step 3) bring each weapon's speed and scaling;
-// until then a plain attack keeps the old power and speed.
-
-/** Damage before randomness and debuffs. */
+/**
+ * A plain attack's damage before randomness, defence and debuffs: the
+ * family's and the item's damage, plus level, plus each attribute times the
+ * family's scale. A weapon outside the character's training deals 30% less.
+ */
 export function attackPower(c: Gear): number {
-  return 3 + totalStats(c).might + c.level + gearBonus(c, 'attack');
+  const family = wieldedFamily(c);
+  const s = totalStats(c);
+  let amount = family.damage + gearBonus(c, 'attack') + c.level;
+  for (const [k, factor] of Object.entries(family.scale) as [keyof Stats, number][]) amount += s[k] * factor;
+  return Math.round(amount * (wieldsTrained(c) ? 1 : UNTRAINED_DAMAGE));
 }
 
-/** Seconds between attacks: Agility makes them quicker. */
+/** Seconds between attacks: the family's speed, up to 30% quicker with Agility, never under 0.35. */
 export function attackCooldown(c: Worn): number {
-  return Math.max(0.35, 0.8 - totalStats(c).agility * 0.03);
+  const bonus = Math.min(0.3, totalStats(c).agility * 0.01);
+  return Math.max(0.35, Math.round((wieldedFamily(c).speed / (1 + bonus)) * 100) / 100);
+}
+
+/** How far a plain attack reaches, in tiles: the weapon family's reach. */
+export function attackReach(c: Partial<Pick<Character, 'equipment'>>): number {
+  return wieldedFamily(c).reach;
+}
+
+/** Chance (0 to 0.25) that a heavy weapon's hit cancels the target's next attack: Might raises it. */
+export function staggerChance(c: Worn): number {
+  return wieldedFamily(c).heavy && wieldsTrained(c) ? Math.min(0.25, totalStats(c).might * 0.01) : 0;
+}
+
+/** A trained shield's chance (at most 0.4) to block a hit, and how much a block takes off (Might adds to it). */
+export function blocking(c: Worn): { chance: number; amount: number } {
+  const shield = trainedShield(c);
+  if (!shield?.block) return { chance: 0, amount: 0 };
+  return { chance: Math.min(0.4, shield.block), amount: (shield.blockAmount ?? 0) + totalStats(c).might * 0.5 };
 }
 
 /** Damage of a critical hit, as a multiple of the hit. */
 export const CRIT_MULTIPLIER = 1.5;
 
-/** Chance (0 to 0.35) that a hit is critical: Agility raises it. */
+/** Chance (0 to 0.35) that a hit is critical: Agility raises it, and so do twin blades. */
 export function critChance(c: Worn): number {
-  return Math.min(0.35, 0.05 + totalStats(c).agility * 0.004);
+  const weapon = wieldsTrained(c) ? (wieldedFamily(c).crit ?? 0) : 0;
+  return Math.min(0.35, 0.05 + totalStats(c).agility * 0.004 + weapon);
 }
 
 /** Chance (0 to 0.2) to dodge a physical hit: Agility raises it. */
@@ -70,7 +96,7 @@ export function armor(c: Worn): number {
   return gearBonus(c, 'armor') + totalStats(c).vigor * 0.5;
 }
 
-/** Defence against arcane hits: half of Spirit (worn ward comes with damage types). */
+/** Defence against arcane hits: worn ward plus half of Spirit. */
 export function ward(c: Worn): number {
-  return totalStats(c).spirit * 0.5;
+  return gearBonus(c, 'ward') + totalStats(c).spirit * 0.5;
 }

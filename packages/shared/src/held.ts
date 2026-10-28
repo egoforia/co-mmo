@@ -1,4 +1,5 @@
-import type { Character } from './rpg.ts';
+import { ITEMS, type Character } from './rpg.ts';
+import { WEAPON_FAMILIES } from './weapons.ts';
 import { facingSide, type Facing } from './walk.ts';
 
 // Held items (milestone 10): a player's painted look stays as it is, and the
@@ -22,6 +23,12 @@ export interface ArtPoints {
 
 /** A held item's longest side, as a share of its holder's height. */
 export const HELD_SIZE = 0.42;
+
+/** How big this item shows in the hand: by its weapon family, so a greatsword towers over a wand. */
+export function heldSize(item: string | undefined): number {
+  const family = item ? ITEMS[item]?.weapon : undefined;
+  return HELD_SIZE * (family ? WEAPON_FAMILIES[family].held : 1);
+}
 
 /**
  * Whether an item in this hand is drawn behind the body: walking away, or

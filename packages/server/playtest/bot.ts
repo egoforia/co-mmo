@@ -6,11 +6,11 @@
 
 import { WebSocket } from 'ws';
 import {
-  ATTACK_RANGE,
   SEARCH_RANGE,
   SIDE_STEP,
   TALK_RANGE,
   attackCooldown,
+  attackReach,
   collides,
   generateRegion,
   itemCount,
@@ -252,7 +252,7 @@ export class Bot {
     let last: Point = { x: target.x, y: target.y };
     const regionId = this.region.id;
     const since = this.mark();
-    const route: Route = { target: () => last, near: ATTACK_RANGE * 0.8, path: [], i: 0, plannedAt: 0 };
+    const route: Route = { target: () => last, near: attackReach(this.character) * 0.8, path: [], i: 0, plannedAt: 0 };
     this.plan(route);
     const end = Date.now() + ms;
     while (Date.now() < end) {
@@ -265,7 +265,7 @@ export class Bot {
       else if (this.log.slice(since).some((m) => m.t === 'hit' && m.target === id && m.defeated)) return { result: 'none' };
       if (this.snapshot && this.snapshot.hp < maxHp(this.character) * 0.4 && itemCount(this.character, 'tonic') > 0) this.send({ t: 'use', item: 'tonic' });
       const p = this.at;
-      if (Math.hypot(last.x - p.x, last.y - p.y) <= ATTACK_RANGE * 0.9) {
+      if (Math.hypot(last.x - p.x, last.y - p.y) <= attackReach(this.character) * 0.9) {
         if (Date.now() - this.lastAttack >= attackCooldown(this.character) * 1000 + 30) {
           this.lastAttack = Date.now();
           this.send({ t: 'attack' });

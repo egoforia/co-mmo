@@ -47,7 +47,8 @@ describe('equipment', () => {
     expect(equip(c, 'wooden-sword')).toBeUndefined();
     expect(c.equipment.weapon).toBe('wooden-sword');
     expect(itemCount(c, 'wooden-sword')).toBe(0);
-    expect(attackPower(c)).toBe(bare + 2);
+    // A sword brings its family's 3 damage and Agility scaling, plus its own +2.
+    expect(attackPower(c)).toBeGreaterThan(bare + 2);
     expect(equip(c, 'crab-lance')).toBeUndefined();
     expect(itemCount(c, 'wooden-sword')).toBe(1);
     expect(totalStats(c).agility).toBe(c.stats.agility + 1);

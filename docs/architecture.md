@@ -86,14 +86,18 @@ use). The hour and weather come from shared `sky.ts`, worked out from the
 clock and the region alone, so every server, cell and browser agrees
 without being told; people's days are in shared `routines.ts`.
 Character rules are shared `rpg.ts`, a face over `rpg/`: `attributes.ts`
-holds the five attributes' numbers (health, Energy, regeneration, crits,
-dodge, cooldowns, Armor and Ward; `docs/attributes.md`) and `callings.ts`
-how a people and Calling build them (creation, level-ups, free points,
-changing Calling). The peoples and Callings themselves are plain data in
-shared `races.ts` and `classes.ts` (`docs/races.md`, `docs/classes.md`).
+holds the five attributes' numbers (health, Energy, regeneration, attack
+power, speed and reach, crits, stagger, dodge, block, cooldowns, Armor and
+Ward; `docs/attributes.md`) and `callings.ts` how a people and Calling
+build them (creation, level-ups, free points, changing Calling). The
+peoples and Callings themselves are plain data in shared `races.ts` and
+`classes.ts` (`docs/races.md`, `docs/classes.md`).
 A character saved before Callings is held at `game-socket.ts` with a
 `callingNeeded` message until it answers `chooseCalling`; changing people or
 Calling later is a `calling` wish made only in the Workshop, like a new look.
+Shared `weapons.ts` holds the weapon and off-hand families, damage types,
+creature Armor and Ward, and `trainedIn`, which says whether a Calling is
+trained in a family (`docs/classes.md#weapons`).
 
 **Wishes.** `wishes.ts` is one face over the parts in `wishes/`:
 `prayers.ts` (talking to the God, its limits and cost), `cards.ts` (wish

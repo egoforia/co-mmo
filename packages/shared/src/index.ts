@@ -21,6 +21,7 @@ export * from './walk-rig.ts';
 export * from './walk.ts';
 export * from './sounds.ts';
 export * from './held.ts';
+export * from './weapons.ts';
 export * from './light.ts';
 export * from './lighting.ts';
 export * from './mods.ts';

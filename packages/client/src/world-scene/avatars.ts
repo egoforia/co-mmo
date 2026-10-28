@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import {
   CREATURES,
-  HELD_SIZE,
+  heldSize,
   ITEMS,
   Interpolator,
   PLAYER_SPEED,
@@ -421,7 +421,7 @@ export function placeHeld(
   image
     .setFlipX(flip)
     .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
-    .setScale((b.displayHeight * HELD_SIZE) / Math.max(image.width, image.height))
+    .setScale((b.displayHeight * heldSize(held.item)) / Math.max(image.width, image.height))
     .setPosition(x, y)
     .setDepth(b.depth + (heldBehind(a.worn, side) ? -1 : 1))
     .setVisible(b.visible);

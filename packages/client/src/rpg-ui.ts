@@ -9,6 +9,8 @@ import {
   attackCooldown,
   armor,
   attackPower,
+  attackReach,
+  familyText,
   bonusText,
   creatorXpToNext,
   critChance,
@@ -222,7 +224,7 @@ export class RpgUi {
         const ruled = contentEntries().some((e) => e.definition?.kind === 'rule' && s.item.startsWith(`${e.id}-`));
         const hint = def.kind === 'book' ? 'Click to read'
           : def.heal ? 'Click to drink'
-            : def.slot ? `Wear: ${bonusText(def.bonus) || SLOT_NAMES[def.slot]}`
+            : def.slot ? `Wear: ${[familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · ') || SLOT_NAMES[def.slot]}`
               : def.teaches ? 'Click to read and learn'
                 : ruled ? 'Click to use' : 'For crafting and trade';
         return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}`)}">
@@ -235,7 +237,7 @@ export class RpgUi {
       const id = c.equipment[slot];
       const def = id ? ITEMS[id] : undefined;
       return def
-        ? `<button type="button" class="slot worn" data-slot="${slot}" title="Click to take it off">${itemLabel(id!)}<span class="hint">${escapeHtml(bonusText(def.bonus))}</span></button>`
+        ? `<button type="button" class="slot worn" data-slot="${slot}" title="Click to take it off">${itemLabel(id!)}<span class="hint">${escapeHtml([familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · '))}</span></button>`
         : `<div class="slot empty"><span class="name">${SLOT_NAMES[slot]}</span><span class="hint">Nothing worn</span></div>`;
     }).join('');
     const s = c.stats;
@@ -255,7 +257,7 @@ export class RpgUi {
       ${calling}
       <dl class="sheet">
         ${stat('Might', 'might')}${stat('Agility', 'agility')}${stat('Wit', 'wit')}${stat('Spirit', 'spirit')}${stat('Vigor', 'vigor')}
-        <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Armour</dt><dd>${one(armor(c))}</dd></div><div><dt>Ward</dt><dd>${one(ward(c))}</dd></div>
+        <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Reach</dt><dd>${one(attackReach(c))}<small>steps</small></dd></div><div><dt>Attack every</dt><dd>${attackCooldown(c).toFixed(2)}<small>s</small></dd></div><div><dt>Armour</dt><dd>${one(armor(c))}</dd></div><div><dt>Ward</dt><dd>${one(ward(c))}</dd></div>
         <div><dt>Critical hit</dt><dd>${percent(critChance(c))}</dd></div><div><dt>Dodge</dt><dd>${percent(dodgeChance(c))}</dd></div>
         <div class="wide"><dt>Creator level</dt><dd>${c.creatorLevel}<small>${c.creatorXp} / ${creatorXpToNext(c.creatorLevel)}</small></dd></div>
       </dl>

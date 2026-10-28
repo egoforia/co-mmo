@@ -10,6 +10,7 @@ import {
   MAX_WISHED_DROP_QTY,
   MAX_WISHED_DROPS,
   MAX_WISHED_HEAL,
+  WEAPON_FAMILY_IDS,
   MAX_WISHED_LEVEL,
   FLAME_LIGHT,
   MAX_LIGHT_RADIUS,
@@ -77,7 +78,7 @@ or, when offering a wish:
 {"say": "<what you say>", "wish": {"tier": "minor|moderate|major|engine|refused", "title": "<a few words>", "summary": "<one plain sentence of what will be made>", "definition": <definition or null>}}
 
 Definitions (only for minor and moderate):
-item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit|vigor (gear only: the stat it helps)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"look":LOOK}
+item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit|vigor (gear only: the stat it helps)","family":"${WEAPON_FAMILY_IDS.join('|')} (weapons only: what kind of weapon it is) or shield|tome|orb|lantern (offhand only)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"look":LOOK}
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
 ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase|patrol|timid|pack","active":"day|night (leave out for creatures about at all hours)","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}

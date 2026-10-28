@@ -9,12 +9,13 @@ export interface Vec2 {
 /**
  * Advances a position by one tick of input. Shared by the server (which is
  * authoritative) and the client (which predicts its own movement with it).
- * Axes are resolved separately so players slide along walls.
+ * Axes are resolved separately so players slide along walls. `pace` is the
+ * share of full speed statuses allow (paceOf: Slowed, Rooted, Stunned).
  */
-export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 0): Vec2 {
-  if (dx === 0 && dy === 0) return pos;
+export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 0, pace = 1): Vec2 {
+  if ((dx === 0 && dy === 0) || pace <= 0) return pos;
   const len = Math.hypot(dx, dy);
-  const dist = PLAYER_SPEED * TICK_SECONDS;
+  const dist = PLAYER_SPEED * TICK_SECONDS * pace;
   const mx = (dx / len) * dist;
   const my = (dy / len) * dist;
 

@@ -238,8 +238,8 @@ export function takeStairs(map: RegionMap, at: Placed, climbs = true): Placed | 
  * onto. The server moves players with it and each browser predicts its own
  * player with it, so both change floors on the same step.
  */
-export function walkOn(map: RegionMap, at: Placed, dx: number, dy: number): Placed {
-  const next = step(map, at, dx, dy, at.floor);
+export function walkOn(map: RegionMap, at: Placed, dx: number, dy: number, pace = 1): Placed {
+  const next = step(map, at, dx, dy, at.floor, pace);
   if (next.x === at.x && next.y === at.y) return at;
   const moved = { x: next.x, y: next.y, floor: at.floor };
   return takeStairs(map, moved) ?? moved;

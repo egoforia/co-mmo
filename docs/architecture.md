@@ -72,7 +72,11 @@ every building for the Art tab's Buildings page), `art-files.ts`
 
 **The world.** `world.ts` (regions, travel, hosting), `region.ts` (one
 region's tick: movement, snapshots, joining and leaving) with its systems in
-`region/`: `state.ts` (who and what is here, shared by all), `combat.ts`,
+`region/`: `state.ts` (who and what is here, shared by all), `combat.ts`
+(attacks, rewards, and `useAbility`, which looks each ability's effect up in
+`effects/`: one small file per family of the effect kit, all given the same
+`EffectKit` moves), `statuses.ts` (putting statuses on players and creatures,
+Vigor shortening them, damage ticks), `fallen.ts`,
 `minds.ts` (runs the creatures and NPCs below each tick), `kit.ts` (gear, items, crafting, shops),
 `quests.ts` (talking and quests), `bodies.ts` (loot) and `chat.ts`,
 `region-views.ts` (what players see of each thing: the one shape both
@@ -88,8 +92,14 @@ without being told; people's days are in shared `routines.ts`.
 Character rules are shared `rpg.ts`, a face over `rpg/`: `attributes.ts`
 holds the five attributes' numbers (health, Energy, regeneration, attack
 power, speed and reach, crits, stagger, dodge, block, cooldowns, Armor and
-Ward; `docs/attributes.md`) and `callings.ts` how a people and Calling
-build them (creation, level-ups, free points, changing Calling). The
+Ward; `docs/attributes.md`), `callings.ts` how a people and Calling
+build them (creation, level-ups, free points, changing Calling),
+`abilities.ts` the effect kit an ability is made of (`AbilityEffect`,
+`AbilityDef`) and `statuses.ts` the status rules both sides use (lengths,
+stun immunity, pace, shields; `docs/attributes.md#statuses`). Shared
+`wished-abilities.ts` holds the world-set numbers for each effect a wish may
+choose. Statuses travel in snapshots; until their icons are painted (build
+plan step 10) the browser shows them as words on name tags and the HUD. The
 peoples and Callings themselves are plain data in shared `races.ts` and
 `classes.ts` (`docs/races.md`, `docs/classes.md`).
 A character saved before Callings is held at `game-socket.ts` with a

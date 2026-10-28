@@ -14,6 +14,7 @@ import {
   generateRegion,
   heldItem,
   offHandItem,
+  paceFor,
   type ArtEntry,
   type ArtManifest,
   type ArtPointsManifest,
@@ -49,6 +50,7 @@ import {
   setHeld,
   syncAvatars,
   walkAvatar,
+  withStatuses,
 } from './world-scene/avatars.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
 import {
@@ -377,6 +379,8 @@ export class WorldScene extends Phaser.Scene {
 
   onSnapshot(snapshot: SnapshotMessage): void {
     if (!this.predictor || !this.sys.isActive()) return;
+    // Slowed, Rooted or Stunned: predict our steps at the pace the server allows.
+    this.predictor.pace = paceFor((snapshot.statuses ?? []).map((s) => s.id));
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
     const now = performance.now();
     const load = (k: string, u: string) => this.loadArt(k, u);
@@ -386,7 +390,7 @@ export class WorldScene extends Phaser.Scene {
       if (!remote) continue;
       setHeld(this, remote, p.held, 'right', load);
       setHeld(this, remote, p.offHeld, 'left', load);
-      remote.label.setText(p.fallen ? `${p.name} (Fallen)` : p.name);
+      remote.label.setText(withStatuses(p.fallen ? `${p.name} (Fallen)` : p.name, p.statuses));
       remote.body.setAlpha(p.fallen ? FALLEN_ALPHA : 1);
     }
     syncAvatars(this, this.creatures, snapshot.creatures ?? [], now, (c) => makeCreature(this, this.metrics, c));

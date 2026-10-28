@@ -9,6 +9,7 @@ import {
   type PlayerInfo,
   type RegionMap,
   type ServerMessage,
+  type Status,
 } from '@co-mmo/shared';
 import type { Connection, RegionHooks } from '../region.ts';
 import type { Creature } from '../creature-brain.ts';
@@ -48,6 +49,37 @@ export interface PlayerState {
   looting?: string;
   /** While Fallen at 0 HP (region/fallen.ts): when they wake at the shrine, epoch ms. */
   fallenUntil?: number;
+  /** Running statuses (region/statuses.ts) and when a new stun can take again. */
+  statuses: Status[];
+  stunImmuneUntil?: number;
+  /** The way they last walked, one step long: blinks and cones go this way when no creature is chosen. */
+  facing?: { dx: number; dy: number };
+  /** The stance they hold (effects/stance.ts), until used again or out of Energy. */
+  stance?: { ability: string; amount: number };
+}
+
+/** A trap a player set (effects/trap.ts): it springs on the first creature to step close. */
+export interface Trap {
+  owner: string;
+  ability: string;
+  x: number;
+  y: number;
+  floor: number;
+  radius: number;
+  amount: number;
+  /** Epoch ms when it crumbles unsprung. */
+  until: number;
+}
+
+/** A summoned helper (effects/summon.ts): it stays by its owner and strikes what is near. */
+export interface Helper {
+  owner: string;
+  ability: string;
+  amount: number;
+  radius: number;
+  until: number;
+  /** Epoch ms of its next strike. */
+  nextAt: number;
 }
 
 /** A defeated creature's body: what it dropped waits there for anyone to take. */
@@ -72,6 +104,9 @@ export class RegionState {
   /** Bodies of defeated creatures, until they fade. */
   bodies: Body[] = [];
   bodyCount = 0;
+  /** Traps set and helpers summoned by players here. */
+  traps: Trap[] = [];
+  helpers: Helper[] = [];
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   townsfolk: Townsperson[] = [];
   tickCount = 0;

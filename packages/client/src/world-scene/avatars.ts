@@ -16,6 +16,7 @@ import {
   walkDirection,
   walkFrameRate,
   walkStandArt,
+  statusWords,
   type ArtEntry,
   type ArtManifest,
   type ArtPoint,
@@ -270,7 +271,14 @@ export function makeNpc(scene: Phaser.Scene, metrics: FigureMetricsCache, n: Npc
 
 /** A creature's name tag says when it is asleep or running away. */
 export function creatureLabel(c: CreatureState): string {
-  return c.mood === 'asleep' ? `${c.name} (asleep)` : c.mood === 'fleeing' ? `${c.name} (running away)` : c.name;
+  const name = c.mood === 'asleep' ? `${c.name} (asleep)` : c.mood === 'fleeing' ? `${c.name} (running away)` : c.name;
+  return withStatuses(name, c.statuses);
+}
+
+/** A name tag with its statuses after it, in words until their icons are painted (build plan step 10). */
+export function withStatuses(name: string, statuses: CreatureState['statuses']): string {
+  const words = statusWords(statuses);
+  return words ? `${name} · ${words}` : name;
 }
 
 /** A body's name tag says when there is something on it for us. */

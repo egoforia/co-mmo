@@ -1,4 +1,4 @@
-import { TICK_RATE, awake, collides, noticeScale, type CreatureDef, type CreatureMood, type RegionMap, type Weather } from '@co-mmo/shared';
+import { TICK_RATE, awake, collides, noticeScale, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
 import { canReach, goTo, moveAway, moveToward, wander, type Walker } from './walkers.ts';
 
 // How creatures behave, one tick at a time: sleeping out of their hours,
@@ -47,6 +47,11 @@ export interface Creature extends Walker {
   /** A patrol's rounds about its spot, and which corner it walks to next. */
   route?: Spot[];
   leg: number;
+  /** Running statuses (region/statuses.ts) and when a new stun can take again. */
+  statuses: Status[];
+  stunImmuneUntil?: number;
+  /** Share of its speed its statuses allow this tick (paceOf); full when missing. */
+  pace?: number;
 }
 
 /** A player as creatures see them. */
@@ -80,7 +85,7 @@ export interface Habitat {
 export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number, floor = 0): Creature {
   return {
     id, kind, def, x, y, floor, home: { x, y, floor }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
-    aggro: null, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0,
+    aggro: null, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0, statuses: [],
   };
 }
 
@@ -88,7 +93,7 @@ export function makeCreature(id: string, kind: string, def: CreatureDef, x: numb
 export function think(c: Creature, h: Habitat): void {
   if (c.respawnAt !== null) {
     if (h.now < c.respawnAt) return;
-    Object.assign(c, { respawnAt: null, hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, fleeing: null, asleep: false });
+    Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, fleeing: null, asleep: false });
     return;
   }
   const up = awake(c.def.active, h.phase);
@@ -96,7 +101,7 @@ export function think(c: Creature, h: Habitat): void {
   if (c.fleeing) return run(c, h);
   if (c.aggro) return fight(c, h);
   if (c.returning) {
-    if (goTo(h.map, c, c.home, c.def.speed) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) {
+    if (goTo(h.map, c, c.home, speedOf(c)) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) {
       c.returning = false;
       c.hp = c.def.hp;
     }
@@ -107,9 +112,14 @@ export function think(c: Creature, h: Habitat): void {
   if (c.def.behavior === 'patrol') return patrol(c, h);
   if (c.def.behavior === 'pack') {
     const leader = packLeader(c, h.creatures);
-    if (leader !== c) return wander(h.map, c, WANDER_SPEED * 1.2, 2.5, h.random, leader);
+    if (leader !== c) return wander(h.map, c, WANDER_SPEED * (c.pace ?? 1) * 1.2, 2.5, h.random, leader);
   }
-  wander(h.map, c, WANDER_SPEED, WANDER_RADIUS, h.random);
+  wander(h.map, c, WANDER_SPEED * (c.pace ?? 1), WANDER_RADIUS, h.random);
+}
+
+/** How fast it moves when in a hurry, as its statuses allow (Slowed, Rooted). */
+function speedOf(c: Creature): number {
+  return c.def.speed * (c.pace ?? 1);
 }
 
 /** Someone struck it: it wakes and fights back, or runs if it is timid or badly hurt; a pack joins in. */
@@ -159,11 +169,11 @@ function fight(c: Creature, h: Habitat): void {
   // Gone up or down: after them by the stairs, or give up if only a ladder leads there.
   if (p.floor !== c.floor) {
     if (!canReach(h.map, c, p)) return giveUp(c);
-    goTo(h.map, c, p, c.def.speed);
+    goTo(h.map, c, p, speedOf(c));
     return;
   }
   const d = Math.hypot(p.x - c.x, p.y - c.y);
-  if (d > CREATURE_REACH * 0.8) moveToward(h.map, c, p.x, p.y, c.def.speed);
+  if (d > CREATURE_REACH * 0.8) moveToward(h.map, c, p.x, p.y, speedOf(c));
   if (d <= CREATURE_REACH && h.now - c.lastAttack >= c.def.cooldown * 1000) {
     c.lastAttack = h.now;
     h.hurt(c, p.id);
@@ -175,7 +185,7 @@ function run(c: Creature, h: Habitat): void {
   const p = h.players.find((x) => x.id === c.fleeing);
   const safe = !p || !p.alive || p.floor !== c.floor || Math.hypot(p.x - c.x, p.y - c.y) > c.def.notice + 6;
   if (safe || h.now > c.fleeUntil || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH * 1.5) return giveUp(c);
-  moveAway(h.map, c, p.x, p.y, c.def.speed * 1.1);
+  moveAway(h.map, c, p.x, p.y, speedOf(c) * 1.1);
 }
 
 /** Out of its hours: walks home and sleeps there. */
@@ -183,19 +193,19 @@ function sleep(c: Creature, h: Habitat): void {
   c.target = null;
   const away = c.floor !== c.home.floor || Math.hypot(c.x - c.home.x, c.y - c.home.y) > 0.5;
   // One that cannot find its way home (no stairs back) sleeps where it is.
-  if (away && canReach(h.map, c, c.home) && !goTo(h.map, c, c.home, WANDER_SPEED)) return;
+  if (away && canReach(h.map, c, c.home) && !goTo(h.map, c, c.home, WANDER_SPEED * (c.pace ?? 1))) return;
   c.asleep = true;
 }
 
 /** Walks rounds about its spot, corner to corner, pausing at each. */
 function patrol(c: Creature, h: Habitat): void {
   c.route ??= rounds(c, h);
-  if (c.route.length < 2) return wander(h.map, c, WANDER_SPEED, WANDER_RADIUS, h.random);
+  if (c.route.length < 2) return wander(h.map, c, WANDER_SPEED * (c.pace ?? 1), WANDER_RADIUS, h.random);
   if (c.rest-- > 0) return;
   const to = c.route[c.leg % c.route.length]!;
   const before = { x: c.x, y: c.y };
   // A creature that cannot get round the corner (something stands in the way) tries the next one.
-  if (moveToward(h.map, c, to.x, to.y, WANDER_SPEED) || (c.x === before.x && c.y === before.y)) {
+  if (moveToward(h.map, c, to.x, to.y, WANDER_SPEED * (c.pace ?? 1)) || (c.x === before.x && c.y === before.y)) {
     c.leg = (c.leg + 1) % c.route.length;
     c.rest = Math.floor(TICK_RATE / 2);
   }

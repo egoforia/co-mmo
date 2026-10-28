@@ -51,6 +51,7 @@ import { findSpots } from './walkers.ts';
 import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
 import { Combat } from './region/combat.ts';
+import { Fallen } from './region/fallen.ts';
 import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
@@ -170,6 +171,8 @@ export interface Carry {
   readyAt: Map<string, number>;
   /** The floor they were on (floors.ts), so moving the region elsewhere keeps them upstairs. */
   floor?: number;
+  /** While Fallen: when they wake at the shrine, so moving the region keeps their time. */
+  fallenUntil?: number;
 }
 
 /**
@@ -189,6 +192,7 @@ export class Region {
   private readonly quests: Quests;
   private readonly looting: Bodies;
   private readonly talk: Chat;
+  private readonly fallen: Fallen;
   /** The weather over this land as players last heard it. */
   private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
@@ -217,6 +221,7 @@ export class Region {
     this.minds = new Minds(this.s);
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
+    this.fallen = new Fallen(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
     this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
@@ -343,6 +348,25 @@ export class Region {
     this.s.levelUps(p, gainXp(p.character, amount));
     p.dirty = true;
     this.s.flush(p);
+  }
+
+  /**
+   * Raises a Fallen player where they lie with `share` of their health and
+   * no Weakened (Peal of Waking, Great Bell of Waking); `by` is who rang
+   * them back. Returns false when they were not Fallen.
+   */
+  raise(id: string, share: number, by?: string): boolean {
+    const p = this.s.players.get(id);
+    if (!p) return false;
+    const raised = this.fallen.raise(p, share, by ? this.s.players.get(by) : undefined);
+    this.s.flush(p);
+    return raised;
+  }
+
+  /** True while a player lies Fallen, for tests and tools. */
+  isFallen(id: string): boolean {
+    const p = this.s.players.get(id);
+    return !!p && this.fallen.is(p);
   }
 
   /** A line in one player's log. */
@@ -505,7 +529,7 @@ export class Region {
     this.s.players.delete(id);
     for (const c of this.s.creatures) if (c.aggro === id || c.fleeing === id) giveUp(c);
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
-    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}) };
+    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}) };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
   }
 
@@ -554,6 +578,9 @@ export class Region {
       case 'trade':
         this.trades.handle(id, message);
         break;
+      case 'wake':
+        this.fallen.wake(p);
+        break;
     }
     this.s.flush(p);
   }
@@ -574,6 +601,11 @@ export class Region {
     for (const p of this.s.players.values()) {
       const batch = p.inputs.splice(0, MAX_INPUTS_PER_TICK);
       for (const input of batch) {
+        // The Fallen lie still where they fell; their steps are counted but not taken.
+        if (this.fallen.is(p)) {
+          p.ack = input.seq;
+          continue;
+        }
         const next = walkOn(this.map, p, input.dx, input.dy);
         const way = wayTaken(this.map, p.floor, next);
         if (way) this.s.notice(p, climbWords(way, p.floor));
@@ -603,12 +635,11 @@ export class Region {
     // A loot window closes when its body fades or its looter walks away.
     for (const p of this.s.players.values()) if (p.looting && !this.looting.lootable(p, p.looting)) this.looting.closeLoot(p);
     this.minds.live(phase);
-    for (const p of this.s.players.values()) {
-      if (p.character.hp <= 0 && !departures.some((d) => d.id === p.info.id && d.cell === undefined)) {
-        const i = departures.findIndex((d) => d.id === p.info.id);
-        if (i >= 0) departures.splice(i, 1);
-        departures.push({ id: p.info.id, died: true });
-      }
+    // The Fallen lie where they fell until a friend raises them or they wake at the shrine.
+    for (const id of this.fallen.tick(now)) {
+      const i = departures.findIndex((d) => d.id === id);
+      if (i >= 0) departures.splice(i, 1);
+      departures.push({ id, died: true });
     }
 
     const all = [...this.s.players.values()];
@@ -649,7 +680,7 @@ export class Region {
       }
       p.crowd = players.length + creatures.length;
       p.conn.send({
-        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), players, creatures, bodies, npcs, online,
+        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), players, creatures, bodies, npcs, online,
       });
       this.s.flush(p);
     }
@@ -689,6 +720,11 @@ export class Region {
     for (const p of this.s.players.values()) this.s.notice(p, WEATHER_NEWS[weather]);
   }
 
+}
+
+/** The snapshot's Fallen countdown, sent only while it runs. */
+function fallenFor(seconds: number | undefined): { fallen?: number } {
+  return seconds === undefined ? {} : { fallen: seconds };
 }
 
 /** The open spot nearest (x, y), within a few tiles, at the middle of a tile. */

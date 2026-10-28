@@ -18,6 +18,7 @@ import { EditorUi } from './editor-ui.ts';
 import { MiniMap } from './mini-map.ts';
 import { chooseCamera } from './camera.ts';
 import { PerfOverlay } from './perf-overlay.ts';
+import { FallenUi } from './fallen-ui.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
 
 async function boot(): Promise<void> {
@@ -100,6 +101,7 @@ function play(token: string): void {
   let prayer: PrayerUi | null = null;
   let draft: DraftView | null = null;
   let party: PartyUi | null = null;
+  let fallen: FallenUi | null = null;
   let perf: PerfOverlay | null = null;
   let myId = '';
   const sound = new GameSound();
@@ -192,7 +194,8 @@ function play(token: string): void {
         scene?.onSnapshot(message);
         rpg?.setVitals(message.hp, message.energy);
         kit?.setEnergy(message.energy);
-        scene?.setWeakened(rpg?.weakened ?? false);
+        scene?.setWeakened(rpg?.weakened ?? false, message.fallen !== undefined);
+        fallen?.show(message.fallen);
         setHud(name, message.online, region, scene?.skyText());
         break;
       case 'chat':
@@ -303,6 +306,7 @@ function play(token: string): void {
     });
     chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
+    fallen = new FallenUi(() => connection.send({ t: 'wake' }));
     party.start(myId);
     const account = new AccountWindow(token, welcome.you.role !== 'player' ? () => perf : undefined);
     onAccountClick(() => void account.toggle());

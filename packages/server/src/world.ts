@@ -766,7 +766,7 @@ export class World {
     if (this.moving.has(id) || this.where.get(id) !== region.def.id) return;
     const name = region.nameOf(id) ?? 'Someone';
     if (departure.died) {
-      // Respawn at the shrine, Weakened for a while; nothing is lost.
+      // The Fallen wake at the shrine, Weakened for a while; nothing is lost.
       this.moving.add(id);
       this.track(settle(region.remove(id, `${name} fell in ${region.def.name}.`), (fallen) => {
         this.moving.delete(id);
@@ -777,7 +777,7 @@ export class World {
         this.where.set(id, home.def.id);
         home.join(fallen.info, fallen.conn, home.map.spawn, fallen.character, `${name} woke at the shrine of ${home.def.name}.`);
         this.partyChanged(id);
-        fallen.conn.send({ t: 'notice', text: `You fell, and woke at the shrine. You are Weakened for ${WEAKENED_MS / 1000} seconds.` });
+        fallen.conn.send({ t: 'notice', text: `You woke at the shrine. You are Weakened for ${WEAKENED_MS / 1000} seconds.` });
       }));
       return;
     }

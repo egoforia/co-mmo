@@ -460,6 +460,14 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #trade-request p { margin: 0 0 8px; }
 #trade-request button { padding: 6px 12px; background: var(--accent); color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
 #trade-request button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
+/* Lying Fallen: the line, the time left and the Wake at the shrine button. */
+#fallen {
+  position: fixed; top: 160px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 32px)); padding: 12px;
+  background: var(--panel); border: 1px solid var(--accent); font-size: 13px; text-align: center;
+}
+#fallen p { margin: 0 0 8px; }
+#fallen .note { color: var(--muted); }
+#fallen button { padding: 6px 12px; background: var(--accent); color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
 /* The loot window: a fallen creature's things, laid out like the bag. */
 #loot h2 span { display: flex; align-items: center; gap: 8px; }
 #loot h2 img.from { width: 36px; height: 36px; object-fit: contain; }

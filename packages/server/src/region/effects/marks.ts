@@ -1,4 +1,5 @@
 import { STATUSES } from '@co-mmo/shared';
+import { provoke } from '../../creature-brain.ts';
 import { afflictCreature } from '../statuses.ts';
 import type { Creature } from '../state.ts';
 import { addStatus, aimAt, type Cast, type Effect, type EffectKit } from './types.ts';
@@ -19,15 +20,17 @@ export const debuff: Effect = {
 
 /**
  * Taunts the creatures around you (or the chosen one in range, when the
- * skill has no radius): they are Taunted by you. Making them fight you
- * comes with threat (build plan step 5).
+ * skill has no radius): Taunted by you, they fight you whatever the threat
+ * (threat.ts chooseTarget) until it wears off.
  */
 export const taunt: Effect = {
   ready: (kit, cast) => (taunted(kit, cast).length ? undefined : 'Nothing near enough to taunt.'),
   run: (kit, cast) => {
     const list = taunted(kit, cast);
     for (const c of list) {
-      afflictCreature(kit.s, c, 'taunted', cast.a.duration ?? TAUNT_SECONDS, { by: cast.p.info.id });
+      if (!afflictCreature(kit.s, c, 'taunted', cast.a.duration ?? TAUNT_SECONDS, { by: cast.p.info.id })) continue;
+      provoke(c, cast.p.info.id, { creatures: kit.s.creatures, now: cast.now });
+      if (!c.fleeing) c.aggro = cast.p.info.id;
       if (cast.a.status && cast.a.status !== 'taunted') addStatus(kit, cast, c);
     }
     kit.s.notice(cast.p, list.length === 1 ? `${list[0]!.def.name} turns on you.` : `${list.length} creatures turn on you.`);

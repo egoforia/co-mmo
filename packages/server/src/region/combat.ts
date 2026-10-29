@@ -25,6 +25,7 @@ import {
   type StatusId,
 } from '@co-mmo/shared';
 import { provoke } from '../creature-brain.ts';
+import { addThreat } from '../threat.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
@@ -43,18 +44,18 @@ export class Combat implements EffectKit {
   ) {}
 
   /**
-   * A plain attack (Space) on the nearest creature in the weapon's reach, once
-   * it is ready: bows, wands and the like fire across the room. A trained
+   * A plain attack (Space) on the chosen creature, or the nearest when it is
+   * out of the weapon's reach, once it is ready: bows, wands and the like fire across the room. A trained
    * greatsword also hits the next creature in reach, a censer everything
    * close to its target, and a heavy weapon may stagger what it hits.
    */
-  attack(p: PlayerState): void {
+  attack(p: PlayerState, targetId?: string): void {
     const now = this.s.now();
     const ch = p.character;
     if (ch.hp <= 0 || !canAct(p, now) || now - p.lastAttack < attackCooldown(ch) * 1000 - 1) return;
     p.lastAttack = now;
     const reach = attackReach(ch);
-    const target = this.creatureInReach(p, reach);
+    const target = (targetId && this.creatureInReach(p, reach, targetId)) || this.creatureInReach(p, reach);
     if (!target) return;
     const family = wieldedFamily(ch);
     const trained = wieldsTrained(ch);
@@ -119,6 +120,7 @@ export class Combat implements EffectKit {
    * Damages a creature (halved while Weakened, more if it is Marked by the
    * player or their party): its shield takes the hit first, then its Armor
    * softens physical hits and its Ward arcane ones, unless the blow pierces.
+   * The damage is threat from the player (times the ability's `threat`).
    * A defeat pays the rewards.
    */
   strike(p: PlayerState, target: Creature, raw: number, how: Blow): void {
@@ -132,9 +134,13 @@ export class Combat implements EffectKit {
     const defeated = target.hp === 0;
     const { ability, ranged, type } = how;
     this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, damage: type, ...(ability ? { ability } : {}), ...(ranged ? { ranged } : {}) });
-    if (!defeated) return provoke(target, p.info.id, { creatures: this.s.creatures, now });
+    if (!defeated) {
+      addThreat(target, p.info.id, amount * ((ability && ABILITIES[ability]?.threat) || 1));
+      return provoke(target, p.info.id, { creatures: this.s.creatures, now });
+    }
     target.respawnAt = now + target.def.respawnSeconds * 1000;
     target.aggro = null;
+    target.threat = {};
     target.statuses = [];
     this.reward(p, target);
   }

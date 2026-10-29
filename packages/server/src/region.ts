@@ -51,7 +51,7 @@ import {
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
 import { bodyView, creatureView, npcView, playerView } from './region-views.ts';
-import { giveUp, makeCreature, mood, type Creature } from './creature-brain.ts';
+import { makeCreature, mood, type Creature } from './creature-brain.ts';
 import { makeTownsperson } from './townsfolk.ts';
 import { findSpots } from './walkers.ts';
 import { Bodies } from './region/bodies.ts';
@@ -479,6 +479,12 @@ export class Region {
     return c && { mood: mood(c), aggro: c.aggro };
   }
 
+  /** Who a creature fights and its threat list (threat.ts), for tests and tools. */
+  creatureThreat(id: string): { aggro: string | null; threat: Record<string, number> } | undefined {
+    const c = this.s.creatures.find((k) => k.id === id);
+    return c && { aggro: c.aggro, threat: { ...c.threat } };
+  }
+
   /**
    * Puts a status on a player or creature here (Vigor shortens a player's
    * harmful ones); false when it did not take. For tests, tools and, later,
@@ -556,7 +562,7 @@ export class Region {
     if (!p) return undefined;
     this.trades.leave(id);
     this.s.players.delete(id);
-    for (const c of this.s.creatures) if (c.aggro === id || c.fleeing === id) giveUp(c);
+    this.minds.forgetPlayer(id, this.now());
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
     const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}), statuses: p.statuses, ...(p.stunImmuneUntil ? { stunImmuneUntil: p.stunImmuneUntil } : {}) };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
@@ -575,7 +581,7 @@ export class Region {
         this.talk.chat(p, message.channel, message.text, message.to);
         break;
       case 'attack':
-        this.combat.attack(p);
+        this.combat.attack(p, message.target);
         break;
       case 'interact':
         this.quests.interact(p);

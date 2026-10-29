@@ -1,16 +1,31 @@
 import { POISONED_HEALING, STATUSES, cleanse as clear, maxHp, statusOf } from '@co-mmo/shared';
+import { healThreat } from '../../threat.ts';
 import { afflictPlayer } from '../statuses.ts';
-import type { Effect } from './types.ts';
+import { allyFor, type Effect } from './types.ts';
 
-/** Mends you; Poison makes it weaker. */
+/**
+ * Mends the chosen ally in range, else the most hurt one, else you (only you
+ * when it has no range); Poison makes it weaker. Creatures fighting the one
+ * healed take threat from the healer.
+ */
 export const heal: Effect = {
-  ready: (_kit, { p }) => (p.character.hp >= maxHp(p.character) ? 'You are already at full health.' : undefined),
-  run: (kit, { p, a, amount, now }) => {
-    const ch = p.character;
-    const poisoned = statusOf(p, 'poisoned', now) ? POISONED_HEALING : 1;
+  ready: (kit, cast) => {
+    const m = allyFor(kit, cast);
+    if (m.character.hp < maxHp(m.character)) return undefined;
+    return m === cast.p ? 'You are already at full health.' : `${m.info.name} is already at full health.`;
+  },
+  run: (kit, cast) => {
+    const { p, a, amount, now } = cast;
+    const m = allyFor(kit, cast);
+    const ch = m.character;
+    const poisoned = statusOf(m, 'poisoned', now) ? POISONED_HEALING : 1;
     const healed = Math.min(maxHp(ch) - ch.hp, Math.round(amount * poisoned));
     ch.hp += healed;
-    kit.s.notice(p, `${a.name} restores ${healed} health.`);
+    m.dirty = true;
+    healThreat(kit.s.creatures, m.info.id, p.info.id, healed);
+    if (m === p) return kit.s.notice(p, `${a.name} restores ${healed} health.`);
+    kit.s.notice(p, `${a.name} restores ${healed} health to ${m.info.name}.`);
+    kit.s.notice(m, `${p.info.name}'s ${a.name} restores ${healed} of your health.`);
   },
 };
 
@@ -23,18 +38,23 @@ export const shield: Effect = {
   },
 };
 
-/** The ability's status on you and your party close by (a Shield's size is the ability's amount). */
+/**
+ * The ability's status on you and your party close by (a Shield's size is the
+ * ability's amount); one with no radius goes to one ally, chosen as heals are.
+ */
 export const buff: Effect = {
   ready: (_kit, { a }) => (a.status ? undefined : 'That has nothing to give.'),
-  run: (kit, { p, a, amount }) => {
+  run: (kit, cast) => {
+    const { p, a, amount } = cast;
     const status = a.status!;
     const size = status === 'shielded' ? { amount: Math.round(amount) } : {};
-    const party = kit.partyNear(p, a.radius ?? 0);
+    const party = a.radius ? kit.partyNear(p, a.radius) : [allyFor(kit, cast)];
     for (const m of party) {
       afflictPlayer(kit.s, m, status, a.duration, { by: p.info.id, ...size });
       if (m !== p) kit.s.notice(m, `${p.info.name}'s ${a.name} leaves you ${STATUSES[status].name}.`);
     }
-    kit.s.notice(p, `${a.name}: ${party.length > 1 ? `you and ${party.length - 1} near you are` : 'you are'} ${STATUSES[status].name}.`);
+    const one = party[0] !== p ? `${party[0]!.info.name} is` : 'you are';
+    kit.s.notice(p, `${a.name}: ${party.length > 1 ? `you and ${party.length - 1} near you are` : one} ${STATUSES[status].name}.`);
   },
 };
 

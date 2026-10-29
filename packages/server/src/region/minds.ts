@@ -1,5 +1,5 @@
 import { ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, type Weather } from '@co-mmo/shared';
-import { giveUp, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
+import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
@@ -68,6 +68,13 @@ export class Minds {
     p.lastHurt = now;
     const defeated = p.character.hp === 0;
     this.s.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated });
-    if (defeated) giveUp(c);
+    // Fallen: every creature after them turns to whoever else threatened it, or goes home.
+    if (defeated) this.forgetPlayer(p.info.id, now);
+  }
+
+  /** A player fell or left: off every creature's threat list. */
+  forgetPlayer(id: string, now: number): void {
+    const standing = (other: string) => (this.s.players.get(other)?.character.hp ?? 0) > 0 && other !== id;
+    for (const c of this.s.creatures) if (c.threat[id] !== undefined || c.aggro === id || c.fleeing === id) forget(c, id, standing, now);
   }
 }

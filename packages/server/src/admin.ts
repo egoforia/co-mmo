@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ITEMS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
@@ -26,6 +27,7 @@ import { perfView } from './perf.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
+import { ProfilerManager, getProfilerManager } from './debug/profiler-session.ts';
 
 export interface AdminContext {
   store: Store;
@@ -61,6 +63,8 @@ export interface AdminContext {
   regionServers?: RegionServers;
   /** Every request sent to an outside service (Owner). */
   apiLog?: ApiLog;
+  /** CPU profiler and heap snapshot manager (Owner). */
+  profiler?: ProfilerManager;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
 }
@@ -81,6 +85,7 @@ export async function handleAdmin(
 ): Promise<boolean> {
   if (!path.startsWith('/api/admin/')) return false;
   const { store, world, wishes, rules, reports, builds, json } = ctx;
+  const profiler = ctx.profiler ?? getProfilerManager(ctx.env);
   if (!account) return json(res, 401, { error: 'unauthorized' }), true;
   if (account.suspended) return json(res, 403, { error: 'suspended', message: 'Your account is suspended.' }), true;
   if (account.role === 'player') return json(res, 403, { error: 'forbidden', message: "God's View is for Stewards and the Owner." }), true;
@@ -571,7 +576,66 @@ export async function handleAdmin(
       regionServers: Boolean(servers),
       store: store.label,
       now: Date.now(),
+      profileRetention: profiler.getRetentionPolicy(),
+      profiles: await profiler.listProfiles(),
+      activeProfile: profiler.getActiveStatus().profile,
     }), true;
+  }
+
+  // Starts recording a CPU profile or taking a heap snapshot (Owner).
+  if (route === 'servers/profile' && method === 'POST') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const host = typeof body?.host === 'string' && body.host ? body.host : 'gateway';
+    const kind = body?.kind === 'heap' ? 'heap' : 'cpu';
+    const durationSeconds = typeof body?.durationSeconds === 'number' && body.durationSeconds > 0
+      ? body.durationSeconds
+      : (kind === 'cpu' ? 10 : 0);
+
+    try {
+      const active = await profiler.startProfile({ host, kind, durationSeconds }, ctx.regionServers);
+      return json(res, 200, { started: true, profile: active }), true;
+    } catch (err: any) {
+      if (err.code === 'already_recording') {
+        return json(res, 409, { error: 'already_recording', message: 'A profile is already being recorded.' }), true;
+      }
+      if (err.code === 'no_server') {
+        return json(res, 404, { error: 'no_server', message: 'That region server is not running.' }), true;
+      }
+      return json(res, 500, { error: 'profiler_error', message: err.message || 'Failed to start profile.' }), true;
+    }
+  }
+
+  // Checks the active recording status (Owner).
+  if (route === 'servers/profile/status' && method === 'GET') {
+    if (ownerOnly()) return true;
+    return json(res, 200, profiler.getActiveStatus()), true;
+  }
+
+  // Downloads a recorded .cpuprofile or .heapsnapshot file (Owner).
+  const profileDownloadMatch = route.match(/^servers\/profile\/([^/]+)$/);
+  if (profileDownloadMatch && method === 'GET') {
+    if (ownerOnly()) return true;
+    const id = decodeURIComponent(profileDownloadMatch[1]!);
+    const file = await profiler.getProfileFile(id);
+    if (!file) return json(res, 404, { error: 'not_found', message: 'Profile not found.' }), true;
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${file.filename}"`,
+      'Content-Length': file.sizeBytes,
+    });
+    const stream = fs.createReadStream(file.filePath);
+    stream.pipe(res);
+    return true;
+  }
+
+  // Deletes a recorded profile file (Owner).
+  if (profileDownloadMatch && method === 'DELETE') {
+    if (ownerOnly()) return true;
+    const id = decodeURIComponent(profileDownloadMatch[1]!);
+    const deleted = await profiler.deleteProfile(id);
+    if (!deleted) return json(res, 404, { error: 'not_found', message: 'Profile not found.' }), true;
+    return json(res, 200, { deleted: true, id }), true;
   }
 
   // The performance overlay (Stewards and the Owner): how the server running your part of the world keeps up.

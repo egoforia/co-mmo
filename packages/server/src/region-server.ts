@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
+import path from 'node:path';
 import { applyContent, DEFAULT_SKY, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
 import { answer, type Bus } from './bus.ts';
 import { Region, type Cell, type Connection, type Leaving } from './region.ts';
 import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
 import { LoadMeter } from './load-meter.ts';
+import { getProfilerConfig, recordProfileLocally } from './debug/profiler-session.ts';
 
 /** How often a region server tells the gateway it is alive and how busy it is. */
 export const BEAT_MS = 2000;
@@ -18,6 +20,7 @@ export interface RegionServerOptions {
   /** Runs the ticks itself (off in tests that tick by hand). */
   autoTick?: boolean;
   beatMs?: number;
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -120,6 +123,10 @@ export class RegionServer {
     }
     if (m.t === 'world') {
       this.world = m.state;
+      return;
+    }
+    if (m.t === 'start-profile') {
+      void this.recordProfile(m.profileId, m.durationSeconds, m.kind);
       return;
     }
     if (m.t === 'content') {
@@ -263,6 +270,18 @@ export class RegionServer {
 
   private failed(err: unknown): void {
     this.meter.failed(err, 'Region server error');
+  }
+
+  private async recordProfile(profileId: string, durationSeconds: number, kind: 'cpu' | 'heap'): Promise<void> {
+    try {
+      const config = getProfilerConfig(this.options.env);
+      const ext = kind === 'cpu' ? 'cpuprofile' : 'heapsnapshot';
+      const filePath = path.join(config.dir, `${profileId}.${ext}`);
+      const { data } = await recordProfileLocally(filePath, kind, durationSeconds, config);
+      this.toGateway({ t: 'profile-done', profileId, data });
+    } catch (err) {
+      this.toGateway({ t: 'profile-done', profileId, error: (err as Error).message });
+    }
   }
 
   private toGateway(message: ToGateway): void {

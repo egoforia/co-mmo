@@ -1,7 +1,7 @@
 // The Server health tab: each server's regions, players, tick time and memory, with restart and move.
 
 import { escapeHtml } from '../ui.ts';
-import { TICK_RATE, TICK_SECONDS } from '@co-mmo/shared';
+import { TICK_RATE, TICK_SECONDS, type ActiveProfileRecording, type ProfileInfo, type ProfileRetentionPolicy } from '@co-mmo/shared';
 import { api, toast, type Handled, type Tab } from './core.ts';
 
 interface ServerLoad {
@@ -29,14 +29,88 @@ interface Host {
   seen: number;
 }
 
+interface ServersResponse {
+  hosts: Host[];
+  regionServers: boolean;
+  store: string;
+  now: number;
+  profileRetention?: ProfileRetentionPolicy;
+  profiles?: ProfileInfo[];
+  activeProfile?: ActiveProfileRecording;
+}
+
 /** A tick has this long before the next one is due. */
 const TICK_MS = TICK_SECONDS * 1000;
 
 const since = (ms: number) => (ms < 90_000 ? `${Math.max(0, Math.round(ms / 1000))} s` : ms < 5_400_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 3_600_000)} h`);
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+let activeRecordingId: string | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+function trackRecording(profileId: string) {
+  activeRecordingId = profileId;
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const el = document.querySelector<HTMLElement>('.profile-countdown');
+    if (el) {
+      const rem = parseInt(el.dataset.remaining || '0', 10);
+      if (rem > 1) {
+        const next = rem - 1;
+        el.dataset.remaining = String(next);
+        el.textContent = `Recording in progress... ${next} s left`;
+      } else {
+        el.textContent = 'Recording in progress... 1 s left';
+      }
+    }
+
+    try {
+      const status = await api<{ recording: boolean; profile?: ActiveProfileRecording }>('servers/profile/status');
+      if (!status.recording) {
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+        const finishedId = activeRecordingId;
+        activeRecordingId = null;
+        toast('Profile ready. Download will begin shortly.');
+        if (finishedId) {
+          const a = document.createElement('a');
+          a.href = `/api/admin/servers/profile/${encodeURIComponent(finishedId)}`;
+          a.download = '';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+        const tabEl = document.querySelector<HTMLElement>('[data-tab="servers"]');
+        if (tabEl) tabEl.click();
+      } else if (status.profile && el) {
+        el.dataset.remaining = String(status.profile.remainingSeconds);
+        el.textContent = `Recording in progress... ${status.profile.remainingSeconds} s left`;
+      }
+    } catch {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+  }, 1000);
+}
+
 async function servers(): Promise<string> {
-  const s = await api<{ hosts: Host[]; regionServers: boolean; store: string; now: number }>('servers');
+  const s = await api<ServersResponse>('servers');
+  if (s.activeProfile && !pollTimer) {
+    trackRecording(s.activeProfile.id);
+  }
+
+  const isRecording = Boolean(s.activeProfile);
   const hostName = (h: Host) => (h.kind === 'gateway' ? 'Game server' : `Region server ${escapeHtml(h.id)}`);
+
   const card = (h: Host) => {
     const l = h.load;
     // Half a tick is fine; a whole tick means players feel it.
@@ -51,6 +125,9 @@ async function servers(): Promise<string> {
         <button type="button" data-region-restart="${escapeHtml(r.region)}" data-players="${r.players}">Restart${r.parts ? ' all parts' : ''}</button>
         ${s.hosts.length > 1 && !r.parts ? `<select data-move-for="${escapeHtml(r.id)}" aria-label="Move ${escapeHtml(r.name)} to">${moveTo()}</select><button type="button" data-region-move="${escapeHtml(r.id)}" data-players="${r.players}">Move</button>` : ''}
       </td></tr>`).join('');
+
+    const hostRecording = s.activeProfile?.host === h.id ? s.activeProfile : undefined;
+
     return `<div class="host">
       <h3>${hostName(h)}</h3>
       <div class="stats">
@@ -63,22 +140,103 @@ async function servers(): Promise<string> {
       </div>
       ${l.lastError ? `<p class="note warn">Last error: ${escapeHtml(l.lastError)}</p>` : ''}
       <p class="note">On ${escapeHtml(l.host)} (process ${l.pid}), running for ${since(s.now - l.startedAt)}${h.kind === 'region-server' ? `, last heard from ${since(quiet)} ago` : ''}.</p>
+      <div class="actions" style="margin-top: 0.5rem; margin-bottom: 0.5rem;">
+        <button type="button" data-profile-cpu="${escapeHtml(h.id)}" ${isRecording ? 'disabled' : ''} title="${isRecording ? 'A profile is already being recorded.' : ''}">Record CPU profile (10 s)</button>
+        <button type="button" data-profile-heap="${escapeHtml(h.id)}" ${isRecording ? 'disabled' : ''} title="${isRecording ? 'A profile is already being recorded.' : ''}">Take heap snapshot</button>
+      </div>
+      ${hostRecording ? `<p class="note warn profile-countdown" data-remaining="${hostRecording.remainingSeconds}">Recording in progress... ${hostRecording.remainingSeconds} s left</p>` : ''}
       ${rows ? `<table class="log">${rows}</table>` : '<p class="note">No regions run here right now.</p>'}
     </div>`;
   };
+
   const how = s.regionServers
     ? s.hosts.length > 1
       ? 'Regions run on the region servers below. If one stops, its regions come back to the game server within a few seconds, with their players.'
       : 'No region server is running, so every region runs in the game server. Start some with <code>npm run region-server</code> (or <code>REGION_SERVERS</code> with <code>npm run dev</code>).'
     : 'Every region runs in the game server. Set <code>REDIS_URL</code> to let region servers share the work (see docs/scale.md).';
+
+  const retention = s.profileRetention;
+  const profiles = s.profiles ?? [];
+  const profilesTable = profiles.length > 0
+    ? `<table class="log">
+        <thead>
+          <tr>
+            <th>Server</th>
+            <th>Type</th>
+            <th>Recorded</th>
+            <th>Size</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${profiles.map((p) => `
+            <tr>
+              <td><b>${escapeHtml(p.host === 'gateway' ? 'Game server' : p.host)}</b></td>
+              <td>${p.kind === 'cpu' ? 'CPU profile' : 'Heap snapshot'}</td>
+              <td>${since(s.now - p.startedAt)} ago</td>
+              <td>${formatBytes(p.sizeBytes)}</td>
+              <td class="actions">
+                <a class="button" href="/api/admin/servers/profile/${encodeURIComponent(p.id)}" download="${escapeHtml(p.id)}.${p.kind === 'cpu' ? 'cpuprofile' : 'heapsnapshot'}">Download</a>
+                <button type="button" data-profile-delete="${escapeHtml(p.id)}">Delete</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`
+    : '<p class="note">No profiles recorded yet.</p>';
+
   return `
     <p>${how} The world is kept in ${escapeHtml(s.store)}.</p>
     ${s.hosts.map(card).join('')}
+    <div class="host" style="margin-top: 1rem;">
+      <h3>Recorded profiles</h3>
+      ${retention ? `<p class="note">Keeps up to ${retention.maxFiles} profiles for ${retention.pruneHours} hour${retention.pruneHours === 1 ? '' : 's'} in <code>${escapeHtml(retention.dir)}</code>.</p>` : ''}
+      ${profilesTable}
+    </div>
     <p class="note">Restarting a region sets it up again from scratch: creatures respawn, and players inside stay where they stood. Moving a region does the same on another server.
       A region with more than 50 players splits into parts side by side, up to four, spread over the servers; players walk between parts without noticing, and it joins up again once it has been quieter for half a minute.</p>`;
 }
 
 async function click(t: HTMLButtonElement): Promise<Handled> {
+  if (t.dataset.profileCpu) {
+    const host = t.dataset.profileCpu;
+    t.disabled = true;
+    try {
+      const res = await api<{ started: boolean; profile: ActiveProfileRecording }>('servers/profile', 'POST', { host, kind: 'cpu', durationSeconds: 10 });
+      toast('Recording in progress... 10 s left');
+      trackRecording(res.profile.id);
+    } catch (err: any) {
+      toast(err.message || 'Could not start profile.');
+    }
+    return true;
+  }
+
+  if (t.dataset.profileHeap) {
+    const host = t.dataset.profileHeap;
+    t.disabled = true;
+    try {
+      const res = await api<{ started: boolean; profile: ActiveProfileRecording }>('servers/profile', 'POST', { host, kind: 'heap' });
+      toast('Taking heap snapshot...');
+      trackRecording(res.profile.id);
+    } catch (err: any) {
+      toast(err.message || 'Could not take heap snapshot.');
+    }
+    return true;
+  }
+
+  if (t.dataset.profileDelete) {
+    const id = t.dataset.profileDelete;
+    if (!confirm('Delete this recorded profile?')) return 'keep';
+    t.disabled = true;
+    try {
+      await api(`servers/profile/${encodeURIComponent(id)}`, 'DELETE');
+      toast('Deleted profile.');
+    } catch (err: any) {
+      toast(err.message || 'Could not delete profile.');
+    }
+    return true;
+  }
+
   if (!t.dataset.regionRestart && !t.dataset.regionMove) return false;
   const region = (t.dataset.regionRestart ?? t.dataset.regionMove)!;
   const to = t.dataset.regionMove ? document.querySelector<HTMLSelectElement>(`select[data-move-for="${CSS.escape(region)}"]`)?.value : undefined;

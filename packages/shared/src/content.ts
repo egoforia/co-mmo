@@ -12,6 +12,8 @@ import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
 import { cleanLight, type Light } from './light.ts';
 import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
+import { WISHED_ABILITY_NUMBERS, wishedEffect, wishedStatus } from './wished-abilities.ts';
+import type { StatusId } from './rpg/statuses.ts';
 import {
   ABILITIES,
   BEHAVIORS,
@@ -93,6 +95,8 @@ export interface AbilityWish {
   name: string;
   description: string;
   effect: AbilityEffect;
+  /** The one status it adds, from those its effect may carry (wishedStatus). */
+  status?: StatusId;
   /** How the scroll looks. */
   look: WishLook;
 }
@@ -537,8 +541,9 @@ export function validateDefinition(raw: unknown): WishDefinition {
     return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(family ? { family } : {}), ...(light ? { light } : {}), look };
   }
   if (d.kind === 'ability') {
-    const effect: AbilityEffect = d.effect === 'bolt' || d.effect === 'heal' ? d.effect : 'strike';
-    return { kind: 'ability', name, description, effect, look };
+    const effect = wishedEffect(d.effect);
+    const status = wishedStatus(effect, d.status);
+    return { kind: 'ability', name, description, effect, ...(status ? { status } : {}), look };
   }
   if (d.kind === 'creature') {
     const behavior: Behavior = BEHAVIORS.find((b) => b === d.behavior) ?? 'wander';
@@ -785,12 +790,11 @@ function gearFamily(slot: EquipSlot, rarity: Rarity, w: ItemWish | RuleItem): Pa
   return offhand === 'shield' ? { offhand, ...shieldBlock(rarity) } : { offhand };
 }
 
-/** Numbers for a wished ability come from its effect, a little below the built-in ones. */
+/** Numbers for a wished ability come from its effect, a little below the built-in ones (wished-abilities.ts). */
 export function abilityFromWish(w: AbilityWish): AbilityDef {
-  const base = { name: w.name, description: w.description, effect: w.effect };
-  if (w.effect === 'bolt') return { ...base, energy: 6, cooldown: 3, range: 5, base: 2, stat: 'wit', factor: 1.3 };
-  if (w.effect === 'heal') return { ...base, energy: 10, cooldown: 12, range: 0, base: 6, stat: 'spirit', factor: 2.5 };
-  return { ...base, energy: 8, cooldown: 6, range: 1.8, base: 3, stat: 'might', factor: 1.3 };
+  const effect = wishedEffect(w.effect);
+  const status = wishedStatus(effect, w.status);
+  return { name: w.name, description: w.description, effect, ...WISHED_ABILITY_NUMBERS[effect], ...(status ? { status } : {}) };
 }
 
 /** The scroll a wished ability comes on; it shares the wish's id. */

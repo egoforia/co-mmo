@@ -1,7 +1,11 @@
 import {
   ABILITIES,
+  MARK_BONUS,
   abilityAmount,
+  absorb,
   afterArmor,
+  canAct,
+  statusOf,
   lootTable,
   rollDrops,
   BODY_SECONDS,
@@ -14,24 +18,27 @@ import {
   CRIT_MULTIPLIER,
   discover,
   gainXp,
-  maxHp,
   partyXp,
   staggerChance,
   wieldedFamily,
   wieldsTrained,
-  type DamageType,
+  type StatusId,
 } from '@co-mmo/shared';
 import { provoke } from '../creature-brain.ts';
+import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
+import { tickStatuses } from './statuses.ts';
 
 /**
  * Players fighting creatures: plain attacks, abilities, and what a defeat
  * pays (XP shared with the party nearby, gold, a body with its loot).
+ * Each ability effect is a small function in effects/; this gives them the
+ * moves they share (EffectKit) and ticks statuses, traps, helpers and stances.
  */
-export class Combat {
+export class Combat implements EffectKit {
   constructor(
-    private readonly s: RegionState,
+    readonly s: RegionState,
     private readonly quests: Quests,
   ) {}
 
@@ -44,7 +51,7 @@ export class Combat {
   attack(p: PlayerState): void {
     const now = this.s.now();
     const ch = p.character;
-    if (ch.hp <= 0 || now - p.lastAttack < attackCooldown(ch) * 1000 - 1) return;
+    if (ch.hp <= 0 || !canAct(p, now) || now - p.lastAttack < attackCooldown(ch) * 1000 - 1) return;
     p.lastAttack = now;
     const reach = attackReach(ch);
     const target = this.creatureInReach(p, reach);
@@ -67,7 +74,7 @@ export class Combat {
   }
 
   /** Live creatures on the player's floor within `range` of a point, nearest first. */
-  private creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[] {
+  creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[] {
     return this.s.creatures
       .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) <= range)
       .sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
@@ -80,7 +87,7 @@ export class Combat {
   }
 
   /** The nearest live creature within reach, or the one asked for if it is in reach. */
-  private creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined {
+  creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined {
     let target: Creature | undefined;
     let best = range;
     for (const c of this.s.creatures) {
@@ -94,60 +101,79 @@ export class Combat {
     return target;
   }
 
+  /** Party members on their feet within `radius` of the player (and the player, first). */
+  partyNear(p: PlayerState, radius: number): PlayerState[] {
+    const party = this.s.hooks.party?.(p.info.id) ?? [p.info.id];
+    const near = party
+      .map((id) => this.s.players.get(id))
+      .filter((m): m is PlayerState => !!m && m !== p && m.character.hp > 0 && m.floor === p.floor && Math.hypot(m.x - p.x, m.y - p.y) <= radius);
+    return [p, ...near];
+  }
+
   /** A hit made critical by chance (Agility raises it) does half again as much. */
-  private critical(p: PlayerState, amount: number): number {
+  critical(p: PlayerState, amount: number): number {
     return this.s.random() < critChance(p.character) ? amount * CRIT_MULTIPLIER : amount;
   }
 
   /**
-   * Damages a creature (halved while Weakened): its Armor softens physical
-   * hits and its Ward arcane ones. A defeat pays the rewards.
+   * Damages a creature (halved while Weakened, more if it is Marked by the
+   * player or their party): its shield takes the hit first, then its Armor
+   * softens physical hits and its Ward arcane ones, unless the blow pierces.
+   * A defeat pays the rewards.
    */
-  private strike(p: PlayerState, target: Creature, raw: number, how: { type: DamageType; ability?: string; ranged?: boolean }): void {
-    const weakened = this.s.now() < p.character.weakenedUntil ? 0.5 : 1;
-    const defence = how.type === 'arcane' ? target.def.ward : target.def.armor;
-    const amount = afterArmor(raw * weakened, defence ?? 0);
+  strike(p: PlayerState, target: Creature, raw: number, how: Blow): void {
+    const now = this.s.now();
+    const weakened = now < p.character.weakenedUntil ? 0.5 : 1;
+    const mark = statusOf(target, 'marked', now);
+    const marked = mark?.by && (mark.by === p.info.id || (this.s.hooks.party?.(p.info.id) ?? []).includes(mark.by)) ? 1 + MARK_BONUS : 1;
+    const defence = how.pierce ? 0 : how.type === 'arcane' ? target.def.ward : target.def.armor;
+    const amount = afterArmor(absorb(target, raw * weakened * marked, now), defence ?? 0);
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
     const { ability, ranged, type } = how;
     this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, damage: type, ...(ability ? { ability } : {}), ...(ranged ? { ranged } : {}) });
-    if (!defeated) return provoke(target, p.info.id, { creatures: this.s.creatures, now: this.s.now() });
-    target.respawnAt = this.s.now() + target.def.respawnSeconds * 1000;
+    if (!defeated) return provoke(target, p.info.id, { creatures: this.s.creatures, now });
+    target.respawnAt = now + target.def.respawnSeconds * 1000;
     target.aggro = null;
+    target.statuses = [];
     this.reward(p, target);
   }
 
-  /** Uses an ability (keys 1 to 4): a heal, or a strike or bolt at a creature in reach. */
+  /**
+   * Uses an ability (keys 1 to 4): its effect (effects/) checks it can be
+   * used, then Energy and the rest are paid and it runs. Using a stance
+   * that is already held leaves it, at no cost.
+   */
   useAbility(p: PlayerState, id: string, targetId?: string): void {
     const a = ABILITIES[id];
     const ch = p.character;
     if (!a || !ch.abilities.includes(id) || ch.hp <= 0) return;
     const now = this.s.now();
+    if (!canAct(p, now)) return this.s.notice(p, 'You are Stunned and cannot act.');
+    if (a.effect === 'stance' && p.stance?.ability === id) return endStance(this, p);
     if (now < (p.readyAt.get(id) ?? 0) - 1) return;
     if (ch.energy < a.energy) return this.s.notice(p, `Not enough Energy for ${a.name}.`);
-    const max = maxHp(ch);
-    let target: Creature | undefined;
-    if (a.effect === 'heal') {
-      if (ch.hp >= max) return this.s.notice(p, 'You are already at full health.');
-    } else {
-      target = this.creatureInReach(p, a.range, targetId) ?? (targetId ? this.creatureInReach(p, a.range) : undefined);
-      if (!target) return this.s.notice(p, a.effect === 'bolt' ? `No creature within ${a.range} steps.` : 'Nothing in reach to strike.');
-    }
+    const effect = EFFECTS[a.effect];
+    const cast: Cast = { p, id, a, now, amount: 0, ...(targetId ? { targetId } : {}) };
+    const refused = effect.ready?.(this, cast);
+    if (refused) return this.s.notice(p, refused);
     ch.energy -= a.energy;
     // Wit shortens the rest; the client shows the rest it is told.
     const rest = Math.round(a.cooldown * cooldownFactor(ch) * 10) / 10;
     p.readyAt.set(id, now + rest * 1000);
     p.conn.send({ t: 'cooldown', ability: id, seconds: rest });
     p.dirty = true;
-    const amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2);
-    // Bolts are arcane; strikes are blows of the weapon, so physical.
-    if (target) this.strike(p, target, this.critical(p, amount), { type: a.effect === 'bolt' ? 'arcane' : 'physical', ability: id });
-    else {
-      const healed = Math.min(max - ch.hp, Math.round(amount));
-      ch.hp += healed;
-      this.s.notice(p, `${a.name} restores ${healed} health.`);
-    }
+    cast.amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2);
+    effect.run(this, cast);
     this.s.credit(id, p, 'use');
+  }
+
+  /** Each tick: statuses wear off and hurt, traps spring, helpers strike and stances drain Energy. */
+  tick(now: number): void {
+    tickStatuses(this.s, now, (by, c, amount, id) => this.strike(by, c, amount, statusBlow(id)));
+    springTraps(this, now);
+    helpersAct(this, now);
+    holdStances(this);
   }
 
   private reward(p: PlayerState, c: Creature): void {
@@ -184,4 +210,9 @@ export class Combat {
       m.dirty = true;
     }
   }
+}
+
+/** A damage status's tick: Burning is arcane; Bleeding and Poison go past armour. */
+function statusBlow(id: StatusId): Blow {
+  return id === 'burning' ? { type: 'arcane' } : { type: 'physical', pierce: true };
 }

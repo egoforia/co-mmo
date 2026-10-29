@@ -193,6 +193,7 @@ function play(token: string): void {
       case 'snapshot':
         scene?.onSnapshot(message);
         rpg?.setVitals(message.hp, message.energy);
+        rpg?.setStatuses(message.statuses);
         kit?.setEnergy(message.energy);
         scene?.setWeakened(rpg?.weakened ?? false, message.fallen !== undefined);
         fallen?.show(message.fallen);

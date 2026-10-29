@@ -9,11 +9,14 @@ import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
 import { levelUpStats } from './rpg/callings.ts';
+import { WEAPON_EFFECTS, type AbilityDef } from './rpg/abilities.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
 import { twoHanded } from './weapons.ts';
 
 export * from './rpg/attributes.ts';
 export * from './rpg/callings.ts';
+export * from './rpg/abilities.ts';
+export * from './rpg/statuses.ts';
 
 export interface Stats {
   /** Heavy weapon damage and a little health. */
@@ -391,29 +394,6 @@ export const ITEMS: Record<string, ItemDef> = {
 
 // --- Abilities ---------------------------------------------------------------
 
-/**
- * What an ability does: `strike` hits the creature in reach with your weapon,
- * `bolt` hits one further away, `heal` mends you. The amount grows with a
- * stat, so the same ability gets better as you do.
- */
-export type AbilityEffect = 'strike' | 'bolt' | 'heal';
-
-export interface AbilityDef {
-  name: string;
-  description: string;
-  effect: AbilityEffect;
-  /** Energy it costs. */
-  energy: number;
-  /** Seconds before it can be used again. */
-  cooldown: number;
-  /** How far it reaches, in tiles (not used by heal). */
-  range: number;
-  /** The amount is base + level + stat × factor (+ weapon damage for strikes). */
-  base: number;
-  stat: keyof Stats;
-  factor: number;
-}
-
 /** Abilities are learned from trainers, scrolls and quests (design doc, Characters and progression). */
 export const ABILITIES: Record<string, AbilityDef> = {
   'power-strike': {
@@ -436,7 +416,7 @@ export const ABILITIES: Record<string, AbilityDef> = {
 /** Damage or healing an ability does for this character, before randomness. */
 export function abilityAmount(c: Gear, a: AbilityDef): number {
   const amount = a.base + c.level + Math.round(totalStats(c)[a.stat] * a.factor);
-  return a.effect === 'strike' ? amount + gearBonus(c, 'attack') : amount;
+  return WEAPON_EFFECTS.includes(a.effect) ? amount + gearBonus(c, 'attack') : amount;
 }
 
 /** Learns an ability; false when it is unknown or already known. */

@@ -95,6 +95,10 @@ Steps 3, 4 and 8 can be built side by side once step 1 is in.
 - `validateDefinition` and `abilityFromWish` (`content.ts`) accept the new
   effects for wished abilities, still with world-set numbers.
 - Tests: one per effect and per status, including stun immunity.
+- Built: the kit also has `line` (docs/classes.md lists it). Silenced is a
+  status too, waiting for creature specials. Summoned helpers and traps work
+  but are not seen yet, and statuses show as words: their pictures come in
+  step 10. Taunt only sets the status; threat is step 5.
 
 ## 5. Threat and targeting
 

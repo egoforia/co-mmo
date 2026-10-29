@@ -10,6 +10,7 @@ import type { RegionDef } from './world.ts';
 import type { SkyConfig, Weather } from './sky.ts';
 import { EQUIP_SLOTS, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
 import type { DamageType } from './weapons.ts';
+import type { StatusId, StatusView } from './rpg/statuses.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -293,6 +294,8 @@ export interface EntityState {
   offHeld?: string;
   /** Lying Fallen at 0 HP, waiting for a friend to raise them or to wake at the shrine. */
   fallen?: true;
+  /** Their running statuses (rpg/statuses.ts), when they have any. */
+  statuses?: StatusId[];
 }
 
 export interface CreatureState {
@@ -306,6 +309,8 @@ export interface CreatureState {
   floor?: number;
   health: number;
   mood?: CreatureMood;
+  /** Its running statuses (rpg/statuses.ts), when it has any. */
+  statuses?: StatusId[];
 }
 
 /** A defeated creature's body, lying where it fell until it fades. */
@@ -348,6 +353,8 @@ export interface SnapshotMessage {
   energy: number;
   /** While you lie Fallen: whole seconds left before you wake at the shrine. */
   fallen?: number;
+  /** Your running statuses and the seconds each has left, when you have any. */
+  statuses?: StatusView[];
   /** Other players inside the view radius. */
   players: EntityState[];
   /** Creatures inside the view radius. */

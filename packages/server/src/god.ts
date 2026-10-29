@@ -1,4 +1,6 @@
 import {
+  ABILITY_EFFECTS,
+  WISHED_AILMENTS,
   BIOMES,
   CREATURES,
   ITEMS,
@@ -80,7 +82,7 @@ or, when offering a wish:
 Definitions (only for minor and moderate):
 item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit|vigor (gear only: the stat it helps)","family":"${WEAPON_FAMILY_IDS.join('|')} (weapons only: what kind of weapon it is) or shield|tome|orb|lantern (offhand only)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"look":LOOK}
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
-ability: {"kind":"ability","name":"...","description":"...","effect":"strike|bolt|heal","look":LOOK} (strike: a heavy blow at a creature in reach; bolt: hits a creature up to five steps away; heal: mends the user; the world sets the numbers)
+ability: {"kind":"ability","name":"...","description":"...","effect":"${ABILITY_EFFECTS.join('|')}","status":"<optional: one of ${WISHED_AILMENTS.join('|')} for what it hits (damage effects and debuff), or shielded for buff and stance>","look":LOOK} (strike: a blow at a creature in reach; bolt: hits one up to five steps away; heal: mends the user; area: hits all around a spot; cone: hits all in front; line: hits all in a line ahead; dash: rush to a creature and strike; blink: vanish and appear a few steps on; shield: absorbs damage; buff: a status on the user and party; debuff: marks or ails one creature; taunt: creatures nearby turn on the user; trap: set at the user's feet, springs on a creature; summon: a helper fights beside the user for a while; stance: held until used again, draining Energy; cleanse: washes ailments away. The world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase|patrol|timid|pack","active":"day|night (leave out for creatures about at all hours)","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
 loot: {"kind":"loot","creature":"<id from: %CREATURES%>","drops":[<up to ${MAX_WISHED_DROPS} of {"item":"<id from: %ITEMS%>","chance":<0.05-${MAX_WISHED_CHANCE}>,"qty":<1-${MAX_WISHED_DROP_QTY}>}>]} (a chance of 0.25 is one defeat in four; keep rare and valuable things rare)
 npc: {"kind":"npc","name":"...","description":"...","greeting":"<what they say when spoken to>","look":LOOK}

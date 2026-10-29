@@ -34,6 +34,12 @@ import {
   type ServerMessage,
   type Side,
   type SkyConfig,
+  type Status,
+  type StatusId,
+  type StatusView,
+  paceOf,
+  statusIds,
+  statusViews,
   type Weather,
   DEFAULT_SKY,
   floorName,
@@ -56,6 +62,7 @@ import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
 import { RegionState, type PlayerState } from './region/state.ts';
+import { afflictCreature, afflictPlayer, type StatusFrom } from './region/statuses.ts';
 
 export { findSpots, nearestTile } from './walkers.ts';
 
@@ -173,6 +180,9 @@ export interface Carry {
   floor?: number;
   /** While Fallen: when they wake at the shrine, so moving the region keeps their time. */
   fallenUntil?: number;
+  /** Running statuses and stun immunity, which go with them. */
+  statuses?: Status[];
+  stunImmuneUntil?: number;
 }
 
 /**
@@ -469,6 +479,25 @@ export class Region {
     return c && { mood: mood(c), aggro: c.aggro };
   }
 
+  /**
+   * Puts a status on a player or creature here (Vigor shortens a player's
+   * harmful ones); false when it did not take. For tests, tools and, later,
+   * creatures' own specials.
+   */
+  afflict(id: string, status: StatusId, seconds?: number, from?: StatusFrom): boolean {
+    const p = this.s.players.get(id);
+    if (p) return afflictPlayer(this.s, p, status, seconds, from);
+    const c = this.s.creatures.find((k) => k.id === id);
+    return !!c && afflictCreature(this.s, c, status, seconds, from);
+  }
+
+  /** A player's or creature's running statuses, for tests and tools. */
+  statusesOf(id: string): Status[] {
+    const now = this.now();
+    const who = this.s.players.get(id) ?? this.s.creatures.find((k) => k.id === id);
+    return who ? who.statuses.filter((x) => x.until > now) : [];
+  }
+
   /** Moves a player, for tests and tools. */
   placePlayer(id: string, x: number, y: number, floor = 0): void {
     const p = this.s.players.get(id);
@@ -508,7 +537,7 @@ export class Region {
       else floor = 0;
     }
     const p: PlayerState = {
-      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), ...carry, floor,
+      info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), statuses: [], ...carry, floor,
     };
     this.s.players.set(info.id, p);
     // Walking into the next cell of the same land: nothing changes on the player's screen.
@@ -529,7 +558,7 @@ export class Region {
     this.s.players.delete(id);
     for (const c of this.s.creatures) if (c.aggro === id || c.fleeing === id) giveUp(c);
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
-    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}) };
+    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}), statuses: p.statuses, ...(p.stunImmuneUntil ? { stunImmuneUntil: p.stunImmuneUntil } : {}) };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
   }
 
@@ -606,7 +635,10 @@ export class Region {
           p.ack = input.seq;
           continue;
         }
-        const next = walkOn(this.map, p, input.dx, input.dy);
+        // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
+        const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now));
+        const len = Math.hypot(input.dx, input.dy);
+        if (len > 0) p.facing = { dx: input.dx / len, dy: input.dy / len };
         const way = wayTaken(this.map, p.floor, next);
         if (way) this.s.notice(p, climbWords(way, p.floor));
         p.x = next.x;
@@ -630,6 +662,7 @@ export class Region {
     }
     const { phase, weather } = this.sky(now);
     this.weatherTurns(weather);
+    this.combat.tick(now);
     this.minds.think(now, phase, weather);
     this.s.bodies = this.s.bodies.filter((b) => now < b.until);
     // A loot window closes when its body fades or its looter walks away.
@@ -655,12 +688,12 @@ export class Region {
       const players: EntityState[] = [];
       for (const other of all) {
         if (other === p || !near(other)) continue;
-        players.push(playerView(other));
+        players.push(playerView(other, statusIds(other, now, other.character.weakenedUntil)));
       }
       const creatures: CreatureState[] = [];
       for (const c of this.s.creatures) {
         if (c.respawnAt !== null || !near(c)) continue;
-        creatures.push(creatureView(c, mood(c)));
+        creatures.push(creatureView(c, mood(c), statusIds(c, now)));
       }
       const bodies: BodyState[] = [];
       for (const b of this.s.bodies) {
@@ -680,7 +713,7 @@ export class Region {
       }
       p.crowd = players.length + creatures.length;
       p.conn.send({
-        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), players, creatures, bodies, npcs, online,
+        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now), players, creatures, bodies, npcs, online,
       });
       this.s.flush(p);
     }
@@ -693,12 +726,13 @@ export class Region {
     const g: Ghosts = { players: [], creatures: [], bodies: [], npcs: [] };
     if (!cell) return g;
     const seen = (x: number) => (cell.index > 0 && x < cell.x0 + VIEW_RADIUS) || (cell.index < cell.count - 1 && x >= cell.x1 - VIEW_RADIUS);
+    const now = this.now();
     for (const p of this.s.players.values()) {
       if (!seen(p.x)) continue;
-      g.players.push(playerView(p));
+      g.players.push(playerView(p, statusIds(p, now, p.character.weakenedUntil)));
     }
     for (const c of this.s.creatures) {
-      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c, mood(c)));
+      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c, mood(c), statusIds(c, now)));
     }
     // Bodies are searched in their own cell; across the border they are only seen.
     for (const b of this.s.bodies) if (seen(b.x)) g.bodies.push(bodyView(b, false));
@@ -720,6 +754,12 @@ export class Region {
     for (const p of this.s.players.values()) this.s.notice(p, WEATHER_NEWS[weather]);
   }
 
+}
+
+/** The snapshot's own statuses, sent only when there are some. */
+function statusesFor(p: PlayerState, now: number): { statuses?: StatusView[] } {
+  const statuses = statusViews(p, now, p.character.weakenedUntil);
+  return statuses.length ? { statuses } : {};
 }
 
 /** The snapshot's Fallen countdown, sent only while it runs. */

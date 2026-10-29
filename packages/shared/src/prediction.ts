@@ -19,6 +19,8 @@ export class Predictor {
   private pending: PendingInput[] = [];
   private seq: number;
   position: Placed;
+  /** Share of full speed our statuses allow (paceOf), as the last snapshot said; the server applies the same. */
+  pace = 1;
 
   /**
    * `lastSeq` carries numbering over when the player changes region, since
@@ -49,7 +51,7 @@ export class Predictor {
   apply(dx: number, dy: number): PendingInput {
     const input = { seq: ++this.seq, dx, dy };
     this.pending.push(input);
-    this.position = walkOn(this.map, this.position, dx, dy);
+    this.position = walkOn(this.map, this.position, dx, dy, this.pace);
     return input;
   }
 
@@ -57,7 +59,7 @@ export class Predictor {
   reconcile(ack: number, server: Vec2 & { floor?: number }): void {
     this.pending = this.pending.filter((i) => i.seq > ack);
     let pos: Placed = { x: server.x, y: server.y, floor: server.floor ?? 0 };
-    for (const input of this.pending) pos = walkOn(this.map, pos, input.dx, input.dy);
+    for (const input of this.pending) pos = walkOn(this.map, pos, input.dx, input.dy, this.pace);
     this.position = pos;
   }
 

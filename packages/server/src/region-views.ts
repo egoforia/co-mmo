@@ -1,4 +1,4 @@
-import { heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type EntityState, type NpcState, type PlayerInfo } from '@co-mmo/shared';
+import { heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type EntityState, type NpcState, type PlayerInfo, type StatusId } from '@co-mmo/shared';
 
 // What players see of each thing in a region, as sent in snapshots and
 // across a split region's cell borders. One builder per kind, so both
@@ -14,8 +14,13 @@ function floorOf(floor: number | undefined): { floor?: number } {
   return floor ? { floor } : {};
 }
 
-/** Another player as seen by those nearby. */
-export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: number; character: Character }): EntityState {
+/** Running statuses, sent only when there are some. */
+function statusesOf(statuses: StatusId[] | undefined): { statuses?: StatusId[] } {
+  return statuses?.length ? { statuses } : {};
+}
+
+/** Another player as seen by those nearby, with their running statuses (statusIds). */
+export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: number; character: Character }, statuses?: StatusId[]): EntityState {
   const held = heldItem(p.character);
   const offHeld = offHandItem(p.character);
   return {
@@ -23,12 +28,13 @@ export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: 
     ...(held ? { held } : {}),
     ...(offHeld ? { offHeld } : {}),
     ...(p.character.hp <= 0 ? { fallen: true as const } : {}),
+    ...statusesOf(statuses),
   };
 }
 
-/** A living creature, and what it is up to when that shows (asleep, running away). */
-export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number }, mood?: CreatureMood): CreatureState {
-  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...(mood ? { mood } : {}) };
+/** A living creature, what it is up to when that shows (asleep, running away), and its running statuses. */
+export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number }, mood?: CreatureMood, statuses?: StatusId[]): CreatureState {
+  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...(mood ? { mood } : {}), ...statusesOf(statuses) };
 }
 
 /** A defeated creature's body; `loot` says whether the viewer may search it here. */

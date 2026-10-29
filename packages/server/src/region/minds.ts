@@ -1,4 +1,4 @@
-import { ITEMS, TALK_RANGE, afterArmor, armor, blocking, dodgeChance, heldItem, offHandItem, type Weather } from '@co-mmo/shared';
+import { ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, type Weather } from '@co-mmo/shared';
 import { giveUp, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { PlayerState, RegionState } from './state.ts';
@@ -13,10 +13,18 @@ export class Minds {
     private readonly s: RegionState,
   ) {}
 
-  /** Every creature takes its turn: respawn, sleep, notice, fight, run, walk home or roam. */
+  /**
+   * Every creature takes its turn: respawn, sleep, notice, fight, run, walk
+   * home or roam. A Stunned one loses its turn; Slowed and Rooted ones move
+   * slower or not at all.
+   */
   think(now: number, phase: number, weather: Weather): void {
     const habitat = this.habitat(now, phase, weather);
-    for (const c of this.s.creatures) think(c, habitat);
+    for (const c of this.s.creatures) {
+      if (c.respawnAt === null && !canAct(c, now)) continue;
+      c.pace = paceOf(c, now);
+      think(c, habitat);
+    }
   }
 
   /** NPCs go about their day, but wait while someone is close enough to talk. */
@@ -50,12 +58,12 @@ export class Minds {
 
   private hurt(p: PlayerState, c: Creature, now: number): void {
     // A creature's bite is physical: Agility may dodge it, a shield may block
-    // some of it, and Armour (gear and Vigor) softens the rest.
+    // some of it, Armour (gear and Vigor) softens the rest, and a Shield takes it before health.
     if (this.s.random() < dodgeChance(p.character)) return;
     let raw = c.def.damage * (0.8 + this.s.random() * 0.4);
     const shield = blocking(p.character);
     if (shield.chance && this.s.random() < shield.chance) raw = Math.max(0, raw - shield.amount);
-    const amount = afterArmor(raw, armor(p.character));
+    const amount = absorb(p, afterArmor(raw, armor(p.character)), now);
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
     const defeated = p.character.hp === 0;

@@ -2,6 +2,7 @@ import { ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeCh
 import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { Gauges } from './gauges.ts';
+import type { Paths } from './paths/index.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
 /**
@@ -13,6 +14,7 @@ export class Minds {
   constructor(
     private readonly s: RegionState,
     private readonly gauges: Gauges,
+    private readonly paths: Paths,
   ) {}
 
   /**
@@ -39,7 +41,8 @@ export class Minds {
     const players: Prey[] = [];
     for (const p of this.s.players.values()) {
       const lit = [heldItem(p.character), offHandItem(p.character)].some((item) => item && ITEMS[item]?.light);
-      players.push({ id: p.info.id, x: p.x, y: p.y, floor: p.floor, alive: p.character.hp > 0, lit });
+      // The Hidden (Mirage, Sunfall Dance) are as good as gone to creatures.
+      players.push({ id: p.info.id, x: p.x, y: p.y, floor: p.floor, alive: p.character.hp > 0 && !this.paths.hidden(p, now), lit });
     }
     return {
       map: this.s.map, now, tick: this.s.tickCount, random: this.s.random, phase, weather, players, creatures: this.s.creatures,
@@ -61,14 +64,18 @@ export class Minds {
   private hurt(p: PlayerState, c: Creature, now: number): void {
     // A creature's bite is physical: Agility may dodge it, a shield may block
     // some of it, Armour (gear and Vigor) softens the rest, and a Shield takes it before health.
-    if (this.s.random() < dodgeChance(p.character)) return;
-    let raw = c.def.damage * (0.8 + this.s.random() * 0.4);
+    // Path skills change it too (paths/index.ts): nothing reaches the Hidden, a Knelled creature
+    // hits softer, Rooted Stand adds Armor, and the Unyielding keep their last point of health.
+    if (this.paths.hidden(p, now) || this.s.random() < dodgeChance(p.character)) return;
+    let raw = c.def.damage * (0.8 + this.s.random() * 0.4) * this.paths.dealtBy(c, now);
     const shield = blocking(p.character);
     if (shield.chance && this.s.random() < shield.chance) raw = Math.max(0, raw - shield.amount);
-    const amount = absorb(p, afterArmor(raw, armor(p.character)), now);
+    const amount = this.paths.floor(p, absorb(p, afterArmor(raw, armor(p.character) + this.paths.extraArmor(p)), now), now);
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
-    this.gauges.struck(p);
+    // Steady Breath: now and then a hit leaves a Ranger's Focus be.
+    if (!this.paths.steady(p, now)) this.gauges.struck(p);
+    this.paths.struck(p, c, amount, now);
     const defeated = p.character.hp === 0;
     this.s.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated });
     // Fallen: every creature after them turns to whoever else threatened it, or goes home.

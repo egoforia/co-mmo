@@ -28,6 +28,7 @@ import { provoke } from '../creature-brain.ts';
 import { addThreat } from '../threat.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
 import type { Gauges } from './gauges.ts';
+import { PATH_RULES, type Paths } from './paths/index.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 import { tickStatuses } from './statuses.ts';
@@ -43,6 +44,7 @@ export class Combat implements EffectKit {
     readonly s: RegionState,
     private readonly quests: Quests,
     readonly gauges: Gauges,
+    readonly paths: Paths,
   ) {}
 
   /**
@@ -72,7 +74,9 @@ export class Combat implements EffectKit {
     const stagger = staggerChance(ch);
     for (const c of hits) {
       if (stagger && this.s.random() < stagger) this.stagger(c);
-      this.strike(p, c, this.critical(p, power * (0.9 + this.s.random() * 0.2)), { type: family.damageType, ranged: family.ranged });
+      const plain = power * (0.9 + this.s.random() * 0.2);
+      const hit = this.critical(p, plain);
+      this.strike(p, c, hit, { type: family.damageType, ranged: family.ranged, ...(hit > plain ? { crit: true } : {}) });
       this.gauges.landed(p);
     }
   }
@@ -116,6 +120,8 @@ export class Combat implements EffectKit {
 
   /** A hit made critical by chance (Agility and Focus raise it) does half again as much. */
   critical(p: PlayerState, amount: number): number {
+    // A Duelist's next hit out of a Mirage is critical whatever the dice say.
+    if (this.paths.critical(p)) return amount * CRIT_MULTIPLIER;
     return this.s.random() < critChance(p.character) + this.gauges.critBonus(p) ? amount * CRIT_MULTIPLIER : amount;
   }
 
@@ -132,11 +138,13 @@ export class Combat implements EffectKit {
     const mark = statusOf(target, 'marked', now);
     const marked = mark?.by && (mark.by === p.info.id || (this.s.hooks.party?.(p.info.id) ?? []).includes(mark.by)) ? 1 + MARK_BONUS : 1;
     const defence = how.pierce ? 0 : how.type === 'arcane' ? target.def.ward : target.def.armor;
-    const amount = afterArmor(absorb(target, raw * weakened * marked, now), defence ?? 0);
+    // Path passives and a Knell make some blows land harder (paths/index.ts).
+    const amount = afterArmor(absorb(target, raw * weakened * marked * this.paths.dealtTo(p, target, now), now), defence ?? 0);
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
     const { ability, ranged, type } = how;
     this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, damage: type, ...(ability ? { ability } : {}), ...(ranged ? { ranged } : {}) });
+    this.paths.landed(p, target, amount, how, now);
     if (!defeated) {
       addThreat(target, p.info.id, amount * ((ability && ABILITIES[ability]?.threat) || 1));
       return provoke(target, p.info.id, { creatures: this.s.creatures, now });
@@ -160,11 +168,16 @@ export class Combat implements EffectKit {
     const now = this.s.now();
     if (!canAct(p, now)) return this.s.notice(p, 'You are Stunned and cannot act.');
     if (a.effect === 'stance' && p.stance?.ability === id) return endStance(this, p);
+    // A Path skill used again while what it made is out ends it, like leaving a stance (the spirit hawk).
+    const ended = PATH_RULES[id]?.again?.(this, p, id);
+    if (ended) return this.s.notice(p, ended);
     if (now < (p.readyAt.get(id) ?? 0) - 1) return;
     if (ch.energy < a.energy) return this.s.notice(p, `Not enough Energy for ${a.name}.`);
     const effect = EFFECTS[a.effect];
+    // A Path skill may check and do more than its effect's data says (paths/).
+    const rule = PATH_RULES[id];
     const cast: Cast = { p, id, a, now, amount: 0, ...(targetId ? { targetId } : {}) };
-    const refused = effect.ready?.(this, cast);
+    const refused = rule?.ready ? rule.ready(this, cast, effect) : effect.ready?.(this, cast);
     if (refused) return this.s.notice(p, refused);
     ch.energy -= a.energy;
     // Wit shortens the rest; the client shows the rest it is told.
@@ -174,11 +187,13 @@ export class Combat implements EffectKit {
     p.dirty = true;
     // The gauge may lift it: a finisher grows with the pips it spends, a Woven spell doubles.
     const spend = this.gauges.cast(p, a);
-    cast.amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2) * spend.factor;
+    cast.amount = this.paths.castAmount(p, a, abilityAmount(ch, a)) * (0.9 + this.s.random() * 0.2) * spend.factor;
     if (spend.woven) cast.woven = true;
     if (spend.spent) cast.spent = spend.spent;
-    effect.run(this, cast);
+    if (rule?.run) rule.run(this, cast, effect);
+    else effect.run(this, cast);
     this.gauges.spend(p, spend);
+    this.paths.afterCast(p, a, spend);
     this.s.credit(id, p, 'use');
   }
 
@@ -188,6 +203,7 @@ export class Combat implements EffectKit {
     springTraps(this, now);
     helpersAct(this, now);
     holdStances(this);
+    this.paths.tick(now);
     this.gauges.tick(now);
   }
 

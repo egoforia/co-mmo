@@ -25,6 +25,8 @@ export const heal: Effect = {
     const poisoned = statusOf(m, 'poisoned', now) ? POISONED_HEALING : 1;
     const healed = Math.min(maxHp(ch) - ch.hp, Math.round(amount * poisoned));
     ch.hp += healed;
+    // Overtone: what goes past full health may become a shield.
+    kit.paths.overheal(p, m, Math.round(amount * poisoned) - healed);
     m.dirty = true;
     healThreat(kit.s.creatures, m.info.id, p.info.id, healed);
     kit.gauges.healed(p, m, healed);

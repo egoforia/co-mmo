@@ -15,6 +15,10 @@ export type StatusId =
   | 'marked'
   | 'taunted'
   | 'shielded'
+  | 'hidden'
+  | 'unyielding'
+  | 'graced'
+  | 'knelled'
   | 'weakened';
 
 /** What a status is called, whether it harms (Vigor shortens those), and its usual length. */
@@ -38,6 +42,10 @@ export const STATUSES: Record<StatusId, StatusInfo> = {
   marked: { name: 'Marked', harmful: true, seconds: 8, description: 'Takes more damage from whoever marked it and their party.' },
   taunted: { name: 'Taunted', harmful: true, seconds: 4, description: 'Must fight whoever taunted it.' },
   shielded: { name: 'Shielded', harmful: false, seconds: 6, description: 'A shield takes damage before health does.' },
+  hidden: { name: 'Hidden', harmful: false, seconds: 2, description: 'Creatures cannot see or strike you.' },
+  unyielding: { name: 'Unyielding', harmful: false, seconds: 8, description: 'Health cannot drop below 1.' },
+  graced: { name: 'Graced', harmful: false, seconds: 10, description: 'Heals a little each second.' },
+  knelled: { name: 'Knelled', harmful: true, seconds: 8, description: 'Deals less damage, takes more, and heals whoever strikes it.' },
   weakened: { name: 'Weakened', harmful: true, seconds: 30, description: 'Deals half damage after waking at the shrine.' },
 };
 
@@ -53,6 +61,8 @@ export const STUN_IMMUNE_MS = 6000;
 export const MARK_BONUS = 0.12;
 /** Heals on the Poisoned do this share of their amount. */
 export const POISONED_HEALING = 0.7;
+/** Statuses only Path skills give (skills/*-paths.ts): wished abilities never carry them. */
+export const PATH_STATUSES: readonly StatusId[] = ['hidden', 'unyielding', 'graced', 'knelled'];
 
 /** One running status: when it ends, who gave it, and its strength (damage per second, or what a shield has left). */
 export interface Status {

@@ -146,6 +146,25 @@ Steps 3, 4 and 8 can be built side by side once step 1 is in.
   [classes.md](classes.md#common-techniques).
 - The Calling Wish at levels 10 and 20: a free Minor wish limited to a new
   look and name for one skill.
+- Built in two halves. 7b (Paths, trials, mentors, the Calling Wish): Path
+  skills are data in `packages/shared/src/skills/<calling>-paths.ts`
+  (`PATH_SKILLS`; actives join `ABILITIES`, passives are known by Path and
+  level, `knowsPassive`), and `rpg/paths.ts` chooses a Path, learns its skills
+  (`settlePathSkills`, run on level-up) and counts Calling Wishes. What data
+  cannot say is in `packages/server/src/region/paths/` (`PATH_RULES`, the same
+  shape as the core skills' rules, and the `Paths` hooks). The trials
+  (`trials.ts`) are quests from the Sanctum mentor handed in to the Path
+  mentor (`turnIn`); Threads in the Tide gathers a pearl, a gull feather and a
+  crab shell (a new `gather` goal). The Path mentors carry `pathMentor` in
+  `lands.ts`; Zephyr Falcon stands in for the Windkeeper. A Sanctum mentor
+  teaches forgotten Path skills again. The Calling Wish is a `skill` wish
+  (`calling-wish.ts`), free, granted by the God like the look wish, and
+  refused in words when it touches a number; its picture waits for step 10's
+  skill effects. Left for later: the spirit hawk and the sand double cannot
+  be struck yet (helpers have no health), Iron Psalm's bell-mace Echo waits for
+  the bell-mace's own heal, Rewrite clears all ailments rather than only those
+  of the last 3 s, Sunfall Dance strikes in place rather than leaping, and
+  Rooted Stand uses the usual Slowed pace (35% slower, the page says 30%).
 
 ## 8. The Fallen and raising
 

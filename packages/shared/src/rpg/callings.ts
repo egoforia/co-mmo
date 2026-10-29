@@ -6,6 +6,7 @@ import { CALLINGS, CALLING_PRIMARY_START, CALLING_SECONDARY_START, type CallingI
 import { RACES, type RaceId } from '../races.ts';
 import { STARTING_STATS, newCharacter, type Character, type Stats } from '../rpg.ts';
 import { maxEnergy, maxHp } from './attributes.ts';
+import { settlePathSkills } from './paths.ts';
 
 const STAT_KEYS: readonly (keyof Stats)[] = ['might', 'agility', 'wit', 'spirit', 'vigor'];
 
@@ -50,6 +51,8 @@ export function chooseCalling(c: Character, race: RaceId, calling: CallingId): v
   c.race = race;
   c.calling = calling;
   delete c.path;
+  // The old Path's skills go with it.
+  settlePathSkills(c);
   c.stats = callingStats(race, calling, c.level);
   c.freePoints = c.level - 1;
   settle(c);

@@ -30,6 +30,7 @@ import {
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
 import { itemLabel } from './kit-ui.ts';
+import { pathChoicesHtml, pathSheetHtml } from './path-ui.ts';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
 
@@ -49,6 +50,8 @@ export interface RpgActions {
   /** Opens a shopkeeper's or trainer's window. */
   openShop(npc: { id: string; name: string }): void;
   accept(quest: string): void;
+  /** Chooses a Path at the mentor beside you. */
+  choosePath(npc: string, path: string): void;
   /** Tells the Stewards about a wished thing. */
   report(kind: 'content' | 'player', target: string, reason: string): void;
   /** True while typing in chat, so letters are not shortcuts. */
@@ -104,9 +107,11 @@ export class RpgUi {
       const target = e.target as HTMLElement;
       const quest = target.closest<HTMLElement>('[data-accept]')?.dataset.accept;
       if (quest) actions.accept(quest);
+      const path = target.closest<HTMLElement>('[data-path]');
+      if (path) actions.choosePath(path.dataset.npc!, path.dataset.path!);
       const shop = target.closest<HTMLElement>('[data-shop]');
       if (shop) actions.openShop({ id: shop.dataset.shop!, name: shop.dataset.name ?? '' });
-      if (quest || shop || target.closest('[data-close]')) $('dialogue').hidden = true;
+      if (quest || shop || path || target.closest('[data-close]')) $('dialogue').hidden = true;
     });
     $('keys').addEventListener('click', (e) => {
       // Let Space strike rather than press the button again.
@@ -155,7 +160,7 @@ export class RpgUi {
       : `<div class="buttons">${shop}<button type="button" class="quiet" data-close>Goodbye</button></div>`;
     box.innerHTML = `
       <img src="${escapeHtml(artSrc(d.npc.asset))}" alt="">
-      <div class="words"><h3>${escapeHtml(d.npc.name)}</h3>${paragraphs}${offer}</div>`;
+      <div class="words"><h3>${escapeHtml(d.npc.name)}</h3>${paragraphs}${d.paths?.length ? pathChoicesHtml(d.npc.id, d.paths) : ''}${offer}</div>`;
     box.hidden = false;
   }
 
@@ -225,7 +230,7 @@ export class RpgUi {
     const el = $('quests');
     el.hidden = active.length === 0;
     el.innerHTML = active
-      .map((q) => `<li><b>${escapeHtml(QUESTS[q.id]!.title)}</b><span>${escapeHtml(questProgressText(q))}</span></li>`)
+      .map((q) => `<li><b>${escapeHtml(QUESTS[q.id]!.title)}</b><span>${escapeHtml(questProgressText(q, this.character))}</span></li>`)
       .join('');
   }
 
@@ -275,6 +280,7 @@ export class RpgUi {
         <div><dt>Critical hit</dt><dd>${percent(critChance(c))}</dd></div><div><dt>Dodge</dt><dd>${percent(dodgeChance(c))}</dd></div>
         <div class="wide"><dt>Creator level</dt><dd>${c.creatorLevel}<small>${c.creatorXp} / ${creatorXpToNext(c.creatorLevel)}</small></dd></div>
       </dl>
+      ${pathSheetHtml(c)}
       ${abilities ? `<h3>Abilities</h3><ul class="abilities">${abilities}</ul>` : '<p class="note">No abilities yet. Trainers, scrolls and quests teach them.</p>'}`;
   }
 

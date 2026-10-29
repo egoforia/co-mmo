@@ -350,6 +350,7 @@ function play(token: string): void {
       unequip: (slot) => connection.send({ t: 'equip', slot }),
       openShop: (npc) => kit?.openShop(npc),
       accept: (quest) => connection.send({ t: 'accept', quest }),
+      choosePath: (npc, path) => connection.send({ t: 'choosePath', npc, path }),
       report: (kind, target, reason) => connection.send({ t: 'report', kind, target, reason }),
       typing: isTyping,
       prayer: () => prayer?.toggle(true),

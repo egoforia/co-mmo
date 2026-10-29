@@ -127,7 +127,7 @@ export class WishPainter {
    * one picture for an item, creature or person, one per item for a rule.
    */
   paint(record: ContentRecord, force = false, prompts: Record<string, string> = {}, only?: string): Promise<void> | undefined {
-    if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe' || record.definition.kind === 'loot' || record.definition.kind === 'calling') return undefined;
+    if (!record.definition || record.status !== 'granted' || record.definition.kind === 'recipe' || record.definition.kind === 'loot' || record.definition.kind === 'calling' || record.definition.kind === 'skill') return undefined;
     const provider = this.ai.image('wishes');
     if (!provider) return undefined;
     if (!force && this.budget.state().paused) return undefined;
@@ -274,7 +274,7 @@ export class WishPainter {
    */
   async preview(record: ContentRecord, pictureId: string, prompt?: string): Promise<Recipe> {
     const def = record.definition;
-    if (!def || record.status !== 'granted' || def.kind === 'recipe' || def.kind === 'loot' || def.kind === 'calling') throw new Error('That wish has no picture to paint.');
+    if (!def || record.status !== 'granted' || def.kind === 'recipe' || def.kind === 'loot' || def.kind === 'calling' || def.kind === 'skill') throw new Error('That wish has no picture to paint.');
     const recipes = this.recipes!;
     const kit = def.kind === 'region' ? wildKit(def.biome).find((a) => a.id === pictureId) : undefined;
     if (kit) {
@@ -399,7 +399,7 @@ export class WishPainter {
     const pictures: LibraryPicture[] = [];
     for (const record of this.store.content) {
       const def = record.definition;
-      if (record.status !== 'granted' || !def || def.kind === 'recipe' || def.kind === 'loot' || def.kind === 'calling') continue;
+      if (record.status !== 'granted' || !def || def.kind === 'recipe' || def.kind === 'loot' || def.kind === 'calling' || def.kind === 'skill') continue;
       const all: LibraryPicture[] = def.kind === 'region' ? regionPictures(record.id, def)
         : def.kind === 'rule' ? Object.entries(def.items).map(([key, item]) => ({ id: ruleItemId(record.id, key), def: { kind: 'item', ...item } as ItemWish }))
         : [{ id: record.id, def }];

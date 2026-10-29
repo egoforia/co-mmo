@@ -14,6 +14,7 @@ import {
 import type { Connection, RegionHooks } from '../region.ts';
 import type { Creature } from '../creature-brain.ts';
 import type { GaugeState } from './gauges.ts';
+import { levelWords } from './paths/words.ts';
 import type { Townsperson } from '../townsfolk.ts';
 import { nearestTile } from '../walkers.ts';
 
@@ -59,6 +60,8 @@ export interface PlayerState {
   stance?: { ability: string; amount: number };
   /** Their Calling's signature gauge (region/gauges.ts), once they have one. */
   gauge?: GaugeState;
+  /** Until when nothing can Slow or Root them (a Duelist's Dune Tempest, region/paths/duelist.ts). */
+  steadfastUntil?: number;
 }
 
 /** A trap a player set (effects/trap.ts): it springs on the first creature to step close. */
@@ -146,6 +149,7 @@ export class RegionState {
   levelUps(p: PlayerState, levels: number): void {
     if (!levels) return;
     this.notice(p, `You reached level ${p.character.level}! Every stat rose by ${levels}.`);
+    for (const line of levelWords(p.character, p.character.level - levels, p.character.level)) this.notice(p, line);
     this.broadcastSystem(`${p.info.name} reached level ${p.character.level}.`);
     this.hooks.journal?.(`${p.info.name} reached level ${p.character.level}.`, p.info.id);
   }

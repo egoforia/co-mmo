@@ -4,7 +4,7 @@
 // people build, to a structured brief for the Stewards or the Owner.
 
 import { BIOMES, type BiomeId } from './biomes.ts';
-import { CREATURES, ITEMS, bonusText } from './rpg.ts';
+import { ABILITIES, CREATURES, ITEMS, bonusText } from './rpg.ts';
 import { chanceText, lootTable } from './loot.ts';
 import { RACES, RACE_IDS } from './races.ts';
 import { CALLINGS, CALLING_IDS } from './classes.ts';
@@ -552,6 +552,8 @@ export function worldLines(def: WishDefinition): string[] {
     }
     case 'player':
       return ['Your look, painted from your words.'];
+    case 'skill':
+      return [`${ABILITIES[def.skill]?.name ?? 'Your skill'} is called ${def.name} from now on, and looks as you described.`, 'It hits, costs and rests exactly as before.'];
     case 'calling':
       return [
         ...(def.calling ? [`Your attributes are set again for a ${CALLINGS[def.calling].name}, every free point back to place. Your Path is cleared until you do the new trial.`] : []),

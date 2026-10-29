@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
-import { TICK_SECONDS, type ArtManifest, type SkyConfig } from '@co-mmo/shared';
+import { TICK_SECONDS, type ArtManifest, type PhaseTimings, type SkyConfig } from '@co-mmo/shared';
 import { Auth, type Mailer } from './auth.ts';
 import { World } from './world.ts';
+import { Region } from './region.ts';
+import { TickProfiler, aggregatePhaseTimings } from './region/profiler.ts';
+import { SlowTickBuffer } from './debug/slow-tick-buffer.ts';
 import { WorldEditor } from './world-editor.ts';
 import { handleWorldEdits } from './world-edit-routes.ts';
 import type { Account, Store } from './store.ts';
@@ -115,6 +118,10 @@ export interface App {
   hands: HandFinder;
   /** The region servers, when there is a bus to reach them. */
   regionServers?: RegionServers;
+  /** How hard this process works. */
+  meter: LoadMeter;
+  /** Recent slow ticks captured across the fleet. */
+  slowTicks: SlowTickBuffer;
   /** Every request sent to an outside service, for God's View's API Log. */
   apiLog: ApiLog;
   /** Resolves once the app listens for region servers. */
@@ -173,12 +180,65 @@ export function createApp(options: AppOptions): App {
   const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
   const recipes = new RecipeBook(options.wishes.artDir);
   const wishes = new Wishes(store, world, rules, options.wishes, { ai, budget, artJobs, paintRequests, recipes });
+  const slowTicks = new SlowTickBuffer();
+  const rulesProfiler = new TickProfiler();
   // Regions run on region servers when there are any (design doc, Scaling without a cap).
-  const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries() }) : undefined;
+  const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries(), slowTicks }) : undefined;
   if (regionServers) world.hosting = regionServers;
   const ready = regionServers ? regionServers.start() : Promise.resolve();
   // How hard this process works, for God's View's Server health tab.
   const meter = new LoadMeter();
+  meter.setPhaseBreakdown(() => {
+    const sources: { id: string; timings: PhaseTimings }[] = [];
+    for (const unit of world.units()) {
+      if (unit instanceof Region) {
+        sources.push({ id: unit.key, timings: unit.profiler.timings() });
+      }
+    }
+    sources.push({ id: 'gateway', timings: rulesProfiler.timings() });
+    return aggregatePhaseTimings(sources);
+  });
+  meter.setOnSlowTick((totalMs, tickErr) => {
+    let slowestRegion: Region | undefined;
+    let maxRegionMs = -1;
+    let totalPlayers = 0;
+    let totalCreatures = 0;
+    let totalActiveStatuses = 0;
+    const currentPhases: Record<string, number> = { ...rulesProfiler.currentPhases() };
+
+    for (const unit of world.units()) {
+      if (unit instanceof Region) {
+        const c = unit.counts();
+        totalPlayers += c.players;
+        totalCreatures += c.creatures;
+        totalActiveStatuses += c.activeStatuses;
+
+        const unitPhases = unit.profiler.currentPhases();
+        let unitTotal = 0;
+        for (const [p, ms] of Object.entries(unitPhases)) {
+          currentPhases[p] = Math.round(((currentPhases[p] ?? 0) + ms) * 100) / 100;
+          unitTotal += ms;
+        }
+        if (unitTotal > maxRegionMs) {
+          maxRegionMs = unitTotal;
+          slowestRegion = unit;
+        }
+      }
+    }
+
+    slowTicks.record({
+      at: Date.now(),
+      host: 'gateway',
+      region: slowestRegion ? slowestRegion.key : 'gateway',
+      ...(slowestRegion?.cell ? { cell: { index: slowestRegion.cell.index, count: slowestRegion.cell.count } } : {}),
+      totalMs: Math.round(totalMs * 10) / 10,
+      phases: currentPhases,
+      players: slowestRegion ? slowestRegion.counts().players : totalPlayers,
+      creatures: slowestRegion ? slowestRegion.counts().creatures : totalCreatures,
+      activeStatuses: slowestRegion ? slowestRegion.counts().activeStatuses : totalActiveStatuses,
+      ...(tickErr ? { error: (tickErr as Error).message ?? String(tickErr) } : {}),
+    });
+  });
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now, ai, budget });
   wishes.restore();
   const painterOptions: BuildingPainterOptions = {
@@ -304,7 +364,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, houses: kitHouses, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, apiLog, ...(regionServers ? { regionServers } : {}) };
+    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, houses: kitHouses, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, slowTicks, apiLog, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (await handleKitHouses(req, res, url, authenticate(req), { world, houses: kitHouses })) return;
@@ -345,8 +405,9 @@ export function createApp(options: AppOptions): App {
   const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, heartbeatMs: options.heartbeatMs });
 
   const tickTimer = setInterval(() => meter.tick(() => {
+    rulesProfiler.startTick();
     world.tick(meter.strain);
-    rules.tick();
+    rulesProfiler.measure('rules', () => rules.tick());
   }), TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 
@@ -366,6 +427,8 @@ export function createApp(options: AppOptions): App {
     auth,
     art: artStudio,
     hands: handFinder,
+    meter,
+    slowTicks,
     ...(regionServers ? { regionServers } : {}),
     apiLog,
     ready,

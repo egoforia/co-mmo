@@ -63,6 +63,19 @@ what a robot sees (`unreachable`).
 A wish may add a playtest file, but the harness, the bot and the test
 settings are core files for the wish guard.
 
+## Headless traces and combat logs
+
+Two debugging tools help verify simulation behavior in tests without running full browser robots:
+- **Headless replay**: Replay recorded traces tick-by-tick using
+  `npx tsx packages/server/src/tools/replay.ts <trace.json> --verify`.
+  Because the simulation loop relies strictly on dependency-injected time
+  and PRNG, replays execute bit-exact matching of positions, combat,
+  threat, and state snapshot hashes.
+- **Combat logger**: Test suites can attach `CombatLogger` to a region
+  to inspect fine-grained damage receipts (attacker, target, damage type,
+  variance, crit, dodge, shield block, Armor/Ward reduction, and threat change)
+  for combat balance verification.
+
 ## On a pull request
 
 Put the **playtest** label on a pull request to have it played

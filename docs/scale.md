@@ -152,6 +152,24 @@ has 50 ms; a card turns red when the slowest one ran over), memory, the
 errors it caught and the last one, and the machine and process it runs as.
 It refreshes every few seconds.
 
+The tab includes tools for understanding and diagnosing simulation performance:
+- **Phase breakdown**: A color bar and table break down where tick time
+  is spent across simulation phases (Inputs & movement, Sky & weather,
+  Combat & effects, Creature brains, Loot & fading bodies, Townsfolk routines,
+  Fallen revival, Player snapshots, and Sandbox rules), highlighting the
+  slowest region.
+- **Recent slow ticks**: Any tick exceeding the 50 ms budget is kept in a
+  ring buffer with its server, region, entity counts, active statuses,
+  per-phase breakdown, and any caught error. The log can be cleared anytime.
+- **On-demand CPU profiles and heap snapshots**: The Owner can click
+  "Record CPU profile (10 s)" or "Take heap snapshot" on any host. Recorded
+  files are saved in `data/profiles/` (configurable via `PROFILE_DIR`,
+  `PROFILE_MAX_FILES`, `PROFILE_PRUNE_HOURS`) and can be downloaded or
+  deleted directly from the HUD.
+- **Region replay recording**: The Owner can record a 30-second headless
+  replay trace of any region, or use local dev-only pause and single-step
+  controls when debugging tricky tick interactions.
+
 Each region has **Restart**, which sets it up again where it runs, and
 **Move** with a choice of host, which sets it up on another server. Players
 inside stay where they stood and see a short pause; creatures respawn.

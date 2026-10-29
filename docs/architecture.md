@@ -64,6 +64,25 @@ on another object after it is built). `region-main.ts` starts a region server.
 the event loop's delay and memory, in the gateway and every region server;
 God's View's Server health tab shows every host, and `perf.ts` gives the
 performance overlay the host running a player's region.
+`region/profiler.ts` times each simulation phase (`inputs`, `sky`, `combat`,
+`minds_think`, `bodies`, `minds_live`, `fallen`, `snapshots`, and sandbox
+wishes in `app.ts`), keeping rolling averages and worst times.
+`debug/slow-tick-buffer.ts` captures any tick exceeding the 50 ms budget
+with entity counts, active statuses, and per-phase timings.
+`debug/profiler-session.ts` takes on-demand 10-second V8 CPU profiles and
+heap snapshots via Node's built-in `node:inspector` with automatic file pruning.
+
+**Debugging and inspection.**
+- `region/inspect.ts`: live entity inspection (HP, Energy, threat list,
+  statuses, signature gauge pips, brain cooldowns) streamed on demand.
+- `region/combat-logger.ts`: 500-event ring buffer recording hit traces
+  (attacker, target, damage type, scaling, rolls, Armor/Ward mitigations,
+  threat deltas) viewable in God's View and downloadable as JSON.
+- `debug/prng.ts`: Mulberry32 deterministic pseudo-random number generator.
+- `debug/region-recorder.ts`: captures initial region state and per-tick
+  player inputs into a `ReplayTrace` (chat messages scrubbed for privacy).
+- `tools/replay.ts`: headless CLI tool to replay traces bit-for-bit with
+  optional step debugging and snapshot hash verification.
 
 **HTTP and the socket.** `http.ts` (JSON, files, bearer tokens),
 `account-routes.ts`, `auth.ts`, `admin.ts` (God's View API; `art-buildings.ts` lists

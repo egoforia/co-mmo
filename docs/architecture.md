@@ -76,7 +76,9 @@ region's tick: movement, snapshots, joining and leaving) with its systems in
 (attacks, rewards, and `useAbility`, which looks each ability's effect up in
 `effects/`: one small file per family of the effect kit, all given the same
 `EffectKit` moves), `statuses.ts` (putting statuses on players and creatures,
-Vigor shortening them, damage ticks), `fallen.ts`,
+Vigor shortening them, damage ticks), `gauges.ts` (each player's signature
+gauge: what fills, empties and spends it, sent as a `gauge` message),
+`fallen.ts`,
 `minds.ts` (runs the creatures and NPCs below each tick), `kit.ts` (gear, items, crafting, shops),
 `quests.ts` (talking and quests), `bodies.ts` (loot) and `chat.ts`,
 `region-views.ts` (what players see of each thing: the one shape both
@@ -97,7 +99,8 @@ Ward; `docs/attributes.md`), `callings.ts` how a people and Calling
 build them (creation, level-ups, free points, changing Calling),
 `abilities.ts` the effect kit an ability is made of (`AbilityEffect`,
 `AbilityDef`) and `statuses.ts` the status rules both sides use (lengths,
-stun immunity, pace, shields; `docs/attributes.md#statuses`). Shared
+stun immunity, pace, shields; `docs/attributes.md#statuses`), and
+`gauges.ts` the signature gauges' numbers (`docs/classes.md#signature-gauges`). Shared
 `wished-abilities.ts` holds the world-set numbers for each effect a wish may
 choose. Statuses travel in snapshots; until their icons are painted (build
 plan step 10) the browser shows them as words on name tags and the HUD. The

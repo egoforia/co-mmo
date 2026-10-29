@@ -69,8 +69,14 @@ export interface AbilityDef {
   threat?: number;
   /** The Wishweaver thread it belongs to. */
   thread?: Thread;
-  /** A finisher spends the Calling's gauge (build plan step 6). */
+  /**
+   * A finisher spends all of the Calling's gauge (rpg/gauges.ts): its amount
+   * grows by `perPip` for each pip spent. A Bellkeeper's finisher heal is a
+   * Toll: it rings every Echo in range instead of healing you.
+   */
   finisher?: boolean;
+  /** A finisher's extra amount per pip spent (0.25 is +25%); FINISHER_PER_PIP when not set. */
+  perPip?: number;
 }
 
 /** Effects that hurt creatures with the ability's amount. */

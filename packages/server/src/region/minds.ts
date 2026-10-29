@@ -1,6 +1,7 @@
 import { ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, type Weather } from '@co-mmo/shared';
 import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
+import type { Gauges } from './gauges.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
 /**
@@ -11,6 +12,7 @@ import type { PlayerState, RegionState } from './state.ts';
 export class Minds {
   constructor(
     private readonly s: RegionState,
+    private readonly gauges: Gauges,
   ) {}
 
   /**
@@ -66,6 +68,7 @@ export class Minds {
     const amount = absorb(p, afterArmor(raw, armor(p.character)), now);
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
+    this.gauges.struck(p);
     const defeated = p.character.hp === 0;
     this.s.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated });
     // Fallen: every creature after them turns to whoever else threatened it, or goes home.

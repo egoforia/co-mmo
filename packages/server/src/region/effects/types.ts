@@ -1,4 +1,5 @@
 import { DOT_SHARE, DAMAGE_STATUSES, abilityDamageType, maxHp, type AbilityDef, type DamageType } from '@co-mmo/shared';
+import type { Gauges } from '../gauges.ts';
 import type { Creature, PlayerState, RegionState } from '../state.ts';
 import { afflictCreature } from '../statuses.ts';
 
@@ -18,6 +19,8 @@ export interface Blow {
 /** The combat moves effects use; Combat provides them. */
 export interface EffectKit {
   readonly s: RegionState;
+  /** The players' signature gauges: hits fill them, finishers and Toll spend them. */
+  readonly gauges: Gauges;
   /** Damages a creature for a player, paying the rewards on a defeat. */
   strike(p: PlayerState, c: Creature, raw: number, how: Blow): void;
   /** A hit made critical by chance. */
@@ -41,8 +44,12 @@ export interface Cast {
   targetId?: string;
   /** The creature an effect settled on before the cost was paid. */
   target?: Creature;
-  /** Damage, healing or shield from the ability's numbers, after randomness. */
+  /** Damage, healing or shield from the ability's numbers, after randomness (and the gauge's lift). */
   amount: number;
+  /** A Wishweaver spell cast at three Weave: its amount is doubled, and skills may do more (build plan step 7). */
+  woven?: boolean;
+  /** The gauge pips a finisher spends. */
+  spent?: number;
 }
 
 /** An effect of the kit. */
@@ -58,6 +65,8 @@ export function hitWith(kit: EffectKit, cast: Cast, c: Creature, share = 1): voi
   const { p, a, id } = cast;
   const amount = kit.critical(p, cast.amount * share);
   kit.strike(p, c, amount, { type: abilityDamageType(a), ability: id });
+  // A finisher's own hits do not build the gauge it spends.
+  if (!a.finisher) kit.gauges.landed(p);
   if (a.status && c.respawnAt === null) addStatus(kit, cast, c, amount);
 }
 

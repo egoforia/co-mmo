@@ -34,6 +34,7 @@ import {
   type ServerMessage,
   type Side,
   type SkyConfig,
+  type GaugeId,
   type Status,
   type StatusId,
   type StatusView,
@@ -58,6 +59,7 @@ import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
 import { Combat } from './region/combat.ts';
 import { Fallen } from './region/fallen.ts';
+import { Gauges, type GaugeState } from './region/gauges.ts';
 import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
@@ -183,6 +185,8 @@ export interface Carry {
   /** Running statuses and stun immunity, which go with them. */
   statuses?: Status[];
   stunImmuneUntil?: number;
+  /** Their signature gauge, which goes with them too. */
+  gauge?: GaugeState;
 }
 
 /**
@@ -198,6 +202,7 @@ export class Region {
   private readonly s: RegionState;
   private readonly combat: Combat;
   private readonly minds: Minds;
+  private readonly gauges: Gauges;
   private readonly kit: Kit;
   private readonly quests: Quests;
   private readonly looting: Bodies;
@@ -227,8 +232,9 @@ export class Region {
     this.s = new RegionState(this.map, this.hooks, this.now, this.random);
     this.looting = new Bodies(this.s);
     this.quests = new Quests(this.s, this.looting, () => this.sky().phase);
-    this.combat = new Combat(this.s, this.quests);
-    this.minds = new Minds(this.s);
+    this.gauges = new Gauges(this.s);
+    this.combat = new Combat(this.s, this.quests, this.gauges);
+    this.minds = new Minds(this.s, this.gauges);
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
     this.fallen = new Fallen(this.s);
@@ -497,6 +503,13 @@ export class Region {
     return !!c && afflictCreature(this.s, c, status, seconds, from);
   }
 
+  /** A player's signature gauge and its pips, for tests and tools. */
+  gauge(id: string): { id: GaugeId; pips: number } | undefined {
+    const p = this.s.players.get(id);
+    const g = p && this.gauges.of(p);
+    return g && { id: g.id, pips: g.pips };
+  }
+
   /** A player's or creature's running statuses, for tests and tools. */
   statusesOf(id: string): Status[] {
     const now = this.now();
@@ -546,6 +559,7 @@ export class Region {
       info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), statuses: [], ...carry, floor,
     };
     this.s.players.set(info.id, p);
+    this.gauges.of(p);
     // Walking into the next cell of the same land: nothing changes on the player's screen.
     if (handoff) return;
     this.welcome(p);
@@ -564,7 +578,7 @@ export class Region {
     this.s.players.delete(id);
     this.minds.forgetPlayer(id, this.now());
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
-    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}), statuses: p.statuses, ...(p.stunImmuneUntil ? { stunImmuneUntil: p.stunImmuneUntil } : {}) };
+    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}), statuses: p.statuses, ...(p.stunImmuneUntil ? { stunImmuneUntil: p.stunImmuneUntil } : {}), ...(p.gauge ? { gauge: p.gauge } : {}) };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
   }
 
@@ -643,6 +657,7 @@ export class Region {
         }
         // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
         const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now));
+        if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
         const len = Math.hypot(input.dx, input.dy);
         if (len > 0) p.facing = { dx: input.dx / len, dy: input.dy / len };
         const way = wayTaken(this.map, p.floor, next);

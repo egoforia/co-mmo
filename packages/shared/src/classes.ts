@@ -4,7 +4,7 @@
 // data; skills are ability ids that arrive in ABILITIES with the skills step
 // (docs/callings-build-plan.md, step 7); weapon families are in weapons.ts.
 
-import type { Stats } from './rpg.ts';
+import type { GaugeId, Stats } from './rpg.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
 
 export type CallingId = 'warden' | 'duelist' | 'ranger' | 'wishweaver' | 'bellkeeper';
@@ -32,7 +32,8 @@ export interface CallingDef {
   weapons: WeaponFamily[];
   /** Off-hand families it is trained in. */
   offhands: OffhandFamily[];
-  gauge: { id: string; name: string };
+  /** Its signature gauge (rpg/gauges.ts). */
+  gauge: { id: GaugeId; name: string };
   /** Learned automatically at levels 1, 2, 4, 6 and 8. */
   core: { level: number; skill: string }[];
   paths: [PathDef, PathDef];

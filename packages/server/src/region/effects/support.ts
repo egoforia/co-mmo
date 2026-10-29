@@ -6,16 +6,20 @@ import { allyFor, type Effect } from './types.ts';
 /**
  * Mends the chosen ally in range, else the most hurt one, else you (only you
  * when it has no range); Poison makes it weaker. Creatures fighting the one
- * healed take threat from the healer.
+ * healed take threat from the healer. A Bellkeeper's heal leaves an Echo on
+ * the one healed, and their finisher heal is a Toll that rings every Echo in
+ * range instead.
  */
 export const heal: Effect = {
   ready: (kit, cast) => {
+    if (cast.a.finisher) return kit.gauges.echoesNear(cast.p, cast.a.range).length ? undefined : 'No Echoes are close enough to ring.';
     const m = allyFor(kit, cast);
     if (m.character.hp < maxHp(m.character)) return undefined;
     return m === cast.p ? 'You are already at full health.' : `${m.info.name} is already at full health.`;
   },
   run: (kit, cast) => {
     const { p, a, amount, now } = cast;
+    if (a.finisher) return void kit.gauges.toll(p, a);
     const m = allyFor(kit, cast);
     const ch = m.character;
     const poisoned = statusOf(m, 'poisoned', now) ? POISONED_HEALING : 1;
@@ -23,6 +27,7 @@ export const heal: Effect = {
     ch.hp += healed;
     m.dirty = true;
     healThreat(kit.s.creatures, m.info.id, p.info.id, healed);
+    kit.gauges.healed(p, m, healed);
     if (m === p) return kit.s.notice(p, `${a.name} restores ${healed} health.`);
     kit.s.notice(p, `${a.name} restores ${healed} health to ${m.info.name}.`);
     kit.s.notice(m, `${p.info.name}'s ${a.name} restores ${healed} of your health.`);

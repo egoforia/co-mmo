@@ -11,6 +11,7 @@ import type { SkyConfig, Weather } from './sky.ts';
 import { EQUIP_SLOTS, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
 import type { DamageType } from './weapons.ts';
 import type { StatusId, StatusView } from './rpg/statuses.ts';
+import type { GaugeId } from './rpg/gauges.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -551,6 +552,14 @@ export interface CooldownMessage {
   seconds: number;
 }
 
+/** Your signature gauge changed (rpg/gauges.ts): its pips, and whether your next spell is Woven. */
+export interface GaugeMessage {
+  t: 'gauge';
+  gauge: GaugeId;
+  pips: number;
+  woven?: boolean;
+}
+
 /** Someone nearby asked to trade with you. */
 export interface TradeRequestMessage {
   t: 'trade-request';
@@ -589,6 +598,7 @@ export type ServerMessage =
   | LootMessage
   | DraftUpdateMessage
   | CooldownMessage
+  | GaugeMessage
   | TradeMessage
   | TradeRequestMessage
   | PartyMessage

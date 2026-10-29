@@ -1,4 +1,7 @@
 import {
+  ABILITIES,
+  coreSkillsAt,
+  keyWords,
   wisherOf,
   VIEW_RADIUS,
   Tile,
@@ -85,6 +88,21 @@ export interface Helper {
   nextAt: number;
 }
 
+/** Hallowed ground (a Bellkeeper's Sanctuary, region/skills/bellkeeper.ts): it heals and guards the party inside each second. */
+export interface Zone {
+  owner: string;
+  ability: string;
+  x: number;
+  y: number;
+  floor: number;
+  radius: number;
+  /** Health restored to each one inside, each second. */
+  amount: number;
+  until: number;
+  /** Epoch ms of its next heal. */
+  nextAt: number;
+}
+
 /** A defeated creature's body: what it dropped waits there for anyone to take. */
 export interface Body {
   id: string;
@@ -110,6 +128,8 @@ export class RegionState {
   /** Traps set and helpers summoned by players here. */
   traps: Trap[] = [];
   helpers: Helper[] = [];
+  /** Hallowed ground laid by players here. */
+  zones: Zone[] = [];
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   townsfolk: Townsperson[] = [];
   tickCount = 0;
@@ -146,6 +166,13 @@ export class RegionState {
   levelUps(p: PlayerState, levels: number): void {
     if (!levels) return;
     this.notice(p, `You reached level ${p.character.level}! Every stat rose by ${levels}.`);
+    // The Calling's core skills of the levels just reached (gainXp has taught them).
+    const { calling, level } = p.character;
+    for (let l = level - levels + 1; calling && l <= level; l++) {
+      for (const id of coreSkillsAt(calling, l)) {
+        if (p.character.abilities.includes(id)) this.notice(p, `You learned ${ABILITIES[id]!.name}. ${keyWords(p.character, id)}`);
+      }
+    }
     this.broadcastSystem(`${p.info.name} reached level ${p.character.level}.`);
     this.hooks.journal?.(`${p.info.name} reached level ${p.character.level}.`, p.info.id);
   }

@@ -1,6 +1,7 @@
 import { collides, paceOf } from '@co-mmo/shared';
 import type { PlayerState, RegionState } from '../state.ts';
-import { aimAt, hitWith, towards, type Effect } from './types.ts';
+import { afflictPlayer } from '../statuses.ts';
+import { aimAt, hitWith, towards, type Cast, type EffectKit, type Effect } from './types.ts';
 
 /** Dashes and blinks move in steps this long, stopping before anything solid. */
 const STEP = 0.25;
@@ -24,23 +25,34 @@ export const dash: Effect = {
 
 /**
  * Vanishes and appears up to the ability's range away, the way you face (or
- * toward the creature you chose); with a radius, a gust hits what stood
- * around the spot you left.
+ * toward the creature you chose; away from it or to one side for a skill
+ * that says `away`); with a radius, a gust hits what stood around the spot
+ * you left. Its status, if any, is on you after.
  */
 export const blink: Effect = {
   ready: (_kit, cast) => (paceOf(cast.p, cast.now) ? undefined : 'You cannot move right now.'),
   run: (kit, cast) => {
     const { p, a } = cast;
     const from = { x: p.x, y: p.y };
-    const chosen = cast.targetId ? kit.creatureInReach(p, a.range + 2, cast.targetId) : undefined;
-    slide(kit.s, p, towards(p, chosen), a.range);
+    slide(kit.s, p, blinkWay(kit, cast), a.range);
     if (a.radius) for (const c of kit.creaturesNear(p, from, a.radius)) hitWith(kit, cast, c);
+    if (a.status) afflictPlayer(kit.s, p, a.status, a.duration);
     kit.s.notice(p, `${a.name} carries you ${Math.round(Math.hypot(p.x - from.x, p.y - from.y))} steps.`);
   },
 };
 
+/** Which way a blink goes: toward the chosen creature, or away from (or beside) the chosen or nearest one. */
+function blinkWay(kit: EffectKit, cast: Cast): { dx: number; dy: number } {
+  const { p, a } = cast;
+  const reach = a.range + 2;
+  const chosen = cast.targetId ? kit.creatureInReach(p, reach, cast.targetId) : undefined;
+  if (!a.away) return towards(p, chosen);
+  const to = towards(p, chosen ?? kit.creatureInReach(p, reach));
+  return a.away === 'back' ? { dx: -to.dx, dy: -to.dy } : { dx: -to.dy, dy: to.dx };
+}
+
 /** Moves a player up to `distance` along a direction, stopping before anything solid. */
-function slide(s: RegionState, p: PlayerState, dir: { dx: number; dy: number }, distance: number): void {
+export function slide(s: RegionState, p: PlayerState, dir: { dx: number; dy: number }, distance: number): void {
   for (let gone = 0; gone + STEP <= distance + 1e-9; gone += STEP) {
     const x = p.x + dir.dx * STEP;
     const y = p.y + dir.dy * STEP;

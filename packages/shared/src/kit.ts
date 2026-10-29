@@ -9,6 +9,7 @@ import {
   addItem,
   itemCount,
   learnAbility,
+  replacedWords,
   takeItem,
   totalStats,
   type Character,
@@ -127,6 +128,8 @@ export function train(c: Character, npc: string, ability: string): string | unde
   const offer = SHOPS[npc]?.teaches.find((t) => t.ability === ability);
   if (!offer || !ABILITIES[ability]) return 'They cannot teach you that.';
   if (c.abilities.includes(ability)) return 'You know that already.';
+  const replaced = replacedWords(c, ability);
+  if (replaced) return replaced;
   if (c.gold < offer.price) return `Lessons cost ${offer.price} gold; you have ${c.gold}.`;
   c.gold -= offer.price;
   learnAbility(c, ability);
@@ -138,6 +141,8 @@ export function readScroll(c: Character, item: string): string | undefined {
   const ability = ITEMS[item]?.teaches;
   if (!ability || !ABILITIES[ability]) return 'The words have faded; nothing can be learned from it.';
   if (c.abilities.includes(ability)) return `You know ${ABILITIES[ability]!.name} already. Sell the scroll, or give it to a friend.`;
+  const replaced = replacedWords(c, ability);
+  if (replaced) return `${replaced} Sell the scroll, or give it to a friend.`;
   if (!takeItem(c, item)) return 'That is not in your bag.';
   learnAbility(c, ability);
   return undefined;

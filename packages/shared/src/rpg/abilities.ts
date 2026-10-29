@@ -77,6 +77,16 @@ export interface AbilityDef {
   finisher?: boolean;
   /** A finisher's extra amount per pip spent (0.25 is +25%); FINISHER_PER_PIP when not set. */
   perPip?: number;
+  /** Adds the weapon's damage though its effect is not a blow (a Duelist's Whirl, a Ranger's Aimed Shot). */
+  weapon?: boolean;
+  /** Gauge pips it adds when used (a taunt: one for each creature it turns, up to this many). */
+  gain?: number;
+  /** A damage status's share of the hit dealt each second, when not DOT_SHARE (Rend 0.5, Ember Bolt 0.1). */
+  dotShare?: number;
+  /** A bolt that jumps on: how many creatures it hits in all, each jump weaker (Chain Spark). */
+  chain?: number;
+  /** A blink's way: away from the creature chosen or nearest (Tumble), or to one side of it (Sidestep). */
+  away?: 'back' | 'aside';
 }
 
 /** Effects that hurt creatures with the ability's amount. */
@@ -86,6 +96,11 @@ export const DAMAGE_EFFECTS: readonly AbilityEffect[] = ['strike', 'bolt', 'area
 export const WEAPON_EFFECTS: readonly AbilityEffect[] = ['strike', 'dash', 'cone'];
 
 /** Whether an ability's hits are physical (Armor softens them) or arcane (Ward does). */
-export function abilityDamageType(a: Pick<AbilityDef, 'effect' | 'damageType'>): DamageType {
-  return a.damageType ?? (WEAPON_EFFECTS.includes(a.effect) || a.effect === 'trap' ? 'physical' : 'arcane');
+export function abilityDamageType(a: Pick<AbilityDef, 'effect' | 'damageType' | 'weapon'>): DamageType {
+  return a.damageType ?? (WEAPON_EFFECTS.includes(a.effect) || a.weapon || a.effect === 'trap' ? 'physical' : 'arcane');
+}
+
+/** Whether an ability adds the weapon's damage to its amount. */
+export function addsWeapon(a: Pick<AbilityDef, 'effect' | 'weapon'>): boolean {
+  return WEAPON_EFFECTS.includes(a.effect) || !!a.weapon;
 }

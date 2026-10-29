@@ -233,11 +233,11 @@ export class Region {
     this.looting = new Bodies(this.s);
     this.quests = new Quests(this.s, this.looting, () => this.sky().phase);
     this.gauges = new Gauges(this.s);
-    this.combat = new Combat(this.s, this.quests, this.gauges);
-    this.minds = new Minds(this.s, this.gauges);
+    this.fallen = new Fallen(this.s);
+    this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen);
+    this.minds = new Minds(this.s, this.gauges, this.combat);
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
-    this.fallen = new Fallen(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
     this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
@@ -617,6 +617,9 @@ export class Region {
         break;
       case 'ability':
         this.combat.useAbility(p, message.ability, message.target);
+        break;
+      case 'hotbar':
+        this.kit.arrangeHotbar(p, message.slots);
         break;
       case 'craft':
         this.kit.craft(p, message.recipe);

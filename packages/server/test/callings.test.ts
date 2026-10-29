@@ -91,6 +91,7 @@ describe('characters from before Callings', () => {
     // Saved before Callings: no freePoints, no calling, five levels of +1 to everything.
     const old = { ...newCharacter(), level: 5, gold: 42, favor: 7, abilities: ['mend'], stats: { might: 7, agility: 7, wit: 7, spirit: 7, vigor: 7 } } as Partial<Character>;
     delete old.freePoints;
+    delete old.hotbar;
     old.inventory = [...old.inventory!, { item: 'tonic', qty: 3 }];
     store.accountById(mara.id)!.character = old as Character;
 
@@ -104,7 +105,7 @@ describe('characters from before Callings', () => {
 
     await c.send({ t: 'chooseCalling', race: 'cervid', calling: 'bellkeeper' });
     const welcome = await c.waitFor<WelcomeMessage>((m) => m.t === 'welcome');
-    expect(welcome.character).toMatchObject({ race: 'cervid', calling: 'bellkeeper', level: 5, gold: 42, favor: 7, freePoints: 4, abilities: ['mend'] });
+    expect(welcome.character).toMatchObject({ race: 'cervid', calling: 'bellkeeper', level: 5, gold: 42, favor: 7, freePoints: 4, abilities: ['bell-mend', 'chime', 'toll'], hotbar: ['bell-mend', 'chime', 'toll', '', '', ''] });
     expect(welcome.character.stats).toEqual(callingStats('cervid', 'bellkeeper', 5));
     expect(welcome.character.inventory).toContainEqual({ item: 'tonic', qty: 3 });
     expect(store.accountById(mara.id)!.character).toMatchObject({ race: 'cervid', calling: 'bellkeeper' });

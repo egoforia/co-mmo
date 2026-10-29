@@ -13,6 +13,7 @@ import {
 } from '@co-mmo/shared';
 import type { Connection, RegionHooks } from '../region.ts';
 import type { Creature } from '../creature-brain.ts';
+import type { GaugeState } from './gauges.ts';
 import type { Townsperson } from '../townsfolk.ts';
 import { nearestTile } from '../walkers.ts';
 
@@ -56,6 +57,8 @@ export interface PlayerState {
   facing?: { dx: number; dy: number };
   /** The stance they hold (effects/stance.ts), until used again or out of Energy. */
   stance?: { ability: string; amount: number };
+  /** Their Calling's signature gauge (region/gauges.ts), once they have one. */
+  gauge?: GaugeState;
 }
 
 /** A trap a player set (effects/trap.ts): it springs on the first creature to step close. */

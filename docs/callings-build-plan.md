@@ -118,6 +118,12 @@ Steps 3, 4 and 8 can be built side by side once step 1 is in.
   Warden, Duelist and Ranger gain from it.
 - A small protocol message for gauge changes; HUD pips under the health bar.
 - Tests: each gauge fills, empties and is spent as described.
+- Built: shared `rpg/gauges.ts`, server `region/gauges.ts`. Step 7's
+  skills only add data: `finisher` with `perPip` spends the gauge (a
+  Bellkeeper's finisher heal is Toll), `thread` feeds Weave, and effects read
+  `cast.woven` and `cast.spent`; skills that add pips (Challenge, Riposte,
+  Sidestep) call `Gauges.add`. Echoes last 20 s and Resolve starts emptying
+  after 5 s out of a fight, a pip every 2 s (numbers the pages leave open).
 
 ## 7. Skills, Paths, hotbar, mentors and trials
 

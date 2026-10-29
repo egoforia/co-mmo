@@ -2,14 +2,22 @@ import { POISONED_HEALING, STATUSES, cleanse as clear, maxHp, statusOf } from '@
 import { afflictPlayer } from '../statuses.ts';
 import type { Effect } from './types.ts';
 
-/** Mends you; Poison makes it weaker. */
+/**
+ * Mends you; Poison makes it weaker. A Bellkeeper's heal leaves an Echo, and
+ * their finisher heal is a Toll that rings every Echo in range instead.
+ */
 export const heal: Effect = {
-  ready: (_kit, { p }) => (p.character.hp >= maxHp(p.character) ? 'You are already at full health.' : undefined),
+  ready: (kit, { p, a }) => {
+    if (a.finisher) return kit.gauges.echoesNear(p, a.range).length ? undefined : 'No Echoes are close enough to ring.';
+    return p.character.hp >= maxHp(p.character) ? 'You are already at full health.' : undefined;
+  },
   run: (kit, { p, a, amount, now }) => {
+    if (a.finisher) return void kit.gauges.toll(p, a);
     const ch = p.character;
     const poisoned = statusOf(p, 'poisoned', now) ? POISONED_HEALING : 1;
     const healed = Math.min(maxHp(ch) - ch.hp, Math.round(amount * poisoned));
     ch.hp += healed;
+    kit.gauges.healed(p, p, healed);
     kit.s.notice(p, `${a.name} restores ${healed} health.`);
   },
 };

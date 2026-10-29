@@ -156,6 +156,7 @@ html, body {
 .bar b { position: relative; display: block; text-align: center; font-weight: 600; line-height: 16px; text-shadow: 0 1px 0 #000; }
 .bar.xp b { line-height: 10px; font-size: 9px; }
 #stats-line { color: var(--muted); }
+#gauge-line { margin: -2px 0 6px; font-size: 12px; letter-spacing: 1px; color: #f2dc6b; text-shadow: 0 1px 0 #000; }
 #stats-line .weak { color: #b79ad6; }
 
 #quests {

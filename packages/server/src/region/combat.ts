@@ -26,6 +26,7 @@ import {
 } from '@co-mmo/shared';
 import { provoke } from '../creature-brain.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
+import type { Gauges } from './gauges.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 import { tickStatuses } from './statuses.ts';
@@ -40,6 +41,7 @@ export class Combat implements EffectKit {
   constructor(
     readonly s: RegionState,
     private readonly quests: Quests,
+    readonly gauges: Gauges,
   ) {}
 
   /**
@@ -70,6 +72,7 @@ export class Combat implements EffectKit {
     for (const c of hits) {
       if (stagger && this.s.random() < stagger) this.stagger(c);
       this.strike(p, c, this.critical(p, power * (0.9 + this.s.random() * 0.2)), { type: family.damageType, ranged: family.ranged });
+      this.gauges.landed(p);
     }
   }
 
@@ -110,9 +113,9 @@ export class Combat implements EffectKit {
     return [p, ...near];
   }
 
-  /** A hit made critical by chance (Agility raises it) does half again as much. */
+  /** A hit made critical by chance (Agility and Focus raise it) does half again as much. */
   critical(p: PlayerState, amount: number): number {
-    return this.s.random() < critChance(p.character) ? amount * CRIT_MULTIPLIER : amount;
+    return this.s.random() < critChance(p.character) + this.gauges.critBonus(p) ? amount * CRIT_MULTIPLIER : amount;
   }
 
   /**
@@ -163,17 +166,23 @@ export class Combat implements EffectKit {
     p.readyAt.set(id, now + rest * 1000);
     p.conn.send({ t: 'cooldown', ability: id, seconds: rest });
     p.dirty = true;
-    cast.amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2);
+    // The gauge may lift it: a finisher grows with the pips it spends, a Woven spell doubles.
+    const spend = this.gauges.cast(p, a);
+    cast.amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2) * spend.factor;
+    if (spend.woven) cast.woven = true;
+    if (spend.spent) cast.spent = spend.spent;
     effect.run(this, cast);
+    this.gauges.spend(p, spend);
     this.s.credit(id, p, 'use');
   }
 
-  /** Each tick: statuses wear off and hurt, traps spring, helpers strike and stances drain Energy. */
+  /** Each tick: statuses wear off and hurt, traps spring, helpers strike, stances drain Energy and gauges move. */
   tick(now: number): void {
     tickStatuses(this.s, now, (by, c, amount, id) => this.strike(by, c, amount, statusBlow(id)));
     springTraps(this, now);
     helpersAct(this, now);
     holdStances(this);
+    this.gauges.tick(now);
   }
 
   private reward(p: PlayerState, c: Creature): void {

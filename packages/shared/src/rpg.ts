@@ -17,6 +17,7 @@ export * from './rpg/attributes.ts';
 export * from './rpg/callings.ts';
 export * from './rpg/abilities.ts';
 export * from './rpg/statuses.ts';
+export * from './rpg/gauges.ts';
 
 export interface Stats {
   /** Heavy weapon damage and a little health. */

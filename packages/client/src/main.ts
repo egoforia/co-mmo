@@ -19,6 +19,7 @@ import { MiniMap } from './mini-map.ts';
 import { chooseCamera } from './camera.ts';
 import { PerfOverlay } from './perf-overlay.ts';
 import { FallenUi } from './fallen-ui.ts';
+import { GaugeUi } from './gauge-ui.ts';
 import { LIT, LIT_FIGURE, LitFigurePipeline, LitPipeline } from './lit-pipeline.ts';
 
 async function boot(): Promise<void> {
@@ -102,6 +103,7 @@ function play(token: string): void {
   let draft: DraftView | null = null;
   let party: PartyUi | null = null;
   let fallen: FallenUi | null = null;
+  const gauge = new GaugeUi();
   let perf: PerfOverlay | null = null;
   let myId = '';
   const sound = new GameSound();
@@ -180,6 +182,7 @@ function play(token: string): void {
         sound.music(message.region.def.biome);
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
+        gauge.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
         // A body's loot stays behind in the region you left.
         loot?.show(null);
@@ -233,6 +236,7 @@ function play(token: string): void {
         character = message.character;
         rpg?.setCharacter(message.character);
         kit?.setCharacter(message.character);
+        gauge.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
         scene?.setMyHeld(heldItem(message.character), offHandItem(message.character));
         break;
@@ -263,6 +267,9 @@ function play(token: string): void {
       case 'dialogue':
         sound.play('talk');
         rpg?.showDialogue(message);
+        break;
+      case 'gauge':
+        gauge.show(message);
         break;
       case 'cooldown':
         kit?.cooldown(message.ability, message.seconds);

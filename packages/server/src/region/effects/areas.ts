@@ -40,8 +40,8 @@ export const line: Effect = {
   },
 };
 
-/** The creatures a cone or line covers. */
-function ahead(kit: EffectKit, cast: Cast, shape: 'cone' | 'line'): Creature[] {
+/** The creatures a cone or line covers (Stampede knocks back those its line covered). */
+export function ahead(kit: EffectKit, cast: Cast, shape: 'cone' | 'line'): Creature[] {
   const { p, a } = cast;
   const dir = towards(p, cast.target ?? aimAt(kit, cast));
   return kit.creaturesNear(p, p, a.range).filter((c) => {

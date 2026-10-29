@@ -1,4 +1,4 @@
-import { BIOMES, standing, type BiomeId, type PlayerInfo, type WishDefinition, type WishTier } from '@co-mmo/shared';
+import { BIOMES, callingWishesLeft, skillName, standing, type BiomeId, type PlayerInfo, type WishDefinition, type WishTier } from '@co-mmo/shared';
 import type { ChatModel, ChatResult, ChatTurn } from '../ai/chat.ts';
 import type { AiServices } from '../ai/services.ts';
 import type { Budget } from '../budget.ts';
@@ -117,6 +117,9 @@ export class Prayers {
         .slice(-8)
         .reverse()
         .map((c) => `${c.title} (wished by ${c.wisher.name})`),
+      ...(callingWishesLeft(character) > 0
+        ? { callingWish: `${player.name} holds ${callingWishesLeft(character) === 1 ? 'a Calling Wish' : `${callingWishesLeft(character)} Calling Wishes`}. Their skills: ${character.abilities.map((a) => `${skillName(character, a)} (${a})`).join(', ') || 'none yet'}.` }
+        : {}),
     };
   }
 

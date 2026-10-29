@@ -1,4 +1,4 @@
-import { ABILITIES, CALLING_SKILLS, HOTBAR_SIZE, type Character } from '@co-mmo/shared';
+import { ABILITIES, CALLING_SKILLS, HOTBAR_SIZE, PATH_SKILLS, skillName, type Character } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -43,7 +43,8 @@ export class SpellbookUi {
   private render(): void {
     const c = this.character;
     const known = c.abilities.filter((a) => ABILITIES[a]);
-    const order = [...known.filter((a) => CALLING_SKILLS[a]), ...known.filter((a) => !CALLING_SKILLS[a])];
+    const own = (a: string) => !!CALLING_SKILLS[a] || !!PATH_SKILLS[a];
+    const order = [...known.filter(own), ...known.filter((a) => !own(a))];
     const rows = order.map((id) => {
       const a = ABILITIES[id]!;
       const on = c.hotbar.indexOf(id) + 1;
@@ -51,8 +52,8 @@ export class SpellbookUi {
         .map((k) => `<button type="button" class="key${k === on ? ' on' : ''}" data-skill="${escapeHtml(id)}" data-key="${k}" title="Put it on key ${k}">${k}</button>`)
         .join('');
       const off = on ? `<button type="button" class="quiet" data-skill="${escapeHtml(id)}" data-key="0">Take off</button>` : '';
-      const kind = CALLING_SKILLS[id] ? 'Calling skill' : 'Common technique';
-      return `<li><b>${escapeHtml(a.name)}</b> <small>${kind}</small>
+      const kind = CALLING_SKILLS[id] ? 'Calling skill' : PATH_SKILLS[id] ? 'Path skill' : 'Common technique';
+      return `<li><b>${escapeHtml(skillName(c, id))}</b> <small>${kind}</small>
         <span class="info">${escapeHtml(a.description)} ${a.energy} Energy, rests ${a.cooldown} s.</span>
         <span class="keys">${keys}${off}</span></li>`;
     }).join('');

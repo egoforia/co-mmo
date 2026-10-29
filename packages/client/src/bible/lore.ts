@@ -1,4 +1,4 @@
-import { CALLINGS, CALLING_IDS, OFFHAND_FAMILIES, RACES, RACE_IDS, WEAPON_FAMILIES, type CallingId, type Stats } from '@co-mmo/shared';
+import { CALLINGS, CALLING_IDS, OFFHAND_FAMILIES, pathSkillName, RACES, RACE_IDS, WEAPON_FAMILIES, type CallingId, type Stats } from '@co-mmo/shared';
 import type { Chapter } from '../bible.ts';
 
 // The in-game editions of docs/world.md, races.md, attributes.md, classes.md
@@ -53,7 +53,7 @@ function callingSection(id: CallingId): string {
       <li><b>Gauge:</b> ${c.gauge.name}.</li>
       <li><b>Mentors:</b> ${c.mentor} in the Sanctum; ${c.pathMentor} at ${s.home}.</li>
       <li><b>Trial at level 10:</b> ${s.trial}</li>
-      <li><b>Paths:</b> ${c.paths.map((p) => `<b>${p.name}</b>, ${p.blurb.charAt(0).toLowerCase()}${p.blurb.slice(1)}`).join(' Or ')}</li>
+      <li><b>Paths:</b> ${c.paths.map((p) => `<b>${p.name}</b>, ${p.blurb.charAt(0).toLowerCase()}${p.blurb.slice(1)} ${p.skills.map((k) => `${pathSkillName(k.skill)} at ${k.level}`).join(', ')}.`).join(' Or ')}</li>
     </ul>`;
 }
 

@@ -1,5 +1,7 @@
 import { DOT_SHARE, DAMAGE_STATUSES, abilityDamageType, maxHp, type AbilityDef, type DamageType } from '@co-mmo/shared';
 import type { Gauges } from '../gauges.ts';
+import type { Paths } from '../paths/index.ts';
+import { slowLength } from '../paths/types.ts';
 import type { Creature, PlayerState, RegionState } from '../state.ts';
 import { afflictCreature } from '../statuses.ts';
 
@@ -14,6 +16,8 @@ export interface Blow {
   ranged?: boolean;
   /** Goes past Armor and Ward (Bleeding, Poison). */
   pierce?: boolean;
+  /** A critical hit (Blazing Edge sets these Burning). */
+  crit?: boolean;
 }
 
 /** The combat moves effects use; Combat provides them. */
@@ -21,6 +25,8 @@ export interface EffectKit {
   readonly s: RegionState;
   /** The players' signature gauges: hits fill them, finishers and Toll spend them. */
   readonly gauges: Gauges;
+  /** Path skills at work: their timed parts, passives and hooks (region/paths/). */
+  readonly paths: Paths;
   /** Damages a creature for a player, paying the rewards on a defeat. */
   strike(p: PlayerState, c: Creature, raw: number, how: Blow): void;
   /** A hit made critical by chance. */
@@ -67,8 +73,9 @@ export interface Effect {
 /** Hits a creature with the cast's amount (× `share`), then adds the ability's status if it still stands. */
 export function hitWith(kit: EffectKit, cast: Cast, c: Creature, share = 1): void {
   const { p, a, id } = cast;
-  const amount = kit.critical(p, cast.amount * share);
-  kit.strike(p, c, amount, { type: abilityDamageType(a), ability: id });
+  const plain = cast.amount * share;
+  const amount = kit.critical(p, plain);
+  kit.strike(p, c, amount, { type: abilityDamageType(a), ability: id, ...(amount > plain ? { crit: true } : {}) });
   // A finisher's own hits do not build the gauge it spends.
   if (!a.finisher) kit.gauges.landed(p);
   if (a.status && c.respawnAt === null) addStatus(kit, cast, c, amount);
@@ -79,7 +86,7 @@ export function addStatus(kit: EffectKit, cast: Cast, c: Creature, hit = cast.am
   const status = cast.a.status;
   if (!status) return false;
   const amount = DAMAGE_STATUSES.includes(status) ? Math.max(1, Math.round(hit * (cast.a.dotShare ?? DOT_SHARE))) : undefined;
-  return afflictCreature(kit.s, c, status, cast.a.duration, { by: cast.p.info.id, ...(amount ? { amount } : {}) });
+  return afflictCreature(kit.s, c, status, slowLength(cast.p, status, cast.a.duration), { by: cast.p.info.id, ...(amount ? { amount } : {}) });
 }
 
 /** The chosen creature in reach, else the nearest; sets it on the cast. */

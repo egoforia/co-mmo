@@ -1,4 +1,4 @@
-import { addItem, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
+import { addItem, applySkillLook, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
 
 /**
  * A change to a player's character made from outside the simulation: Favor
@@ -21,6 +21,8 @@ export type CharacterOp =
   | { op: 'creatorXp'; amount: number }
   /** A new people and/or Calling, by wish; fails, changing nothing, when it changes nothing. */
   | { op: 'calling'; race?: RaceId; calling?: CallingId }
+  /** A Calling Wish: a skill's new name and look; fails, changing nothing, when no Calling Wish is left. */
+  | { op: 'skillLook'; skill: string; name: string; description: string; wish: string }
   /** Drops items and abilities whose wish was rolled back. */
   | { op: 'forget' };
 
@@ -60,6 +62,8 @@ export function applyOp(c: Character, op: CharacterOp): OpResult {
       return { ok: true, levels: gainCreatorXp(c, op.amount) };
     case 'calling':
       return { ok: !changeCalling(c, op.race, op.calling) };
+    case 'skillLook':
+      return { ok: applySkillLook(c, op, op.wish) };
     case 'forget':
       forgetVanished(c);
       return { ok: true };

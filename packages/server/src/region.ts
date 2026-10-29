@@ -61,6 +61,7 @@ import { Chat } from './region/chat.ts';
 import { Combat } from './region/combat.ts';
 import { CombatLogger, combatLogger } from './region/combat-logger.ts';
 import { Fallen } from './region/fallen.ts';
+import { Paths } from './region/paths/index.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
 import { inspectEntity } from './region/inspect.ts';
 import { Kit } from './region/kit.ts';
@@ -211,6 +212,7 @@ export class Region {
   private readonly looting: Bodies;
   private readonly talk: Chat;
   private readonly fallen: Fallen;
+  private readonly paths: Paths;
   /** The weather over this land as players last heard it. */
   private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
@@ -238,9 +240,10 @@ export class Region {
     this.quests = new Quests(this.s, this.looting, () => this.sky().phase);
     this.gauges = new Gauges(this.s);
     this.fallen = new Fallen(this.s);
-    this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen);
+    this.paths = new Paths(this.s, this.gauges, () => this.combat);
+    this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen, this.paths);
     this.combat.logger = this.logger;
-    this.minds = new Minds(this.s, this.gauges, this.combat);
+    this.minds = new Minds(this.s, this.gauges, this.combat, this.paths);
     this.minds.logger = this.logger;
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
@@ -640,6 +643,9 @@ export class Region {
         break;
       case 'equip':
         this.kit.wear(p, message.item, message.slot);
+        break;
+      case 'choosePath':
+        this.quests.choosePath(p, message.npc, message.path);
         break;
       case 'spendPoint':
         this.kit.placePoint(p, message.stat);

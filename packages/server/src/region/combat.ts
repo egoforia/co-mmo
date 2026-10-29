@@ -31,6 +31,7 @@ import type { CombatLogger } from './combat-logger.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
 import type { Fallen } from './fallen.ts';
 import type { Gauges } from './gauges.ts';
+import { PATH_RULES, type Paths } from './paths/index.ts';
 import { SKILL_RULES, tendSanctuaries } from './skills/index.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
@@ -64,6 +65,7 @@ export class Combat implements EffectKit {
     private readonly quests: Quests,
     readonly gauges: Gauges,
     private readonly fallen: Fallen,
+    readonly paths: Paths,
   ) {}
 
   /** Raises a Fallen player where they lie (Peal of Waking). */
@@ -101,8 +103,9 @@ export class Combat implements EffectKit {
       const isStagger = Boolean(stagger && staggerRoll < stagger);
       if (isStagger) this.stagger(c);
       const variance = 0.9 + this.s.random() * 0.2;
-      const amountWithCrit = this.critical(p, power * variance);
-      this.strike(p, c, amountWithCrit, { type: family.damageType, ranged: family.ranged }, {
+      const plain = power * variance;
+      const hit = this.critical(p, plain);
+      this.strike(p, c, hit, { type: family.damageType, ranged: family.ranged, ...(hit > plain ? { crit: true } : {}) }, {
         actionKind: 'attack',
         actionId: 'attack',
         variance,
@@ -153,6 +156,11 @@ export class Combat implements EffectKit {
 
   /** A hit made critical by chance (Agility and Focus raise it) does half again as much. */
   critical(p: PlayerState, amount: number): number {
+    // A Duelist's next hit out of a Mirage is critical whatever the dice say.
+    if (this.paths.critical(p)) {
+      this.lastCrit = { chance: 1, rolled: 0, crit: true, multiplier: CRIT_MULTIPLIER };
+      return amount * CRIT_MULTIPLIER;
+    }
     const chance = critChance(p.character) + this.gauges.critBonus(p);
     const rolled = this.s.random();
     const isCrit = rolled < chance;
@@ -172,7 +180,8 @@ export class Combat implements EffectKit {
     const weakened = now < p.character.weakenedUntil ? 0.5 : 1;
     const mark = statusOf(target, 'marked', now);
     const marked = mark?.by && (mark.by === p.info.id || (this.s.hooks.party?.(p.info.id) ?? []).includes(mark.by)) ? 1 + MARK_BONUS : 1;
-    const rawBeforeAbsorb = raw * weakened * marked;
+    const pathBonus = this.paths.dealtTo(p, target, now);
+    const rawBeforeAbsorb = raw * weakened * marked * pathBonus;
     const afterAbsorb = absorb(target, rawBeforeAbsorb, now);
     const shieldAbsorb = rawBeforeAbsorb - afterAbsorb;
     const defence = how.pierce ? 0 : how.type === 'arcane' ? target.def.ward : target.def.armor;
@@ -247,7 +256,7 @@ export class Combat implements EffectKit {
       });
     }
     this.lastCrit = undefined;
-
+    this.paths.landed(p, target, amount, how, now);
     if (!defeated) {
       addThreat(target, p.info.id, threatAdded);
       return provoke(target, p.info.id, { creatures: this.s.creatures, now });
@@ -272,10 +281,14 @@ export class Combat implements EffectKit {
     const now = this.s.now();
     if (!canAct(p, now)) return this.s.notice(p, 'You are Stunned and cannot act.');
     if (a.effect === 'stance' && p.stance?.ability === id) return endStance(this, p);
+    // A Path skill used again while what it made is out ends it, like leaving a stance (the spirit hawk).
+    const ended = PATH_RULES[id]?.again?.(this, p, id);
+    if (ended) return this.s.notice(p, ended);
     if (now < (p.readyAt.get(id) ?? 0) - 1) return;
     if (ch.energy < a.energy) return this.s.notice(p, `Not enough Energy for ${a.name}.`);
     const effect = EFFECTS[a.effect];
-    const rule = SKILL_RULES[id];
+    // A Calling skill or Path skill may check and do more than its effect's data says (skills/, paths/).
+    const rule = SKILL_RULES[id] ?? PATH_RULES[id];
     const cast: Cast = { p, id, a, now, amount: 0, ...(targetId ? { targetId } : {}) };
     const refused = rule?.ready ? rule.ready(this, cast, effect) : effect.ready?.(this, cast);
     if (refused) return this.s.notice(p, refused);
@@ -289,7 +302,8 @@ export class Combat implements EffectKit {
     const spend = this.gauges.cast(p, a);
     const variance = 0.9 + this.s.random() * 0.2;
     cast.variance = variance;
-    cast.amount = abilityAmount(ch, a) * variance * spend.factor;
+    const scaledBase = this.paths.castAmount(p, a, abilityAmount(ch, a));
+    cast.amount = scaledBase * variance * spend.factor;
     if (spend.woven) cast.woven = true;
     if (spend.spent) cast.spent = spend.spent;
     this.activeCast = cast;
@@ -302,6 +316,7 @@ export class Combat implements EffectKit {
     this.gauges.spend(p, spend);
     // Riposte and Sidestep add Momentum (a taunt counts what it turned, effects/marks.ts).
     if (a.gain && a.effect !== 'taunt') this.gauges.add(p, a.gain);
+    this.paths.afterCast(p, a, spend);
     this.s.credit(id, p, 'use');
   }
 
@@ -312,6 +327,7 @@ export class Combat implements EffectKit {
     helpersAct(this, now);
     tendSanctuaries(this, now);
     holdStances(this);
+    this.paths.tick(now);
     this.gauges.tick(now);
   }
 

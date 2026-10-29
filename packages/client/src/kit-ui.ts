@@ -1,4 +1,5 @@
 import {
+  skillName,
   ABILITIES,
   HOTBAR_SIZE,
   ITEMS,
@@ -200,9 +201,11 @@ export class KitUi {
         if (!a) return `<button type="button" class="empty" data-open-book title="An empty key. Open your spellbook (K) to put a skill here."><kbd>${i + 1}</kbd></button>`;
         const wait = Math.max(0, (this.readyAt.get(id) ?? 0) - now) / 1000;
         const low = this.energy < a.energy;
+        // A Calling Wish may have renamed it (calling-wish.ts).
+        const name = skillName(this.character, id);
         return `<button type="button" data-ability="${escapeHtml(id)}" class="${low ? 'low' : ''}${wait ? ' resting' : ''}"
-          title="${escapeHtml(`${a.name}: ${a.description} Costs ${a.energy} Energy, rests ${a.cooldown} s.`)}">
-          <kbd>${i + 1}</kbd> ${escapeHtml(a.name)}${wait ? `<span class="wait">${Math.ceil(wait)}</span>` : ''}</button>`;
+          title="${escapeHtml(`${name}: ${a.description} Costs ${a.energy} Energy, rests ${a.cooldown} s.`)}">
+          <kbd>${i + 1}</kbd> ${escapeHtml(name)}${wait ? `<span class="wait">${Math.ceil(wait)}</span>` : ''}</button>`;
       })
       .join('');
   }

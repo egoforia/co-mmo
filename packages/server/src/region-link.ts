@@ -1,4 +1,4 @@
-import type { Character, ClientMessage, SkyConfig, NpcPlacement, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage } from '@co-mmo/shared';
+import type { Character, ClientMessage, SkyConfig, NpcPlacement, PhaseTimings, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage, SlowTickRecord } from '@co-mmo/shared';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { Carry, Cell, Connection, Departure, Ghosts, Leaving } from './region.ts';
 import type { Tile } from '@co-mmo/shared';
@@ -128,6 +128,14 @@ export interface ServerLoad {
   host: string;
   pid: number;
   startedAt: number;
+  /** Per-phase timing breakdown over recent ticks. */
+  phases?: PhaseTimings;
+  /** Slowest region and phase on this host, if any. */
+  slowestRegion?: {
+    id: string;
+    phase: string;
+    ms: number;
+  };
 }
 
 /** One hosted region's state in a beat: who is there and its creatures, for God's View. */
@@ -178,5 +186,7 @@ export type ToGateway =
   | { t: 'hook'; server: string; region: string; hook: 'regionChat'; m: ServerMessage }
   /** A cell's border, each tick, for the cells beside it. */
   | { t: 'edge'; server: string; region: string; ghosts: Ghosts }
+  /** A tick that exceeded the time budget, captured for investigation. */
+  | { t: 'slow-tick'; server: string; record: SlowTickRecord }
   | { t: 'bye'; server: string }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };

@@ -57,6 +57,7 @@ import { makeTownsperson } from './townsfolk.ts';
 import { findSpots } from './walkers.ts';
 import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
+import { TickProfiler } from './region/profiler.ts';
 import { Combat } from './region/combat.ts';
 import { Fallen } from './region/fallen.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
@@ -214,6 +215,8 @@ export class Region {
   private readonly ghosts = new Map<number, Ghosts>();
   /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
   strain = 0;
+  /** Measures the simulation phases of each tick. */
+  readonly profiler = new TickProfiler();
 
   private readonly hooks: RegionHooks;
   private readonly trades: TradeDesk;
@@ -517,6 +520,21 @@ export class Region {
     return who ? who.statuses.filter((x) => x.until > now) : [];
   }
 
+  /** Player, alive creature and active status counts, for slow-tick inspection. */
+  counts(): { players: number; creatures: number; activeStatuses: number } {
+    const now = this.now();
+    let statuses = 0;
+    for (const p of this.s.players.values()) {
+      if (p.statuses) for (const s of p.statuses) if (s.until > now) statuses++;
+    }
+    let creatures = 0;
+    for (const c of this.s.creatures) {
+      if (c.respawnAt === null) creatures++;
+      if (c.statuses) for (const s of c.statuses) if (s.until > now) statuses++;
+    }
+    return { players: this.s.players.size, creatures, activeStatuses: statuses };
+  }
+
   /** Moves a player, for tests and tools. */
   placePlayer(id: string, x: number, y: number, floor = 0): void {
     const p = this.s.players.get(id);
@@ -647,100 +665,124 @@ export class Region {
    * Returns players who walked off an open edge or fell, for the world to move.
    */
   tick(): Departure[] {
+    this.profiler.startTick();
+    const phase = <T>(name: string, fn: () => T): T => this.profiler.measure(name, fn);
     this.s.tickCount++;
     const now = this.now();
-    const departures: Departure[] = [];
-    for (const p of this.s.players.values()) {
-      const batch = p.inputs.splice(0, MAX_INPUTS_PER_TICK);
-      for (const input of batch) {
-        // The Fallen lie still where they fell; their steps are counted but not taken.
-        if (this.fallen.is(p)) {
+
+    const departures = phase('inputs', () => {
+      const list: Departure[] = [];
+      for (const p of this.s.players.values()) {
+        const batch = p.inputs.splice(0, MAX_INPUTS_PER_TICK);
+        for (const input of batch) {
+          // The Fallen lie still where they fell; their steps are counted but not taken.
+          if (this.fallen.is(p)) {
+            p.ack = input.seq;
+            continue;
+          }
+          // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
+          const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now));
+          if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
+          const len = Math.hypot(input.dx, input.dy);
+          if (len > 0) p.facing = { dx: input.dx / len, dy: input.dy / len };
+          const way = wayTaken(this.map, p.floor, next);
+          if (way) this.s.notice(p, climbWords(way, p.floor));
+          p.x = next.x;
+          p.y = next.y;
+          p.floor = next.floor;
           p.ack = input.seq;
+        }
+        const side = outsideSide(this.map, p.x, p.y);
+        const cell = this.cell;
+        if (side) list.push({ id: p.info.id, side });
+        else if (cell && cell.index > 0 && p.x < cell.x0 - CELL_MARGIN) list.push({ id: p.info.id, cell: cell.index - 1 });
+        else if (cell && cell.index < cell.count - 1 && p.x >= cell.x1 + CELL_MARGIN) list.push({ id: p.info.id, cell: cell.index + 1 });
+        const max = maxHp(p.character);
+        if (p.character.hp > 0 && p.character.hp < max && now - p.lastHurt >= REGEN_DELAY_MS) {
+          p.character.hp = Math.min(max, p.character.hp + regenPerSecond(p.character) * TICK_SECONDS);
+        }
+        const maxE = maxEnergy(p.character);
+        if (p.character.hp > 0 && p.character.energy < maxE) {
+          p.character.energy = Math.min(maxE, p.character.energy + energyPerSecond(p.character) * TICK_SECONDS);
+        }
+      }
+      return list;
+    });
+
+    let skyPhase = 0;
+    let weather: Weather = 'clear';
+    phase('sky', () => {
+      const sky = this.sky(now);
+      skyPhase = sky.phase;
+      weather = sky.weather;
+      this.weatherTurns(weather);
+    });
+
+    phase('combat', () => this.combat.tick(now));
+    phase('minds_think', () => this.minds.think(now, skyPhase, weather));
+
+    phase('bodies', () => {
+      this.s.bodies = this.s.bodies.filter((b) => now < b.until);
+      // A loot window closes when its body fades or its looter walks away.
+      for (const p of this.s.players.values()) if (p.looting && !this.looting.lootable(p, p.looting)) this.looting.closeLoot(p);
+    });
+
+    phase('minds_live', () => this.minds.live(skyPhase));
+
+    phase('fallen', () => {
+      // The Fallen lie where they fell until a friend raises them or they wake at the shrine.
+      for (const id of this.fallen.tick(now)) {
+        const i = departures.findIndex((d) => d.id === id);
+        if (i >= 0) departures.splice(i, 1);
+        departures.push({ id, died: true });
+      }
+    });
+
+    phase('snapshots', () => {
+      const all = [...this.s.players.values()];
+      const online = this.hooks.online();
+      for (const p of all) {
+        const every = snapshotEvery(p.crowd, this.strain);
+        if (every > 1 && (this.s.tickCount + p.phase) % every !== 0) {
+          this.s.flush(p);
           continue;
         }
-        // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
-        const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now));
-        if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
-        const len = Math.hypot(input.dx, input.dy);
-        if (len > 0) p.facing = { dx: input.dx / len, dy: input.dy / len };
-        const way = wayTaken(this.map, p.floor, next);
-        if (way) this.s.notice(p, climbWords(way, p.floor));
-        p.x = next.x;
-        p.y = next.y;
-        p.floor = next.floor;
-        p.ack = input.seq;
-      }
-      const side = outsideSide(this.map, p.x, p.y);
-      const cell = this.cell;
-      if (side) departures.push({ id: p.info.id, side });
-      else if (cell && cell.index > 0 && p.x < cell.x0 - CELL_MARGIN) departures.push({ id: p.info.id, cell: cell.index - 1 });
-      else if (cell && cell.index < cell.count - 1 && p.x >= cell.x1 + CELL_MARGIN) departures.push({ id: p.info.id, cell: cell.index + 1 });
-      const max = maxHp(p.character);
-      if (p.character.hp > 0 && p.character.hp < max && now - p.lastHurt >= REGEN_DELAY_MS) {
-        p.character.hp = Math.min(max, p.character.hp + regenPerSecond(p.character) * TICK_SECONDS);
-      }
-      const maxE = maxEnergy(p.character);
-      if (p.character.hp > 0 && p.character.energy < maxE) {
-        p.character.energy = Math.min(maxE, p.character.energy + energyPerSecond(p.character) * TICK_SECONDS);
-      }
-    }
-    const { phase, weather } = this.sky(now);
-    this.weatherTurns(weather);
-    this.combat.tick(now);
-    this.minds.think(now, phase, weather);
-    this.s.bodies = this.s.bodies.filter((b) => now < b.until);
-    // A loot window closes when its body fades or its looter walks away.
-    for (const p of this.s.players.values()) if (p.looting && !this.looting.lootable(p, p.looting)) this.looting.closeLoot(p);
-    this.minds.live(phase);
-    // The Fallen lie where they fell until a friend raises them or they wake at the shrine.
-    for (const id of this.fallen.tick(now)) {
-      const i = departures.findIndex((d) => d.id === id);
-      if (i >= 0) departures.splice(i, 1);
-      departures.push({ id, died: true });
-    }
-
-    const all = [...this.s.players.values()];
-    const online = this.hooks.online();
-    for (const p of all) {
-      const every = snapshotEvery(p.crowd, this.strain);
-      if (every > 1 && (this.s.tickCount + p.phase) % every !== 0) {
+        // What is on their own floor, or across open outdoor balconies/terraces.
+        const near = (o: { x: number; y: number; floor?: number }) => canSeeAcrossFloors(this.map, p, o) && Math.abs(o.x - p.x) <= VIEW_RADIUS && Math.abs(o.y - p.y) <= VIEW_RADIUS;
+        const players: EntityState[] = [];
+        for (const other of all) {
+          if (other === p || !near(other)) continue;
+          players.push(playerView(other, statusIds(other, now, other.character.weakenedUntil)));
+        }
+        const creatures: CreatureState[] = [];
+        for (const c of this.s.creatures) {
+          if (c.respawnAt !== null || !near(c)) continue;
+          creatures.push(creatureView(c, mood(c), statusIds(c, now)));
+        }
+        const bodies: BodyState[] = [];
+        for (const b of this.s.bodies) {
+          if (!near(b)) continue;
+          bodies.push(bodyView(b, b.loot.length > 0));
+        }
+        const npcs: NpcState[] = [];
+        for (const n of this.s.townsfolk) {
+          if (near(n)) npcs.push(npcView(n));
+        }
+        // What the cells beside this one show across the border.
+        for (const g of this.ghosts.values()) {
+          for (const e of g.players) if (e.id !== p.info.id && near(e)) players.push(e);
+          for (const e of g.creatures) if (near(e)) creatures.push(e);
+          for (const e of g.bodies) if (near(e)) bodies.push(e);
+          for (const e of g.npcs) if (near(e)) npcs.push(e);
+        }
+        p.crowd = players.length + creatures.length;
+        p.conn.send({
+          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now), players, creatures, bodies, npcs, online,
+        });
         this.s.flush(p);
-        continue;
       }
-      // What is on their own floor, or across open outdoor balconies/terraces.
-      const near = (o: { x: number; y: number; floor?: number }) => canSeeAcrossFloors(this.map, p, o) && Math.abs(o.x - p.x) <= VIEW_RADIUS && Math.abs(o.y - p.y) <= VIEW_RADIUS;
-      const players: EntityState[] = [];
-      for (const other of all) {
-        if (other === p || !near(other)) continue;
-        players.push(playerView(other, statusIds(other, now, other.character.weakenedUntil)));
-      }
-      const creatures: CreatureState[] = [];
-      for (const c of this.s.creatures) {
-        if (c.respawnAt !== null || !near(c)) continue;
-        creatures.push(creatureView(c, mood(c), statusIds(c, now)));
-      }
-      const bodies: BodyState[] = [];
-      for (const b of this.s.bodies) {
-        if (!near(b)) continue;
-        bodies.push(bodyView(b, b.loot.length > 0));
-      }
-      const npcs: NpcState[] = [];
-      for (const n of this.s.townsfolk) {
-        if (near(n)) npcs.push(npcView(n));
-      }
-      // What the cells beside this one show across the border.
-      for (const g of this.ghosts.values()) {
-        for (const e of g.players) if (e.id !== p.info.id && near(e)) players.push(e);
-        for (const e of g.creatures) if (near(e)) creatures.push(e);
-        for (const e of g.bodies) if (near(e)) bodies.push(e);
-        for (const e of g.npcs) if (near(e)) npcs.push(e);
-      }
-      p.crowd = players.length + creatures.length;
-      p.conn.send({
-        t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now), players, creatures, bodies, npcs, online,
-      });
-      this.s.flush(p);
-    }
+    });
+
     return departures;
   }
 

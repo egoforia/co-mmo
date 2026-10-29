@@ -312,7 +312,7 @@ function play(token: string): void {
       else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
       else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, Tab or a click chooses a target, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     fallen = new FallenUi(() => connection.send({ t: 'wake' }));
     party.start(myId);
@@ -340,7 +340,8 @@ function play(token: string): void {
     }
     rpg = new RpgUi(welcome.character, {
       attack: () => {
-        connection.send({ t: 'attack' });
+        const target = scene?.target;
+        connection.send({ t: 'attack', ...(target ? { target } : {}) });
         sound.play('swing');
         scene?.swing();
       },
@@ -357,7 +358,8 @@ function play(token: string): void {
     loot = new LootUi({ send: (m) => connection.send(m), typing: isTyping });
     kit = new KitUi(welcome.character, {
       ability: (ability) => {
-        connection.send({ t: 'ability', ability });
+        const target = scene?.target;
+        connection.send({ t: 'ability', ability, ...(target ? { target } : {}) });
         sound.play('spell');
       },
       craft: (recipe) => connection.send({ t: 'craft', recipe }),

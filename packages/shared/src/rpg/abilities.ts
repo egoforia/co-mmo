@@ -51,7 +51,7 @@ export interface AbilityDef {
   energy: number;
   /** Seconds before it can be used again. */
   cooldown: number;
-  /** How far it reaches, in tiles (not used by heal). */
+  /** How far it reaches, in tiles (a heal with none mends only you). */
   range: number;
   /** The amount is base + level + stat × factor (+ weapon damage for strikes and dashes). */
   base: number;
@@ -65,6 +65,8 @@ export interface AbilityDef {
   duration?: number;
   /** Physical or arcane, when not the effect's own kind (see abilityDamageType). */
   damageType?: DamageType;
+  /** Times the usual threat its hits cause (a Warden's Shield Bash: 3). */
+  threat?: number;
   /** The Wishweaver thread it belongs to. */
   thread?: Thread;
   /**

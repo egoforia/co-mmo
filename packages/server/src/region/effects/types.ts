@@ -1,4 +1,4 @@
-import { DOT_SHARE, DAMAGE_STATUSES, abilityDamageType, type AbilityDef, type DamageType } from '@co-mmo/shared';
+import { DOT_SHARE, DAMAGE_STATUSES, abilityDamageType, maxHp, type AbilityDef, type DamageType } from '@co-mmo/shared';
 import type { Gauges } from '../gauges.ts';
 import type { Creature, PlayerState, RegionState } from '../state.ts';
 import { afflictCreature } from '../statuses.ts';
@@ -40,7 +40,7 @@ export interface Cast {
   id: string;
   a: AbilityDef;
   now: number;
-  /** The creature the player chose, if any. */
+  /** The creature (or, for heals and buffs, the player) the player chose, if any. */
   targetId?: string;
   /** The creature an effect settled on before the cost was paid. */
   target?: Creature;
@@ -83,6 +83,21 @@ export function aimAt(kit: EffectKit, cast: Cast, range = cast.a.range): Creatur
   const { p, targetId } = cast;
   cast.target = kit.creatureInReach(p, range, targetId) ?? (targetId ? kit.creatureInReach(p, range) : undefined);
   return cast.target;
+}
+
+/**
+ * Who a heal or buff goes to: the chosen player when they stand within
+ * `range` on the same floor, else the most hurt of the party in range, else
+ * the player. A range of 0 means only the player.
+ */
+export function allyFor(kit: EffectKit, cast: Cast, range = cast.a.range): PlayerState {
+  const { p, targetId } = cast;
+  if (range <= 0) return p;
+  const chosen = targetId ? kit.s.players.get(targetId) : undefined;
+  if (chosen && chosen.character.hp > 0 && chosen.floor === p.floor && Math.hypot(chosen.x - p.x, chosen.y - p.y) <= range) return chosen;
+  const hurt = (m: PlayerState) => m.character.hp / maxHp(m.character);
+  // partyNear lists the player first, so they win a tie.
+  return kit.partyNear(p, range).reduce((best, m) => (hurt(m) < hurt(best) ? m : best));
 }
 
 /** A unit step from the player toward a point, or the way they face when it is where they stand. */

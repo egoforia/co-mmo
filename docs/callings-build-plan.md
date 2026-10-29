@@ -110,6 +110,11 @@ Steps 3, 4 and 8 can be built side by side once step 1 is in.
   Heals and buffs pick the most hurt ally when none is chosen.
 - Tests: the healer draws threat, a taunt forces the target, a creature
   switches only past 10% more threat.
+- Built: the rules are in `packages/server/src/threat.ts`. A Fallen player
+  leaves every threat list and the creature turns to the next. `AbilityDef`
+  has `threat` (a multiplier, e.g. Shield Bash's 3) for step 7 to fill.
+  A heal with range 0 mends only its user (wished heals stay that way); Mend
+  now reaches 5 steps. The chosen target shows as a gold name tag with ▸.
 
 ## 6. Signature gauges
 

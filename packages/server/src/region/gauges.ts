@@ -21,6 +21,7 @@ import {
   type GaugeId,
   type Thread,
 } from '@co-mmo/shared';
+import { healThreat } from '../threat.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
 /** An Echo a Bellkeeper's heal left on someone: Toll repeats a share of `amount`. */
@@ -179,6 +180,7 @@ export class Gauges {
       const healed = Math.min(maxHp(ch) - ch.hp, Math.round(echo.amount * ECHO_SHARE * poisoned));
       ch.hp += healed;
       ally.dirty = true;
+      healThreat(this.s.creatures, ally.info.id, p.info.id, healed);
       this.s.notice(ally, ally === p ? `${a.name} rings your Echo: +${healed} health.` : `${p.info.name}'s ${a.name} rings your Echo: +${healed} health.`);
     }
     g.echoes = g.echoes.filter((e) => !rung.some((r) => r.echo === e));

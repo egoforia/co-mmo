@@ -53,6 +53,7 @@ import {
   withStatuses,
 } from './world-scene/avatars.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
+import { Targeting } from './world-scene/targeting.ts';
 import {
   applyFloorView,
   drawNearChunks,
@@ -128,6 +129,8 @@ export class WorldScene extends Phaser.Scene {
   private nearAt = '';
   /** Kit houses' pictures, loaded as they are drawn on the server. */
   private houseArt!: HouseArt;
+  /** The creature or player we chose by clicking or Tab. */
+  private readonly targeting = new Targeting();
   /** Counts pictures loaded since we started, so the mini map knows when to put its floors together again. */
   private artLoaded = 0;
   /** Cached figure heights and ground-contact vertical origins. */
@@ -259,6 +262,7 @@ export class WorldScene extends Phaser.Scene {
     this.keys = kb.addKeys({
       up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', w: 'W', a: 'A', s: 'S', d: 'D',
     }, false) as typeof this.keys;
+    this.listenForTargets();
 
     const cam = this.cameras.main;
     cam.setZoom(cameraZoom());
@@ -400,6 +404,27 @@ export class WorldScene extends Phaser.Scene {
     const bodies = snapshot.bodies ?? [];
     syncAvatars(this, this.bodies, bodies, now, (b) => makeBody(this, this.metrics, b));
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
+    this.targeting.refresh((id) => this.creatures.get(id) ?? this.remotes.get(id));
+  }
+
+  /** The creature or player we chose, sent with attacks and abilities; the server checks the range. */
+  get target(): string | undefined {
+    return this.targeting.id ?? undefined;
+  }
+
+  /** Clicking a creature or player chooses them (clicking the ground lets go); Tab goes through the creatures near us. */
+  private listenForTargets(): void {
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const hit = Targeting.under(p.worldX, p.worldY, [this.creatures, this.remotes]);
+      this.targeting.choose(hit?.[0] ?? null, hit?.[1]);
+    });
+    const tab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey || this.options.typing()) return;
+      e.preventDefault();
+      this.targeting.cycle(this.creatures, this.me, this.floor);
+    };
+    window.addEventListener('keydown', tab);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener('keydown', tab));
   }
 
   update(_time: number, deltaMs: number): void {

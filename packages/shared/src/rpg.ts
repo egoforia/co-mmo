@@ -404,8 +404,8 @@ export const ABILITIES: Record<string, AbilityDef> = {
   },
   mend: {
     name: 'Mend',
-    description: 'A quiet prayer that closes wounds. Spirit makes it stronger.',
-    effect: 'heal', energy: 10, cooldown: 12, range: 0, base: 8, stat: 'spirit', factor: 3,
+    description: 'A quiet prayer that closes wounds, yours or a friend\'s up to five steps away. Spirit makes it stronger.',
+    effect: 'heal', energy: 10, cooldown: 12, range: 5, base: 8, stat: 'spirit', factor: 3,
   },
   firebolt: {
     name: 'Firebolt',

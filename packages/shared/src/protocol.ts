@@ -47,6 +47,8 @@ export interface PingMessage {
 /** Strike the nearest creature in reach. */
 export interface AttackMessage {
   t: 'attack';
+  /** The creature the player chose; the nearest in reach when missing or out of reach. */
+  target?: string;
 }
 
 /** While Fallen: stop waiting for a friend and wake at the shrine now. */
@@ -157,7 +159,7 @@ export interface SpendPointMessage {
   stat: keyof Stats;
 }
 
-/** Use a learned ability; bolts aim at `target` (a creature id) or the nearest creature. */
+/** Use a learned ability on `target`: a creature id for attacks, a player id for heals and buffs; the server falls back when it is out of range. */
 export interface AbilityMessage {
   t: 'ability';
   ability: string;
@@ -635,7 +637,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     return ['invite', 'accept', 'decline', 'leave'].includes(m.action as string) &&
       (m.name === undefined || (typeof m.name === 'string' && m.name.length <= 64));
   }
-  if (m.t === 'attack' || m.t === 'interact' || m.t === 'wake') return true;
+  if (m.t === 'attack') return m.target === undefined || isId(m.target);
+  if (m.t === 'interact' || m.t === 'wake') return true;
   if (m.t === 'ping') return Number.isSafeInteger(m.n);
   if (m.t === 'loot') {
     return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&

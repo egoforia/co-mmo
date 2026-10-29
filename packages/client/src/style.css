@@ -404,8 +404,9 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 .rarity-epic { color: #c08ef0; }
 .rarity-legendary { color: #feae34; }
 
+/* Keys 1 to 6 sit above the shortcut row, clear of the chat. */
 #abilities {
-  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; gap: 6px;
+  position: fixed; right: 12px; bottom: 52px; display: flex; gap: 6px; max-width: calc(100vw - 480px); flex-wrap: wrap; justify-content: flex-end;
 }
 #abilities button {
   position: relative; background: var(--panel); border: 1px solid var(--edge); color: var(--ink);
@@ -425,8 +426,9 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 .window .note { color: var(--muted); font-size: 12px; }
 .window .rows { list-style: none; margin: 0; padding: 0; }
 #spellbook .keys { display: flex; gap: 4px; margin-top: 4px; grid-column: 1 / -1; }
-#spellbook .key { min-width: 26px; }
-#spellbook .key.on { border-color: var(--accent); color: var(--accent); }
+#spellbook button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
+#spellbook button.key { min-width: 26px; background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
+#spellbook button.key.on { background: var(--accent); color: var(--bg); font-weight: 700; }
 #spellbook small { color: var(--muted); }
 .window .rows li {
   display: grid; grid-template-columns: 32px auto 1fr auto auto; gap: 4px 8px; align-items: center;

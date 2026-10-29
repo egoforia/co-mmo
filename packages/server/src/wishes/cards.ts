@@ -8,6 +8,8 @@ import {
   callingChangeProblem,
   validateCallingWish,
   validateLookWish,
+  validateSkillLookWish,
+  skillName,
   wishCost,
   type PlayerInfo,
   type Role,
@@ -111,9 +113,20 @@ export class WishCards {
     if (wish.tier === 'refused') return undefined;
     let definition: WishDefinition | undefined;
     let tier = wish.tier;
-    if (tier === 'minor' || tier === 'moderate') {
+    const raw = wish.definition as { kind?: unknown } | undefined;
+    // A Calling Wish answers to the wisher's own character; a refusal is said, never sent to the Stewards.
+    if (raw?.kind === 'skill' && tier !== 'major' && tier !== 'engine') {
+      const character = this.world.regionOf(playerId)?.character(playerId);
+      if (!character) return undefined;
       try {
-        const raw = wish.definition as { kind?: unknown } | undefined;
+        definition = validateSkillLookWish(raw, character);
+        tier = 'minor';
+      } catch (err) {
+        if (!(err instanceof WishError)) throw err;
+        return { note: err.message };
+      }
+    } else if (tier === 'minor' || tier === 'moderate') {
+      try {
         // A new look is painted as one of the player's people.
         const race = this.world.regionOf(playerId)?.character(playerId)?.race;
         definition = look && raw?.kind === 'player' ? validateLookWish({ ...raw, ...(race ? { race } : {}) })
@@ -143,6 +156,7 @@ export class WishCards {
         ? tier === 'engine' ? 'Set before the Owner for the next game update' : 'Set before the Stewards for review'
         : definition?.kind === 'player' ? 'Your look, painted for everyone to see'
         : definition?.kind === 'calling' ? 'You yourself: your attributes, and your look for a new people'
+        : definition?.kind === 'skill' ? 'Your own skill, with your Calling Wish: its name and look change, nothing else'
         : definition?.kind === 'item' ? 'In your bag'
           : definition?.kind === 'ability' ? 'A scroll in your bag'
             : definition?.kind === 'recipe' ? 'Known to everyone, in the crafting book (C)'
@@ -202,6 +216,15 @@ export class WishCards {
       const why = callingChangeProblem(character, def.race, def.calling);
       if (why) return this.news.say(player.id, why);
     }
+    if (def.kind === 'skill') {
+      try {
+        validateSkillLookWish(def, character);
+      } catch (err) {
+        if (!(err instanceof WishError)) throw err;
+        return this.news.say(player.id, err.message);
+      }
+    }
+    const reshaped = def.kind === 'skill' ? skillName(character, def.skill) : undefined;
     if (def.kind === 'loot' && !CREATURES[def.creature]) return this.news.say(player.id, 'That creature is no longer in the world. Choose another and ask again.');
     if (def.kind === 'region' && (!open.edge || !this.world.cellFree(open.edge.cell))) {
       return this.news.say(player.id, 'Another land has grown there since you asked. Find an open edge of the world and wish again.');
@@ -212,6 +235,7 @@ export class WishCards {
     this.granting.place(record);
     void this.world.change(player.id, { op: 'favor', amount: -open.card.cost });
     if (def.kind === 'item' || def.kind === 'ability') void this.world.change(player.id, { op: 'give', item: record.id, qty: 1 });
+    if (def.kind === 'skill') void this.world.change(player.id, { op: 'skillLook', skill: def.skill, name: def.name, description: def.description, wish: record.id });
     if (def.kind === 'calling') {
       void this.world.change(player.id, { op: 'calling', ...(def.race ? { race: def.race } : {}), ...(def.calling ? { calling: def.calling } : {}) });
       if (def.race && def.race !== race) this.granting.repaintLook(player, def.race);
@@ -222,6 +246,7 @@ export class WishCards {
       : def.kind === 'recipe' ? 'It is done. Anyone can make it now: press C to open the crafting book.'
         : def.kind === 'region' ? `It is done. A road now leads ${open.edge!.side} to ${def.name}.`
           : def.kind === 'player' ? 'It is done. Everyone will see your new look.'
+          : def.kind === 'skill' ? `It is done. Your ${reshaped} is ${def.name} now. Only its look and name have changed; it strikes as it always did.`
           : def.kind === 'calling' ? `It is done. ${def.calling ? 'Your free points are back for you to place: open your bag (I) to place them.' : 'Your new people will be painted soon.'}`
             : def.kind === 'loot' ? `It is done. Defeat a ${CREATURES[def.creature]?.name ?? 'creature'} and press E beside its body to see.`
             : 'It is done. Look around you.');

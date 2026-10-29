@@ -59,6 +59,7 @@ import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
 import { Combat } from './region/combat.ts';
 import { Fallen } from './region/fallen.ts';
+import { Paths } from './region/paths/index.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
 import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
@@ -208,6 +209,7 @@ export class Region {
   private readonly looting: Bodies;
   private readonly talk: Chat;
   private readonly fallen: Fallen;
+  private readonly paths: Paths;
   /** The weather over this land as players last heard it. */
   private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
@@ -234,8 +236,9 @@ export class Region {
     this.quests = new Quests(this.s, this.looting, () => this.sky().phase);
     this.gauges = new Gauges(this.s);
     this.fallen = new Fallen(this.s);
-    this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen);
-    this.minds = new Minds(this.s, this.gauges, this.combat);
+    this.paths = new Paths(this.s, this.gauges, () => this.combat);
+    this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen, this.paths);
+    this.minds = new Minds(this.s, this.gauges, this.combat, this.paths);
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
@@ -611,6 +614,9 @@ export class Region {
         break;
       case 'equip':
         this.kit.wear(p, message.item, message.slot);
+        break;
+      case 'choosePath':
+        this.quests.choosePath(p, message.npc, message.path);
         break;
       case 'spendPoint':
         this.kit.placePoint(p, message.stat);

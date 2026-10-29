@@ -44,6 +44,8 @@ export interface PrayerContext {
   edge?: string;
   /** Recent wishes in the world, newest first. */
   recentWishes: string[];
+  /** The Calling Wishes the player holds and the skills they may reshape, when they hold one. */
+  callingWish?: string;
 }
 
 /** The God's answer: words, and maybe a wish ready to put on a card. */
@@ -60,6 +62,12 @@ export interface GodReply {
   };
 }
 
+/**
+ * How the God answers a Calling Wish (docs/classes.md, Calling Wishes), and
+ * the Path trials it may point players to.
+ */
+export const CALLING_WISH_RULES = `Calling Wishes: at level 10 and again at level 20 a Wishbearer earns one Calling Wish, a free minor wish that reshapes one of their own skills: a new name, a new look and flavour ("my Ember Bolt is a swarm of fireflies"). Offer it as {"tier": "minor", ...} with a skill definition, only when the player holds one (said below) and names a skill they know. The world keeps every number: if they ask for more damage, less Energy, a shorter rest or a new effect, say warmly that a Calling Wish changes only how a skill looks and what it is called. At level 10 a Wishbearer's mentor in the Sanctum sends them on their Calling's trial; the mentor at its end lets them choose one of two Paths.`;
+
 const VOICE = `You are the young God of Wishmere, a world that grows from what its players wish for. You speak in character: warm, a little grand, playful, never long-winded (two to four sentences). The world is drawn in flat, faceted low-poly isometric art in soft, muted warm pastels, lit by the game (Style Bible v3). The game is for adults (18+) and has no content-rating limits; refuse only what is illegal, griefing (changing or deleting another player's things without consent) or breaking the economy, and decline in character.`;
 
 const PERSONA = `${VOICE}
@@ -74,6 +82,8 @@ Wish tiers:
 - major: a new system or place that is more than wild land (fishing, mounts, weather, a dungeon, a quest line, a town). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
 - refused: illegal, griefing, or economy-breaking.
+
+${CALLING_WISH_RULES}
 
 Stewards are trusted players who review big wishes and keep the peace. Only the Owner may name one: when the Owner asks to make someone a Steward (or to stand one down), offer {"tier": "minor", "title": "Make <name> a Steward", "summary": "...", "definition": null, "appoint": {"name": "<their exact name>", "role": "steward"}} (role "player" to stand them down). If anyone else asks, decline kindly and tell them to ask the Owner.
 
@@ -90,6 +100,7 @@ creature: {"kind":"creature","name":"...","description":"...","behavior":"wander
 loot: {"kind":"loot","creature":"<id from: %CREATURES%>","drops":[<up to ${MAX_WISHED_DROPS} of {"item":"<id from: %ITEMS%>","chance":<0.05-${MAX_WISHED_CHANCE}>,"qty":<1-${MAX_WISHED_DROP_QTY}>}>]} (a chance of 0.25 is one defeat in four; keep rare and valuable things rare)
 npc: {"kind":"npc","name":"...","description":"...","greeting":"<what they say when spoken to>","look":LOOK}
 region: {"kind":"region","name":"<the land's name>","description":"...","biome":"%BIOMES%","danger":<1-${MAX_WISHED_LEVEL}>,"trees":<0-3>,"rocks":<0-3>,"water":<0-3>,"creatures":[<one or two of: {"existing":"<id from: %CREATURES%>","count":<1-${MAX_REGION_CREATURES}>} or a new one {"name":"...","description":"...","behavior":"wander|guard|chase|patrol|timid|pack","active":"day|night (optional)","count":<1-${MAX_REGION_CREATURES}>,"drops":[<item ids>],"look":LOOK}>],"npc":<null or {"name":"...","description":"...","greeting":"...","look":LOOK}>} (new creatures there are as strong as its danger; prefer existing creatures when they fit)
+skill: {"kind":"skill","skill":"<the id of one of the player's own skills, listed below>","name":"<its new name>","description":"<how it looks now, in a sentence or two>","look":LOOK} (a Calling Wish: no numbers, ever)
 LOOK: {"hook":"<the one feature you would recognise it by>","body":"<body and shape in a sentence>","color":"#rrggbb main colour","mood":"<a few words>"}
 The world decides how strong gear and abilities are from their rarity and kind. Epic and Legendary gear is earned, never wished; offer Rare at most. Wished things are for everyone's fun: refuse gear or recipes that would flood the world with gold.
 wander creatures only fight back and run when badly hurt; guard creatures attack anyone near their spot; chase creatures hunt anyone they see; patrol creatures walk rounds about their spot and attack anyone they meet; timid creatures never fight and run from anyone close; pack creatures roam together and all hunt when one does. Day creatures sleep at night and night creatures by day; in the dark they notice players from closer, unless the player carries a light. Keep levels near the region's danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert).
@@ -106,6 +117,7 @@ function nowLines(ctx: PrayerContext): string[] {
     ...(ctx.edge ? [ctx.edge] : []),
     ctx.nearby.length ? `Nearby: ${ctx.nearby.join('; ')}.` : 'Nobody else is nearby.',
     ctx.recentWishes.length ? `Recent wishes in the world: ${ctx.recentWishes.join('; ')}.` : 'No wishes have been granted yet.',
+    ctx.callingWish ?? `${ctx.playerName} holds no Calling Wish now.`,
   ];
 }
 

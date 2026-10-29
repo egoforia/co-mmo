@@ -12,6 +12,8 @@ import { levelUpStats } from './rpg/callings.ts';
 import { HOTBAR_SIZE, settleSkills, slotSkill, upgradeHotbar } from './rpg/skills.ts';
 import { CALLING_SKILLS } from './skills/index.ts';
 import { addsWeapon, type AbilityDef } from './rpg/abilities.ts';
+import { settlePathSkills, type SkillLook } from './rpg/paths.ts';
+import { PATH_ABILITIES } from './skills/paths.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
 import { twoHanded } from './weapons.ts';
 
@@ -21,6 +23,8 @@ export * from './rpg/abilities.ts';
 export * from './rpg/statuses.ts';
 export * from './rpg/gauges.ts';
 export * from './rpg/skills.ts';
+export * from './rpg/paths.ts';
+export * from './skills/paths.ts';
 
 export interface Stats {
   /** Heavy weapon damage and a little health. */
@@ -90,8 +94,12 @@ export interface Character {
   race?: RaceId;
   /** Their Calling (docs/classes.md); without one, levels raise all five attributes. */
   calling?: CallingId;
-  /** The Path chosen after the Calling's level-10 trial. */
+  /** The Path chosen after the Calling's level-10 trial (rpg/paths.ts). */
   path?: string;
+  /** Calling Wishes spent (one comes at level 10 and one at 20). */
+  callingWishesUsed?: number;
+  /** Skills a Calling Wish gave a new look and name, by ability id; the numbers stay the world's. */
+  skillLooks?: Record<string, SkillLook>;
   /** Attribute points gained by levelling and not yet placed. */
   freePoints: number;
 }
@@ -228,6 +236,7 @@ export function gainXp(c: Character, amount: number): number {
   }
   if (levels) {
     settleSkills(c);
+    settlePathSkills(c);
     c.hp = maxHp(c);
     c.energy = maxEnergy(c);
     c.favor += levels * LEVEL_FAVOR;
@@ -415,6 +424,7 @@ export const ITEMS: Record<string, ItemDef> = {
  */
 export const ABILITIES: Record<string, AbilityDef> = {
   ...CALLING_SKILLS,
+  ...PATH_ABILITIES,
   'power-strike': {
     name: 'Power Strike',
     description: 'A heavy two-handed blow at the creature in reach. Might and your weapon make it hurt.',
@@ -629,7 +639,9 @@ export const CREATURES: Record<string, CreatureDef> = {
 
 export type QuestGoal =
   | { kind: 'talk'; npc: string }
-  | { kind: 'defeat'; creature: string; count: number };
+  | { kind: 'defeat'; creature: string; count: number }
+  /** Bring these things; they are handed over when the quest is. */
+  | { kind: 'gather'; items: InventorySlot[] };
 
 export interface QuestDef {
   title: string;
@@ -642,6 +654,11 @@ export interface QuestDef {
   thanks: string;
   goal: QuestGoal;
   requires?: string;
+  /** Offered only to this Calling (a trial), and from this level. */
+  calling?: CallingId;
+  minLevel?: number;
+  /** Who it is handed in to, when not the one who gave it (a trial ends with the Path mentor). */
+  turnIn?: string;
   reward: { xp: number; gold: number; items?: InventorySlot[]; ability?: string };
 }
 
@@ -691,11 +708,12 @@ export const NPC_GREETINGS: Record<string, string> = {
   'old-bramble': 'Mind the roots, and mind the mushrooms.',
   marina: 'Shells, salt and stories. Have a look at what I have, or show me what you found.',
   'cactus-elder': 'Slow down, traveller. The desert has time.',
-  'bramble-ursine-npc': 'May the earth cradle your steps, traveller.',
-  'tide-lutran-npc': 'The currents carry tales from distant shores.',
-  'zephyr-falcon-npc': 'Keep your eyes to the wind and your bow strung.',
-  'dune-scorpid-npc': 'Walk softly upon the sands, and fear no venom.',
-  'sylvan-cervid-npc': 'Listen closely: the mycelium whispers of ancient roots.',
+  // The five Sanctum mentors teach their Calling, and send its players on their trial at level 10 (trials.ts).
+  'bramble-ursine-npc': 'May the earth cradle your steps, traveller. I teach the Wardens. Come back at level 10, and I will send you to Mossgate.',
+  'tide-lutran-npc': 'The currents carry tales from distant shores. I teach the Wishweavers. At level 10, the tide will carry you to the Queen.',
+  'zephyr-falcon-npc': 'Keep your eyes to the wind and your bow strung. I teach the Rangers. At level 10, I will set you a watch of your own.',
+  'dune-scorpid-npc': 'Walk softly upon the sands, and fear no venom. I teach the Duelists. At level 10, the Mirage Palace will be waiting.',
+  'sylvan-cervid-npc': 'Listen closely: the mycelium whispers of ancient roots. I teach the Bellkeepers. At level 10, I will give you a bell to carry.',
 };
 
 /** The quest an NPC can offer this character now, if any. */
@@ -704,19 +722,30 @@ export function questOffered(c: Character, npc: string): string | undefined {
     ([id, q]) =>
       q.giver === npc &&
       !c.quests.some((s) => s.id === id) &&
+      (!q.calling || q.calling === c.calling) &&
+      c.level >= (q.minLevel ?? 0) &&
       (!q.requires || c.quests.some((s) => s.id === q.requires && s.done)),
   )?.[0];
 }
 
-export function questComplete(state: QuestState): boolean {
+/** Whether a defeat or gather quest is ready to hand in (gathering counts what is in the bag). */
+export function questComplete(state: QuestState, c?: Character): boolean {
   const q = QUESTS[state.id];
   if (!q || state.done) return false;
+  if (q.goal.kind === 'gather') return !!c && q.goal.items.every((i) => itemCount(c, i.item) >= i.qty);
   return q.goal.kind === 'defeat' && state.count >= q.goal.count;
+}
+
+/** Who a quest is handed in to. */
+export function questTurnIn(id: string): string {
+  const q = QUESTS[id]!;
+  return q.goal.kind === 'talk' ? q.goal.npc : q.turnIn ?? q.giver;
 }
 
 /** Gives a quest's rewards and marks it done. Returns levels gained. */
 export function completeQuest(c: Character, state: QuestState): number {
   const q = QUESTS[state.id]!;
+  if (q.goal.kind === 'gather') for (const i of q.goal.items) takeItem(c, i.item, i.qty);
   state.done = true;
   c.gold += q.reward.gold;
   c.favor += QUEST_FAVOR;
@@ -735,12 +764,16 @@ export function rewardText(id: string): string {
   return parts.join(', ');
 }
 
-export function questProgressText(state: QuestState): string {
+export function questProgressText(state: QuestState, c?: Character): string {
   const q = QUESTS[state.id];
   if (!q) return '';
   if (q.goal.kind === 'talk') return `Talk to ${npcName(q.goal.npc)}`;
+  if (q.goal.kind === 'gather') {
+    if (questComplete(state, c)) return `Return to ${npcName(questTurnIn(state.id))}`;
+    return `Bring ${q.goal.items.map((i) => `${ITEMS[i.item]?.name ?? i.item}: ${c ? Math.min(itemCount(c, i.item), i.qty) : 0}/${i.qty}`).join(', ')}`;
+  }
   const name = CREATURES[q.goal.creature]?.name ?? q.goal.creature;
-  if (state.count >= q.goal.count) return `Return to ${npcName(q.giver)}`;
+  if (state.count >= q.goal.count) return `Return to ${npcName(questTurnIn(state.id))}`;
   return `Defeat ${name}s: ${state.count}/${q.goal.count}`;
 }
 

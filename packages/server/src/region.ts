@@ -48,12 +48,15 @@ import {
   dayPhase,
   weatherAt,
   skyWords,
+  type ReplayHeader,
+  type PlayerStateSnapshot,
+  type CreatureStateSnapshot,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
 import { bodyView, creatureView, npcView, playerView } from './region-views.ts';
 import { makeCreature, mood, type Creature } from './creature-brain.ts';
-import { makeTownsperson } from './townsfolk.ts';
+import { makeTownsperson, type Townsperson } from './townsfolk.ts';
 import { findSpots } from './walkers.ts';
 import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
@@ -63,7 +66,7 @@ import { Gauges, type GaugeState } from './region/gauges.ts';
 import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
-import { RegionState, type PlayerState } from './region/state.ts';
+import { RegionState, type Body, type PlayerState } from './region/state.ts';
 import { afflictCreature, afflictPlayer, type StatusFrom } from './region/statuses.ts';
 
 export { findSpots, nearestTile } from './walkers.ts';
@@ -157,6 +160,12 @@ export type Departure =
   /** Walked over a border into the next cell of a split region. */
   | { id: string; cell: number; side?: undefined; died?: undefined };
 
+/** Interface for recording inputs and ticks on a Region. */
+export interface RegionRecorderInterface {
+  recordInput(playerId: string, message: ClientMessage): void;
+  recordTick(tick: number, clock: number, departures: Departure[]): void;
+}
+
 export interface Leaving {
   info: PlayerInfo;
   conn: Connection;
@@ -217,12 +226,13 @@ export class Region {
 
   private readonly hooks: RegionHooks;
   private readonly trades: TradeDesk;
+  private recorder?: RegionRecorderInterface;
 
   constructor(
     readonly def: RegionDef,
     hooks?: RegionHooks,
     private readonly now: () => number = Date.now,
-    private readonly random: () => number = Math.random,
+    private random: () => number = Math.random,
     /** Set when this is one cell of a split region. */
     readonly cell?: Cell,
   ) {
@@ -585,6 +595,7 @@ export class Region {
   handle(id: string, message: ClientMessage): void {
     const p = this.s.players.get(id);
     if (!p) return;
+    this.recorder?.recordInput(id, message);
     switch (message.t) {
       case 'input':
         if (message.seq <= p.ack) return;
@@ -741,6 +752,7 @@ export class Region {
       });
       this.s.flush(p);
     }
+    this.recorder?.recordTick(this.s.tickCount, now, departures);
     return departures;
   }
 
@@ -776,6 +788,221 @@ export class Region {
     if (!was || was === weather) return;
     this.broadcast({ t: 'sky', weather });
     for (const p of this.s.players.values()) this.s.notice(p, WEATHER_NEWS[weather]);
+  }
+
+  // --- Replay recording and headless restore -----------------------------------
+
+  setRandom(random: () => number): void {
+    this.random = random;
+    this.s.random = random;
+  }
+
+  setRecorder(recorder?: RegionRecorderInterface): void {
+    this.recorder = recorder;
+  }
+
+  getRecorder(): RegionRecorderInterface | undefined {
+    return this.recorder;
+  }
+
+  currentTime(): number {
+    return this.now();
+  }
+
+  currentTick(): number {
+    return this.s.tickCount;
+  }
+
+  allPlayers(): PlayerState[] {
+    return [...this.s.players.values()];
+  }
+
+  allCreatures(): Creature[] {
+    return this.s.creatures;
+  }
+
+  allBodies(): Body[] {
+    return this.s.bodies;
+  }
+
+  allTownsfolk(): Townsperson[] {
+    return this.s.townsfolk;
+  }
+
+  /** Captures an initial state snapshot of the region for replay traces. */
+  captureInitialState(): ReplayHeader['initialState'] {
+    const players: PlayerStateSnapshot[] = [];
+    for (const p of this.s.players.values()) {
+      players.push({
+        info: { ...p.info },
+        character: JSON.parse(JSON.stringify(p.character)),
+        x: p.x,
+        y: p.y,
+        floor: p.floor,
+        inputs: p.inputs.map((i) => ({ ...i })),
+        ack: p.ack,
+        lastAttack: p.lastAttack,
+        lastHurt: p.lastHurt,
+        readyAt: Object.fromEntries(p.readyAt.entries()),
+        statuses: JSON.parse(JSON.stringify(p.statuses)),
+        stunImmuneUntil: p.stunImmuneUntil,
+        facing: p.facing ? { ...p.facing } : undefined,
+        stance: p.stance ? { ...p.stance } : undefined,
+        gauge: p.gauge ? JSON.parse(JSON.stringify(p.gauge)) : undefined,
+        fallenUntil: p.fallenUntil,
+        phase: p.phase,
+      });
+    }
+
+    const creatures: CreatureStateSnapshot[] = this.s.creatures.map((c) => ({
+      id: c.id,
+      kind: c.kind,
+      def: c.def,
+      hp: c.hp,
+      x: c.x,
+      y: c.y,
+      floor: c.floor,
+      home: { ...c.home },
+      target: c.target ? { ...c.target } : null,
+      rest: c.rest,
+      aggro: c.aggro,
+      threat: { ...c.threat },
+      returning: c.returning,
+      lastAttack: c.lastAttack,
+      respawnAt: c.respawnAt,
+      fleeing: c.fleeing,
+      fleeUntil: c.fleeUntil,
+      asleep: c.asleep,
+      route: c.route ? c.route.map((s) => ({ ...s })) : undefined,
+      leg: c.leg,
+      statuses: JSON.parse(JSON.stringify(c.statuses)),
+      stunImmuneUntil: c.stunImmuneUntil,
+      pace: c.pace,
+    }));
+
+    const bodies: Body[] = this.s.bodies.map((b) => ({
+      id: b.id,
+      kind: b.kind,
+      def: b.def,
+      x: b.x,
+      y: b.y,
+      floor: b.floor,
+      until: b.until,
+      finders: [...b.finders],
+      loot: JSON.parse(JSON.stringify(b.loot)),
+    }));
+
+    const townsfolk: Townsperson[] = this.s.townsfolk.map((n) => ({
+      id: n.id,
+      name: n.name,
+      asset: n.asset,
+      x: n.x,
+      y: n.y,
+      floor: n.floor,
+      home: { ...n.home },
+      spots: JSON.parse(JSON.stringify(n.spots)),
+      part: n.part,
+      path: n.path.map((s) => ({ ...s })),
+      asleep: n.asleep,
+      target: n.target ? { ...n.target } : null,
+      rest: n.rest,
+    }));
+
+    return { players, creatures, bodies, townsfolk };
+  }
+
+  /** Restores the region's simulation state from a replay snapshot. */
+  restoreInitialState(initialState: ReplayHeader['initialState'], startTick = 0): void {
+    this.s.tickCount = startTick;
+    this.s.players.clear();
+    for (const ps of initialState.players) {
+      const readyAt = new Map<string, number>(Object.entries(ps.readyAt ?? {}));
+      const conn: Connection = {
+        send: () => {},
+        close: () => {},
+      };
+      const player: PlayerState = {
+        info: { ...ps.info },
+        conn,
+        character: JSON.parse(JSON.stringify(ps.character)),
+        x: ps.x,
+        y: ps.y,
+        floor: ps.floor ?? 0,
+        inputs: ps.inputs ? ps.inputs.map((i) => ({ ...i })) : [],
+        ack: ps.ack ?? 0,
+        chatTimes: [],
+        lastAttack: ps.lastAttack ?? 0,
+        lastHurt: ps.lastHurt ?? 0,
+        readyAt,
+        dirty: false,
+        crowd: 0,
+        phase: ps.phase ?? 0,
+        statuses: ps.statuses ? JSON.parse(JSON.stringify(ps.statuses)) : [],
+        stunImmuneUntil: ps.stunImmuneUntil,
+        facing: ps.facing ? { ...ps.facing } : undefined,
+        stance: ps.stance ? { ...ps.stance } : undefined,
+        gauge: ps.gauge ? JSON.parse(JSON.stringify(ps.gauge)) : undefined,
+        fallenUntil: ps.fallenUntil,
+      };
+      this.s.players.set(player.info.id, player);
+    }
+
+    this.s.creatures = initialState.creatures.map((cs) => {
+      const def = cs.def ?? CREATURES[cs.kind];
+      return {
+        id: cs.id,
+        kind: cs.kind,
+        def,
+        hp: cs.hp,
+        x: cs.x,
+        y: cs.y,
+        floor: cs.floor ?? 0,
+        home: { ...cs.home },
+        target: cs.target ? { ...cs.target } : null,
+        rest: cs.rest ?? 0,
+        aggro: cs.aggro,
+        threat: { ...cs.threat },
+        returning: cs.returning ?? false,
+        lastAttack: cs.lastAttack ?? 0,
+        respawnAt: cs.respawnAt,
+        fleeing: cs.fleeing,
+        fleeUntil: cs.fleeUntil ?? 0,
+        asleep: cs.asleep ?? false,
+        route: cs.route ? cs.route.map((s) => ({ ...s })) : undefined,
+        leg: cs.leg ?? 0,
+        statuses: cs.statuses ? JSON.parse(JSON.stringify(cs.statuses)) : [],
+        stunImmuneUntil: cs.stunImmuneUntil,
+        pace: cs.pace,
+      };
+    });
+
+    this.s.bodies = initialState.bodies.map((bs) => ({
+      id: bs.id,
+      kind: bs.kind,
+      def: bs.def ?? CREATURES[bs.kind],
+      x: bs.x,
+      y: bs.y,
+      floor: bs.floor ?? 0,
+      until: bs.until,
+      finders: [...bs.finders],
+      loot: JSON.parse(JSON.stringify(bs.loot)),
+    }));
+
+    this.s.townsfolk = initialState.townsfolk.map((ts) => ({
+      id: ts.id,
+      name: ts.name,
+      asset: ts.asset,
+      x: ts.x,
+      y: ts.y,
+      floor: ts.floor ?? 0,
+      home: { ...ts.home },
+      spots: JSON.parse(JSON.stringify(ts.spots)),
+      part: ts.part,
+      path: ts.path ? ts.path.map((s) => ({ ...s })) : [],
+      asleep: ts.asleep ?? false,
+      target: ts.target ? { ...ts.target } : null,
+      rest: ts.rest ?? 0,
+    }));
   }
 
 }

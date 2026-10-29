@@ -26,6 +26,8 @@ import { perfView } from './perf.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
+import { Region } from './region.ts';
+import { startRegionRecording, stopRegionRecording, getActiveRecording } from './debug/region-recorder.ts';
 
 export interface AdminContext {
   store: Store;
@@ -571,6 +573,8 @@ export async function handleAdmin(
       regionServers: Boolean(servers),
       store: store.label,
       now: Date.now(),
+      isDev: process.env.NODE_ENV !== 'production',
+      paused: world.isPaused(),
     }), true;
   }
 
@@ -629,6 +633,63 @@ export async function handleAdmin(
     } catch (err) {
       if (!(err instanceof WishError)) throw err;
       return json(res, 400, { error: 'invalid', message: err.message }), true;
+    }
+  }
+
+  // --- Replay recording (Owner-only) -------------------------------------------
+  if (route === 'replay/start' && method === 'POST') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const regionId = (typeof body?.regionId === 'string' && body.regionId ? body.regionId : undefined) ?? world.home.def.id;
+    const durationSeconds = typeof body?.durationSeconds === 'number' && body.durationSeconds > 0 ? body.durationSeconds : 30;
+    const reg = world.region(regionId);
+    if (!reg) return json(res, 404, { error: 'not_found', message: `Region "${regionId}" not found.` }), true;
+    const unit = reg instanceof Region ? reg : (reg.cells?.[0] instanceof Region ? reg.cells[0] : null);
+    if (!unit) return json(res, 400, { error: 'bad_request', message: 'Cannot record remote or cell-less region.' }), true;
+
+    startRegionRecording(unit, { durationSeconds });
+    return json(res, 200, { ok: true, regionId: unit.def.id, durationSeconds, recording: true }), true;
+  }
+
+  if (route === 'replay/stop' && method === 'POST') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const regionId = (typeof body?.regionId === 'string' && body.regionId ? body.regionId : undefined) ?? world.home.def.id;
+    const trace = stopRegionRecording(regionId);
+    if (!trace) return json(res, 404, { error: 'not_found', message: `No active recording for region "${regionId}".` }), true;
+    return json(res, 200, { ok: true, regionId, trace }), true;
+  }
+
+  if (route === 'replay/status' && method === 'GET') {
+    if (ownerOnly()) return true;
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const regionId = url.searchParams.get('regionId') ?? world.home.def.id;
+    const recorder = getActiveRecording(regionId);
+    return json(res, 200, { ok: true, regionId, ...(recorder ? recorder.status() : { active: false, ticksRecorded: 0, maxTicks: 0, secondsRemaining: 0 }) }), true;
+  }
+
+  // --- Dev-only pause and step controls (strictly non-production) --------------
+  if (route.startsWith('dev/')) {
+    if (process.env.NODE_ENV === 'production') {
+      return json(res, 403, { error: 'forbidden', message: 'Dev simulation controls are only available in development.' }), true;
+    }
+    if (ownerOnly()) return true;
+
+    const devAction = route.slice('dev/'.length);
+    const body = await ctx.readJson(req);
+    const regionId = typeof body?.regionId === 'string' && body.regionId ? body.regionId : undefined;
+
+    if (devAction === 'pause' && method === 'POST') {
+      world.pause(regionId);
+      return json(res, 200, { ok: true, paused: true, regionId: regionId ?? 'world' }), true;
+    }
+    if (devAction === 'step' && method === 'POST') {
+      world.step(regionId, rules);
+      return json(res, 200, { ok: true, stepped: true, regionId: regionId ?? 'world' }), true;
+    }
+    if (devAction === 'resume' && method === 'POST') {
+      world.resume(regionId);
+      return json(res, 200, { ok: true, paused: false, regionId: regionId ?? 'world' }), true;
     }
   }
 

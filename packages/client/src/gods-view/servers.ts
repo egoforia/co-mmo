@@ -35,7 +35,7 @@ const TICK_MS = TICK_SECONDS * 1000;
 const since = (ms: number) => (ms < 90_000 ? `${Math.max(0, Math.round(ms / 1000))} s` : ms < 5_400_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 3_600_000)} h`);
 
 async function servers(): Promise<string> {
-  const s = await api<{ hosts: Host[]; regionServers: boolean; store: string; now: number }>('servers');
+  const s = await api<{ hosts: Host[]; regionServers: boolean; store: string; now: number; isDev?: boolean; paused?: boolean }>('servers');
   const hostName = (h: Host) => (h.kind === 'gateway' ? 'Game server' : `Region server ${escapeHtml(h.id)}`);
   const card = (h: Host) => {
     const l = h.load;
@@ -49,6 +49,7 @@ async function servers(): Promise<string> {
     const moveTo = () => s.hosts.filter((o) => o.id !== h.id).map((o) => `<option value="${escapeHtml(o.id)}">${o.kind === 'gateway' ? 'Game server' : escapeHtml(o.id)}</option>`).join('');
     const rows = h.regions.map((r) => `<tr><td><b>${escapeHtml(r.name)}</b>${r.parts ? ` <small>part ${r.part} of ${r.parts}</small>` : ''}</td><td>${r.players} here, ${r.creatures} creature${r.creatures === 1 ? '' : 's'}</td><td class="actions">
         <button type="button" data-region-restart="${escapeHtml(r.region)}" data-players="${r.players}">Restart${r.parts ? ' all parts' : ''}</button>
+        <button type="button" data-replay-record="${escapeHtml(r.region)}">Record region replay (30 s)</button>
         ${s.hosts.length > 1 && !r.parts ? `<select data-move-for="${escapeHtml(r.id)}" aria-label="Move ${escapeHtml(r.name)} to">${moveTo()}</select><button type="button" data-region-move="${escapeHtml(r.id)}" data-players="${r.players}">Move</button>` : ''}
       </td></tr>`).join('');
     return `<div class="host">
@@ -71,7 +72,23 @@ async function servers(): Promise<string> {
       ? 'Regions run on the region servers below. If one stops, its regions come back to the game server within a few seconds, with their players.'
       : 'No region server is running, so every region runs in the game server. Start some with <code>npm run region-server</code> (or <code>REGION_SERVERS</code> with <code>npm run dev</code>).'
     : 'Every region runs in the game server. Set <code>REDIS_URL</code> to let region servers share the work (see docs/scale.md).';
+
+  const devControls = s.isDev
+    ? `<div class="host dev-controls" style="margin-bottom: 1rem;">
+        <h3>Development controls</h3>
+        <p class="note">Dev-only simulation controls for stepping and pausing ticks.</p>
+        <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;">
+          ${s.paused
+            ? `<b class="bad">Simulation paused</b>
+               <button type="button" data-dev-step>Step one tick</button>
+               <button type="button" data-dev-resume>Resume simulation</button>`
+            : `<button type="button" data-dev-pause>Pause simulation</button>`}
+        </div>
+      </div>`
+    : '';
+
   return `
+    ${devControls}
     <p>${how} The world is kept in ${escapeHtml(s.store)}.</p>
     ${s.hosts.map(card).join('')}
     <p class="note">Restarting a region sets it up again from scratch: creatures respawn, and players inside stay where they stood. Moving a region does the same on another server.
@@ -79,6 +96,71 @@ async function servers(): Promise<string> {
 }
 
 async function click(t: HTMLButtonElement): Promise<Handled> {
+  if (t.dataset.replayRecord) {
+    const region = t.dataset.replayRecord;
+    t.disabled = true;
+    let secondsLeft = 30;
+    t.textContent = `Recording in progress... ${secondsLeft} s remaining`;
+
+    try {
+      await api('replay/start', 'POST', { regionId: region, durationSeconds: 30 });
+    } catch (err) {
+      toast(`Failed to start recording: ${err instanceof Error ? err.message : String(err)}`);
+      t.disabled = false;
+      t.textContent = 'Record region replay (30 s)';
+      return true;
+    }
+
+    const interval = setInterval(async () => {
+      secondsLeft--;
+      if (secondsLeft > 0) {
+        t.textContent = `Recording in progress... ${secondsLeft} s remaining`;
+      } else {
+        clearInterval(interval);
+        try {
+          const res = await api<{ ok: boolean; trace: unknown }>('replay/stop', 'POST', { regionId: region });
+          if (res.trace) {
+            const blob = new Blob([JSON.stringify(res.trace, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${region}-${Date.now()}.replay.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast('Replay saved. Download will begin shortly.');
+          }
+        } catch (err) {
+          toast(`Failed to save replay: ${err instanceof Error ? err.message : String(err)}`);
+        } finally {
+          t.disabled = false;
+          t.textContent = 'Record region replay (30 s)';
+        }
+      }
+    }, 1000);
+    return true;
+  }
+
+  if (t.dataset.devPause !== undefined) {
+    t.disabled = true;
+    await api('dev/pause', 'POST', {});
+    toast('Simulation paused');
+    return true;
+  }
+
+  if (t.dataset.devStep !== undefined) {
+    t.disabled = true;
+    await api('dev/step', 'POST', {});
+    toast('Step one tick');
+    return true;
+  }
+
+  if (t.dataset.devResume !== undefined) {
+    t.disabled = true;
+    await api('dev/resume', 'POST', {});
+    toast('Resume simulation');
+    return true;
+  }
+
   if (!t.dataset.regionRestart && !t.dataset.regionMove) return false;
   const region = (t.dataset.regionRestart ?? t.dataset.regionMove)!;
   const to = t.dataset.regionMove ? document.querySelector<HTMLSelectElement>(`select[data-move-for="${CSS.escape(region)}"]`)?.value : undefined;

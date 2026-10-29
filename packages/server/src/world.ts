@@ -696,11 +696,59 @@ export class World {
 
   /** Ticks every region here, then moves players who walked off an open edge or fell. Regions on region servers tick there. */
   tick(strain = 0): void {
+    if (this.paused && !this.stepping) return;
     for (const region of this.regions.values()) {
+      if (this.pausedRegions.has(region.def.id) && !this.stepping) continue;
       for (const unit of region.cells ?? [region]) if (unit instanceof Region) unit.strain = strain;
       for (const departure of region.tick()) this.depart(region, departure);
     }
     if (++this.ticks % TICK_RATE === 0) this.checkCrowds();
+  }
+
+  // --- Dev pause and step controls --------------------------------------------
+
+  /** Whether the world simulation is paused in dev mode. */
+  paused = false;
+  private readonly pausedRegions = new Set<string>();
+  private stepping = false;
+
+  pause(regionId?: string): void {
+    if (regionId) this.pausedRegions.add(regionId);
+    else this.paused = true;
+  }
+
+  resume(regionId?: string): void {
+    if (regionId) {
+      this.pausedRegions.delete(regionId);
+    } else {
+      this.paused = false;
+      this.pausedRegions.clear();
+    }
+  }
+
+  isPaused(regionId?: string): boolean {
+    return regionId ? this.pausedRegions.has(regionId) || this.paused : this.paused;
+  }
+
+  step(regionId?: string, rules?: { tick: () => void }): void {
+    if (regionId) {
+      const region = this.regions.get(regionId);
+      if (region) {
+        for (const unit of region.cells ?? [region]) {
+          if (unit instanceof Region) {
+            for (const departure of unit.tick()) this.depart(region, departure);
+          }
+        }
+      }
+    } else {
+      this.stepping = true;
+      try {
+        this.tick();
+        rules?.tick();
+      } finally {
+        this.stepping = false;
+      }
+    }
   }
 
   /**

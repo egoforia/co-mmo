@@ -345,8 +345,10 @@ export function createApp(options: AppOptions): App {
   const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, heartbeatMs: options.heartbeatMs });
 
   const tickTimer = setInterval(() => meter.tick(() => {
-    world.tick(meter.strain);
-    rules.tick();
+    if (!world.isPaused()) {
+      world.tick(meter.strain);
+      rules.tick();
+    }
   }), TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 

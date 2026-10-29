@@ -32,10 +32,7 @@ Rules from the Owner, all binding:
   prompt and references in the Art tab and waits for approval; paid calls go
   through the paint queue and `budget.ts`.
 - Character looks have empty hands; weapons and off-hand items are separate
-  held items placed by the hand finder. Each weapon and off-hand family has
-  a plain picture of its own (`held-<family>`, `assets/held-anchors.ts`): a
-  wished weapon shows it in the hand until its own is painted, and sends it
-  as the first reference when it is (`heldArts` in shared `held.ts`).
+  held items placed by the hand finder.
 
 Where things are:
 

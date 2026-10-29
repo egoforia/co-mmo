@@ -1,5 +1,7 @@
 import {
+  skillName,
   ABILITIES,
+  HOTBAR_SIZE,
   ITEMS,
   RECIPES,
   SHOPS,
@@ -14,6 +16,7 @@ import {
   type TradeRequestMessage,
   type TradeView,
 } from '@co-mmo/shared';
+import { SpellbookUi } from './spellbook-ui.ts';
 import { escapeHtml } from './ui.ts';
 import { artSrc } from './wished.ts';
 
@@ -21,6 +24,8 @@ const $ = (id: string) => document.getElementById(id)!;
 
 export interface KitActions {
   ability(id: string): void;
+  /** Arrange keys 1 to 6: an ability id per key, or '' for none. */
+  hotbar(slots: string[]): void;
   craft(recipe: string): void;
   shop(action: 'buy' | 'sell' | 'learn', npc: string, id: string, qty?: number): void;
   trade(message: TradeActionMessage): void;
@@ -36,8 +41,9 @@ export function itemLabel(id: string): string {
 }
 
 /**
- * The Adventurer's kit on screen: the ability bar (keys 1 to 4), the
- * crafting book (C), shop and trainer windows, and trading with players.
+ * The Adventurer's kit on screen: the ability bar (keys 1 to 6, arranged in
+ * the spellbook, K), the crafting book (C), shop and trainer windows, and
+ * trading with players.
  */
 export class KitUi {
   private character: Character;
@@ -47,18 +53,23 @@ export class KitUi {
   private shopNpc: { id: string; name: string } | null = null;
   private trade: TradeView | null = null;
   private timer: number | undefined;
+  private readonly spellbook: SpellbookUi;
 
   constructor(character: Character, private readonly actions: KitActions) {
     this.character = character;
     this.energy = character.energy;
+    this.spellbook = new SpellbookUi(character, (slots) => actions.hotbar(slots));
     window.addEventListener('keydown', (e) => this.onKey(e));
     $('abilities').addEventListener('click', (e) => {
       const id = (e.target as HTMLElement).closest<HTMLElement>('[data-ability]')?.dataset.ability;
+      if ((e.target as HTMLElement).closest('[data-open-book]')) this.spellbook.toggle(true);
       (e.target as HTMLElement).closest('button')?.blur();
       if (id) this.use(id);
     });
     $('keys').addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest<HTMLElement>('[data-open]')?.dataset.open === 'crafting') this.toggleCrafting(true);
+      const open = (e.target as HTMLElement).closest<HTMLElement>('[data-open]')?.dataset.open;
+      if (open === 'crafting') this.toggleCrafting(true);
+      if (open === 'spellbook') this.spellbook.toggle(true);
     });
     $('crafting').addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -92,6 +103,7 @@ export class KitUi {
   setCharacter(character: Character): void {
     this.character = character;
     this.energy = character.energy;
+    this.spellbook.setCharacter(character);
     this.render();
   }
 
@@ -146,14 +158,17 @@ export class KitUi {
   private onKey(e: KeyboardEvent): void {
     if (this.actions.typing() || e.ctrlKey || e.metaKey || e.altKey) return;
     const n = Number(e.key);
-    if (n >= 1 && n <= 4) {
-      // The same order as the bar: abilities whose wish is switched off are left out.
-      const id = this.character.abilities.filter((a) => ABILITIES[a])[n - 1];
-      if (id) this.use(id);
+    if (n >= 1 && n <= HOTBAR_SIZE) {
+      // The key as the bar shows it: an ability whose wish is switched off does nothing.
+      const id = this.character.hotbar[n - 1];
+      if (id && ABILITIES[id]) this.use(id);
     } else if (e.key.toLowerCase() === 'c') {
       this.toggleCrafting();
+    } else if (e.key.toLowerCase() === 'k') {
+      this.spellbook.toggle();
     } else if (e.key === 'Escape') {
       $('crafting').hidden = true;
+      this.spellbook.toggle(false);
       this.closeShop();
     }
   }
@@ -176,18 +191,21 @@ export class KitUi {
   }
 
   private renderBar(): void {
-    const known = this.character.abilities.filter((id) => ABILITIES[id]).slice(0, 4);
+    const keys = Array.from({ length: HOTBAR_SIZE }, (_, i) => this.character.hotbar[i] ?? '');
     const bar = $('abilities');
-    bar.hidden = known.length === 0;
+    bar.hidden = !keys.some((id) => id && ABILITIES[id]);
     const now = performance.now();
-    bar.innerHTML = known
+    bar.innerHTML = keys
       .map((id, i) => {
-        const a = ABILITIES[id]!;
+        const a = id ? ABILITIES[id] : undefined;
+        if (!a) return `<button type="button" class="empty" data-open-book title="An empty key. Open your spellbook (K) to put a skill here."><kbd>${i + 1}</kbd></button>`;
         const wait = Math.max(0, (this.readyAt.get(id) ?? 0) - now) / 1000;
         const low = this.energy < a.energy;
+        // A Calling Wish may have renamed it (calling-wish.ts).
+        const name = skillName(this.character, id);
         return `<button type="button" data-ability="${escapeHtml(id)}" class="${low ? 'low' : ''}${wait ? ' resting' : ''}"
-          title="${escapeHtml(`${a.name}: ${a.description} Costs ${a.energy} Energy, rests ${a.cooldown} s.`)}">
-          <kbd>${i + 1}</kbd> ${escapeHtml(a.name)}${wait ? `<span class="wait">${Math.ceil(wait)}</span>` : ''}</button>`;
+          title="${escapeHtml(`${name}: ${a.description} Costs ${a.energy} Energy, rests ${a.cooldown} s.`)}">
+          <kbd>${i + 1}</kbd> ${escapeHtml(name)}${wait ? `<span class="wait">${Math.ceil(wait)}</span>` : ''}</button>`;
       })
       .join('');
   }

@@ -1,6 +1,7 @@
-import { ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, type Weather } from '@co-mmo/shared';
+import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, statusOf, type Weather } from '@co-mmo/shared';
 import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
+import type { Combat } from './combat.ts';
 import type { Gauges } from './gauges.ts';
 import type { Paths } from './paths/index.ts';
 import type { PlayerState, RegionState } from './state.ts';
@@ -14,6 +15,7 @@ export class Minds {
   constructor(
     private readonly s: RegionState,
     private readonly gauges: Gauges,
+    private readonly combat: Pick<Combat, 'strike'>,
     private readonly paths: Paths,
   ) {}
 
@@ -62,15 +64,32 @@ export class Minds {
   }
 
   private hurt(p: PlayerState, c: Creature, now: number): void {
-    // A creature's bite is physical: Agility may dodge it, a shield may block
-    // some of it, Armour (gear and Vigor) softens the rest, and a Shield takes it before health.
-    // Path skills change it too (paths/index.ts): nothing reaches the Hidden, a Knelled creature
-    // hits softer, Rooted Stand adds Armor, and the Unyielding keep their last point of health.
-    if (this.paths.hidden(p, now) || this.s.random() < dodgeChance(p.character)) return;
+    // A creature's bite is physical: Agility may dodge it (more while
+    // Evasive), a Poised Duelist turns it aside and strikes back, a shield
+    // may block some of it, Armour (gear and Vigor) softens the rest, being
+    // Guarded spares a share, and a Shield takes it before health. Path
+    // skills change it too (paths/index.ts): nothing reaches the Hidden, a
+    // Knelled creature hits softer, Rooted Stand adds Armor, and the
+    // Unyielding keep their last point of health.
+    if (this.paths.hidden(p, now) || this.s.random() < dodgeChance(p.character) + (statusOf(p, 'evasive', now) ? EVASIVE_DODGE : 0)) return;
+    const poised = statusOf(p, 'poised', now);
+    if (poised) {
+      p.statuses.splice(p.statuses.indexOf(poised), 1);
+      this.s.notice(p, `You turn the ${c.def.name}'s blow aside and strike back.`);
+      this.combat.strike(p, c, poised.amount ?? 0, { type: 'physical', ability: 'riposte' });
+      return;
+    }
     let raw = c.def.damage * (0.8 + this.s.random() * 0.4) * this.paths.dealtBy(c, now);
     const shield = blocking(p.character);
     if (shield.chance && this.s.random() < shield.chance) raw = Math.max(0, raw - shield.amount);
-    const amount = this.paths.floor(p, absorb(p, afterArmor(raw, armor(p.character) + this.paths.extraArmor(p)), now), now);
+    const guard = statusOf(p, 'guarded', now);
+    // Hold the Line: each blow on a Guarded ally steadies the Warden who guards them.
+    if (guard?.by && guard.by !== p.info.id) {
+      const warden = this.s.players.get(guard.by);
+      if (warden) this.gauges.add(warden, 1, 'resolve');
+    }
+    const armored = afterArmor(raw, armor(p.character) + this.paths.extraArmor(p)) * (1 - (guard?.amount ?? 0) / 100);
+    const amount = this.paths.floor(p, absorb(p, armored, now), now);
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
     // Steady Breath: now and then a hit leaves a Ranger's Focus be.

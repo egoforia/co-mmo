@@ -1,8 +1,9 @@
 import { maxHp, pathNumbers, statusOf } from '@co-mmo/shared';
+import { mend } from '../effects/support.ts';
 import { allyFor, hitWith } from '../effects/types.ts';
 import type { PlayerState } from '../state.ts';
 import { afflictPlayer } from '../statuses.ts';
-import { healPlayer, spotFor, type PathRule } from './types.ts';
+import { spotFor, type PathRule } from './types.ts';
 
 // The Bellkeeper's Paths (docs/classes/bellkeeper.md). Knell is data (its
 // status is read by combat and the creatures' minds); Overtone and Iron Psalm
@@ -37,15 +38,11 @@ export const BELLKEEPER_PATH_RULES: Record<string, PathRule> = {
       const radius = a.radius ?? 8;
       let healed = 0;
       for (const m of kit.partyNear(p, radius)) {
-        const got = healPlayer(kit, p, m, amount);
-        if (got) {
-          healed++;
-          kit.gauges.healed(p, m, got);
-        }
+        if (mend(kit, p, m, amount)) healed++;
       }
       let raised = 0;
       for (const m of fallenNear(kit.s.hooks.party?.(p.info.id) ?? [p.info.id], kit.s.players, p, radius)) {
-        if (kit.paths.fallen.raise(m, pathNumbers('great-bell-of-waking').raise ?? 0.5, p)) raised++;
+        if (kit.raise(m, pathNumbers('great-bell-of-waking').raise ?? 0.5, p)) raised++;
       }
       kit.s.notice(p, `${a.name} rings out: ${healed} healed${raised ? `, ${raised} raised` : ''}.`);
     },

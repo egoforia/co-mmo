@@ -27,8 +27,10 @@ import {
 import { provoke } from '../creature-brain.ts';
 import { addThreat } from '../threat.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
+import type { Fallen } from './fallen.ts';
 import type { Gauges } from './gauges.ts';
 import { PATH_RULES, type Paths } from './paths/index.ts';
+import { SKILL_RULES, tendSanctuaries } from './skills/index.ts';
 import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 import { tickStatuses } from './statuses.ts';
@@ -44,8 +46,14 @@ export class Combat implements EffectKit {
     readonly s: RegionState,
     private readonly quests: Quests,
     readonly gauges: Gauges,
+    private readonly fallen: Fallen,
     readonly paths: Paths,
   ) {}
+
+  /** Raises a Fallen player where they lie (Peal of Waking). */
+  raise(p: PlayerState, share: number, by: PlayerState): boolean {
+    return this.fallen.raise(p, share, by);
+  }
 
   /**
    * A plain attack (Space) on the chosen creature, or the nearest when it is
@@ -157,9 +165,10 @@ export class Combat implements EffectKit {
   }
 
   /**
-   * Uses an ability (keys 1 to 4): its effect (effects/) checks it can be
-   * used, then Energy and the rest are paid and it runs. Using a stance
-   * that is already held leaves it, at no cost.
+   * Uses an ability (keys 1 to 6): its effect (effects/), or the Calling
+   * skill's own rule (skills/), checks it can be used, then Energy and the
+   * rest are paid and it runs. Skills that add gauge pips add them after.
+   * Using a stance that is already held leaves it, at no cost.
    */
   useAbility(p: PlayerState, id: string, targetId?: string): void {
     const a = ABILITIES[id];
@@ -174,8 +183,8 @@ export class Combat implements EffectKit {
     if (now < (p.readyAt.get(id) ?? 0) - 1) return;
     if (ch.energy < a.energy) return this.s.notice(p, `Not enough Energy for ${a.name}.`);
     const effect = EFFECTS[a.effect];
-    // A Path skill may check and do more than its effect's data says (paths/).
-    const rule = PATH_RULES[id];
+    // A Calling skill or Path skill may check and do more than its effect's data says (skills/, paths/).
+    const rule = SKILL_RULES[id] ?? PATH_RULES[id];
     const cast: Cast = { p, id, a, now, amount: 0, ...(targetId ? { targetId } : {}) };
     const refused = rule?.ready ? rule.ready(this, cast, effect) : effect.ready?.(this, cast);
     if (refused) return this.s.notice(p, refused);
@@ -193,15 +202,18 @@ export class Combat implements EffectKit {
     if (rule?.run) rule.run(this, cast, effect);
     else effect.run(this, cast);
     this.gauges.spend(p, spend);
+    // Riposte and Sidestep add Momentum (a taunt counts what it turned, effects/marks.ts).
+    if (a.gain && a.effect !== 'taunt') this.gauges.add(p, a.gain);
     this.paths.afterCast(p, a, spend);
     this.s.credit(id, p, 'use');
   }
 
-  /** Each tick: statuses wear off and hurt, traps spring, helpers strike, stances drain Energy and gauges move. */
+  /** Each tick: statuses wear off and hurt, traps spring, helpers strike, Sanctuaries heal, stances drain Energy and gauges move. */
   tick(now: number): void {
     tickStatuses(this.s, now, (by, c, amount, id) => this.strike(by, c, amount, statusBlow(id)));
     springTraps(this, now);
     helpersAct(this, now);
+    tendSanctuaries(this, now);
     holdStances(this);
     this.paths.tick(now);
     this.gauges.tick(now);

@@ -1,6 +1,7 @@
 import { GAUGE_MAX, STATUSES, cleanse, knowsPassive, maxEnergy, pathNumbers } from '@co-mmo/shared';
+import { mend } from '../effects/support.ts';
 import { allyFor, hitWith } from '../effects/types.ts';
-import { healPlayer, spotFor, type PathRule } from './types.ts';
+import { spotFor, type PathRule } from './types.ts';
 
 // The Wishweaver's Paths (docs/classes/wishweaver.md). Overflow and Loose
 // Ends are passives in paths/index.ts. All their damage is arcane.
@@ -73,7 +74,7 @@ export const WISHWEAVER_PATH_RULES: Record<string, PathRule> = {
         return kit.s.notice(p, `${a.name}: ${c.def.name} takes back every blow it dealt.`);
       }
       const m = allyFor(kit, cast);
-      const healed = healPlayer(kit, p, m, kit.paths.recent({ victim: m.info.id }, seconds, now));
+      const healed = mend(kit, p, m, kit.paths.recent({ victim: m.info.id }, seconds, now));
       cleanse(m);
       kit.paths.rewritten(m.info.id);
       kit.s.notice(p, m === p ? `${a.name} undoes the last ${seconds} seconds: +${healed} health.` : `${a.name} undoes ${m.info.name}'s last ${seconds} seconds: +${healed} health.`);

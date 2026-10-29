@@ -75,7 +75,8 @@ region's tick: movement, snapshots, joining and leaving) with its systems in
 `region/`: `state.ts` (who and what is here, shared by all), `combat.ts`
 (attacks, rewards, and `useAbility`, which looks each ability's effect up in
 `effects/`: one small file per family of the effect kit, all given the same
-`EffectKit` moves), `statuses.ts` (putting statuses on players and creatures,
+`EffectKit` moves, and `skills/`: one file per Calling for what a core skill
+does beyond its effect's data, as a `SkillRule`), `statuses.ts` (putting statuses on players and creatures,
 Vigor shortening them, damage ticks), `gauges.ts` (each player's signature
 gauge: what fills, empties and spends it, sent as a `gauge` message),
 `fallen.ts`, `paths/` (Path skills at work: `PATH_RULES`, one file per
@@ -103,13 +104,15 @@ build them (creation, level-ups, free points, changing Calling),
 `AbilityDef`) and `statuses.ts` the status rules both sides use (lengths,
 stun immunity, pace, shields; `docs/attributes.md#statuses`), and
 `gauges.ts` the signature gauges' numbers (`docs/classes.md#signature-gauges`),
-and `paths.ts` choosing a Path after the trial, learning its skills at 10,
-15 and 20, and counting Calling Wishes. Path skills are data in shared
-`skills/<calling>-paths.ts` (actives join `ABILITIES`, passives take no
-key); the five trial quests and the Path choice a mentor offers are in
-shared `trials.ts`; the Calling Wish (a skill's new name and look, never its
-numbers) is checked in shared `calling-wish.ts` and granted through
-`wishes/cards.ts` like any instant wish. Shared
+and `skills.ts` learning core skills and the six-key hotbar the server
+checks, and `paths.ts` choosing a Path after the trial, learning its skills at
+10, 15 and 20, and counting Calling Wishes. Each Calling's skill data is one
+file in shared `skills/`, its Path skills in `skills/<calling>-paths.ts`
+(actives join `ABILITIES`, passives take no key); the five trial quests and
+the Path choice a mentor offers are in shared `trials.ts`; the Calling Wish
+(a skill's new name and look, never its numbers) is checked in shared
+`calling-wish.ts` and granted through `wishes/cards.ts` like any instant
+wish. Shared
 `wished-abilities.ts` holds the world-set numbers for each effect a wish may
 choose. Statuses travel in snapshots; until their icons are painted (build
 plan step 10) the browser shows them as words on name tags and the HUD. The

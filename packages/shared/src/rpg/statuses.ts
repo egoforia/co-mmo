@@ -15,6 +15,10 @@ export type StatusId =
   | 'marked'
   | 'taunted'
   | 'shielded'
+  | 'guarded'
+  | 'evasive'
+  | 'poised'
+  | 'hallowed'
   | 'hidden'
   | 'unyielding'
   | 'graced'
@@ -42,6 +46,10 @@ export const STATUSES: Record<StatusId, StatusInfo> = {
   marked: { name: 'Marked', harmful: true, seconds: 8, description: 'Takes more damage from whoever marked it and their party.' },
   taunted: { name: 'Taunted', harmful: true, seconds: 4, description: 'Must fight whoever taunted it.' },
   shielded: { name: 'Shielded', harmful: false, seconds: 6, description: 'A shield takes damage before health does.' },
+  guarded: { name: 'Guarded', harmful: false, seconds: 6, description: 'Takes less damage from every blow.' },
+  evasive: { name: 'Evasive', harmful: false, seconds: 2, description: 'Dodges blows far more often.' },
+  poised: { name: 'Poised', harmful: false, seconds: 1.5, description: 'Turns aside the next blow up close and strikes back.' },
+  hallowed: { name: 'Hallowed', harmful: false, seconds: 2, description: 'No new ailment can take hold.' },
   hidden: { name: 'Hidden', harmful: false, seconds: 2, description: 'Creatures cannot see or strike you.' },
   unyielding: { name: 'Unyielding', harmful: false, seconds: 8, description: 'Health cannot drop below 1.' },
   graced: { name: 'Graced', harmful: false, seconds: 10, description: 'Heals a little each second.' },
@@ -61,6 +69,10 @@ export const STUN_IMMUNE_MS = 6000;
 export const MARK_BONUS = 0.12;
 /** Heals on the Poisoned do this share of their amount. */
 export const POISONED_HEALING = 0.7;
+/** Extra dodge chance while Evasive (a Duelist's Sidestep). */
+export const EVASIVE_DODGE = 0.3;
+/** Statuses only Calling skills give: wished abilities never carry them. */
+export const SKILL_STATUSES: readonly StatusId[] = ['guarded', 'evasive', 'poised', 'hallowed'];
 /** Statuses only Path skills give (skills/*-paths.ts): wished abilities never carry them. */
 export const PATH_STATUSES: readonly StatusId[] = ['hidden', 'unyielding', 'graced', 'knelled'];
 
@@ -110,10 +122,11 @@ export function statusOf(a: Afflicted, id: StatusId, now: number): Status | unde
  * Puts a status on someone for `ms`. The same status again keeps the longer
  * time and the stronger amount rather than stacking. A stun does nothing
  * while they are immune, and leaves them immune for STUN_IMMUNE_MS after it
- * ends. Returns false when it did not take.
+ * ends. Nothing harmful takes while Hallowed. Returns false when it did not take.
  */
 export function afflict(a: Afflicted, id: StatusId, ms: number, now: number, from: { by?: string; amount?: number } = {}): boolean {
   if (ms <= 0) return false;
+  if (STATUSES[id].harmful && statusOf(a, 'hallowed', now)) return false;
   if (id === 'stunned') {
     if (now < (a.stunImmuneUntil ?? 0)) return false;
     a.stunImmuneUntil = now + ms + STUN_IMMUNE_MS;

@@ -13,6 +13,7 @@ export * from './buildings.ts';
 export * from './rpg.ts';
 export * from './races.ts';
 export * from './classes.ts';
+export * from './skills/index.ts';
 export * from './kit.ts';
 export * from './content.ts';
 export * from './loot.ts';

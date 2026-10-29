@@ -172,7 +172,7 @@ describe('the Calling Wish', () => {
     const c = await joined(ws, mara.token);
 
     const answer = await pray(c, 'My Piercing Arrow should be a swarm of fireflies');
-    expect(god.asked[0]!.system).toMatch(/Mara holds a Calling Wish\. Their skills: Piercing Arrow \(piercing-arrow\)/);
+    expect(god.asked[0]!.system).toMatch(/Mara holds a Calling Wish\. Their skills: .*Piercing Arrow \(piercing-arrow\)/);
     expect(answer.card).toMatchObject({ tier: 'minor', cost: 0 });
     await c.send({ t: 'wish', card: answer.card!.id, confirm: true });
     const done = await c.waitFor<GodMessage>((m) => m.t === 'god' && /^It is done/.test((m as GodMessage).say));

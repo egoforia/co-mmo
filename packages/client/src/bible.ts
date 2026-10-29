@@ -64,7 +64,7 @@ export const CHAPTERS: Chapter[] = [
         <li>In the dark, in fog and in sandstorms, most creatures only notice you up close. Carry a torch or anything else that glows and they see you coming.</li>
         <li>Health returns slowly once you are out of the fight. A <b>Tonic</b> restores it at once.</li>
         <li>If you fall, you wake at the Sanctum shrine with everything you carried, Weakened for a short while.</li>
-        <li><b>1</b> to <b>4</b> use your abilities. Each costs <b>Energy</b> (the blue bar), which comes back by itself, and rests a few seconds after use. Old Bramble teaches Power Strike when you help her, Sister Amala teaches Mend for a little gold, and the Cactus Elder sells the Scroll of Firebolt.</li>
+        <li><b>1</b> to <b>6</b> use your abilities; <b>K</b> opens your spellbook to choose which. Your Calling teaches you a skill at levels 1, 2, 4, 6 and 8. Each costs <b>Energy</b> (the blue bar), which comes back by itself, and rests a few seconds after use. Old Bramble teaches Power Strike when you help her, Sister Amala teaches Mend for a little gold, and the Cactus Elder sells the Scroll of Firebolt.</li>
       </ul>
       <h3>Your things</h3>
       <ul>

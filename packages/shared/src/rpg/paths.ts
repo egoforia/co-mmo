@@ -113,6 +113,7 @@ export function knowsPassive(c: Pick<Character, 'calling' | 'path' | 'level'>, i
 export function settlePathSkills(c: Character): string[] {
   const own = c.calling ? pathSkillsFor(c.calling, c.path, c.level) : [];
   c.abilities = c.abilities.filter((a) => !PATH_SKILLS[a] || own.includes(a));
+  c.hotbar = c.hotbar.map((a) => (a && c.abilities.includes(a) ? a : ''));
   return own.filter((id) => PATH_SKILLS[id]!.ability && ABILITIES[id] && learnAbility(c, id));
 }
 

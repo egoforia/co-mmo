@@ -167,6 +167,12 @@ export interface SpendPointMessage {
   stat: keyof Stats;
 }
 
+/** Arrange keys 1 to 6 from the spellbook: an ability id per key, or '' for none. The server checks each is known. */
+export interface HotbarMessage {
+  t: 'hotbar';
+  slots: string[];
+}
+
 /** Use a learned ability on `target`: a creature id for attacks, a player id for heals and buffs; the server falls back when it is out of range. */
 export interface AbilityMessage {
   t: 'ability';
@@ -217,6 +223,7 @@ export type ClientMessage =
   | ChooseCallingMessage
   | ChoosePathMessage
   | AbilityMessage
+  | HotbarMessage
   | CraftMessage
   | ShopMessage
   | TradeActionMessage
@@ -678,6 +685,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'chooseCalling') return isRace(m.race) && isCalling(m.calling);
   if (m.t === 'choosePath') return isId(m.npc) && isId(m.path);
   if (m.t === 'ability') return isId(m.ability) && (m.target === undefined || isId(m.target));
+  if (m.t === 'hotbar') return Array.isArray(m.slots) && m.slots.length <= 6 && m.slots.every((s) => s === '' || isId(s));
   if (m.t === 'craft') return isId(m.recipe);
   if (m.t === 'shop') {
     return ['buy', 'sell', 'learn'].includes(m.action as string) && isId(m.npc) && isId(m.id) &&

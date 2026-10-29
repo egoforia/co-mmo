@@ -1,5 +1,4 @@
-import { POISONED_HEALING, STATUSES, attackPower, knowsPassive, maxHp, pathNumbers, statusOf, type StatusId } from '@co-mmo/shared';
-import { healThreat } from '../../threat.ts';
+import { STATUSES, attackPower, knowsPassive, pathNumbers, type StatusId } from '@co-mmo/shared';
 import type { Cast, Effect, EffectKit } from '../effects/index.ts';
 import type { Creature, PlayerState } from '../state.ts';
 
@@ -34,23 +33,6 @@ export function spotFor(kit: EffectKit, cast: Cast): { x: number; y: number } {
 /** A creature's share of its health left. */
 export function healthShare(c: Creature): number {
   return c.def.hp > 0 ? c.hp / c.def.hp : 1;
-}
-
-/**
- * Heals a player for a Path skill: Poison weakens it, creatures fighting
- * them take threat from the healer, and what goes beyond full health may
- * become a shield (Overtone, through `overheal`). Returns what was healed.
- */
-export function healPlayer(kit: EffectKit, by: PlayerState, m: PlayerState, amount: number): number {
-  const ch = m.character;
-  if (ch.hp <= 0) return 0;
-  const wanted = Math.round(amount * (statusOf(m, 'poisoned', kit.s.now()) ? POISONED_HEALING : 1));
-  const healed = Math.max(0, Math.min(maxHp(ch) - ch.hp, wanted));
-  ch.hp += healed;
-  m.dirty = true;
-  if (healed) healThreat(kit.s.creatures, m.info.id, by.info.id, healed);
-  kit.paths.overheal(by, m, wanted - healed);
-  return healed;
 }
 
 /** The slows Loose Ends lengthens. */

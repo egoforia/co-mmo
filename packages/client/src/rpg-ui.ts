@@ -266,7 +266,10 @@ export class RpgUi {
     const stat = (name: string, k: keyof typeof s) => `<div><dt>${name}</dt><dd>${t[k]}${t[k] > s[k] ? `<small>+${t[k] - s[k]}</small>` : ''}${place(k)}</dd></div>`;
     const who = c.race && c.calling ? `${RACES[c.race].name} ${CALLINGS[c.calling].name}` : '';
     const calling = who ? `<p class="calling">${escapeHtml(who)}${free > 0 ? ` · <b>${free} free point${free > 1 ? 's' : ''}</b> to place with +` : ''}</p>` : '';
-    const abilities = c.abilities.filter((a) => ABILITIES[a]).map((a, i) => `<li><kbd>${i + 1}</kbd> <b>${escapeHtml(ABILITIES[a]!.name)}</b> ${escapeHtml(ABILITIES[a]!.description)}</li>`).join('');
+    const abilities = c.abilities.filter((a) => ABILITIES[a]).map((a) => {
+      const key = c.hotbar.indexOf(a) + 1;
+      return `<li>${key ? `<kbd>${key}</kbd> ` : ''}<b>${escapeHtml(ABILITIES[a]!.name)}</b> ${escapeHtml(ABILITIES[a]!.description)}</li>`;
+    }).join('');
     $('inventory').innerHTML = `
       <h2>Your bag <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <h3>Worn</h3>

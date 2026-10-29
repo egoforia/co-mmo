@@ -33,6 +33,8 @@ export const taunt: Effect = {
       if (!c.fleeing) c.aggro = cast.p.info.id;
       if (cast.a.status && cast.a.status !== 'taunted') addStatus(kit, cast, c);
     }
+    // A Warden's Challenge: a pip of Resolve for each creature turned, up to `gain`.
+    if (cast.a.gain) kit.gauges.add(cast.p, Math.min(cast.a.gain, list.length));
     kit.s.notice(cast.p, list.length === 1 ? `${list[0]!.def.name} turns on you.` : `${list.length} creatures turn on you.`);
   },
 };

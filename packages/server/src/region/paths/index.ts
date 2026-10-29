@@ -11,7 +11,6 @@ import {
   type StatusId,
 } from '@co-mmo/shared';
 import type { Blow, EffectKit } from '../effects/index.ts';
-import type { Fallen } from '../fallen.ts';
 import type { GaugeSpend, Gauges } from '../gauges.ts';
 import type { Creature, PlayerState, RegionState } from '../state.ts';
 import { afflictCreature, afflictPlayer } from '../statuses.ts';
@@ -22,7 +21,7 @@ import type { PathRule } from './types.ts';
 import { WARDEN_PATH_RULES } from './warden.ts';
 import { WISHWEAVER_PATH_RULES } from './wishweaver.ts';
 
-export { healPlayer, slowLength, type PathRule } from './types.ts';
+export { slowLength, type PathRule } from './types.ts';
 
 /** Path skills that do more than their effect's data says, by ability id (build plan step 7b). */
 export const PATH_RULES: Record<string, PathRule> = {
@@ -58,7 +57,6 @@ export class Paths {
   constructor(
     readonly s: RegionState,
     readonly gauges: Gauges,
-    readonly fallen: Fallen,
     /** The combat moves (Combat), for passives that strike back or heal from a tick. */
     private readonly kit: () => EffectKit,
   ) {}

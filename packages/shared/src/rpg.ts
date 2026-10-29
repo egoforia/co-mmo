@@ -9,7 +9,9 @@ import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
 import { levelUpStats } from './rpg/callings.ts';
-import { WEAPON_EFFECTS, type AbilityDef } from './rpg/abilities.ts';
+import { HOTBAR_SIZE, settleSkills, slotSkill, upgradeHotbar } from './rpg/skills.ts';
+import { CALLING_SKILLS } from './skills/index.ts';
+import { addsWeapon, type AbilityDef } from './rpg/abilities.ts';
 import { settlePathSkills, type SkillLook } from './rpg/paths.ts';
 import { PATH_ABILITIES } from './skills/paths.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
@@ -20,6 +22,7 @@ export * from './rpg/callings.ts';
 export * from './rpg/abilities.ts';
 export * from './rpg/statuses.ts';
 export * from './rpg/gauges.ts';
+export * from './rpg/skills.ts';
 export * from './rpg/paths.ts';
 export * from './skills/paths.ts';
 
@@ -80,8 +83,10 @@ export interface Character {
   energy: number;
   /** Item ids worn, by slot. Worn items are not in the bag. */
   equipment: Partial<Record<EquipSlot, string>>;
-  /** Abilities learned, in the order they fill the 1 to 4 keys. */
+  /** Abilities learned (the spellbook), in the order learned. */
   abilities: string[];
+  /** What sits on keys 1 to 6: an ability id from the spellbook, or '' for an empty key (rpg/skills.ts). */
+  hotbar: string[];
   /** Creator XP: earned when others use, fight or visit what this player wished for. */
   creatorXp: number;
   creatorLevel: number;
@@ -131,6 +136,7 @@ export function newCharacter(): Character {
     energy: 0,
     equipment: {},
     abilities: [],
+    hotbar: Array<string>(HOTBAR_SIZE).fill(''),
     creatorXp: 0,
     creatorLevel: 1,
     freePoints: 0,
@@ -151,6 +157,9 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   c.equipment = { ...c.equipment };
   c.abilities = [...c.abilities];
   forgetVanished(c);
+  upgradeHotbar(c, saved);
+  // Characters from before the skills step learn their Calling's core skills for their level now.
+  settleSkills(c);
   c.hp = Math.min(Math.max(1, c.hp), maxHp(c));
   c.energy = Math.min(Math.max(0, c.energy), maxEnergy(c));
   return c;
@@ -167,6 +176,7 @@ export function forgetVanished(c: Character): void {
     if (ITEMS[worn]) addItem(c, worn);
   }
   c.abilities = c.abilities.filter((a) => ABILITIES[a] || SLEEPING_ABILITIES.has(a));
+  if (c.hotbar) c.hotbar = c.hotbar.map((a) => (a && c.abilities.includes(a) ? a : ''));
 }
 
 /** Stats with what the character wears added. */
@@ -211,8 +221,9 @@ export function partyXp(xp: number, sharers: number): number {
 
 /**
  * Adds XP, levelling up as many times as it covers. Each level raises the
- * Calling's two attributes and gives a free point (levelUpStats), and
- * restores health. Returns the number of levels gained.
+ * Calling's two attributes and gives a free point (levelUpStats), teaches
+ * the core skill of that level (settleSkills), and restores health. Returns
+ * the number of levels gained.
  */
 export function gainXp(c: Character, amount: number): number {
   c.xp += amount;
@@ -224,6 +235,7 @@ export function gainXp(c: Character, amount: number): number {
     levelUpStats(c);
   }
   if (levels) {
+    settleSkills(c);
     settlePathSkills(c);
     c.hp = maxHp(c);
     c.energy = maxEnergy(c);
@@ -404,8 +416,14 @@ export const ITEMS: Record<string, ItemDef> = {
 
 // --- Abilities ---------------------------------------------------------------
 
-/** Abilities are learned from trainers, scrolls and quests (design doc, Characters and progression). */
+/**
+ * Every ability. Calling skills (skills/*.ts) are learned on levelling up;
+ * the rest are common techniques anyone can slot, learned from trainers,
+ * scrolls and quests (docs/classes.md, Common techniques). Wished abilities
+ * join them.
+ */
 export const ABILITIES: Record<string, AbilityDef> = {
+  ...CALLING_SKILLS,
   ...PATH_ABILITIES,
   'power-strike': {
     name: 'Power Strike',
@@ -427,13 +445,14 @@ export const ABILITIES: Record<string, AbilityDef> = {
 /** Damage or healing an ability does for this character, before randomness. */
 export function abilityAmount(c: Gear, a: AbilityDef): number {
   const amount = a.base + c.level + Math.round(totalStats(c)[a.stat] * a.factor);
-  return WEAPON_EFFECTS.includes(a.effect) ? amount + gearBonus(c, 'attack') : amount;
+  return addsWeapon(a) ? amount + gearBonus(c, 'attack') : amount;
 }
 
-/** Learns an ability; false when it is unknown or already known. */
+/** Learns an ability, putting it on the first free key; false when it is unknown or already known. */
 export function learnAbility(c: Character, id: string): boolean {
   if (!ABILITIES[id] || c.abilities.includes(id)) return false;
   c.abilities.push(id);
+  slotSkill(c, id);
   return true;
 }
 

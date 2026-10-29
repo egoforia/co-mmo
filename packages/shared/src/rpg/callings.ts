@@ -6,6 +6,7 @@ import { CALLINGS, CALLING_PRIMARY_START, CALLING_SECONDARY_START, type CallingI
 import { RACES, type RaceId } from '../races.ts';
 import { STARTING_STATS, newCharacter, type Character, type Stats } from '../rpg.ts';
 import { maxEnergy, maxHp } from './attributes.ts';
+import { settleSkills } from './skills.ts';
 import { settlePathSkills } from './paths.ts';
 
 const STAT_KEYS: readonly (keyof Stats)[] = ['might', 'agility', 'wit', 'spirit', 'vigor'];
@@ -46,6 +47,7 @@ export function startCharacter(race: RaceId, calling: CallingId): Character {
  * the rules for their level with every free point back to place. Used at
  * creation, when a character from before Callings chooses, and when a
  * Calling changes by wish (the Path is cleared: the new trial comes first).
+ * They learn the Calling's core skills for their level (settleSkills).
  */
 export function chooseCalling(c: Character, race: RaceId, calling: CallingId): void {
   c.race = race;
@@ -55,6 +57,7 @@ export function chooseCalling(c: Character, race: RaceId, calling: CallingId): v
   settlePathSkills(c);
   c.stats = callingStats(race, calling, c.level);
   c.freePoints = c.level - 1;
+  settleSkills(c);
   settle(c);
 }
 

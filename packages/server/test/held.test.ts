@@ -3,8 +3,10 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { BUILDING_STYLES, FACINGS, ITEMS, WALK_DIRECTIONS, addItem, buildingArtIds, equipmentBonus, heldBehind, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { BUILDING_STYLES, FACINGS, HELD_FAMILIES, ITEMS, familyArt, heldArts, WALK_DIRECTIONS, addItem, buildingArtIds, equipmentBonus, heldBehind, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import type { ChatModel, ChatRequest } from '../src/ai/chat.ts';
+import { ANCHORS } from '../src/assets/anchors.ts';
+import { artRequest } from '../src/assets/wish-art.ts';
 import { findPoint, mirroredHands, steadyHands, stripFrames } from '../src/assets/points.ts';
 import { HandFinder, type PointSource } from '../src/hand-finder.ts';
 import { pointSources } from '../src/hand-sources.ts';
@@ -169,6 +171,33 @@ describe('the hand finder', () => {
     expect(heldBehind('back-left', 'left')).toBe(false);
     // The four cardinal ways as before.
     expect(['front', 'back', 'left', 'right'].map((f) => heldBehind(f as 'front', 'right'))).toEqual([false, true, true, false]);
+  });
+
+  it("finds the grip on each family's own picture once it ships, and shows it until a weapon's own is painted", () => {
+    const shipped = { 'held-bow': { file: 'art/held-bow.png', kind: 'item' as const, width: 128, height: 128 } };
+    const store = { content: [] } as unknown as Parameters<typeof pointSources>[0];
+    const grips = pointSources(store, shipped, {}, async () => Buffer.alloc(0)).filter((x) => x.kind === 'grip').map((x) => x.id);
+    expect(grips).toContain('held-bow');
+    expect(grips).not.toContain('held-staff');
+    // A wished bow's own picture first, then the family's; a charm has no family.
+    const bow = itemFromWish('w1', { kind: 'item', name: 'Gull Bow', description: 'A bow of gull bone.', itemKind: 'weapon', look: { hook: 'a bone bow', body: 'bow', color: '#fff', mood: 'keen' } });
+    ITEMS['wished-test-bow'] = bow;
+    try {
+      expect(heldArts('wished-test-bow')).toEqual(['wished-w1', 'held-bow']);
+    } finally {
+      delete ITEMS['wished-test-bow'];
+    }
+    expect(heldArts('scarab-charm')).toEqual(['item-scarab-charm']);
+    expect(HELD_FAMILIES).toHaveLength(18);
+  });
+
+  it('sends a wished weapon\'s family picture first when it is painted', () => {
+    const look = { hook: 'a bone bow', body: 'bow', color: '#fff', mood: 'keen' };
+    expect(artRequest({ kind: 'item', name: 'Gull Bow', description: 'A bow of gull bone.', itemKind: 'weapon', look }, 'sanctum').references).toEqual(['held-bow', 'item-tonic']);
+    expect(artRequest({ kind: 'item', name: 'Oak Buckler', description: 'Small and round.', itemKind: 'offhand', look }, 'sanctum').references).toEqual(['held-shield', 'item-tonic']);
+    expect(artRequest({ kind: 'item', name: 'Lucky Bead', description: 'A bead.', itemKind: 'charm', look }, 'sanctum').references).toEqual(['item-tonic', 'item-goat-horn']);
+    // Every family's picture is an anchor, so it is painted like one.
+    for (const family of HELD_FAMILIES) expect(ANCHORS.some((a) => a.id === familyArt(family)), family).toBe(true);
   });
 
   it('stops while today\'s spending is paused', async () => {

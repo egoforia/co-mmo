@@ -530,7 +530,9 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   if (def.kind === 'item') return itemArt(def.itemKind);
   if (def.kind === 'ability' || def.kind === 'recipe' || def.kind === 'skill') return 'item-scroll';
   if (def.kind === 'npc') return 'sanctum-pilgrim';
-  if (def.kind === 'player' || def.kind === 'calling') return 'player-mara';
+  // A people's own body until the look is painted (races.ts).
+  if (def.kind === 'player') return def.race ? RACES[def.race].body : 'player-mara';
+  if (def.kind === 'calling') return 'player-mara';
   if (def.kind === 'region') return 'sanctum-shrine';
   if (def.kind === 'loot') return CREATURES[def.creature]?.art ?? 'woods-mushroom';
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';

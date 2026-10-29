@@ -84,7 +84,8 @@ snapshots and split-region borders send), `split-region.ts`, the
 `region-*`/`remote-region.ts` files for region servers, `parties.ts`,
 `trades.ts`, `character-ops.ts`. What lives in a region keeps its own module:
 `creature-brain.ts` (each creature's behaviour: wander, guard, chase,
-patrol, timid, pack; sleep out of its hours, fleeing), `townsfolk.ts`
+patrol, timid, pack; sleep out of its hours, fleeing) with `threat.ts`
+(who it fights: the threat list, the 10% rule, taunts), `townsfolk.ts`
 (people keeping their day) and `walkers.ts` (moving and path finding both
 use). The hour and weather come from shared `sky.ts`, worked out from the
 clock and the region alone, so every server, cell and browser agrees

@@ -1,4 +1,5 @@
 import { TICK_RATE, awake, collides, noticeScale, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
+import { addThreat, chooseTarget } from './threat.ts';
 import { canReach, goTo, moveAway, moveToward, wander, type Walker } from './walkers.ts';
 
 // How creatures behave, one tick at a time: sleeping out of their hours,
@@ -7,7 +8,8 @@ import { canReach, goTo, moveAway, moveToward, wander, type Walker } from './wal
 // roaming in packs. The region owns the creatures and the players; this
 // decides what each creature does next. Creatures only notice and strike
 // those on their own floor; one chasing someone follows them up or down
-// stairs (never a ladder) while they stay within its leash.
+// stairs (never a ladder) while they stay within its leash. Who it fights
+// is chosen by threat (threat.ts).
 
 type Spot = { x: number; y: number };
 
@@ -35,6 +37,8 @@ export interface Creature extends Walker {
   hp: number;
   /** The player it is fighting. */
   aggro: string | null;
+  /** Who has threatened it while it fights, by player id (threat.ts); cleared when it gives up. */
+  threat: Record<string, number>;
   returning: boolean;
   lastAttack: number;
   /** Epoch ms when a defeated creature comes back; null while alive. */
@@ -85,7 +89,7 @@ export interface Habitat {
 export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number, floor = 0): Creature {
   return {
     id, kind, def, x, y, floor, home: { x, y, floor }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
-    aggro: null, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0, statuses: [],
+    aggro: null, threat: {}, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0, statuses: [],
   };
 }
 
@@ -93,7 +97,7 @@ export function makeCreature(id: string, kind: string, def: CreatureDef, x: numb
 export function think(c: Creature, h: Habitat): void {
   if (c.respawnAt !== null) {
     if (h.now < c.respawnAt) return;
-    Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, fleeing: null, asleep: false });
+    Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, threat: {}, fleeing: null, asleep: false });
     return;
   }
   const up = awake(c.def.active, h.phase);
@@ -122,22 +126,42 @@ function speedOf(c: Creature): number {
   return c.def.speed * (c.pace ?? 1);
 }
 
-/** Someone struck it: it wakes and fights back, or runs if it is timid or badly hurt; a pack joins in. */
+/**
+ * Someone struck, healed against or taunted it: it wakes and fights, or runs
+ * if it is timid or badly hurt; a pack joins in. One already fighting keeps
+ * its target until threat (threat.ts) turns it.
+ */
 export function provoke(c: Creature, playerId: string, h: Pick<Habitat, 'creatures' | 'now'>): void {
   c.asleep = false;
+  addThreat(c, playerId, 0);
   if (shouldFlee(c)) return flee(c, playerId, h.now);
+  if (c.aggro) return;
   c.aggro = playerId;
   c.returning = false;
   c.target = null;
   if (c.def.behavior === 'pack') rally(c, playerId, h.creatures);
 }
 
-/** Stops fighting or running and walks home. */
+/** Stops fighting or running and walks home, forgetting who threatened it. */
 export function giveUp(c: Creature): void {
   c.aggro = null;
+  c.threat = {};
   c.fleeing = null;
   c.returning = true;
   c.target = null;
+}
+
+/**
+ * A player fell or left: off its list. It turns to whoever has the most
+ * threat of those still standing, or gives up when nobody is.
+ */
+export function forget(c: Creature, playerId: string, standing: (id: string) => boolean, now: number): void {
+  delete c.threat[playerId];
+  if (c.fleeing === playerId) return giveUp(c);
+  if (c.aggro !== playerId) return;
+  c.aggro = null;
+  c.aggro = chooseTarget(c, standing, now);
+  if (!c.aggro) giveUp(c);
 }
 
 /** What players see it doing, when it is more than going about its business. */
@@ -156,6 +180,7 @@ function notice(c: Creature, h: Habitat): void {
     if (!p.alive || p.floor !== c.floor || Math.hypot(p.x - from.x, p.y - from.y) > def.notice * noticeScale(def.active, h.phase, h.weather, p.lit)) continue;
     if (def.behavior === 'timid') return flee(c, p.id, h.now);
     c.aggro = p.id;
+    addThreat(c, p.id, 0);
     c.asleep = false;
     if (def.behavior === 'pack') rally(c, p.id, h.creatures);
     return;
@@ -163,8 +188,10 @@ function notice(c: Creature, h: Habitat): void {
 }
 
 function fight(c: Creature, h: Habitat): void {
+  const standing = (id: string) => h.players.some((x) => x.id === id && x.alive);
+  c.aggro = chooseTarget(c, standing, h.now);
   const p = h.players.find((x) => x.id === c.aggro);
-  if (!p || !p.alive || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH) return giveUp(c);
+  if (!p || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH) return giveUp(c);
   if (shouldFlee(c)) return flee(c, p.id, h.now);
   // Gone up or down: after them by the stairs, or give up if only a ladder leads there.
   if (p.floor !== c.floor) {
@@ -238,6 +265,7 @@ function rally(c: Creature, playerId: string, creatures: Creature[]): void {
     if (k === c || k.kind !== c.kind || k.floor !== c.floor || k.respawnAt !== null || k.aggro || k.fleeing) continue;
     if (Math.hypot(k.x - c.x, k.y - c.y) > PACK_RADIUS) continue;
     Object.assign(k, { aggro: playerId, asleep: false, returning: false, target: null });
+    addThreat(k, playerId, 0);
   }
 }
 

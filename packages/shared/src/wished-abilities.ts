@@ -4,7 +4,7 @@
 // Callings).
 
 import { ABILITY_EFFECTS, DAMAGE_EFFECTS, type AbilityDef, type AbilityEffect } from './rpg/abilities.ts';
-import { STATUSES, type StatusId } from './rpg/statuses.ts';
+import { SKILL_STATUSES, STATUSES, type StatusId } from './rpg/statuses.ts';
 
 type Numbers = Omit<AbilityDef, 'name' | 'description' | 'effect' | 'status'>;
 
@@ -36,7 +36,7 @@ export const WISHED_AILMENTS: readonly StatusId[] = (Object.keys(STATUSES) as St
 
 /** The status a wished ability may carry: an ailment on what it hits, a helpful one on you. */
 export function wishedStatus(effect: AbilityEffect, raw: unknown): StatusId | undefined {
-  const named = (Object.keys(STATUSES) as StatusId[]).find((s) => s === raw && s !== 'weakened' && s !== 'taunted');
+  const named = (Object.keys(STATUSES) as StatusId[]).find((s) => s === raw && s !== 'weakened' && s !== 'taunted' && !SKILL_STATUSES.includes(s));
   const helps = effect === 'buff' || effect === 'stance';
   const fits = named && (helps ? !STATUSES[named].harmful : STATUSES[named].harmful && (DAMAGE_EFFECTS.includes(effect) || effect === 'debuff'));
   return fits ? named : DEFAULT_STATUS[effect];

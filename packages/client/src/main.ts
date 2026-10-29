@@ -312,7 +312,7 @@ function play(token: string): void {
       else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
       else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 4 use abilities, Tab or a click chooses a target, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 6 use abilities (K arranges them), Tab or a click chooses a target, E talks or opens the loot of a fallen creature, I opens your bag, C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     fallen = new FallenUi(() => connection.send({ t: 'wake' }));
     party.start(myId);
@@ -362,6 +362,7 @@ function play(token: string): void {
         connection.send({ t: 'ability', ability, ...(target ? { target } : {}) });
         sound.play('spell');
       },
+      hotbar: (slots) => connection.send({ t: 'hotbar', slots }),
       craft: (recipe) => connection.send({ t: 'craft', recipe }),
       shop: (action, npc, id, qty) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}) }),
       trade: (m) => connection.send(m),

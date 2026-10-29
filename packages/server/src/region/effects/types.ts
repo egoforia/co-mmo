@@ -31,6 +31,8 @@ export interface EffectKit {
   creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined;
   /** Party members in the region within `radius` of the player and on their feet, the player first. */
   partyNear(p: PlayerState, radius: number): PlayerState[];
+  /** Raises a Fallen player where they lie with `share` of their health (region/fallen.ts); false if they were not Fallen. */
+  raise(p: PlayerState, share: number, by: PlayerState): boolean;
 }
 
 /** One use of an ability. */
@@ -74,7 +76,7 @@ export function hitWith(kit: EffectKit, cast: Cast, c: Creature, share = 1): voi
 export function addStatus(kit: EffectKit, cast: Cast, c: Creature, hit = cast.amount): boolean {
   const status = cast.a.status;
   if (!status) return false;
-  const amount = DAMAGE_STATUSES.includes(status) ? Math.max(1, Math.round(hit * DOT_SHARE)) : undefined;
+  const amount = DAMAGE_STATUSES.includes(status) ? Math.max(1, Math.round(hit * (cast.a.dotShare ?? DOT_SHARE))) : undefined;
   return afflictCreature(kit.s, c, status, cast.a.duration, { by: cast.p.info.id, ...(amount ? { amount } : {}) });
 }
 

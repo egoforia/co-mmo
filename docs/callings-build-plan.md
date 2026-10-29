@@ -146,6 +146,22 @@ Steps 3, 4 and 8 can be built side by side once step 1 is in.
   [classes.md](classes.md#common-techniques).
 - The Calling Wish at levels 10 and 20: a free Minor wish limited to a new
   look and name for one skill.
+- Built (7a, 2026-10-29): the 25 core skills, one data file per Calling in
+  `packages/shared/src/skills/`, with what data cannot say in
+  `packages/server/src/region/skills/` (a `SkillRule` per skill: Shield
+  Bash without a shield, Hold the Line, Woven spells, Chime, Sanctuary and
+  Peal of Waking). New statuses Guarded, Evasive, Poised and Hallowed (only
+  skills give them). `settleSkills` (shared `rpg/skills.ts`) teaches the core
+  skills for the level on level-up, at creation, on a Calling change and on
+  joining, and swaps the old Mend and Firebolt for the Bellkeeper's Mend
+  (`bell-mend`) and Ember Bolt; everyone else keeps them as common
+  techniques. `Character.hotbar` holds keys 1 to 6, set from the spellbook
+  (K) with a `hotbar` message the server checks. Left for 7b: Path skills
+  (fill `CALLINGS[...].paths[].skills` ids into `skills/*.ts`, learned when
+  `path` is set, in `settleSkills`), trials, mentors and the Calling Wish.
+  Not yet as the pages say: Slowed is one pace for every skill (35% slower,
+  not Earthbreak's 40% or Tide Lash's 30%), Volley lands at once rather
+  than in three waves, and Hawk Mark's "cannot hide" waits for hiding.
 
 ## 8. The Fallen and raising
 

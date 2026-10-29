@@ -14,7 +14,9 @@ import {
   unequip,
   TALK_RANGE,
   itemCount,
+  keyWords,
   maxHp,
+  setHotbar,
   npcName,
   takeItem,
   type EquipSlot,
@@ -53,6 +55,13 @@ export class Kit {
     p.dirty = true;
   }
 
+  /** Arranges keys 1 to 6 from the spellbook; the server checks every ability is known. */
+  arrangeHotbar(p: PlayerState, slots: string[]): void {
+    const why = setHotbar(p.character, slots);
+    if (why) return this.s.notice(p, why);
+    p.dirty = true;
+  }
+
   /** Makes a recipe from what is in the bag. */
   craft(p: PlayerState, recipe: string): void {
     const why = craft(p.character, recipe);
@@ -78,7 +87,7 @@ export class Kit {
       ? `You bought a ${name} for ${before - ch.gold} gold.`
       : m.action === 'sell'
         ? `You sold ${m.qty && m.qty > 1 ? `${m.qty} × ` : 'a '}${name} for ${ch.gold - before} gold.`
-        : `${npcName(m.npc)} teaches you ${name}. It is on the ${ch.abilities.length} key.`);
+        : `${npcName(m.npc)} teaches you ${name}. ${keyWords(ch, m.id)}`);
     p.dirty = true;
   }
 
@@ -91,7 +100,7 @@ export class Kit {
     if (def.teaches) {
       const why = readScroll(ch, item);
       if (why) return this.s.notice(p, why);
-      this.s.notice(p, `You read the scroll and learn ${ABILITIES[def.teaches]!.name}. It is on the ${ch.abilities.length} key.`);
+      this.s.notice(p, `You read the scroll and learn ${ABILITIES[def.teaches]!.name}. ${keyWords(ch, def.teaches)}`);
       this.s.credit(item, p, 'learn');
       p.dirty = true;
       return;

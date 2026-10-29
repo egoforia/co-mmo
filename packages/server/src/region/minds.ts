@@ -1,6 +1,7 @@
-import { ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, type Weather } from '@co-mmo/shared';
+import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, statusOf, type Weather } from '@co-mmo/shared';
 import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
+import type { Combat } from './combat.ts';
 import type { Gauges } from './gauges.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
@@ -13,6 +14,7 @@ export class Minds {
   constructor(
     private readonly s: RegionState,
     private readonly gauges: Gauges,
+    private readonly combat: Pick<Combat, 'strike'>,
   ) {}
 
   /**
@@ -59,13 +61,28 @@ export class Minds {
   }
 
   private hurt(p: PlayerState, c: Creature, now: number): void {
-    // A creature's bite is physical: Agility may dodge it, a shield may block
-    // some of it, Armour (gear and Vigor) softens the rest, and a Shield takes it before health.
-    if (this.s.random() < dodgeChance(p.character)) return;
+    // A creature's bite is physical: Agility may dodge it (more while
+    // Evasive), a Poised Duelist turns it aside and strikes back, a shield
+    // may block some of it, Armour (gear and Vigor) softens the rest, being
+    // Guarded spares a share, and a Shield takes it before health.
+    if (this.s.random() < dodgeChance(p.character) + (statusOf(p, 'evasive', now) ? EVASIVE_DODGE : 0)) return;
+    const poised = statusOf(p, 'poised', now);
+    if (poised) {
+      p.statuses.splice(p.statuses.indexOf(poised), 1);
+      this.s.notice(p, `You turn the ${c.def.name}'s blow aside and strike back.`);
+      this.combat.strike(p, c, poised.amount ?? 0, { type: 'physical', ability: 'riposte' });
+      return;
+    }
     let raw = c.def.damage * (0.8 + this.s.random() * 0.4);
     const shield = blocking(p.character);
     if (shield.chance && this.s.random() < shield.chance) raw = Math.max(0, raw - shield.amount);
-    const amount = absorb(p, afterArmor(raw, armor(p.character)), now);
+    const guard = statusOf(p, 'guarded', now);
+    // Hold the Line: each blow on a Guarded ally steadies the Warden who guards them.
+    if (guard?.by && guard.by !== p.info.id) {
+      const warden = this.s.players.get(guard.by);
+      if (warden) this.gauges.add(warden, 1, 'resolve');
+    }
+    const amount = absorb(p, afterArmor(raw, armor(p.character)) * (1 - (guard?.amount ?? 0) / 100), now);
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
     this.gauges.struck(p);

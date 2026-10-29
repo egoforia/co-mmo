@@ -1,8 +1,8 @@
 // The five Callings (docs/classes.md and docs/classes/*.md): a Wishbearer's
 // class. Each has two neighbouring attributes on the pentagon, three trained
 // weapon families, a signature gauge, five core skills and two Paths. Plain
-// data; skills are ability ids that arrive in ABILITIES with the skills step
-// (docs/callings-build-plan.md, step 7); weapon families are in weapons.ts.
+// data; skills are ability ids in ABILITIES (core skills in skills/*.ts;
+// Path skills arrive with build plan step 7b); weapon families are in weapons.ts.
 
 import type { GaugeId, Stats } from './rpg.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
@@ -121,7 +121,7 @@ export const CALLINGS: Record<CallingId, CallingDef> = {
     weapons: ['bell-mace', 'censer', 'hand-bell'], offhands: ['lantern', 'shield'],
     gauge: { id: 'echo', name: 'Echo' },
     core: [
-      { level: 1, skill: 'mend' }, { level: 2, skill: 'chime' }, { level: 4, skill: 'toll' },
+      { level: 1, skill: 'bell-mend' }, { level: 2, skill: 'chime' }, { level: 4, skill: 'toll' },
       { level: 6, skill: 'sanctuary' }, { level: 8, skill: 'peal-of-waking' },
     ],
     paths: [

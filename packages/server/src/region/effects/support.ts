@@ -1,7 +1,8 @@
 import { POISONED_HEALING, STATUSES, cleanse as clear, maxHp, statusOf } from '@co-mmo/shared';
 import { healThreat } from '../../threat.ts';
 import { afflictPlayer } from '../statuses.ts';
-import { allyFor, type Effect } from './types.ts';
+import type { PlayerState } from '../state.ts';
+import { allyFor, type Effect, type EffectKit } from './types.ts';
 
 /**
  * Mends the chosen ally in range, else the most hurt one, else you (only you
@@ -18,21 +19,31 @@ export const heal: Effect = {
     return m === cast.p ? 'You are already at full health.' : `${m.info.name} is already at full health.`;
   },
   run: (kit, cast) => {
-    const { p, a, amount, now } = cast;
+    const { p, a, amount } = cast;
     if (a.finisher) return void kit.gauges.toll(p, a);
     const m = allyFor(kit, cast);
-    const ch = m.character;
-    const poisoned = statusOf(m, 'poisoned', now) ? POISONED_HEALING : 1;
-    const healed = Math.min(maxHp(ch) - ch.hp, Math.round(amount * poisoned));
-    ch.hp += healed;
-    m.dirty = true;
-    healThreat(kit.s.creatures, m.info.id, p.info.id, healed);
-    kit.gauges.healed(p, m, healed);
+    const healed = mend(kit, p, m, amount);
     if (m === p) return kit.s.notice(p, `${a.name} restores ${healed} health.`);
     kit.s.notice(p, `${a.name} restores ${healed} health to ${m.info.name}.`);
     kit.s.notice(m, `${p.info.name}'s ${a.name} restores ${healed} of your health.`);
   },
 };
+
+/**
+ * Heals one player for `healer` (less while Poisoned, never past full): the
+ * creatures fighting them take threat from the healer, and a Bellkeeper's
+ * heal leaves an Echo. Returns the health restored.
+ */
+export function mend(kit: EffectKit, healer: PlayerState, m: PlayerState, amount: number): number {
+  const ch = m.character;
+  const poisoned = statusOf(m, 'poisoned', kit.s.now()) ? POISONED_HEALING : 1;
+  const healed = Math.max(0, Math.min(maxHp(ch) - ch.hp, Math.round(amount * poisoned)));
+  ch.hp += healed;
+  m.dirty = true;
+  healThreat(kit.s.creatures, m.info.id, healer.info.id, healed);
+  kit.gauges.healed(healer, m, healed);
+  return healed;
+}
 
 /** A shield on you that takes the ability's amount of damage before your health does. */
 export const shield: Effect = {
@@ -52,7 +63,8 @@ export const buff: Effect = {
   run: (kit, cast) => {
     const { p, a, amount } = cast;
     const status = a.status!;
-    const size = status === 'shielded' ? { amount: Math.round(amount) } : {};
+    // A Shield's size and a Riposte's answering blow are the ability's amount.
+    const size = status === 'shielded' || status === 'poised' ? { amount: Math.round(amount) } : {};
     const party = a.radius ? kit.partyNear(p, a.radius) : [allyFor(kit, cast)];
     for (const m of party) {
       afflictPlayer(kit.s, m, status, a.duration, { by: p.info.id, ...size });

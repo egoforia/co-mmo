@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { CREATURES, ITEMS, type GodMessage } from '@co-mmo/shared';
 import type { ChatModel } from '../src/ai/chat.ts';
-import { parseGodReply } from '../src/god.ts';
+import { OfflineGod, parseGodReply, systemPrompt, workshopPrompt } from '../src/god.ts';
 import { account, api, app, connect, joined, pray, start, stop, wish } from './helpers.ts';
 
 describe('the God', () => {
@@ -12,6 +12,25 @@ describe('the God', () => {
     expect(parseGodReply('Hello there')).toEqual({ say: 'Hello there' });
     const r = parseGodReply('```json\n{"say":"Yes","wish":{"tier":"minor","title":"Hat","summary":"A hat."}}\n```');
     expect(r.wish).toMatchObject({ tier: 'minor', title: 'Hat' });
+  });
+
+  it('knows the story of the world, the peoples and the Callings', () => {
+    const ctx = { playerName: 'Mara', role: 'player', favor: 10, regionName: 'The Sanctum', biome: 'sanctum', nearby: [], recentWishes: [] };
+    const prompt = systemPrompt(ctx);
+    for (const word of ['the Listener', 'the Hush', 'wishstuff', 'young God', 'Wishbearers', 'Ursine', 'Lutran', 'Warden', 'Duelist', 'Ranger', 'Wishweaver', 'Bellkeeper', 'Oakheart', 'Style Bible v3']) {
+      expect(prompt).toContain(word);
+    }
+    expect(prompt).not.toContain('Legend of Mana');
+    expect(prompt).toMatch(/new class is not a sixth Calling/);
+    // The Workshop keeps wished content to the story too.
+    const sub = { id: 'hat', name: 'Hat', blurb: 'A hat.', tier: 'minor', makes: 'content', fields: [] } as any;
+    expect(workshopPrompt(ctx, { category: { id: 'items', name: 'Items' } as any, sub, fields: {}, locked: [] } as any)).toContain('the Hush');
+  });
+
+  it('offline, sets a wish for a new class before the Stewards', () => {
+    const reply = new OfflineGod().answer('I wish for a new class of shadow knights') as any;
+    expect(reply.wish).toMatchObject({ tier: 'major', title: 'A new Calling', definition: null });
+    expect(reply.say).toMatch(/Stewards/);
   });
 
   it('chats without offering a wish when nothing is asked for', async () => {

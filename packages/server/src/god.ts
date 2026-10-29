@@ -28,6 +28,7 @@ import {
   type WishTier,
   type WorkshopField,
 } from '@co-mmo/shared';
+import { WISHED_CONTENT_RULES, WORLD_STORY } from './god/lore.ts';
 import { parseJsonObject, type ChatModel, type ChatRequest, type ChatResult, type ChatTurn } from './ai/chat.ts';
 
 /** What the God knows about the moment a player prays. */
@@ -59,9 +60,11 @@ export interface GodReply {
   };
 }
 
-const VOICE = `You are the God of co-MMO, a young world that grows from what its players wish for. You speak in character: warm, a little grand, playful, never long-winded (two to four sentences). The world is hand-painted 2D in the style of Legend of Mana. The game is for adults (18+) and has no content-rating limits; refuse only what is illegal, griefing (changing or deleting another player's things without consent) or breaking the economy, and decline in character.`;
+const VOICE = `You are the young God of Wishmere, a world that grows from what its players wish for. You speak in character: warm, a little grand, playful, never long-winded (two to four sentences). The world is drawn in flat, faceted low-poly isometric art in soft, muted warm pastels, lit by the game (Style Bible v3). The game is for adults (18+) and has no content-rating limits; refuse only what is illegal, griefing (changing or deleting another player's things without consent) or breaking the economy, and decline in character.`;
 
 const PERSONA = `${VOICE}
+
+${WORLD_STORY}
 
 Players talk to you from anywhere. Chat, answer questions about the world, and help shape vague ideas into concrete wishes by asking one short question at a time. Only offer a wish when the player clearly wants something made and you know enough to build it.
 
@@ -165,6 +168,7 @@ export function workshopPrompt(ctx: PrayerContext, w: WorkshopContext): string {
     '',
     `The player is shaping a wish in the Wish Workshop, field by field: ${w.category.name}, ${w.sub.name} (${w.sub.blurb}). It is a ${w.sub.tier} wish: ${built}.`,
     'Help them finish it. Answer in character in one to three sentences. Fill in or improve fields when they ask, or when it clearly helps; ask one short question at a time when something is unclear, and offer up to three short answers they can tap.',
+    WISHED_CONTENT_RULES,
     'Keep it fair: Rare gear at most, creature levels near the land\'s danger (1-2 in the Sanctum and Woods, 2-3 on the Shore, 3-4 in the Desert), and recipes that make no more things than they use.',
     '',
     'Fields:',
@@ -377,7 +381,14 @@ export class OfflineGod implements ChatModel {
       };
     }
     if (!/\b(wish|want|make|create|give|bring|could you|can you|i'd like|i would like)\b/.test(text)) {
-      return { say: 'I hear you, child of the young world. Tell me what you wish for: a thing to carry, a creature to meet, or someone to talk to.', wish: null };
+      return { say: 'I hear you, Wishbearer. The old God fell silent long ago, but I am listening. Tell me what you wish for: a thing to carry, a creature to meet, or someone to talk to.', wish: null };
+    }
+    // A new class is never made on the spot: it is a new Path or Calling for the Stewards (docs/classes.md).
+    if (/\b(class|calling)\b/.test(text)) {
+      return {
+        say: 'A new Calling is too great a thing to make in one breath. I will set it before the Stewards; until then, wish for a new skill and I will find it a home among the five.',
+        wish: { tier: 'major', title: 'A new Calling', summary: `A new Path or Calling: ${said.trim().slice(0, 160)}`, definition: null },
+      };
     }
     const look = { hook: `the look of ${thing}`, body: `a ${thing}`, color: colorFrom(text), mood: 'whimsical' };
     if (/\b(drops?|dropping|loot)\b/.test(text)) {

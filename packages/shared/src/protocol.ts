@@ -12,6 +12,7 @@ import { EQUIP_SLOTS, isStat, type Character, type EquipSlot, type InventorySlot
 import type { DamageType } from './weapons.ts';
 import type { StatusId, StatusView } from './rpg/statuses.ts';
 import type { GaugeId } from './rpg/gauges.ts';
+import type { PathChoice } from './trials.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -153,6 +154,13 @@ export interface ChooseCallingMessage {
   calling: CallingId;
 }
 
+/** Choose (or change to) a Path at the Calling's Path mentor `npc`, after the trial (rpg/paths.ts). */
+export interface ChoosePathMessage {
+  t: 'choosePath';
+  npc: string;
+  path: string;
+}
+
 /** Place one free attribute point (docs/attributes.md, How attributes grow). */
 export interface SpendPointMessage {
   t: 'spendPoint';
@@ -213,6 +221,7 @@ export type ClientMessage =
   | EquipMessage
   | SpendPointMessage
   | ChooseCallingMessage
+  | ChoosePathMessage
   | AbilityMessage
   | HotbarMessage
   | CraftMessage
@@ -515,6 +524,8 @@ export interface DialogueMessage {
   offer?: { quest: string; title: string; reward: string };
   /** The NPC keeps a shop or teaches: the prices come from SHOPS. */
   shop?: boolean;
+  /** A Path mentor after the trial: the Paths the player may choose (trials.ts). */
+  paths?: PathChoice[];
 }
 
 /** A fallen creature's loot, as its window shows it. */
@@ -672,6 +683,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   }
   if (m.t === 'spendPoint') return isStat(m.stat);
   if (m.t === 'chooseCalling') return isRace(m.race) && isCalling(m.calling);
+  if (m.t === 'choosePath') return isId(m.npc) && isId(m.path);
   if (m.t === 'ability') return isId(m.ability) && (m.target === undefined || isId(m.target));
   if (m.t === 'hotbar') return Array.isArray(m.slots) && m.slots.length <= 6 && m.slots.every((s) => s === '' || isId(s));
   if (m.t === 'craft') return isId(m.recipe);

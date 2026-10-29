@@ -86,7 +86,7 @@ async function prepareArt(entry: ContentEntry): Promise<void> {
     await Promise.all(regionPictures(entry.id, def).map((p) => picture(wishArtKey(p.id), entry.itemArt?.[p.id], p.def)));
     return;
   }
-  if (def.kind !== 'recipe' && def.kind !== 'loot' && def.kind !== 'calling') await picture(wishArtKey(entry.id), entry.art, def);
+  if (def.kind !== 'recipe' && def.kind !== 'loot' && def.kind !== 'calling' && def.kind !== 'skill') await picture(wishArtKey(entry.id), entry.art, def);
 }
 
 async function picture(key: string, painted: string | undefined, def: PicturedWish | RuleItem): Promise<void> {

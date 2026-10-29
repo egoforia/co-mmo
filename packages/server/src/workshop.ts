@@ -305,13 +305,13 @@ export class Workshop {
         card,
         world: checked.definition ? worldLines(checked.definition) : [],
         ...(checked.brief ? { plan: reviewPlan(checked.tier) } : {}),
-        ...(checked.definition && checked.definition.kind !== 'recipe' && checked.definition.kind !== 'loot' && checked.definition.kind !== 'calling' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
+        ...(checked.definition && checked.definition.kind !== 'recipe' && checked.definition.kind !== 'loot' && checked.definition.kind !== 'calling' && checked.definition.kind !== 'skill' ? { art: await this.art(playerId, checked.definition, biome, draft, checked) } : {}),
       },
     };
   }
 
   /** What the image model would be asked for, built by the same code that paints. */
-  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' | 'loot' | 'calling' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
+  private async art(playerId: string, def: Exclude<WishDefinition, { kind: 'recipe' | 'loot' | 'calling' | 'skill' }>, biome: BiomeId, draft: WishDraft, checked: CheckedDraft): Promise<ArtPreview> {
     const provider = this.options.ai.image('wishes');
     const pictures: PicturePreview[] = [];
     const picture = (label: string, prompt: string, wanted: string[], withRaw = false): void => {

@@ -23,8 +23,15 @@ export interface StatusFrom {
  * Returns false when it did not take.
  */
 export function afflictPlayer(s: RegionState, p: PlayerState, id: StatusId, seconds: number | undefined, from: StatusFrom = {}): boolean {
+  if (shrugs(p, id, s.now())) return false;
   const ms = statusLength(id, seconds ?? STATUSES[id].seconds, totalStats(p.character).vigor);
   return afflict(p, id, ms, s.now(), from);
+}
+
+/** Whether a Path keeps this status off the player: Rooted Stand stops Stuns and Roots, a Dune Tempest spin Slows and Roots. */
+export function shrugs(p: PlayerState, id: StatusId, now: number): boolean {
+  if (p.stance?.ability === 'rooted-stand' && (id === 'stunned' || id === 'rooted')) return true;
+  return (p.steadfastUntil ?? 0) > now && (id === 'slowed' || id === 'rooted');
 }
 
 /** Puts a status on a creature for `seconds` (its usual length when missing); false when it did not take. */

@@ -4,7 +4,7 @@
 // Callings).
 
 import { ABILITY_EFFECTS, DAMAGE_EFFECTS, type AbilityDef, type AbilityEffect } from './rpg/abilities.ts';
-import { SKILL_STATUSES, STATUSES, type StatusId } from './rpg/statuses.ts';
+import { PATH_STATUSES, SKILL_STATUSES, STATUSES, type StatusId } from './rpg/statuses.ts';
 
 type Numbers = Omit<AbilityDef, 'name' | 'description' | 'effect' | 'status'>;
 
@@ -32,11 +32,11 @@ export const WISHED_ABILITY_NUMBERS: Record<AbilityEffect, Numbers> = {
 const DEFAULT_STATUS: Partial<Record<AbilityEffect, StatusId>> = { debuff: 'marked', trap: 'rooted', buff: 'shielded', stance: 'shielded' };
 
 /** Ailments a wished ability may put on what it hits: never Weakened (waking at the shrine does that) or Taunted (taunts do). */
-export const WISHED_AILMENTS: readonly StatusId[] = (Object.keys(STATUSES) as StatusId[]).filter((s) => STATUSES[s].harmful && s !== 'weakened' && s !== 'taunted');
+export const WISHED_AILMENTS: readonly StatusId[] = (Object.keys(STATUSES) as StatusId[]).filter((s) => STATUSES[s].harmful && s !== 'weakened' && s !== 'taunted' && !PATH_STATUSES.includes(s));
 
 /** The status a wished ability may carry: an ailment on what it hits, a helpful one on you. */
 export function wishedStatus(effect: AbilityEffect, raw: unknown): StatusId | undefined {
-  const named = (Object.keys(STATUSES) as StatusId[]).find((s) => s === raw && s !== 'weakened' && s !== 'taunted' && !SKILL_STATUSES.includes(s));
+  const named = (Object.keys(STATUSES) as StatusId[]).find((s) => s === raw && s !== 'weakened' && s !== 'taunted' && !SKILL_STATUSES.includes(s) && !PATH_STATUSES.includes(s));
   const helps = effect === 'buff' || effect === 'stance';
   const fits = named && (helps ? !STATUSES[named].harmful : STATUSES[named].harmful && (DAMAGE_EFFECTS.includes(effect) || effect === 'debuff'));
   return fits ? named : DEFAULT_STATUS[effect];

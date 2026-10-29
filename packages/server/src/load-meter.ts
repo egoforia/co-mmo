@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { TICK_SECONDS } from '@co-mmo/shared';
+import { TICK_SECONDS, type HostTickBreakdown, type PhaseTimings } from '@co-mmo/shared';
 import type { ServerLoad } from './region-link.ts';
 
 /** How many recent ticks the averages cover (5 s at 20 ticks a second). */
@@ -9,6 +9,17 @@ const KEPT = 100;
 const MIN_TICKS = 10;
 /** How long the event loop's delays are gathered before they start over, so the numbers say what is happening now. */
 const LAG_WINDOW_MS = 10_000;
+/** Ticks that take at least this long (50 ms) are considered slow ticks. */
+export const SLOW_TICK_THRESHOLD_MS = TICK_SECONDS * 1000;
+
+export interface LoadMeterOptions {
+  /** Callback invoked when a tick takes longer than the threshold. */
+  onSlowTick?: (totalMs: number, err?: unknown) => void;
+  /** Supplies per-phase timing breakdown and slowest region for ServerLoad. */
+  phaseBreakdown?: () => HostTickBreakdown | PhaseTimings | undefined;
+  /** Slow-tick threshold in milliseconds (defaults to 50ms). */
+  slowTickThresholdMs?: number;
+}
 
 /**
  * Measures how hard a game process works: how long its ticks take, its
@@ -27,10 +38,23 @@ export class LoadMeter {
   private lastLag = { lagMs: 0, worstLagMs: 0 };
   readonly startedAt: number;
 
-  constructor(private readonly now: () => number = Date.now) {
+  constructor(
+    private readonly now: () => number = Date.now,
+    private readonly options: LoadMeterOptions = {},
+  ) {
     this.startedAt = now();
     this.lagSince = now();
     this.lag.enable();
+  }
+
+  /** Sets or updates the slow tick callback. */
+  setOnSlowTick(fn: (totalMs: number, err?: unknown) => void): void {
+    this.options.onSlowTick = fn;
+  }
+
+  /** Sets or updates the phase breakdown provider. */
+  setPhaseBreakdown(fn: () => HostTickBreakdown | PhaseTimings | undefined): void {
+    this.options.phaseBreakdown = fn;
   }
 
   /** Runs one tick, timing it; an error is counted and logged rather than stopping the game. */
@@ -38,13 +62,25 @@ export class LoadMeter {
     const started = performance.now();
     this.starts.push(started);
     if (this.starts.length > KEPT) this.starts.shift();
+    let tickErr: unknown;
     try {
       work();
     } catch (err) {
+      tickErr = err;
       this.failed(err);
     }
-    this.times.push(performance.now() - started);
+    const elapsed = performance.now() - started;
+    this.times.push(elapsed);
     if (this.times.length > KEPT) this.times.shift();
+
+    const threshold = this.options.slowTickThresholdMs ?? SLOW_TICK_THRESHOLD_MS;
+    if (elapsed >= threshold) {
+      try {
+        this.options.onSlowTick?.(elapsed, tickErr);
+      } catch (slowTickErr) {
+        console.error('Failed to capture slow tick:', slowTickErr);
+      }
+    }
   }
 
   /** Counts an error caught somewhere in this process. */
@@ -96,6 +132,20 @@ export class LoadMeter {
     const times = this.times;
     const round = (n: number) => Math.round(n * 100) / 100;
     const memory = process.memoryUsage();
+    let phases: PhaseTimings | undefined;
+    let slowestRegion: { id: string; phase: string; ms: number } | undefined;
+    if (this.options.phaseBreakdown) {
+      const breakdown = this.options.phaseBreakdown();
+      if (breakdown) {
+        if ('phases' in breakdown && typeof (breakdown as HostTickBreakdown).phases === 'object') {
+          const hostBreakdown = breakdown as HostTickBreakdown;
+          phases = hostBreakdown.phases;
+          slowestRegion = hostBreakdown.slowestRegion;
+        } else {
+          phases = breakdown as PhaseTimings;
+        }
+      }
+    }
     return {
       tickMs: times.length ? round(times.reduce((a, b) => a + b, 0) / times.length) : 0,
       worstTickMs: round(Math.max(0, ...times)),
@@ -108,6 +158,8 @@ export class LoadMeter {
       host: hostname(),
       pid: process.pid,
       startedAt: this.startedAt,
+      ...(phases && Object.keys(phases).length > 0 ? { phases } : {}),
+      ...(slowestRegion ? { slowestRegion } : {}),
     };
   }
 }

@@ -1,6 +1,7 @@
 import type { ContentEntry, RegionDef } from '@co-mmo/shared';
 import { Requests, type Bus } from './bus.ts';
 import { GATEWAY, serverChannel, type Placement, type RegionHandle, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
+import type { SlowTickBuffer } from './debug/slow-tick-buffer.ts';
 import type { Cell, Ghosts } from './region.ts';
 import { RemoteRegion } from './remote-region.ts';
 import type { Hosting, World } from './world.ts';
@@ -54,6 +55,8 @@ export interface RegionServersOptions {
   content: () => ContentEntry[];
   /** How long a silent server is waited for; DEAD_MS unless a test says otherwise. */
   deadMs?: number;
+  /** Buffer to record slow-tick events received from region servers. */
+  slowTicks?: SlowTickBuffer;
 }
 
 /**
@@ -180,6 +183,10 @@ export class RegionServers implements Hosting {
       return;
     }
     known.seen = this.now();
+    if (m.t === 'slow-tick') {
+      this.options.slowTicks?.push(m.record);
+      return;
+    }
     if (m.t === 'beat') {
       known.load = m.load;
       for (const beat of m.regions) this.remote(beat.id, server)?.beat(beat);

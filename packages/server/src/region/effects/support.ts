@@ -37,9 +37,12 @@ export const heal: Effect = {
 export function mend(kit: EffectKit, healer: PlayerState, m: PlayerState, amount: number): number {
   const ch = m.character;
   const poisoned = statusOf(m, 'poisoned', kit.s.now()) ? POISONED_HEALING : 1;
-  const healed = Math.max(0, Math.min(maxHp(ch) - ch.hp, Math.round(amount * poisoned)));
+  const wanted = Math.round(amount * poisoned);
+  const healed = Math.max(0, Math.min(maxHp(ch) - ch.hp, wanted));
   ch.hp += healed;
   m.dirty = true;
+  // Overtone: what goes past full health may become a shield.
+  kit.paths.overheal(healer, m, wanted - healed);
   healThreat(kit.s.creatures, m.info.id, healer.info.id, healed);
   kit.gauges.healed(healer, m, healed);
   return healed;

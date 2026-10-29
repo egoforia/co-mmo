@@ -25,6 +25,7 @@ import type { World } from './world.ts';
 import type { LoadMeter } from './load-meter.ts';
 import { perfView } from './perf.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
+import type { SlowTickBuffer } from './debug/slow-tick-buffer.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
 import { ProfilerManager, getProfilerManager } from './debug/profiler-session.ts';
@@ -59,6 +60,8 @@ export interface AdminContext {
   env: Record<string, string | undefined>;
   /** How hard this process (the gateway) works. */
   meter: LoadMeter;
+  /** Recent slow ticks captured across the fleet (Owner). */
+  slowTicks?: SlowTickBuffer;
   /** The region servers, when REDIS_URL lets them join; absent when every region runs here. */
   regionServers?: RegionServers;
   /** Every request sent to an outside service (Owner). */
@@ -576,10 +579,18 @@ export async function handleAdmin(
       regionServers: Boolean(servers),
       store: store.label,
       now: Date.now(),
+      slowTicks: ctx.slowTicks?.list() ?? [],
       profileRetention: profiler.getRetentionPolicy(),
       profiles: await profiler.listProfiles(),
       activeProfile: profiler.getActiveStatus().profile,
     }), true;
+  }
+
+  // Clears recorded slow ticks (Owner).
+  if (route === 'servers/slow-ticks/clear' && method === 'POST') {
+    if (ownerOnly()) return true;
+    ctx.slowTicks?.clear();
+    return json(res, 200, { ok: true, message: 'Cleared slow ticks.' }), true;
   }
 
   // Starts recording a CPU profile or taking a heap snapshot (Owner).

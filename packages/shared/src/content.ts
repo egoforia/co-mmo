@@ -153,6 +153,20 @@ export interface CallingWish {
   calling?: CallingId;
 }
 
+/**
+ * A Calling Wish (calling-wish.ts): one of the wisher's skills gets a new
+ * name and look; its numbers stay the world's. Free, at levels 10 and 20.
+ */
+export interface SkillLookWish {
+  kind: 'skill';
+  /** The ability id it reshapes. */
+  skill: string;
+  /** The skill's new name. */
+  name: string;
+  description: string;
+  look: WishLook;
+}
+
 /** A creature a wished region brings: one that already exists, or a new one. */
 export type RegionCreature =
   | { existing: string; count: number }
@@ -194,14 +208,18 @@ export interface LootWish {
   mode: 'add' | 'set';
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | CallingWish | RecipeWish | AbilityWish | RegionWish | LootWish;
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | CallingWish | SkillLookWish | RecipeWish | AbilityWish | RegionWish | LootWish;
 
-/** Wished things that have one picture of their own (not recipes, regions, loot or a Calling). */
-export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish | CallingWish>;
+/**
+ * Wished things that have one picture of their own (not recipes, regions,
+ * loot, a Calling, or a skill's new look, which is painted with the skill
+ * effects in build plan step 10).
+ */
+export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish | CallingWish | SkillLookWish>;
 
 /** Whether a wish paints a picture of its own (recipes and loot use pictures that exist; regions paint their parts). */
 export function isPictured(def: Definition): def is PicturedWish {
-  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'rule' && def.kind !== 'calling';
+  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'rule' && def.kind !== 'calling' && def.kind !== 'skill';
 }
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
@@ -429,11 +447,13 @@ export const MAX_RECIPE_RESULT = 3;
 /** The tier a buildable wish costs: things for your bag are minor, the rest moderate. */
 export function contentTier(def: WishDefinition): 'minor' | 'moderate' {
   // A creature's loot changes what everyone finds, so it weighs like a creature.
-  return def.kind === 'item' || def.kind === 'recipe' || def.kind === 'player' ? 'minor' : 'moderate';
+  return def.kind === 'item' || def.kind === 'recipe' || def.kind === 'player' || def.kind === 'skill' ? 'minor' : 'moderate';
 }
 
 /** Favor a buildable wish costs: its tier's price, more for a whole region. */
 export function wishCost(def: WishDefinition): number {
+  // A Calling Wish is free: it is earned at levels 10 and 20.
+  if (def.kind === 'skill') return 0;
   return def.kind === 'region' ? REGION_WISH_COST : WISH_COSTS[contentTier(def)];
 }
 
@@ -508,7 +528,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   const itemArt = (kind: ItemWish['itemKind']) => kind === 'consumable' ? 'item-tonic' : (SLOT_ART as Record<string, string>)[kind] ?? 'item-goat-horn';
   if (!('kind' in def)) return itemArt(def.itemKind);
   if (def.kind === 'item') return itemArt(def.itemKind);
-  if (def.kind === 'ability' || def.kind === 'recipe') return 'item-scroll';
+  if (def.kind === 'ability' || def.kind === 'recipe' || def.kind === 'skill') return 'item-scroll';
   if (def.kind === 'npc') return 'sanctum-pilgrim';
   if (def.kind === 'player' || def.kind === 'calling') return 'player-mara';
   if (def.kind === 'region') return 'sanctum-shrine';

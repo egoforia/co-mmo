@@ -1,7 +1,18 @@
-// The Server health tab: each server's regions, players, tick time and memory, with restart and move.
+// The Server health tab: each server's regions, players, tick time, memory,
+// phase breakdown, and recent slow ticks, with restart, move, CPU profiling,
+// and heap snapshots.
 
 import { escapeHtml } from '../ui.ts';
-import { TICK_RATE, TICK_SECONDS, type ActiveProfileRecording, type ProfileInfo, type ProfileRetentionPolicy } from '@co-mmo/shared';
+import {
+  PHASE_LABELS,
+  TICK_RATE,
+  TICK_SECONDS,
+  type ActiveProfileRecording,
+  type PhaseTimings,
+  type ProfileInfo,
+  type ProfileRetentionPolicy,
+  type SlowTickRecord,
+} from '@co-mmo/shared';
 import { api, toast, type Handled, type Tab } from './core.ts';
 
 interface ServerLoad {
@@ -17,6 +28,12 @@ interface ServerLoad {
   host: string;
   pid: number;
   startedAt: number;
+  phases?: PhaseTimings;
+  slowestRegion?: {
+    id: string;
+    phase: string;
+    ms: number;
+  };
 }
 
 interface Host {
@@ -34,10 +51,24 @@ interface ServersResponse {
   regionServers: boolean;
   store: string;
   now: number;
+  slowTicks?: SlowTickRecord[];
   profileRetention?: ProfileRetentionPolicy;
   profiles?: ProfileInfo[];
   activeProfile?: ActiveProfileRecording;
 }
+
+/** Distinct colors for tick phase breakdown bars and legends. */
+const PHASE_COLORS: Record<string, string> = {
+  inputs: '#4dabf7',
+  sky: '#74c0fc',
+  combat: '#ff6b6b',
+  minds_think: '#da77f2',
+  bodies: '#ffd43b',
+  minds_live: '#69db7c',
+  fallen: '#adb5bd',
+  snapshots: '#ffa94d',
+  rules: '#38d9a9',
+};
 
 /** A tick has this long before the next one is due. */
 const TICK_MS = TICK_SECONDS * 1000;
@@ -111,6 +142,42 @@ async function servers(): Promise<string> {
   const isRecording = Boolean(s.activeProfile);
   const hostName = (h: Host) => (h.kind === 'gateway' ? 'Game server' : `Region server ${escapeHtml(h.id)}`);
 
+  const phaseBarAndTable = (phases?: PhaseTimings) => {
+    if (!phases) return '';
+    const entries = Object.entries(phases).filter(([_, t]) => t.avgMs > 0 || t.worstMs > 0);
+    if (!entries.length) return '';
+    const totalAvg = entries.reduce((sum, [_, t]) => sum + t.avgMs, 0);
+
+    const segments = entries.map(([phase, t]) => {
+      const pct = totalAvg > 0 ? (t.avgMs / totalAvg) * 100 : 0;
+      const label = PHASE_LABELS[phase] ?? phase;
+      const color = PHASE_COLORS[phase] ?? '#ced4da';
+      return `<div class="phase-segment" style="width: ${pct.toFixed(1)}%; background: ${color};" title="${escapeHtml(label)}: ${t.avgMs.toFixed(1)} ms (${pct.toFixed(0)}%)"></div>`;
+    }).join('');
+
+    const rows = entries.map(([phase, t]) => {
+      const pct = totalAvg > 0 ? (t.avgMs / totalAvg) * 100 : 0;
+      const label = PHASE_LABELS[phase] ?? phase;
+      const color = PHASE_COLORS[phase] ?? '#ced4da';
+      return `<tr>
+        <td><span class="phase-dot" style="background: ${color}"></span><b>${escapeHtml(label)}</b></td>
+        <td>${t.avgMs.toFixed(1)} ms</td>
+        <td>${t.worstMs.toFixed(1)} ms</td>
+        <td>${pct.toFixed(0)}%</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div class="phase-breakdown">
+        <h4>Tick phases</h4>
+        <div class="phase-bar">${segments}</div>
+        <table class="log phase-table">
+          <thead><tr><th>Phase</th><th>Average</th><th>Slowest</th><th>Share</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  };
+
   const card = (h: Host) => {
     const l = h.load;
     // Half a tick is fine; a whole tick means players feel it.
@@ -127,6 +194,9 @@ async function servers(): Promise<string> {
       </td></tr>`).join('');
 
     const hostRecording = s.activeProfile?.host === h.id ? s.activeProfile : undefined;
+    const slowestNote = l.slowestRegion
+      ? `<p class="note">Slowest region: <b>${escapeHtml(l.slowestRegion.id)}</b> (${escapeHtml(PHASE_LABELS[l.slowestRegion.phase] ?? l.slowestRegion.phase)}: ${l.slowestRegion.ms.toFixed(1)} ms)</p>`
+      : '';
 
     return `<div class="host">
       <h3>${hostName(h)}</h3>
@@ -145,8 +215,86 @@ async function servers(): Promise<string> {
         <button type="button" data-profile-heap="${escapeHtml(h.id)}" ${isRecording ? 'disabled' : ''} title="${isRecording ? 'A profile is already being recorded.' : ''}">Take heap snapshot</button>
       </div>
       ${hostRecording ? `<p class="note warn profile-countdown" data-remaining="${hostRecording.remainingSeconds}">Recording in progress... ${hostRecording.remainingSeconds} s left</p>` : ''}
+      ${slowestNote}
+      ${phaseBarAndTable(l.phases)}
       ${rows ? `<table class="log">${rows}</table>` : '<p class="note">No regions run here right now.</p>'}
     </div>`;
+  };
+
+  const slowTicksSection = () => {
+    const list = s.slowTicks ?? [];
+    if (!list.length) {
+      return `<details class="slow-ticks">
+        <summary><b>Recent slow ticks</b></summary>
+        <p class="note">No slow ticks recorded recently.</p>
+      </details>`;
+    }
+
+    const rows = list.map((t) => {
+      const phaseEntries = Object.entries(t.phases);
+      const totalPhases = phaseEntries.reduce((sum, [_, ms]) => sum + ms, 0);
+      const slowest = [...phaseEntries].sort((a, b) => b[1] - a[1])[0];
+      const slowestDesc = slowest ? `${escapeHtml(PHASE_LABELS[slowest[0]] ?? slowest[0])} (${slowest[1].toFixed(1)} ms)` : 'None';
+      const serverLabel = t.host === 'gateway' ? 'Game server' : escapeHtml(t.host);
+      const landLabel = `${escapeHtml(t.region)}${t.cell ? ` <small>part ${t.cell.index + 1} of ${t.cell.count}</small>` : ''}`;
+
+      const segments = phaseEntries.map(([phase, ms]) => {
+        const pct = totalPhases > 0 ? (ms / totalPhases) * 100 : 0;
+        const color = PHASE_COLORS[phase] ?? '#ced4da';
+        const label = PHASE_LABELS[phase] ?? phase;
+        return `<div class="phase-segment" style="width: ${pct.toFixed(1)}%; background: ${color};" title="${escapeHtml(label)}: ${ms.toFixed(1)} ms"></div>`;
+      }).join('');
+
+      const phaseDetails = phaseEntries.map(([phase, ms]) => {
+        const label = PHASE_LABELS[phase] ?? phase;
+        const color = PHASE_COLORS[phase] ?? '#ced4da';
+        return `<span><span class="phase-dot" style="background: ${color}"></span>${escapeHtml(label)}: <b>${ms.toFixed(1)} ms</b></span>`;
+      }).join(' &nbsp; ');
+
+      return `
+        <tr>
+          <td>${since(s.now - t.at)} ago</td>
+          <td>${serverLabel}</td>
+          <td>${landLabel}</td>
+          <td>${t.players} player${t.players === 1 ? '' : 's'}, ${t.creatures} creature${t.creatures === 1 ? '' : 's'}</td>
+          <td>${t.activeStatuses} active</td>
+          <td>${slowestDesc}</td>
+          <td class="bad"><b>${t.totalMs.toFixed(1)} ms</b></td>
+          <td class="actions">
+            <button type="button" data-toggle-slow-tick="${t.id}">Breakdown</button>
+          </td>
+        </tr>
+        <tr id="slow-tick-detail-${t.id}" class="slow-tick-detail" style="display: none;">
+          <td colspan="8">
+            <div class="phase-bar">${segments}</div>
+            <div class="slow-tick-phases">${phaseDetails}</div>
+            ${t.error ? `<p class="note warn">Caught error: ${escapeHtml(t.error)}</p>` : ''}
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <details class="slow-ticks" open>
+        <summary><b>Recent slow ticks</b> <small>(${list.length})</small></summary>
+        <p class="note">Ticks that ran over 50 ms budget recently.
+          <button type="button" data-clear-slow-ticks="true">Clear slow ticks</button>
+        </p>
+        <table class="log slow-ticks-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Server</th>
+              <th>Land</th>
+              <th>Entities</th>
+              <th>Statuses</th>
+              <th>Slowest phase</th>
+              <th>Total time</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </details>`;
   };
 
   const how = s.regionServers
@@ -188,6 +336,7 @@ async function servers(): Promise<string> {
   return `
     <p>${how} The world is kept in ${escapeHtml(s.store)}.</p>
     ${s.hosts.map(card).join('')}
+    ${slowTicksSection()}
     <div class="host" style="margin-top: 1rem;">
       <h3>Recorded profiles</h3>
       ${retention ? `<p class="note">Keeps up to ${retention.maxFiles} profiles for ${retention.pruneHours} hour${retention.pruneHours === 1 ? '' : 's'} in <code>${escapeHtml(retention.dir)}</code>.</p>` : ''}
@@ -198,6 +347,19 @@ async function servers(): Promise<string> {
 }
 
 async function click(t: HTMLButtonElement): Promise<Handled> {
+  if (t.dataset.clearSlowTicks) {
+    t.disabled = true;
+    await api('servers/slow-ticks/clear', 'POST');
+    toast('Cleared slow ticks.');
+    return true;
+  }
+  if (t.dataset.toggleSlowTick) {
+    const detail = document.getElementById(`slow-tick-detail-${t.dataset.toggleSlowTick}`);
+    if (detail) {
+      detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    }
+    return 'keep';
+  }
   if (t.dataset.profileCpu) {
     const host = t.dataset.profileCpu;
     t.disabled = true;

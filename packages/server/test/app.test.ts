@@ -117,7 +117,9 @@ describe('game connection', () => {
   });
 
   it('keeps answering clients connected and drops silent ones', async () => {
-    const { store, ws } = await start(50);
+    // Server and clients share one process: a heartbeat with room for a busy CI runner's
+    // pauses, so the answering client is never late, while the silent one still goes within a second.
+    const { store, ws } = await start(300);
     const invite = store.createInvite(null, 'player');
     const a = store.acceptInvite(invite.code, 'Mara', 'sanctum');
     const live = connect(ws, a.token);

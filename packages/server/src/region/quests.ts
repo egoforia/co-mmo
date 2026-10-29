@@ -1,5 +1,13 @@
 import {
+  ABILITIES,
+  SANCTUM_MENTORS,
   SHOPS,
+  choosePath,
+  mentorOf,
+  pathChoices,
+  pathOf,
+  questTurnIn,
+  settlePathSkills,
   NPC_GREETINGS,
   QUESTS,
   TALK_RANGE,
@@ -15,6 +23,7 @@ import {
 import type { Bodies } from './bodies.ts';
 import { TILE_NAMES } from '../region.ts';
 import { greetingNow, type Townsperson } from '../townsfolk.ts';
+import { learnedWords, mentorWords } from './paths/words.ts';
 import type { PlayerState, RegionState } from './state.ts';
 
 /**
@@ -58,7 +67,7 @@ export class Quests {
     for (const q of ch.quests) {
       const def = QUESTS[q.id];
       if (!def || q.done) continue;
-      const handIn = def.goal.kind === 'talk' ? def.goal.npc === npc.id : def.giver === npc.id && questComplete(q);
+      const handIn = questTurnIn(q.id) === npc.id && (def.goal.kind === 'talk' || questComplete(q, ch));
       if (handIn) {
         const levels = completeQuest(ch, q);
         this.s.notice(p, `Quest complete: ${def.title}. You received ${rewardText(q.id)}.`);
@@ -67,8 +76,20 @@ export class Quests {
         text = def.thanks;
         break;
       }
-      if (def.giver === npc.id && def.goal.kind === 'defeat') text = def.waiting;
+      if (def.giver === npc.id && def.goal.kind !== 'talk') text = def.waiting;
     }
+
+    // Your Calling's mentor in the Sanctum teaches again any Path skill you have forgotten.
+    if (ch.calling && SANCTUM_MENTORS[ch.calling] === npc.id) {
+      const again = settlePathSkills(ch);
+      if (again.length) {
+        this.s.notice(p, `${npc.name} teaches you ${again.map((a) => ABILITIES[a]!.name).join(' and ')} again.`);
+        p.dirty = true;
+      }
+    }
+    // A Path mentor, once the trial is done, lets you choose a Path.
+    const paths = pathChoices(ch, npc.id);
+    if (paths) text = [text, mentorWords(ch)].filter(Boolean).join('\n\n');
 
     const offer = questOffered(ch, npc.id);
     // What they are up to at this hour comes first: woken from sleep, or out gathering herbs.
@@ -81,7 +102,26 @@ export class Quests {
     };
     if (offer) message.offer = { quest: offer, title: QUESTS[offer]!.title, reward: rewardText(offer) };
     if (SHOPS[npc.id]) message.shop = true;
+    if (paths?.length) message.paths = paths;
     p.conn.send(message);
+  }
+
+  /** Chooses (or changes to) a Path at the Calling's Path mentor, standing beside them. */
+  choosePath(p: PlayerState, npcId: string, path: string): void {
+    const ch = p.character;
+    const npc = this.s.townsfolk.find((n) => n.id === npcId);
+    if (!npc || npc.floor !== p.floor || Math.hypot(npc.x - p.x, npc.y - p.y) > TALK_RANGE + 1) return;
+    if (!ch.calling || mentorOf(npcId) !== ch.calling) return this.s.notice(p, `${npc.name} cannot set you on a Path.`);
+    const before = new Set(ch.abilities);
+    const why = choosePath(ch, path);
+    if (why) return this.s.notice(p, why);
+    const def = pathOf(ch.calling, path)!;
+    this.s.notice(p, `You walk the ${def.name} Path now.`);
+    for (const id of def.skills.filter((s) => s.level <= ch.level).map((s) => s.skill)) {
+      if (!before.has(id)) this.s.notice(p, learnedWords(id));
+    }
+    this.s.broadcastSystem(`${p.info.name} walks the ${def.name} Path.`);
+    p.dirty = true;
   }
 
   /** Takes a quest the NPC beside the player offers. */
@@ -101,7 +141,7 @@ export class Quests {
       const goal = QUESTS[q.id]?.goal;
       if (q.done || goal?.kind !== 'defeat' || goal.creature !== kind || q.count >= goal.count) continue;
       q.count++;
-      if (q.count === goal.count) this.s.notice(p, `${QUESTS[q.id]!.title}: done! Return to ${npcName(QUESTS[q.id]!.giver)}.`);
+      if (q.count === goal.count) this.s.notice(p, `${QUESTS[q.id]!.title}: done! Return to ${npcName(questTurnIn(q.id))}.`);
     }
   }
 }

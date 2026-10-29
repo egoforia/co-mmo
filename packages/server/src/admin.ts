@@ -26,6 +26,7 @@ import { perfView } from './perf.ts';
 import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
+import { combatLogger, type CombatLogger } from './region/combat-logger.ts';
 
 export interface AdminContext {
   store: Store;
@@ -38,6 +39,8 @@ export interface AdminContext {
   rules: LiveRules;
   reports: Reports;
   builds: Builds;
+  /** Combat log recorder for balance debugging (Stewards & Owner). */
+  combatLogger?: CombatLogger;
   /** The Art tab: painting log, repaints and walks (Owner). */
   art?: ArtStudio;
   /** Where hands and grips are found in pictures, for held items (Owner). */
@@ -88,6 +91,82 @@ export async function handleAdmin(
   const ownerOnly = () => (owner ? false : (json(res, 403, { error: 'forbidden', message: 'Only the Owner can do that.' }), true));
   const route = path.slice('/api/admin/'.length);
   const method = req.method ?? 'GET';
+  const cLogger = ctx.combatLogger ?? combatLogger;
+
+  const inspectMatch = route.match(/^inspect\/([^/]+)\/(player|creature)\/([^/]+)$/);
+  if (inspectMatch && method === 'GET') {
+    const [, regionId, kind, id] = inspectMatch;
+    const isSse = req.headers.accept?.includes('text/event-stream');
+    if (isSse) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      const sendInspection = async () => {
+        try {
+          const inspection = await world.inspect(regionId, kind as 'player' | 'creature', id);
+          if (inspection) {
+            res.write(`data: ${JSON.stringify(inspection)}\n\n`);
+          }
+        } catch {
+          // ignore disconnect
+        }
+      };
+      await sendInspection();
+      const timer = setInterval(() => void sendInspection(), 100);
+      req.on('close', () => clearInterval(timer));
+      return true;
+    }
+
+    const inspection = await world.inspect(regionId, kind as 'player' | 'creature', id);
+    if (!inspection) return json(res, 404, { error: 'not_found', message: 'Entity not found.' }), true;
+    return json(res, 200, inspection), true;
+  }
+
+  if (route === 'combat-log' && method === 'GET') {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const region = url.searchParams.get('region') || undefined;
+    const entity = url.searchParams.get('entity') || undefined;
+    const events = cLogger.events({ region, entity });
+    return json(res, 200, {
+      events,
+      status: cLogger.status(),
+    }), true;
+  }
+
+  if (route === 'combat-log/toggle' && method === 'POST') {
+    const body = await ctx.readJson(req);
+    const enabled = body?.enabled === true;
+    if (enabled) {
+      const region = typeof body?.region === 'string' && body.region ? body.region : undefined;
+      const entity = typeof body?.entity === 'string' && body.entity ? body.entity : undefined;
+      const maxEvents = typeof body?.maxEvents === 'number' ? body.maxEvents : undefined;
+      const maxDurationMs = typeof body?.maxDurationMs === 'number' ? body.maxDurationMs : undefined;
+      cLogger.enable({ region, entity, maxEvents, maxDurationMs });
+    } else {
+      cLogger.disable();
+    }
+    return json(res, 200, { ok: true, status: cLogger.status() }), true;
+  }
+
+  if (route === 'combat-log/export' && method === 'GET') {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const region = url.searchParams.get('region') || undefined;
+    const entity = url.searchParams.get('entity') || undefined;
+    const payload = cLogger.exportJson({ region, entity });
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename="combat-log.json"',
+    });
+    res.end(payload);
+    return true;
+  }
+
+  if (route === 'combat-log/clear' && method === 'POST') {
+    cLogger.clear();
+    return json(res, 200, { ok: true, status: cLogger.status() }), true;
+  }
 
   if (route === 'overview' && method === 'GET') {
     const regions = [...world.regions.values()].map((r) => ({
@@ -100,7 +179,7 @@ export async function handleAdmin(
       width: r.map.width,
       height: r.map.height,
       players: r.playerIds().map((id) => ({ id, name: r.nameOf(id), ...r.position(id), level: r.character(id)?.level })),
-      creatures: r.creatureIds().map((id) => r.creature(id)).filter(Boolean),
+      creatures: r.creatureIds().map((id) => { const c = r.creature(id); return c ? { id, ...c } : undefined; }).filter(Boolean),
       npcs: r.map.npcs.map((n) => ({ name: n.name, x: n.x, y: n.y })),
       landmarks: r.map.landmarks.map((l) => ({ asset: l.asset, x: l.x, y: l.y })),
     }));

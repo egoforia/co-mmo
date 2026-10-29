@@ -27,6 +27,7 @@ import {
   type PartyMessage,
   type PlayerInfo,
   type ServerMessage,
+  type EntityInspection,
   DEFAULT_SKY,
   dayPhase,
   weatherAt,
@@ -405,6 +406,14 @@ export class World {
 
   region(id: string): RegionHandle | undefined {
     return this.regions.get(id);
+  }
+
+  /** Inspect an entity in any region (local or remote), for Stewards and Owner. */
+  async inspect(regionId: string, kind: 'player' | 'creature', id: string): Promise<EntityInspection | undefined> {
+    const r = this.region(regionId) ?? this.unit(regionId);
+    if (!r) return undefined;
+    if (r.inspect) return r.inspect(kind, id);
+    return undefined;
   }
 
   /** A region, or one cell of a split region, by its name between servers. */

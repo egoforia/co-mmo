@@ -1,4 +1,4 @@
-import { generateRegion, type Character, type ClientMessage, type NpcPlacement, type PlayerInfo, type RegionDef, type RegionInfo, type RegionMap, type ServerMessage, type Tile } from '@co-mmo/shared';
+import { generateRegion, type Character, type ClientMessage, type EntityInspection, type NpcPlacement, type PlayerInfo, type RegionDef, type RegionInfo, type RegionMap, type ServerMessage, type Tile } from '@co-mmo/shared';
 import type { Bus, Requests } from './bus.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import { findSpots, nearestTile, type Carry, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
@@ -213,6 +213,14 @@ export class RemoteRegion implements RegionHandle {
   /** The region server's latest word on its creatures, for God's View. */
   beat(beat: RegionBeat): void {
     this.creatures = beat.creatures;
+  }
+
+  /** Asks the remote region server for live inspection of an entity. */
+  async inspect(kind: 'player' | 'creature', id: string): Promise<EntityInspection | undefined> {
+    const result = await this.requests.ask<EntityInspection | null>(this.channel, {
+      t: 'inspect', region: this.key, kind, id,
+    });
+    return result ?? undefined;
   }
 
   private get channel(): string {

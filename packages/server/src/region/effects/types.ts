@@ -52,6 +52,8 @@ export interface Cast {
   woven?: boolean;
   /** The gauge pips a finisher spends. */
   spent?: number;
+  /** Damage roll variance factor (0.9 to 1.1). */
+  variance?: number;
 }
 
 /** An effect of the kit. */

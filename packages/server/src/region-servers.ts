@@ -179,6 +179,7 @@ export class RegionServers implements Hosting {
     if (m.t === 'out') return region.deliver(m.items);
     if (m.t === 'edge') return this.world.edge(m.region, m.ghosts as Ghosts);
     if (m.t === 'departures') return this.world.departed(m.region, m.list);
+    if (m.t !== 'hook') return;
     // Things a region asks of the whole world.
     switch (m.hook) {
       case 'worldChat':

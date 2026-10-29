@@ -340,3 +340,58 @@ pre.prompt mark { background: rgba(254, 174, 52, 0.28); color: var(--ink); }
 .light-previews figure { margin: 0; text-align: center; }
 .light-previews img { height: 72px; display: block; background: #2a2533; border-radius: 4px; }
 .light-previews figcaption { font-size: 11px; opacity: 0.8; }
+
+/* --- Live Entity Inspector (Tool 4) --- */
+.region-inspect-details { margin-top: 6px; font-size: 11px; }
+.region-inspect-details summary { cursor: pointer; color: var(--accent, #6fc3df); }
+.entity-inspect-list { display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; margin-top: 4px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 4px; }
+.entity-item { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 2px 4px; }
+.btn-inspect { font-size: 10px; padding: 2px 6px; background: #3a3845; color: #fff; border: 1px solid #5a5768; border-radius: 3px; cursor: pointer; }
+.btn-inspect:hover { background: #504d60; }
+
+.inspector-modal { position: fixed; bottom: 20px; right: 20px; z-index: 1000; width: 380px; max-width: 90vw; max-height: 85vh; overflow-y: auto; background: #1f1d24; border: 1px solid #454252; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); padding: 16px; color: #eee; font-family: inherit; }
+.inspector-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+.inspector-header h3 { margin: 0; font-size: 16px; }
+.inspector-sub { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+.inspector-close-btn { font-size: 11px; padding: 4px 8px; background: #443c4f; color: #ddd; border: 1px solid #665b75; border-radius: 4px; cursor: pointer; }
+.inspector-close-btn:hover { background: #5a5068; color: #fff; }
+.inspector-bars { margin-bottom: 12px; }
+.bar-group { margin-bottom: 8px; }
+.bar-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+.progress-bar { width: 100%; height: 10px; background: #2f2c38; border-radius: 5px; overflow: hidden; }
+.progress-bar .fill { height: 100%; transition: width 0.2s ease; }
+.health-bar .fill { background: #e0474c; }
+.energy-bar .fill { background: #3b9ee0; }
+.inspector-section { margin-top: 12px; padding-top: 8px; border-top: 1px solid #2f2c38; }
+.inspector-section h4 { margin: 0 0 6px 0; font-size: 13px; color: #bbb; text-transform: uppercase; letter-spacing: 0.5px; }
+.inspector-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.inspector-tag { font-size: 11px; background: #2f2a3a; border: 1px solid #4f475f; padding: 2px 6px; border-radius: 4px; }
+.gauge-pips { font-size: 16px; letter-spacing: 3px; color: #ffd23f; margin: 4px 0; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 12px; }
+.inspector-table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 4px; }
+.inspector-table th { text-align: left; padding: 4px; opacity: 0.7; border-bottom: 1px solid #333; }
+.inspector-table td { padding: 4px; border-bottom: 1px solid #282531; }
+.threat-target-row { background: rgba(224, 71, 76, 0.15); }
+.badge.target { background: #e0474c; color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 3px; }
+.badge.woven { background: #9b5de5; color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 3px; }
+
+/* --- Combat Log (Tool 5) --- */
+.combat-log-pane { padding: 12px; }
+.combat-log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.combat-log-actions { display: flex; gap: 8px; align-items: center; }
+.combat-log-filters { margin-bottom: 12px; }
+.combat-log-filters input { width: 300px; max-width: 100%; padding: 6px 10px; font-size: 13px; background: #25222e; border: 1px solid #443e54; border-radius: 4px; color: #eee; }
+.combat-log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.combat-log-table th { text-align: left; padding: 8px; background: #25222e; border-bottom: 1px solid #443e54; }
+.combat-log-table td { padding: 6px 8px; border-bottom: 1px solid #282531; }
+.log-row.crit-row { background: rgba(255, 210, 63, 0.08); }
+.log-row.dodged-row { opacity: 0.7; }
+.damage-physical { color: #f28b43; font-weight: bold; }
+.damage-arcane { color: #b070f0; font-weight: bold; }
+.calling-tag { background: #353042; padding: 1px 4px; border-radius: 3px; font-size: 10px; opacity: 0.8; }
+.tag.crit { background: #ffd23f; color: #222; font-weight: bold; font-size: 10px; padding: 1px 4px; border-radius: 3px; }
+.tag.defeat { background: #e0474c; color: #fff; font-size: 10px; padding: 1px 4px; border-radius: 3px; }
+.tag.blocked { background: #555; color: #fff; font-size: 10px; padding: 1px 4px; border-radius: 3px; }
+.tag.dodged { background: #444; color: #aaa; font-size: 10px; padding: 1px 4px; border-radius: 3px; }
+.log-breakdown { font-size: 10px; opacity: 0.65; margin-top: 2px; }
+.log-time { font-family: ui-monospace, monospace; opacity: 0.6; font-size: 11px; }

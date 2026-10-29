@@ -62,6 +62,8 @@ export interface PlayerState {
   stance?: { ability: string; amount: number };
   /** Their Calling's signature gauge (region/gauges.ts), once they have one. */
   gauge?: GaugeState;
+  /** The creature or player they currently target, if any. */
+  targetId?: string | null;
 }
 
 /** A trap a player set (effects/trap.ts): it springs on the first creature to step close. */

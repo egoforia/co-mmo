@@ -2,6 +2,7 @@
 
 import { escapeHtml } from '../ui.ts';
 import { api, usd, when, type Budget, type Entry, type Tab } from './core.ts';
+import { openInspector } from './inspector.ts';
 
 interface Region {
   id: string;
@@ -17,7 +18,7 @@ interface Region {
   width: number;
   height: number;
   players: { id: string; name: string; x: number; y: number; level?: number }[];
-  creatures: { kind: string; x: number; y: number; alive: boolean }[];
+  creatures: { id?: string; kind: string; x: number; y: number; alive: boolean }[];
   npcs: { name: string; x: number; y: number }[];
   landmarks: { asset: string; x: number; y: number }[];
 }
@@ -40,8 +41,20 @@ async function world(): Promise<string> {
     if (!r) return '<div></div>';
     const alive = r.creatures.filter((c) => c.alive).length;
     const credit = r.wisher ? `<br><small>wished by ${escapeHtml(r.wisher)} · danger ${r.danger}</small>` : '';
+    const inspectItems: string[] = [];
+    for (const p of r.players) {
+      inspectItems.push(`<div class="entity-item"><span>${escapeHtml(p.name)} <small>(Lv ${p.level ?? 1})</small></span> <button type="button" class="btn-inspect" data-region="${r.id}" data-kind="player" data-id="${p.id}">Inspect</button></div>`);
+    }
+    for (const c of r.creatures) {
+      if (c.alive && c.id) {
+        inspectItems.push(`<div class="entity-item"><span>${escapeHtml(c.id)}</span> <button type="button" class="btn-inspect" data-region="${r.id}" data-kind="creature" data-id="${c.id}">Inspect</button></div>`);
+      }
+    }
+    const inspectSection = inspectItems.length
+      ? `<details class="region-inspect-details"><summary>Inspect entities (${inspectItems.length})</summary><div class="entity-inspect-list">${inspectItems.join('')}</div></details>`
+      : '';
     return `<figure class="region ${r.id} ${escapeHtml(r.biome)}"><canvas data-region="${r.id}" width="320" height="${Math.round((320 * r.height) / r.width)}"></canvas>
-      <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures${r.sky ? ` · ${escapeHtml(r.sky)}` : ''}${credit}</figcaption></figure>`;
+      <figcaption><b>${escapeHtml(r.name)}</b> · ${r.players.length} here · ${alive} creatures${r.sky ? ` · ${escapeHtml(r.sky)}` : ''}${credit}${inspectSection}</figcaption></figure>`;
   };
   const grid: string[] = [];
   for (let y = top; y < top + rows; y++) for (let x = left; x < left + columns; x++) grid.push(cell(x, y));
@@ -88,6 +101,16 @@ function drawMaps(): void {
       ctx.fillText(p.name, p.x * s + 7, p.y * s + 4);
     }
   }
+
+  document.querySelectorAll<HTMLButtonElement>('.btn-inspect').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const region = b.dataset.region!;
+      const kind = b.dataset.kind as 'player' | 'creature';
+      const id = b.dataset.id!;
+      openInspector(region, kind, id);
+    };
+  });
 }
 
 export const worldTab: Tab = { id: 'world', label: 'World', page: world, after: drawMaps, refreshMs: 3000 };

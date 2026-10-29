@@ -191,6 +191,13 @@ export class RegionServer {
       case 'ghosts':
         region.seeAcross(m.from, m.ghosts);
         return;
+      case 'inspect': {
+        const inspection = region.inspect(m.kind, m.id);
+        answer(this.bus, m, inspection ?? null);
+        return;
+      }
+      case 'watch-entity':
+        return;
     }
   }
 

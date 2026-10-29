@@ -22,10 +22,12 @@ import {
   staggerChance,
   wieldedFamily,
   wieldsTrained,
+  WOVEN_FACTOR,
   type StatusId,
 } from '@co-mmo/shared';
 import { provoke } from '../creature-brain.ts';
 import { addThreat } from '../threat.ts';
+import type { CombatLogger } from './combat-logger.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
 import type { Fallen } from './fallen.ts';
 import type { Gauges } from './gauges.ts';
@@ -34,6 +36,18 @@ import type { Quests } from './quests.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 import { tickStatuses } from './statuses.ts';
 
+export interface AttackTraceInfo {
+  actionKind?: 'attack' | 'ability' | 'status';
+  actionId?: string;
+  variance?: number;
+  stagger?: { chance: number; rolled: number; staggered: boolean };
+  crit?: { chance: number; rolled: number; crit: boolean; multiplier: number };
+  base?: number;
+  power?: number;
+  wovenFactor?: number;
+  gaugeFactor?: number;
+}
+
 /**
  * Players fighting creatures: plain attacks, abilities, and what a defeat
  * pays (XP shared with the party nearby, gold, a body with its loot).
@@ -41,6 +55,10 @@ import { tickStatuses } from './statuses.ts';
  * moves they share (EffectKit) and ticks statuses, traps, helpers and stances.
  */
 export class Combat implements EffectKit {
+  logger?: CombatLogger;
+  private activeCast?: Cast;
+  private lastCrit?: { chance: number; rolled: number; crit: boolean; multiplier: number };
+
   constructor(
     readonly s: RegionState,
     private readonly quests: Quests,
@@ -79,8 +97,19 @@ export class Combat implements EffectKit {
     const power = attackPower(ch);
     const stagger = staggerChance(ch);
     for (const c of hits) {
-      if (stagger && this.s.random() < stagger) this.stagger(c);
-      this.strike(p, c, this.critical(p, power * (0.9 + this.s.random() * 0.2)), { type: family.damageType, ranged: family.ranged });
+      const staggerRoll = this.s.random();
+      const isStagger = Boolean(stagger && staggerRoll < stagger);
+      if (isStagger) this.stagger(c);
+      const variance = 0.9 + this.s.random() * 0.2;
+      const amountWithCrit = this.critical(p, power * variance);
+      this.strike(p, c, amountWithCrit, { type: family.damageType, ranged: family.ranged }, {
+        actionKind: 'attack',
+        actionId: 'attack',
+        variance,
+        stagger: stagger ? { chance: stagger, rolled: staggerRoll, staggered: isStagger } : undefined,
+        base: power,
+        power,
+      });
       this.gauges.landed(p);
     }
   }
@@ -124,7 +153,11 @@ export class Combat implements EffectKit {
 
   /** A hit made critical by chance (Agility and Focus raise it) does half again as much. */
   critical(p: PlayerState, amount: number): number {
-    return this.s.random() < critChance(p.character) + this.gauges.critBonus(p) ? amount * CRIT_MULTIPLIER : amount;
+    const chance = critChance(p.character) + this.gauges.critBonus(p);
+    const rolled = this.s.random();
+    const isCrit = rolled < chance;
+    this.lastCrit = { chance, rolled, crit: isCrit, multiplier: CRIT_MULTIPLIER };
+    return isCrit ? amount * CRIT_MULTIPLIER : amount;
   }
 
   /**
@@ -134,19 +167,89 @@ export class Combat implements EffectKit {
    * The damage is threat from the player (times the ability's `threat`).
    * A defeat pays the rewards.
    */
-  strike(p: PlayerState, target: Creature, raw: number, how: Blow): void {
+  strike(p: PlayerState, target: Creature, raw: number, how: Blow, traceInfo?: AttackTraceInfo): void {
     const now = this.s.now();
     const weakened = now < p.character.weakenedUntil ? 0.5 : 1;
     const mark = statusOf(target, 'marked', now);
     const marked = mark?.by && (mark.by === p.info.id || (this.s.hooks.party?.(p.info.id) ?? []).includes(mark.by)) ? 1 + MARK_BONUS : 1;
+    const rawBeforeAbsorb = raw * weakened * marked;
+    const afterAbsorb = absorb(target, rawBeforeAbsorb, now);
+    const shieldAbsorb = rawBeforeAbsorb - afterAbsorb;
     const defence = how.pierce ? 0 : how.type === 'arcane' ? target.def.ward : target.def.armor;
-    const amount = afterArmor(absorb(target, raw * weakened * marked, now), defence ?? 0);
+    const amount = afterArmor(afterAbsorb, defence ?? 0);
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
     const { ability, ranged, type } = how;
     this.s.broadcastNear(target, { t: 'hit', by: p.info.id, target: target.id, amount, defeated, damage: type, ...(ability ? { ability } : {}), ...(ranged ? { ranged } : {}) });
+
+    const threatMultiplier = (ability && ABILITIES[ability]?.threat) || 1;
+    const threatAdded = amount * threatMultiplier;
+    const currentThreat = target.threat[p.info.id] ?? 0;
+
+    if (this.logger?.active) {
+      const cast = this.activeCast;
+      const crit = traceInfo?.crit ?? this.lastCrit;
+      const actionKind = traceInfo?.actionKind ?? (cast ? 'ability' : ability ? 'ability' : 'attack');
+      const actionId = traceInfo?.actionId ?? cast?.id ?? ability ?? 'attack';
+      const actionName = actionId === 'attack' ? 'Attack' : (ABILITIES[actionId]?.name ?? actionId);
+      const baseVal = traceInfo?.base ?? cast?.a.base ?? raw;
+      const powerVal = traceInfo?.power ?? (cast ? abilityAmount(p.character, cast.a) : raw);
+      const varianceVal = traceInfo?.variance ?? cast?.variance ?? 1;
+
+      this.logger.record({
+        id: `hit-${++this.s.bodyCount}-${now}`,
+        at: now,
+        tick: this.s.tickCount,
+        region: this.s.map.def.id,
+        attacker: {
+          id: p.info.id,
+          name: p.info.name,
+          kind: 'player',
+          calling: p.character.calling,
+        },
+        target: {
+          id: target.id,
+          name: target.def.name,
+          kind: 'creature',
+        },
+        action: {
+          id: actionId,
+          name: actionName,
+          kind: actionKind,
+        },
+        damageType: type,
+        pierce: Boolean(how.pierce),
+        rolls: {
+          variance: varianceVal,
+          crit,
+          stagger: traceInfo?.stagger,
+        },
+        factors: {
+          base: baseVal,
+          power: powerVal,
+          raw,
+          weakenedFactor: weakened,
+          markedFactor: marked,
+          wovenFactor: cast?.woven ? WOVEN_FACTOR : traceInfo?.wovenFactor,
+          gaugeFactor: traceInfo?.gaugeFactor,
+        },
+        mitigation: {
+          shieldAbsorb,
+          defenseStat: defence ?? 0,
+          afterDefense: amount,
+        },
+        finalAmount: amount,
+        defeated,
+        threat: {
+          added: threatAdded,
+          newTotal: currentThreat + threatAdded,
+        },
+      });
+    }
+    this.lastCrit = undefined;
+
     if (!defeated) {
-      addThreat(target, p.info.id, amount * ((ability && ABILITIES[ability]?.threat) || 1));
+      addThreat(target, p.info.id, threatAdded);
       return provoke(target, p.info.id, { creatures: this.s.creatures, now });
     }
     target.respawnAt = now + target.def.respawnSeconds * 1000;
@@ -184,11 +287,18 @@ export class Combat implements EffectKit {
     p.dirty = true;
     // The gauge may lift it: a finisher grows with the pips it spends, a Woven spell doubles.
     const spend = this.gauges.cast(p, a);
-    cast.amount = abilityAmount(ch, a) * (0.9 + this.s.random() * 0.2) * spend.factor;
+    const variance = 0.9 + this.s.random() * 0.2;
+    cast.variance = variance;
+    cast.amount = abilityAmount(ch, a) * variance * spend.factor;
     if (spend.woven) cast.woven = true;
     if (spend.spent) cast.spent = spend.spent;
-    if (rule?.run) rule.run(this, cast, effect);
-    else effect.run(this, cast);
+    this.activeCast = cast;
+    try {
+      if (rule?.run) rule.run(this, cast, effect);
+      else effect.run(this, cast);
+    } finally {
+      this.activeCast = undefined;
+    }
     this.gauges.spend(p, spend);
     // Riposte and Sidestep add Momentum (a taunt counts what it turned, effects/marks.ts).
     if (a.gain && a.effect !== 'taunt') this.gauges.add(p, a.gain);
@@ -197,7 +307,7 @@ export class Combat implements EffectKit {
 
   /** Each tick: statuses wear off and hurt, traps spring, helpers strike, Sanctuaries heal, stances drain Energy and gauges move. */
   tick(now: number): void {
-    tickStatuses(this.s, now, (by, c, amount, id) => this.strike(by, c, amount, statusBlow(id)));
+    tickStatuses(this.s, now, (by, c, amount, id) => this.strike(by, c, amount, statusBlow(id), { actionKind: 'status', actionId: id }));
     springTraps(this, now);
     helpersAct(this, now);
     tendSanctuaries(this, now);

@@ -382,7 +382,22 @@ export interface SnapshotMessage {
   bodies: BodyState[];
   /** NPCs inside the view radius. */
   npcs: NpcState[];
+  /** What skills left inside the view radius (traps, Echoes, a hawk, a sand double), when there is any. */
+  marks?: WorldMark[];
   online: number;
+}
+
+/**
+ * Something a skill leaves in the world that is only seen, never touched:
+ * a trap, an Echo, hallowed ground, a spirit hawk, a sand double. Shown as
+ * its painted picture (skill-art.ts), or not at all until that is painted.
+ */
+export interface WorldMark {
+  id: string;
+  asset: string;
+  x: number;
+  y: number;
+  floor?: number;
 }
 
 export interface ChatMessage {

@@ -131,7 +131,18 @@ export class RegionState {
   /** Traps set and helpers summoned by players here. */
   traps: Trap[] = [];
   helpers: Helper[] = [];
-  /** Hallowed ground laid by players here. */
+  /** Sand doubles left by Mirage: only seen, never struck. */
+  doubles: SandDouble[] = [];
+  /** The double of sand a Mirage leaves where its Duelist stood (paths/duelist.ts), seen until they come out of hiding. */
+export interface SandDouble {
+  owner: string;
+  x: number;
+  y: number;
+  floor: number;
+  until: number;
+}
+
+/** Hallowed ground laid by players here. */
   zones: Zone[] = [];
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   townsfolk: Townsperson[] = [];

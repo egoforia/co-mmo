@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
+import { ISO_WAYS, RACES, RACE_IDS, walkArt } from '@co-mmo/shared';
 import { ANCHORS } from '../src/assets/anchors.ts';
 import { GeminiImageProvider } from '../src/assets/gemini.ts';
 import { ProviderError } from '../src/assets/provider.ts';
@@ -79,6 +81,24 @@ describe('wished art requests', () => {
     expect(referencesFor('npc', 'sunlit-shore')).toEqual(['shore-trader', 'sanctum-pilgrim']);
     expect(referencesFor('creature', 'frostpeak')).toEqual(['woods-mushroom', 'shore-crab-knight']);
     expect(referencesFor('item', 'mirage-desert')).toEqual(['item-tonic', 'item-goat-horn']);
+  });
+
+  it("sends a player's people's body first, and nothing new for a look without a people", () => {
+    expect(referencesFor('player', 'sanctum', 'ursine')).toEqual(['bramble-ursine', 'player-mara']);
+    expect(referencesFor('player', 'sanctum')).toEqual(['player-mara', 'player-ilya']);
+    const lutran = artRequest({ kind: 'player', name: 'Pip', description: 'A sailor in a striped shirt.', race: 'lutran', look }, 'sunlit-shore');
+    expect(lutran.references).toEqual(['tide-lutran', 'player-mara']);
+    expect(lutran.prompt).toContain('one of the Lutran, otterfolk');
+  });
+
+  it("paints each people's body from an approved anchor with walks in all four isometric ways", async () => {
+    const shipped = JSON.parse(await readFile(new URL('../../client/public/art/manifest.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+    for (const race of RACE_IDS) {
+      const body = RACES[race].body;
+      expect(ANCHORS.find((a) => a.id === body), body).toBeTruthy();
+      expect(shipped[body], body).toBeTruthy();
+      for (const way of ISO_WAYS) expect(shipped[walkArt(body, way)], `${body} ${way}`).toBeTruthy();
+    }
   });
 
   it('builds the prompt from the Style Bible and the wish, with the biome for living things', () => {

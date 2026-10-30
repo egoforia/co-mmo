@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { CHARACTER_HEIGHT, RACES, isoSpan, type BiomeId, type Footprint, type PicturedWish } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, RACES, isoSpan, type BiomeId, type Footprint, type PicturedWish, type RaceId } from '@co-mmo/shared';
 import { pictureName } from './names.ts';
 import { removeKeyBackground } from './postprocess.ts';
 import type { GeneratedImage, ImageProvider } from './provider.ts';
@@ -63,9 +63,13 @@ const BIOME_REFERENCES: Partial<Record<BiomeId, { creature?: string; npc: string
   'mirage-desert': { creature: 'desert-scarab', npc: 'desert-cactus-folk' },
 };
 
-/** The anchors sent with a wished thing's picture: two, its biome's own first. */
-export function referencesFor(kind: PicturedWish['kind'], biome: BiomeId): string[] {
-  const own = kind === 'creature' || kind === 'npc' ? BIOME_REFERENCES[biome]?.[kind] : undefined;
+/**
+ * The anchors sent with a wished thing's picture: two, its biome's own
+ * first; a player's look sends their people's body first, so an Ursine
+ * stays a bear whatever they wear (docs/races.md).
+ */
+export function referencesFor(kind: PicturedWish['kind'], biome: BiomeId, race?: RaceId): string[] {
+  const own = kind === 'creature' || kind === 'npc' ? BIOME_REFERENCES[biome]?.[kind] : kind === 'player' && race ? RACES[race].body : undefined;
   return own ? [own, ...REFERENCES[kind].filter((r) => r !== own)].slice(0, 2) : REFERENCES[kind];
 }
 
@@ -108,7 +112,7 @@ export interface ArtRequest {
  * previews both use this, so a preview shows exactly what will be sent.
  */
 export function artRequest(def: PicturedWish, biome: BiomeId): ArtRequest {
-  return { prompt: buildPrompt(describeWish(def, biome)), references: referencesFor(def.kind, biome), box: BOX[def.kind] };
+  return { prompt: buildPrompt(describeWish(def, biome)), references: referencesFor(def.kind, biome, def.kind === 'player' ? def.race : undefined), box: BOX[def.kind] };
 }
 
 /**

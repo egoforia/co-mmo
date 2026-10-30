@@ -12,6 +12,10 @@ egoforia on 2026-10-27.
   your look. Your look wish ("How do you look?") is painted as one of your
   people; the people decides the body, the wish decides the rest (clothes,
   colours, scars, style).
+- Each people's body is an approved anchor with walks in all four isometric
+  ways (`body` in `races.ts`: Bramble Ursine, Dune Scorpid, Zephyr Falcon,
+  Sylvan Cervid, Tide Lutran). Until your look is painted you wear it, and
+  when it is painted it is sent to the image model as the first reference.
 - Characters made before peoples existed choose theirs, with their Calling,
   the next time they play (see Migration in [classes.md](classes.md)).
 - Changing your people later is a Moderate wish (6 Favor). The God repaints

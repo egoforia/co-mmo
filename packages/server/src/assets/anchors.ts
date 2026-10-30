@@ -1,4 +1,5 @@
 import type { AssetDescription } from './style.ts';
+import { HELD_ANCHORS } from './held-anchors.ts';
 import { LAND_ANCHORS } from './land-anchors.ts';
 
 /**
@@ -142,6 +143,8 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[] })
     colors: { main: 'sage green', secondary: 'apricot', accent: 'pink flower' }, details: ['woven poncho', 'tiny walking stick'],
     mood: 'wise, slow', extra: { role: 'elder' },
   },
+  // A plain picture of each weapon and off-hand family, for held items.
+  ...HELD_ANCHORS,
   // Players and items
   {
     id: 'player-mara', name: 'Mara', kind: 'player', biome: 'any',

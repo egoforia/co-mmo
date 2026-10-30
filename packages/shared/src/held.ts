@@ -1,5 +1,5 @@
 import { ITEMS, type Character } from './rpg.ts';
-import { WEAPON_FAMILIES } from './weapons.ts';
+import { OFFHAND_FAMILIES, WEAPON_FAMILIES, WEAPON_FAMILY_IDS, type OffhandFamily, type WeaponFamily } from './weapons.ts';
 import { facingSide, type Facing } from './walk.ts';
 
 // Held items (milestone 10): a player's painted look stays as it is, and the
@@ -38,6 +38,26 @@ export function heldSize(item: string | undefined): number {
  */
 export function heldBehind(facing: Facing, hand: 'right' | 'left'): boolean {
   return facing === 'back' || facingSide(facing) === (hand === 'right' ? 'left' : 'right');
+}
+
+/** Every weapon and off-hand family, each with a picture of its own (familyArt). */
+export const HELD_FAMILIES: readonly (WeaponFamily | OffhandFamily)[] = [...WEAPON_FAMILY_IDS, ...(Object.keys(OFFHAND_FAMILIES) as OffhandFamily[])];
+
+/** The art id of a family's own picture: a plain one of its kind, painted like any anchor. */
+export function familyArt(family: WeaponFamily | OffhandFamily): string {
+  return `held-${family}`;
+}
+
+/**
+ * The pictures an item may show in the hand, best first: its own, then its
+ * family's, which stands in while a wished weapon's own is unpainted or its
+ * grip is not found yet.
+ */
+export function heldArts(item: string): string[] {
+  const def = ITEMS[item];
+  if (!def) return [];
+  const family = def.weapon ?? def.offhand;
+  return family ? [def.art, familyArt(family)] : [def.art];
 }
 
 /** Points by art id, as the server serves them. */

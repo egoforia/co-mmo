@@ -48,6 +48,7 @@ import {
   dayPhase,
   weatherAt,
   skyWords,
+  type EntityInspection,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
@@ -59,9 +60,11 @@ import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
 import { TickProfiler } from './region/profiler.ts';
 import { Combat } from './region/combat.ts';
+import { CombatLogger, combatLogger } from './region/combat-logger.ts';
 import { Fallen } from './region/fallen.ts';
 import { Paths } from './region/paths/index.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
+import { inspectEntity } from './region/inspect.ts';
 import { Kit } from './region/kit.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
@@ -217,6 +220,7 @@ export class Region {
   private readonly ghosts = new Map<number, Ghosts>();
   /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
   strain = 0;
+  readonly logger: CombatLogger = combatLogger;
   /** Measures the simulation phases of each tick. */
   readonly profiler = new TickProfiler();
 
@@ -241,7 +245,9 @@ export class Region {
     this.fallen = new Fallen(this.s);
     this.paths = new Paths(this.s, this.gauges, () => this.combat);
     this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen, this.paths);
+    this.combat.logger = this.logger;
     this.minds = new Minds(this.s, this.gauges, this.combat, this.paths);
+    this.minds.logger = this.logger;
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
@@ -555,6 +561,28 @@ export class Region {
     return (this.s.creatures.find((k) => k.id === id) ?? this.s.townsfolk.find((n) => n.id === id) ?? this.s.players.get(id))?.floor;
   }
 
+  /** Internal simulation state for inspection and debug tools. */
+  get state(): RegionState {
+    return this.s;
+  }
+
+  /** Signature gauges system. */
+  get gaugeSystem(): Gauges {
+    return this.gauges;
+  }
+
+  /** Swaps or sets the combat logger for testing or recording. */
+  setCombatLogger(logger: CombatLogger): void {
+    (this as any).logger = logger;
+    this.combat.logger = logger;
+    this.minds.logger = logger;
+  }
+
+  /** Live entity inspector for Stewards and Owner (Tool 4). */
+  inspect(kind: 'player' | 'creature', id: string): EntityInspection | undefined {
+    return inspectEntity(this, kind, id);
+  }
+
   /**
    * Adds a player at the given position, or at the spawn point when it is
    * missing or no longer walkable (a wish may have changed the map).
@@ -616,6 +644,7 @@ export class Region {
         this.talk.chat(p, message.channel, message.text, message.to);
         break;
       case 'attack':
+        if (message.target !== undefined) p.targetId = message.target;
         this.combat.attack(p, message.target);
         break;
       case 'interact':
@@ -640,6 +669,7 @@ export class Region {
         this.kit.placePoint(p, message.stat);
         break;
       case 'ability':
+        if (message.target !== undefined) p.targetId = message.target;
         this.combat.useAbility(p, message.ability, message.target);
         break;
       case 'hotbar':

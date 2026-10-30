@@ -39,5 +39,7 @@ export * from './sea-cave.ts';
 export * as buildingKit from './building-kit/index.ts';
 export * from './footprints.ts';
 export * from './wished-abilities.ts';
+export * from './debug.ts';
+export * from './combat-log.ts';
 export * from './profiler.ts';
 export * from './slow-ticks.ts';

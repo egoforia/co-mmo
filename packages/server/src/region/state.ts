@@ -63,6 +63,8 @@ export interface PlayerState {
   stance?: { ability: string; amount: number };
   /** Their Calling's signature gauge (region/gauges.ts), once they have one. */
   gauge?: GaugeState;
+  /** The creature or player they currently target, if any. */
+  targetId?: string | null;
   /** Until when nothing can Slow or Root them (a Duelist's Dune Tempest, region/paths/duelist.ts). */
   steadfastUntil?: number;
 }

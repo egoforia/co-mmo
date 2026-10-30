@@ -19,6 +19,7 @@ import { playersTab } from './gods-view/players.ts';
 import { aiTab } from './gods-view/ai.ts';
 import { budgetTab } from './gods-view/budget.ts';
 import { serversTab } from './gods-view/servers.ts';
+import { combatLogTab } from './gods-view/combat-log.ts';
 import { updatesTab } from './gods-view/updates.ts';
 
 const main = document.getElementById('main')!;
@@ -38,6 +39,7 @@ const TABS: Tab[] = [
   aiTab,
   budgetTab,
   serversTab,
+  combatLogTab,
   { id: 'api-log', label: 'API Log', ownerOnly: true, page: () => apiLogPage(api) },
   updatesTab,
 ];

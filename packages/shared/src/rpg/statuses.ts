@@ -19,6 +19,10 @@ export type StatusId =
   | 'evasive'
   | 'poised'
   | 'hallowed'
+  | 'hidden'
+  | 'unyielding'
+  | 'graced'
+  | 'knelled'
   | 'weakened';
 
 /** What a status is called, whether it harms (Vigor shortens those), and its usual length. */
@@ -46,6 +50,10 @@ export const STATUSES: Record<StatusId, StatusInfo> = {
   evasive: { name: 'Evasive', harmful: false, seconds: 2, description: 'Dodges blows far more often.' },
   poised: { name: 'Poised', harmful: false, seconds: 1.5, description: 'Turns aside the next blow up close and strikes back.' },
   hallowed: { name: 'Hallowed', harmful: false, seconds: 2, description: 'No new ailment can take hold.' },
+  hidden: { name: 'Hidden', harmful: false, seconds: 2, description: 'Creatures cannot see or strike you.' },
+  unyielding: { name: 'Unyielding', harmful: false, seconds: 8, description: 'Health cannot drop below 1.' },
+  graced: { name: 'Graced', harmful: false, seconds: 10, description: 'Heals a little each second.' },
+  knelled: { name: 'Knelled', harmful: true, seconds: 8, description: 'Deals less damage, takes more, and heals whoever strikes it.' },
   weakened: { name: 'Weakened', harmful: true, seconds: 30, description: 'Deals half damage after waking at the shrine.' },
 };
 
@@ -65,6 +73,8 @@ export const POISONED_HEALING = 0.7;
 export const EVASIVE_DODGE = 0.3;
 /** Statuses only Calling skills give: wished abilities never carry them. */
 export const SKILL_STATUSES: readonly StatusId[] = ['guarded', 'evasive', 'poised', 'hallowed'];
+/** Statuses only Path skills give (skills/*-paths.ts): wished abilities never carry them. */
+export const PATH_STATUSES: readonly StatusId[] = ['hidden', 'unyielding', 'graced', 'knelled'];
 
 /** One running status: when it ends, who gave it, and its strength (damage per second, or what a shield has left). */
 export interface Status {

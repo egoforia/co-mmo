@@ -1,4 +1,4 @@
-import { applyContent, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
+import { RACES, applyContent, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until the image model paints a wish's own
@@ -38,7 +38,10 @@ export function lookArt(playerId: string): string | undefined {
   for (const e of entries.values()) {
     if (standing(e) && e.definition?.kind === 'player' && e.wisher.id === playerId && (!newest || e.at > newest.at)) newest = e;
   }
-  return newest ? wishArtKey(newest.id) : undefined;
+  if (!newest) return undefined;
+  // Until it is painted, their people's own body, which walks all four ways (races.ts).
+  const race = newest.definition?.kind === 'player' ? newest.definition.race : undefined;
+  return !newest.art && race ? RACES[race].body : wishArtKey(newest.id);
 }
 
 /**
@@ -86,7 +89,7 @@ async function prepareArt(entry: ContentEntry): Promise<void> {
     await Promise.all(regionPictures(entry.id, def).map((p) => picture(wishArtKey(p.id), entry.itemArt?.[p.id], p.def)));
     return;
   }
-  if (def.kind !== 'recipe' && def.kind !== 'loot' && def.kind !== 'calling') await picture(wishArtKey(entry.id), entry.art, def);
+  if (def.kind !== 'recipe' && def.kind !== 'loot' && def.kind !== 'calling' && def.kind !== 'skill') await picture(wishArtKey(entry.id), entry.art, def);
 }
 
 async function picture(key: string, painted: string | undefined, def: PicturedWish | RuleItem): Promise<void> {

@@ -214,3 +214,13 @@ The import tool (`scripts/import-all-beastfolk-attacks.ts`) executes the followi
        "cycleSeconds": 0.8
      }
      ```
+
+## 8. Held Items
+
+Character looks have empty hands. Weapons and off-hand items are separate
+pictures that the hand finder places on the found hand and grip. Each of the
+fourteen weapon families and four off-hand families also has a plain picture
+of its own (`held-<family>`, in `packages/server/src/assets/held-anchors.ts`).
+A wished weapon shows its family's picture in the hand until its own picture
+is painted, and sends the family picture as its first reference when it is
+painted (`heldArts` in `packages/shared/src/held.ts`).

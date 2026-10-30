@@ -2,6 +2,7 @@ import { FLAME_LIGHT } from './light.ts';
 import { CREATURES, ITEMS, NPC_GREETINGS, NPC_NAMES, QUESTS, type CreatureDef, type ItemDef, type QuestDef } from './rpg.ts';
 import { RECIPES, SHOPS, type RecipeDef, type ShopDef } from './kit.ts';
 import { creatureDefence } from './weapons.ts';
+import type { CallingId } from './classes.ts';
 
 // What lives in the great places of the bigger lands (places.ts): their
 // creatures, the people who keep them, what can be found there and the
@@ -139,21 +140,27 @@ export const LAND_RECIPES: Record<string, RecipeDef> = {
   'temple-lantern': { materials: [{ item: 'moth-dust', qty: 3 }, { item: 'crab-shell', qty: 1 }], result: { item: 'temple-lantern', qty: 1 }, wit: 2 },
 };
 
-/** The people of the great places. */
-export const LAND_PEOPLE: Record<string, { name: string; greeting: string; shop?: ShopDef }> = {
+/**
+ * The people of the great places. A `pathMentor` ends that Calling's trial
+ * and lets its players choose a Path (rpg/paths.ts PATH_MENTORS, trials.ts).
+ */
+export const LAND_PEOPLE: Record<string, { name: string; greeting: string; shop?: ShopDef; pathMentor?: CallingId }> = {
   'brother-tolle': {
     name: 'Brother Tolle',
+    pathMentor: 'bellkeeper',
     greeting: 'Every bell in this temple rings for a wish someone made. Listen, and you can hear the world growing.',
     shop: { sells: [{ item: 'temple-lantern', price: 25 }, { item: 'tonic', price: 8 }], teaches: [], buys: true },
   },
-  'sir-alder': { name: 'Sir Alder', greeting: 'Mossgate fell long ago, but someone must still keep the gate. I am the last knight. Perhaps you will be the next.' },
+  'sir-alder': { name: 'Sir Alder', pathMentor: 'warden', greeting: 'Mossgate fell long ago, but someone must still keep the gate. I am the last knight. Perhaps you will be the next.' },
   'queen-nerissa': {
     name: 'Queen Nerissa',
+    pathMentor: 'wishweaver',
     greeting: 'Welcome to my coral halls, land-walker. Pearls for news, news for pearls: that is the way of the tide.',
     shop: { sells: [{ item: 'tonic', price: 9 }], teaches: [], buys: true },
   },
   'sultana-zahra': {
     name: 'Sultana Zahra',
+    pathMentor: 'duelist',
     greeting: 'The Mirage Palace is real enough, traveller, whatever the dunes tell you. Sit, drink, and tell me of the world beyond the sand.',
     shop: { sells: [{ item: 'tonic', price: 12 }, { item: 'scroll-firebolt', price: 45 }], teaches: [], buys: true },
   },

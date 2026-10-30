@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { ISO_WAYS, ITEMS, WALKING_LOOKS, WALK_FRAMES, ruleItemId, wishArtKey, type ArtManifest } from '@co-mmo/shared';
+import { HELD_FAMILIES, ISO_WAYS, ITEMS, familyArt, WALKING_LOOKS, WALK_FRAMES, ruleItemId, wishArtKey, type ArtManifest } from '@co-mmo/shared';
 import type { PointSource } from './hand-finder.ts';
 import type { Store } from './store.ts';
 
@@ -46,5 +46,7 @@ export function pointSources(store: Store, shipped: ArtManifest, painted: ArtMan
     ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),
     ...Object.values(ITEMS).filter((item) => item.slot === 'weapon' || item.slot === 'offhand' || item.slot === 'charm')
       .flatMap((item) => source(item.art, 'grip', item.art.startsWith('wished-') ? wished.get(item.art) : art[item.art]?.file)),
+    // Each family's own picture, which a weapon shows until its own is painted.
+    ...HELD_FAMILIES.flatMap((family) => source(familyArt(family), 'grip', art[familyArt(family)]?.file)),
   ];
 }

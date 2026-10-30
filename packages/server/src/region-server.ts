@@ -1,10 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
-import { applyContent, DEFAULT_SKY, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
+import path from 'node:path';
+import { applyContent, DEFAULT_SKY, TICK_SECONDS, type ServerMessage, type SlowTickRecord } from '@co-mmo/shared';
 import { answer, type Bus } from './bus.ts';
 import { Region, type Cell, type Connection, type Leaving } from './region.ts';
 import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
 import { LoadMeter } from './load-meter.ts';
+import { getProfilerConfig, recordProfileLocally } from './debug/profiler-session.ts';
+import { aggregatePhaseTimings } from './region/profiler.ts';
 
 /** How often a region server tells the gateway it is alive and how busy it is. */
 export const BEAT_MS = 2000;
@@ -18,6 +21,8 @@ export interface RegionServerOptions {
   /** Runs the ticks itself (off in tests that tick by hand). */
   autoTick?: boolean;
   beatMs?: number;
+  env?: Record<string, string | undefined>;
+  slowTickThresholdMs?: number;
 }
 
 /**
@@ -47,7 +52,58 @@ export class RegionServer {
     this.id = options.id ?? `${hostname()}-${process.pid}-${randomBytes(3).toString('hex')}`;
     this.now = options.now ?? Date.now;
     this.random = options.random ?? Math.random;
-    this.meter = new LoadMeter(this.now);
+    this.meter = new LoadMeter(this.now, {
+      slowTickThresholdMs: options.slowTickThresholdMs,
+      phaseBreakdown: () => {
+        const sources = [...this.regions.values()].map((r) => ({
+          id: r.key,
+          timings: r.profiler.timings(),
+        }));
+        return aggregatePhaseTimings(sources);
+      },
+      onSlowTick: (totalMs, tickErr) => {
+        let slowestRegion: Region | undefined;
+        let maxRegionMs = -1;
+        let totalPlayers = 0;
+        let totalCreatures = 0;
+        let totalActiveStatuses = 0;
+        const currentPhases: Record<string, number> = {};
+
+        for (const r of this.regions.values()) {
+          const c = r.counts();
+          totalPlayers += c.players;
+          totalCreatures += c.creatures;
+          totalActiveStatuses += c.activeStatuses;
+
+          const unitPhases = r.profiler.currentPhases();
+          let unitTotal = 0;
+          for (const [p, ms] of Object.entries(unitPhases)) {
+            currentPhases[p] = Math.round(((currentPhases[p] ?? 0) + ms) * 100) / 100;
+            unitTotal += ms;
+          }
+          if (unitTotal > maxRegionMs) {
+            maxRegionMs = unitTotal;
+            slowestRegion = r;
+          }
+        }
+
+        const record: SlowTickRecord = {
+          id: 0,
+          at: this.now(),
+          host: this.id,
+          region: slowestRegion ? slowestRegion.key : this.id,
+          ...(slowestRegion?.cell ? { cell: { index: slowestRegion.cell.index, count: slowestRegion.cell.count } } : {}),
+          totalMs: Math.round(totalMs * 10) / 10,
+          phases: currentPhases,
+          players: slowestRegion ? slowestRegion.counts().players : totalPlayers,
+          creatures: slowestRegion ? slowestRegion.counts().creatures : totalCreatures,
+          activeStatuses: slowestRegion ? slowestRegion.counts().activeStatuses : totalActiveStatuses,
+          ...(tickErr ? { error: (tickErr as Error).message ?? String(tickErr) } : {}),
+        };
+
+        this.toGateway({ t: 'slow-tick', server: this.id, record });
+      },
+    });
   }
 
   /** Starts listening, says hello, and starts ticking. */
@@ -120,6 +176,10 @@ export class RegionServer {
     }
     if (m.t === 'world') {
       this.world = m.state;
+      return;
+    }
+    if (m.t === 'start-profile') {
+      void this.recordProfile(m.profileId, m.durationSeconds, m.kind);
       return;
     }
     if (m.t === 'content') {
@@ -270,6 +330,18 @@ export class RegionServer {
 
   private failed(err: unknown): void {
     this.meter.failed(err, 'Region server error');
+  }
+
+  private async recordProfile(profileId: string, durationSeconds: number, kind: 'cpu' | 'heap'): Promise<void> {
+    try {
+      const config = getProfilerConfig(this.options.env);
+      const ext = kind === 'cpu' ? 'cpuprofile' : 'heapsnapshot';
+      const filePath = path.join(config.dir, `${profileId}.${ext}`);
+      const { data } = await recordProfileLocally(filePath, kind, durationSeconds, config);
+      this.toGateway({ t: 'profile-done', profileId, data });
+    } catch (err) {
+      this.toGateway({ t: 'profile-done', profileId, error: (err as Error).message });
+    }
   }
 
   private toGateway(message: ToGateway): void {

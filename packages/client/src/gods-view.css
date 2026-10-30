@@ -214,6 +214,17 @@ ul.brief { margin: 4px 0 8px; padding-left: 18px; }
 /* Server health */
 .host { border-top: 1px solid var(--edge); margin-top: 14px; padding-top: 4px; }
 .host select { margin-left: 8px; }
+.phase-breakdown { margin: 12px 0 8px; }
+.phase-breakdown h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.phase-bar { display: flex; height: 10px; border-radius: 4px; overflow: hidden; background: var(--edge); margin: 6px 0 10px; }
+.phase-segment { height: 100%; transition: width 0.2s ease; }
+.phase-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.phase-table { margin-bottom: 12px; }
+.slow-ticks { border-top: 1px solid var(--edge); margin-top: 16px; padding-top: 8px; }
+.slow-ticks summary { font-size: 15px; cursor: pointer; user-select: none; }
+.slow-ticks-table { margin-top: 8px; }
+.slow-tick-detail { background: rgba(0, 0, 0, 0.05); }
+.slow-tick-phases { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; font-size: 12px; }
 
 /* API Log */
 .form.filters { max-width: none; }

@@ -19,6 +19,12 @@ export interface RaceDef {
   name: string;
   /** Their animal, for the painter: the people decides the body, the look wish the rest. */
   animal: string;
+  /**
+   * The approved anchor that is their body (assets/anchors, with walks in all
+   * four isometric ways): worn until a player's own look is painted, and sent
+   * to the image model as the first reference when it is.
+   */
+  body: string;
   /** Where their families' stories come from. */
   home: string;
   /** +1 to two attributes that are never neighbours on the pentagon. */
@@ -33,31 +39,31 @@ export interface RaceDef {
 
 export const RACES: Record<RaceId, RaceDef> = {
   ursine: {
-    id: 'ursine', name: 'Ursine', animal: 'bear', home: 'Whispering Woods',
+    id: 'ursine', name: 'Ursine', animal: 'bear', body: 'bramble-ursine', home: 'Whispering Woods',
     lift: { might: 1, spirit: 1 }, trait: 'hibernal', traitName: 'Hibernal',
     traitText: 'You heal 25% faster when out of a fight.',
     blurb: 'Sturdy bearfolk of the Whispering Woods, who sleep deep and heal well.',
   },
   scorpid: {
-    id: 'scorpid', name: 'Scorpid', animal: 'scorpion', home: 'Mirage Desert',
+    id: 'scorpid', name: 'Scorpid', animal: 'scorpion', body: 'dune-scorpid', home: 'Mirage Desert',
     lift: { agility: 1, vigor: 1 }, trait: 'chitin', traitName: 'Chitin',
     traitText: 'Poison and bleeding last half as long on you.',
     blurb: 'Patient, chitin-plated scorpionfolk of the Mirage Desert. They fear no venom.',
   },
   falcon: {
-    id: 'falcon', name: 'Falcon', animal: 'falcon', home: 'Sky Ruins and Frostpeak',
+    id: 'falcon', name: 'Falcon', animal: 'falcon', body: 'zephyr-falcon', home: 'Sky Ruins and Frostpeak',
     lift: { agility: 1, spirit: 1 }, trait: 'keen-eye', traitName: 'Keen Eye',
     traitText: 'Your ranged attacks and skills reach one tile further, and you spot hidden things from further away.',
     blurb: 'Lean, watchful birdfolk of the high cliffs, who see every danger coming.',
   },
   cervid: {
-    id: 'cervid', name: 'Cervid', animal: 'deer', home: 'Mushroom Hollow',
+    id: 'cervid', name: 'Cervid', animal: 'deer', body: 'sylvan-cervid', home: 'Mushroom Hollow',
     lift: { wit: 1, vigor: 1 }, trait: 'mycelial-sense', traitName: 'Mycelial Sense',
     traitText: 'Healing on you is 10% stronger, and herbs and materials nearby show on your map.',
     blurb: 'Serene deerfolk of Mushroom Hollow, with velvet antlers, who hear the land.',
   },
   lutran: {
-    id: 'lutran', name: 'Lutran', animal: 'otter', home: 'Sunlit Shore',
+    id: 'lutran', name: 'Lutran', animal: 'otter', body: 'tide-lutran', home: 'Sunlit Shore',
     lift: { might: 1, wit: 1 }, trait: 'tideborn', traitName: 'Tideborn',
     traitText: 'You move 10% faster on shore sand and in shallow water.',
     blurb: 'Curious, buoyant otterfolk of the Sunlit Shore, who are never bored.',

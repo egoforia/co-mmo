@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import {
   CREATURES,
+  heldArts,
   heldSize,
   ITEMS,
   Interpolator,
@@ -383,8 +384,18 @@ export function setHeld(
   dropLight(scene, a[slot]?.lit);
   const light = item ? ITEMS[item]?.light : undefined;
   a[slot] = item ? { item, lit: light ? makeLight(scene, light) : undefined } : undefined;
+  // Its own picture; a family's picture ships with the game and is loaded with it.
   const key = item ? ITEMS[item]?.art : undefined;
   if (key && !scene.textures.exists(key)) void loadArt(key, artSrc(key));
+}
+
+/**
+ * The picture shown in the hand: the item's own once it is loaded and its
+ * grip found, else its family's (a wished bow shows a bow until its own is
+ * painted), else nothing.
+ */
+export function heldPicture(scene: Phaser.Scene, item: string, points: ArtPointsManifest): string | undefined {
+  return heldArts(item).find((key) => points[key]?.grip && scene.textures.exists(key));
 }
 
 /**
@@ -403,7 +414,7 @@ export function placeHeld(
 ): void {
   const held = side === 'right' ? a.held : a.offHeld;
   if (!held) return;
-  const key = ITEMS[held.item]?.art;
+  const key = heldPicture(scene, held.item, points);
   const b = a.body;
   const hand = handOf(a, side, points);
   const grip = key ? points[key]?.grip : undefined;
@@ -413,7 +424,7 @@ export function placeHeld(
     const lx = b.x + (b.flipX ? b.originX - hx : hx - b.originX) * b.displayWidth;
     placeLight(held.lit, lx, b.y + (hy - b.originY) * b.displayHeight, scene.time.now, b.visible, darkness);
   }
-  if (!key || !hand || !grip || !scene.textures.exists(key)) {
+  if (!key || !hand || !grip) {
     held.image?.setVisible(false);
     return;
   }

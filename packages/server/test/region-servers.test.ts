@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { MemoryBus } from '../src/bus.ts';
@@ -27,9 +30,9 @@ async function settle(rounds = 8): Promise<void> {
   for (let i = 0; i < rounds; i++) await new Promise((r) => setImmediate(r));
 }
 
-async function until(test: () => boolean, ms = 3000): Promise<void> {
+async function until(test: () => boolean | Promise<boolean>, ms = 3000): Promise<void> {
   const end = Date.now() + ms;
-  while (!test()) {
+  while (!(await test())) {
     if (Date.now() > end) throw new Error('timed out');
     await new Promise((r) => setTimeout(r, 5));
   }
@@ -274,5 +277,49 @@ describe("God's View Server health", () => {
     expect(app!.world.home).not.toBe(old);
     expect(app!.world.home.has(owner.id)).toBe(true);
     expect((await api(base, '/api/admin/servers/move', owner.token, 'POST', { region: 'sanctum', to: 'r1' })).status).toBe(400);
+  });
+
+  it('records a CPU profile on a remote region server across the bus', async () => {
+    const tempDir = await fs.promises.mkdtemp(path.join(tmpdir(), 'remote-profiles-'));
+    const bus = new MemoryBus();
+    const regionServer = new RegionServer({ bus, id: 'r1', env: { PROFILE_DIR: tempDir } });
+    const { store, base } = await start({
+      regionBus: bus,
+      env: { PROFILE_DIR: tempDir },
+    });
+    await regionServer.start();
+    running.push(regionServer);
+    await until(() => app!.world.home.host === 'r1');
+
+    const owner = account(store, 'egoforia', 'owner');
+
+    // Request remote profiling on r1
+    const res = await api(base, '/api/admin/servers/profile', owner.token, 'POST', {
+      host: 'r1',
+      kind: 'cpu',
+      durationSeconds: 0.15,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.started).toBe(true);
+    expect(res.body.profile.host).toBe('r1');
+    const profileId = res.body.profile.id;
+
+    // Check status is recording
+    const statusDuring = await api(base, '/api/admin/servers/profile/status', owner.token);
+    expect(statusDuring.body.recording).toBe(true);
+
+    // Wait until recording is done
+    await until(async () => !(await api(base, '/api/admin/servers/profile/status', owner.token)).body.recording, 5000);
+
+    // Download the profile from gateway
+    const download = await fetch(`${base}/api/admin/servers/profile/${encodeURIComponent(profileId)}`, {
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+    expect(download.status).toBe(200);
+    const data = await download.json();
+    expect(data).toHaveProperty('nodes');
+    expect(Array.isArray(data.nodes)).toBe(true);
+
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
   });
 });

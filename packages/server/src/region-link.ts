@@ -1,4 +1,4 @@
-import type { Character, ClientMessage, SkyConfig, NpcPlacement, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage, EntityInspection } from '@co-mmo/shared';
+import type { Character, ClientMessage, SkyConfig, NpcPlacement, PhaseTimings, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage, SlowTickRecord, EntityInspection } from '@co-mmo/shared';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { Carry, Cell, Connection, Departure, Ghosts, Leaving } from './region.ts';
 import type { Tile } from '@co-mmo/shared';
@@ -130,6 +130,14 @@ export interface ServerLoad {
   host: string;
   pid: number;
   startedAt: number;
+  /** Per-phase timing breakdown over recent ticks. */
+  phases?: PhaseTimings;
+  /** Slowest region and phase on this host, if any. */
+  slowestRegion?: {
+    id: string;
+    phase: string;
+    ms: number;
+  };
 }
 
 /** One hosted region's state in a beat: who is there and its creatures, for God's View. */
@@ -163,6 +171,7 @@ export type ToServer =
   | { t: 'watch-entity'; region: string; kind: 'player' | 'creature'; id: string; watch: boolean }
   /** The gateway does not know this server (it restarted, or gave the server up for dead): drop everything and say hello again. */
   | { t: 'reset' }
+  | { t: 'start-profile'; profileId: string; durationSeconds: number; kind: 'cpu' | 'heap' }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };
 
 /** One thing for the gateway to pass on to a player. */
@@ -183,5 +192,8 @@ export type ToGateway =
   /** A cell's border, each tick, for the cells beside it. */
   | { t: 'edge'; server: string; region: string; ghosts: Ghosts }
   | { t: 'entity-inspection'; server: string; region: string; data: EntityInspection }
+  /** A tick that exceeded the time budget, captured for investigation. */
+  | { t: 'slow-tick'; server: string; record: SlowTickRecord }
   | { t: 'bye'; server: string }
+  | { t: 'profile-done'; profileId: string; error?: string; data?: string }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };

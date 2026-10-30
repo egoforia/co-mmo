@@ -65,6 +65,108 @@
     "width": 128,
     "height": 128
   },
+  "bramble-ursine": {
+    "file": "art/bramble-ursine.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "bramble-ursine-attack-back-left": {
+    "file": "art/bramble-ursine-attack-back-left.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 176,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "bramble-ursine-attack-back-right": {
+    "file": "art/bramble-ursine-attack-back-right.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 176,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "bramble-ursine-attack-front-left": {
+    "file": "art/bramble-ursine-attack-front-left.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 176,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "bramble-ursine-attack-front-right": {
+    "file": "art/bramble-ursine-attack-front-right.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 176,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "bramble-ursine-run-back-left": {
+    "file": "art/bramble-ursine-run-back-left.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-run-back-right": {
+    "file": "art/bramble-ursine-run-back-right.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-run-front-left": {
+    "file": "art/bramble-ursine-run-front-left.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-run-front-right": {
+    "file": "art/bramble-ursine-run-front-right.png",
+    "kind": "walk",
+    "width": 1520,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "bramble-ursine-walk-back-left": {
+    "file": "art/bramble-ursine-walk-back-left.png",
+    "kind": "walk",
+    "width": 1656,
+    "height": 185,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "bramble-ursine-walk-back-right": {
+    "file": "art/bramble-ursine-walk-back-right.png",
+    "kind": "walk",
+    "width": 1656,
+    "height": 185,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "bramble-ursine-walk-front-left": {
+    "file": "art/bramble-ursine-walk-front-left.png",
+    "kind": "walk",
+    "width": 1656,
+    "height": 185,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "bramble-ursine-walk-front-right": {
+    "file": "art/bramble-ursine-walk-front-right.png",
+    "kind": "walk",
+    "width": 1656,
+    "height": 185,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
   "bridge-planks": {
     "file": "art/bridge-planks.png",
     "kind": "tile",
@@ -257,9 +359,267 @@
     "width": 896,
     "height": 512
   },
+  "dune-scorpid": {
+    "file": "art/dune-scorpid.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "dune-scorpid-attack-back-left": {
+    "file": "art/dune-scorpid-attack-back-left.png",
+    "kind": "walk",
+    "width": 2952,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "dune-scorpid-attack-back-right": {
+    "file": "art/dune-scorpid-attack-back-right.png",
+    "kind": "walk",
+    "width": 2952,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "dune-scorpid-attack-front-left": {
+    "file": "art/dune-scorpid-attack-front-left.png",
+    "kind": "walk",
+    "width": 2952,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "dune-scorpid-attack-front-right": {
+    "file": "art/dune-scorpid-attack-front-right.png",
+    "kind": "walk",
+    "width": 2952,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "dune-scorpid-run-back-left": {
+    "file": "art/dune-scorpid-run-back-left.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-back-right": {
+    "file": "art/dune-scorpid-run-back-right.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-front-left": {
+    "file": "art/dune-scorpid-run-front-left.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-run-front-right": {
+    "file": "art/dune-scorpid-run-front-right.png",
+    "kind": "walk",
+    "width": 1480,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "dune-scorpid-walk-back-left": {
+    "file": "art/dune-scorpid-walk-back-left.png",
+    "kind": "walk",
+    "width": 1440,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "dune-scorpid-walk-back-right": {
+    "file": "art/dune-scorpid-walk-back-right.png",
+    "kind": "walk",
+    "width": 1440,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "dune-scorpid-walk-front-left": {
+    "file": "art/dune-scorpid-walk-front-left.png",
+    "kind": "walk",
+    "width": 1440,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "dune-scorpid-walk-front-right": {
+    "file": "art/dune-scorpid-walk-front-right.png",
+    "kind": "walk",
+    "width": 1440,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "fx-bell": {
+    "file": "art/fx-bell.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-echo": {
+    "file": "art/fx-echo.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-ember": {
+    "file": "art/fx-ember.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-gale": {
+    "file": "art/fx-gale.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-hallowed-ground": {
+    "file": "art/fx-hallowed-ground.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-mark": {
+    "file": "art/fx-mark.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
   "fx-slash": {
     "file": "art/fx-slash.png",
     "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-tide": {
+    "file": "art/fx-tide.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "fx-trap": {
+    "file": "art/fx-trap.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "held-axe": {
+    "file": "art/held-axe.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-bell-mace": {
+    "file": "art/held-bell-mace.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-bow": {
+    "file": "art/held-bow.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-censer": {
+    "file": "art/held-censer.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-greatsword": {
+    "file": "art/held-greatsword.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-hammer": {
+    "file": "art/held-hammer.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-hand-bell": {
+    "file": "art/held-hand-bell.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-javelins": {
+    "file": "art/held-javelins.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-lantern": {
+    "file": "art/held-lantern.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-orb": {
+    "file": "art/held-orb.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-shield": {
+    "file": "art/held-shield.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-sling": {
+    "file": "art/held-sling.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-spear": {
+    "file": "art/held-spear.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-staff": {
+    "file": "art/held-staff.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-sword": {
+    "file": "art/held-sword.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-tome": {
+    "file": "art/held-tome.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-twin-blades": {
+    "file": "art/held-twin-blades.png",
+    "kind": "item",
+    "width": 128,
+    "height": 128
+  },
+  "held-wand": {
+    "file": "art/held-wand.png",
+    "kind": "item",
     "width": 128,
     "height": 128
   },
@@ -425,6 +785,18 @@
     "width": 128,
     "height": 128
   },
+  "ladder-down": {
+    "file": "art/ladder-down.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 160
+  },
+  "ladder-up": {
+    "file": "art/ladder-up.png",
+    "kind": "prop",
+    "width": 128,
+    "height": 256
+  },
   "player-ilya": {
     "file": "art/player-ilya.png",
     "kind": "player",
@@ -461,6 +833,54 @@
     "width": 192,
     "height": 256
   },
+  "sanctum-cathedral-door": {
+    "file": "art/sanctum-cathedral-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-floor": {
+    "file": "art/sanctum-cathedral-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-brazier": {
+    "file": "art/sanctum-cathedral-furniture-brazier.png",
+    "kind": "set-piece",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-crypt-gate": {
+    "file": "art/sanctum-cathedral-furniture-crypt-gate.png",
+    "kind": "set-piece",
+    "width": 640,
+    "height": 512
+  },
+  "sanctum-cathedral-furniture-gold-pew": {
+    "file": "art/sanctum-cathedral-furniture-gold-pew.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-high-altar": {
+    "file": "art/sanctum-cathedral-furniture-high-altar.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-cathedral-furniture-lectern": {
+    "file": "art/sanctum-cathedral-furniture-lectern.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-cathedral-wall": {
+    "file": "art/sanctum-cathedral-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
   "sanctum-flagstones": {
     "file": "art/sanctum-flagstones.png",
     "kind": "tile",
@@ -472,6 +892,54 @@
     "kind": "set-piece",
     "width": 384,
     "height": 320
+  },
+  "sanctum-inn-door": {
+    "file": "art/sanctum-inn-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-inn-floor": {
+    "file": "art/sanctum-inn-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-inn-furniture-ale-cask": {
+    "file": "art/sanctum-inn-furniture-ale-cask.png",
+    "kind": "set-piece",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-inn-furniture-bar-counter": {
+    "file": "art/sanctum-inn-furniture-bar-counter.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-inn-furniture-bench": {
+    "file": "art/sanctum-inn-furniture-bench.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-inn-furniture-dining-table": {
+    "file": "art/sanctum-inn-furniture-dining-table.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-inn-furniture-hearth": {
+    "file": "art/sanctum-inn-furniture-hearth.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-inn-wall": {
+    "file": "art/sanctum-inn-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
   },
   "sanctum-lantern-moth": {
     "file": "art/sanctum-lantern-moth.png",
@@ -500,6 +968,48 @@
   "sanctum-rock": {
     "file": "art/sanctum-rock.png",
     "kind": "prop",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-scriptorium-door": {
+    "file": "art/sanctum-scriptorium-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-scriptorium-floor": {
+    "file": "art/sanctum-scriptorium-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-reading-lectern": {
+    "file": "art/sanctum-scriptorium-furniture-reading-lectern.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-relic-case": {
+    "file": "art/sanctum-scriptorium-furniture-relic-case.png",
+    "kind": "set-piece",
+    "width": 384,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-scribe-desk": {
+    "file": "art/sanctum-scriptorium-furniture-scribe-desk.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-scriptorium-furniture-tall-bookshelf": {
+    "file": "art/sanctum-scriptorium-furniture-tall-bookshelf.png",
+    "kind": "set-piece",
+    "width": 256,
+    "height": 128
+  },
+  "sanctum-scriptorium-wall": {
+    "file": "art/sanctum-scriptorium-wall.png",
+    "kind": "tile",
     "width": 128,
     "height": 128
   },
@@ -556,6 +1066,12 @@
     "kind": "tile",
     "width": 128,
     "height": 128
+  },
+  "sandstorm-double": {
+    "file": "art/sandstorm-double.png",
+    "kind": "monster",
+    "width": 134,
+    "height": 168
   },
   "shore-coral-palace-door": {
     "file": "art/shore-coral-palace-door.png",
@@ -743,6 +1259,342 @@
     "width": 128,
     "height": 192
   },
+  "spirit-hawk": {
+    "file": "art/spirit-hawk.png",
+    "kind": "monster",
+    "width": 180,
+    "height": 112
+  },
+  "stairs-down": {
+    "file": "art/stairs-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-up": {
+    "file": "art/stairs-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "status-bleeding": {
+    "file": "art/status-bleeding.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-burning": {
+    "file": "art/status-burning.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-evasive": {
+    "file": "art/status-evasive.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-graced": {
+    "file": "art/status-graced.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-guarded": {
+    "file": "art/status-guarded.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-hallowed": {
+    "file": "art/status-hallowed.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-hidden": {
+    "file": "art/status-hidden.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-knelled": {
+    "file": "art/status-knelled.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-marked": {
+    "file": "art/status-marked.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-poised": {
+    "file": "art/status-poised.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-poisoned": {
+    "file": "art/status-poisoned.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-rooted": {
+    "file": "art/status-rooted.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-shielded": {
+    "file": "art/status-shielded.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-silenced": {
+    "file": "art/status-silenced.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-slowed": {
+    "file": "art/status-slowed.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-stunned": {
+    "file": "art/status-stunned.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-taunted": {
+    "file": "art/status-taunted.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-unyielding": {
+    "file": "art/status-unyielding.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "status-weakened": {
+    "file": "art/status-weakened.png",
+    "kind": "effect",
+    "width": 128,
+    "height": 128
+  },
+  "sylvan-cervid": {
+    "file": "art/sylvan-cervid.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "sylvan-cervid-attack-back-left": {
+    "file": "art/sylvan-cervid-attack-back-left.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "sylvan-cervid-attack-back-right": {
+    "file": "art/sylvan-cervid-attack-back-right.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "sylvan-cervid-attack-front-left": {
+    "file": "art/sylvan-cervid-attack-front-left.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "sylvan-cervid-attack-front-right": {
+    "file": "art/sylvan-cervid-attack-front-right.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 174,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "sylvan-cervid-run-back-left": {
+    "file": "art/sylvan-cervid-run-back-left.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-back-right": {
+    "file": "art/sylvan-cervid-run-back-right.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-front-left": {
+    "file": "art/sylvan-cervid-run-front-left.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-run-front-right": {
+    "file": "art/sylvan-cervid-run-front-right.png",
+    "kind": "walk",
+    "width": 1340,
+    "height": 184,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "sylvan-cervid-walk-back-left": {
+    "file": "art/sylvan-cervid-walk-back-left.png",
+    "kind": "walk",
+    "width": 1536,
+    "height": 181,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "sylvan-cervid-walk-back-right": {
+    "file": "art/sylvan-cervid-walk-back-right.png",
+    "kind": "walk",
+    "width": 1536,
+    "height": 181,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "sylvan-cervid-walk-front-left": {
+    "file": "art/sylvan-cervid-walk-front-left.png",
+    "kind": "walk",
+    "width": 1536,
+    "height": 181,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "sylvan-cervid-walk-front-right": {
+    "file": "art/sylvan-cervid-walk-front-right.png",
+    "kind": "walk",
+    "width": 1536,
+    "height": 181,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "tide-lutran": {
+    "file": "art/tide-lutran.png",
+    "kind": "npc",
+    "width": 128,
+    "height": 192
+  },
+  "tide-lutran-attack-back-left": {
+    "file": "art/tide-lutran-attack-back-left.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 177,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "tide-lutran-attack-back-right": {
+    "file": "art/tide-lutran-attack-back-right.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 177,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "tide-lutran-attack-front-left": {
+    "file": "art/tide-lutran-attack-front-left.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 177,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "tide-lutran-attack-front-right": {
+    "file": "art/tide-lutran-attack-front-right.png",
+    "kind": "walk",
+    "width": 3000,
+    "height": 177,
+    "frames": 12,
+    "cycleSeconds": 0.8
+  },
+  "tide-lutran-run-back-left": {
+    "file": "art/tide-lutran-run-back-left.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 186,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-back-right": {
+    "file": "art/tide-lutran-run-back-right.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 186,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-front-left": {
+    "file": "art/tide-lutran-run-front-left.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 186,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-run-front-right": {
+    "file": "art/tide-lutran-run-front-right.png",
+    "kind": "walk",
+    "width": 1740,
+    "height": 186,
+    "frames": 10,
+    "cycleSeconds": 0.67
+  },
+  "tide-lutran-walk-back-left": {
+    "file": "art/tide-lutran-walk-back-left.png",
+    "kind": "walk",
+    "width": 2232,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "tide-lutran-walk-back-right": {
+    "file": "art/tide-lutran-walk-back-right.png",
+    "kind": "walk",
+    "width": 2232,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "tide-lutran-walk-front-left": {
+    "file": "art/tide-lutran-walk-front-left.png",
+    "kind": "walk",
+    "width": 2232,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
+  "tide-lutran-walk-front-right": {
+    "file": "art/tide-lutran-walk-front-right.png",
+    "kind": "walk",
+    "width": 2232,
+    "height": 184,
+    "frames": 12,
+    "cycleSeconds": 0.9
+  },
   "woods-bark-golem": {
     "file": "art/woods-bark-golem.png",
     "kind": "monster",
@@ -923,417 +1775,25 @@
     "width": 512,
     "height": 512
   },
-  "bramble-ursine": {
-    "file": "art/bramble-ursine.png",
-    "kind": "npc",
-    "width": 128,
-    "height": 192
-  },
-  "tide-lutran": {
-    "file": "art/tide-lutran.png",
-    "kind": "npc",
-    "width": 128,
-    "height": 192
-  },
   "zephyr-falcon": {
     "file": "art/zephyr-falcon.png",
     "kind": "npc",
     "width": 128,
     "height": 192
   },
-  "dune-scorpid": {
-    "file": "art/dune-scorpid.png",
-    "kind": "npc",
-    "width": 128,
-    "height": 192
-  },
-  "sylvan-cervid": {
-    "file": "art/sylvan-cervid.png",
-    "kind": "npc",
-    "width": 128,
-    "height": 192
-  },
-  "bramble-ursine-walk-front-left": {
-    "file": "art/bramble-ursine-walk-front-left.png",
+  "zephyr-falcon-attack-back-left": {
+    "file": "art/zephyr-falcon-attack-back-left.png",
     "kind": "walk",
-    "width": 1656,
-    "height": 185,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "bramble-ursine-walk-front-right": {
-    "file": "art/bramble-ursine-walk-front-right.png",
-    "kind": "walk",
-    "width": 1656,
-    "height": 185,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "bramble-ursine-walk-back-left": {
-    "file": "art/bramble-ursine-walk-back-left.png",
-    "kind": "walk",
-    "width": 1656,
-    "height": 185,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "bramble-ursine-walk-back-right": {
-    "file": "art/bramble-ursine-walk-back-right.png",
-    "kind": "walk",
-    "width": 1656,
-    "height": 185,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "tide-lutran-walk-front-left": {
-    "file": "art/tide-lutran-walk-front-left.png",
-    "kind": "walk",
-    "width": 2232,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "tide-lutran-walk-front-right": {
-    "file": "art/tide-lutran-walk-front-right.png",
-    "kind": "walk",
-    "width": 2232,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "tide-lutran-walk-back-left": {
-    "file": "art/tide-lutran-walk-back-left.png",
-    "kind": "walk",
-    "width": 2232,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "tide-lutran-walk-back-right": {
-    "file": "art/tide-lutran-walk-back-right.png",
-    "kind": "walk",
-    "width": 2232,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "zephyr-falcon-walk-front-left": {
-    "file": "art/zephyr-falcon-walk-front-left.png",
-    "kind": "walk",
-    "width": 1680,
-    "height": 187,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "zephyr-falcon-walk-front-right": {
-    "file": "art/zephyr-falcon-walk-front-right.png",
-    "kind": "walk",
-    "width": 1680,
-    "height": 187,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "zephyr-falcon-walk-back-left": {
-    "file": "art/zephyr-falcon-walk-back-left.png",
-    "kind": "walk",
-    "width": 1680,
-    "height": 187,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "zephyr-falcon-walk-back-right": {
-    "file": "art/zephyr-falcon-walk-back-right.png",
-    "kind": "walk",
-    "width": 1680,
-    "height": 187,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "dune-scorpid-walk-front-left": {
-    "file": "art/dune-scorpid-walk-front-left.png",
-    "kind": "walk",
-    "width": 1440,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "dune-scorpid-walk-front-right": {
-    "file": "art/dune-scorpid-walk-front-right.png",
-    "kind": "walk",
-    "width": 1440,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "dune-scorpid-walk-back-left": {
-    "file": "art/dune-scorpid-walk-back-left.png",
-    "kind": "walk",
-    "width": 1440,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "dune-scorpid-walk-back-right": {
-    "file": "art/dune-scorpid-walk-back-right.png",
-    "kind": "walk",
-    "width": 1440,
-    "height": 184,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "sylvan-cervid-walk-front-left": {
-    "file": "art/sylvan-cervid-walk-front-left.png",
-    "kind": "walk",
-    "width": 1536,
-    "height": 181,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "sylvan-cervid-walk-front-right": {
-    "file": "art/sylvan-cervid-walk-front-right.png",
-    "kind": "walk",
-    "width": 1536,
-    "height": 181,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "sylvan-cervid-walk-back-left": {
-    "file": "art/sylvan-cervid-walk-back-left.png",
-    "kind": "walk",
-    "width": 1536,
-    "height": 181,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "sylvan-cervid-walk-back-right": {
-    "file": "art/sylvan-cervid-walk-back-right.png",
-    "kind": "walk",
-    "width": 1536,
-    "height": 181,
-    "frames": 12,
-    "cycleSeconds": 0.9
-  },
-  "bramble-ursine-run-front-left": {
-    "file": "art/bramble-ursine-run-front-left.png",
-    "kind": "walk",
-    "width": 1520,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "bramble-ursine-run-front-right": {
-    "file": "art/bramble-ursine-run-front-right.png",
-    "kind": "walk",
-    "width": 1520,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "bramble-ursine-run-back-left": {
-    "file": "art/bramble-ursine-run-back-left.png",
-    "kind": "walk",
-    "width": 1520,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "bramble-ursine-run-back-right": {
-    "file": "art/bramble-ursine-run-back-right.png",
-    "kind": "walk",
-    "width": 1520,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "tide-lutran-run-front-left": {
-    "file": "art/tide-lutran-run-front-left.png",
-    "kind": "walk",
-    "width": 1740,
-    "height": 186,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "tide-lutran-run-front-right": {
-    "file": "art/tide-lutran-run-front-right.png",
-    "kind": "walk",
-    "width": 1740,
-    "height": 186,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "tide-lutran-run-back-left": {
-    "file": "art/tide-lutran-run-back-left.png",
-    "kind": "walk",
-    "width": 1740,
-    "height": 186,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "tide-lutran-run-back-right": {
-    "file": "art/tide-lutran-run-back-right.png",
-    "kind": "walk",
-    "width": 1740,
-    "height": 186,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "zephyr-falcon-run-front-left": {
-    "file": "art/zephyr-falcon-run-front-left.png",
-    "kind": "walk",
-    "width": 1560,
-    "height": 191,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "zephyr-falcon-run-front-right": {
-    "file": "art/zephyr-falcon-run-front-right.png",
-    "kind": "walk",
-    "width": 1560,
-    "height": 191,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "zephyr-falcon-run-back-left": {
-    "file": "art/zephyr-falcon-run-back-left.png",
-    "kind": "walk",
-    "width": 1560,
-    "height": 191,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "zephyr-falcon-run-back-right": {
-    "file": "art/zephyr-falcon-run-back-right.png",
-    "kind": "walk",
-    "width": 1560,
-    "height": 191,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "dune-scorpid-run-front-left": {
-    "file": "art/dune-scorpid-run-front-left.png",
-    "kind": "walk",
-    "width": 1480,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "dune-scorpid-run-front-right": {
-    "file": "art/dune-scorpid-run-front-right.png",
-    "kind": "walk",
-    "width": 1480,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "dune-scorpid-run-back-left": {
-    "file": "art/dune-scorpid-run-back-left.png",
-    "kind": "walk",
-    "width": 1480,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "dune-scorpid-run-back-right": {
-    "file": "art/dune-scorpid-run-back-right.png",
-    "kind": "walk",
-    "width": 1480,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "sylvan-cervid-run-front-left": {
-    "file": "art/sylvan-cervid-run-front-left.png",
-    "kind": "walk",
-    "width": 1340,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "sylvan-cervid-run-front-right": {
-    "file": "art/sylvan-cervid-run-front-right.png",
-    "kind": "walk",
-    "width": 1340,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "sylvan-cervid-run-back-left": {
-    "file": "art/sylvan-cervid-run-back-left.png",
-    "kind": "walk",
-    "width": 1340,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "sylvan-cervid-run-back-right": {
-    "file": "art/sylvan-cervid-run-back-right.png",
-    "kind": "walk",
-    "width": 1340,
-    "height": 184,
-    "frames": 10,
-    "cycleSeconds": 0.67
-  },
-  "bramble-ursine-attack-front-left": {
-    "file": "art/bramble-ursine-attack-front-left.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 176,
+    "width": 2976,
+    "height": 175,
     "frames": 12,
     "cycleSeconds": 0.8
   },
-  "bramble-ursine-attack-front-right": {
-    "file": "art/bramble-ursine-attack-front-right.png",
+  "zephyr-falcon-attack-back-right": {
+    "file": "art/zephyr-falcon-attack-back-right.png",
     "kind": "walk",
-    "width": 3000,
-    "height": 176,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "bramble-ursine-attack-back-left": {
-    "file": "art/bramble-ursine-attack-back-left.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 176,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "bramble-ursine-attack-back-right": {
-    "file": "art/bramble-ursine-attack-back-right.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 176,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "tide-lutran-attack-front-left": {
-    "file": "art/tide-lutran-attack-front-left.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 177,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "tide-lutran-attack-front-right": {
-    "file": "art/tide-lutran-attack-front-right.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 177,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "tide-lutran-attack-back-left": {
-    "file": "art/tide-lutran-attack-back-left.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 177,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "tide-lutran-attack-back-right": {
-    "file": "art/tide-lutran-attack-back-right.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 177,
+    "width": 2976,
+    "height": 175,
     "frames": 12,
     "cycleSeconds": 0.8
   },
@@ -1353,246 +1813,68 @@
     "frames": 12,
     "cycleSeconds": 0.8
   },
-  "zephyr-falcon-attack-back-left": {
-    "file": "art/zephyr-falcon-attack-back-left.png",
+  "zephyr-falcon-run-back-left": {
+    "file": "art/zephyr-falcon-run-back-left.png",
     "kind": "walk",
-    "width": 2976,
-    "height": 175,
-    "frames": 12,
-    "cycleSeconds": 0.8
+    "width": 1560,
+    "height": 191,
+    "frames": 10,
+    "cycleSeconds": 0.67
   },
-  "zephyr-falcon-attack-back-right": {
-    "file": "art/zephyr-falcon-attack-back-right.png",
+  "zephyr-falcon-run-back-right": {
+    "file": "art/zephyr-falcon-run-back-right.png",
     "kind": "walk",
-    "width": 2976,
-    "height": 175,
-    "frames": 12,
-    "cycleSeconds": 0.8
+    "width": 1560,
+    "height": 191,
+    "frames": 10,
+    "cycleSeconds": 0.67
   },
-  "dune-scorpid-attack-front-left": {
-    "file": "art/dune-scorpid-attack-front-left.png",
+  "zephyr-falcon-run-front-left": {
+    "file": "art/zephyr-falcon-run-front-left.png",
     "kind": "walk",
-    "width": 2952,
-    "height": 174,
-    "frames": 12,
-    "cycleSeconds": 0.8
+    "width": 1560,
+    "height": 191,
+    "frames": 10,
+    "cycleSeconds": 0.67
   },
-  "dune-scorpid-attack-front-right": {
-    "file": "art/dune-scorpid-attack-front-right.png",
+  "zephyr-falcon-run-front-right": {
+    "file": "art/zephyr-falcon-run-front-right.png",
     "kind": "walk",
-    "width": 2952,
-    "height": 174,
-    "frames": 12,
-    "cycleSeconds": 0.8
+    "width": 1560,
+    "height": 191,
+    "frames": 10,
+    "cycleSeconds": 0.67
   },
-  "dune-scorpid-attack-back-left": {
-    "file": "art/dune-scorpid-attack-back-left.png",
+  "zephyr-falcon-walk-back-left": {
+    "file": "art/zephyr-falcon-walk-back-left.png",
     "kind": "walk",
-    "width": 2952,
-    "height": 174,
+    "width": 1680,
+    "height": 187,
     "frames": 12,
-    "cycleSeconds": 0.8
+    "cycleSeconds": 0.9
   },
-  "dune-scorpid-attack-back-right": {
-    "file": "art/dune-scorpid-attack-back-right.png",
+  "zephyr-falcon-walk-back-right": {
+    "file": "art/zephyr-falcon-walk-back-right.png",
     "kind": "walk",
-    "width": 2952,
-    "height": 174,
+    "width": 1680,
+    "height": 187,
     "frames": 12,
-    "cycleSeconds": 0.8
+    "cycleSeconds": 0.9
   },
-  "sylvan-cervid-attack-front-left": {
-    "file": "art/sylvan-cervid-attack-front-left.png",
+  "zephyr-falcon-walk-front-left": {
+    "file": "art/zephyr-falcon-walk-front-left.png",
     "kind": "walk",
-    "width": 3000,
-    "height": 174,
+    "width": 1680,
+    "height": 187,
     "frames": 12,
-    "cycleSeconds": 0.8
+    "cycleSeconds": 0.9
   },
-  "sylvan-cervid-attack-front-right": {
-    "file": "art/sylvan-cervid-attack-front-right.png",
+  "zephyr-falcon-walk-front-right": {
+    "file": "art/zephyr-falcon-walk-front-right.png",
     "kind": "walk",
-    "width": 3000,
-    "height": 174,
+    "width": 1680,
+    "height": 187,
     "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "sylvan-cervid-attack-back-left": {
-    "file": "art/sylvan-cervid-attack-back-left.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 174,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "sylvan-cervid-attack-back-right": {
-    "file": "art/sylvan-cervid-attack-back-right.png",
-    "kind": "walk",
-    "width": 3000,
-    "height": 174,
-    "frames": 12,
-    "cycleSeconds": 0.8
-  },
-  "sanctum-cathedral-floor": {
-    "file": "art/sanctum-cathedral-floor.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-cathedral-wall": {
-    "file": "art/sanctum-cathedral-wall.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-cathedral-door": {
-    "file": "art/sanctum-cathedral-door.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-cathedral-furniture-high-altar": {
-    "file": "art/sanctum-cathedral-furniture-high-altar.png",
-    "kind": "set-piece",
-    "width": 384,
-    "height": 128
-  },
-  "sanctum-cathedral-furniture-gold-pew": {
-    "file": "art/sanctum-cathedral-furniture-gold-pew.png",
-    "kind": "set-piece",
-    "width": 384,
-    "height": 128
-  },
-  "sanctum-cathedral-furniture-brazier": {
-    "file": "art/sanctum-cathedral-furniture-brazier.png",
-    "kind": "set-piece",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-cathedral-furniture-lectern": {
-    "file": "art/sanctum-cathedral-furniture-lectern.png",
-    "kind": "set-piece",
-    "width": 384,
-    "height": 128
-  },
-  "sanctum-cathedral-furniture-crypt-gate": {
-    "file": "art/sanctum-cathedral-furniture-crypt-gate.png",
-    "kind": "set-piece",
-    "width": 640,
-    "height": 512
-  },
-  "sanctum-scriptorium-floor": {
-    "file": "art/sanctum-scriptorium-floor.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-scriptorium-wall": {
-    "file": "art/sanctum-scriptorium-wall.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-scriptorium-door": {
-    "file": "art/sanctum-scriptorium-door.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-scriptorium-furniture-tall-bookshelf": {
-    "file": "art/sanctum-scriptorium-furniture-tall-bookshelf.png",
-    "kind": "set-piece",
-    "width": 256,
-    "height": 128
-  },
-  "sanctum-scriptorium-furniture-scribe-desk": {
-    "file": "art/sanctum-scriptorium-furniture-scribe-desk.png",
-    "kind": "set-piece",
-    "width": 256,
-    "height": 128
-  },
-  "sanctum-scriptorium-furniture-reading-lectern": {
-    "file": "art/sanctum-scriptorium-furniture-reading-lectern.png",
-    "kind": "set-piece",
-    "width": 256,
-    "height": 128
-  },
-  "sanctum-scriptorium-furniture-relic-case": {
-    "file": "art/sanctum-scriptorium-furniture-relic-case.png",
-    "kind": "set-piece",
-    "width": 384,
-    "height": 128
-  },
-  "sanctum-inn-floor": {
-    "file": "art/sanctum-inn-floor.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-inn-wall": {
-    "file": "art/sanctum-inn-wall.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-inn-door": {
-    "file": "art/sanctum-inn-door.png",
-    "kind": "tile",
-    "width": 128,
-    "height": 128
-  },
-  "sanctum-inn-furniture-hearth": {
-    "file": "art/sanctum-inn-furniture-hearth.png",
-    "kind": "set-piece",
-    "width": 384,
-    "height": 128
-  },
-  "sanctum-inn-furniture-bar-counter": {
-    "file": "art/sanctum-inn-furniture-bar-counter.png",
-    "kind": "set-piece",
-    "width": 256,
-    "height": 128
-  },
-  "sanctum-inn-furniture-dining-table": {
-    "file": "art/sanctum-inn-furniture-dining-table.png",
-    "kind": "set-piece",
-    "width": 256,
-    "height": 128
-  },
-  "sanctum-inn-furniture-bench": {
-    "file": "art/sanctum-inn-furniture-bench.png",
-    "kind": "set-piece",
-    "width": 384,
-    "height": 128
-  },
-  "sanctum-inn-furniture-ale-cask": {
-    "file": "art/sanctum-inn-furniture-ale-cask.png",
-    "kind": "set-piece",
-    "width": 128,
-    "height": 128
-  },
-  "stairs-up": {
-    "file": "art/stairs-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-down": {
-    "file": "art/stairs-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "ladder-up": {
-    "file": "art/ladder-up.png",
-    "kind": "prop",
-    "width": 128,
-    "height": 256
-  },
-  "ladder-down": {
-    "file": "art/ladder-down.png",
-    "kind": "prop",
-    "width": 128,
-    "height": 160
+    "cycleSeconds": 0.9
   }
 }

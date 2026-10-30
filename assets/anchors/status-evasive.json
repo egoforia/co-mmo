@@ -1,0 +1,31 @@
+{
+  "id": "status-evasive",
+  "description": {
+    "id": "status-evasive",
+    "name": "Evasive icon",
+    "kind": "effect",
+    "biome": "any",
+    "references": [
+      "item-scarab-charm",
+      "item-tonic"
+    ],
+    "silhouetteHook": "a swift curved feather on a small round flat badge",
+    "body": "a simple icon, one symbol, readable when tiny, seen straight on",
+    "colors": {
+      "main": "pale sage",
+      "secondary": "cream rim",
+      "accent": "brass"
+    },
+    "mood": "reassuring"
+  },
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nFlat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.\nNO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.\nA small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.\nA single game sprite in classic 2:1 isometric view, looking down at about 30 degrees from one corner, standing upright, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject,\nwith no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.\nSubject: Evasive icon (effect). Most recognisable feature: a swift curved feather on a small round flat badge. Body and shape: a simple icon, one symbol, readable when tiny, seen straight on. Colours: main pale sage, secondary cream rim, small accent of brass. Mood: reassuring.\nAvoid: photorealistic, painterly, watercolour, brush strokes, anime cel shading, outlines, thick black outlines, shading, cast shadow, drop shadow, highlights, gradients, glow, texture, noise, pure black, pure white, harsh contrast, neon, lens flare, blur, top-down view, text, letters, words, labels with writing, watermark, signature, frame, border, vignette, background scenery, floor, ground shadow, cast shadow, gradient background.",
+  "references": [
+    "item-scarab-charm",
+    "item-tonic"
+  ],
+  "provider": "gemini",
+  "model": "gemini-3.1-flash-image",
+  "styleVersion": 1,
+  "mimeType": "image/jpeg",
+  "createdAt": "2026-10-30T22:24:16.681Z"
+}

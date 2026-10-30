@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { ISO_WAYS, RACES, RACE_IDS, walkArt } from '@co-mmo/shared';
+import { CREATURE_HEIGHTS, ECHO_ART, EFFECT_ARTS, HALLOWED_ART, HAWK_SKILL, ISO_WAYS, RACES, RACE_IDS, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, STATUSES, TRAP_ART, statusArt, walkArt, type StatusId } from '@co-mmo/shared';
 import { ANCHORS } from '../src/assets/anchors.ts';
 import { GeminiImageProvider } from '../src/assets/gemini.ts';
 import { ProviderError } from '../src/assets/provider.ts';
 import { BASE_PROMPT, buildPrompt } from '../src/assets/style.ts';
-import { artRequest, referencesFor } from '../src/assets/wish-art.ts';
+import { artRequest, fitCharacter, referencesFor } from '../src/assets/wish-art.ts';
+import type { RegionState } from '../src/region/state.ts';
+import { worldMarks } from '../src/region/world-marks.ts';
 
 describe('buildPrompt', () => {
   it('starts with the Style Bible base prompt and ends with what to avoid', () => {
@@ -107,5 +109,44 @@ describe('wished art requests', () => {
     expect(req.prompt).toContain('Biome: Whispering Woods');
     expect(req.prompt).toContain('Subject: Lantern Moth (monster). Most recognisable feature: a paper lantern.');
     expect(req.box).toEqual({ width: 128, height: 128 });
+  });
+});
+
+describe('skill pictures (build plan step 10)', () => {
+  it('has an anchor for every skill effect, every status icon, the spirit hawk and the Sandstorm double', () => {
+    const ids = new Map(ANCHORS.map((a) => [a.id, a]));
+    for (const id of [...EFFECT_ARTS, ...(Object.keys(STATUSES) as StatusId[]).map(statusArt)]) expect(ids.get(id)?.kind, id).toBe('effect');
+    expect(ids.get(SPIRIT_HAWK_ART)).toMatchObject({ kind: 'monster', tier: 'small' });
+    expect(ids.get(SAND_DOUBLE_ART)).toMatchObject({ kind: 'monster', tier: 'medium' });
+    expect(ids.size).toBe(ANCHORS.length);
+  });
+
+  it('fits a creature to its height tier, feet on the bottom row', async () => {
+    const sharp = (await import('sharp')).default;
+    const raw = await sharp({ create: { width: 300, height: 400, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: await sharp({ create: { width: 100, height: 300, channels: 4, background: { r: 200, g: 100, b: 50, alpha: 1 } } }).png().toBuffer(), left: 100, top: 50 }])
+      .png().toBuffer();
+    const fitted = await fitCharacter(raw, { width: 128, height: CREATURE_HEIGHTS.small }, CREATURE_HEIGHTS.small);
+    const trimmed = await sharp(fitted).trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
+    expect(trimmed.info.height).toBe(CREATURE_HEIGHTS.small);
+    expect((await sharp(fitted).metadata()).height).toBe(CREATURE_HEIGHTS.small);
+  });
+});
+
+describe('what skills leave in the world', () => {
+  it('shows traps, hallowed ground, a sand double, the spirit hawk beside its friend, and Echoes on friends, until they go', () => {
+    const now = 1000;
+    const player = (id: string, x: number, y: number, gauge?: unknown) => [id, { info: { id }, x, y, floor: 0, gauge }];
+    const s = {
+      traps: [{ owner: 'a', ability: 'snare', x: 1, y: 2, floor: 0, until: now + 5 }, { owner: 'a', ability: 'snare', x: 9, y: 9, floor: 0, until: now - 1 }],
+      zones: [{ owner: 'b', x: 3, y: 3, floor: 1, until: now + 5 }],
+      doubles: [{ owner: 'a', x: 4, y: 4, floor: 0, until: now + 5 }],
+      helpers: [{ owner: 'a', ability: HAWK_SKILL, until: now + 5 }, { owner: 'a', ability: 'wished-wolf', until: now + 5 }],
+      players: new Map([player('a', 10, 10), player('b', 20, 20, { echoes: [{ on: 'a', amount: 3, until: now + 5 }] })] as never),
+    } as unknown as RegionState;
+    const marks = worldMarks(s, now);
+    expect(marks.map((m) => m.asset).sort()).toEqual([ECHO_ART, HALLOWED_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TRAP_ART].sort());
+    expect(marks.find((m) => m.asset === ECHO_ART)).toMatchObject({ x: 10, y: 10 });
+    expect(marks.find((m) => m.asset === HALLOWED_ART)).toMatchObject({ floor: 1 });
   });
 });

@@ -48,7 +48,11 @@ export const DUELIST_PATH_RULES: Record<string, PathRule> = {
       const id = p.info.id;
       const standing = (other: string) => other !== id && (kit.s.players.get(other)?.character.hp ?? 0) > 0;
       for (const c of kit.creaturesNear(p, p, a.radius ?? 5)) if (c.threat[id] !== undefined || c.aggro === id) forget(c, id, standing, now);
-      afflictPlayer(kit.s, p, 'hidden', pathNumbers('mirage').hidden);
+      const hidden = pathNumbers('mirage').hidden ?? 2;
+      afflictPlayer(kit.s, p, 'hidden', hidden);
+      // The double stands where they were for as long as they hide.
+      kit.s.doubles = kit.s.doubles.filter((d) => d.owner !== id);
+      kit.s.doubles.push({ owner: id, x: p.x, y: p.y, floor: p.floor, until: now + hidden * 1000 });
       kit.paths.ambush(p);
       kit.s.notice(p, `${a.name}: a double of sand takes your place, and you slip from sight.`);
     },

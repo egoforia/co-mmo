@@ -224,3 +224,22 @@ of its own (`held-<family>`, in `packages/server/src/assets/held-anchors.ts`).
 A wished weapon shows its family's picture in the hand until its own picture
 is painted, and sends the family picture as its first reference when it is
 painted (`heldArts` in `packages/shared/src/held.ts`).
+
+## 9. Skill Pictures
+
+Skills show painted pictures too (`packages/shared/src/skill-art.ts`, anchors
+in `packages/server/src/assets/skill-anchors.ts`):
+
+- **Bursts:** the Ember, Tide and Gale threads, and the Bellkeeper's bell,
+  flash on whoever the skill strikes.
+- **Marks in the world:** traps, hallowed ground, Echoes on friends, the
+  spirit hawk and the Sandstorm double. The server sends them in the
+  snapshot's `marks` (`region/world-marks.ts`), and they are only seen.
+- **Status icons:** one per status, in a row over name tags and in the stats
+  line. The hunter's mark floats over the Marked. A status whose icon is not
+  painted yet keeps its name in words.
+- **Creatures:** the spirit hawk is in the `small` tier (112 px) and the
+  Sandstorm double in the `medium` tier (168 px). `npm run game-art` fits any
+  anchor with a `tier` to that height.
+
+Until a picture is painted, nothing shows in its place.

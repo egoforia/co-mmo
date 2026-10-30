@@ -552,3 +552,4 @@ body.has-mini-map-min #quests { top: 92px; }
   #mini-map { width: 150px; }
   body.has-mini-map #quests { top: 292px; }
 }
+#stats-line .status-icon { width: 16px; height: 16px; vertical-align: -3px; }

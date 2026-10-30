@@ -3,6 +3,8 @@ import {
   CRIT_MULTIPLIER,
   PATH_MENTORS,
   QUESTS,
+  SAND_DOUBLE_ART,
+  SPIRIT_HAWK_ART,
   SKILL_NUMBERS_KEPT,
   TICK_SECONDS,
   TRIAL_QUESTS,
@@ -253,6 +255,9 @@ describe('Path signature skills', () => {
     use('mirage');
     expect(statusIds(region, 'a')).toContain('hidden');
     expect(region.creatureThreat(foe)!.aggro).not.toBe('a');
+    // The double of sand stands where they were, for players to see.
+    tick(0.1);
+    expect(of(conn, 'snapshot').at(-1)!.marks?.map((m) => m.asset)).toContain(SAND_DOUBLE_ART);
     region.handle('a', { t: 'attack', target: foe });
     expect(of(conn, 'hit').at(-1)!.amount).toBeGreaterThanOrEqual(Math.floor(plain * CRIT_MULTIPLIER) - 1);
   });
@@ -274,6 +279,7 @@ describe('Path signature skills', () => {
     use('call-companion');
     tick(1.5);
     expect(of(conn, 'hit').some((h) => h.ability === 'call-companion' && h.target === foe)).toBe(true);
+    expect(of(conn, 'snapshot').at(-1)!.marks?.map((m) => m.asset)).toContain(SPIRIT_HAWK_ART);
     const energy = me().energy;
     use('call-companion');
     expect(notices(conn).at(-1)).toMatch(/hawk flies home/);

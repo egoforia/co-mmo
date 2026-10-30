@@ -18,6 +18,7 @@ import { OfflineCompiler } from './compiler.ts';
 import { Wishes, type WishOptions } from './wishes.ts';
 import { Workshop } from './workshop.ts';
 import { handleAdmin } from './admin.ts';
+import { ProfilerManager, getProfilerConfig } from './debug/profiler-session.ts';
 import { LoadMeter } from './load-meter.ts';
 import { LiveRules } from './live-rules.ts';
 import { Reports } from './reports.ts';
@@ -349,6 +350,11 @@ export function createApp(options: AppOptions): App {
   const restoring = builds.restore().catch((err) => console.error('Builds did not restore:', (err as Error).message));
   builds.start();
 
+  const profiler = new ProfilerManager(getProfilerConfig(env));
+  if (regionServers) {
+    regionServers.onProfileDone = (m) => void profiler.handleProfileDone(m);
+  }
+
   const server = createServer((req, res) => {
     handleHttp(req, res).catch((err) => {
       console.error(err);
@@ -364,7 +370,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, houses: kitHouses, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, slowTicks, apiLog, ...(regionServers ? { regionServers } : {}) };
+    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, houses: kitHouses, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, slowTicks, apiLog, profiler, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (await handleKitHouses(req, res, url, authenticate(req), { world, houses: kitHouses })) return;
@@ -458,6 +464,7 @@ export function createApp(options: AppOptions): App {
       clearInterval(autosaveTimer);
       await Promise.allSettled([...world.pending]);
       saveAll();
+      profiler.close();
       await regionServers?.close();
       await socket.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));

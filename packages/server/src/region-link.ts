@@ -167,6 +167,7 @@ export type ToServer =
   | { t: 'content'; entries: import('@co-mmo/shared').ContentEntry[] }
   /** The gateway does not know this server (it restarted, or gave the server up for dead): drop everything and say hello again. */
   | { t: 'reset' }
+  | { t: 'start-profile'; profileId: string; durationSeconds: number; kind: 'cpu' | 'heap' }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };
 
 /** One thing for the gateway to pass on to a player. */
@@ -189,4 +190,5 @@ export type ToGateway =
   /** A tick that exceeded the time budget, captured for investigation. */
   | { t: 'slow-tick'; server: string; record: SlowTickRecord }
   | { t: 'bye'; server: string }
+  | { t: 'profile-done'; profileId: string; error?: string; data?: string }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };

@@ -15,7 +15,7 @@ export type KitAsset = AssetDescription & {
    * it is plain open water.
    */
   centerCrop?: number;
-  /** Clear the key colour showing through gaps inside the subject too (an archway, a ring). */
+  /** Clear the key colour showing through gaps inside the subject too (an archway, a ring); on unless set to false. */
   holes?: boolean;
 };
 

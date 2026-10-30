@@ -31,6 +31,18 @@ describe('removeKeyBackground', () => {
     expect(await alphaAtCentre((await removeKeyBackground(png, undefined, { holes: true })).png)).toBe(0);
   });
 
+  it('keeps enclosed pockets when the key is white, since the subject may be white too', async () => {
+    // An old anchor on white: a white robe inside a dark outline must survive.
+    const outline = await sharp({ create: { width: 30, height: 30, channels: 3, background: '#403020' } })
+      .composite([{ input: await sharp({ create: { width: 14, height: 14, channels: 3, background: '#ffffff' } }).png().toBuffer(), left: 8, top: 8 }])
+      .png().toBuffer();
+    const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#ffffff' } })
+      .composite([{ input: outline, left: 17, top: 17 }]).png().toBuffer();
+    const { data, info } = await raw((await removeKeyBackground(png, undefined, { holes: true })).png);
+    expect(data[3]).toBe(0);
+    expect(data[(32 * info.width + 32) * 4 + 3]).toBe(255);
+  });
+
   it('flags a background that is not one flat colour', async () => {
     const noisy = Buffer.alloc(32 * 32 * 3).map(() => Math.floor(Math.random() * 256));
     const png = await sharp(noisy, { raw: { width: 32, height: 32, channels: 3 } }).png().toBuffer();

@@ -152,7 +152,8 @@ export async function paintWish(
     }
   }
   const raw = await provider.generate({ prompt: request.prompt, references, labels: sent.map(pictureName) });
-  const { png, clean } = await removeKeyBackground(await sharp(raw.data).png().toBuffer());
+  // Enclosed pockets of key colour go too: a wished bow's string or a ring would otherwise keep a magenta fill.
+  const { png, clean } = await removeKeyBackground(await sharp(raw.data).png().toBuffer(), undefined, { holes: true });
   // People stand the same height as everyone else; things fit their box.
   const fitted = def.kind === 'player' || def.kind === 'npc' ? await fitCharacter(png, request.box) : await fitToBox(png, request.box);
   await mkdir(artDir, { recursive: true });

@@ -178,17 +178,17 @@ export interface PaintedWish {
 
 /**
  * Trims the transparent margin and scales a person so the figure is
- * CHARACTER_HEIGHT tall, feet on the bottom row of a box as tall as `box`;
+ * CHARACTER_HEIGHT tall (or a creature its height tier's), feet on the bottom row of a box as tall as `box`;
  * a figure wider than the box widens it rather than shrinking.
  */
-export async function fitCharacter(png: Buffer, box: { width: number; height: number }): Promise<Buffer> {
+export async function fitCharacter(png: Buffer, box: { width: number; height: number }, height: number = CHARACTER_HEIGHT): Promise<Buffer> {
   const trimmed = await sharp(png).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
-  const scale = CHARACTER_HEIGHT / trimmed.info.height;
+  const scale = height / trimmed.info.height;
   const w = Math.max(1, Math.round(trimmed.info.width * scale));
   const width = Math.max(box.width, Math.ceil(w / 2) * 2);
-  const resized = await sharp(trimmed.data).resize(w, CHARACTER_HEIGHT, { kernel: 'lanczos3' }).png().toBuffer();
+  const resized = await sharp(trimmed.data).resize(w, height, { kernel: 'lanczos3' }).png().toBuffer();
   return sharp({ create: { width, height: box.height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite([{ input: resized, left: Math.floor((width - w) / 2), top: box.height - CHARACTER_HEIGHT }])
+    .composite([{ input: resized, left: Math.floor((width - w) / 2), top: box.height - height }])
     .png()
     .toBuffer();
 }

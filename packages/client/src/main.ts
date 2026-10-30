@@ -338,6 +338,8 @@ function play(token: string): void {
       edit.hidden = false;
       edit.addEventListener('click', () => opened.toggle());
     }
+    // Painted status icons show in the stats line; a status without one is named instead.
+    const statusIcon = (key: string) => manifest[key]?.file;
     rpg = new RpgUi(welcome.character, {
       attack: () => {
         const target = scene?.target;
@@ -356,6 +358,7 @@ function play(token: string): void {
       prayer: () => prayer?.toggle(true),
       spendPoint: (stat) => connection.send({ t: 'spendPoint', stat }),
     });
+    rpg.statusIcon = statusIcon;
     loot = new LootUi({ send: (m) => connection.send(m), typing: isTyping });
     kit = new KitUi(welcome.character, {
       ability: (ability) => {

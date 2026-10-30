@@ -167,7 +167,7 @@ export function paceFor(ids: readonly StatusId[]): number {
   return ids.includes('slowed') ? SLOW_PACE : 1;
 }
 
-/** Statuses as a name tag shows them: "Slowed, Marked". No icon is painted yet (build plan step 10), so words stand in. */
+/** Statuses in words: "Slowed, Marked"; a name tag uses them for statuses whose icons are not painted yet (statusTag). */
 export function statusWords(ids: readonly StatusId[] | undefined): string {
   return (ids ?? []).map((id) => STATUSES[id].name).join(', ');
 }

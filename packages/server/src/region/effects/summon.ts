@@ -10,8 +10,8 @@ const HELPER_RADIUS = 5;
 /**
  * Calls a helper that stays by you and strikes the nearest creature every
  * 1.2 s for the ability's amount, until its time runs out or you fall. One
- * of each at a time: calling it again starts it afresh. Its picture is
- * painted with the spirit hawk (build plan step 10); until then it is heard of, not seen.
+ * of each at a time: calling it again starts it afresh. The spirit hawk
+ * (Call Companion) is seen beside its owner (region/world-marks.ts).
  */
 export const summon: Effect = {
   run: (kit, { p, id, a, amount, now }) => {

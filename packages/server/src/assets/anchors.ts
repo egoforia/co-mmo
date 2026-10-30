@@ -1,13 +1,14 @@
 import type { AssetDescription } from './style.ts';
 import { HELD_ANCHORS } from './held-anchors.ts';
 import { LAND_ANCHORS } from './land-anchors.ts';
+import { SKILL_ANCHORS, type TieredAsset } from './skill-anchors.ts';
 
 /**
  * The first reference set (Style Bible, Open decisions): the Sanctum and the
  * three launch biomes, plus players and items. Once reviewed, these images are
  * sent as references with every generation so new assets match them.
  */
-export const ANCHORS: (AssetDescription & { id: string; references?: string[] })[] = [
+export const ANCHORS: (AssetDescription & { id: string; references?: string[]; tier?: TieredAsset['tier'] })[] = [
   // The Sanctum
   {
     id: 'sanctum-flagstones', name: 'Sanctum flagstones', kind: 'tile', biome: 'sanctum',
@@ -251,4 +252,6 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[] })
     details: ['a few tiny embers trailing behind'], mood: 'bright, magical', extra: { category: 'spell effect' },
   },
   ...LAND_ANCHORS,
+  // Skill effects, status icons, and the creatures skills bring.
+  ...SKILL_ANCHORS,
 ];

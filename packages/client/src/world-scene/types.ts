@@ -50,6 +50,8 @@ export interface Avatar {
   pace?: number;
   shadow: Phaser.GameObjects.Ellipse;
   label: Phaser.GameObjects.Text;
+  /** Its painted status icons (status-icons.ts), and which they are. */
+  icons?: { keys: string; images: Phaser.GameObjects.Image[] };
   /** Health bar, shown once hurt. */
   bar?: { bg: Phaser.GameObjects.Rectangle; fill: Phaser.GameObjects.Rectangle };
   /** Offset for lunges and recoils, in pixels; tweened. */

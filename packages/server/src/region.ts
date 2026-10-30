@@ -62,6 +62,7 @@ import { findSpots } from './walkers.ts';
 import { Bodies } from './region/bodies.ts';
 import { Chat } from './region/chat.ts';
 import { TickProfiler } from './region/profiler.ts';
+import { worldMarks } from './region/world-marks.ts';
 import { Combat } from './region/combat.ts';
 import { CombatLogger, combatLogger } from './region/combat-logger.ts';
 import { Fallen } from './region/fallen.ts';
@@ -770,6 +771,7 @@ export class Region {
 
     phase('bodies', () => {
       this.s.bodies = this.s.bodies.filter((b) => now < b.until);
+      this.s.doubles = this.s.doubles.filter((d) => now < d.until);
       // A loot window closes when its body fades or its looter walks away.
       for (const p of this.s.players.values()) if (p.looting && !this.looting.lootable(p, p.looting)) this.looting.closeLoot(p);
     });
@@ -788,6 +790,7 @@ export class Region {
     phase('snapshots', () => {
       const all = [...this.s.players.values()];
       const online = this.hooks.online();
+      const allMarks = worldMarks(this.s, now);
       for (const p of all) {
         const every = snapshotEvery(p.crowd, this.strain);
         if (every > 1 && (this.s.tickCount + p.phase) % every !== 0) {
@@ -823,8 +826,9 @@ export class Region {
           for (const e of g.npcs) if (near(e)) npcs.push(e);
         }
         p.crowd = players.length + creatures.length;
+        const marks = allMarks.filter(near);
         p.conn.send({
-          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now), players, creatures, bodies, npcs, online,
+          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now), players, creatures, bodies, npcs, ...(marks.length ? { marks } : {}), online,
         });
         this.s.flush(p);
       }

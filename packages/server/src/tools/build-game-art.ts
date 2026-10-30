@@ -7,7 +7,7 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import type { ArtManifest, ArtEntry } from '@co-mmo/shared';
+import { CREATURE_HEIGHTS, type ArtManifest, type ArtEntry, type CreatureSizeTier } from '@co-mmo/shared';
 import { fitCharacter } from '../assets/wish-art.ts';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -68,6 +68,16 @@ for (const file of (await readdir(anchorDir)).filter((f) => f.endsWith('.json'))
   }
 
   const box = SET_PIECE_BOX[id] ?? (kind === 'prop' && id.endsWith('-rock') ? ROCK_BOX : BOX[kind]) ?? BOX.item!;
+  // Creatures with a height tier stand that tall, whatever their picture's margins (docs/art-pipeline.md).
+  const tier: CreatureSizeTier | undefined = recipe.description.tier;
+  if (tier && CREATURE_HEIGHTS[tier]) {
+    const height = CREATURE_HEIGHTS[tier];
+    const fitted = await fitCharacter(png, { width: 128, height }, height);
+    await writeFile(resolve(outDir, `${id}.png`), fitted);
+    const { width } = await sharp(fitted).metadata();
+    manifest[id] = entry(id, kind, width!, height);
+    continue;
+  }
   // People all stand the same height, as they do when they walk.
   if (kind === 'player' || kind === 'npc') {
     const fitted = await fitCharacter(png, box);

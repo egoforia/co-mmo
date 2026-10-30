@@ -121,7 +121,8 @@ async function processAnchor(anchor: (typeof ALL)[number], raw: Buffer): Promise
     await writeFile(resolve(previewDir, `${anchor.id}-grid.png`), await tileGrid(tile));
     return;
   }
-  const { png, clean } = await removeKeyBackground(raw, undefined, { holes: anchor.holes ?? (anchor.kind === 'prop' || anchor.kind === 'effect') });
+  // Every sprite clears enclosed key pockets (inside a bowstring, a chain link), unless its anchor says not to.
+  const { png, clean } = await removeKeyBackground(raw, undefined, { holes: anchor.holes ?? true });
   await writeFile(out, png);
   if (!clean) console.warn(`warning ${anchor.id}: background is not one flat colour; check it or regenerate`);
 }

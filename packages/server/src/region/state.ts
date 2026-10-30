@@ -154,7 +154,7 @@ export class RegionState {
     readonly map: RegionMap,
     readonly hooks: RegionHooks,
     readonly now: () => number,
-    readonly random: () => number,
+    public random: () => number,
   ) {}
 
   /** Delivers a message to everyone in this region. */

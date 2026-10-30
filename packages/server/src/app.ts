@@ -412,8 +412,10 @@ export function createApp(options: AppOptions): App {
 
   const tickTimer = setInterval(() => meter.tick(() => {
     rulesProfiler.startTick();
-    world.tick(meter.strain);
-    rulesProfiler.measure('rules', () => rules.tick());
+    if (!world.isPaused()) {
+      world.tick(meter.strain);
+      rulesProfiler.measure('rules', () => rules.tick());
+    }
   }), TICK_SECONDS * 1000);
   const autosaveTimer = setInterval(() => saveAll(), options.autosaveMs ?? 30_000);
 

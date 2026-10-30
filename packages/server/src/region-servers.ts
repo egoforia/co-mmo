@@ -76,6 +76,8 @@ export class RegionServers implements Hosting {
   private stateQueued = false;
   /** Cells just given to each server, not yet among the world's regions, so the cells of one region spread out. */
   private readonly given = new Map<string, number>();
+  /** Callback when a remote region server finishes recording a profile. */
+  onProfileDone?: (m: { profileId: string; error?: string; data?: string }) => void;
 
   constructor(private readonly bus: Bus, private readonly world: World, private readonly options: RegionServersOptions) {
     this.requests = new Requests(bus, GATEWAY);
@@ -97,6 +99,11 @@ export class RegionServers implements Hosting {
   /** Region servers up now. */
   list(): ServerInfo[] {
     return [...this.servers.values()];
+  }
+
+  /** Starts recording a CPU profile or heap snapshot on a remote region server. */
+  startProfile(server: string, profileId: string, durationSeconds: number, kind: 'cpu' | 'heap'): void {
+    this.command(server, { t: 'start-profile', profileId, durationSeconds, kind });
   }
 
   /** Every host and what it runs, for God's View's Server health tab. */
@@ -162,6 +169,10 @@ export class RegionServers implements Hosting {
       this.requests.answered(m);
       return;
     }
+    if (m.t === 'profile-done') {
+      this.onProfileDone?.(m);
+      return;
+    }
     const server = m.server;
     if (m.t === 'hello') return void this.hello(server, m.load);
     if (m.t === 'bye') return void this.lost(server, 'it stopped');
@@ -186,6 +197,7 @@ export class RegionServers implements Hosting {
     if (m.t === 'out') return region.deliver(m.items);
     if (m.t === 'edge') return this.world.edge(m.region, m.ghosts as Ghosts);
     if (m.t === 'departures') return this.world.departed(m.region, m.list);
+    if (m.t !== 'hook') return;
     // Things a region asks of the whole world.
     switch (m.hook) {
       case 'worldChat':

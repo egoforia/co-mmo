@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ITEMS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
@@ -27,6 +28,8 @@ import { hostStatus, type RegionServers } from './region-servers.ts';
 import type { SlowTickBuffer } from './debug/slow-tick-buffer.ts';
 import type { ApiLog, ApiLogFilter } from './api-log.ts';
 import { lootOverview } from './loot-admin.ts';
+import { combatLogger, type CombatLogger } from './region/combat-logger.ts';
+import { ProfilerManager, getProfilerManager } from './debug/profiler-session.ts';
 
 export interface AdminContext {
   store: Store;
@@ -39,6 +42,8 @@ export interface AdminContext {
   rules: LiveRules;
   reports: Reports;
   builds: Builds;
+  /** Combat log recorder for balance debugging (Stewards & Owner). */
+  combatLogger?: CombatLogger;
   /** The Art tab: painting log, repaints and walks (Owner). */
   art?: ArtStudio;
   /** Where hands and grips are found in pictures, for held items (Owner). */
@@ -64,6 +69,8 @@ export interface AdminContext {
   regionServers?: RegionServers;
   /** Every request sent to an outside service (Owner). */
   apiLog?: ApiLog;
+  /** CPU profiler and heap snapshot manager (Owner). */
+  profiler?: ProfilerManager;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
 }
@@ -84,6 +91,7 @@ export async function handleAdmin(
 ): Promise<boolean> {
   if (!path.startsWith('/api/admin/')) return false;
   const { store, world, wishes, rules, reports, builds, json } = ctx;
+  const profiler = ctx.profiler ?? getProfilerManager(ctx.env);
   if (!account) return json(res, 401, { error: 'unauthorized' }), true;
   if (account.suspended) return json(res, 403, { error: 'suspended', message: 'Your account is suspended.' }), true;
   if (account.role === 'player') return json(res, 403, { error: 'forbidden', message: "God's View is for Stewards and the Owner." }), true;
@@ -91,6 +99,82 @@ export async function handleAdmin(
   const ownerOnly = () => (owner ? false : (json(res, 403, { error: 'forbidden', message: 'Only the Owner can do that.' }), true));
   const route = path.slice('/api/admin/'.length);
   const method = req.method ?? 'GET';
+  const cLogger = ctx.combatLogger ?? combatLogger;
+
+  const inspectMatch = route.match(/^inspect\/([^/]+)\/(player|creature)\/([^/]+)$/);
+  if (inspectMatch && method === 'GET') {
+    const [, regionId, kind, id] = inspectMatch;
+    const isSse = req.headers.accept?.includes('text/event-stream');
+    if (isSse) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      const sendInspection = async () => {
+        try {
+          const inspection = await world.inspect(regionId, kind as 'player' | 'creature', id);
+          if (inspection) {
+            res.write(`data: ${JSON.stringify(inspection)}\n\n`);
+          }
+        } catch {
+          // ignore disconnect
+        }
+      };
+      await sendInspection();
+      const timer = setInterval(() => void sendInspection(), 100);
+      req.on('close', () => clearInterval(timer));
+      return true;
+    }
+
+    const inspection = await world.inspect(regionId, kind as 'player' | 'creature', id);
+    if (!inspection) return json(res, 404, { error: 'not_found', message: 'Entity not found.' }), true;
+    return json(res, 200, inspection), true;
+  }
+
+  if (route === 'combat-log' && method === 'GET') {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const region = url.searchParams.get('region') || undefined;
+    const entity = url.searchParams.get('entity') || undefined;
+    const events = cLogger.events({ region, entity });
+    return json(res, 200, {
+      events,
+      status: cLogger.status(),
+    }), true;
+  }
+
+  if (route === 'combat-log/toggle' && method === 'POST') {
+    const body = await ctx.readJson(req);
+    const enabled = body?.enabled === true;
+    if (enabled) {
+      const region = typeof body?.region === 'string' && body.region ? body.region : undefined;
+      const entity = typeof body?.entity === 'string' && body.entity ? body.entity : undefined;
+      const maxEvents = typeof body?.maxEvents === 'number' ? body.maxEvents : undefined;
+      const maxDurationMs = typeof body?.maxDurationMs === 'number' ? body.maxDurationMs : undefined;
+      cLogger.enable({ region, entity, maxEvents, maxDurationMs });
+    } else {
+      cLogger.disable();
+    }
+    return json(res, 200, { ok: true, status: cLogger.status() }), true;
+  }
+
+  if (route === 'combat-log/export' && method === 'GET') {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const region = url.searchParams.get('region') || undefined;
+    const entity = url.searchParams.get('entity') || undefined;
+    const payload = cLogger.exportJson({ region, entity });
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename="combat-log.json"',
+    });
+    res.end(payload);
+    return true;
+  }
+
+  if (route === 'combat-log/clear' && method === 'POST') {
+    cLogger.clear();
+    return json(res, 200, { ok: true, status: cLogger.status() }), true;
+  }
 
   if (route === 'overview' && method === 'GET') {
     const regions = [...world.regions.values()].map((r) => ({
@@ -103,7 +187,7 @@ export async function handleAdmin(
       width: r.map.width,
       height: r.map.height,
       players: r.playerIds().map((id) => ({ id, name: r.nameOf(id), ...r.position(id), level: r.character(id)?.level })),
-      creatures: r.creatureIds().map((id) => r.creature(id)).filter(Boolean),
+      creatures: r.creatureIds().map((id) => { const c = r.creature(id); return c ? { id, ...c } : undefined; }).filter(Boolean),
       npcs: r.map.npcs.map((n) => ({ name: n.name, x: n.x, y: n.y })),
       landmarks: r.map.landmarks.map((l) => ({ asset: l.asset, x: l.x, y: l.y })),
     }));
@@ -575,6 +659,9 @@ export async function handleAdmin(
       store: store.label,
       now: Date.now(),
       slowTicks: ctx.slowTicks?.list() ?? [],
+      profileRetention: profiler.getRetentionPolicy(),
+      profiles: await profiler.listProfiles(),
+      activeProfile: profiler.getActiveStatus().profile,
     }), true;
   }
 
@@ -583,6 +670,62 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     ctx.slowTicks?.clear();
     return json(res, 200, { ok: true, message: 'Cleared slow ticks.' }), true;
+  }
+
+  // Starts recording a CPU profile or taking a heap snapshot (Owner).
+  if (route === 'servers/profile' && method === 'POST') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const host = typeof body?.host === 'string' && body.host ? body.host : 'gateway';
+    const kind = body?.kind === 'heap' ? 'heap' : 'cpu';
+    const durationSeconds = typeof body?.durationSeconds === 'number' && body.durationSeconds > 0
+      ? body.durationSeconds
+      : (kind === 'cpu' ? 10 : 0);
+
+    try {
+      const active = await profiler.startProfile({ host, kind, durationSeconds }, ctx.regionServers);
+      return json(res, 200, { started: true, profile: active }), true;
+    } catch (err: any) {
+      if (err.code === 'already_recording') {
+        return json(res, 409, { error: 'already_recording', message: 'A profile is already being recorded.' }), true;
+      }
+      if (err.code === 'no_server') {
+        return json(res, 404, { error: 'no_server', message: 'That region server is not running.' }), true;
+      }
+      return json(res, 500, { error: 'profiler_error', message: err.message || 'Failed to start profile.' }), true;
+    }
+  }
+
+  // Checks the active recording status (Owner).
+  if (route === 'servers/profile/status' && method === 'GET') {
+    if (ownerOnly()) return true;
+    return json(res, 200, profiler.getActiveStatus()), true;
+  }
+
+  // Downloads a recorded .cpuprofile or .heapsnapshot file (Owner).
+  const profileDownloadMatch = route.match(/^servers\/profile\/([^/]+)$/);
+  if (profileDownloadMatch && method === 'GET') {
+    if (ownerOnly()) return true;
+    const id = decodeURIComponent(profileDownloadMatch[1]!);
+    const file = await profiler.getProfileFile(id);
+    if (!file) return json(res, 404, { error: 'not_found', message: 'Profile not found.' }), true;
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': `attachment; filename="${file.filename}"`,
+      'Content-Length': file.sizeBytes,
+    });
+    const stream = fs.createReadStream(file.filePath);
+    stream.pipe(res);
+    return true;
+  }
+
+  // Deletes a recorded profile file (Owner).
+  if (profileDownloadMatch && method === 'DELETE') {
+    if (ownerOnly()) return true;
+    const id = decodeURIComponent(profileDownloadMatch[1]!);
+    const deleted = await profiler.deleteProfile(id);
+    if (!deleted) return json(res, 404, { error: 'not_found', message: 'Profile not found.' }), true;
+    return json(res, 200, { deleted: true, id }), true;
   }
 
   // The performance overlay (Stewards and the Owner): how the server running your part of the world keeps up.

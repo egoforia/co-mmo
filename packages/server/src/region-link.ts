@@ -1,4 +1,4 @@
-import type { Character, ClientMessage, SkyConfig, NpcPlacement, PhaseTimings, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage, SlowTickRecord } from '@co-mmo/shared';
+import type { Character, ClientMessage, SkyConfig, NpcPlacement, PhaseTimings, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage, SlowTickRecord, EntityInspection } from '@co-mmo/shared';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { Carry, Cell, Connection, Departure, Ghosts, Leaving } from './region.ts';
 import type { Tile } from '@co-mmo/shared';
@@ -63,6 +63,8 @@ export interface RegionHandle {
   readonly cells?: RegionHandle[];
   /** A cell: what the cell at `from` shows near the border. */
   seeAcross?(from: number, ghosts: Ghosts): void;
+  /** Live entity inspection for debug tools. */
+  inspect?(kind: 'player' | 'creature', id: string): EntityInspection | undefined | Promise<EntityInspection | undefined>;
 }
 
 /** A Carry as it travels between servers (a Map does not survive JSON). */
@@ -165,8 +167,11 @@ export type ToServer =
   | { t: 'ghosts'; region: string; from: number; ghosts: Ghosts }
   | { t: 'world'; state: WorldState }
   | { t: 'content'; entries: import('@co-mmo/shared').ContentEntry[] }
+  | { t: 'inspect'; region: string; kind: 'player' | 'creature'; id: string; ask?: number; replyTo?: string }
+  | { t: 'watch-entity'; region: string; kind: 'player' | 'creature'; id: string; watch: boolean }
   /** The gateway does not know this server (it restarted, or gave the server up for dead): drop everything and say hello again. */
   | { t: 'reset' }
+  | { t: 'start-profile'; profileId: string; durationSeconds: number; kind: 'cpu' | 'heap' }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };
 
 /** One thing for the gateway to pass on to a player. */
@@ -186,7 +191,9 @@ export type ToGateway =
   | { t: 'hook'; server: string; region: string; hook: 'regionChat'; m: ServerMessage }
   /** A cell's border, each tick, for the cells beside it. */
   | { t: 'edge'; server: string; region: string; ghosts: Ghosts }
+  | { t: 'entity-inspection'; server: string; region: string; data: EntityInspection }
   /** A tick that exceeded the time budget, captured for investigation. */
   | { t: 'slow-tick'; server: string; record: SlowTickRecord }
   | { t: 'bye'; server: string }
+  | { t: 'profile-done'; profileId: string; error?: string; data?: string }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };

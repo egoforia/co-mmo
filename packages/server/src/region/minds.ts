@@ -2,6 +2,7 @@ import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, 
 import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { Combat } from './combat.ts';
+import type { CombatLogger } from './combat-logger.ts';
 import type { Gauges } from './gauges.ts';
 import type { Paths } from './paths/index.ts';
 import type { PlayerState, RegionState } from './state.ts';
@@ -12,6 +13,8 @@ import type { PlayerState, RegionState } from './state.ts';
  * (its players, the hour, the weather) and deals the blows creatures strike.
  */
 export class Minds {
+  logger?: CombatLogger;
+
   constructor(
     private readonly s: RegionState,
     private readonly gauges: Gauges,
@@ -71,7 +74,34 @@ export class Minds {
     // skills change it too (paths/index.ts): nothing reaches the Hidden, a
     // Knelled creature hits softer, Rooted Stand adds Armor, and the
     // Unyielding keep their last point of health.
-    if (this.paths.hidden(p, now) || this.s.random() < dodgeChance(p.character) + (statusOf(p, 'evasive', now) ? EVASIVE_DODGE : 0)) return;
+    if (this.paths.hidden(p, now)) return;
+    const dodgeChanceVal = dodgeChance(p.character) + (statusOf(p, 'evasive', now) ? EVASIVE_DODGE : 0);
+    const dodgeRoll = this.s.random();
+    const dodged = dodgeRoll < dodgeChanceVal;
+    if (dodged) {
+      if (this.logger?.active) {
+        this.logger.record({
+          id: `hit-${++this.s.bodyCount}-${now}`,
+          at: now,
+          tick: this.s.tickCount,
+          region: this.s.map.def.id,
+          attacker: { id: c.id, name: c.def.name, kind: 'creature' },
+          target: { id: p.info.id, name: p.info.name, kind: 'player' },
+          action: { id: 'attack', name: 'Attack', kind: 'attack' },
+          damageType: 'physical',
+          pierce: false,
+          rolls: {
+            variance: 1,
+            dodge: { chance: dodgeChanceVal, rolled: dodgeRoll, dodged: true },
+          },
+          factors: { base: c.def.damage, power: c.def.damage, raw: 0 },
+          mitigation: { shieldAbsorb: 0, defenseStat: armor(p.character), afterDefense: 0 },
+          finalAmount: 0,
+          defeated: false,
+        });
+      }
+      return;
+    }
     const poised = statusOf(p, 'poised', now);
     if (poised) {
       p.statuses.splice(p.statuses.indexOf(poised), 1);
@@ -79,17 +109,24 @@ export class Minds {
       this.combat.strike(p, c, poised.amount ?? 0, { type: 'physical', ability: 'riposte' });
       return;
     }
-    let raw = c.def.damage * (0.8 + this.s.random() * 0.4) * this.paths.dealtBy(c, now);
+    const varianceRoll = 0.8 + this.s.random() * 0.4;
+    let raw = c.def.damage * varianceRoll * this.paths.dealtBy(c, now);
+    const baseRaw = raw;
     const shield = blocking(p.character);
-    if (shield.chance && this.s.random() < shield.chance) raw = Math.max(0, raw - shield.amount);
+    const blockRoll = this.s.random();
+    const blocked = Boolean(shield.chance && blockRoll < shield.chance);
+    if (blocked) raw = Math.max(0, raw - shield.amount);
     const guard = statusOf(p, 'guarded', now);
     // Hold the Line: each blow on a Guarded ally steadies the Warden who guards them.
     if (guard?.by && guard.by !== p.info.id) {
       const warden = this.s.players.get(guard.by);
       if (warden) this.gauges.add(warden, 1, 'resolve');
     }
-    const armored = afterArmor(raw, armor(p.character) + this.paths.extraArmor(p)) * (1 - (guard?.amount ?? 0) / 100);
-    const amount = this.paths.floor(p, absorb(p, armored, now), now);
+    const targetArmor = armor(p.character) + this.paths.extraArmor(p);
+    const afterArmorVal = afterArmor(raw, targetArmor) * (1 - (guard?.amount ?? 0) / 100);
+    const absorbed = absorb(p, afterArmorVal, now);
+    const amount = this.paths.floor(p, absorbed, now);
+    const shieldAbsorb = afterArmorVal - absorbed;
     p.character.hp = Math.max(0, p.character.hp - amount);
     p.lastHurt = now;
     // Steady Breath: now and then a hit leaves a Ranger's Focus be.
@@ -97,6 +134,38 @@ export class Minds {
     this.paths.struck(p, c, amount, now);
     const defeated = p.character.hp === 0;
     this.s.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated });
+
+    if (this.logger?.active) {
+      this.logger.record({
+        id: `hit-${++this.s.bodyCount}-${now}`,
+        at: now,
+        tick: this.s.tickCount,
+        region: this.s.map.def.id,
+        attacker: { id: c.id, name: c.def.name, kind: 'creature' },
+        target: { id: p.info.id, name: p.info.name, kind: 'player' },
+        action: { id: 'attack', name: 'Attack', kind: 'attack' },
+        damageType: 'physical',
+        pierce: false,
+        rolls: {
+          variance: varianceRoll,
+          dodge: { chance: dodgeChanceVal, rolled: dodgeRoll, dodged: false },
+          block: shield.chance ? { chance: shield.chance, rolled: blockRoll, blocked, amount: blocked ? shield.amount : 0 } : undefined,
+        },
+        factors: {
+          base: c.def.damage,
+          power: c.def.damage,
+          raw: baseRaw,
+        },
+        mitigation: {
+          shieldAbsorb,
+          defenseStat: targetArmor,
+          afterDefense: afterArmorVal,
+        },
+        finalAmount: amount,
+        defeated,
+      });
+    }
+
     // Fallen: every creature after them turns to whoever else threatened it, or goes home.
     if (defeated) this.forgetPlayer(p.info.id, now);
   }

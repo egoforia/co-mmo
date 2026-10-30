@@ -8,7 +8,7 @@ export interface GeneratedVideo {
   data: Buffer;
   /** Length of the clip, which is what it is billed by. */
   seconds: number;
-  resolution?: '720p' | '1080p' | string;
+  resolution?: '480p' | '720p' | '1080p' | string;
   /** Optional native or sampled frame rate. */
   fps?: number;
   /** Video frame width in pixels. */
@@ -37,6 +37,8 @@ export interface VideoRequest {
   negativePrompt?: string;
   /** Whether provider-side automatic prompt expansion/rewriting is enabled (default false). */
   promptExpansion?: boolean;
+  /** Fixed seed, for providers that take one, so a clip can be made again the same way. */
+  seed?: number;
 }
 
 /**
@@ -60,11 +62,19 @@ const DEFAULT_USD_PER_SECOND: Record<string, [number, number]> = {
   'wan-2.1': [0.05, 0.08],
   'wan-2.1-t2v-14b': [0.05, 0.08],
   'wan-2.1-i2v-720p': [0.05, 0.08],
-  'wan-3.0': [0.05, 0.08],
-  // Replicate provider-prefixed models
+  'wan-3.0': [0.1, 0.2],
+  // Replicate models, by their owner/name there
+  'alibaba/wan-3': [0.1, 0.2],
   'replicate/wan-2.1': [0.05, 0.08],
-  'replicate/wan-3.0': [0.05, 0.08],
+  'replicate/wan-3.0': [0.1, 0.2],
   default: [0.4, 0.4],
+};
+
+/** Dollars per second at 480p, for models that offer it; others are priced as 720p. */
+const USD_PER_SECOND_480P: Record<string, number> = {
+  'alibaba/wan-3': 0.05,
+  'wan-3.0': 0.05,
+  'replicate/wan-3.0': 0.05,
 };
 
 const customUsdPerSecond: Record<string, [number, number]> = {};
@@ -101,7 +111,8 @@ export function knownVideoModels(): string[] {
 /** What a clip cost; an unknown model is priced like the dearest one, so budgets err safe. */
 export function videoUsd(model: string, video: GeneratedVideo): number {
   const [hd, fullHd] = videoRatesPerSecond(model);
-  return (video.resolution === '1080p' ? fullHd : hd) * video.seconds;
+  const sd = video.resolution === '480p' ? USD_PER_SECOND_480P[model.toLowerCase().trim()] : undefined;
+  return (sd ?? (video.resolution === '1080p' ? fullHd : hd)) * video.seconds;
 }
 
 /** Dollars per second of video, backwards-compatible proxy mapping. */

@@ -208,6 +208,12 @@ export function describeCall(url: URL, body: unknown): { service: string; kind: 
   if (host === 'github.com') return { service: 'GitHub', kind: path.startsWith('/login/oauth') ? 'Sign-in' : 'Other' };
   if (/^(oauth2|openidconnect|accounts)\.googleapis\.com$|^accounts\.google\.com$/.test(host)) return { service: 'Google', kind: 'Sign-in' };
   if (host === 'api.resend.com') return { service: 'Resend', kind: 'Email' };
+  if (host === 'api.replicate.com') {
+    const model = path.match(/^\/v1\/models\/([^/]+\/[^/]+)\/predictions/)?.[1] ?? (typeof sent.version === 'string' ? sent.version : undefined);
+    const kind = path.startsWith('/v1/files') ? 'Upload' : /^\/v1\/predictions\/[^/]+/.test(path) ? 'Video (checking)' : 'Video';
+    return { service: 'Replicate', kind, ...(model ? { model } : {}) };
+  }
+  if (host === 'replicate.delivery' || host.endsWith('.replicate.delivery')) return { service: 'Replicate', kind: 'Video (download)' };
   // OpenAI-compatible services set with OPENAI_BASE_URL.
   if (path.endsWith('/chat/completions')) return { service: host, kind: 'Chat', ...(named ? { model: named } : {}) };
   return { service: host, kind: 'Other', ...(named ? { model: named } : {}) };

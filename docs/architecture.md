@@ -30,7 +30,7 @@ adapter) and picking it in the place named under "Chosen in".
 | Where regions run | `Hosting` (`world.ts`), `RegionHandle` (`region-link.ts`) | in process, `RegionServers` + `RemoteRegion` | `main.ts` (`REDIS_URL`); `scripts/dev.mjs` starts `REGION_SERVERS` of them |
 | Language models | `ChatModel` (`ai/chat.ts`) | Gemini, Claude, OpenAI-compatible, offline God | `ai/services.ts` |
 | Pictures | `ImageProvider` (`assets/provider.ts`) | Gemini image models | `ai/services.ts` |
-| Video (walks) | `VideoProvider` (`assets/video.ts`) | Veo | `ai/services.ts` |
+| Video (walks) | `VideoProvider` (`assets/video.ts`) | Veo, Replicate (`assets/replicate.ts`, Wan 3) | `ai/services.ts` |
 | Music and effects | `SoundProvider` (`assets/sound.ts`) | Lyria, ElevenLabs | `ai/services.ts` |
 | Art style | `StyleProfile` (`assets/style-profile.ts`) | `FLAT_ISOMETRIC` | `chooseStyle` (`ART_STYLE`) |
 | Camera | `Projection` (`client/src/projection.ts`) | `ISOMETRIC` | `chooseCamera` (`client/src/camera.ts`) |

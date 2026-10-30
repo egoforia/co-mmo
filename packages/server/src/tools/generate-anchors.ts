@@ -5,23 +5,24 @@
 //   npm run anchors -- --limit 5
 //   npm run anchors -- --process-only   redo post-processing, no generation
 //   npm run anchors -- --model gemini-3.1-flash-image   (default: the model chosen in God's View)
+//   npm run anchors -- --provider gemini                (default: the provider chosen in God's View)
 //   npm run anchors -- --only player-mara --edit "empty hands, no staff"
 //       paints an existing anchor again from its own picture with one change
 //
 // The provider's image is kept in raw/; the game copy next to it has the key
 // background removed (sprites) or is made seamless (tiles, with a 4x4 preview
 // in previews/).
-// Needs GEMINI_API_KEY. Each image is saved with a recipe (prompt, model,
+// Needs the provider's key, read from the checkout's .env when there is one. Each image is saved with a recipe (prompt, model,
 // style version, time), so the set can be regenerated with a better model.
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ANCHORS } from '../assets/anchors.ts';
 import { BIOME_KIT, type KitAsset } from '../assets/kit.ts';
-import { GeminiImageProvider } from '../assets/gemini.ts';
 import { makeSeamless, removeKeyBackground, tileGrid } from '../assets/postprocess.ts';
 import { BASE_PROMPT, SPRITE_FRAMING, STYLE_VERSION, buildPrompt } from '../assets/style.ts';
-import { savedImageModel } from './saved-model.ts';
+import type { ImageProvider } from '../assets/provider.ts';
+import { loadEnv, toolImageProvider } from './saved-model.ts';
 import sharp from 'sharp';
 
 const args = process.argv.slice(2);
@@ -41,6 +42,7 @@ const limit = Number(value('limit') ?? Infinity);
 // Approximate price per image; confirm against the provider's price page.
 const pricePerImage = Number(process.env.IMAGE_PRICE_USD ?? 0.04);
 const outDir = resolve(fileURLToPath(new URL('../../../../assets/anchors/', import.meta.url)));
+loadEnv(resolve(outDir, '../..'));
 
 const ALL: KitAsset[] = [...ANCHORS, ...BIOME_KIT];
 const selected = ALL.filter((a) => !only || a.id === only).slice(0, limit);
@@ -60,10 +62,6 @@ const previewDir = resolve(outDir, 'previews');
 await mkdir(rawDir, { recursive: true });
 await mkdir(previewDir, { recursive: true });
 
-// The model chosen in God's View, unless --model names another.
-const model = value('model') ?? (await savedImageModel(resolve(outDir, '../..'))) ?? process.env.GEMINI_IMAGE_MODEL;
-const provider = new GeminiImageProvider(process.env.GEMINI_API_KEY ?? '', model);
-
 if (processOnly) {
   for (const anchor of selected) {
     const raw = resolve(rawDir, `${anchor.id}.png`);
@@ -71,6 +69,9 @@ if (processOnly) {
   }
   process.exit(0);
 }
+
+// The provider and model chosen in God's View, unless --provider or --model names another.
+const provider: ImageProvider = await toolImageProvider(resolve(outDir, '../..'), { provider: value('provider'), model: value('model') });
 
 let made = 0;
 for (const anchor of selected) {

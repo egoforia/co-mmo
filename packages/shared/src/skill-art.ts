@@ -6,7 +6,7 @@
 
 import type { Thread } from './rpg/abilities.ts';
 import { ABILITIES } from './rpg.ts';
-import type { StatusId } from './rpg/statuses.ts';
+import { statusWords, type StatusId } from './rpg/statuses.ts';
 import { BELLKEEPER_SKILLS } from './skills/bellkeeper.ts';
 import { BELLKEEPER_PATHS } from './skills/bellkeeper-paths.ts';
 
@@ -38,6 +38,12 @@ export const EFFECT_ARTS: readonly string[] = [...Object.values(THREAD_ART), BEL
 /** A status's icon, shown over name tags and in the HUD. */
 export function statusArt(id: StatusId): string {
   return `status-${id}`;
+}
+
+/** A name tag: the name, then the names of statuses whose icons are not painted yet (those show as icons). */
+export function statusTag(name: string, statuses: readonly StatusId[] | undefined, painted: (key: string) => boolean): string {
+  const words = statusWords((statuses ?? []).filter((id) => !painted(statusArt(id))));
+  return words ? `${name} · ${words}` : name;
 }
 
 const BELLS = new Set([...Object.keys(BELLKEEPER_SKILLS), ...Object.keys(BELLKEEPER_PATHS)]);

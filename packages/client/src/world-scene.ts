@@ -3,7 +3,8 @@
 // - world-scene/walls.ts: isometric cutaway walls (rockWalls), roof/half caps, diamondLayer
 // - world-scene/regions.ts: region & chunk streaming, landmarks, stairs, lamps, kit houses, floor visibility
 // - world-scene/avatars.ts: avatars, walk cycles, FigureMetricsCache, and vision-mapped held items
-// - world-scene/combat.ts: hit numbers, slash arcs, Firebolt projectiles, lunges, and fade-outs
+// - world-scene/combat.ts: hit numbers, slash arcs, Firebolt projectiles, thread and bell bursts, lunges, and fade-outs
+// - world-scene/marks.ts and status-icons.ts: what skills leave in the world, and status icons over name tags
 // Put new domain logic in the matching world-scene/* module rather than growing this facade.
 
 import Phaser from 'phaser';
@@ -15,6 +16,7 @@ import {
   heldItem,
   offHandItem,
   paceFor,
+  statusTag,
   type ArtEntry,
   type ArtManifest,
   type ArtPointsManifest,
@@ -50,8 +52,9 @@ import {
   setHeld,
   syncAvatars,
   walkAvatar,
-  withStatuses,
 } from './world-scene/avatars.ts';
+import { Marks } from './world-scene/marks.ts';
+import { setStatusIcons } from './world-scene/status-icons.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
 import { Targeting } from './world-scene/targeting.ts';
 import {
@@ -74,6 +77,7 @@ import {
   type SceneCounts,
   type WorldSceneOptions,
   cameraZoom,
+  floorDepthOffset,
   floorLift,
   setDepthShade,
   overlaps,
@@ -121,6 +125,8 @@ export class WorldScene extends Phaser.Scene {
    * the server are counted from it.
    */
   private origin = { x: 0, y: 0 };
+  /** What skills left nearby: traps, Echoes, a spirit hawk, a sand double. */
+  private marks?: Marks;
   /** The regions drawn around us, by id. */
   private drawn = new Map<string, DrawnRegion>();
   /** Kit art painted since the land was last drawn. */
@@ -300,6 +306,7 @@ export class WorldScene extends Phaser.Scene {
     this.map = generateRegion(def);
     const size = this.map.width;
     this.origin = { x: def.at.x * size, y: def.at.y * size };
+    this.marks?.clear();
     const around = [def, ...welcome.neighbours.filter((n) => Math.max(Math.abs(n.at.x - def.at.x), Math.abs(n.at.y - def.at.y)) === 1)];
     const wanted = new Set(around.map((d) => d.id));
     for (const [id, region] of this.drawn) {
@@ -388,17 +395,29 @@ export class WorldScene extends Phaser.Scene {
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
     const now = performance.now();
     const load = (k: string, u: string) => this.loadArt(k, u);
+    const painted = (key: string) => this.textures.exists(key);
     syncAvatars(this, this.remotes, snapshot.players, now, (e) => makeAvatar(this, this.metrics, playerTexture(e.id), e.name, false));
     for (const p of snapshot.players) {
       const remote = this.remotes.get(p.id);
       if (!remote) continue;
       setHeld(this, remote, p.held, 'right', load);
       setHeld(this, remote, p.offHeld, 'left', load);
-      remote.label.setText(withStatuses(p.fallen ? `${p.name} (Fallen)` : p.name, p.statuses));
+      remote.label.setText(statusTag(p.fallen ? `${p.name} (Fallen)` : p.name, p.statuses, painted));
+      setStatusIcons(this, remote, p.statuses);
       remote.body.setAlpha(p.fallen ? FALLEN_ALPHA : 1);
     }
     syncAvatars(this, this.creatures, snapshot.creatures ?? [], now, (c) => makeCreature(this, this.metrics, c));
-    for (const c of snapshot.creatures ?? []) this.creatures.get(c.id)?.label.setText(creatureLabel(c));
+    for (const c of snapshot.creatures ?? []) {
+      const creature = this.creatures.get(c.id);
+      creature?.label.setText(creatureLabel(c, painted));
+      if (creature) setStatusIcons(this, creature, c.statuses);
+    }
+    setStatusIcons(this, this.me, (snapshot.statuses ?? []).map((s) => s.id));
+    this.marks ??= new Marks(this);
+    this.marks.sync(snapshot.marks, (x, y, floor) => {
+      const at = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
+      return { x: at.x, y: at.y - floorLift(floor), depth: floorDepthOffset(floor) + PROJECTION.depth(this.origin.x + x, this.origin.y + y) };
+    });
     syncAvatars(this, this.npcs, snapshot.npcs ?? [], now, (n) => makeNpc(this, this.metrics, n));
     for (const n of snapshot.npcs ?? []) this.npcs.get(n.id)?.label.setText(n.asleep ? `${n.name} (asleep)` : n.name);
     const bodies = snapshot.bodies ?? [];

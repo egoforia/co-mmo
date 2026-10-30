@@ -6,6 +6,7 @@ import {
   ABILITIES,
   ITEMS,
   WEAPON_FAMILIES,
+  hitArt,
   isWalkDirection,
   type HitMessage,
 } from '@co-mmo/shared';
@@ -37,6 +38,7 @@ export function showHit(
   if (attacker && target && isBolt) fireBolt(scene, attacker, target, darkness);
   else if (attacker && attacker !== me && target) lunge(scene, attacker, toward(attacker, target));
   if (!target) return;
+  burst(scene, target, hitArt(hit.ability));
   const hurtMe = target === me;
   const number = scene.add
     .text(target.body.x + (Math.random() - 0.5) * T * 0.3, target.body.y - target.body.displayHeight * 0.8, `${hit.amount}`, {
@@ -98,6 +100,15 @@ export function fireBolt(scene: Phaser.Scene, from: Avatar, to: Avatar, darkness
       onComplete: () => { spark.destroy(); dropLight(scene, lit); },
     }),
   });
+}
+
+/** A thread's or bell's painted burst where a skill strikes, swelling and fading; nothing until it is painted. */
+export function burst(scene: Phaser.Scene, target: Avatar, art: string | undefined): void {
+  if (!art || !scene.textures.exists(art)) return;
+  const b = target.body;
+  const image = scene.add.image(b.x, b.y - b.displayHeight * 0.5, art).setDepth(b.depth + 1);
+  image.setScale((T * 0.9) / Math.max(image.width, image.height));
+  scene.tweens.add({ targets: image, scale: image.scale * 1.4, alpha: 0, duration: 360, ease: 'Quad.easeOut', onComplete: () => image.destroy() });
 }
 
 /** A short jab and back along `aim`, a step on screen one long. */

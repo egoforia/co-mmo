@@ -17,7 +17,7 @@ import {
   walkDirection,
   walkFrameRate,
   walkStandArt,
-  statusWords,
+  statusTag,
   type ArtEntry,
   type ArtManifest,
   type ArtPoint,
@@ -31,6 +31,7 @@ import { PROJECTION } from '../projection.ts';
 import { playerArt } from '../textures.ts';
 import { figureRows, groundFrame, standingMetrics } from './figure-ground.ts';
 import { artSrc, lookArt } from '../wished.ts';
+import { dropStatusIcons, placeStatusIcons } from './status-icons.ts';
 import {
   type Avatar,
   type Hand,
@@ -270,16 +271,10 @@ export function makeNpc(scene: Phaser.Scene, metrics: FigureMetricsCache, n: Npc
   return a;
 }
 
-/** A creature's name tag says when it is asleep or running away. */
-export function creatureLabel(c: CreatureState): string {
+/** A creature's name tag says when it is asleep or running away, and names statuses whose icons are not painted yet. */
+export function creatureLabel(c: CreatureState, painted: (key: string) => boolean): string {
   const name = c.mood === 'asleep' ? `${c.name} (asleep)` : c.mood === 'fleeing' ? `${c.name} (running away)` : c.name;
-  return withStatuses(name, c.statuses);
-}
-
-/** A name tag with its statuses after it, in words until their icons are painted (build plan step 10). */
-export function withStatuses(name: string, statuses: CreatureState['statuses']): string {
-  const words = statusWords(statuses);
-  return words ? `${name} · ${words}` : name;
+  return statusTag(name, c.statuses, painted);
 }
 
 /** A body's name tag says when there is something on it for us. */
@@ -288,6 +283,7 @@ export function bodyLabel(b: BodyState): string {
 }
 
 export function destroyAvatar(scene: Phaser.Scene, a: Avatar): void {
+  dropStatusIcons(a);
   a.held?.image?.destroy();
   a.offHeld?.image?.destroy();
   dropLight(scene, a.held?.lit);
@@ -365,6 +361,7 @@ export function placeAvatar(
   a.shadow.setDepth(depth - 2);
   a.body.setDepth(depth);
   a.label.setDepth(LABEL_DEPTH);
+  placeStatusIcons(a);
   // After the body's depth is set, or the item lags a step behind it and slips behind the body while walking down.
   placeHeld(scene, a, 'right', points, darkness);
   placeHeld(scene, a, 'left', points, darkness);

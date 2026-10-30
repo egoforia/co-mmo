@@ -7,6 +7,7 @@ import {
   RACES,
   SLOT_NAMES,
   STATUSES,
+  statusArt,
   attackCooldown,
   armor,
   attackPower,
@@ -69,8 +70,10 @@ export class RpgUi {
   private energy: number;
   private chapter = CHAPTERS[0]!.id;
   private lastAttack = 0;
-  /** Our statuses in words, as the last snapshot told them. */
+  /** Our statuses as the stats line shows them (HTML), as the last snapshot told them. */
   private statusText = '';
+  /** A painted status icon's picture, once it ships with the game (skill-art.ts); words stand in until then. */
+  statusIcon: (key: string) => string | undefined = () => undefined;
 
   constructor(character: Character, private readonly actions: RpgActions) {
     this.character = character;
@@ -144,7 +147,11 @@ export class RpgUi {
 
   /** Our running statuses from the snapshot, shown in words beside the stats until their icons are painted (build plan step 10). */
   setStatuses(statuses: StatusView[] | undefined): void {
-    const next = (statuses ?? []).map((s) => `${STATUSES[s.id].name} ${s.left}s`).join(' · ');
+    const next = (statuses ?? []).map((s) => {
+      const name = STATUSES[s.id].name;
+      const icon = this.statusIcon(statusArt(s.id));
+      return icon ? `<img class="status-icon" src="${escapeHtml(icon)}" alt="${escapeHtml(name)}" title="${escapeHtml(name)}"> ${s.left}s` : `${escapeHtml(name)} ${s.left}s`;
+    }).join(' · ');
     if (next === this.statusText) return;
     this.statusText = next;
     this.renderStats();
@@ -221,7 +228,7 @@ export class RpgUi {
     $('energy-text').textContent = `${energy} / ${maxE} Energy`;
     // Weakened comes in the snapshot's statuses with the rest; before the first one, the character says.
     const shown = this.statusText || (this.weakened ? 'Weakened' : '');
-    const weak = shown ? ` · <span class="weak">${escapeHtml(shown)}</span>` : '';
+    const weak = shown ? ` · <span class="weak">${this.statusText ? shown : escapeHtml(shown)}</span>` : '';
     $('stats-line').innerHTML = `Level ${c.level} · ${c.gold} gold · <span class="favor">✦ ${c.favor} Favor</span>${weak}`;
   }
 

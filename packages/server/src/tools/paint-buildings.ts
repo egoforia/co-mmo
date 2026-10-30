@@ -7,19 +7,20 @@
 //   npm run building-art -- --only bramble-cottage-floor --force
 //   npm run building-art -- --process-only     redo post-processing, no generation
 //   npm run building-art -- --model gemini-3.1-flash-image
+//   npm run building-art -- --provider gemini
 //
-// The model is the one saved in God's View (data/world.json), unless
-// --model names another. The provider's images are kept in
+// The provider and model are the ones saved in God's View (data/world.json),
+// unless --provider or --model names another. The provider's images are kept in
 // assets/buildings/raw with a recipe each; the game copies go to
-// packages/client/public/art and its manifest. Needs GEMINI_API_KEY.
+// packages/client/public/art and its manifest. Needs the provider's key,
+// read from the checkout's .env when there is one.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BUILDING_STYLES, type ArtManifest } from '@co-mmo/shared';
 import { buildingArtJobs, paintBuildingArt, processBuildingArt, type BuildingArtDirs } from '../assets/building-art.ts';
-import { GeminiImageProvider } from '../assets/gemini.ts';
 import { imageUsd } from '../assets/wish-art.ts';
-import { savedImageModel } from './saved-model.ts';
+import { loadEnv, toolImageProvider } from './saved-model.ts';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
@@ -29,6 +30,7 @@ const value = (name: string) => {
 };
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
+loadEnv(root);
 const dirs: BuildingArtDirs = {
   anchorDir: resolve(root, 'assets/anchors'),
   rawDir: resolve(root, 'assets/buildings/raw'),
@@ -48,8 +50,7 @@ if (flag('dry-run')) {
 }
 
 const manifest = JSON.parse(await readFile(manifestFile, 'utf8')) as ArtManifest;
-const model = value('model') ?? (await savedImageModel(root)) ?? process.env.GEMINI_IMAGE_MODEL;
-const provider = flag('process-only') ? undefined : new GeminiImageProvider(process.env.GEMINI_API_KEY ?? '', model);
+const provider = flag('process-only') ? undefined : await toolImageProvider(root, { provider: value('provider'), model: value('model') });
 let usd = 0;
 
 for (const job of jobs) {

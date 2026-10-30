@@ -34,7 +34,7 @@ describe('the AI models tab', () => {
     const { base, store } = await start({ env: { GEMINI_API_KEY: 'g' }, realImages: true });
     const owner = account(store, 'Ego', 'owner');
     const { body } = await api(base, '/api/admin/ai', owner.token);
-    expect(body.keys.map((k: any) => [k.name, k.set])).toEqual([['GEMINI_API_KEY', true], ['ANTHROPIC_API_KEY', false], ['OPENAI_API_KEY', false], ['ELEVENLABS_API_KEY', false]]);
+    expect(body.keys.map((k: any) => [k.name, k.set])).toEqual([['GEMINI_API_KEY', true], ['ANTHROPIC_API_KEY', false], ['OPENAI_API_KEY', false], ['ELEVENLABS_API_KEY', false], ['REPLICATE_API_TOKEN', false]]);
     expect(body.catalog.image.map((m: any) => m.model)).toContain('gemini-3.1-flash-image');
     expect(body.catalog.video.find((m: any) => m.model === 'veo-3.1-lite-generate-preview').usd).toBeCloseTo(0.4);
     expect(body.ai.video).toEqual({ provider: 'gemini', model: 'veo-3.1-lite-generate-preview', dailyClips: 7 });

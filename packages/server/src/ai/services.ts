@@ -2,6 +2,7 @@ import { GeminiImageProvider } from '../assets/gemini.ts';
 import type { ImageProvider } from '../assets/provider.ts';
 import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from '../assets/sound.ts';
 import { GeminiVideoProvider, type VideoProvider } from '../assets/video.ts';
+import { ReplicateVideoProvider, replicateToken } from '../assets/replicate.ts';
 import { queuedImages, queuedSound, queuedVideo, type DailyClips, type PaintQueue } from '../paint-queue.ts';
 import { soundSettings, styleCheckSettings, videoSettings, type ArtUse, type Settings } from '../settings.ts';
 import { createChatModel, type ChatModel } from './chat.ts';
@@ -128,10 +129,7 @@ export class AiServices {
     const provider = settings.ai.image.provider;
     if (!provider || provider === 'none') return undefined;
     const model = (use && settings.ai.image.uses?.[use]) || settings.ai.image.model;
-    if (provider === 'gemini') {
-      return env.GEMINI_API_KEY ? new GeminiImageProvider(env.GEMINI_API_KEY, model || undefined) : undefined;
-    }
-    return undefined;
+    return imageProviderFor(provider, model, env);
   }
 
   // Video clips use the provider and model chosen in AI settings (defaults to Gemini/Veo).
@@ -140,10 +138,7 @@ export class AiServices {
     if (overrides?.videoProvider) return overrides.videoProvider();
     const v = videoSettings(this.options.settings(), env);
     if (!v || v.provider === 'none') return undefined;
-    if (v.provider === 'gemini') {
-      return env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, v.model || undefined) : undefined;
-    }
-    return undefined;
+    return videoProviderFor(v.provider, v.model, env);
   }
 
   private chosenEffects(): SoundProvider | undefined {
@@ -164,4 +159,29 @@ export class AiServices {
     const queue = this.options.paintQueue;
     return provider && queue ? queuedSound(queue, provider) : provider;
   }
+}
+
+/** Image providers the game can paint with, by their settings id. */
+export const IMAGE_PROVIDERS = ['gemini'] as const;
+
+/** Video providers the game can make clips with, by their settings id. */
+export const VIDEO_PROVIDERS = ['gemini', 'replicate'] as const;
+
+/**
+ * The image provider named in settings with its model, when its key is set.
+ * The art tools use this too, so they paint with what God's View offers.
+ */
+export function imageProviderFor(provider: string, model: string | undefined, env: Record<string, string | undefined>): ImageProvider | undefined {
+  if (provider === 'gemini') return env.GEMINI_API_KEY ? new GeminiImageProvider(env.GEMINI_API_KEY, model || undefined) : undefined;
+  return undefined;
+}
+
+/** The video provider named in settings with its model, when its key is set. */
+export function videoProviderFor(provider: string, model: string | undefined, env: Record<string, string | undefined>): VideoProvider | undefined {
+  if (provider === 'gemini') return env.GEMINI_API_KEY ? new GeminiVideoProvider(env.GEMINI_API_KEY, model || undefined) : undefined;
+  if (provider === 'replicate') {
+    const token = replicateToken(env);
+    return token ? new ReplicateVideoProvider(token, model || undefined) : undefined;
+  }
+  return undefined;
 }

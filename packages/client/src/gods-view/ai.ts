@@ -15,6 +15,7 @@ interface AiSettings {
   };
   providers: { id: string; keySet: boolean; keyName: string | null; defaultModel: string }[];
   imageKeySet: boolean;
+  replicateKeySet?: boolean;
   effectsKeySet: boolean;
   /** Walk clips made since Google's daily reset, when walks use Veo. */
   clipsToday?: { count: number; resetsAt: number };
@@ -51,9 +52,9 @@ async function ai(): Promise<string> {
       <h3>Pictures, video and sound</h3>
       <label>Pictures<span><select name="imageProvider"><option value="gemini"${s.ai.image.provider === 'gemini' ? ' selected' : ''}>Google AI Studio${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.image.provider === 'none' ? ' selected' : ''}>None (placeholder art only)</option></select><input name="imageModel" list="image-models" value="${escapeHtml(s.ai.image.model)}"></span></label>
       ${ART_USES.map(([use, name]) => `<label class="sub">${name}<span><input name="use-${use}" list="image-models" value="${escapeHtml(s.ai.image.uses?.[use] ?? '')}" placeholder="same as Pictures"></span></label>`).join('')}
-      <label>Walk videos<span><select name="videoProvider"><option value="gemini"${s.ai.video.provider === 'gemini' ? ' selected' : ''}>Google Veo${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.video.provider === 'none' ? ' selected' : ''}>None (no new walks)</option></select><input name="videoModel" list="video-models" value="${escapeHtml(s.ai.video.model)}" placeholder="veo-3.1-lite-generate-preview"></span></label>
+      <label>Walk videos<span><select name="videoProvider"><option value="gemini"${s.ai.video.provider === 'gemini' ? ' selected' : ''}>Google Veo${s.imageKeySet ? '' : ' (no key)'}</option><option value="replicate"${s.ai.video.provider === 'replicate' ? ' selected' : ''}>Replicate (Wan)${s.replicateKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.video.provider === 'none' ? ' selected' : ''}>None (no new walks)</option></select><input name="videoModel" list="video-models" value="${escapeHtml(s.ai.video.model)}" placeholder="veo-3.1-lite-generate-preview"></span></label>
       <label class="sub">Clips a day<span><input name="dailyClips" type="number" min="0" max="1000" step="1" value="${s.ai.video.dailyClips}"></span></label>
-      <p class="note">Google allows only a few Veo clips a day on this key and does not say so when it refuses, so walks stop once this many are made and pick up after Google's reset at 08:00 UTC.${s.clipsToday ? ` Made since the last reset: <b>${s.clipsToday.count} of ${s.ai.video.dailyClips}</b>.` : ''}</p>
+      <p class="note">Google allows only a few Veo clips a day on this key and does not say so when it refuses, so walks stop once this many are made and pick up after Google's reset at 08:00 UTC. Replicate has no daily cap, so there this is just a limit on spending; <code>alibaba/wan-3</code> costs about $0.10 a second at 720p.${s.clipsToday ? ` Made since the last reset: <b>${s.clipsToday.count} of ${s.ai.video.dailyClips}</b>.` : ''}</p>
       <label>Sound effects<span><select name="effectsProvider"><option value="elevenlabs"${s.ai.sound.effects.provider === 'elevenlabs' ? ' selected' : ''}>ElevenLabs${s.effectsKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.effects.provider === 'none' ? ' selected' : ''}>None (no sound effects)</option></select><input name="effectsModel" list="effects-models" value="${escapeHtml(s.ai.sound.effects.model)}" placeholder="eleven_text_to_sound_v2"></span></label>
       <label>Music<span><select name="musicProvider"><option value="gemini"${s.ai.sound.music.provider === 'gemini' ? ' selected' : ''}>Google Lyria${s.imageKeySet ? '' : ' (no key)'}</option><option value="none"${s.ai.sound.music.provider === 'none' ? ' selected' : ''}>None (no music)</option></select><input name="musicModel" list="music-models" value="${escapeHtml(s.ai.sound.music.model)}" placeholder="lyria-3-clip-preview"></span></label>
       <h3>Style check</h3>
@@ -138,12 +139,16 @@ async function submit(form: HTMLFormElement, f: Record<string, string>): Promise
   return true;
 }
 
+const VIDEO_DEFAULTS: Record<string, string> = { gemini: 'veo-3.1-lite-generate-preview', replicate: 'alibaba/wan-3' };
+
 /** A provider change suggests its default model. */
 function change(el: HTMLElement): boolean {
   const select = el as HTMLSelectElement;
   const input = select.parentElement?.querySelector<HTMLInputElement>('input');
   const provider = aiState?.providers.find((p) => p.id === select.value);
   if (input && provider && /Provider$/.test(select.name) && !['imageProvider', 'videoProvider', 'effectsProvider', 'musicProvider'].includes(select.name)) input.value = provider.defaultModel;
+  // Each video service has its own models; suggest the first one it offers.
+  if (input && select.name === 'videoProvider') input.value = VIDEO_DEFAULTS[select.value] ?? '';
   return false;
 }
 

@@ -7,6 +7,7 @@ import type { KitHouses } from './assets/building-kit/kit-houses.ts';
 import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
 import { knownVideoModels, videoUsd } from './assets/video.ts';
+import { DEFAULT_REPLICATE_VIDEO_MODEL, replicateToken } from './assets/replicate.ts';
 import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
@@ -380,6 +381,7 @@ export async function handleAdmin(
         defaultModel: DEFAULT_MODELS[id],
       })),
       imageKeySet: Boolean(ctx.env.GEMINI_API_KEY),
+      replicateKeySet: Boolean(replicateToken(ctx.env)),
       ...(clips ? { clipsToday: { count: clips.count, resetsAt: clips.resetsAt } } : {}),
       effectsKeySet: Boolean(ctx.env.ELEVENLABS_API_KEY),
       // Every key the game can use, whether it is set, and what it is for; never the key itself.
@@ -388,6 +390,7 @@ export async function handleAdmin(
         { name: 'ANTHROPIC_API_KEY', set: Boolean(ctx.env.ANTHROPIC_API_KEY), for: 'Anthropic Claude for the God' },
         { name: 'OPENAI_API_KEY', set: Boolean(ctx.env.OPENAI_API_KEY), for: 'OpenAI or a compatible service for the God' },
         { name: 'ELEVENLABS_API_KEY', set: Boolean(ctx.env.ELEVENLABS_API_KEY), for: 'ElevenLabs sound effects' },
+        { name: 'REPLICATE_API_TOKEN', set: Boolean(replicateToken(ctx.env)), for: 'Replicate: walk videos (Wan); REPLICATE_API_KEY works too' },
       ],
       // Models with a known price, offered in each picker; any other name can still be typed.
       catalog: {
@@ -416,7 +419,7 @@ export async function handleAdmin(
     if (image.provider !== 'none' && Object.keys(chosen).length) image.uses = chosen;
     const vid = body?.video as Record<string, unknown> | undefined;
     const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings, ctx.env)
-      : vid?.provider && vid.provider !== 'none' ? { provider: String(vid.provider), model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : 'veo-3.1-lite-generate-preview' }
+      : vid?.provider && vid.provider !== 'none' ? { provider: String(vid.provider), model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : vid.provider === 'replicate' ? DEFAULT_REPLICATE_VIDEO_MODEL : 'veo-3.1-lite-generate-preview' }
       : { provider: 'none', model: '' };
     // Google's daily clip cap for the key, which the game stops at rather than finding out from refusals.
     const clipsADay = vid?.dailyClips === undefined || vid.dailyClips === '' ? dailyClips(store.settings) : Number(vid.dailyClips);

@@ -254,6 +254,7 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `ART_STYLE` | `flat-isometric` | The art style every new picture is painted in (`packages/server/src/assets/style-profile.ts`); pictures already painted keep their style until repainted |
 | `GEMINI_API_KEY` | none | Google AI Studio: the God's default model (`gemini-3.8-flash`), wish art, walks (Veo) and each land's music (Lyria) |
 | `ELEVENLABS_API_KEY` | none | ElevenLabs: the game's sound effects; without it the game plays music only |
+| `REPLICATE_API_TOKEN` | none | Replicate: walk and flight clips with Wan 3 (`alibaba/wan-3`), when chosen for walk videos in God's View. `REPLICATE_API_KEY` is read too |
 | `ANTHROPIC_API_KEY` | none | Optional: Claude models for the God |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none | Optional: OpenAI or any OpenAI-compatible service |
 | `GITHUB_ISSUES_TOKEN` | none | Fine-grained GitHub token with only Issues read and write on the game's repository; lets approved Engine wishes become issues for the coding agent |
@@ -283,9 +284,11 @@ docker run -p 8080:8080 -v co-mmo-data:/data -e PUBLIC_URL=http://localhost:8080
 
 ## Reference art (anchors)
 
-The Style Bible's reference images are generated with Google AI Studio
-(Gemini) through `packages/server/src/assets`, where the provider sits behind
-an `ImageProvider` interface. With `GEMINI_API_KEY` set:
+The Style Bible's reference images are painted with the image provider and
+model chosen in God's View (Google AI Studio, Gemini, unless another is
+chosen) through `packages/server/src/assets`, where the provider sits behind
+an `ImageProvider` interface. `--provider` and `--model` pick another for one
+run. The tools read keys such as `GEMINI_API_KEY` from the checkout's `.env`:
 
 ```sh
 npm run anchors -- --dry-run   # show every prompt and the estimated cost

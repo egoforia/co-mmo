@@ -24,7 +24,7 @@ const fromRaw = (r: Raw) => sharp(r.data, { raw: { width: r.width, height: r.hei
  * boundary get partial alpha with the key colour un-mixed, so edges stay soft.
  * `clean` is false when the border is not mostly one flat colour.
  * With `holes`, enclosed pockets of near-exact key colour (gaps between a
- * tree's branches) are removed too.
+ * tree's branches, inside a bowstring) are removed too, when the key is vivid.
  */
 export async function removeKeyBackground(
   png: Buffer,
@@ -55,7 +55,9 @@ export async function removeKeyBackground(
     }
   }
 
-  if (holes) fillHoles(bg, dist, w, h, tolerance * 0.6);
+  // Only a vivid key (magenta) can be told from the subject inside it: older
+  // anchors painted on white would lose their white robes and stone.
+  if (holes && vivid(key)) fillHoles(bg, dist, w, h, tolerance * 0.6);
 
   for (let i = 0; i < w * h; i++) {
     if (bg[i]) {
@@ -76,6 +78,9 @@ export async function removeKeyBackground(
   }
   return { png: await fromRaw(img), clean };
 }
+
+/** A strongly coloured key, far from white, grey and black. */
+const vivid = (key: number[]) => Math.max(...key) - Math.min(...key) > 100;
 
 /** Marks enclosed runs of near-key pixels as background when big enough to be a gap, not a speck. */
 function fillHoles(bg: Uint8Array, dist: (i: number) => number, w: number, h: number, tolerance: number, minSize = 24): void {

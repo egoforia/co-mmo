@@ -4,6 +4,7 @@
 // - art-ui/walkers.ts: Characters & Monsters sub-tabs, 4-way isometric views, and hand-finder / held-item try-on UI
 // - art-ui/buildings.ts: Buildings sub-tab (how each building stands, its kit views, furniture footprints)
 // - art-ui/dialogs.ts: recipe diff formatter, review/approval modal, and side-by-side version comparison modal
+// - art-ui/hand-status.ts: the "Finding hands" line and its link to the character page's hand finder
 // Put new sub-tab markup or dialog logic in the matching art-ui/* module rather than growing this file.
 
 import type { Facing } from '@co-mmo/shared';
@@ -38,10 +39,11 @@ import {
 } from './art-ui/state.ts';
 import { buildingsPage, footprintSubmit, loadBuildings } from './art-ui/buildings.ts';
 import { holdable, peoplePage, redrawHands } from './art-ui/walkers.ts';
+import { focusHandFinder, followHandStatus, handStatusLine, loadHandStatus, refreshHandStatus } from './art-ui/hand-status.ts';
 import { lightPreviews } from './light-preview.ts';
 import { workedOutNormalMap } from './normal-preview.ts';
 
-export { refreshArtJobs, type ArtContext };
+export { focusHandFinder, refreshArtJobs, refreshHandStatus, type ArtContext };
 
 /** The Art tab, as HTML. */
 export async function artPage(context: ArtContext): Promise<string> {
@@ -51,6 +53,7 @@ export async function artPage(context: ArtContext): Promise<string> {
     context.api<ArtOverview>('art'),
     fetch('/api/art-points').then((r) => (r.ok ? r.json() : {}), () => ({})),
     context.api<{ questions: HandQuestion[]; mirrored?: Record<string, string> }>('art/hands').catch(() => ({ questions: [] })),
+    loadHandStatus(context),
   ]);
   artState.questions = asked.questions;
   artState.mirrored = asked.mirrored ?? {};
@@ -69,6 +72,7 @@ export async function artPage(context: ArtContext): Promise<string> {
   };
   return `
     <p>${o.imageModel ? `Pictures: <b>${esc(o.imageModel)}</b>` : '<b class="bad">No image model is set</b> (AI models tab)'} · ${o.videoModel ? `Walks: <b>${esc(o.videoModel)}</b>` : 'Walks need Google AI Studio as the image model'} · ${budgetLine(o.budget)}</p>
+    ${handStatusLine()}
     <nav class="subtabs">${SUBTABS.map(([id, label]) => `<a href="${go(id)}" data-art-go${id === sub ? ' aria-current="page"' : ''}>${label}${id === 'now' ? openCount(o.jobs) : ''}</a>`).join('')}</nav>
     ${pages[sub]()}`;
 }
@@ -160,6 +164,7 @@ export function artClick(target: HTMLElement): boolean {
   if (link) {
     // The link lets go of focus, or the page keeps itself as it is for what is being typed.
     link.blur();
+    if (link.dataset.handsFocus !== undefined) followHandStatus(link);
     return true;
   }
   const t = target.closest<HTMLButtonElement>('button');

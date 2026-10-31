@@ -57,6 +57,25 @@ export interface HandQuestion {
   system: string;
 }
 
+/** What the hand finder is doing, as the Art tab shows it. */
+export interface HandFinderStatus {
+  running: boolean;
+  /** Pictures looked at so far in this run, out of those it set out to look at. */
+  done: number;
+  total: number;
+  /** The art id of the picture being looked at now. */
+  looking?: string;
+  /** When the last run that looked at anything ended, how many pictures it looked at, and in how many it found points. */
+  last?: { at: number; looked: number; found: number };
+  /** Why pictures are waiting and not being looked at, in plain words. */
+  blocked?: string;
+  /** Pictures with no points yet, or painted again since they were looked at. */
+  waiting: number;
+}
+
+/** How long a count of waiting pictures is trusted before they are counted again. */
+const COUNT_MS = 30_000;
+
 /** Hands and grips found so far, kept on disk beside the painted art. */
 export class HandFinder {
   private found: Record<string, Found> = {};
@@ -65,6 +84,10 @@ export class HandFinder {
   job?: Promise<void>;
   /** Asked again while running: run once more after, for pictures painted meanwhile. */
   private again = false;
+  private progress: { done: number; total: number; looking?: string } = { done: 0, total: 0 };
+  private last?: { at: number; looked: number; found: number };
+  /** Pictures counted as waiting, and when they were counted. */
+  private counted?: { at: number; waiting: number };
 
   constructor(private readonly options: HandFinderOptions) {}
 
@@ -131,16 +154,61 @@ export class HandFinder {
   }
 
   private async run(): Promise<void> {
+    this.progress = { done: 0, total: 0 };
+    let found = 0;
+    try {
+      const todo = await this.waiting();
+      this.progress.total = todo.length;
+      for (const { source, picture } of todo) {
+        const model = this.options.model();
+        if (!model || this.whyNot(model)) return;
+        this.progress.looking = source.id;
+        await this.look(source, picture, model);
+        const points = this.found[source.id];
+        if (points?.grip || points?.hands?.some(Boolean) || points?.leftHands?.some(Boolean)) found++;
+        this.progress.done++;
+        this.counted = { at: Date.now(), waiting: todo.length - this.progress.done };
+      }
+    } finally {
+      if (this.progress.done) this.last = { at: Date.now(), looked: this.progress.done, found };
+      this.progress = { done: 0, total: 0 };
+    }
+  }
+
+  /** Every picture with no points yet, or painted again since, read and ready to look at. */
+  private async waiting(): Promise<{ source: PointSource; picture: Buffer }[]> {
     await this.load();
+    const todo: { source: PointSource; picture: Buffer }[] = [];
     for (const source of await this.options.sources()) {
       const picture = await source.read().catch(() => undefined);
-      if (!picture) continue;
-      const from = this.stamp(source, picture);
-      if (this.found[source.id]?.from === from) continue;
-      const model = this.options.model();
-      if (!model || this.options.paused()) return;
-      await this.look(source, picture, model);
+      if (picture && this.found[source.id]?.from !== this.stamp(source, picture)) todo.push({ source, picture });
     }
+    this.counted = { at: Date.now(), waiting: todo.length };
+    return todo;
+  }
+
+  /** Why nothing can be looked at now, in words for the Owner; none when it can. */
+  private whyNot(model: ChatModel | undefined): string | undefined {
+    if (!model) return 'No judge model that can read pictures is set, so hands are not being found. Choose one on the AI models tab, under Judge.';
+    if (this.options.paused()) return 'Spending is paused for now, so hands are not being found until it starts again.';
+    return undefined;
+  }
+
+  /** What the hand finder is doing now, and how many pictures still wait for it. */
+  async status(): Promise<HandFinderStatus> {
+    // Counted again now and then while idle, for pictures painted since the last run.
+    if (!this.job && (!this.counted || Date.now() - this.counted.at > COUNT_MS)) await this.waiting();
+    const waiting = this.counted?.waiting ?? 0;
+    const blocked = waiting ? this.whyNot(this.options.model()) : undefined;
+    return {
+      running: !!this.job,
+      done: this.progress.done,
+      total: this.progress.total,
+      ...(this.job && this.progress.looking ? { looking: this.progress.looking } : {}),
+      ...(this.last ? { last: this.last } : {}),
+      ...(blocked ? { blocked } : {}),
+      waiting,
+    };
   }
 
   /** The file and a fingerprint of its pixels: the same file name can hold a new picture (shipped art updated with the game). */

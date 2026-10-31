@@ -7,7 +7,7 @@
 import { loadToken, rejoinWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 import { apiLogPage, wireApiLog } from './api-log-ui.ts';
-import { artChange, artClick, artPage, artSubmit, refreshArtJobs, type ArtContext } from './art-ui.ts';
+import { artChange, artClick, artPage, artSubmit, focusHandFinder, refreshArtJobs, refreshHandStatus, type ArtContext } from './art-ui.ts';
 import { lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { GameDown, api, rerender, toast, view, type Tab } from './gods-view/core.ts';
 import { worldTab } from './gods-view/world.ts';
@@ -35,7 +35,7 @@ const TABS: Tab[] = [
   { id: 'loot', label: 'Loot', page: () => lootPage(artContext) },
   reportsTab,
   playersTab,
-  { id: 'art', label: 'Art', ownerOnly: true, page: () => artPage(artContext) },
+  { id: 'art', label: 'Art', ownerOnly: true, page: () => artPage(artContext), after: focusHandFinder },
   aiTab,
   budgetTab,
   serversTab,
@@ -86,6 +86,8 @@ async function boot(): Promise<void> {
   }
   // Painting moves on its own; keep the log fresh without touching the forms below it.
   setInterval(() => view.tab === 'art' && document.visibilityState === 'visible' && void refreshArtJobs(artContext), 3000);
+  // The hand finder runs on its own too; its "Finding hands" line follows it.
+  setInterval(() => view.tab === 'art' && document.visibilityState === 'visible' && void refreshHandStatus(artContext), 3000);
 }
 
 /** Opens a tab; the Art tab's own pages follow it in the address (#art/items/Weapons). */

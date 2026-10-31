@@ -483,6 +483,8 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
     if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [], mirrored: (await ctx.hands?.mirrored()) ?? {} }), true;
+    // What the hand finder is doing, for the Art tab's "Finding hands" line.
+    if (route === 'art/hands/status' && method === 'GET') return json(res, 200, (await ctx.hands?.status()) ?? { running: false, done: 0, total: 0, waiting: 0 }), true;
     if (route === 'art/buildings' && method === 'GET') return json(res, 200, { buildings: await buildingsOverview(world, ctx.houses) }), true;
     if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: ctx.budget.state() }), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;

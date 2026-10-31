@@ -275,7 +275,8 @@ per panel. God's View is
 `BUTTON_ACTIONS` dispatch table) + `art-ui/` (`state.ts` shared `artState`,
 `pages.ts` sub-tab renderers, `walkers.ts` character/ways/hand-point editors,
 `dialogs.ts` review and history modals, `buildings.ts` the Buildings page:
-each building's kit views and furniture hit boxes), `loot-tab.ts` and
+each building's kit views and furniture hit boxes, `hand-status.ts` the
+"Finding hands" line, from `art/hands/status`), `loot-tab.ts` and
 `api-log-ui.ts`.
 
 ## Changing something big

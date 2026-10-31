@@ -95,6 +95,39 @@ describe('the hand finder', () => {
     expect(Object.keys(await again.manifest())).toEqual(['player-mara-walk-front', 'item-wooden-sword']);
   });
 
+  it('tells how far a run has got, and why it is not running', async () => {
+    const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
+    const png = await picture(128, 128);
+    let model: ChatModel | undefined;
+    let paused = false;
+    const sources = ['a', 'b', 'c'].map((id): PointSource => ({ id: `item-${id}`, kind: 'grip', file: `art/${id}.png`, frames: 1, read: async () => png }));
+    const finder = new HandFinder({ artDir, model: () => model, sources: async () => sources, paused: () => paused, spend: () => {} });
+
+    // No judge: everything waits, and the Owner is told why.
+    await finder.start();
+    expect(await finder.status()).toMatchObject({ running: false, waiting: 3, blocked: expect.stringMatching(/judge/) });
+    model = fakeEye([]);
+    paused = true;
+    expect((await finder.status()).blocked).toMatch(/paused/);
+
+    // A run counts up as it goes, picture by picture.
+    paused = false;
+    const seen: { done: number; total: number; looking?: string }[] = [];
+    const answers = ['{"point": [500, 500]}', '{"point": null}', '{"point": [200, 200]}'];
+    model = { provider: 'gemini', model: 'gemini-3.8-flash', async complete() {
+      const { done, total, looking } = await finder.status();
+      seen.push({ done, total, looking });
+      return { text: answers.shift()!, inputTokens: 1, outputTokens: 1, usd: 0 };
+    } };
+    await finder.start();
+    expect(seen).toEqual([{ done: 0, total: 3, looking: 'item-a' }, { done: 1, total: 3, looking: 'item-b' }, { done: 2, total: 3, looking: 'item-c' }]);
+    // Idle after: nothing waiting, and two of the three had a grip found.
+    const after = await finder.status();
+    expect(after).toMatchObject({ running: false, done: 0, total: 0, waiting: 0, last: { looked: 3, found: 2 } });
+    expect(after.looking).toBeUndefined();
+    expect(after.blocked).toBeUndefined();
+  });
+
   it('keeps each hand on its side walking towards us, swapping a frame the model mixed up', () => {
     const r = (x: number) => [x, 0.5] as [number, number];
     // The right hand is on the picture's left in most frames; frame 3 came back the other way round.
@@ -299,6 +332,8 @@ describe('the art points the game serves', () => {
     expect(body['item-wooden-sword']).toEqual({ grip: [0.5, 0.5] });
     // God's View shows the questions and looks again at a walk when asked.
     expect((await api(base, '/api/admin/art/hands', owner.token)).body.questions.map((q: { facing: string }) => q.facing)).toEqual([...FACINGS]);
+    // The Art tab's "Finding hands" line: nothing waiting once every painted picture was looked at.
+    expect((await api(base, '/api/admin/art/hands/status', owner.token)).body).toMatchObject({ running: false, waiting: 0, last: { looked: 3, found: 3 } });
     const again = await api(base, '/api/admin/art/hands/find', owner.token, 'POST', { ids: [walkArt('player-mara', 'front')], frame: 0 });
     expect(again.body).toMatchObject({ ok: true, looked: 1 });
     // A walk can take the hands of the walk facing the other way, mirrored, but only that one.

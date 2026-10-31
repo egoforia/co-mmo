@@ -52,7 +52,7 @@ export function walkerHtml(w: WalkerView): string {
   const data = artState.data!;
   const bodyPick = `<label>Body<span><select name="body">${data.bodies.map((b) => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')}</select></span></label>`;
   return `
-    <div class="walker">
+    <div class="walker" data-walker="${esc(w.id)}">
       <header>${w.url ? `<img src="${esc(w.url)}" alt="">` : ''}<div><b>${esc(w.name)}</b><br><small>${esc(w.kind)}</small></div>
         <form class="form walker-body">${bodyPick}</form></header>
       ${waysHtml(w)}
@@ -208,7 +208,7 @@ export function handsHtml(w: WalkerView): string {
     const from = `${w.id}-walk-${turned}`;
     const copied = artState.mirrored[id] ? ` · mirrored from the ${DIRECTIONS.find(([o]) => artState.mirrored[id] === `${w.id}-walk-${o}`)?.[1] ?? 'other'} walk` : '';
     const mirror = w.walks[turned] && artState.points[from]?.hands ? `<button type="button" class="quiet" data-hands-mirror="${esc(JSON.stringify({ from, to: id }))}" data-label="${esc(`${label} walk`)}" data-from-label="${esc(`${turnedLabel} walk`)}">Use the ${turnedLabel} walk's hands, mirrored</button>` : '';
-    return [`<div class="hand-row"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, 'Find again for this walk')}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`];
+    return [`<div class="hand-row" data-art-id="${esc(id)}"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, 'Find again for this walk')}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`];
   });
   if (!rows.length) return '';
   return `<details class="hands"${artState.openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: shields and off-hand items)</summary>

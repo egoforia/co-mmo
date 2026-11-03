@@ -1,4 +1,4 @@
-import { RACES, applyContent, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ContentEntry, type PicturedWish, type RuleItem } from '@co-mmo/shared';
+import { RACES, applyContent, hashString, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ContentEntry, type PicturedWish, type RaceId, type RuleItem } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until the image model paints a wish's own
@@ -29,6 +29,12 @@ export function onContent(listener: (changed: ContentEntry[]) => void): void {
 
 export function contentEntries(): ContentEntry[] {
   return [...entries.values()].sort((a, b) => b.at - a.at);
+}
+
+/** The body a player wears with no look of their own: their people's, or one of the two approved player looks before they chose a people. */
+export function playerArt(playerId: string, race?: RaceId): string {
+  if (race) return RACES[race].body;
+  return hashString(playerId) % 2 === 0 ? 'player-mara' : 'player-ilya';
 }
 
 /** The art key of a player's own look, once they have described it. */

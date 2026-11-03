@@ -300,6 +300,8 @@ export type CreatureMood = 'asleep' | 'fleeing';
 export interface EntityState {
   id: string;
   name: string;
+  /** Their people (races.ts), whose body they wear until they describe a look of their own. */
+  race?: RaceId;
   color: number;
   x: number;
   y: number;

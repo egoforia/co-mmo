@@ -21,6 +21,7 @@ import {
   type ArtManifest,
   type ArtPointsManifest,
   type HitMessage,
+  type RaceId,
   type RegionMap,
   type Side,
   type SnapshotMessage,
@@ -96,6 +97,8 @@ export class WorldScene extends Phaser.Scene {
   private lastSeq = 0;
   private me!: Avatar;
   private remotes = new Map<string, Remote>();
+  /** Each player's people, as snapshots tell it, for the body they wear without a look of their own. */
+  private races = new Map<string, RaceId>();
   private creatures = new Map<string, Remote>();
   /** Bodies of defeated creatures, lying where they fell until they fade. */
   private bodies = new Map<string, Remote>();
@@ -243,6 +246,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.lit) shadePictures(this);
     this.houseArt = new HouseArt(this);
     this.remotes = new Map();
+    this.races = new Map(welcome.character.race ? [[welcome.you.id, welcome.character.race]] : []);
     this.creatures = new Map();
     this.bodies = new Map();
     this.npcs = new Map();
@@ -256,7 +260,7 @@ export class WorldScene extends Phaser.Scene {
     this.floor = this.predictor.position.floor;
     this.shown = { x: welcome.x, y: welcome.y };
     this.applyFloor();
-    this.me = makeAvatar(this, this.metrics, playerTexture(welcome.you.id), welcome.you.name, true);
+    this.me = makeAvatar(this, this.metrics, playerTexture(welcome.you.id, this.races.get(welcome.you.id)), welcome.you.name, true);
     setHeld(this, this.me, heldItem(welcome.character), 'right', (k, u) => this.loadArt(k, u));
     setHeld(this, this.me, offHandItem(welcome.character), 'left', (k, u) => this.loadArt(k, u));
     this.refreshWishes();
@@ -394,7 +398,8 @@ export class WorldScene extends Phaser.Scene {
     const now = performance.now();
     const load = (k: string, u: string) => this.loadArt(k, u);
     const painted = (key: string) => this.textures.exists(key);
-    syncAvatars(this, this.remotes, snapshot.players, now, (e) => makeAvatar(this, this.metrics, playerTexture(e.id), e.name, false));
+    for (const p of snapshot.players) if (p.race) this.races.set(p.id, p.race);
+    syncAvatars(this, this.remotes, snapshot.players, now, (e) => makeAvatar(this, this.metrics, playerTexture(e.id, e.race), e.name, false));
     for (const p of snapshot.players) {
       const remote = this.remotes.get(p.id);
       if (!remote) continue;
@@ -525,7 +530,7 @@ export class WorldScene extends Phaser.Scene {
     // A look described, painted or rolled back: players change clothes.
     const players: [string, Avatar][] = [[this.welcome.you.id, this.me], ...this.remotes];
     for (const [id, a] of players) {
-      const art = playerTexture(id);
+      const art = playerTexture(id, this.races.get(id));
       if (!a || a.art === art) continue;
       a.art = art;
       a.body.stop();

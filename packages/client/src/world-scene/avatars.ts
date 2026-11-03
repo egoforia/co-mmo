@@ -23,12 +23,12 @@ import {
   type BodyState,
   type CreatureState,
   type NpcState,
+  type RaceId,
 } from '@co-mmo/shared';
 import { dropLight, litFigure, makeLight, placeLight } from '../lights.ts';
 import { PROJECTION } from '../projection.ts';
-import { playerArt } from '../textures.ts';
 import { figureRows, groundFrame, standingMetrics } from './figure-ground.ts';
-import { artSrc, lookArt } from '../wished.ts';
+import { artSrc, lookArt, playerArt } from '../wished.ts';
 import { dropStatusIcons, placeStatusIcons } from './status-icons.ts';
 import {
   type Avatar,
@@ -197,9 +197,9 @@ export function walkAvatar(
   a.body.setFlipX(facingSide(a.facing) === 'left');
 }
 
-/** A player's own painted look, or one of the two approved player looks. */
-export function playerTexture(id: string): string {
-  return lookArt(id) ?? playerArt(id);
+/** A player's own painted look, else their people's body (playerArt). */
+export function playerTexture(id: string, race?: RaceId): string {
+  return lookArt(id) ?? playerArt(id, race);
 }
 
 export function makeAvatar(

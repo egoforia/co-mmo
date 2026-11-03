@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ContentEntry } from '@co-mmo/shared';
-import { lookArt, updateContent } from '../src/wished.ts';
+import { lookArt, playerArt, updateContent } from '../src/wished.ts';
 
 const look = { hook: 'a striped scarf', body: 'small and round', color: '#e8c66a', mood: 'cheerful' };
 
@@ -24,5 +24,13 @@ describe('player bodies', () => {
   it('wears their own look once it is painted', () => {
     updateContent([entry('a', 'bear', { art: '/wished-art/a.png' }, 'ursine')], true);
     expect(lookArt('bear')).toBe('wished-a');
+  });
+});
+
+describe('player bodies without a look of their own', () => {
+  it("wear their people's body, or an approved player look before choosing a people", () => {
+    expect(playerArt('anyone', 'ursine')).toBe('bramble-ursine');
+    expect(playerArt('anyone', 'lutran')).toBe('tide-lutran');
+    expect(['player-mara', 'player-ilya']).toContain(playerArt('anyone'));
   });
 });

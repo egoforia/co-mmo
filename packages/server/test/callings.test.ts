@@ -16,6 +16,7 @@ import {
   type NoticeMessage,
   type WelcomeMessage,
 } from '@co-mmo/shared';
+import { playerView } from '../src/region-views.ts';
 import { account, app, connect, joined, start } from './helpers.ts';
 
 async function post(base: string, path: string, body: unknown) {
@@ -165,5 +166,14 @@ describe('changing people or Calling by wish', () => {
     const said = await c.waitFor<GodMessage>((m) => m.t === 'god' && /already a Ranger/.test((m as GodMessage).say));
     expect(said).toBeDefined();
     expect(store.content.some((r) => r.definition?.kind === 'calling')).toBe(false);
+  });
+});
+
+describe('what others see of a player', () => {
+  it('tells their people, so they wear its body, and nothing before they chose one', () => {
+    const info = { id: 'p', name: 'Bramble', color: 0, role: 'player' as const };
+    const bear = startCharacter('ursine', 'warden');
+    expect(playerView({ info, x: 1, y: 1, character: bear }).race).toBe('ursine');
+    expect(playerView({ info, x: 1, y: 1, character: newCharacter() })).not.toHaveProperty('race');
   });
 });

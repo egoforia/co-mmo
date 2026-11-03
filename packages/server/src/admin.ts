@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, WishError, engineModId, isFacing, skyWords, wishProgress, type Role } from '@co-mmo/shared';
+import { ITEMS, TURNED, WishError, engineModId, isFacing, movingArt, skyWords, wishProgress, type Role } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { buildingsOverview } from './art-buildings.ts';
 import type { KitHouses } from './assets/building-kit/kit-houses.ts';
@@ -17,7 +17,7 @@ import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
 import type { HandFinder } from './hand-finder.ts';
-import { TURNED, type Facing } from './assets/points.ts';
+import { HAND_VIEWS, type Facing, type HandView } from './assets/points.ts';
 import type { Updater } from './updates.ts';
 import type { Wishes } from './wishes.ts';
 import type { AiServices } from './ai/services.ts';
@@ -561,16 +561,15 @@ export async function handleAdmin(
       }
       if (route === 'art/hands/question' && method === 'POST') {
         const facing = String(body?.facing ?? '');
-        if (!ctx.hands || !isFacing(facing)) return json(res, 400, { error: 'bad_request', message: 'There is no question like that.' }), true;
-        await ctx.hands.setQuestion(facing, typeof body?.prompt === 'string' ? body.prompt : '');
+        if (!ctx.hands || !(HAND_VIEWS as readonly string[]).includes(facing)) return json(res, 400, { error: 'bad_request', message: 'There is no question like that.' }), true;
+        await ctx.hands.setQuestion(facing as HandView, typeof body?.prompt === 'string' ? body.prompt : '');
         return json(res, 200, { ok: true }), true;
       }
       if (route === 'art/hands/mirror' && method === 'POST') {
         // Only between one walker's walks, runs or attacks facing opposite ways.
         const [from, to] = [String(body?.from ?? ''), String(body?.to ?? '')];
-        const strip = (id: string) => /^(.+)-(walk|run|attack)-((?:front|back)-(?:left|right)|front|back|left|right)$/.exec(id);
-        const [a, b] = [strip(from), strip(to)];
-        if (!ctx.hands || !a || !b || a[1] !== b[1] || a[2] !== b[2] || TURNED[a[3] as Facing] !== b[3]) return json(res, 400, { error: 'bad_request', message: 'Hands can only be mirrored between the same character\'s walks, runs or attacks facing opposite ways.' }), true;
+        const [a, b] = [movingArt(from), movingArt(to)];
+        if (!ctx.hands || !a || !b || a.noun === 'stand' || a.look !== b.look || a.noun !== b.noun || TURNED[a.facing] !== b.facing) return json(res, 400, { error: 'bad_request', message: 'Hands can only be mirrored between the same character\'s walks, runs or attacks facing opposite ways.' }), true;
         try {
           await ctx.hands.mirror(from, to);
           return json(res, 200, { ok: true }), true;

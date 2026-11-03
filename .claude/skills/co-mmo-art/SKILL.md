@@ -76,11 +76,14 @@ Where things are:
   painted again on its own from the others. Start-up paints nothing; a walk
   clip is made only when the Owner asks in the Art tab. Name a way by the
   picture's corner: "turned to the left" is read as the figure's own left.
-  Top-down walks (front, back, left, right) are never painted any more: the
-  painter, prompts and Art tab take only `ISO_WAYS`. Old top-down walks and
-  pictures are still served, put back and used for held-item hands, so a
-  walker shows them until its isometric ways are painted (the Owner,
-  2026-10-24).
+  Top-down walks (front, back, left, right) were retired with the camera
+  (the Owner, 2026-11-03): `Facing` is only the four `ISO_WAYS`, nothing
+  top-down is painted, shown, served or looked at by the hand finder, and
+  old top-down files stay on disk untouched. A walker with no isometric
+  picture for the way it faces glides in its own picture, turned to that
+  side, until its ways are painted; that is the one place a walker is ever
+  mirrored. The hand finder asks a look's own picture, which faces us, its
+  own question (`look`).
 - Sound: `shared/src/sounds.ts` (descriptions), `sound-maker.ts`.
 - The camera: every tile-to-screen sum goes through `PROJECTION` (`ISOMETRIC`)
   in `packages/client/src/projection.ts`; do not write `x * TILE_PIXELS` in

@@ -97,12 +97,12 @@ describe('the camera projection', () => {
     expect(ISOMETRIC.face(right.dx, right.dy, 'back-left')).toBe('back-right');
     const left = ISOMETRIC.inputToWorld(-1, 1);
     expect(ISOMETRIC.face(left.dx, left.dy, 'back-right')).toBe('back-left');
-    // A newcomer facing us turns to a front way.
-    expect(ISOMETRIC.face(down.dx, down.dy, 'front')).toMatch(/^front-/);
+    // A newcomer facing us (the first way) turns to a front way.
+    expect(ISOMETRIC.face(down.dx, down.dy, ISOMETRIC.ways[0]!)).toMatch(/^front-/);
     // Each way faces the grid step it is named after.
     for (const way of ISOMETRIC.ways) {
       const { dx, dy } = ISO_WAY_STEPS[way as IsoWay];
-      expect(ISOMETRIC.face(dx, dy, 'front')).toBe(way);
+      expect(ISOMETRIC.face(dx, dy, ISOMETRIC.ways[0]!)).toBe(way);
     }
   });
 });

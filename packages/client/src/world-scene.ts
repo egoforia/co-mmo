@@ -114,8 +114,6 @@ export class WorldScene extends Phaser.Scene {
   private lit = false;
   /** The hour and the weather, which grade the light and brighten lights at night. */
   private readonly sky = new SkyClock();
-  /** Which way we face: 1 right, -1 left. */
-  private facing = 1;
   /** We lie Fallen, so our steps wait until we are raised or wake at the shrine. */
   private fallen = false;
   /**
@@ -464,7 +462,6 @@ export class WorldScene extends Phaser.Scene {
         const step = PROJECTION.inputToWorld(dx, dy);
         const input = predictor.apply(step.dx, step.dy);
         this.options.send({ t: 'input', ...input });
-        if (dx !== 0) this.facing = dx;
       }
     }
     const held = this.readInput();
@@ -571,7 +568,7 @@ export class WorldScene extends Phaser.Scene {
   /** Our own strike: a lunge and a slash, whether or not it lands. */
   swing(): void {
     if (!this.predictor) return;
-    swingSlash(this, this.me, this.facing);
+    swingSlash(this, this.me);
   }
 
   /** Greys our sprite while Weakened after falling, and more while we lie Fallen (when we cannot walk). */

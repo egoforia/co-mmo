@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, WALK_DIRECTIONS, buildingArtIds, walkArt, walkStandArt } from '@co-mmo/shared';
+import { BUILDING_STYLES, ISO_WAYS, buildingArtIds, walkArt, walkStandArt } from '@co-mmo/shared';
 import { ANCHORS } from '../src/assets/anchors.ts';
 import type { ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
@@ -20,7 +20,7 @@ async function shippedManifest(dir: string): Promise<string> {
   const ids = [
     ...Object.values(BUILDING_STYLES).flatMap(buildingArtIds),
     'sanctum-rock', 'desert-scarab',
-    ...['player-mara', 'player-ilya'].flatMap((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d))),
+    ...['player-mara', 'player-ilya'].flatMap((look) => ISO_WAYS.map((d) => walkArt(look, d))),
   ];
   const path = join(dir, 'shipped.json');
   await writeFile(path, JSON.stringify(Object.fromEntries(ids.map(entry))));
@@ -272,7 +272,7 @@ describe('the Art tab', () => {
     await app!.art.idle();
     const scarab = async () => (await api(base, '/api/admin/art', owner.token)).body.walkers.find((w: any) => w.id === 'desert-scarab');
     const before = (await scarab()).standing['front-left'];
-    expect(before).toMatchObject({ approved: false, url: expect.stringMatching(/^\/wished-art\/walks\/views\/desert-scarab-front-left\.png/), versions: [] });
+    expect(before).toMatchObject({ url: expect.stringMatching(/^\/wished-art\/walks\/views\/desert-scarab-front-left\.png/), versions: [] });
 
     // The standing picture alone, with the Owner's own words: no clip is made.
     const words = 'The scarab facing the lower left, shell gleaming.';
@@ -372,7 +372,7 @@ describe('the Art tab', () => {
     await app!.art.idle();
     const art = (await api(base, '/api/art', owner.token)).body;
     expect(art[walkStandArt('desert-scarab', 'front-left')]).toMatchObject({ kind: 'stand', file: expect.stringMatching(/^wished-art\/walks\/views\/desert-scarab-front-left\.png\?v=/) });
-    expect(art[walkStandArt('desert-scarab', 'left')]).toBeUndefined();
+    expect(art[walkStandArt('desert-scarab', 'front-right')]).toBeUndefined();
     expect(art[walkArt('desert-scarab', 'front-left')]).toBeUndefined();
     expect(clips.asked).toHaveLength(0);
 

@@ -68,10 +68,9 @@ export interface ArtItem {
   normalPaintable?: boolean;
 }
 
-export type Direction = 'front' | 'right' | 'back' | 'left';
 export interface WalkVersion { id: string; url: string; frames: number; width: number; height: number; cycleSeconds: number; recipe?: Recipe }
 export interface WalkStrip { url: string; frames: number; width: number; height: number; cycleSeconds: number; recipe?: Recipe; versions: WalkVersion[] }
-export interface StandingView { url?: string; approved: boolean; recipe?: Recipe; versions: { id: string; url: string; recipe?: Recipe }[] }
+export interface StandingView { url?: string; recipe?: Recipe; versions: { id: string; url: string; recipe?: Recipe }[] }
 
 export interface WalkerView {
   id: string;
@@ -145,8 +144,8 @@ export interface Review {
   fingerprint: string;
 }
 
-/** The questions the hand finder asks, one per way of facing. */
-export interface HandQuestion { facing: Direction; prompt: string; usual: string; own: boolean; system: string }
+/** The questions the hand finder asks: one for a look's own picture, which faces us, and one per way of facing. */
+export interface HandQuestion { facing: Facing | 'look'; prompt: string; usual: string; own: boolean; system: string }
 
 /** One version in a comparison: how it looks and what made it. */
 export interface Shown { id: string; label: string; look: string; recipe?: Recipe }
@@ -154,16 +153,8 @@ export interface Shown { id: string; label: string; look: string; recipe?: Recip
 export const SUBTABS = [['now', 'Painting now'], ['characters', 'Characters'], ['monsters', 'Monsters'], ['items', 'Items'], ['biomes', 'Biomes'], ['looks', 'Building looks'], ['buildings', 'Buildings'], ['sounds', 'Sounds and music']] as const;
 export type Subtab = (typeof SUBTABS)[number][0];
 export const ITEM_ORDER = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'];
-export const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['right', 'right'], ['back', 'away'], ['left', 'left']];
 /** The isometric camera's ways, in words, as the Art tab shows them. */
 export const WAYS: [IsoWay, string][] = [['front-left', 'towards us, left'], ['front-right', 'towards us, right'], ['back-left', 'away, left'], ['back-right', 'away, right']];
-/** Every way a standing picture can face, in words. */
-export const FACING_WORDS: [Facing, string][] = [...DIRECTIONS, ...WAYS];
-/** The walk whose picture, mirrored, stands in for this one (as the hand finder mirrors hands). */
-export const TURNED: Record<Facing, Facing> = {
-  front: 'back', back: 'front', left: 'right', right: 'left',
-  'front-left': 'front-right', 'front-right': 'front-left', 'back-left': 'back-right', 'back-right': 'back-left',
-};
 export const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
 export const STATUS: Record<ArtJob['status'], string> = { queued: 'In line', waiting: 'Waiting for a turn', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
 export const MEDIA: Record<ArtJob['media'], string> = { picture: 'picture', clip: 'video clip', sound: 'sound' };

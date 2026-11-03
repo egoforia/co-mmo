@@ -7,7 +7,6 @@ import {
   ITEMS,
   WEAPON_FAMILIES,
   hitArt,
-  isWalkDirection,
   type HitMessage,
 } from '@co-mmo/shared';
 import { dropLight, litFigure, makeLight, placeLight } from '../lights.ts';
@@ -60,9 +59,9 @@ export function showHit(
 }
 
 /** Our own strike: a lunge and a slash, whether or not it lands (no slash for bows, wands and other ranged weapons). */
-export function swingSlash(scene: Phaser.Scene, me: Avatar, facingSign: number): void {
-  // Along the isometric way we face, or left or right as we last walked.
-  const aim = isWalkDirection(me.facing) ? { x: facingSign, y: 0 } : wayOnScreen(me.facing);
+export function swingSlash(scene: Phaser.Scene, me: Avatar): void {
+  // Along the isometric way we face.
+  const aim = wayOnScreen(me.facing);
   lunge(scene, me, aim);
   const family = me.held ? ITEMS[me.held.item]?.weapon : undefined;
   if (!scene.textures.exists('fx-slash') || (family && WEAPON_FAMILIES[family].ranged)) return;
@@ -78,7 +77,7 @@ export function swingSlash(scene: Phaser.Scene, me: Avatar, facingSign: number):
  * along the isometric way nearest them, which it turns to face.
  */
 export function toward(a: Avatar, target: Avatar): { x: number; y: number } {
-  if (isWalkDirection(a.facing) || !a.at || !target.at) return { x: Math.sign(target.body.x - a.body.x || 1), y: 0 };
+  if (!a.at || !target.at) return { x: Math.sign(target.body.x - a.body.x || 1), y: 0 };
   a.facing = PROJECTION.face(target.at.x - a.at.x, target.at.y - a.at.y, a.facing);
   return wayOnScreen(a.facing);
 }

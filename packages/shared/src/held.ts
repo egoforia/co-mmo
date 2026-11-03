@@ -31,13 +31,12 @@ export function heldSize(item: string | undefined): number {
 }
 
 /**
- * Whether an item in this hand is drawn behind the body: walking away, or
- * facing the way that puts the hand on the far side (the right hand facing
- * left, the left hand facing right). Turned halfway, as in the isometric
- * ways, the far hand is the one on the side the walker turns towards.
+ * Whether an item in this hand is drawn behind the body: turned halfway, as
+ * in the isometric ways, the far hand is the one on the side the walker
+ * turns towards (the right hand facing left, the left hand facing right).
  */
 export function heldBehind(facing: Facing, hand: 'right' | 'left'): boolean {
-  return facing === 'back' || facingSide(facing) === (hand === 'right' ? 'left' : 'right');
+  return facingSide(facing) === (hand === 'right' ? 'left' : 'right');
 }
 
 /** Every weapon and off-hand family, each with a picture of its own (familyArt). */

@@ -4,6 +4,7 @@
 import {
   HELD_SIZE,
   ISO_WAYS,
+  TURNED,
   facingSide,
   heldBehind,
   walkStandArt,
@@ -15,8 +16,6 @@ import { itemHtml } from './pages.ts';
 import {
   type ArtItem,
   HOLDABLE,
-  FACING_WORDS,
-  TURNED,
   WAYS,
   type WalkerView,
   artState,
@@ -182,8 +181,7 @@ export function handsHtml(w: WalkerView): string {
   const ids: string[] = [];
   const sections = ANIMATIONS.flatMap(([kind, title, noun]) => {
     const strips = w[kind];
-    // Isometric strips (everyone today) and the older four-way walks some characters still have.
-    const rows = FACING_WORDS.flatMap(([d, label]) => {
+    const rows = WAYS.flatMap(([d, label]) => {
       const strip = strips?.[d];
       if (!strip) return [];
       const id = `${w.id}-${noun}-${d}`;
@@ -233,9 +231,9 @@ function handRowHtml(w: WalkerView, id: string, d: Facing, label: string, noun: 
     </details>` : '';
   const missing = !hands ? ' · not looked at yet' : !lefts ? ' · left hand not looked for yet: it is found by itself after Pull and restart, or use Find again' : '';
   // Turning round mirrors the picture, so the opposite way's hands, mirrored, can stand in for this one's.
-  const [turned, turnedLabel] = FACING_WORDS.find(([o]) => o === TURNED[d])!;
+  const [turned, turnedLabel] = WAYS.find(([o]) => o === TURNED[d])!;
   const from = `${w.id}-${noun}-${turned}`;
-  const copied = artState.mirrored[id] ? ` · mirrored from the ${FACING_WORDS.find(([o]) => artState.mirrored[id] === `${w.id}-${noun}-${o}`)?.[1] ?? 'other'} ${noun}` : '';
+  const copied = artState.mirrored[id] ? ` · mirrored from the ${WAYS.find(([o]) => artState.mirrored[id] === `${w.id}-${noun}-${o}`)?.[1] ?? 'other'} ${noun}` : '';
   const mirror = strips?.[turned] && artState.points[from]?.hands ? `<button type="button" class="quiet" data-hands-mirror="${esc(JSON.stringify({ from, to: id }))}" data-label="${esc(`${label} ${noun}`)}" data-from-label="${esc(`${turnedLabel} ${noun}`)}">Use the ${turnedLabel} ${noun}'s hands, mirrored</button>` : '';
   return `<div class="hand-row" data-art-id="${esc(id)}"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, `Find again for this ${noun}`)}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`;
 }

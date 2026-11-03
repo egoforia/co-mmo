@@ -12,9 +12,7 @@ import {
   WALK_FRAMES,
   facingSide,
   heldBehind,
-  isWalkDirection,
   walkArt,
-  walkDirection,
   walkFrameRate,
   walkStandArt,
   statusTag,
@@ -162,11 +160,10 @@ export function stride(
 
 /**
  * Plays an avatar's walk for its step, `step` along the grid and `screen`
- * on screen, and stands it still facing that way when it stops. In the
- * isometric camera it shows the walk made for the way it faces, else the
- * standing picture painted for it, gliding; until that is painted, it
- * falls back to any cardinal walk or standing picture, turned to face
- * left or right.
+ * on screen, and stands it still facing that way when it stops. It shows
+ * the walk made for the way it faces, else the standing picture painted for
+ * it, gliding; until that is painted, its own picture, gliding and turned
+ * to the side it faces.
  */
 export function walkAvatar(
   scene: Phaser.Scene,
@@ -176,43 +173,28 @@ export function walkAvatar(
   screen: { dx: number; dy: number },
 ): void {
   a.facing = PROJECTION.face(step.dx, step.dy, a.facing);
-  a.turn = walkDirection(screen.dx, screen.dy, a.turn);
   const moving = screen.dx !== 0 || screen.dy !== 0;
-  if (!isWalkDirection(a.facing)) {
-    const way = walkStandArt(a.art, a.facing);
-    const walking = walkArt(a.art, a.facing);
-    if (scene.anims.exists(walking)) {
-      a.worn = a.facing;
-      // Standing still since it came into view: show the way it faces, not whatever it wore before.
-      if (!moving && !a.body.anims.isPlaying && scene.textures.exists(way) && a.body.texture.key !== way && a.body.texture.key !== walking) dress(scene, metrics, a, way);
-      else stride(scene, metrics, a, walking, moving, way);
-      return;
-    }
-    if (scene.textures.exists(way)) {
-      if (a.body.anims.isPlaying) a.body.stop();
-      a.body.setFlipX(false);
-      if (a.body.texture.key !== way) dress(scene, metrics, a, way);
-      a.worn = a.facing;
-      return;
-    }
-  }
-  a.worn = a.turn;
-  const sheet = walkArt(a.art, a.turn);
-  if (scene.anims.exists(sheet)) {
-    // Facing us, the approved standing pose; any other way, the walk's first step.
-    stride(scene, metrics, a, sheet, moving, a.turn === 'front' ? a.art : undefined);
+  const way = walkStandArt(a.art, a.facing);
+  const walking = walkArt(a.art, a.facing);
+  if (scene.anims.exists(walking)) {
+    a.worn = a.facing;
+    // Standing still since it came into view: show the way it faces, not whatever it wore before.
+    if (!moving && !a.body.anims.isPlaying && scene.textures.exists(way) && a.body.texture.key !== way && a.body.texture.key !== walking) dress(scene, metrics, a, way);
+    else stride(scene, metrics, a, walking, moving, way);
     return;
   }
   // No walk painted this way: another way's walk stops.
   if (a.body.anims.isPlaying) a.body.stop();
-  const stand = walkStandArt(a.art, a.turn);
-  if (scene.textures.exists(stand)) {
+  if (scene.textures.exists(way)) {
     a.body.setFlipX(false);
-    if (a.body.texture.key !== stand) dress(scene, metrics, a, stand);
+    if (a.body.texture.key !== way) dress(scene, metrics, a, way);
+    a.worn = a.facing;
     return;
   }
+  // Only its own picture: it faces us, so it is turned to the side it faces, as wished things with one picture always were.
+  a.worn = undefined;
   if (scene.textures.exists(a.art) && a.body.texture.key !== a.art) dress(scene, metrics, a, a.art);
-  if (screen.dx !== 0) a.body.setFlipX(screen.dx < 0);
+  a.body.setFlipX(facingSide(a.facing) === 'left');
 }
 
 /** A player's own painted look, or one of the two approved player looks. */
@@ -240,7 +222,7 @@ export function makeAvatar(
       strokeThickness: Math.round(T / 24),
     })
     .setOrigin(0.5, 1);
-  const a: Avatar = { body, art: texture, facing: PROJECTION.ways[0]!, turn: 'front', worn: 'front', scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
+  const a: Avatar = { body, art: texture, facing: PROJECTION.ways[0]!, scale: 1, shadow, label, nudge: { x: 0, y: 0 } };
   metrics.alignBaseline(scene.textures, a, key);
   return a;
 }
@@ -432,14 +414,15 @@ export function placeHeld(
   const mirrored = b.flipX;
   const x = b.x + (mirrored ? b.originX - hand[0] : hand[0] - b.originX) * b.displayWidth;
   const y = b.y + (hand[1] - b.originY) * b.displayHeight;
-  const flip = mirrored || facingSide(a.worn) === 'left';
+  // Its own picture turns with the body and holds the item in front; a way's picture never flips.
+  const flip = a.worn ? facingSide(a.worn) === 'left' : mirrored;
   const image = held.image;
   image
     .setFlipX(flip)
     .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
     .setScale((b.displayHeight * heldSize(held.item)) / Math.max(image.width, image.height))
     .setPosition(x, y)
-    .setDepth(b.depth + (heldBehind(a.worn, side) ? -1 : 1))
+    .setDepth(b.depth + (a.worn && heldBehind(a.worn, side) ? -1 : 1))
     .setVisible(b.visible);
 }
 

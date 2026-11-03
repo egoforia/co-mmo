@@ -3,13 +3,11 @@
 
 import {
   ISO_WAYS,
-  isWalkDirection,
   type Facing,
 } from '@co-mmo/shared';
 import {
   type ArtItem,
   type Ask,
-  FACING_WORDS,
   MEDIA,
   type Recipe,
   type RecipeStep,
@@ -132,12 +130,12 @@ export function sourcesHtml(ask: Extract<Ask, { what: 'view' }>): string {
   const w = artState.data!.walkers.find((x) => x.id === ask.walker);
   if (!w) return '';
   // The server's choice when none is made: an isometric way is painted from the other isometric ways too, so it matches them.
-  const others = isWalkDirection(ask.direction) ? [] : ISO_WAYS.filter((d) => d !== ask.direction && w.standing[d].url && !w.standing[d].approved);
+  const others = ISO_WAYS.filter((d) => d !== ask.direction && w.standing[d].url);
   const from = ask.from ?? ['approved', ...others];
   const options: [string, string, string | undefined][] = [['approved', 'The approved picture', w.url]];
   for (const [d, label] of WAYS) {
     const view = w.standing[d];
-    if (view.url && !view.approved) options.push([d, `Standing, ${label}`, view.url]);
+    if (view.url) options.push([d, `Standing, ${label}`, view.url]);
   }
   if (options.length < 2) return '';
   return `<form class="form review-sources"><p class="note">Paint it from these pictures (the approved one alone does not show everything, such as how a scarf hangs at the back):</p>
@@ -194,18 +192,18 @@ export function pictureVersions(item: ArtItem): void {
 }
 
 export function walkVersions(w: WalkerView, direction: Facing): void {
-  const label = FACING_WORDS.find(([d]) => d === direction)![1];
+  const label = WAYS.find(([d]) => d === direction)![1];
   const strip = w.walks[direction];
   const earlier: Shown[] = (strip?.versions ?? w.lost[direction] ?? []).map((v) => ({ id: v.id, label: `Put aside ${putAside(v.id)}`, look: stripHtml(v, label, 160), recipe: v.recipe }));
   const now: Shown = { id: 'now', label: strip ? madeOn(strip.recipe, 'shipped with the game') : 'no walk now', look: stripHtml(strip, label, 160), recipe: strip?.recipe };
-  openVersions(`${w.name} walking ${label === 'towards us' ? 'towards us' : label === 'away' ? 'away' : label}`, now, earlier, (version) => artState.ctx.api('art/restore-walk', 'POST', { walker: w.id, direction, version }));
+  openVersions(`${w.name} walking ${label}`, now, earlier, (version) => artState.ctx.api('art/restore-walk', 'POST', { walker: w.id, direction, version }));
 }
 
 export function viewVersions(w: WalkerView, direction: Facing): void {
-  const label = FACING_WORDS.find(([d]) => d === direction)![1];
+  const label = WAYS.find(([d]) => d === direction)![1];
   const view = w.standing[direction];
-  const earlier: Shown[] = view.versions.map((v) => ({ id: v.id, label: v.id === 'approved' ? 'The approved picture' : `Put aside ${putAside(v.id)}`, look: picture(v.url), recipe: v.recipe }));
-  const now: Shown = { id: 'now', label: view.approved ? 'the approved picture' : madeOn(view.recipe, 'painted here'), look: view.url ? picture(view.url) : '', recipe: view.recipe };
+  const earlier: Shown[] = view.versions.map((v) => ({ id: v.id, label: `Put aside ${putAside(v.id)}`, look: picture(v.url), recipe: v.recipe }));
+  const now: Shown = { id: 'now', label: madeOn(view.recipe, 'painted here'), look: view.url ? picture(view.url) : '', recipe: view.recipe };
   openVersions(`${w.name} standing, facing ${label}`, now, earlier, (version) => artState.ctx.api('art/restore-view', 'POST', { walker: w.id, direction, version }));
 }
 

@@ -1,5 +1,4 @@
 import { PLAYER_SPEED } from './constants.ts';
-import { WALK_VIEWS, type WalkView } from './walk-rig.ts';
 
 // Walks are painted as a short video from a look's view in each direction;
 // the server keeps one cycle's frames as a strip and the client plays it at a
@@ -31,10 +30,6 @@ export const WALK_FRAMES = 12;
 /** Seconds one walk cycle takes at the player's speed when a body type does not say. */
 export const WALK_CYCLE_SECONDS = 0.6;
 
-/** The ways a walker can face: towards the viewer, right, away and left. */
-export const WALK_DIRECTIONS = WALK_VIEWS;
-export type WalkDirection = WalkView;
-
 /**
  * The ways a walker faces in the isometric camera (the camera plan of
  * 2026-10-18): turned halfway between the front or back and a side, which
@@ -52,9 +47,13 @@ export type IsoWay = (typeof ISO_WAYS)[number];
  */
 export const TURNTABLE_WAYS = ['front-left', 'front-right', 'back-right', 'back-left'] as const;
 
-/** Every way a walker can be painted standing: the four cardinal ways, then the isometric ones. */
-export const FACINGS = [...WALK_DIRECTIONS, ...ISO_WAYS] as const;
-export type Facing = WalkDirection | IsoWay;
+/**
+ * Every way a walker faces, walks and is painted standing: the isometric
+ * ways. The top-down ways (front, right, back, left) were retired with the
+ * isometric camera (the Owner, 2026-11-03).
+ */
+export const FACINGS = ISO_WAYS;
+export type Facing = IsoWay;
 
 /** The grid step each isometric way faces along. */
 export const ISO_WAY_STEPS: Record<IsoWay, { dx: number; dy: number }> = {
@@ -64,27 +63,23 @@ export const ISO_WAY_STEPS: Record<IsoWay, { dx: number; dy: number }> = {
   'back-right': { dx: 0, dy: -1 },
 };
 
-/** True for the four cardinal ways, which every walker walks in. */
-export function isWalkDirection(facing: string): facing is WalkDirection {
-  return (WALK_DIRECTIONS as readonly string[]).includes(facing);
-}
-
-/** True for any way a walker can be painted standing. */
+/** True for any way a walker can face. */
 export function isFacing(facing: string): facing is Facing {
   return (FACINGS as readonly string[]).includes(facing);
 }
 
-/** Which side of the picture a walker facing this way looks towards, if either. */
-export function facingSide(facing: Facing): 'left' | 'right' | undefined {
-  if (facing === 'left' || facing === 'front-left' || facing === 'back-left') return 'left';
-  if (facing === 'right' || facing === 'front-right' || facing === 'back-right') return 'right';
-  return undefined;
+/** Which side of the picture a walker facing this way looks towards. */
+export function facingSide(facing: Facing): 'left' | 'right' {
+  return facing.endsWith('-left') ? 'left' : 'right';
 }
+
+/** The way a walker faces after turning to the other side: an isometric way's mirror image. */
+export const TURNED: Record<Facing, Facing> = { 'front-left': 'front-right', 'front-right': 'front-left', 'back-left': 'back-right', 'back-right': 'back-left' };
 
 /** The approved player looks that have walks. */
 export const WALKING_LOOKS = ['player-mara', 'player-ilya'] as const;
 
-/** Art id of a look's walk strip for one way: a cardinal way, or an isometric one once its walk is made. */
+/** Art id of a look's walk strip for one way, once its walk is made. */
 export function walkArt(look: string, direction: Facing): string {
   return `${look}-walk-${direction}`;
 }
@@ -94,9 +89,28 @@ export function walkStandArt(look: string, direction: Facing): string {
   return `${look}-stand-${direction}`;
 }
 
-/** Every walk strip the game needs, for every walking look. */
-export function walkArtIds(): string[] {
-  return WALKING_LOOKS.flatMap((look) => WALK_DIRECTIONS.map((d) => walkArt(look, d)));
+/** The moving pictures a walker has one of for each way it faces. */
+export type Moving = 'walk' | 'run' | 'attack' | 'stand';
+
+const MOVING = /^(.+?)-(walk|run|attack|stand)-(.+)$/;
+
+/**
+ * Whose walk, run, attack or standing picture an art id is, and which way it
+ * faces: `bramble-ursine-run-back-left` is bramble-ursine's run facing
+ * back-left. None for any other art id, or one facing a retired way.
+ */
+export function movingArt(id: string): { look: string; noun: Moving; facing: Facing } | undefined {
+  const m = MOVING.exec(id);
+  return m && isFacing(m[3]!) ? { look: m[1]!, noun: m[2] as Moving, facing: m[3] } : undefined;
+}
+
+/**
+ * True for a walk, run, attack or standing picture facing a way no walker
+ * faces any more (`player-mara-walk-front`): painted for the top-down
+ * camera, kept on disk but no longer shown or looked at.
+ */
+export function isRetiredArt(id: string): boolean {
+  return MOVING.test(id) && !movingArt(id);
 }
 
 /**
@@ -105,15 +119,4 @@ export function walkArtIds(): string[] {
  */
 export function walkFrameRate(frames = WALK_FRAMES, speed = PLAYER_SPEED, cycleSeconds = WALK_CYCLE_SECONDS): number {
   return (frames / cycleSeconds) * (speed / PLAYER_SPEED);
-}
-
-/**
- * Which way someone moving by (dx, dy) faces. Sideways wins on a diagonal,
- * so the walker turns the way the arrow keys point; standing still keeps the
- * way they faced before.
- */
-export function walkDirection(dx: number, dy: number, before: WalkDirection = 'front'): WalkDirection {
-  if (Math.abs(dx) > 1e-6) return dx > 0 ? 'right' : 'left';
-  if (Math.abs(dy) > 1e-6) return dy > 0 ? 'front' : 'back';
-  return before;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { handLink, handStatusHtml, type HandStatus } from '../src/art-ui/hand-status.ts';
 import type { ArtItem, WalkerView } from '../src/art-ui/state.ts';
 
-const mara = { id: 'player-mara', name: 'Mara', place: { tab: 'characters', page: 'Mara' }, walks: { front: {} } } as unknown as WalkerView;
+const mara = { id: 'player-mara', name: 'Mara', place: { tab: 'characters', page: 'Mara' }, walks: { 'front-left': {} } } as unknown as WalkerView;
 const sword = { id: 'held-sword', name: 'Sword', place: { tab: 'items', page: 'Weapons' } } as unknown as ArtItem;
 const idle: HandStatus = { running: false, done: 0, total: 0, waiting: 0 };
 
@@ -13,9 +13,9 @@ describe('the Art tab\'s "Finding hands" line', () => {
   });
 
   it('counts a run as it goes, naming the picture being looked at, and leads to its character', () => {
-    const html = handStatusHtml({ ...idle, running: true, done: 6, total: 18, waiting: 12, looking: 'player-mara-walk-front' }, [mara], [sword]);
+    const html = handStatusHtml({ ...idle, running: true, done: 6, total: 18, waiting: 12, looking: 'player-mara-walk-front-right' }, [mara], [sword]);
     expect(html).toContain('Finding hands… 7 of 18');
-    expect(html).toContain('looking at Mara walking towards us');
+    expect(html).toContain('looking at Mara walking towards us, right');
     expect(html).toContain('href="#art/characters/Mara"');
     expect(html).toContain('data-hands-focus="player-mara"');
     expect(handStatusHtml({ ...idle, running: true, done: 0, total: 18, waiting: 18, looking: 'held-sword' }, [mara], [sword])).toContain('looking at Sword');

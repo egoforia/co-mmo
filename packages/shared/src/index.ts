@@ -17,6 +17,7 @@ export * from './skills/index.ts';
 export * from './kit.ts';
 export * from './content.ts';
 export * from './loot.ts';
+export * from './materials.ts';
 export * from './workshop.ts';
 export * from './walk-rig.ts';
 export * from './walk.ts';

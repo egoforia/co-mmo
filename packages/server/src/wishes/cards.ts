@@ -5,6 +5,7 @@ import {
   WishError,
   contentTier,
   validateDefinition,
+  regionDef,
   callingChangeProblem,
   validateCallingWish,
   validateLookWish,
@@ -135,6 +136,10 @@ export class WishCards {
         if (!(err instanceof WishError)) throw err;
         // Not buildable as content: a person will have to build it.
         tier = 'major';
+      }
+      // A wished material that names no land it comes from comes from where the wisher stands.
+      if (definition?.kind === 'item' && definition.material && !namesHomes((raw as { material?: unknown } | undefined)?.material)) {
+        definition.material.homes = [this.world.regionOf(playerId)?.def.id ?? this.world.home.def.id];
       }
       // Things for your bag are minor; creatures, people and abilities moderate, whatever the model said.
       if (definition) tier = contentTier(definition);
@@ -327,4 +332,10 @@ export class WishCards {
     this.news.say(owner.id, steward ? `It is done. ${appoint.name} is a Steward now.` : `It is done. ${appoint.name} rests from their duties.`);
   }
 
+}
+
+/** True when a wished material's raw words name at least one region that exists. */
+function namesHomes(raw: unknown): boolean {
+  const homes = (raw as { homes?: unknown } | undefined)?.homes;
+  return Array.isArray(homes) && homes.some((h) => typeof h === 'string' && Boolean(regionDef(h)));
 }

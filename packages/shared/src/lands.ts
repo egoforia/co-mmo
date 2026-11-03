@@ -80,27 +80,27 @@ export const LAND_CREATURES: Record<string, CreatureDef> = {
 
 /** What can be found in the bigger lands. */
 export const LAND_ITEMS: Record<string, ItemDef> = {
-  'moth-dust': { name: 'Moth Dust', kind: 'material', art: 'item-moth-dust', description: 'A pinch of softly glowing powder shaken from a lantern moth\'s wings.', value: 6 },
+  'moth-dust': { name: 'Moth Dust', kind: 'material', art: 'item-moth-dust', description: 'A pinch of softly glowing powder shaken from a lantern moth\'s wings.', value: 6, material: { family: 'wishstuff', homes: ['sanctum'], source: 'creature', tier: 1, traits: ['shimmering'] } },
   'temple-lantern': {
     name: 'Temple Lantern', kind: 'equipment', art: 'item-temple-lantern', slot: 'offhand', offhand: 'lantern', rarity: 'common', bonus: { armor: 1, spirit: 1 },
     description: 'A brass lantern from the Temple of the Hundred Bells. Carry it at night and creatures will see you coming, but so will you.', value: 20,
     light: { ...FLAME_LIGHT, color: '#ffd27a' },
   },
-  'wolf-pelt': { name: 'Thorn Wolf Pelt', kind: 'material', art: 'item-wolf-pelt', description: 'A grey pelt still prickly with little thorns. Warm, once you pick them out.', value: 10 },
-  heartwood: { name: 'Golem Heartwood', kind: 'material', art: 'item-heartwood', description: 'A knot of glowing amber wood from a bark golem\'s chest. It hums faintly.', value: 14 },
+  'wolf-pelt': { name: 'Thorn Wolf Pelt', kind: 'material', art: 'item-wolf-pelt', description: 'A grey pelt still prickly with little thorns. Warm, once you pick them out.', value: 10, material: { family: 'hide', homes: ['woods'], source: 'creature', tier: 1, traits: ['warm'] } },
+  heartwood: { name: 'Golem Heartwood', kind: 'material', art: 'item-heartwood', description: 'A knot of glowing amber wood from a bark golem\'s chest. It hums faintly.', value: 14, material: { family: 'wood', homes: ['woods'], source: 'creature', tier: 2, traits: ['sturdy'] } },
   'golem-club': {
     name: 'Golem Club', kind: 'equipment', art: 'item-golem-club', slot: 'weapon', weapon: 'hammer', rarity: 'rare', bonus: { attack: 8, might: 2 },
     description: 'A heavy club of mossy bark that still puts out a leaf now and then.', value: 70,
   },
-  'gull-feather': { name: 'Gull Feather', kind: 'material', art: 'item-gull-feather', description: 'A long grey and white feather. Fletchers and hat makers want it.', value: 5 },
-  pearl: { name: 'Pearl', kind: 'material', art: 'item-pearl', description: 'A round pearl with a pink shimmer. Traders pay well for it.', value: 30 },
+  'gull-feather': { name: 'Gull Feather', kind: 'material', art: 'item-gull-feather', description: 'A long grey and white feather. Fletchers and hat makers want it.', value: 5, material: { family: 'feather', homes: ['shore'], source: 'creature', tier: 1, traits: ['light'] } },
+  pearl: { name: 'Pearl', kind: 'material', art: 'item-pearl', description: 'A round pearl with a pink shimmer. Traders pay well for it.', value: 30, material: { family: 'gem', homes: ['shore'], source: 'creature', tier: 2, traits: ['warding'] } },
   'coral-spear': {
     name: 'Coral Spear', kind: 'equipment', art: 'item-coral-spear', slot: 'weapon', weapon: 'spear', rarity: 'rare', bonus: { attack: 7, agility: 2 },
     description: 'A spear of pink coral with a pearl set where the shaft meets the point.', value: 75,
   },
-  'jackal-fang': { name: 'Jackal Fang', kind: 'material', art: 'item-jackal-fang', description: 'A long curved fang on a scrap of turquoise cord.', value: 9 },
-  'ancient-linen': { name: 'Ancient Linen', kind: 'material', art: 'item-ancient-linen', description: 'A roll of old linen wrapping, faintly golden and smelling of spice.', value: 12 },
-  'wyrm-scale': { name: 'Wyrm Scale', kind: 'material', art: 'item-wyrm-scale', description: 'A sand wyrm\'s scale as big as a hand, hard as bronze.', value: 25 },
+  'jackal-fang': { name: 'Jackal Fang', kind: 'material', art: 'item-jackal-fang', description: 'A long curved fang on a scrap of turquoise cord.', value: 9, material: { family: 'bone', homes: ['desert'], source: 'creature', tier: 1, traits: [] } },
+  'ancient-linen': { name: 'Ancient Linen', kind: 'material', art: 'item-ancient-linen', description: 'A roll of old linen wrapping, faintly golden and smelling of spice.', value: 12, material: { family: 'fibre', homes: ['desert'], source: 'creature', tier: 2, traits: ['warding'] } },
+  'wyrm-scale': { name: 'Wyrm Scale', kind: 'material', art: 'item-wyrm-scale', description: 'A sand wyrm\'s scale as big as a hand, hard as bronze.', value: 25, material: { family: 'plate', homes: ['desert'], source: 'creature', tier: 2, traits: ['sturdy'] } },
   'sunstone-amulet': {
     name: 'Sunstone Amulet', kind: 'equipment', art: 'item-sunstone-amulet', slot: 'charm', rarity: 'rare', bonus: { spirit: 3, wit: 2 },
     description: 'A warm orange stone in a gold sun-shaped setting, from the tomb of the Sun King.', value: 90,
@@ -123,10 +123,12 @@ export const LAND_ITEMS: Record<string, ItemDef> = {
   },
   'ancient-bone': {
     name: 'Ancient Bone', kind: 'material', art: 'item-goat-horn', description: 'A bleached bone from the forgotten crypts below the cathedral.', value: 10,
+    material: { family: 'bone', homes: ['sanctum'], source: 'creature', tier: 1, traits: [] },
   },
   'demon-horn': {
     name: 'Demon Horn', kind: 'material', art: 'item-goat-horn', rarity: 'rare',
     description: 'A twisted obsidian horn radiating dark abyssal heat.', value: 50,
+    material: { family: 'bone', homes: ['sanctum'], source: 'boss', tier: 3, traits: ['warding'] },
   },
   'sanctum-relic': {
     name: 'Sanctum Relic', kind: 'equipment', art: 'item-sunstone-amulet', slot: 'charm', rarity: 'rare', bonus: { attack: 7, spirit: 5 },

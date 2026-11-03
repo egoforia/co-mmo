@@ -7,6 +7,7 @@ import { SLEEPING_ABILITIES } from './mods.ts';
 import type { Active } from './sky.ts';
 import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
+import type { MaterialInfo } from './materials.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
 import { levelUpStats } from './rpg/callings.ts';
 import { HOTBAR_SIZE, settleSkills, slotSkill, upgradeHotbar } from './rpg/skills.ts';
@@ -296,6 +297,8 @@ export interface ItemDef {
   value?: number;
   /** Equipment that burns or glows: the light it casts while held. */
   light?: Light;
+  /** Materials: family, home regions, source, tier and trait (materials.ts). */
+  material?: MaterialInfo;
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -319,6 +322,7 @@ export const ITEMS: Record<string, ItemDef> = {
     art: 'item-goat-horn',
     description: 'A curled horn, sun-bleached and carved with old caravan marks. Traders and crafters will want it.',
     value: 12,
+    material: { family: 'bone', homes: ['desert'], source: 'creature', tier: 1, traits: [] },
   },
   'mushroom-cap': {
     name: 'Mushroom Cap',
@@ -326,6 +330,7 @@ export const ITEMS: Record<string, ItemDef> = {
     art: 'item-mushroom-cap',
     description: 'A springy spotted cap from a Walking Mushroom. Herbalists brew it; hatters wear it.',
     value: 2,
+    material: { family: 'herb', homes: ['woods'], source: 'creature', tier: 1, traits: [] },
   },
   'crab-shell': {
     name: 'Crab Shell',
@@ -333,6 +338,7 @@ export const ITEMS: Record<string, ItemDef> = {
     art: 'item-crab-shell',
     description: "A hard coral plate from a Crab Knight's back. Good for armour and lance tips.",
     value: 4,
+    material: { family: 'plate', homes: ['shore'], source: 'creature', tier: 1, traits: ['sturdy'] },
   },
   'scarab-shell': {
     name: 'Scarab Wing Case',
@@ -340,6 +346,7 @@ export const ITEMS: Record<string, ItemDef> = {
     art: 'item-scarab-shell',
     description: 'A golden wing case that never quite cools. Charm makers prize it.',
     value: 6,
+    material: { family: 'plate', homes: ['desert'], source: 'creature', tier: 1, traits: ['shimmering'] },
   },
   'wooden-sword': {
     name: 'Wooden Sword',

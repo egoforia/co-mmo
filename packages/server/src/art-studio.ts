@@ -35,6 +35,7 @@ import {
 import type { KitSheetView } from './assets/building-kit/kit-sheets.ts';
 import type { KitAsset } from './assets/kit.ts';
 import { seaCaveBox } from './assets/sea-cave-kit.ts';
+import { homeLandBox } from './assets/home-land-art.ts';
 import { paintKitAsset } from './assets/wild-kit.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import type { BudgetState } from './budget.ts';
@@ -245,7 +246,7 @@ export class ArtStudio {
       return { estimateUsd };
     }
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
-    const shipped = (await this.options.shipped())[asset] ?? seaCaveBox(asset);
+    const shipped = (await this.options.shipped())[asset] ?? seaCaveBox(asset) ?? homeLandBox(asset);
     if (!shipped) throw new ArtRequestError('That picture is not part of the game yet.');
     const handle = this.options.jobs.add(asset, kit.name ?? asset, 'picture', 'gods-view', estimateUsd);
     this.enqueue(async () => {

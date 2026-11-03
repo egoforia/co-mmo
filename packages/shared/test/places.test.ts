@@ -10,6 +10,7 @@ import {
   REGION_SIZE,
   Tile,
   WORLD_REGIONS,
+  homeLandLayout,
   generateRegion,
   isBlocking,
   type RegionMap,
@@ -43,7 +44,8 @@ describe('the bigger lands', () => {
     const at = (p: { x: number; y: number }) => seen[Math.floor(p.y) * map.width + Math.floor(p.x)];
     for (const n of map.npcs) expect(at(n), n.name).toBe(1);
     const places = BIOME_PLACES[map.def.biome] ?? [];
-    expect(places.length).toBeGreaterThanOrEqual(4);
+    // The launch lands' great places; the home lands beyond them have none yet.
+    if (!homeLandLayout(map.def.biome)) expect(places.length).toBeGreaterThanOrEqual(4);
     for (const b of map.buildings) expect(at({ x: b.door.x, y: b.door.y + 1 }), b.style).toBe(1);
     // Nearly every creature too: a few may be shut in by trees, as before.
     const free = map.creatures.filter((c) => at(c)).length;

@@ -8,6 +8,7 @@ import { buildingArtJobs, processBuildingArt } from '../src/assets/building-art.
 import type { GeneratedImage, ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import { BuildingPainter } from '../src/building-painter.ts';
 import { STYLE } from '../src/assets/style-profile.ts';
+import { homeLandBox } from '../src/assets/home-land-art.ts';
 
 const cottage = BUILDING_STYLES['bramble-cottage']!;
 const raw = async (png: Buffer) => sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -145,7 +146,8 @@ describe('the shipped art', () => {
     const missing = new Set<string>();
     for (const def of WORLD_REGIONS) {
       const map = generateRegion(def);
-      for (const thing of [...map.creatures, ...map.npcs]) if (!(thing.asset in manifest)) missing.add(thing.asset);
+      // Frostpeak's and Mushroom Hollow's are painted the first time from the Art tab.
+      for (const thing of [...map.creatures, ...map.npcs]) if (!(thing.asset in manifest) && !homeLandBox(thing.asset)) missing.add(thing.asset);
     }
     for (const item of Object.values(LAND_ITEMS)) if (!(item.art in manifest)) missing.add(item.art);
     if (!('bridge-planks' in manifest)) missing.add('bridge-planks');

@@ -67,11 +67,11 @@ describe('regions on region servers', () => {
     expect([...world.regions.values()].every((r) => r.host === 'gateway')).toBe(true);
     const a = await server('a');
     await until(() => [...world.regions.values()].every((r) => r.host === 'a'));
-    expect(a.hosted().sort()).toEqual(['desert', 'sanctum', 'shore', 'woods']);
+    expect(a.hosted().sort()).toEqual(['desert', 'frostpeak', 'mushroom-hollow', 'sanctum', 'shore', 'woods']);
     // A second server takes its share of the regions nobody is in.
     const b = await server('b');
-    await until(() => b.hosted().length === 2);
-    expect(a.hosted()).toHaveLength(2);
+    await until(() => b.hosted().length === 3);
+    expect(a.hosted()).toHaveLength(3);
   });
 
   it('plays a region on a region server: welcome, steps and snapshots come back through the gateway', async () => {
@@ -227,7 +227,7 @@ describe("God's View Server health", () => {
     expect(gateway).toMatchObject({ id: 'gateway', kind: 'gateway', regions: [] });
     expect(gateway.load).toMatchObject({ tickMs: expect.any(Number), memoryMb: expect.any(Number), errors: 0, pid: process.pid });
     expect(r1).toMatchObject({ id: 'r1', kind: 'region-server', players: 1 });
-    expect(r1.regions.map((r: any) => r.id).sort()).toEqual(['desert', 'sanctum', 'shore', 'woods']);
+    expect(r1.regions.map((r: any) => r.id).sort()).toEqual(['desert', 'frostpeak', 'mushroom-hollow', 'sanctum', 'shore', 'woods']);
     expect(r1.load).toMatchObject({ ticksPerSecond: expect.any(Number), lagMs: expect.any(Number), worstLagMs: expect.any(Number), heapMb: expect.any(Number) });
     for (const r of r1.regions) expect(r.creatures).toEqual(expect.any(Number));
 

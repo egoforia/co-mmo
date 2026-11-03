@@ -3,6 +3,7 @@ import { rand2, valueNoise } from './random.ts';
 import { furnitureArt } from './buildings.ts';
 import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
+import { homeLandLayout } from './home-lands.ts';
 import { applyEdits, type WorldEdit } from './world-edits.ts';
 import type { Stairway, Storey } from './floors.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -70,12 +71,18 @@ export interface WildLand {
   wisher: string;
 }
 
-/** The launch world: the Sanctum in the middle, a biome on three sides. */
+/**
+ * The world the game ships with: the Sanctum in the middle, a launch biome on
+ * three sides, Frostpeak to the north and Mushroom Hollow beyond the Woods
+ * (home-lands.ts).
+ */
 export const WORLD_REGIONS: RegionDef[] = [
-  { id: 'sanctum', name: 'the Sanctum', biome: 'sanctum', seed: 1337, at: { x: 0, y: 0 }, exits: { west: 'woods', east: 'shore', south: 'desert' } },
-  { id: 'woods', name: 'Whispering Woods', biome: 'whispering-woods', seed: 2001, at: { x: -1, y: 0 }, exits: { east: 'sanctum' } },
+  { id: 'sanctum', name: 'the Sanctum', biome: 'sanctum', seed: 1337, at: { x: 0, y: 0 }, exits: { north: 'frostpeak', west: 'woods', east: 'shore', south: 'desert' } },
+  { id: 'woods', name: 'Whispering Woods', biome: 'whispering-woods', seed: 2001, at: { x: -1, y: 0 }, exits: { east: 'sanctum', west: 'mushroom-hollow' } },
   { id: 'shore', name: 'Sunlit Shore', biome: 'sunlit-shore', seed: 3001, at: { x: 1, y: 0 }, exits: { west: 'sanctum' } },
   { id: 'desert', name: 'Mirage Desert', biome: 'mirage-desert', seed: 4001, at: { x: 0, y: 1 }, exits: { north: 'sanctum' } },
+  { id: 'frostpeak', name: 'Frostpeak', biome: 'frostpeak', seed: 5001, at: { x: 0, y: -1 }, exits: { south: 'sanctum' } },
+  { id: 'mushroom-hollow', name: 'Mushroom Hollow', biome: 'mushroom-hollow', seed: 6001, at: { x: -2, y: 0 }, exits: { east: 'woods' } },
 ];
 
 /** Regions players wished into being, by id (filled in by applyContent). */
@@ -231,6 +238,12 @@ export interface RegionMap {
   stairways: Stairway[];
   npcs: NpcPlacement[];
   creatures: CreatureSpawn[];
+  /**
+   * Where along an edge its road meets it, in tiles, when not the middle: a
+   * layout sets one when a building stands in the middle road's way, and the
+   * land beyond sets the same, so the road runs on across the border.
+   */
+  gates?: Partial<Record<Side, number>>;
 }
 
 /**
@@ -277,15 +290,19 @@ function layOut(def: RegionDef, size: number): RegionMap {
     creatures: [],
   };
   const c = Math.floor(size / 2);
-  const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? sanctumLayout;
+  const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? homeLandLayout(def.biome) ?? sanctumLayout;
   layout(map, c);
   // The launch lands' caves, palaces, castles and the rest, each joined to the middle by a road.
   if (!def.wild) layPlaces(map, c);
 
   // Roads from every open edge to the middle, then entry points just inside.
   for (const side of Object.keys(def.exits) as Side[]) {
-    const edge = edgePoint(side, size, c);
-    road(map, edge.x, edge.y, c, c);
+    const edge = edgePoint(side, size, map.gates?.[side] ?? c);
+    // Straight in from the edge, then along the middle row to the middle.
+    if ((side === 'north' || side === 'south') && edge.x !== c) {
+      road(map, edge.x, edge.y, edge.x, c);
+      road(map, edge.x, c, c, c);
+    } else road(map, edge.x, edge.y, c, c);
     const inward = { north: [0, 1], south: [0, -1], east: [-1, 0], west: [1, 0] }[side];
     map.entries[side] = { x: edge.x + 1 + inward[0]! * 1.5, y: edge.y + 1 + inward[1]! * 1.5 };
   }
@@ -522,6 +539,8 @@ const sanctumLayout: Layout = (map, c) => {
   road(map, c + 1, c - 20, scriptorium.door.x, scriptorium.door.y + 1);
   road(map, inn.door.x, inn.door.y + 1, c - 7, inn.door.y + 1);
   road(map, c - 18, c - 26, c - 1, c - 26);
+  // The road north to Frostpeak comes in east of the Scriptorium: the Cathedral stands in the middle road's way.
+  map.gates = { ...map.gates, north: SANCTUM_NORTH_GATE(c) };
 
   // The Cathedral Graveyard: ancient crypt stones and weeping ground.
   map.landmarks.push({ asset: 'sanctum-standing-stones', x: c - 20, y: c - 29, footprint: { width: 4, height: 2 } });
@@ -590,6 +609,11 @@ const sanctumLayout: Layout = (map, c) => {
   map.npcs.push({ id: 'sylvan-cervid-npc', name: 'Sylvan Cervid', asset: 'sylvan-cervid', x: c - 1.0, y: c - 4.0 });
   map.spawn = { x: c + 1, y: c + 4 };
 };
+
+/** Where the Sanctum's north road and Frostpeak's south road meet, from the middle tile. */
+export const SANCTUM_NORTH_GATE = (c: number) => c + 32;
+/** Where the Woods' west road and Mushroom Hollow's east road meet: the cottage lane. */
+export const WOODS_WEST_GATE = (c: number) => c + 9;
 
 /** The Sanctum Arcanum's floor, in tiles, inside the walls. */
 export const ARCANUM_SIZE = { width: 10, height: 8 };
@@ -674,6 +698,8 @@ const woodsLayout: Layout = (map, c) => {
   const lane = home.y + home.height + 1;
   road(map, c, lane, home.door.x, home.door.y + 1);
   road(map, c, c, c, lane);
+  // The road west to Mushroom Hollow runs in along the cottage lane, south of the cottage.
+  map.gates = { ...map.gates, west: WOODS_WEST_GATE(c) };
   furnish(map, left + 1, top + 1);
   map.npcs.push({ id: 'old-bramble', name: 'Old Bramble', asset: 'woods-herbalist', x: left + 9.5, y: top + 12.5 });
   creatures(map, 'walking-mushroom', 'Walking Mushroom', 'woods-mushroom', 5 * SPREAD);
@@ -768,7 +794,8 @@ const BIOME_LAYOUTS: Partial<Record<BiomeId, Layout>> = {
 /** Creatures roam the whole land, so each kind comes this many times over to keep the first lands' liveliness. */
 const SPREAD = 8;
 
-function scatter(map: RegionMap, pick: (x: number, y: number) => Tile): void {
+/** Fills every tile of the region with what `pick` chooses for it. */
+export function scatter(map: RegionMap, pick: (x: number, y: number) => Tile): void {
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) map.tiles[y * map.width + x] = pick(x, y);
   }
@@ -842,12 +869,13 @@ export function block(map: RegionMap, x: number, y: number, w: number, h: number
   for (let ty = bottom - h + 1; ty <= bottom; ty++) for (let tx = left; tx < left + w; tx++) set(map, tx, ty, Tile.Blocked);
 }
 
-function edgePoint(side: Side, size: number, c: number): { x: number; y: number } {
+/** Where a road meets an edge, `along` tiles from its west or north end. */
+function edgePoint(side: Side, size: number, along: number): { x: number; y: number } {
   switch (side) {
-    case 'west': return { x: 0, y: c };
-    case 'east': return { x: size - 1, y: c };
-    case 'north': return { x: c, y: 0 };
-    case 'south': return { x: c, y: size - 1 };
+    case 'west': return { x: 0, y: along };
+    case 'east': return { x: size - 1, y: along };
+    case 'north': return { x: along, y: 0 };
+    case 'south': return { x: along, y: size - 1 };
   }
 }
 

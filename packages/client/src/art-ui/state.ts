@@ -159,8 +159,11 @@ export const DIRECTIONS: [Direction, string][] = [['front', 'towards us'], ['rig
 export const WAYS: [IsoWay, string][] = [['front-left', 'towards us, left'], ['front-right', 'towards us, right'], ['back-left', 'away, left'], ['back-right', 'away, right']];
 /** Every way a standing picture can face, in words. */
 export const FACING_WORDS: [Facing, string][] = [...DIRECTIONS, ...WAYS];
-/** The way a walker faces after turning round. */
-export const TURNED: Record<Direction, Direction> = { front: 'back', back: 'front', left: 'right', right: 'left' };
+/** The walk whose picture, mirrored, stands in for this one (as the hand finder mirrors hands). */
+export const TURNED: Record<Facing, Facing> = {
+  front: 'back', back: 'front', left: 'right', right: 'left',
+  'front-left': 'front-right', 'front-right': 'front-left', 'back-left': 'back-right', 'back-right': 'back-left',
+};
 export const SOURCE: Record<ArtItem['source'], string> = { shipped: 'shipped with the game', painted: 'painted here', redone: 'painted again here', missing: 'not painted yet' };
 export const STATUS: Record<ArtJob['status'], string> = { queued: 'In line', waiting: 'Waiting for a turn', painting: 'Painting now', done: 'Done', failed: 'Failed', skipped: 'Not painted' };
 export const MEDIA: Record<ArtJob['media'], string> = { picture: 'picture', clip: 'video clip', sound: 'sound' };

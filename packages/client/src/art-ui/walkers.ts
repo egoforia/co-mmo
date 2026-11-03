@@ -4,17 +4,18 @@
 import {
   HELD_SIZE,
   ISO_WAYS,
+  facingSide,
   heldBehind,
   walkStandArt,
   type ArtPoint,
+  type Facing,
   type IsoWay,
 } from '@co-mmo/shared';
 import { itemHtml } from './pages.ts';
 import {
   type ArtItem,
-  DIRECTIONS,
-  type Direction,
   HOLDABLE,
+  FACING_WORDS,
   TURNED,
   WAYS,
   type WalkerView,
@@ -144,14 +145,15 @@ export function holdable(): ArtItem[] {
  * grip on the hand, its longest side a set share of the frame's height,
  * turned the way the walker faces, and behind the body when that hand is.
  */
-export function triedHtml(direction: Direction, side: 'right' | 'left', hand: ArtPoint | null | undefined, height: number): string {
+export function triedHtml(direction: Facing, side: 'right' | 'left', hand: ArtPoint | null | undefined, height: number): string {
   const item = holdable().find((i) => i.id === artState.tryOn[side]);
   const grip = item ? artState.points[item.id]?.grip : undefined;
   const size = item?.url ? artState.sizes.get(item.url) : undefined;
   if (!item?.url || !hand || !grip || !size) return '';
   const scale = (height * HELD_SIZE) / Math.max(...size);
   const [w, h] = [size[0] * scale, size[1] * scale];
-  const flip = direction === 'left';
+  // Mirrored as the game mirrors it: whenever the walker faces to the left, turned fully or halfway.
+  const flip = facingSide(direction) === 'left';
   const gx = flip ? 1 - grip[0] : grip[0];
   return `<img class="held ${heldBehind(direction, side) ? 'behind' : 'front'}" src="${esc(item.url)}" alt="" style="width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;left:calc(${(hand[0] * 100).toFixed(1)}% - ${(gx * w).toFixed(1)}px);top:calc(${(hand[1] * 100).toFixed(1)}% - ${(grip[1] * h).toFixed(1)}px)${flip ? ';transform:scaleX(-1)' : ''}">`;
 }
@@ -174,9 +176,10 @@ export function tryOnHtml(): string {
  * A frame where it found none borrows the nearest frame's hand in the game.
  */
 export function handsHtml(w: WalkerView): string {
-  const ids = DIRECTIONS.filter(([d]) => w.walks[d]).map(([d]) => `${w.id}-walk-${d}`);
+  // Isometric walks (everyone today) and the older four-way walks some characters still have.
+  const ids = FACING_WORDS.filter(([d]) => w.walks[d]).map(([d]) => `${w.id}-walk-${d}`);
   const find = (body: { ids: string[]; frame?: number }, label: string, cls = 'quiet') => `<button type="button" class="${cls}" data-hands-find="${esc(JSON.stringify(body))}">${label}</button>`;
-  const rows = DIRECTIONS.flatMap(([d, label]) => {
+  const rows = FACING_WORDS.flatMap(([d, label]) => {
     const strip = w.walks[d];
     const id = `${w.id}-walk-${d}`;
     const hands = artState.points[id]?.hands;
@@ -204,9 +207,9 @@ export function handsHtml(w: WalkerView): string {
       </details>` : '';
     const missing = !hands ? ' · not looked at yet' : !lefts ? ' · left hand not looked for yet: it is found by itself after Pull and restart, or use Find again' : '';
     // Turning round mirrors the picture, so the opposite walk's hands, mirrored, can stand in for this one's.
-    const [turned, turnedLabel] = DIRECTIONS.find(([o]) => o === TURNED[d])!;
+    const [turned, turnedLabel] = FACING_WORDS.find(([o]) => o === TURNED[d])!;
     const from = `${w.id}-walk-${turned}`;
-    const copied = artState.mirrored[id] ? ` · mirrored from the ${DIRECTIONS.find(([o]) => artState.mirrored[id] === `${w.id}-walk-${o}`)?.[1] ?? 'other'} walk` : '';
+    const copied = artState.mirrored[id] ? ` · mirrored from the ${FACING_WORDS.find(([o]) => artState.mirrored[id] === `${w.id}-walk-${o}`)?.[1] ?? 'other'} walk` : '';
     const mirror = w.walks[turned] && artState.points[from]?.hands ? `<button type="button" class="quiet" data-hands-mirror="${esc(JSON.stringify({ from, to: id }))}" data-label="${esc(`${label} walk`)}" data-from-label="${esc(`${turnedLabel} walk`)}">Use the ${turnedLabel} walk's hands, mirrored</button>` : '';
     return [`<div class="hand-row" data-art-id="${esc(id)}"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, 'Find again for this walk')}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`];
   });

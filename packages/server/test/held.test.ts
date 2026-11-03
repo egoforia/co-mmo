@@ -182,7 +182,12 @@ describe('the hand finder', () => {
     const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
     const eye = fakeEye(['{"near": [500, 600], "far": [500, 300]}']);
     const still = await picture(128, 192);
-    const shipped = { 'player-mara-walk-front': { file: 'art/walk.png', kind: 'walk' as const, width: 256, height: 192, frames: 2 } };
+    const shipped = {
+      'player-mara-walk-front': { file: 'art/walk.png', kind: 'walk' as const, width: 256, height: 192, frames: 2 },
+      // Runs and attacks are painted as walks, and are asked about the way they face.
+      'player-mara-run-back-right': { file: 'art/run.png', kind: 'walk' as const, width: 256, height: 192, frames: 2 },
+      'player-mara-attack-front-left': { file: 'art/attack.png', kind: 'walk' as const, width: 256, height: 192, frames: 2 },
+    };
     const painted = {
       'player-mara-stand-front-left': { file: 'wished-art/walks/views/player-mara-front-left.png?v=1', kind: 'stand' as const, width: 128, height: 192 },
       // Top-down standing pictures are shown only until a walk is made, so they are not looked at.
@@ -190,7 +195,7 @@ describe('the hand finder', () => {
     };
     const store = { content: [] } as unknown as Parameters<typeof pointSources>[0];
     const sources = pointSources(store, shipped, painted, async () => still);
-    expect(sources.filter((x) => x.kind === 'hands').map((x) => [x.id, x.facing, x.frames])).toEqual([['player-mara-walk-front', 'front', 2], ['player-mara-stand-front-left', 'front-left', 1]]);
+    expect(sources.filter((x) => x.kind === 'hands').map((x) => [x.id, x.facing, x.frames])).toEqual([['player-mara-walk-front', 'front', 2], ['player-mara-run-back-right', 'back-right', 2], ['player-mara-attack-front-left', 'front-left', 2], ['player-mara-stand-front-left', 'front-left', 1]]);
     const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => sources.filter((x) => x.id === 'player-mara-stand-front-left') });
     await finder.start();
     expect(eye.asked[0]!.messages[0]!.content).toContain('turned halfway');

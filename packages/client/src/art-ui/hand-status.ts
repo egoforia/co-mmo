@@ -1,7 +1,7 @@
 // The Art tab's "Finding hands" line: what the hand finder is doing on its
 // own, or why it is not, linking to the character page's hand finder.
 
-import { type ArtContext, type ArtItem, FACING_WORDS, type WalkerView, artState, esc, go, when } from './state.ts';
+import { type ArtContext, type ArtItem, WAYS, type WalkerView, artState, esc, go, when } from './state.ts';
 
 /** What the hand finder is doing, as the server tells it. */
 export interface HandStatus {
@@ -28,7 +28,7 @@ export function lookingAt(id: string, walkers: WalkerView[], items: ArtItem[]): 
   const w = walkerOf(id, walkers);
   if (w) {
     const [noun, facing] = /^-(walk|run|attack)-(.+)$/.exec(id.slice(w.id.length))?.slice(1) ?? [];
-    const way = FACING_WORDS.find(([d]) => d === facing)?.[1];
+    const way = WAYS.find(([d]) => d === facing)?.[1];
     return noun && way ? `${w.name} ${DOING[noun]} ${way}` : w.name;
   }
   return items.find((i) => i.id === id)?.name ?? 'a held item';

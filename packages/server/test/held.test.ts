@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { BUILDING_STYLES, FACINGS, HELD_FAMILIES, ITEMS, familyArt, heldArts, WALK_DIRECTIONS, addItem, buildingArtIds, equipmentBonus, heldBehind, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { BUILDING_STYLES, FACINGS, HELD_FAMILIES, ISO_WAYS, ITEMS, familyArt, heldArts, addItem, buildingArtIds, equipmentBonus, heldBehind, heldItem, itemFromWish, newCharacter, offHandItem, regionDef, validateDefinition, walkArt, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import type { ChatModel, ChatRequest } from '../src/ai/chat.ts';
 import { ANCHORS } from '../src/assets/anchors.ts';
 import { artRequest } from '../src/assets/wish-art.ts';
@@ -50,12 +50,12 @@ describe('the hand finder', () => {
     const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
     const strip = await picture(256, 192);
     let sword = await picture(128, 128);
-    // Hands come back as both hands; walking left, the right hand is the far one and the left the near one.
+    // Hands come back as both hands; turned to the left, the right hand is the far one and the left the near one.
     const eye = fakeEye(['{"near": [100, 100], "far": [800, 600]}', '{"near": [100, 100], "far": null}', '{"point": [700, 300]}', '{"far": [810, 610]}', '{"far": [820, 620]}']);
-    let walkFile = 'wished-art/walks/player-mara-walk-front.png';
+    let walkFile = 'wished-art/walks/player-mara-walk-front-left.png';
     const spent: number[] = [];
     const sources = (): PointSource[] => [
-      { id: 'player-mara-walk-front', kind: 'hands', file: walkFile, frames: 2, facing: 'left', read: async () => strip },
+      { id: 'player-mara-walk-front-left', kind: 'hands', file: walkFile, frames: 2, facing: 'front-left', read: async () => strip },
       { id: 'item-wooden-sword', kind: 'grip', file: 'art/item-wooden-sword.png', frames: 1, read: async () => sword },
     ];
     let model: ChatModel | undefined;
@@ -68,7 +68,7 @@ describe('the hand finder', () => {
     model = eye;
     await finder.start();
     expect(await finder.manifest()).toEqual({
-      'player-mara-walk-front': { hands: [[0.6, 0.8], null], leftHands: [[0.1, 0.1], [0.1, 0.1]] },
+      'player-mara-walk-front-left': { hands: [[0.6, 0.8], null], leftHands: [[0.1, 0.1], [0.1, 0.1]] },
       'item-wooden-sword': { grip: [0.3, 0.7] },
     });
     expect(eye.asked[2]!.messages[0]!.content).toMatch(/handle/);
@@ -84,7 +84,7 @@ describe('the hand finder', () => {
     walkFile = `${walkFile}?v=2`;
     await finder.start();
     expect(eye.asked).toHaveLength(5);
-    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.61, 0.81], [0.62, 0.82]], leftHands: [null, null] });
+    expect((await finder.manifest())['player-mara-walk-front-left']).toEqual({ hands: [[0.61, 0.81], [0.62, 0.82]], leftHands: [null, null] });
     // A new picture under the same file name (shipped art updated with the game) is looked at again too.
     sword = await picture(64, 128);
     await finder.start();
@@ -92,7 +92,7 @@ describe('the hand finder', () => {
 
     // Kept on disk for the next start.
     const again = new HandFinder({ artDir, model: () => undefined, sources: async () => [], paused: () => false, spend: () => {} });
-    expect(Object.keys(await again.manifest())).toEqual(['player-mara-walk-front', 'item-wooden-sword']);
+    expect(Object.keys(await again.manifest())).toEqual(['player-mara-walk-front-left', 'item-wooden-sword']);
   });
 
   it('tells how far a run has got, and why it is not running', async () => {
@@ -128,33 +128,59 @@ describe('the hand finder', () => {
     expect(after.blocked).toBeUndefined();
   });
 
-  it('keeps each hand on its side walking towards us, swapping a frame the model mixed up', () => {
+  it('keeps each frame\'s hands as answered, since turned halfway the hands cross as the walker steps', () => {
     const r = (x: number) => [x, 0.5] as [number, number];
-    // The right hand is on the picture's left in most frames; frame 3 came back the other way round.
-    expect(steadyHands('front', [{ right: r(0.3), left: r(0.7) }, { right: r(0.32), left: r(0.68) }, { right: r(0.7), left: r(0.31) }, {}])).toEqual({ right: [r(0.3), r(0.32), r(0.31), null], left: [r(0.7), r(0.68), r(0.7), null] });
-    // Side-on the hands cross, so nothing is swapped.
-    expect(steadyHands('left', [{ right: r(0.3), left: r(0.7) }, { right: r(0.7), left: r(0.3) }])).toEqual({ right: [r(0.3), r(0.7)], left: [r(0.7), r(0.3)] });
+    expect(steadyHands([{ right: r(0.3), left: r(0.7) }, { right: r(0.7), left: r(0.3) }, {}])).toEqual({ right: [r(0.3), r(0.7), null], left: [r(0.7), r(0.3), null] });
   });
 
   it('asks the Owner\'s own question, and looks again at one frame or a whole walk when asked', async () => {
     const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
-    const eye = fakeEye(['{"left": [500, 300], "right": [500, 700]}', '{"left": [500, 310], "right": [500, 690]}', '{"left": [520, 320], "right": [520, 680]}']);
+    const eye = fakeEye(['{"near": [500, 300], "far": [500, 700]}', '{"near": [500, 310], "far": [500, 690]}', '{"near": [520, 320], "far": [520, 680]}']);
     const strip = await picture(256, 192);
-    const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [{ id: 'player-mara-walk-front', kind: 'hands', file: 'w.png', frames: 2, facing: 'front', read: async () => strip }] });
+    const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [{ id: 'player-mara-walk-front-right', kind: 'hands', file: 'w.png', frames: 2, facing: 'front-right', read: async () => strip }] });
     await finder.start();
-    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.3, 0.5], [0.31, 0.5]], leftHands: [[0.7, 0.5], [0.69, 0.5]] });
-    expect((await finder.questions()).find((q) => q.facing === 'front')).toMatchObject({ own: false, system: expect.stringContaining('"left"') });
+    expect((await finder.manifest())['player-mara-walk-front-right']).toEqual({ hands: [[0.3, 0.5], [0.31, 0.5]], leftHands: [[0.7, 0.5], [0.69, 0.5]] });
+    expect((await finder.questions()).find((q) => q.facing === 'front-right')).toMatchObject({ own: false, system: expect.stringContaining('"near"') });
 
-    await finder.setQuestion('front', 'Find the hands, follow the arms.');
-    expect((await finder.questions()).find((q) => q.facing === 'front')).toMatchObject({ own: true, prompt: 'Find the hands, follow the arms.' });
+    await finder.setQuestion('front-right', 'Find the hands, follow the arms.');
+    expect((await finder.questions()).find((q) => q.facing === 'front-right')).toMatchObject({ own: true, prompt: 'Find the hands, follow the arms.' });
     // Saving words looks at nothing; asking again for frame 2 looks at that frame only, with the new words.
     expect(eye.asked).toHaveLength(2);
-    expect(await finder.findAgain(['player-mara-walk-front'], 1)).toBe(1);
+    expect(await finder.findAgain(['player-mara-walk-front-right'], 1)).toBe(1);
     expect(eye.asked).toHaveLength(3);
     expect(eye.asked[2]!.messages[0]!.content).toBe('Find the hands, follow the arms.');
-    expect((await finder.manifest())['player-mara-walk-front']).toEqual({ hands: [[0.3, 0.5], [0.32, 0.52]], leftHands: [[0.7, 0.5], [0.68, 0.52]] });
-    await finder.setQuestion('front', '');
-    expect((await finder.questions()).find((q) => q.facing === 'front')!.own).toBe(false);
+    expect((await finder.manifest())['player-mara-walk-front-right']).toEqual({ hands: [[0.3, 0.5], [0.32, 0.52]], leftHands: [[0.7, 0.5], [0.68, 0.52]] });
+    await finder.setQuestion('front-right', '');
+    expect((await finder.questions()).find((q) => q.facing === 'front-right')!.own).toBe(false);
+  });
+
+  it('asks about a look\'s own picture, which faces us, by the picture\'s left and right', async () => {
+    const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
+    const eye = fakeEye(['{"left": [500, 300], "right": [500, 700]}']);
+    const still = await picture(128, 192);
+    const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [{ id: 'player-mara', kind: 'hands', file: 'm.png', frames: 1, read: async () => still }] });
+    await finder.start();
+    expect(eye.asked[0]!.system).toContain('"left"');
+    // Facing us, the character's right hand is on the picture's left.
+    expect((await finder.manifest())['player-mara']).toEqual({ hands: [[0.3, 0.5]], leftHands: [[0.7, 0.5]] });
+    expect((await finder.questions()).map((q) => q.facing)).toEqual(['look', ...FACINGS]);
+  });
+
+  it('keeps the Owner\'s words for the isometric ways and a look\'s picture, and drops points and questions for retired ways', async () => {
+    const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
+    // Saved before the top-down ways were retired: a look's picture was asked the question for facing front.
+    await writeFile(join(artDir, 'hand-questions.json'), JSON.stringify({ front: 'Facing us: find both hands.', left: 'Side-on: near and far.', 'back-left': 'Turned away to the left.' }));
+    await writeFile(join(artDir, 'points.json'), JSON.stringify({ 'player-mara-walk-front': { from: 'a', hands: [[0.5, 0.5]] }, 'player-mara-walk-front-left': { from: 'b', hands: [[0.4, 0.5]] }, 'item-wooden-sword': { from: 'c', grip: [0.3, 0.7] } }));
+    const finder = new HandFinder({ artDir, model: () => undefined, paused: () => false, spend: () => {}, sources: async () => [] });
+    expect(await finder.manifest()).toEqual({ 'player-mara-walk-front-left': { hands: [[0.4, 0.5]] }, 'item-wooden-sword': { grip: [0.3, 0.7] } });
+    const questions = await finder.questions();
+    expect(questions.map((q) => q.facing)).toEqual(['look', ...FACINGS]);
+    expect(questions.find((q) => q.facing === 'look')).toMatchObject({ own: true, prompt: 'Facing us: find both hands.' });
+    expect(questions.find((q) => q.facing === 'back-left')).toMatchObject({ own: true, prompt: 'Turned away to the left.' });
+    expect(questions.find((q) => q.facing === 'front-left')!.own).toBe(false);
+    // Saving any question writes only the questions still asked.
+    await finder.setQuestion('front-right', 'Turned towards us, to the right.');
+    expect(JSON.parse(await readFile(join(artDir, 'hand-questions.json'), 'utf8'))).toEqual({ look: 'Facing us: find both hands.', 'back-left': 'Turned away to the left.', 'front-right': 'Turned towards us, to the right.' });
   });
 
   it('mirrors one walk\'s hands onto the walk facing the other way, for free', async () => {
@@ -162,20 +188,20 @@ describe('the hand finder', () => {
     const artDir = await mkdtemp(join(tmpdir(), 'co-mmo-points-'));
     const eye = fakeEye(['{"near": [500, 600], "far": [500, 300]}', '{"near": [510, 610], "far": [510, 310]}']);
     const strip = await picture(256, 192);
-    const walk = (d: 'right' | 'left') => ({ id: `player-mara-walk-${d}`, kind: 'hands' as const, file: `${d}.png`, frames: 2, facing: d, read: async () => strip });
-    const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [walk('right')] });
+    const walk = (d: 'front-right' | 'front-left') => ({ id: `player-mara-walk-${d}`, kind: 'hands' as const, file: `${d}.png`, frames: 2, facing: d, read: async () => strip });
+    const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [walk('front-right')] });
     await finder.start();
-    expect((await finder.manifest())['player-mara-walk-right']).toEqual({ hands: [[0.6, 0.5], [0.61, 0.51]], leftHands: [[0.3, 0.5], [0.31, 0.51]] });
+    expect((await finder.manifest())['player-mara-walk-front-right']).toEqual({ hands: [[0.6, 0.5], [0.61, 0.51]], leftHands: [[0.3, 0.5], [0.31, 0.51]] });
 
-    const both = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [walk('right'), walk('left')] });
-    await both.mirror('player-mara-walk-right', 'player-mara-walk-left');
+    const both = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => [walk('front-right'), walk('front-left')] });
+    await both.mirror('player-mara-walk-front-right', 'player-mara-walk-front-left');
     // Each hand stays the same hand, across the picture.
-    expect((await both.manifest())['player-mara-walk-left']).toEqual({ hands: [[0.4, 0.5], [0.39, 0.51]], leftHands: [[0.7, 0.5], [0.69, 0.51]] });
-    expect(await both.mirrored()).toEqual({ 'player-mara-walk-left': 'player-mara-walk-right' });
+    expect((await both.manifest())['player-mara-walk-front-left']).toEqual({ hands: [[0.4, 0.5], [0.39, 0.51]], leftHands: [[0.7, 0.5], [0.69, 0.51]] });
+    expect(await both.mirrored()).toEqual({ 'player-mara-walk-front-left': 'player-mara-walk-front-right' });
     // Nothing asked, and the mirrored walk is not looked at again on the next run.
     await both.start();
     expect(eye.asked).toHaveLength(2);
-    await expect(both.mirror('player-mara-walk-left-x', 'player-mara-walk-right')).rejects.toThrow(/nothing to mirror/);
+    await expect(both.mirror('player-mara-walk-front-left-x', 'player-mara-walk-front-right')).rejects.toThrow(/nothing to mirror/);
   });
 
   it('finds the hands in a standing picture of an isometric way, where the far hand is the one on the side it turns to', async () => {
@@ -183,6 +209,7 @@ describe('the hand finder', () => {
     const eye = fakeEye(['{"near": [500, 600], "far": [500, 300]}']);
     const still = await picture(128, 192);
     const shipped = {
+      // A walk facing a retired way is not shown any more, so it is not looked at.
       'player-mara-walk-front': { file: 'art/walk.png', kind: 'walk' as const, width: 256, height: 192, frames: 2 },
       // Runs and attacks are painted as walks, and are asked about the way they face.
       'player-mara-run-back-right': { file: 'art/run.png', kind: 'walk' as const, width: 256, height: 192, frames: 2 },
@@ -190,12 +217,12 @@ describe('the hand finder', () => {
     };
     const painted = {
       'player-mara-stand-front-left': { file: 'wished-art/walks/views/player-mara-front-left.png?v=1', kind: 'stand' as const, width: 128, height: 192 },
-      // Top-down standing pictures are shown only until a walk is made, so they are not looked at.
+      // Top-down standing pictures are not shown any more either.
       'player-mara-stand-left': { file: 'wished-art/walks/views/player-mara-left.png?v=1', kind: 'stand' as const, width: 128, height: 192 },
     };
     const store = { content: [] } as unknown as Parameters<typeof pointSources>[0];
     const sources = pointSources(store, shipped, painted, async () => still);
-    expect(sources.filter((x) => x.kind === 'hands').map((x) => [x.id, x.facing, x.frames])).toEqual([['player-mara-walk-front', 'front', 2], ['player-mara-run-back-right', 'back-right', 2], ['player-mara-attack-front-left', 'front-left', 2], ['player-mara-stand-front-left', 'front-left', 1]]);
+    expect(sources.filter((x) => x.kind === 'hands').map((x) => [x.id, x.facing, x.frames])).toEqual([['player-mara-run-back-right', 'back-right', 2], ['player-mara-attack-front-left', 'front-left', 2], ['player-mara-stand-front-left', 'front-left', 1]]);
     const finder = new HandFinder({ artDir, model: () => eye, paused: () => false, spend: () => {}, sources: async () => sources.filter((x) => x.id === 'player-mara-stand-front-left') });
     await finder.start();
     expect(eye.asked[0]!.messages[0]!.content).toContain('turned halfway');
@@ -207,8 +234,6 @@ describe('the hand finder', () => {
     expect(heldBehind('back-right', 'right')).toBe(false);
     expect(heldBehind('back-right', 'left')).toBe(true);
     expect(heldBehind('back-left', 'left')).toBe(false);
-    // The four cardinal ways as before.
-    expect(['front', 'back', 'left', 'right'].map((f) => heldBehind(f as 'front', 'right'))).toEqual([false, true, true, false]);
   });
 
   it("finds the grip on each family's own picture once it ships, and shows it until a weapon's own is painted", () => {
@@ -279,8 +304,8 @@ describe('held items', () => {
   });
 
   it('draws each hand\'s item behind the body only when that hand is on the far side', () => {
-    expect((['front', 'right', 'back', 'left'] as const).map((f) => heldBehind(f, 'right'))).toEqual([false, false, true, true]);
-    expect((['front', 'right', 'back', 'left'] as const).map((f) => heldBehind(f, 'left'))).toEqual([false, true, true, false]);
+    expect(FACINGS.map((f) => heldBehind(f, 'right'))).toEqual([true, false, true, false]);
+    expect(FACINGS.map((f) => heldBehind(f, 'left'))).toEqual([false, true, false, true]);
   });
 
   it('wears a wished shield in the off hand, shown in the left hand beside the weapon', () => {
@@ -320,34 +345,33 @@ describe('the art points the game serves', () => {
     const entry = (id: string, kind = 'prop', frames?: number) => [id, { file: `art/${id}.png`, kind, width: 256, height: 192, ...(frames ? { frames } : {}) }];
     const manifest = Object.fromEntries([
       ...Object.values(BUILDING_STYLES).flatMap(buildingArtIds).map((id) => entry(id)),
-      ...['player-mara', 'player-ilya'].flatMap((look) => WALK_DIRECTIONS.map((d) => entry(walkArt(look, d), 'walk', 2))),
+      ...['player-mara', 'player-ilya'].flatMap((look) => ISO_WAYS.map((d) => entry(walkArt(look, d), 'walk', 2))),
       entry('player-mara', 'player'),
       entry('item-wooden-sword', 'item'),
     ]);
     await writeFile(join(root, 'art/manifest.json'), JSON.stringify(manifest));
-    for (const id of [walkArt('player-mara', 'front'), 'player-mara', 'item-wooden-sword']) await writeFile(join(root, `art/${id}.png`), await picture(256, 192));
+    for (const id of [walkArt('player-mara', 'front-right'), 'player-mara', 'item-wooden-sword']) await writeFile(join(root, `art/${id}.png`), await picture(256, 192));
     const eye = fakeEye(Array(20).fill('{"point": [500, 500], "left": [500, 500], "right": [500, 500], "near": [500, 500], "far": [500, 500]}'));
     const { base, store } = await start({ shippedArt: join(root, 'art/manifest.json'), judge: () => eye, sound: { start: false } });
     await app!.hands.start();
     await app!.hands.job;
     const owner = account(store, 'Ego', 'owner');
     const { body } = await api(base, '/api/art-points', owner.token);
-    expect(body[walkArt('player-mara', 'front')]).toEqual({ hands: [[0.5, 0.5], [0.5, 0.5]], leftHands: [[0.5, 0.5], [0.5, 0.5]] });
+    expect(body[walkArt('player-mara', 'front-right')]).toEqual({ hands: [[0.5, 0.5], [0.5, 0.5]], leftHands: [[0.5, 0.5], [0.5, 0.5]] });
     expect(body['player-mara']).toEqual({ hands: [[0.5, 0.5]], leftHands: [[0.5, 0.5]] });
     expect(body['item-wooden-sword']).toEqual({ grip: [0.5, 0.5] });
     // God's View shows the questions and looks again at a walk when asked.
-    expect((await api(base, '/api/admin/art/hands', owner.token)).body.questions.map((q: { facing: string }) => q.facing)).toEqual([...FACINGS]);
+    expect((await api(base, '/api/admin/art/hands', owner.token)).body.questions.map((q: { facing: string }) => q.facing)).toEqual(['look', ...FACINGS]);
     // The Art tab's "Finding hands" line: nothing waiting once every painted picture was looked at.
     expect((await api(base, '/api/admin/art/hands/status', owner.token)).body).toMatchObject({ running: false, waiting: 0, last: { looked: 3, found: 3 } });
-    const again = await api(base, '/api/admin/art/hands/find', owner.token, 'POST', { ids: [walkArt('player-mara', 'front')], frame: 0 });
+    const again = await api(base, '/api/admin/art/hands/find', owner.token, 'POST', { ids: [walkArt('player-mara', 'front-right')], frame: 0 });
     expect(again.body).toMatchObject({ ok: true, looked: 1 });
-    // A walk can take the hands of the walk facing the other way, mirrored, but only that one.
-    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front'), to: walkArt('player-mara', 'left') })).status).toBe(400);
-    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front'), to: walkArt('player-mara', 'back') })).status).toBe(409);
-    // The isometric ways pair up as mirror images: front-left with front-right, never with back-left.
-    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-left'), to: walkArt('player-mara', 'back-left') })).status).toBe(400);
-    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-left'), to: walkArt('player-mara', 'front-right') })).status).toBe(409);
+    // A walk can take the hands of the walk turned to the other side, mirrored, but only that one:
+    // front-right with front-left, never with back-right, nor with a retired way.
+    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-right'), to: walkArt('player-mara', 'back-right') })).status).toBe(400);
+    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-right'), to: 'player-mara-walk-left' })).status).toBe(400);
+    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-right'), to: walkArt('player-mara', 'front-left') })).status).toBe(409);
     // Pictures whose files are missing are left for later.
-    expect(body[walkArt('player-ilya', 'back')]).toBeUndefined();
+    expect(body[walkArt('player-ilya', 'back-left')]).toBeUndefined();
   });
 });

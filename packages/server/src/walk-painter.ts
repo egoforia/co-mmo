@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { BODY_TYPES, FACINGS, ISO_WAYS, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type IsoWay } from '@co-mmo/shared';
+import { BODY_TYPES, FACINGS, ISO_WAYS, isRetiredArt, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { ANCHORS } from './assets/anchors.ts';
 import type { ImageProvider, ImageRequest } from './assets/provider.ts';
 import { KEY_COLOR } from './assets/style.ts';
@@ -65,10 +65,8 @@ export type ViewSource = 'approved' | Facing;
 export interface StandingView {
   /** Where the browser loads it; none when it has to be painted first. */
   url?: string;
-  /** It is the walker's own approved picture (the front only), not one painted for the walk. */
-  approved: boolean;
   recipe?: Recipe;
-  /** Earlier standing pictures; "approved" stands for the approved picture itself. */
+  /** Earlier standing pictures. */
   versions: ArtVersion[];
 }
 
@@ -79,9 +77,6 @@ const CLIP_SECONDS = 8;
 export function estimateClipUsd(model: string): number {
   return videoUsd(model || DEFAULT_VIDEO_MODEL, { mimeType: 'video/mp4', data: Buffer.alloc(0), seconds: CLIP_SECONDS });
 }
-
-/** A picture smaller than this is too soft to start a clip from, so its front view is painted too. */
-const SHARP_ENOUGH = 256;
 
 /**
  * Paints walkers in the four isometric ways when the Owner asks in the Art
@@ -149,9 +144,14 @@ export class WalkPainter {
     return this.job;
   }
 
-  /** Reads the walks painted before, so the manifest is right before any painting. */
+  /**
+   * Reads the walks painted before, so the manifest is right before any
+   * painting. Walks facing a retired way are left out: nothing shows them,
+   * and their files stay on disk.
+   */
   async load(): Promise<void> {
-    this.painted = JSON.parse(await readFile(resolve(this.dir, 'manifest.json'), 'utf8').catch(() => '{}')) as ArtManifest;
+    const painted = JSON.parse(await readFile(resolve(this.dir, 'manifest.json'), 'utf8').catch(() => '{}')) as ArtManifest;
+    this.painted = Object.fromEntries(Object.entries(painted).filter(([id]) => !isRetiredArt(id)));
   }
 
   private async run(): Promise<void> {
@@ -262,24 +262,22 @@ export class WalkPainter {
     if (!video) throw new Error(stopReason(this.options));
     const start = await this.startView(walker, direction);
     if (!start) throw new Error(`${walker.name} has no standing picture facing ${facingWords(direction)} yet. Paint that first.`);
-    const first = { mimeType: 'image/png', data: await startFrame(start.view) };
-    const step = await this.options.recipes!.clipStep(`${walker.name} walking ${facingWords(direction)}`, video, { prompt: prompt ?? walkVideoPrompt(walker.gear, direction, walker.body), seconds: CLIP_SECONDS, first }, estimateClipUsd(video.model), this.startName(walker, direction, start.approved));
+    const first = { mimeType: 'image/png', data: await startFrame(start) };
+    const step = await this.options.recipes!.clipStep(`${walker.name} walking ${facingWords(direction)}`, video, { prompt: prompt ?? walkVideoPrompt(walker.gear, direction, walker.body), seconds: CLIP_SECONDS, first }, estimateClipUsd(video.model), this.startName(walker, direction));
     const frames = BODY_TYPES[walker.body]?.frames ?? 12;
     return { at: Date.now(), steps: [step], notes: [`A clip whose walk fails the free checks is made once more, for about ${estimateClipUsd(video.model).toFixed(2)} dollars. It is cut down to one cycle of ${frames} frames.`, 'The walk it replaces is kept as an earlier version. The other directions are kept as they are.'] };
   }
 
   /** A walker's standing picture facing one way, with what made it and the earlier ones. */
-  async standing(walker: Walker, direction: Facing, approvedUrl?: string): Promise<StandingView> {
+  async standing(walker: Walker, direction: Facing): Promise<StandingView> {
     const key = viewKey(walker, direction);
     const versions = await this.history.versions(key);
     const kept = await stat(this.viewPath(walker, direction)).catch(() => undefined);
-    if (kept && !(await this.approvedCopy(walker, direction))) {
+    if (kept) {
       const recipe = await this.options.recipes?.current(key);
-      if (direction === 'front' && approvedUrl && (await this.sharpReference(walker))) versions.push({ id: 'approved', url: approvedUrl });
-      return { url: `/${WALK_ART_PATH}/views/${walker.id}-${direction}.png?v=${Math.round(kept.mtimeMs).toString(36)}`, approved: false, ...(recipe ? { recipe } : {}), versions };
+      return { url: `/${WALK_ART_PATH}/views/${walker.id}-${direction}.png?v=${Math.round(kept.mtimeMs).toString(36)}`, ...(recipe ? { recipe } : {}), versions };
     }
-    if (direction === 'front' && (await this.sharpReference(walker))) return { ...(approvedUrl ? { url: approvedUrl } : {}), approved: true, versions };
-    return { approved: false, versions };
+    return { versions };
   }
 
   /**
@@ -291,7 +289,7 @@ export class WalkPainter {
     const painted = await this.paintStanding(walker, direction, handle, prompt, from);
     if (!painted) return handle?.skip(stopReason(this.options)), false;
     handle?.done(painted.usd);
-    if (!(await this.approvedCopy(walker, direction))) await this.history.keep(viewKey(walker, direction), this.viewPath(walker, direction));
+    await this.history.keep(viewKey(walker, direction), this.viewPath(walker, direction));
     await this.keepView(walker, direction, painted);
     return true;
   }
@@ -318,7 +316,7 @@ export class WalkPainter {
       });
       if (!ways) continue;
       for (const way of ISO_WAYS) {
-        if (!(await this.approvedCopy(walker, way))) await this.history.keep(viewKey(walker, way), this.viewPath(walker, way));
+        await this.history.keep(viewKey(walker, way), this.viewPath(walker, way));
         // Each way's share of the sheet, so the four add up to what it cost.
         await this.keepView(walker, way, { figure: ways[way], usd: usd / ISO_WAYS.length, request, provider: provider as ImageProvider });
       }
@@ -344,7 +342,7 @@ export class WalkPainter {
     }
     const id = walkArt(walker.id, direction);
     const version = await this.keepVersion(walker, direction);
-    const cut = await this.walk(walker, direction, start.view, body.frames, handle, prompt);
+    const cut = await this.walk(walker, direction, start, body.frames, handle, prompt);
     if (!cut || 'stop' in cut) {
       // Nothing changed, so the copy just put aside is not an earlier version.
       if (version) {
@@ -359,18 +357,10 @@ export class WalkPainter {
     return true;
   }
 
-  /** Puts an earlier standing picture back, or with "approved" the walker's own picture (the front). */
+  /** Puts an earlier standing picture back. */
   async restoreView(walker: Walker, direction: Facing, version: string): Promise<boolean> {
     const key = viewKey(walker, direction);
     const path = this.viewPath(walker, direction);
-    if (version === 'approved') {
-      if (direction !== 'front' || !(await exists(path)) || (await this.approvedCopy(walker, direction))) return false;
-      await this.history.keep(key, path);
-      await rm(path, { force: true });
-      await this.options.recipes?.forget(key);
-      return true;
-    }
-    if (await this.approvedCopy(walker, direction)) await rm(path, { force: true });
     await mkdir(resolve(this.dir, 'views'), { recursive: true });
     const restored = await this.history.restore(key, version, path);
     if (restored) this.options.onPainted?.([walkStandArt(walker.id, direction)]);
@@ -444,26 +434,18 @@ export class WalkPainter {
     return readFile(this.viewPath(walker, direction)).catch(() => undefined);
   }
 
-  /** True when the front's kept standing picture is only the approved picture, kept for the walk (nothing made it). */
-  private async approvedCopy(walker: Walker, direction: Facing): Promise<boolean> {
-    return direction === 'front' && !(await this.options.recipes?.current(viewKey(walker, direction))) && (await this.sharpReference(walker));
-  }
-
   private viewPath(walker: Walker, direction: Facing): string {
     return resolve(this.dir, 'views', `${walker.id}-${direction}.png`);
   }
 
-  /** What a clip in one direction starts from now: the kept standing picture, or the approved picture for the front. */
-  private async startView(walker: Walker, direction: Facing): Promise<{ view: Buffer; approved: boolean } | undefined> {
-    const kept = await this.keptView(walker, direction);
-    if (kept) return { view: kept, approved: await this.approvedCopy(walker, direction) };
-    if (direction === 'front' && (await this.sharpReference(walker))) return { view: await soleFigure(await this.onMagenta(walker)), approved: true };
-    return undefined;
+  /** What a clip in one direction starts from now: the kept standing picture. */
+  private startView(walker: Walker, direction: Facing): Promise<Buffer | undefined> {
+    return this.keptView(walker, direction);
   }
 
   /** What a clip starts from, in words. */
-  private startName(walker: Walker, direction: Facing, approved: boolean): string {
-    return approved ? `${walker.name}'s approved picture` : `${walker.name} standing, facing ${facingWords(direction)}`;
+  private startName(walker: Walker, direction: Facing): string {
+    return `${walker.name} standing, facing ${facingWords(direction)}`;
   }
 
   /**
@@ -483,7 +465,7 @@ export class WalkPainter {
         labels.push(`${walker.name}'s approved picture, on magenta`);
         continue;
       }
-      const view = (await this.approvedCopy(walker, source)) ? undefined : await this.keptView(walker, source);
+      const view = await this.keptView(walker, source);
       if (!view) throw new Error(`${walker.name} has no standing picture facing ${facingWords(source)} to paint from.`);
       references.push({ mimeType: 'image/png', data: await sharp(view).flatten({ background: KEY_COLOR.hex }).png().toBuffer() });
       labels.push(`${walker.name} standing, facing ${facingWords(source)}, on magenta`);
@@ -515,7 +497,7 @@ export class WalkPainter {
   /** Writes the walk strips of every way a walker has frames for. */
   private async writeKept(walker: Walker, redone: boolean): Promise<void> {
     const walks: [Facing, Buffer[]][] = [];
-    // The isometric ways too, so every walk of a look is drawn at one scale.
+    // Every way, so every walk of a look is drawn at one scale.
     for (const d of FACINGS) {
       const frames = (await this.cached(`frames/${walkArt(walker.id, d)}.json`)) as string[] | undefined;
       if (frames) walks.push([d, await Promise.all(frames.map((f) => readFile(resolve(this.dir, 'frames', f))))]);
@@ -547,14 +529,6 @@ export class WalkPainter {
   /** The walker's picture on magenta, the way the image and video models are given it. */
   private async onMagenta(walker: Walker): Promise<Buffer> {
     return sharp(await walker.reference()).flatten({ background: KEY_COLOR.hex }).png().toBuffer();
-  }
-
-  /** True when the walker's own picture is big enough to start the front walk from. */
-  private async sharpReference(walker: Walker): Promise<boolean> {
-    const picture = await walker.reference().catch(() => undefined);
-    if (!picture) return false;
-    const { height = 0 } = await sharp(picture).metadata();
-    return height >= SHARP_ENOUGH;
   }
 
   /**
@@ -641,7 +615,7 @@ export class WalkPainter {
     const recipes = this.options.recipes;
     if (!recipes || !provider) return;
     const view = await recipes.current(viewKey(walker, direction));
-    const clip = await recipes.clipStep(`${walker.name} walking ${facingWords(direction)}`, provider, { prompt, seconds: CLIP_SECONDS, first }, usd, this.startName(walker, direction, false));
+    const clip = await recipes.clipStep(`${walker.name} walking ${facingWords(direction)}`, provider, { prompt, seconds: CLIP_SECONDS, first }, usd, this.startName(walker, direction));
     await recipes.record(walkArt(walker.id, direction), { at: Date.now(), steps: [...(view?.steps ?? []), clip] });
   }
 
@@ -662,14 +636,11 @@ function exists(path: string): Promise<boolean> {
 
 /** Which way a walker faces, in words for the painting log. */
 export function facingWords(direction: Facing): string {
-  return direction === 'front' ? 'towards us' : direction === 'back' ? 'away' : direction.startsWith('front-') ? `towards us and to the ${direction.slice(6)}` : direction.startsWith('back-') ? `away and to the ${direction.slice(5)}` : direction;
+  return direction.startsWith('front-') ? `towards us and to the ${direction.slice(6)}` : `away and to the ${direction.slice(5)}`;
 }
 
-/**
- * A standing picture's file: the walker's id, then its way. The longer ways
- * are tried first, so a front-left picture is not read as a left one.
- */
-const VIEW_FILE = new RegExp(`^(.+?)-(${[...FACINGS].sort((a, b) => b.length - a.length).join('|')})\\.png$`);
+/** A standing picture's file: the walker's id, then its way. Pictures facing a retired way are not read. */
+const VIEW_FILE = new RegExp(`^(.+?)-(${FACINGS.join('|')})\\.png$`);
 
 /** Why painting stopped before the end, in plain words. */
 function stopReason(options: WalkPainterOptions): string {

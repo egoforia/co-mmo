@@ -6,7 +6,6 @@ import {
   FLAME_LIGHT,
   ISO_WAY_STEPS,
   TILE_PIXELS,
-  isWalkDirection,
   type ArtManifest,
   type ArtPointsManifest,
   type Building,
@@ -17,7 +16,6 @@ import {
   type RegionMap,
   type Storey,
   type TileRect,
-  type WalkDirection,
   type WelcomeMessage,
 } from '@co-mmo/shared';
 import type { HouseSource } from '../kit-house-view.ts';
@@ -30,10 +28,8 @@ export interface Avatar {
   art: string;
   /** The way it faces, among the camera's ways. */
   facing: Facing;
-  /** The way it last walked on screen, for cardinal walks and standing pictures. */
-  turn: WalkDirection;
-  /** The way the picture it wears now faces, for which hand is in front. */
-  worn: Facing;
+  /** The way the picture it wears now faces, for which hand is in front; none for its own picture, which faces us. */
+  worn?: Facing;
   /** Where it was last placed, in our region's tiles. */
   at?: { x: number; y: number };
   /** The floor it is on (floors.ts), when not the ground. */
@@ -212,7 +208,7 @@ export interface SceneCounts {
 
 /** An isometric way as a step on screen, one long. */
 export function wayOnScreen(way: Facing): { x: number; y: number } {
-  const step = isWalkDirection(way) ? { dx: 0, dy: 1 } : ISO_WAY_STEPS[way];
+  const step = ISO_WAY_STEPS[way];
   const from = PROJECTION.toScreen(0, 0);
   const to = PROJECTION.toScreen(step.dx, step.dy);
   const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;

@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { FACINGS, type ArtPoints, type ArtPointsManifest } from '@co-mmo/shared';
+import { isRetiredArt, type ArtPoints, type ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
-import { GRIP, HAND_QUESTIONS, POINTS_VERSION, findHands, findPoint, handSystem, mirroredHands, steadyHands, stripFrames, type BothHands, type Facing } from './assets/points.ts';
+import { GRIP, HAND_QUESTIONS, HAND_VIEWS, POINTS_VERSION, findHands, findPoint, handSystem, mirroredHands, steadyHands, stripFrames, type BothHands, type Facing, type HandView } from './assets/points.ts';
 
 // Held items (milestone 10): finds, once per picture, where a walker's two
 // hands are in every frame and where each item is gripped, so the client can
@@ -46,9 +46,9 @@ interface Found extends ArtPoints {
   mirrored?: string;
 }
 
-/** One way of facing's hand question, as God's View shows and edits it. */
+/** One hand question, for a look's picture or one way of facing, as God's View shows and edits it. */
 export interface HandQuestion {
-  facing: Facing;
+  facing: HandView;
   /** The question asked now: the Owner's words, or the usual ones. */
   prompt: string;
   usual: string;
@@ -97,7 +97,8 @@ export class HandFinder {
 
   private load(): Promise<void> {
     this.loaded ??= readFile(this.file, 'utf8').then(
-      (text) => void (this.found = JSON.parse(text) as Record<string, Found>),
+      // Points found in walks facing a retired way are dropped: nothing shows those walks any more.
+      (text) => void (this.found = Object.fromEntries(Object.entries(JSON.parse(text) as Record<string, Found>).filter(([id]) => !isRetiredArt(id)))),
       () => undefined,
     );
     return this.loaded;
@@ -225,7 +226,7 @@ export class HandFinder {
       this.options.spend(usd, model);
       this.found[source.id] = { from, ...(point ? { grip: point } : {}) };
     } else {
-      const facing = source.facing ?? 'front';
+      const facing = source.facing ?? 'look';
       const kept = this.found[source.id];
       // One frame again keeps the others' answers, when they were found in this same picture.
       const both = only !== undefined && kept?.from === from && kept.both?.length === pictures.length ? [...kept.both] : [];
@@ -236,7 +237,7 @@ export class HandFinder {
         this.options.spend(usd, model);
         both[i] = hands;
       }
-      const { right, left } = steadyHands(facing, both);
+      const { right, left } = steadyHands(both);
       this.found[source.id] = { from, hands: right, leftHands: left, both };
     }
     await mkdir(this.options.artDir, { recursive: true });
@@ -247,20 +248,35 @@ export class HandFinder {
     return resolve(this.options.artDir, 'hand-questions.json');
   }
 
-  /** The question asked for each way of facing, with the usual words beside the Owner's. */
+  /** The question asked for a look's picture and each way of facing, with the usual words beside the Owner's. */
   async questions(): Promise<HandQuestion[]> {
-    const own = JSON.parse(await readFile(this.questionsFile, 'utf8').catch(() => '{}')) as Partial<Record<Facing, string>>;
-    return FACINGS.map((facing) => ({ facing, prompt: own[facing] ?? HAND_QUESTIONS[facing], usual: HAND_QUESTIONS[facing], own: !!own[facing], system: handSystem(facing) }));
+    const own = await this.ownQuestions();
+    return HAND_VIEWS.map((facing) => ({ facing, prompt: own[facing] ?? HAND_QUESTIONS[facing], usual: HAND_QUESTIONS[facing], own: !!own[facing], system: handSystem(facing) }));
   }
 
-  /** Words the Owner's question for one way of facing; empty goes back to the usual words. Nothing is looked at again until asked. */
-  async setQuestion(facing: Facing, prompt: string): Promise<void> {
-    const own = JSON.parse(await readFile(this.questionsFile, 'utf8').catch(() => '{}')) as Partial<Record<Facing, string>>;
+  /** Words the Owner's question for a look's picture or one way of facing; empty goes back to the usual words. Nothing is looked at again until asked. */
+  async setQuestion(facing: HandView, prompt: string): Promise<void> {
+    const own = await this.ownQuestions();
     const text = prompt.trim().slice(0, 2000);
     if (text && text !== HAND_QUESTIONS[facing]) own[facing] = text;
     else delete own[facing];
     await mkdir(this.options.artDir, { recursive: true });
     await writeFile(this.questionsFile, JSON.stringify(own, null, 2));
+  }
+
+  /**
+   * The Owner's own words, by question. Saved before the top-down ways were
+   * retired, a look's picture was asked the question for facing `front`, so
+   * those words are kept for it; questions for the other retired ways are dropped.
+   */
+  private async ownQuestions(): Promise<Partial<Record<HandView, string>>> {
+    const saved = JSON.parse(await readFile(this.questionsFile, 'utf8').catch(() => '{}')) as Record<string, string>;
+    const own: Partial<Record<HandView, string>> = {};
+    for (const facing of HAND_VIEWS) {
+      const words = saved[facing] ?? (facing === 'look' ? saved.front : undefined);
+      if (typeof words === 'string' && words) own[facing] = words;
+    }
+    return own;
   }
 
   /**

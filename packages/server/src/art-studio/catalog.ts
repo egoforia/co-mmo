@@ -199,7 +199,7 @@ export class ArtCatalog {
         }
       }
       const standing = {} as WalkerView['standing'];
-      for (const d of FACINGS) standing[d] = await this.options.walks.standing(w, d, w.url);
+      for (const d of FACINGS) standing[d] = await this.options.walks.standing(w, d);
       // What its isometric ways still need: one sheet for the missing pictures, and a clip for each way that does not walk.
       const sheet = ISO_WAYS.some((d) => !standing[d].url) ? picture : 0;
       const estimateUsd = sheet + ISO_WAYS.filter((d) => !walks[d]).length * clip;
@@ -267,7 +267,7 @@ export class ArtCatalog {
     for (const other of ISO_WAYS) {
       if (other === way) continue;
       const view = await this.options.walks.standing(walker, other);
-      if (view.url && !view.approved) from.push(other);
+      if (view.url) from.push(other);
     }
     return from;
   }

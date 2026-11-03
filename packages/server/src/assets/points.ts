@@ -15,14 +15,13 @@ const SYSTEM = [
  * Finds both of the character's hands in a walker's picture or walk frame:
  * the right hand holds a weapon, the left a shield or charm. Models mix up
  * the character's right with the picture's, and asked for "the right hand"
- * seen side-on they point at whichever hand is in front; so the hands are
- * asked for by where they are in the picture (near and far side-on, picture
- * left and right otherwise), and told apart from those: the right hand is
- * the near hand facing right, the far hand facing left, the picture's left
- * facing us and the picture's right seen from behind. Turned halfway, as in
- * the isometric ways, they are near and far too.
+ * they point at whichever hand is in front; so the hands are asked for by
+ * where they are in the picture and told apart from those. Turned halfway,
+ * as in the isometric ways, they are near and far: turned to the right, the
+ * right hand is the near one. A look's own picture faces us, so its hands
+ * are the picture's left and right, the right hand on the picture's left.
  */
-export async function findHands(model: ChatModel, picture: Buffer, facing: Facing, question = HAND_QUESTIONS[facing]): Promise<BothHands & { usd: number }> {
+export async function findHands(model: ChatModel, picture: Buffer, facing: HandView, question = HAND_QUESTIONS[facing]): Promise<BothHands & { usd: number }> {
   const result = await model.complete({
     system: handSystem(facing),
     purpose: 'Finding hands',
@@ -43,23 +42,17 @@ export interface BothHands {
 }
 
 /**
- * Both hands through a walk, frame by frame. Seen from the front or back the
- * hands are a body's width apart, so a frame whose answer has them the other
- * way round from its neighbours (the model mixed them up) is swapped back;
- * side-on the hands cross, so nothing is swapped.
+ * Both hands through a walk, frame by frame. Walks are turned halfway, where
+ * the hands cross in front of and behind the body as it walks, so each
+ * frame's answer is kept as it is: never swapped to match its neighbours.
  */
-export function steadyHands(facing: Facing, frames: BothHands[]): { right: (ArtPoint | null)[]; left: (ArtPoint | null)[] } {
-  const side = facing !== 'front' && facing !== 'back';
-  // The side of the picture the right hand is on, by most frames' answers.
-  const xs = frames.filter((f) => f.right && f.left).map((f) => f.right![0] - f.left![0]);
-  const sign = side ? 0 : Math.sign(xs.reduce((n, x) => n + Math.sign(x), 0));
-  const steady = frames.map((f) => (sign && f.right && f.left && Math.sign(f.right[0] - f.left[0]) === -sign ? { right: f.left, left: f.right } : f));
-  return { right: steady.map((f) => f.right ?? null), left: steady.map((f) => f.left ?? null) };
+export function steadyHands(frames: BothHands[]): { right: (ArtPoint | null)[]; left: (ArtPoint | null)[] } {
+  return { right: frames.map((f) => f.right ?? null), left: frames.map((f) => f.left ?? null) };
 }
 
 /**
- * Hands found in one walk, as they would be in the walk facing the other
- * way (left and right, or towards us and away): turning round is a mirror
+ * Hands found in one walk, as they would be in the walk turned to the other
+ * side (front-left and front-right): turning is a mirror
  * across the picture, and each hand stays the same hand. Frames are matched
  * by their place in the step, so walks of different lengths still line up.
  */
@@ -71,23 +64,20 @@ export function mirroredHands(hands: readonly (ArtPoint | null)[] | undefined, f
   });
 }
 
-/** The way a walker faces after turning round; an isometric way's mirror image. */
-export const TURNED: Record<Facing, Facing> = {
-  front: 'back', back: 'front', left: 'right', right: 'left',
-  'front-left': 'front-right', 'front-right': 'front-left', 'back-left': 'back-right', 'back-right': 'back-left',
-};
-
 export type { Facing };
+
+/** What a hand question is asked about: a walk or standing picture turned one way, or a look's own picture, which faces us. */
+export type HandView = Facing | 'look';
+
+/** Every hand question, in the order God's View lists them. */
+export const HAND_VIEWS: readonly HandView[] = ['look', 'front-left', 'front-right', 'back-left', 'back-right'];
 
 /** Turned halfway, both hands may show; the far one is partly behind the body. */
 const HALFWAY = 'Point to both of the character\'s hands. The character is turned halfway between facing straight at us (or away) and side-on. "near" is the hand on the side nearer to us; "far" is the hand on the far side, partly behind the body: if it is hidden, point to where it must be behind the body. Look at the arms, not the legs.';
 
-/** The usual question for each way a walker faces; the Owner can word them differently in God's View. */
-export const HAND_QUESTIONS: Record<Facing, string> = {
-  front: 'Point to both of the character\'s hands. "left" is the hand on the LEFT side of the picture, "right" the hand on the RIGHT side of the picture. Look at the arms, not the legs: follow each arm from the shoulder down to its hand, even when it swings in front of the body.',
-  back: 'Point to both of the character\'s hands. "left" is the hand on the LEFT side of the picture, "right" the hand on the RIGHT side of the picture. Look at the arms, not the legs: follow each arm from the shoulder down to its hand.',
-  right: 'Point to both of the character\'s hands. "near" is the hand on the side nearer to us, in front of the body; "far" is the hand on the far side, behind the body: if it is hidden, point to where it must be behind the body.',
-  left: 'Point to both of the character\'s hands. "near" is the hand on the side nearer to us, in front of the body; "far" is the hand on the far side, behind the body: if it is hidden, point to where it must be behind the body.',
+/** The usual question for a look's picture and each way a walker faces; the Owner can word them differently in God's View. */
+export const HAND_QUESTIONS: Record<HandView, string> = {
+  look: 'Point to both of the character\'s hands. "left" is the hand on the LEFT side of the picture, "right" the hand on the RIGHT side of the picture. Look at the arms, not the legs: follow each arm from the shoulder down to its hand, even when it swings in front of the body.',
   'front-left': HALFWAY,
   'front-right': HALFWAY,
   'back-left': HALFWAY,
@@ -95,15 +85,14 @@ export const HAND_QUESTIONS: Record<Facing, string> = {
 };
 
 /** The answers that are the character's own right and left hands, for each way it faces: turned to the left, the right hand is the far one. */
-export const RIGHT_HAND_KEY: Record<Facing, string> = { front: 'left', back: 'right', right: 'near', left: 'far', 'front-left': 'far', 'front-right': 'near', 'back-left': 'far', 'back-right': 'near' };
-export const LEFT_HAND_KEY: Record<Facing, string> = { front: 'right', back: 'left', right: 'far', left: 'near', 'front-left': 'near', 'front-right': 'far', 'back-left': 'near', 'back-right': 'far' };
+export const RIGHT_HAND_KEY: Record<HandView, string> = { look: 'left', 'front-left': 'far', 'front-right': 'near', 'back-left': 'far', 'back-right': 'near' };
+export const LEFT_HAND_KEY: Record<HandView, string> = { look: 'right', 'front-left': 'near', 'front-right': 'far', 'back-left': 'near', 'back-right': 'far' };
 
 /** The fixed part of a hand question: the shape of the answer. */
-export function handSystem(facing: Facing): string {
-  const side = facing !== 'front' && facing !== 'back';
+export function handSystem(facing: HandView): string {
   return [
     'You locate things in game sprites.',
-    `Reply with JSON ${side ? '{"near": [y, x], "far": [y, x]}' : '{"left": [y, x], "right": [y, x]}'}, y and x from 0 to 1000 across the picture (0,0 is the top left); null for a hand you cannot place.`,
+    `Reply with JSON ${facing === 'look' ? '{"left": [y, x], "right": [y, x]}' : '{"near": [y, x], "far": [y, x]}'}, y and x from 0 to 1000 across the picture (0,0 is the top left); null for a hand you cannot place.`,
   ].join('\n');
 }
 

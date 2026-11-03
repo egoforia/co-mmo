@@ -65,11 +65,11 @@ const DRAWING = /\b(getContext\s*\(|fillRect|strokeRect|beginPath|quadraticCurve
 const SERVER_CODE = /^packages\/server\/src\/.+\.ts$/;
 const SVG_SHAPES = /<(circle|ellipse|rect|path|line|polygon|polyline)\b/;
 /**
- * The only server files that may draw, because what they draw only steers
- * the image model and players never see it: walk pose guides (the Owner's
- * exception, 2026-10-15) and the doorway sketch sent with building art.
+ * The only server file that may draw, because what it draws only steers the
+ * image model and players never see it: the doorway sketch sent with
+ * building art.
  */
-const MAY_DRAW = [/^packages\/server\/src\/assets\/pose-guide\.ts$/, /^packages\/server\/src\/assets\/building-art\.ts$/];
+const MAY_DRAW = [/^packages\/server\/src\/assets\/building-art\.ts$/];
 
 /**
  * Checks the lines a change adds ({ path, text }) for art drawn in code, and

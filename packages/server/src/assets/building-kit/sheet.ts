@@ -7,7 +7,7 @@ const { K, TILE, arch } = buildingKit;
 
 // The kit's texture sheet: an exact layout the image model paints into. The
 // layout is a magenta sheet with green shapes at exact places and sizes;
-// players never see it, it only steers the model, like the pose guides. The
+// players never see it, it only steers the model, like the doorway sketch. The
 // model paints each shape flat and square-on, and the sheet checks then
 // measure every shape. A texture that fails can be painted again on its own:
 // each painting carries its own layout.

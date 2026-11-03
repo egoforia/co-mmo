@@ -339,6 +339,9 @@ describe('the art points the game serves', () => {
     // A walk can take the hands of the walk facing the other way, mirrored, but only that one.
     expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front'), to: walkArt('player-mara', 'left') })).status).toBe(400);
     expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front'), to: walkArt('player-mara', 'back') })).status).toBe(409);
+    // The isometric ways pair up as mirror images: front-left with front-right, never with back-left.
+    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-left'), to: walkArt('player-mara', 'back-left') })).status).toBe(400);
+    expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-left'), to: walkArt('player-mara', 'front-right') })).status).toBe(409);
     // Pictures whose files are missing are left for later.
     expect(body[walkArt('player-ilya', 'back')]).toBeUndefined();
   });

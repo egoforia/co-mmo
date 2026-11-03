@@ -568,7 +568,7 @@ export async function handleAdmin(
       if (route === 'art/hands/mirror' && method === 'POST') {
         // Only between one walker's walks facing opposite ways.
         const [from, to] = [String(body?.from ?? ''), String(body?.to ?? '')];
-        const walk = (id: string) => /^(.+)-walk-(front|back|left|right)$/.exec(id);
+        const walk = (id: string) => /^(.+)-walk-((?:front|back)-(?:left|right)|front|back|left|right)$/.exec(id);
         const [a, b] = [walk(from), walk(to)];
         if (!ctx.hands || !a || !b || a[1] !== b[1] || TURNED[a[2] as Facing] !== b[2]) return json(res, 400, { error: 'bad_request', message: 'Hands can only be mirrored between the same character\'s walks facing opposite ways.' }), true;
         try {

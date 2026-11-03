@@ -126,11 +126,18 @@ The launch world is laid out as a grid around the Sanctum
 - **Mirage Desert** to the south: home of the Scorpid. Sun scarabs, the Sun
   King's tomb, the Mirage Palace and Sultana Zahra, and the High Cathedral
   with its crypts and the Chained Demon below.
+- **Frostpeak** to the north of the Sanctum: home of the Falcon. Snow hares,
+  crag rams and ice wisps on the snowfields; the elder Ysolde in the middle;
+  the Hoarfrost Roc, the Falcon's forgotten guardian, nesting on the high
+  ground (`packages/shared/src/home-lands/frostpeak.ts`).
+- **Mushroom Hollow** beyond the Woods to the west: home of the Cervid. Spore
+  puffs, glowcap beetles and mycelid stalkers among the giant caps; Mother
+  Morel in the middle; the Rootless King, cut off from the mycelium by the
+  Hush, in its ring to the west (`home-lands/mushroom-hollow.ts`).
 
 Biomes that are not yet in the world, ready for wished regions
-(`packages/shared/src/biomes.ts`): Verdant Meadows, Mushroom Hollow (home of
-the Cervid), Frostpeak and the Sky Ruins (home of the Falcon), Ember Wastes
-and Murkmire Swamp. A region wished at the world's edge is the young God
+(`packages/shared/src/biomes.ts`): Verdant Meadows, the Sky Ruins (the
+Falcon's old watch-towers), Ember Wastes and Murkmire Swamp. A region wished at the world's edge is the young God
 remembering a place the Hush took, or dreaming a new one.
 
 ## Tone

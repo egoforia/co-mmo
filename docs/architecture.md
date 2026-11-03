@@ -152,7 +152,15 @@ prompt builders; never write style sentences anywhere else.
 caves, castle, palaces, tomb and wonders, joined by roads and bridges) and
 `lands.ts` their creatures, treasures, people and quests. Every picture
 they need is a description: buildings in `land-buildings.ts`, the rest in
-`server/src/assets/land-anchors.ts`.
+`server/src/assets/land-anchors.ts`. The home lands beyond the launch four
+(Frostpeak, Mushroom Hollow) are one file each in shared `home-lands/`
+(layout, creatures, finds, people, quests; `home-lands.ts` adds them to the
+tables); their pictures are described in `assets/home-land-anchors.ts` and
+`wild-kit.ts` and painted the first time from the Art tab
+(`homeLandBox` gives their size). A layout sets `RegionMap.gates` where a
+building stands in the middle road's way, and the land beyond sets the same.
+A wished region whose square a shipped land took moves to the nearest free
+one (`World.freeCellNear`).
 
 **Floors.** Shared `floors.ts`: the ground is floor 0, a building's upper
 floors 1, 2... and the floors under it -1, -2... Each floor off the ground is

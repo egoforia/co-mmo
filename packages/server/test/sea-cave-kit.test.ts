@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SEA_CAVE_MOD, SEA_CAVE_PIECES, isoSpan, switchMod } from '@co-mmo/shared';
 import { BIOME_KIT } from '../src/assets/kit.ts';
+import { homeLandKit } from '../src/assets/home-land-art.ts';
 import { pictureName } from '../src/assets/names.ts';
 import { SEA_CAVE_KIT, kitPieces, seaCaveBox } from '../src/assets/sea-cave-kit.ts';
 import type { ImageRequest } from '../src/assets/provider.ts';
@@ -34,10 +35,10 @@ describe("the Smugglers' Sea Cave Art Kit pictures", () => {
   });
 
   it('lists the kit with the scenery only while the wish is on', () => {
-    expect(kitPieces()).toHaveLength(BIOME_KIT.length + SEA_CAVE_KIT.length);
+    expect(kitPieces()).toHaveLength(BIOME_KIT.length + homeLandKit().length + SEA_CAVE_KIT.length);
     expect(pictureName('sea-cave-crates')).toBe("Smugglers' crates");
     switchMod(SEA_CAVE_MOD, false);
-    expect(kitPieces()).toBe(BIOME_KIT);
+    expect(kitPieces()).toEqual([...BIOME_KIT, ...homeLandKit()]);
     expect(pictureName('sea-cave-crates')).toBe('sea-cave-crates');
   });
 

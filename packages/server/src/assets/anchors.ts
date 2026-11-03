@@ -1,6 +1,7 @@
 import type { AssetDescription } from './style.ts';
 import { HELD_ANCHORS } from './held-anchors.ts';
 import { LAND_ANCHORS } from './land-anchors.ts';
+import { HOME_LAND_ANCHORS } from './home-land-anchors.ts';
 import { SKILL_ANCHORS, type TieredAsset } from './skill-anchors.ts';
 
 /**
@@ -252,6 +253,8 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[]; t
     details: ['a few tiny embers trailing behind'], mood: 'bright, magical', extra: { category: 'spell effect' },
   },
   ...LAND_ANCHORS,
+  // Frostpeak's and Mushroom Hollow's creatures and people, painted the first time from the Art tab.
+  ...HOME_LAND_ANCHORS,
   // Skill effects, status icons, and the creatures skills bring.
   ...SKILL_ANCHORS,
 ];

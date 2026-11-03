@@ -9,6 +9,7 @@ import {
   WORLD_REGIONS,
   arrivalPoint,
   cellBeyond,
+  openSides,
   linkRegions,
   nearestOpenSide,
   collides,
@@ -352,6 +353,16 @@ export class World {
   /** True when no region stands on this grid square. */
   cellFree(cell: { x: number; y: number }): boolean {
     return !this.defs().some((d) => d.at.x === cell.x && d.at.y === cell.y);
+  }
+
+  /**
+   * The free grid square beside the world nearest to `cell`: where a wished
+   * region goes when a land the game ships with now stands on its own square.
+   */
+  freeCellNear(cell: { x: number; y: number }): { x: number; y: number } {
+    const defs = this.defs();
+    const free = defs.flatMap((d) => openSides(defs, d).map((side) => cellBeyond(d, side)));
+    return free.sort((a, b) => Math.abs(a.x - cell.x) + Math.abs(a.y - cell.y) - (Math.abs(b.x - cell.x) + Math.abs(b.y - cell.y)) || a.y - b.y || a.x - b.x)[0] ?? cell;
   }
 
   /** Something worth a line in the "While you were away" feed (set by the app, which stores it). */

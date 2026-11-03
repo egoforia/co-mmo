@@ -345,7 +345,14 @@ export class Granting {
     const def = record.definition;
     if (def?.kind === 'region') {
       const land = regionFromWish(record);
-      if (land && !this.world.addRegion(land)) console.error(`Region ${record.id} could not be placed: its square is taken.`);
+      if (!land || this.world.addRegion(land)) return;
+      // A land the game ships with (Frostpeak, Mushroom Hollow) grew on this wished region's square: it moves to the nearest free one.
+      const cell = this.world.freeCellNear(land.at);
+      land.at = cell;
+      if (!this.world.addRegion(land)) return console.error(`Region ${record.id} could not be placed: its square is taken.`);
+      const moved = this.store.updateContent(record.id, { cell });
+      if (moved) applyContent(publicEntry(moved));
+      console.log(`Region ${record.id} moved to (${cell.x}, ${cell.y}): a shipped land stands on its old square.`);
       return;
     }
     if (!def || !record.placements) return;

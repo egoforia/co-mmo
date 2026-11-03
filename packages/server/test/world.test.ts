@@ -32,8 +32,8 @@ describe('World', () => {
     const a = fakeConn();
     world.join(info('a'), a, { regionId: 'woods', x: null, y: null }, newCharacter());
     const welcome = a.messages.find((m) => m.t === 'welcome');
-    // The Sanctum lies east of the Woods, and the Desert south of it: a corner.
-    expect(welcome?.t === 'welcome' && welcome.neighbours.map((n) => n.id).sort()).toEqual(['desert', 'sanctum']);
+    // The Sanctum lies east of the Woods and Mushroom Hollow west; the Desert and Frostpeak are corners.
+    expect(welcome?.t === 'welcome' && welcome.neighbours.map((n) => n.id).sort()).toEqual(['desert', 'frostpeak', 'mushroom-hollow', 'sanctum']);
   });
 
   it('moves a player who walks off the west edge of the Sanctum into the Woods', () => {

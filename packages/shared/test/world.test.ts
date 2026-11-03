@@ -15,6 +15,7 @@ import {
   arrivalPoint,
   cellBeyond,
   collides,
+  homeLandLayout,
   linkRegions,
   nearestOpenSide,
   openSides,
@@ -75,7 +76,8 @@ describe('world layout', () => {
       expect(at(entry)).toBe(1);
     }
     for (const c of map.creatures) expect(collides(map, c.x, c.y)).toBe(false);
-    expect(map.landmarks.length).toBeGreaterThanOrEqual(1);
+    // The launch lands each have a centrepiece; the home lands beyond them have none yet.
+    if (!homeLandLayout(map.def.biome)) expect(map.landmarks.length).toBeGreaterThanOrEqual(1);
     expect(map.npcs.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -97,8 +99,10 @@ describe('world layout', () => {
 
   it('opens edges only where a region lies beyond', () => {
     const c = sanctum.width / 2;
+    const frostpeak = maps.find((m) => m.def.id === 'frostpeak')!;
     expect(tileAt(sanctum, -0.5, c + 0.5)).toBe(Tile.Path);
-    expect(tileAt(sanctum, c + 0.5, -0.5)).toBe(Tile.Water);
+    expect(tileAt(sanctum, c + 0.5, -0.5)).toBe(Tile.Path);
+    expect(tileAt(frostpeak, c + 0.5, -0.5)).toBe(Tile.Water);
     expect(outsideSide(sanctum, -0.1, 10)).toBe('west');
     expect(outsideSide(sanctum, 10, sanctum.height + 0.2)).toBe('south');
   });
@@ -357,7 +361,8 @@ describe('step', () => {
     let y = 2;
     while (!collides(woods, woods.width - 0.1, y)) y++;
     expect(arrivalPoint(woods, 'west', { x: -0.1, y })).toEqual(entry);
-    expect(arrivalPoint(woods, 'east', { x: woods.width + 0.1, y: 30 })).toBeUndefined();
+    const hollow = maps.find((m) => m.def.id === 'mushroom-hollow')!;
+    expect(arrivalPoint(hollow, 'east', { x: hollow.width + 0.1, y: 30 })).toBeUndefined();
   });
 
   it('can walk out of an open edge but not a closed one', () => {
@@ -392,8 +397,8 @@ describe('a growing world', () => {
     expect(links.get('woods')).toMatchObject({ south: 'corner' });
     expect(links.get('desert')).toMatchObject({ west: 'corner' });
     const woods = WORLD_REGIONS.find((r) => r.id === 'woods')!;
-    expect(openSides(WORLD_REGIONS, woods)).toEqual(['north', 'south', 'west']);
-    expect(nearestOpenSide(WORLD_REGIONS, woods, 2, 120)).toBe('west');
+    expect(openSides(WORLD_REGIONS, woods)).toEqual(['north', 'south']);
+    expect(nearestOpenSide(WORLD_REGIONS, woods, 2, 120)).toBe('north');
     expect(nearestOpenSide(WORLD_REGIONS, woods, 120, 250)).toBe('south');
     expect(cellBeyond(woods, 'north')).toEqual({ x: -1, y: -1 });
   });

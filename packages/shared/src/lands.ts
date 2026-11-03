@@ -14,7 +14,7 @@ import type { CallingId } from './classes.ts';
  * for the hardiest. Armor is the level and Ward half of it; tough creatures
  * wear more armour and less ward, and the undead the other way round.
  */
-function creature(def: Omit<CreatureDef, 'hp' | 'damage' | 'cooldown' | 'xp' | 'gold' | 'respawnSeconds'> & { tough?: number; undead?: boolean }): CreatureDef {
+export function levelledCreature(def: Omit<CreatureDef, 'hp' | 'damage' | 'cooldown' | 'xp' | 'gold' | 'respawnSeconds'> & { tough?: number; undead?: boolean }): CreatureDef {
   const l = def.level;
   const tough = def.tough ?? 1;
   const { tough: _t, undead, ...rest } = def;
@@ -32,47 +32,47 @@ function creature(def: Omit<CreatureDef, 'hp' | 'damage' | 'cooldown' | 'xp' | '
 
 /** The bigger lands' creatures. */
 export const LAND_CREATURES: Record<string, CreatureDef> = {
-  'lantern-moth': creature({
+  'lantern-moth': levelledCreature({
     name: 'Lantern Moth', art: 'sanctum-lantern-moth', description: 'A soft moth as big as a cat whose belly glows like a paper lantern. It flutters away from anyone who comes close.',
     behavior: 'timid', active: 'night', level: 1, speed: 3, notice: 3.5, drops: [{ item: 'moth-dust', chance: 0.7 }],
   }),
-  'thorn-wolf': creature({
+  'thorn-wolf': levelledCreature({
     name: 'Thorn Wolf', art: 'woods-thorn-wolf', description: 'A lean wolf with a mane of bramble thorns. Thorn wolves hunt the woods by night, always together.',
     behavior: 'pack', active: 'night', level: 2, speed: 3, notice: 4.5, drops: [{ item: 'wolf-pelt', chance: 0.5 }, { item: 'tonic', chance: 0.15 }],
   }),
-  'bark-golem': creature({
+  'bark-golem': levelledCreature({
     name: 'Bark Golem', art: 'woods-bark-golem', description: 'A hulking figure of living bark and moss that guards the road to Mossgate Castle.',
     behavior: 'guard', level: 3, speed: 1.8, notice: 3, tough: 1.6, drops: [{ item: 'heartwood', chance: 0.6 }, { item: 'golem-club', chance: 0.08 }],
   }),
-  'gull-raider': creature({
+  'gull-raider': levelledCreature({
     name: 'Gull Raider', art: 'shore-gull-raider', description: 'A big grey gull in a pirate bandana that swoops in with its flock to steal from travellers.',
     behavior: 'pack', active: 'day', level: 2, speed: 3.2, notice: 4, drops: [{ item: 'gull-feather', chance: 0.6 }, { item: 'pearl', chance: 0.08 }],
   }),
-  'hermit-crab': creature({
+  'hermit-crab': levelledCreature({
     name: 'Hermit Crab', art: 'shore-hermit-crab', description: 'A shy crab in a shell far too big for it. It scuttles off sideways at the first footstep.',
     behavior: 'timid', level: 1, speed: 2.8, notice: 3, drops: [{ item: 'crab-shell', chance: 0.4 }, { item: 'pearl', chance: 0.15 }],
   }),
-  'drowned-deckhand': creature({
+  'drowned-deckhand': levelledCreature({
     name: 'Drowned Deckhand', art: 'shore-drowned-deckhand', description: 'A sailor of seaweed and old rope who still walks the rounds of a ship long sunk. It wakes when the moon is up.',
     behavior: 'patrol', active: 'night', level: 4, speed: 2.2, notice: 3.5, undead: true, drops: [{ item: 'pearl', chance: 0.35 }, { item: 'coral-spear', chance: 0.08 }],
   }),
-  'dune-jackal': creature({
+  'dune-jackal': levelledCreature({
     name: 'Dune Jackal', art: 'desert-dune-jackal', description: 'A sand-coloured jackal with a turquoise collar. They lope out of the dunes after dark and hunt in packs.',
     behavior: 'pack', active: 'night', level: 3, speed: 3.1, notice: 4.5, drops: [{ item: 'jackal-fang', chance: 0.5 }, { item: 'tonic', chance: 0.15 }],
   }),
-  'mummy-guard': creature({
+  'mummy-guard': levelledCreature({
     name: 'Mummy Guard', art: 'desert-mummy-guard', description: 'A tall guard wrapped in old linen with a golden mask, still walking its rounds for a king long gone.',
     behavior: 'patrol', active: 'night', level: 4, speed: 2, notice: 3.5, tough: 1.3, undead: true, drops: [{ item: 'ancient-linen', chance: 0.6 }, { item: 'sunstone-amulet', chance: 0.05 }],
   }),
-  'sand-wyrm': creature({
+  'sand-wyrm': levelledCreature({
     name: 'Sand Wyrm', art: 'desert-sand-wyrm', description: 'A great armoured worm that sleeps under the old bones and rises at anyone who comes too near.',
     behavior: 'guard', level: 5, speed: 2.4, notice: 4, tough: 2.5, drops: [{ item: 'wyrm-scale', chance: 0.8 }, { item: 'sunstone-amulet', chance: 0.15 }],
   }),
-  'crypt-skeleton': creature({
+  'crypt-skeleton': levelledCreature({
     name: 'Crypt Skeleton', art: 'desert-mummy-guard', description: 'Restless bones awakened in the cold dark catacombs beneath the High Cathedral.',
     behavior: 'patrol', level: 3, speed: 2.1, notice: 3.5, undead: true, drops: [{ item: 'ancient-bone', chance: 0.6 }, { item: 'holy-water', chance: 0.2 }],
   }),
-  'chained-demon': creature({
+  'chained-demon': levelledCreature({
     name: 'Chained Demon', art: 'desert-sand-wyrm', description: 'An ancient terror imprisoned in the subterranean depths by celestial runes and heavy iron chains.',
     behavior: 'guard', level: 6, speed: 1.5, notice: 4, tough: 3.0, drops: [{ item: 'demon-horn', chance: 0.8 }, { item: 'sanctum-relic', chance: 0.35 }],
   }),

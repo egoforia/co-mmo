@@ -31,6 +31,7 @@ import type { KitAsset } from '../assets/kit.ts';
 import { pictureName } from '../assets/names.ts';
 import { kitPieces } from '../assets/sea-cave-kit.ts';
 import { wildKit } from '../assets/wild-kit.ts';
+import { homeLandBox } from '../assets/home-land-art.ts';
 import { artRequest, estimateImageUsd } from '../assets/wish-art.ts';
 import { normalMapId } from '../normal-painter.ts';
 import type { ArtUse } from '../settings.ts';
@@ -77,8 +78,10 @@ export class ArtCatalog {
       items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd('scenery'), repaintable: true, takesNote: true });
     }
     for (const a of ANCHORS) {
-      const repaintable = Boolean(shipped[a.id]) && a.kind !== 'effect';
-      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, ...(shipped[a.id] ? {} : { why: 'Not part of the game yet.' }) });
+      // A home land's creatures and people are painted the first time here.
+      const paintable = Boolean(shipped[a.id] || homeLandBox(a.id));
+      const repaintable = paintable && a.kind !== 'effect';
+      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, ...(paintable ? {} : { why: 'Not part of the game yet.' }) });
     }
     // Lands' buildings after their scenery, so each land's page and the list of lands start with the launch kit.
     for (const style of Object.values(BUILDING_STYLES)) {

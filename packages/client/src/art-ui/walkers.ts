@@ -176,50 +176,68 @@ export function tryOnHtml(): string {
  * A frame where it found none borrows the nearest frame's hand in the game.
  */
 export function handsHtml(w: WalkerView): string {
-  // Isometric walks (everyone today) and the older four-way walks some characters still have.
-  const ids = FACING_WORDS.filter(([d]) => w.walks[d]).map(([d]) => `${w.id}-walk-${d}`);
   const find = (body: { ids: string[]; frame?: number }, label: string, cls = 'quiet') => `<button type="button" class="${cls}" data-hands-find="${esc(JSON.stringify(body))}">${label}</button>`;
-  const rows = FACING_WORDS.flatMap(([d, label]) => {
-    const strip = w.walks[d];
-    const id = `${w.id}-walk-${d}`;
-    const hands = artState.points[id]?.hands;
-    const lefts = artState.points[id]?.leftHands;
-    if (!strip) return [];
-    const height = 96;
-    const width = Math.round((strip.width / strip.frames) * (height / strip.height));
-    const frames = Array.from({ length: strip.frames }, (_, i) => {
-      const at = (hand: ArtPoint, side: string) => `<b class="dot ${side}" title="${side} hand" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%">${side === 'right' ? 'R' : 'L'}</b>`;
-      const right = hands?.[i];
-      const left = lefts?.[i];
-      const dot = right || left ? `${right ? at(right, 'right') : ''}${left ? at(left, 'left') : ''}` : '<small class="none">none</small>';
-      const body = `<span class="body" style="background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0"></span>`;
-      return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hands again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px">${body}${triedHtml(d, 'right', right, height)}${triedHtml(d, 'left', left, height)}${hands || lefts ? dot : ''}</button>`;
-    }).join('');
-    const question = artState.questions.find((q) => q.facing === d);
-    const ask = question ? `
-      <details class="hand-question"><summary>The question asked${question.own ? ' (your words)' : ''}</summary>
-        <form class="form hand-question" data-facing="${d}">
-          <textarea name="prompt" rows="3" maxlength="2000">${esc(question.prompt)}</textarea>
-          <p class="note">Always sent with it: “${esc(question.system)}”</p>
-          <div class="card-actions"><button type="submit" class="quiet">Keep these words</button>${question.own ? `<button type="button" class="quiet" data-hands-usual="${d}">Back to the usual words</button>` : ''}</div>
-          <p class="note">The same question is asked for every character walking ${label}. Nothing is looked at again until you ask.</p>
-        </form>
-      </details>` : '';
-    const missing = !hands ? ' · not looked at yet' : !lefts ? ' · left hand not looked for yet: it is found by itself after Pull and restart, or use Find again' : '';
-    // Turning round mirrors the picture, so the opposite walk's hands, mirrored, can stand in for this one's.
-    const [turned, turnedLabel] = FACING_WORDS.find(([o]) => o === TURNED[d])!;
-    const from = `${w.id}-walk-${turned}`;
-    const copied = artState.mirrored[id] ? ` · mirrored from the ${FACING_WORDS.find(([o]) => artState.mirrored[id] === `${w.id}-walk-${o}`)?.[1] ?? 'other'} walk` : '';
-    const mirror = w.walks[turned] && artState.points[from]?.hands ? `<button type="button" class="quiet" data-hands-mirror="${esc(JSON.stringify({ from, to: id }))}" data-label="${esc(`${label} walk`)}" data-from-label="${esc(`${turnedLabel} walk`)}">Use the ${turnedLabel} walk's hands, mirrored</button>` : '';
-    return [`<div class="hand-row" data-art-id="${esc(id)}"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, 'Find again for this walk')}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`];
+  // Each way's question is shared by every animation, so it is shown once, under the first row facing that way.
+  const asked = new Set<Facing>();
+  const ids: string[] = [];
+  const sections = ANIMATIONS.flatMap(([kind, title, noun]) => {
+    const strips = w[kind];
+    // Isometric strips (everyone today) and the older four-way walks some characters still have.
+    const rows = FACING_WORDS.flatMap(([d, label]) => {
+      const strip = strips?.[d];
+      if (!strip) return [];
+      const id = `${w.id}-${noun}-${d}`;
+      ids.push(id);
+      return [handRowHtml(w, id, d, label, noun, strip, strips, asked, find)];
+    });
+    return rows.length ? [`<section class="hand-animation"><h4>${title}</h4>${rows.join('')}</section>`] : [];
   });
-  if (!rows.length) return '';
+  if (!sections.length) return '';
   return `<details class="hands"${artState.openHands.has(w.id) ? ' open' : ''} data-walker="${esc(w.id)}"><summary>Where the hands were found (right hand: weapons and charms; left hand: shields and off-hand items)</summary>
-    <p class="note">The hand finder looks at every frame once, after a walk is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call. A walk can instead take the hands found in the walk facing the other way, mirrored, for free.</p>
+    <p class="note">The hand finder looks at every frame once, after a walk, run or attack is painted. R is the character's right hand, L their left. Click a frame to look at just that frame again; each look is a small vision-model call. An animation can instead take the hands found in the same animation facing the other way, mirrored, for free.</p>
     ${tryOnHtml()}
     <p class="note">Pick an item to see it in that hand on every frame, as the game draws it. Trying items is free and changes nothing for players.</p>
-    ${find({ ids: [...ids, w.id] }, `Find again for every walk of ${esc(w.name)}`, '')}
-    ${rows.join('')}</details>`;
+    ${find({ ids: [...ids, w.id] }, `Find again for every animation of ${esc(w.name)}`, '')}
+    ${sections.join('')}</details>`;
+}
+
+/** The animations hands are found in: where the walker keeps them, their heading, and the word in their art ids. */
+const ANIMATIONS = [['walks', 'Walking', 'walk'], ['runs', 'Running', 'run'], ['attacks', 'Attacking', 'attack']] as const;
+
+type Strips = WalkerView['walks'];
+
+/** One animation facing one way: its frames with the hands found, and what can be done about them. */
+function handRowHtml(w: WalkerView, id: string, d: Facing, label: string, noun: string, strip: NonNullable<Strips[Facing]>, strips: Strips | undefined, asked: Set<Facing>, find: (body: { ids: string[]; frame?: number }, label: string) => string): string {
+  const hands = artState.points[id]?.hands;
+  const lefts = artState.points[id]?.leftHands;
+  const height = 96;
+  const width = Math.round((strip.width / strip.frames) * (height / strip.height));
+  const frames = Array.from({ length: strip.frames }, (_, i) => {
+    const at = (hand: ArtPoint, side: string) => `<b class="dot ${side}" title="${side} hand" style="left:${(hand[0] * 100).toFixed(1)}%;top:${(hand[1] * 100).toFixed(1)}%">${side === 'right' ? 'R' : 'L'}</b>`;
+    const right = hands?.[i];
+    const left = lefts?.[i];
+    const dot = right || left ? `${right ? at(right, 'right') : ''}${left ? at(left, 'left') : ''}` : '<small class="none">none</small>';
+    const body = `<span class="body" style="background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0"></span>`;
+    return `<button type="button" class="frame" title="Frame ${i + 1}: look for the hands again" data-hands-find="${esc(JSON.stringify({ ids: [id], frame: i }))}" style="width:${width}px;height:${height}px">${body}${triedHtml(d, 'right', right, height)}${triedHtml(d, 'left', left, height)}${hands || lefts ? dot : ''}</button>`;
+  }).join('');
+  const question = asked.has(d) ? undefined : artState.questions.find((q) => q.facing === d);
+  asked.add(d);
+  const ask = question ? `
+    <details class="hand-question"><summary>The question asked${question.own ? ' (your words)' : ''}</summary>
+      <form class="form hand-question" data-facing="${d}">
+        <textarea name="prompt" rows="3" maxlength="2000">${esc(question.prompt)}</textarea>
+        <p class="note">Always sent with it: “${esc(question.system)}”</p>
+        <div class="card-actions"><button type="submit" class="quiet">Keep these words</button>${question.own ? `<button type="button" class="quiet" data-hands-usual="${d}">Back to the usual words</button>` : ''}</div>
+        <p class="note">The same question is asked for every character walking, running or attacking ${label}. Nothing is looked at again until you ask.</p>
+      </form>
+    </details>` : '';
+  const missing = !hands ? ' · not looked at yet' : !lefts ? ' · left hand not looked for yet: it is found by itself after Pull and restart, or use Find again' : '';
+  // Turning round mirrors the picture, so the opposite way's hands, mirrored, can stand in for this one's.
+  const [turned, turnedLabel] = FACING_WORDS.find(([o]) => o === TURNED[d])!;
+  const from = `${w.id}-${noun}-${turned}`;
+  const copied = artState.mirrored[id] ? ` · mirrored from the ${FACING_WORDS.find(([o]) => artState.mirrored[id] === `${w.id}-${noun}-${o}`)?.[1] ?? 'other'} ${noun}` : '';
+  const mirror = strips?.[turned] && artState.points[from]?.hands ? `<button type="button" class="quiet" data-hands-mirror="${esc(JSON.stringify({ from, to: id }))}" data-label="${esc(`${label} ${noun}`)}" data-from-label="${esc(`${turnedLabel} ${noun}`)}">Use the ${turnedLabel} ${noun}'s hands, mirrored</button>` : '';
+  return `<div class="hand-row" data-art-id="${esc(id)}"><div class="hand-head"><small>${label}${missing}${copied}</small>${find({ ids: [id] }, `Find again for this ${noun}`)}${mirror}</div><div class="frames">${frames}</div>${ask}</div>`;
 }
 
 /** Draws the open hands panels again, for a newly tried item. */

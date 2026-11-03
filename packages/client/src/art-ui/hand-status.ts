@@ -1,7 +1,7 @@
 // The Art tab's "Finding hands" line: what the hand finder is doing on its
 // own, or why it is not, linking to the character page's hand finder.
 
-import { type ArtContext, type ArtItem, DIRECTIONS, type WalkerView, artState, esc, go, when } from './state.ts';
+import { type ArtContext, type ArtItem, FACING_WORDS, type WalkerView, artState, esc, go, when } from './state.ts';
 
 /** What the hand finder is doing, as the server tells it. */
 export interface HandStatus {
@@ -14,18 +14,22 @@ export interface HandStatus {
   waiting: number;
 }
 
-/** The walker a hand picture belongs to: its walks, its standing pictures, or its look. */
+/** What a walker is doing in each animation, by the word in its art ids. */
+const DOING: Record<string, string> = { walk: 'walking', run: 'running', attack: 'attacking' };
+
+/** The walker a hand picture belongs to: its walks, runs, attacks, its standing pictures, or its look. */
 export function walkerOf(id: string | undefined, walkers: WalkerView[]): WalkerView | undefined {
   if (!id) return undefined;
-  return walkers.find((w) => id === w.id || id.startsWith(`${w.id}-walk-`) || id.startsWith(`${w.id}-stand-`));
+  return walkers.find((w) => id === w.id || ['walk', 'run', 'attack', 'stand'].some((noun) => id.startsWith(`${w.id}-${noun}-`)));
 }
 
 /** The picture being looked at, in words: a character's walk, or an item's name. */
 export function lookingAt(id: string, walkers: WalkerView[], items: ArtItem[]): string {
   const w = walkerOf(id, walkers);
   if (w) {
-    const way = DIRECTIONS.find(([d]) => id === `${w.id}-walk-${d}`)?.[1];
-    return way ? `${w.name} walking ${way}` : w.name;
+    const [noun, facing] = /^-(walk|run|attack)-(.+)$/.exec(id.slice(w.id.length))?.slice(1) ?? [];
+    const way = FACING_WORDS.find(([d]) => d === facing)?.[1];
+    return noun && way ? `${w.name} ${DOING[noun]} ${way}` : w.name;
   }
   return items.find((i) => i.id === id)?.name ?? 'a held item';
 }

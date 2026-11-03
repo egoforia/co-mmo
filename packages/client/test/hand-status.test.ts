@@ -19,6 +19,7 @@ describe('the Art tab\'s "Finding hands" line', () => {
     expect(html).toContain('href="#art/characters/Mara"');
     expect(html).toContain('data-hands-focus="player-mara"');
     expect(handStatusHtml({ ...idle, running: true, done: 0, total: 18, waiting: 18, looking: 'held-sword' }, [mara], [sword])).toContain('looking at Sword');
+    expect(handStatusHtml({ ...idle, running: true, done: 0, total: 18, waiting: 18, looking: 'player-mara-attack-back-left' }, [mara], [sword])).toContain('looking at Mara attacking away, left');
   });
 
   it('says why pictures are waiting when hands cannot be found', () => {
@@ -30,5 +31,6 @@ describe('the Art tab\'s "Finding hands" line', () => {
   it('leads to the first character page when a held item is being looked at', () => {
     expect(handLink({ ...idle, running: true, looking: 'held-sword' }, [mara])).toEqual({ href: '#art/characters' });
     expect(handLink({ ...idle, running: true, looking: 'player-mara-stand-front-left' }, [mara])).toEqual({ href: '#art/characters/Mara', walker: 'player-mara' });
+    expect(handLink({ ...idle, running: true, looking: 'player-mara-run-front-right' }, [mara])).toEqual({ href: '#art/characters/Mara', walker: 'player-mara' });
   });
 });

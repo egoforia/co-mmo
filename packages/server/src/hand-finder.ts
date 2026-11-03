@@ -123,10 +123,10 @@ export class HandFinder {
   async mirror(fromId: string, toId: string): Promise<void> {
     await this.load();
     const found = this.found[fromId];
-    if (!found?.hands) throw new Error('No hands have been found in that walk yet, so there is nothing to mirror.');
+    if (!found?.hands) throw new Error('No hands have been found in that animation yet, so there is nothing to mirror.');
     const target = (await this.options.sources()).find((s) => s.id === toId && s.kind === 'hands');
     const picture = await target?.read().catch(() => undefined);
-    if (!target || !picture) throw new Error('That walk has not been painted yet.');
+    if (!target || !picture) throw new Error('That animation has not been painted yet.');
     const hands = mirroredHands(found.hands, target.frames);
     const leftHands = mirroredHands(found.leftHands, target.frames);
     const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));

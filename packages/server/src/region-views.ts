@@ -25,6 +25,7 @@ export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: 
   const offHeld = offHandItem(p.character);
   return {
     id: p.info.id, name: p.info.name, color: p.info.color, x: round(p.x), y: round(p.y), ...floorOf(p.floor), health: round(p.character.hp / maxHp(p.character)),
+    ...(p.character.race ? { race: p.character.race } : {}),
     ...(held ? { held } : {}),
     ...(offHeld ? { offHeld } : {}),
     ...(p.character.hp <= 0 ? { fallen: true as const } : {}),

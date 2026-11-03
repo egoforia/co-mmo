@@ -6,7 +6,6 @@ import {
   Tile,
   buildingArt,
   biomeLook as sharedLook,
-  hashString,
   type BiomeId,
   type BiomeLook,
   type BuildingPart,
@@ -232,7 +231,3 @@ export function propTexture(scene: Phaser.Scene, biome: string, kind: 'tree' | '
   return undefined;
 }
 
-/** Which of the two approved player looks a player wears. */
-export function playerArt(playerId: string): string {
-  return hashString(playerId) % 2 === 0 ? 'player-mara' : 'player-ilya';
-}

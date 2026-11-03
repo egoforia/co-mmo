@@ -65,11 +65,9 @@ describe('wish guard on art', () => {
     ])).toEqual([]);
   });
 
-  it('lets only pose guides and the doorway sketch draw on the server', () => {
-    expect(checkArt([
-      add('packages/server/src/assets/pose-guide.ts', '    shapes.push(`<circle cx="1" cy="1" r="2"/>`);'),
-      add('packages/server/src/assets/building-art.ts', '<rect width="100%" height="100%"/>'),
-    ])).toEqual([]);
+  it('lets only the doorway sketch draw on the server', () => {
+    expect(checkArt([add('packages/server/src/assets/building-art.ts', '<rect width="100%" height="100%"/>')])).toEqual([]);
+    expect(checkArt([add('packages/server/src/assets/pose-guide.ts', '    shapes.push(`<circle cx="1" cy="1" r="2"/>`);')])[0]).toMatch(/pose-guide\.ts draws art in code/);
     expect(checkArt([add('packages/server/src/assets/wish-art.ts', '  const svg = `<svg><circle r="4"/></svg>`;')])[0]).toMatch(/wish-art\.ts draws art in code/);
   });
 });

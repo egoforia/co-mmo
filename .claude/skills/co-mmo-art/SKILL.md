@@ -9,11 +9,10 @@ Rules from the Owner, all binding:
 
 - **No art drawn in code.** No canvas shapes, Phaser graphics or tinted
   stand-ins. Every picture comes from the image model chosen in God's View,
-  from a description. The only exceptions are the invisible pose guides
-  (`assets/pose-guide.ts`) and the building doorway sketch, which steer the
-  model and are never shown to players, and the building kit, whose shapes
-  code builds and the image model paints (the Owner, 2026-10-18). The wish
-  guard refuses drawing code.
+  from a description. The only exceptions are the building doorway sketch,
+  which steers the model and is never shown to players, and the building
+  kit, whose shapes code builds and the image model paints (the Owner,
+  2026-10-18). The wish guard refuses drawing code.
 - **No left/right mirroring of characters.** Each direction of anything
   that walks is painted on its own across the four isometric ways
   (`front-left`, `front-right`, `back-left`, `back-right`). Buildings may be

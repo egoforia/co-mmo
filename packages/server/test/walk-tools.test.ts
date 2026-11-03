@@ -1,7 +1,5 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BODY_TYPES, WALK_VIEWS } from '@co-mmo/shared';
-import { GUIDE_SIZE, poseGuide, poseGuideSvg } from '../src/assets/pose-guide.ts';
 import { cutFigures, feetCentre, normalizeWalk } from '../src/assets/walk-frames.ts';
 import { checkWalk } from '../src/assets/walk-checks.ts';
 
@@ -15,26 +13,6 @@ const alphaAt = async (png: Buffer, x: number, y: number) => {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return data[(y * info.width + x) * 4 + 3]!;
 };
-
-describe('pose guides', () => {
-  it('draws every step of every view of every body type', async () => {
-    for (const body of Object.values(BODY_TYPES)) {
-      for (const view of WALK_VIEWS) {
-        const meta = await sharp(await poseGuide(body, view, 0)).metadata();
-        expect([meta.width, meta.height]).toEqual([GUIDE_SIZE.width, GUIDE_SIZE.height]);
-      }
-    }
-  });
-
-  it('draws different pictures for different steps, and marks the face only when it can be seen', () => {
-    const body = BODY_TYPES['two-legged']!;
-    expect(poseGuideSvg(body, 'right', 0)).not.toEqual(poseGuideSvg(body, 'right', 2));
-    const eyes = (view: (typeof WALK_VIEWS)[number]) => (poseGuideSvg(body, view, 0).match(/<circle/g) ?? []).length - 1;
-    expect(eyes('front')).toBe(2);
-    expect(eyes('right')).toBe(1);
-    expect(eyes('back')).toBe(0);
-  });
-});
 
 describe('frame cutter', () => {
   it('keeps a loose part with its own figure, drops specks and stray bits, and reads rows left to right', async () => {

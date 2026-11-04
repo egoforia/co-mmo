@@ -373,5 +373,87 @@ describe('the art points the game serves', () => {
     expect((await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', { from: walkArt('player-mara', 'front-right'), to: walkArt('player-mara', 'front-left') })).status).toBe(409);
     // Pictures whose files are missing are left for later.
     expect(body[walkArt('player-ilya', 'back-left')]).toBeUndefined();
+
+    // Manual frame-by-frame hand & grip placement and single-frame mirroring in the AI Art Studio:
+    const setRes = await api(base, '/api/admin/art/hands/set', owner.token, 'POST', {
+      id: walkArt('player-mara', 'front-right'),
+      frame: 1,
+      right: [0.25, 0.65],
+      left: [0.75, 0.55],
+    });
+    expect(setRes.status).toBe(200);
+    expect(setRes.body.points).toEqual({
+      hands: [[0.5, 0.5], [0.25, 0.65]],
+      leftHands: [[0.5, 0.5], [0.75, 0.55]],
+    });
+
+    const gripRes = await api(base, '/api/admin/art/hands/set', owner.token, 'POST', {
+      id: 'item-wooden-sword',
+      grip: [0.2, 0.85],
+    });
+    expect(gripRes.status).toBe(200);
+    expect(gripRes.body.points).toEqual({ grip: [0.2, 0.85] });
+
+    // Single-frame mirror from front-right frame 1 to front-left frame 1 (mirrors X while keeping each hand on its own side):
+    await writeFile(join(root, `art/${walkArt('player-mara', 'front-left')}.png`), await picture(256, 192));
+    const mirrorFrameRes = await api(base, '/api/admin/art/hands/mirror', owner.token, 'POST', {
+      from: walkArt('player-mara', 'front-right'),
+      to: walkArt('player-mara', 'front-left'),
+      frame: 1,
+      side: 'both',
+    });
+    expect(mirrorFrameRes.status).toBe(200);
+    const pointsAfterMirror = (await api(base, '/api/art-points', owner.token)).body;
+    expect(pointsAfterMirror[walkArt('player-mara', 'front-left')]).toEqual({
+      hands: [null, [0.75, 0.65]],
+      leftHands: [null, [0.25, 0.55]],
+    });
+
+    // AI Art Studio Up Next Queue endpoints:
+    const qAdd = await api(base, '/api/admin/art/queue', owner.token, 'POST', {
+      action: 'add',
+      items: [
+        { kind: 'paint', targetId: 'status-burning', label: 'Paint Burning Icon', category: 'HUD & Skill FX', estimateUsd: 0.04 },
+        { kind: 'paint', targetId: 'fx-slash', label: 'Paint Slash Arc', category: 'HUD & Skill FX', estimateUsd: 0.04 },
+      ],
+    });
+    expect(qAdd.status).toBe(200);
+    expect(qAdd.body.items).toHaveLength(2);
+    const firstId = qAdd.body.items[0].id;
+    const qReorder = await api(base, '/api/admin/art/queue', owner.token, 'POST', {
+      action: 'reorder',
+      id: firstId,
+      toIndex: 1,
+    });
+    expect(qReorder.body.items[1].id).toBe(firstId);
+
+    // AI Art Director endpoints (Style Bible overview & Prompt Harmonizer):
+    const dirOverview = await api(base, '/api/admin/art/director', owner.token);
+    expect(dirOverview.status).toBe(200);
+    expect(dirOverview.body.biomes.frostpeak.name).toBe('Frostpeak');
+    expect(dirOverview.body.fashionStyles.windfelt.name).toBe('Windfelt');
+    const harmonized = await api(base, '/api/admin/art/director', owner.token, 'POST', {
+      action: 'harmonize',
+      asset: 'status-burning',
+      biome: 'frostpeak',
+      fashionStyle: 'windfelt',
+      note: 'brighter ember rim',
+    });
+    expect(harmonized.status).toBe(200);
+    expect(harmonized.body.checklist).toEqual({ facets: true, palette: true, isometric: true, scale: true, negatives: true });
+    expect(harmonized.body.harmonizedPrompt).toContain('Frostpeak');
+
+    // Partial PUT /api/admin/ai updates (decoupled God's View vs AI Art Studio):
+    const putGod = await api(base, '/api/admin/ai', owner.token, 'PUT', {
+      god: { provider: 'offline', model: 'offline' },
+    });
+    expect(putGod.status).toBe(200);
+    const putMedia = await api(base, '/api/admin/ai', owner.token, 'PUT', {
+      video: { provider: 'replicate', model: 'alibaba/wan-3', dailyClips: 12 },
+    });
+    expect(putMedia.status).toBe(200);
+    const aiAfter = (await api(base, '/api/admin/ai', owner.token)).body.ai;
+    expect(aiAfter.god.provider).toBe('offline');
+    expect(aiAfter.video).toMatchObject({ provider: 'replicate', model: 'alibaba/wan-3', dailyClips: 12 });
   });
 });

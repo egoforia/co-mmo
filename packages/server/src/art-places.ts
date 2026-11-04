@@ -5,7 +5,7 @@ import { BIOMES, BUILDING_STYLES, ITEMS, type BiomeId, type ItemWish, type Pictu
 // Owner finds a picture the way they think of it in the game.
 
 /** The Art tab's own tabs, besides Painting now and Sounds and music. */
-export type ArtTab = 'characters' | 'monsters' | 'items' | 'biomes';
+export type ArtTab = 'characters' | 'monsters' | 'items' | 'biomes' | 'hud';
 
 /** Where a picture sits: a tab, a page within it, and a heading on that page. */
 export interface ArtPlace {
@@ -17,7 +17,7 @@ export interface ArtPlace {
 }
 
 /** Kinds of item, in the order the Items tab shows them. */
-export const ITEM_PAGES = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Materials', 'Books and scrolls', 'Other'] as const;
+export const ITEM_PAGES = ['Consumables', 'Weapons', 'Shields', 'Armour', 'Charms', 'Craft tools', 'Materials', 'Books and scrolls', 'Other'] as const;
 
 /** A land's name as a page title: "Sanctum" rather than "the Sanctum". */
 export function landName(biome: BiomeId | 'any'): string {
@@ -28,8 +28,10 @@ export function landName(biome: BiomeId | 'any'): string {
 
 /** A shipped item picture's kind of item, by the items drawn with it. */
 export function shippedItemPage(artId: string): (typeof ITEM_PAGES)[number] {
+  if (artId.startsWith('item-tool-')) return 'Craft tools';
   const item = Object.values(ITEMS).find((i) => i.art === artId);
   if (!item) return 'Other';
+  if (item.kind === 'tool') return 'Craft tools';
   if (item.kind === 'consumable') return 'Consumables';
   if (item.kind === 'material') return 'Materials';
   if (item.kind === 'book' || item.kind === 'scroll') return 'Books and scrolls';
@@ -52,6 +54,12 @@ export function shippedPlace(asset: { id: string; name?: string; kind: string; b
   if (asset.kind === 'player' || asset.kind === 'npc') return { tab: 'characters', page: name };
   if (asset.kind === 'monster') return { tab: 'monsters', page: name };
   if (asset.kind === 'item') return { tab: 'items', page: shippedItemPage(asset.id) };
+  if (asset.kind === 'effect') {
+    return {
+      tab: 'hud',
+      page: asset.id.startsWith('status-') ? 'Status icons' : 'Skill and combat effects',
+    };
+  }
   return { tab: 'biomes', page: landName(asset.biome as BiomeId), section: 'Scenery' };
 }
 

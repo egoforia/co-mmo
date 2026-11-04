@@ -405,18 +405,23 @@ export async function handleAdmin(
   if (route === 'ai' && method === 'PUT') {
     if (ownerOnly()) return true;
     const body = await ctx.readJson(req);
-    const god = modelChoice(body?.god);
+    const god = body?.god === undefined ? store.settings.ai.god : modelChoice(body?.god);
     if (!god) return json(res, 400, { error: 'bad_model', message: 'Choose a provider and model for the God.' }), true;
-    const fallback = body?.fallback ? modelChoice(body.fallback) : null;
-    const compiler = body?.compiler ? modelChoice(body.compiler) : null;
+    const fallback = body?.fallback === undefined ? store.settings.ai.fallback : body.fallback ? modelChoice(body.fallback) : null;
+    const compiler = body?.compiler === undefined ? store.settings.ai.compiler : body.compiler ? modelChoice(body.compiler) : null;
     const img = body?.image as Record<string, unknown> | undefined;
-    const image: Settings['ai']['image'] = img?.provider && img.provider !== 'none'
-      ? { provider: String(img.provider), model: typeof img.model === 'string' && img.model.trim() ? img.model.trim().slice(0, 80) : 'gemini-2.5-flash-image' }
-      : { provider: 'none', model: '' };
-    // Each kind of art may name its own image model; blank uses the main one.
-    const uses = (img?.uses ?? {}) as Record<string, unknown>;
-    const chosen = Object.fromEntries(ART_USES.flatMap((u) => (typeof uses[u] === 'string' && (uses[u] as string).trim() ? [[u, (uses[u] as string).trim().slice(0, 80)]] : [])));
-    if (image.provider !== 'none' && Object.keys(chosen).length) image.uses = chosen;
+    let image: Settings['ai']['image'];
+    if (img === undefined) {
+      image = store.settings.ai.image ?? { provider: 'none', model: '' };
+    } else {
+      image = img?.provider && img.provider !== 'none'
+        ? { provider: String(img.provider), model: typeof img.model === 'string' && img.model.trim() ? img.model.trim().slice(0, 80) : 'gemini-2.5-flash-image' }
+        : { provider: 'none', model: '' };
+      // Each kind of art may name its own image model; blank uses the main one.
+      const uses = (img?.uses ?? {}) as Record<string, unknown>;
+      const chosen = Object.fromEntries(ART_USES.flatMap((u) => (typeof uses[u] === 'string' && (uses[u] as string).trim() ? [[u, (uses[u] as string).trim().slice(0, 80)]] : [])));
+      if (image.provider !== 'none' && Object.keys(chosen).length) image.uses = chosen;
+    }
     const vid = body?.video as Record<string, unknown> | undefined;
     const video: Settings['ai']['video'] = vid === undefined ? videoSettings(store.settings, ctx.env)
       : vid?.provider && vid.provider !== 'none' ? { provider: String(vid.provider), model: typeof vid.model === 'string' && vid.model.trim() ? vid.model.trim().slice(0, 80) : vid.provider === 'replicate' ? DEFAULT_REPLICATE_VIDEO_MODEL : 'veo-3.1-lite-generate-preview' }
@@ -487,6 +492,8 @@ export async function handleAdmin(
     if (route === 'art/hands/status' && method === 'GET') return json(res, 200, (await ctx.hands?.status()) ?? { running: false, done: 0, total: 0, waiting: 0 }), true;
     if (route === 'art/buildings' && method === 'GET') return json(res, 200, { buildings: await buildingsOverview(world, ctx.houses) }), true;
     if (route === 'art/jobs' && method === 'GET') return json(res, 200, { jobs: ctx.art.jobs(), budget: ctx.budget.state() }), true;
+    if (route === 'art/queue' && method === 'GET') return json(res, 200, await ctx.art.upNext.list()), true;
+    if (route === 'art/director' && method === 'GET') return json(res, 200, await ctx.art.director.overview()), true;
     const body = method === 'POST' ? await ctx.readJson(req) : null;
     const note = typeof body?.note === 'string' ? body.note : '';
     // The Owner's own words in place of a prompt, for a walk's standing picture or clip.
@@ -566,16 +573,35 @@ export async function handleAdmin(
         return json(res, 200, { ok: true }), true;
       }
       if (route === 'art/hands/mirror' && method === 'POST') {
-        // Only between one walker's walks, runs or attacks facing opposite ways.
         const [from, to] = [String(body?.from ?? ''), String(body?.to ?? '')];
         const [a, b] = [movingArt(from), movingArt(to)];
-        if (!ctx.hands || !a || !b || a.noun === 'stand' || a.look !== b.look || a.noun !== b.noun || TURNED[a.facing] !== b.facing) return json(res, 400, { error: 'bad_request', message: 'Hands can only be mirrored between the same character\'s walks, runs or attacks facing opposite ways.' }), true;
+        const frame = Number.isInteger(body?.frame) ? (body!.frame as number) : undefined;
+        const fromFrame = Number.isInteger(body?.fromFrame) ? (body!.fromFrame as number) : undefined;
+        const side = body?.side === 'right' || body?.side === 'left' || body?.side === 'both' ? body.side : undefined;
+        const allowAnyWay = body?.allowAnyWay === true || frame !== undefined || side !== undefined;
+        if (!ctx.hands || !a || !b || a.noun === 'stand' || a.look !== b.look || a.noun !== b.noun || (!allowAnyWay && TURNED[a.facing] !== b.facing)) {
+          return json(res, 400, { error: 'bad_request', message: 'Hands can only be mirrored between the same character\'s walks, runs or attacks facing opposite ways.' }), true;
+        }
         try {
-          await ctx.hands.mirror(from, to);
+          await ctx.hands.mirror(from, to, frame !== undefined || side !== undefined ? { frame, fromFrame, side } : undefined);
           return json(res, 200, { ok: true }), true;
         } catch (err) {
           return json(res, 409, { error: 'art_refused', message: (err as Error).message }), true;
         }
+      }
+      if (route === 'art/hands/set' && method === 'POST') {
+        const id = typeof body?.id === 'string' ? body.id.trim() : '';
+        if (!ctx.hands || !id) return json(res, 400, { error: 'bad_request', message: 'Name the animation or item whose points to set.' }), true;
+        await ctx.hands.setPoints(id, {
+          ...(Number.isInteger(body?.frame) ? { frame: body!.frame as number } : {}),
+          ...('right' in (body ?? {}) ? { right: body?.right as [number, number] | null } : {}),
+          ...('left' in (body ?? {}) ? { left: body?.left as [number, number] | null } : {}),
+          ...(Array.isArray(body?.hands) ? { hands: body!.hands as ([number, number] | null)[] } : {}),
+          ...(Array.isArray(body?.leftHands) ? { leftHands: body!.leftHands as ([number, number] | null)[] } : {}),
+          ...('grip' in (body ?? {}) ? { grip: body?.grip as [number, number] | null } : {}),
+        });
+        const points = (await ctx.hands.manifest())[id] ?? {};
+        return json(res, 200, { ok: true, id, points }), true;
       }
       if (route === 'art/hands/find' && method === 'POST') {
         const ids = Array.isArray(body?.ids) ? body.ids.filter((x): x is string => typeof x === 'string').slice(0, 20) : [];
@@ -586,6 +612,110 @@ export async function handleAdmin(
         } catch (err) {
           return json(res, 409, { error: 'art_refused', message: (err as Error).message }), true;
         }
+      }
+      if (route === 'art/queue' && method === 'POST') {
+        const action = String(body?.action ?? '');
+        if (action === 'add' && body?.ask && typeof body.ask === 'object') {
+          const item = await ctx.art.upNext.add(body.ask as ArtAsk, {
+            label: typeof body.label === 'string' ? body.label : undefined,
+            category: typeof body.category === 'string' ? body.category : undefined,
+            estimateUsd: typeof body.estimateUsd === 'number' ? body.estimateUsd : undefined,
+            harmonized: body.harmonized === true,
+          });
+          return json(res, 200, { ok: true, item, ...(await ctx.art.upNext.list()) }), true;
+        }
+        if (action === 'add' && Array.isArray(body?.items)) {
+          for (const raw of body.items) {
+            if (!raw || typeof raw !== 'object') continue;
+            const entry = raw as Record<string, unknown>;
+            const ask: ArtAsk =
+              entry.ask && typeof entry.ask === 'object'
+                ? (entry.ask as ArtAsk)
+                : ({
+                    kind: (typeof entry.kind === 'string' ? entry.kind : 'paint') as ArtAsk['kind'],
+                    asset: typeof entry.targetId === 'string' ? entry.targetId : String(entry.asset ?? ''),
+                  } as ArtAsk);
+            await ctx.art.upNext.add(ask, {
+              label: typeof entry.label === 'string' ? entry.label : undefined,
+              category: typeof entry.category === 'string' ? entry.category : undefined,
+              estimateUsd: typeof entry.estimateUsd === 'number' ? entry.estimateUsd : undefined,
+              harmonized: entry.harmonized === true,
+            });
+          }
+          return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
+        }
+        if (action === 'remove') {
+          await ctx.art.upNext.remove(String(body?.id ?? ''));
+          return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
+        }
+        if (action === 'reorder') {
+          if (Array.isArray(body?.ids)) {
+            await ctx.art.upNext.reorder(body.ids.map(String));
+          } else if (typeof body?.id === 'string' && typeof body?.toIndex === 'number') {
+            const current = (await ctx.art.upNext.list()).items.map((i) => i.id);
+            const fromIdx = current.indexOf(body.id);
+            if (fromIdx >= 0) {
+              current.splice(fromIdx, 1);
+              current.splice(Math.max(0, Math.min(current.length, body.toIndex)), 0, body.id);
+              await ctx.art.upNext.reorder(current);
+            }
+          }
+          return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
+        }
+        if (action === 'update') {
+          await ctx.art.upNext.update(String(body?.id ?? ''), {
+            ...(typeof body?.note === 'string' ? { note: body.note } : {}),
+            ...(typeof body?.prompt === 'string' ? { prompt: body.prompt } : {}),
+            ...(typeof body?.harmonized === 'boolean' ? { harmonized: body.harmonized } : {}),
+            ...(typeof body?.label === 'string' ? { label: body.label } : {}),
+          });
+          return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
+        }
+        if (action === 'clear') {
+          await ctx.art.upNext.clear();
+          return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
+        }
+        if (action === 'pause') {
+          ctx.art.upNext.pause();
+          return json(res, 200, { ok: true }), true;
+        }
+        if (action === 'run') {
+          const count = typeof body?.count === 'number' ? body.count : undefined;
+          const resRun = await ctx.art.upNext.runNext(ctx.art, count);
+          return json(res, 200, { ok: true, ...resRun, ...(await ctx.art.upNext.list()) }), true;
+        }
+        return json(res, 400, { error: 'bad_request', message: 'Unknown queue action.' }), true;
+      }
+      if (route === 'art/director' && method === 'POST') {
+        const action = String(body?.action ?? '');
+        if (action === 'harmonize') {
+          const resH = await ctx.art.director.harmonizeBrief({
+            asset: typeof body?.asset === 'string' ? body.asset : undefined,
+            kind: typeof body?.kind === 'string' ? body.kind : undefined,
+            biome: typeof body?.biome === 'string' ? body.biome : undefined,
+            fashionStyle: typeof body?.fashionStyle === 'string' ? body.fashionStyle : undefined,
+            note: typeof body?.note === 'string' ? body.note : undefined,
+            prompt: typeof body?.prompt === 'string' ? body.prompt : undefined,
+          });
+          return json(res, 200, { ok: true, ...resH }), true;
+        }
+        if (action === 'audit') {
+          const assets = Array.isArray(body?.assets) ? body.assets.map(String) : undefined;
+          const resA = await ctx.art.director.auditAssets(assets);
+          return json(res, 200, { ok: true, ...resA, overview: await ctx.art.director.overview() }), true;
+        }
+        if (action === 'consult') {
+          const question = typeof body?.question === 'string' ? body.question : '';
+          if (!question.trim()) return json(res, 400, { error: 'bad_request', message: 'Ask the AI Art Director a question.' }), true;
+          const assets = Array.isArray(body?.assets) ? body.assets.map(String) : [];
+          const resC = await ctx.art.director.consult(question, assets);
+          return json(res, 200, { ok: true, ...resC, overview: await ctx.art.director.overview() }), true;
+        }
+        if (action === 'style-bible') {
+          const updated = await ctx.art.director.updateStyleBible((body ?? {}) as Parameters<typeof ctx.art.director.updateStyleBible>[0]);
+          return json(res, 200, { ok: true, ...updated }), true;
+        }
+        return json(res, 400, { error: 'bad_request', message: 'Unknown Art Director action.' }), true;
       }
       if (route === 'art/restore-sound' && method === 'POST') {
         await ctx.art.restoreSound(String(body?.sound ?? ''), String(body?.version ?? ''));

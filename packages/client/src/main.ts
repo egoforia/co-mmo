@@ -343,6 +343,8 @@ function play(token: string): void {
     if (welcome.you.role !== 'player') {
       const link = document.getElementById('gods-view-link')!;
       link.hidden = false;
+      const artStudioLink = document.getElementById('art-studio-link');
+      if (artStudioLink) artStudioLink.hidden = welcome.you.role !== 'owner';
       // The Owner and Stewards can change the world where they stand.
       const edit = document.getElementById('edit-world-button')!;
       const opened = new EditorUi({ token, scene: () => scene ?? undefined, region: () => ({ id: regionId, name: region }) });

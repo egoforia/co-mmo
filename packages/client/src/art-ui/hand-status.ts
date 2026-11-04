@@ -37,7 +37,7 @@ export function lookingAt(id: string, walkers: WalkerView[], items: ArtItem[]): 
 /** Where the line leads: the page of the character being looked at, or the first character page. */
 export function handLink(status: HandStatus, walkers: WalkerView[]): { href: string; walker?: string } {
   const w = walkerOf(status.looking, walkers);
-  return w ? { href: go(w.place.tab, w.place.page), walker: w.id } : { href: go('characters') };
+  return w ? { href: go(w.place.tab === 'hud' ? 'hud-fx' : w.place.tab, w.place.page), walker: w.id } : { href: go('characters') };
 }
 
 const pictures = (n: number) => `${n} ${n === 1 ? 'picture' : 'pictures'}`;

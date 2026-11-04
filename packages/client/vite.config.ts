@@ -31,6 +31,7 @@ export default defineConfig({
       input: {
         main: resolve(here, 'index.html'),
         godsView: resolve(here, 'gods-view.html'),
+        artStudio: resolve(here, 'art-studio.html'),
       },
     },
   },

@@ -92,6 +92,29 @@ export function walkStandArt(look: string, direction: Facing): string {
 /** The moving pictures a walker has one of for each way it faces. */
 export type Moving = 'walk' | 'run' | 'attack' | 'stand';
 
+/** An animated strip kind that a walker can play across the four isometric ways. */
+export type AnimationKind = 'walk' | 'run' | 'attack';
+
+export interface AnimationKindDef {
+  id: AnimationKind;
+  label: string;
+  field: 'walks' | 'runs' | 'attacks';
+  defaultFrames: number;
+  defaultCycleSeconds: number;
+}
+
+/** Registry of all walker animation strip kinds, so UI and server tools stay extensible. */
+export const ANIMATION_KINDS: readonly AnimationKindDef[] = [
+  { id: 'walk', label: 'Walk', field: 'walks', defaultFrames: WALK_FRAMES, defaultCycleSeconds: WALK_CYCLE_SECONDS },
+  { id: 'run', label: 'Run', field: 'runs', defaultFrames: 10, defaultCycleSeconds: 0.67 },
+  { id: 'attack', label: 'Attack', field: 'attacks', defaultFrames: 12, defaultCycleSeconds: 0.8 },
+] as const;
+
+/** Art id of a walker's animation strip (`walk`, `run`, `attack`) for one isometric way. */
+export function animationArt(look: string, kind: AnimationKind, direction: Facing): string {
+  return `${look}-${kind}-${direction}`;
+}
+
 const MOVING = /^(.+?)-(walk|run|attack|stand)-(.+)$/;
 
 /**

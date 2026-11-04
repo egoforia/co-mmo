@@ -80,9 +80,23 @@ export function clampQuality(q: number): number {
   return Math.max(QUALITY_MIN, Math.min(QUALITY_MAX, Math.round(Number.isFinite(q) ? q : QUALITY_STANDARD)));
 }
 
+/** Longest a maker's name may take in an id, so every copy id fits a message (protocol.ts). */
+const MAX_MAKER = 48;
+
+/** A maker's name for an id: whole characters, cut to fit. */
+function makerPart(name: string): string {
+  let out = '';
+  for (const ch of name.slice(0, 24)) {
+    const next = out + encode(ch);
+    if (next.length > MAX_MAKER) break;
+    out = next;
+  }
+  return out;
+}
+
 /** The id of a new copy; `nonce` keeps two copies made alike apart. */
 export function copyId(info: CopyInfo, nonce: string): string {
-  const maker = `${info.maker.kind === 'npc' ? 'n' : 'p'}${encode(info.maker.name.slice(0, 24))}`;
+  const maker = `${info.maker.kind === 'npc' ? 'n' : 'p'}${makerPart(info.maker.name)}`;
   return [copyBase(info.of), TAG, clampQuality(info.quality), maker, info.people ?? '', info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
 }
 

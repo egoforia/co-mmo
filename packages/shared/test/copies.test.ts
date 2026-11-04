@@ -13,6 +13,7 @@ import {
   craftQuality,
   crafted,
   discover,
+  isClientMessage,
   isCopyId,
   newCharacter,
   parseCopy,
@@ -92,5 +93,14 @@ describe('crafted copies', () => {
     const forged = copyId(info({ quality: 130 }), 'n');
     const creature = validateDefinition({ kind: 'creature', name: 'Forger', description: 'x', behavior: 'timid', drops: [forged, 'tonic'] });
     expect(JSON.stringify(creature)).not.toContain('~');
+  });
+});
+
+describe('crafted copy ids', () => {
+  it('always fit in a message, however long the names', () => {
+    const long = copyId({ of: 'a'.repeat(36), quality: 100, maker: { kind: 'player', name: '漢'.repeat(30) }, people: 'scorpid', trait: 'shimmering', material: 'b'.repeat(36) }, 'abc123');
+    expect(long.length).toBeLessThanOrEqual(200);
+    expect(parseCopy(long)!.maker.name).toBe('漢'.repeat(5));
+    expect(isClientMessage({ t: 'use', item: long })).toBe(true);
   });
 });

@@ -52,7 +52,7 @@ describe('materials as data', () => {
     expect(wish({ family: 'stardust', tier: 3, traits: ['warm', 'light', 'glowing'], homes: ['nowhere'] }).material).toEqual({ family: 'fibre', homes: [EVERYWHERE_REGION], source: 'creature', tier: 2, traits: ['warm'] });
     expect(wish().material).toMatchObject({ family: 'fibre', tier: 1, traits: [] });
     // Gear has no material data.
-    expect((validateDefinition({ kind: 'item', name: 'Hat', description: 'A hat.', itemKind: 'head', look: {} }) as ItemWish).material).toBeUndefined();
+    expect((validateDefinition({ kind: 'item', name: 'Hat', description: 'A hat.', itemKind: 'head', style: 'pilgrim', look: {} }) as ItemWish).material).toBeUndefined();
   });
 
   it('gives a material wished before materials had data its own from its words', () => {

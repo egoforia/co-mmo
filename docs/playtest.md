@@ -9,7 +9,7 @@ or sound), whatever keys are set.
 npm run playtest
 ```
 
-It takes about six minutes since the lands grew. Each `*.play.ts` file under
+It takes about twelve minutes now there are six lands; walking every road is the longest part. Each `*.play.ts` file under
 `packages/server/playtest/` starts its own server on a random port and runs
 alongside the others.
 
@@ -22,6 +22,7 @@ alongside the others.
 | `wishes.play.ts` | Pray, then wish for a thing to wear, a creature (and fight it), a person (and talk to them), a power (learn and cast it), a drop and a new land (and walk into it). A player without Favor is turned away. |
 | `mods.play.ts` | The Owner switches a wished creature and a wished ring off and on again in God's View while another player watches, then undoes the creature for good. |
 | `together.play.ts` | Two players see each other, chat, form a party, share a fight's XP and trade. |
+| `crafting.play.ts` | A Cervid gathers sage with the sickle their people gave them and brews a tonic, fells an oak branch and trades it to a Scorpid, who digs copper with their own pick and smiths a pair of pliers. |
 | `editor.play.ts` | In Chromium: a Steward opens the world editor, plants a tree and takes it back, lays a road with a house at its end and places monsters, while a robot in the same land is shown each change. |
 | `floors.play.ts` | In Chromium: the Owner gives the Sanctum Arcanum a floor up and a cellar with the world editor's Floors tool, walks up the stairs and back down, is carried into the cellar (the land above hidden), and is still on floor 1 after a reload. |
 | `mini-map.play.ts` | In Chromium: the Owner gives the Sanctum Arcanum a floor up and a cellar; the mini map shows the ground floor, zooms in and out, looks at the floor above and the cellar without moving them, follows them upstairs, maximizes, minimizes (drawing nothing) and closes, and comes back with M or the Map button. |

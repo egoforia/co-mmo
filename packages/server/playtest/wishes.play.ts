@@ -106,6 +106,8 @@ describe('the robot makes wishes', () => {
     expect.soft(world.store.content.length, 'no wish granted without Favor').toBe(before);
 
     // A land: a road appears, the robot walks into it, and everything there is in reach.
+    // Every edge of the Sanctum already meets a land, so the robot asks from the Shore, at the world's edge.
+    expect.soft(await bot.travelTo('shore'), 'the robot walks out to the Shore').toBe(true);
     since = bot.mark();
     const land = await bot.wish('I wish for a misty valley region with wolves');
     const landEntry = land && (await granted(bot, land.card.title, since));

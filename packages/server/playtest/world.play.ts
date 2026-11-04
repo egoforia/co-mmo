@@ -34,7 +34,8 @@ describe('the robot walks the world', () => {
     await bot.travelTo('sanctum');
     expect.soft([...visited].sort()).toEqual(regions().map((r) => r.id).sort());
     expect(world.problems()).toEqual([]);
-  });
+    // Six lands and ten roads, each walked there and back at walking pace: about ten minutes.
+  }, 1_200_000);
 
   it('lands every wished region where a player can walk it', () => {
     // A wished land is laid out from its seed and how wild it is: try many.

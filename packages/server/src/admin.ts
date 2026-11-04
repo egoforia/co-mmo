@@ -628,13 +628,31 @@ export async function handleAdmin(
           for (const raw of body.items) {
             if (!raw || typeof raw !== 'object') continue;
             const entry = raw as Record<string, unknown>;
+            const target = typeof entry.targetId === 'string' ? entry.targetId : String(entry.asset ?? '');
+            const k = typeof entry.kind === 'string' ? entry.kind : 'paint';
             const ask: ArtAsk =
               entry.ask && typeof entry.ask === 'object'
                 ? (entry.ask as ArtAsk)
-                : ({
-                    kind: (typeof entry.kind === 'string' ? entry.kind : 'paint') as ArtAsk['kind'],
-                    asset: typeof entry.targetId === 'string' ? entry.targetId : String(entry.asset ?? ''),
-                  } as ArtAsk);
+                : k === 'paint-group' || k === 'group'
+                  ? { kind: 'group', group: target }
+                  : k === 'view'
+                    ? { kind: 'view', walker: target, direction: (typeof entry.direction === 'string' ? entry.direction : 'front-left') as Facing }
+                    : k === 'ways'
+                      ? { kind: 'ways', ...(target && target !== 'all' ? { walker: target } : {}) }
+                      : k === 'clip'
+                        ? {
+                            kind: 'clip',
+                            walker: target,
+                            body: typeof entry.body === 'string' ? entry.body : 'two-legged',
+                            direction: (typeof entry.direction === 'string' ? entry.direction : 'front-left') as Facing,
+                          }
+                        : k === 'sound'
+                          ? { kind: 'sound', sound: target }
+                          : k === 'normal'
+                            ? { kind: 'normal', asset: target }
+                            : k === 'sheet'
+                              ? { kind: 'sheet', look: target }
+                              : { kind: 'paint', asset: target };
             await ctx.art.upNext.add(ask, {
               label: typeof entry.label === 'string' ? entry.label : undefined,
               category: typeof entry.category === 'string' ? entry.category : undefined,
@@ -667,20 +685,22 @@ export async function handleAdmin(
             ...(typeof body?.note === 'string' ? { note: body.note } : {}),
             ...(typeof body?.prompt === 'string' ? { prompt: body.prompt } : {}),
             ...(typeof body?.harmonized === 'boolean' ? { harmonized: body.harmonized } : {}),
+            ...(typeof body?.harmonizedPrompt === 'string' ? { harmonizedPrompt: body.harmonizedPrompt } : {}),
+            ...(Array.isArray(body?.references) ? { references: body.references.map(String) } : {}),
             ...(typeof body?.label === 'string' ? { label: body.label } : {}),
           });
           return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
         }
-        if (action === 'clear') {
+        if (action === 'clear' || action === 'clear-done') {
           await ctx.art.upNext.clear();
           return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
         }
         if (action === 'pause') {
           ctx.art.upNext.pause();
-          return json(res, 200, { ok: true }), true;
+          return json(res, 200, { ok: true, ...(await ctx.art.upNext.list()) }), true;
         }
-        if (action === 'run') {
-          const count = typeof body?.count === 'number' ? body.count : undefined;
+        if (action === 'run' || action === 'run-next' || action === 'run-all') {
+          const count = action === 'run-next' ? 1 : typeof body?.count === 'number' ? body.count : undefined;
           const resRun = await ctx.art.upNext.runNext(ctx.art, count);
           return json(res, 200, { ok: true, ...resRun, ...(await ctx.art.upNext.list()) }), true;
         }

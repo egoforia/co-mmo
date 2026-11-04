@@ -190,9 +190,9 @@ export const ASKED: Record<ArtJob['source'], string> = { 'start-up': 'start-up',
 /** Item pages whose items can be held. */
 export const HOLDABLE = ['Weapons', 'Shields', 'Charms', 'Craft tools'];
 
-export const usd = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`;
+export const usd = (n: number) => `$${(n ?? 0).toFixed((n ?? 0) < 1 ? 3 : 2)}`;
 export const when = (at: number) => new Date(at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-export const esc = escapeHtml;
+export const esc = (s: string | undefined | null): string => escapeHtml(s ?? '');
 
 export interface UpNextEntry {
   id: string;
@@ -255,16 +255,18 @@ export const artState: {
 };
 
 /** Where the Art Studio is: its tab and page, from the address (#<tab>/<page> or legacy #art/<tab>/<page>). */
-export function where(): { sub: Subtab; page?: string } {
-  const raw = location.hash.slice(1).split('/').filter(Boolean);
+export function where(): { sub: Subtab; page?: string; walker?: string } {
+  const [hashPath, queryString] = location.hash.slice(1).split('?');
+  const raw = (hashPath ?? '').split('/').filter(Boolean);
   const parts = raw[0] === 'art' ? raw.slice(1) : raw;
   const subRaw = parts[0] ?? 'entities';
   const page = parts.length > 1 ? decodeURIComponent(parts.slice(1).join('/')) : undefined;
+  const walker = queryString ? (new URLSearchParams(queryString).get('walker') ?? undefined) : undefined;
   const mapped: Subtab =
     subRaw === 'now' ? 'queue' :
     subRaw === 'characters' || subRaw === 'monsters' ? (subRaw as Subtab) :
     SUBTABS.some(([id]) => id === subRaw) ? (subRaw as Subtab) : 'entities';
-  return { sub: mapped, ...(page ? { page } : {}) };
+  return { sub: mapped, ...(page ? { page } : {}), ...(walker ? { walker } : {}) };
 }
 
 export function go(sub: Subtab, page?: string): string {

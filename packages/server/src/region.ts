@@ -697,7 +697,7 @@ export class Region {
         this.kit.arrangeHotbar(p, message.slots);
         break;
       case 'craft':
-        this.kit.craft(p, message.recipe);
+        this.kit.craft(p, message.recipe, message.lean);
         break;
       case 'shop':
         this.kit.shop(p, message);

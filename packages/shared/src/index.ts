@@ -19,6 +19,7 @@ export * from './content.ts';
 export * from './loot.ts';
 export * from './materials.ts';
 export * from './copies.ts';
+export * from './fashion.ts';
 export * from './gathering.ts';
 export * from './crafts.ts';
 export * from './recipes.ts';

@@ -53,7 +53,8 @@ describe('crafted copies', () => {
     // Copies are not listed with the items.
     expect(Object.keys(ITEMS).some(isCopyId)).toBe(false);
     expect(copyWords(better)).toBe('Tailored by Mara. Quality 130%.');
-    expect(copyWords(ITEMS['wooden-sword'])).toBe('');
+    expect(copyWords(ITEMS['wooden-sword'])).toBe('Tailored by unknown.');
+    expect(copyWords(ITEMS.tonic)).toBe('');
   });
 
   it('are made by shops at standard quality and by players by their Wit', () => {

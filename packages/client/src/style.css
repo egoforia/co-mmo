@@ -429,6 +429,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #spellbook button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
 #spellbook button.key { min-width: 26px; background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
 #spellbook button.key.on { background: var(--accent); color: var(--bg); font-weight: 700; }
+#crafting .lean button.on { background: var(--accent); color: var(--bg); font-weight: 700; }
 #spellbook small { color: var(--muted); }
 .window .rows li {
   display: grid; grid-template-columns: 32px auto 1fr auto auto; gap: 4px 8px; align-items: center;

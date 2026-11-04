@@ -379,7 +379,7 @@ function play(token: string): void {
         sound.play('spell');
       },
       hotbar: (slots) => connection.send({ t: 'hotbar', slots }),
-      craft: (recipe) => connection.send({ t: 'craft', recipe }),
+      craft: (recipe, lean) => connection.send({ t: 'craft', recipe, ...(lean ? { lean } : {}) }),
       shop: (action, npc, id, qty, replace) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}), ...(replace ? { replace } : {}) }),
       trade: (m) => connection.send(m),
       typing: isTyping,

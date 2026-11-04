@@ -22,7 +22,11 @@ import {
   recipeCraft,
   recipeTier,
   recipeTierWords,
+  RACES,
+  STAT_NAMES,
+  liftedStats,
   type CraftId,
+  type Stats,
   type RecipeDef,
   type ShopMessage,
   type Character,
@@ -41,7 +45,8 @@ export interface KitActions {
   ability(id: string): void;
   /** Arrange keys 1 to 6: an ability id per key, or '' for none. */
   hotbar(slots: string[]): void;
-  craft(recipe: string): void;
+  /** Make a recipe; `lean` is which of the maker's people's two lifted attributes gets the larger share. */
+  craft(recipe: string, lean?: keyof Stats): void;
   shop(action: ShopMessage['action'], npc: string, id: string, qty?: number, replace?: string): void;
   trade(message: TradeActionMessage): void;
   /** True while typing in chat, so keys are not shortcuts. */
@@ -69,6 +74,8 @@ export class KitUi {
   private trade: TradeView | null = null;
   private timer: number | undefined;
   private readonly spellbook: SpellbookUi;
+  /** The attribute the player's crafted gear leans toward; the server checks it is one their people lifts. */
+  private lean: keyof Stats | undefined;
 
   constructor(character: Character, private readonly actions: KitActions) {
     this.character = character;
@@ -89,7 +96,12 @@ export class KitUi {
     $('crafting').addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       const recipe = target.closest<HTMLElement>('[data-recipe]')?.dataset.recipe;
-      if (recipe) actions.craft(recipe);
+      const lean = target.closest<HTMLElement>('[data-lean]')?.dataset.lean as keyof Stats | undefined;
+      if (lean) {
+        this.lean = lean;
+        this.renderCrafting();
+      }
+      if (recipe) actions.craft(recipe, this.lean);
       if (target.closest('[data-close]')) $('crafting').hidden = true;
     });
     $('shop').addEventListener('click', (e) => {
@@ -249,7 +261,18 @@ export class KitUi {
     $('crafting').innerHTML = `
       <h2>Crafting book <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <p class="note">Each craft needs its tool in your bag and grows as you practise it. Anyone can reach level 10; a master goes on to 20. Wit makes finer things.</p>
+      ${this.leanLine()}
       ${groups}`;
+  }
+
+  /** The choice of which lifted attribute the gear you make leans toward (Region fashion plan). */
+  private leanLine(): string {
+    const race = this.character.race;
+    if (!race) return '';
+    const stats = liftedStats(race);
+    const chosen = this.lean && stats.includes(this.lean) ? this.lean : stats[0];
+    const buttons = stats.map((k) => `<button type="button" data-lean="${k}"${k === chosen ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"'}>${STAT_NAMES[k]}</button>`).join(' ');
+    return `<p class="note lean">Gear you make carries your ${escapeHtml(RACES[race].name)} hand. Lean it toward ${buttons}</p>`;
   }
 
   /** A craft's heading: its level, practice toward the next, mastery and tool. */

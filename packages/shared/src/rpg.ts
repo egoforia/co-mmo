@@ -57,8 +57,15 @@ export const GARMENT_SLOTS: readonly EquipSlot[] = ['head', 'body', 'cloak', 'fe
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
-/** What a piece of equipment adds while worn: stats, weapon damage, armour and ward. */
-export type Bonus = Partial<Stats> & { attack?: number; armor?: number; ward?: number };
+/**
+ * What a piece of equipment adds while worn: stats, weapon damage, armour and
+ * ward, and (from material traits, Region fashion plan) percentages: dodge
+ * chance, attack speed, health and Energy regeneration.
+ */
+export type Bonus = Partial<Stats> & { attack?: number; armor?: number; ward?: number; dodge?: number; haste?: number; regen?: number; energyRegen?: number };
+
+/** The parts of a Bonus that are not attributes, summed over everything worn by `gearBonus`. */
+export type GearKey = 'attack' | 'armor' | 'ward' | 'dodge' | 'haste' | 'regen' | 'energyRegen';
 
 export interface InventorySlot {
   item: string;
@@ -205,8 +212,8 @@ export function totalStats(c: Pick<Character, 'stats'> & Partial<Pick<Character,
   return total;
 }
 
-/** Weapon damage, armour or ward from everything worn. */
-export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: 'attack' | 'armor' | 'ward'): number {
+/** Weapon damage, armour, ward or a percentage from everything worn. */
+export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: GearKey): number {
   let sum = 0;
   for (const id of Object.values(c.equipment ?? {})) sum += (id ? ITEMS[id]?.bonus?.[key] : 0) ?? 0;
   return sum;
@@ -546,11 +553,16 @@ function clampVitals(c: Character): void {
   c.energy = Math.min(c.energy, maxEnergy(c));
 }
 
-/** A short line of what an item adds, e.g. "+2 damage, +1 Spirit". */
+const BONUS_NAMES: Record<string, string> = {
+  attack: 'damage', armor: 'armour', ward: 'ward', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor',
+  dodge: 'dodge', haste: 'attack speed', regen: 'health regeneration', energyRegen: 'Energy regeneration',
+};
+const PERCENT_KEYS = new Set(['dodge', 'haste', 'regen', 'energyRegen']);
+
+/** A short line of what an item adds, e.g. "+2 damage, +1 Spirit, +5% health regeneration". */
 export function bonusText(bonus: Bonus | undefined): string {
   if (!bonus) return '';
-  const names: Record<string, string> = { attack: 'damage', armor: 'armour', ward: 'ward', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor' };
-  return Object.entries(bonus).filter(([, v]) => v).map(([k, v]) => `+${v} ${names[k] ?? k}`).join(', ');
+  return Object.entries(bonus).filter(([, v]) => v).map(([k, v]) => `+${v}${PERCENT_KEYS.has(k) ? '%' : ''} ${BONUS_NAMES[k] ?? k}`).join(', ');
 }
 
 /**

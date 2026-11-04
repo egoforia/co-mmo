@@ -77,9 +77,9 @@ export class Kit {
   }
 
   /** Makes a recipe from what is in the bag; the craft grows and the tool may wear out. */
-  craft(p: PlayerState, recipe: string): void {
+  craft(p: PlayerState, recipe: string, lean?: keyof Stats): void {
     const before = new Set(p.character.inventory.map((s) => s.item));
-    const why = craft(p.character, recipe, crafted(p.character, p.info.name, recipe, this.s.random));
+    const why = craft(p.character, recipe, crafted(p.character, p.info.name, recipe, this.s.random, lean));
     if (why) return this.s.notice(p, why);
     const r = RECIPES[recipe]!;
     // A crafted piece of gear says how well it came out.
@@ -112,7 +112,7 @@ export class Kit {
     if (m.action === 'master') return this.master(p, m);
     const ch = p.character;
     const before = ch.gold;
-    const why = m.action === 'buy' ? buy(ch, m.npc, m.id, shopMade(npcName(m.npc), this.s.random)) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);
+    const why = m.action === 'buy' ? buy(ch, m.npc, m.id, shopMade(npcName(m.npc), this.s.random, m.npc)) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);
     if (why) return this.s.notice(p, why);
     const name = m.action === 'learn' ? ABILITIES[m.id]!.name : ITEMS[m.id]?.name ?? m.id;
     this.s.notice(p, m.action === 'buy'

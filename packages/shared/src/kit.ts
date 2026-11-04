@@ -15,7 +15,9 @@ import {
   STARTING_STATS,
   type Character,
   type InventorySlot,
+  type Stats,
 } from './rpg.ts';
+import { NPC_PEOPLES, PREFERRED_MATERIAL_QUALITY, canLean, prefersMaterial } from './fashion.ts';
 import { EVERYWHERE_REGION } from './material-traits.ts';
 import { QUALITY_STANDARD, clampQuality, makesCopies, newCopy, type CopyInfo } from './copies.ts';
 import {
@@ -134,8 +136,9 @@ export function mainMaterial(recipe: RecipeDef): string | undefined {
 /**
  * Quality of a piece a player crafts: standard at the recipe's level, two
  * points better for each craft level above it, one for each Wit above the
- * start, five for each tool tier above the first, ten in a home craft, and
- * a little luck either way. Only a master reaches the very top.
+ * start, five for each tool tier above the first, ten in a home craft, ten
+ * more when the main material is one their people prefers, and a little luck
+ * either way. Only a master reaches the very top.
  */
 export function craftQuality(c: Character, recipe: RecipeDef, random: () => number): number {
   const craft = recipeCraft(recipe);
@@ -147,6 +150,7 @@ export function craftQuality(c: Character, recipe: RecipeDef, random: () => numb
     + wit
     + ((bestTool(c, craft)?.tier ?? 1) - 1) * 5
     + (isHomeCraft(c, craft) ? HOME_CRAFT_QUALITY : 0)
+    + (prefersMaterial(c.race, ITEMS[mainMaterial(recipe) ?? '']) ? PREFERRED_MATERIAL_QUALITY : 0)
     + luck;
   return clampQuality(isMastered(c, craft) ? q : Math.min(UNMASTERED_QUALITY_MAX, q));
 }
@@ -177,8 +181,12 @@ export function practise(c: Character, recipeId: string, random: () => number): 
   return { craft, ...(level ? { level } : {}), ...(broke ? { broke } : {}) };
 }
 
-/** The copy a player makes of a recipe's result: their name, people, quality and the main material's trait. */
-export function crafted(c: Character, maker: string, recipeId: string, random: () => number): Mint {
+/**
+ * The copy a player makes of a recipe's result: their name, people, quality
+ * and the main material's trait. `lean` is which of their people's two lifted
+ * attributes they give the larger share; anything else is ignored.
+ */
+export function crafted(c: Character, maker: string, recipeId: string, random: () => number, lean?: keyof Stats): Mint {
   const r = RECIPES[recipeId]!;
   const material = mainMaterial(r);
   const trait = material ? ITEMS[material]?.material?.traits[0] : undefined;
@@ -186,15 +194,16 @@ export function crafted(c: Character, maker: string, recipeId: string, random: (
     of: base,
     quality: craftQuality(c, r, random),
     maker: { kind: 'player', name: maker },
-    ...(c.race ? { people: c.race } : {}),
+    ...(c.race ? { people: c.race, ...(canLean(c.race, lean) ? { lean } : {}) } : {}),
     ...(trait ? { trait } : {}),
     ...(material ? { material } : {}),
   } satisfies CopyInfo, random);
 }
 
-/** The copy a shopkeeper sells: standard quality, made by them. */
-export function shopMade(npcName: string, random: () => number): Mint {
-  return (base) => newCopy({ of: base, quality: QUALITY_STANDARD, maker: { kind: 'npc', name: npcName } }, random);
+/** The copy a shopkeeper sells: standard quality, made by them, leaning their people's way when they have one. */
+export function shopMade(npcName: string, random: () => number, npcId?: string): Mint {
+  const people = npcId && Object.hasOwn(NPC_PEOPLES, npcId) ? NPC_PEOPLES[npcId] : undefined;
+  return (base) => newCopy({ of: base, quality: QUALITY_STANDARD, maker: { kind: 'npc', name: npcName }, ...(people ? { people } : {}) }, random);
 }
 
 // --- Shops and trainers ----------------------------------------------------------

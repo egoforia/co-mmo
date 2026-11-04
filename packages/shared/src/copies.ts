@@ -1,6 +1,7 @@
+import { addBonus, canLean, peopleLean, traitBonus } from './fashion.ts';
 import { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
-import { isRace, type RaceId } from './races.ts';
-import { ITEMS, RARITIES, resolveCopiesWith, type Bonus, type ItemDef } from './rpg.ts';
+import { RACES, isRace, type RaceId } from './races.ts';
+import { ITEMS, RARITIES, bonusText, resolveCopiesWith, type Bonus, type ItemDef, type Rarity, type Stats } from './rpg.ts';
 
 // Crafted copies (gather and craft plan, step 3). Every copy of a piece of
 // gear looks the same, but a crafted one is its own copy: who made it
@@ -28,6 +29,8 @@ export interface CopyInfo {
   maker: { kind: 'player' | 'npc'; name: string };
   /** The maker's people, which sets the attribute lean (Region fashion plan). */
   people?: RaceId;
+  /** Which of the people's two lifted attributes the maker gave the larger share; the first when not said. */
+  lean?: keyof Stats;
   /** The main material's trait (Region fashion plan). */
   trait?: MaterialTrait;
   /** The main material used, by item id. */
@@ -103,7 +106,9 @@ function makerPart(name: string): string {
 /** The id of a new copy; `nonce` keeps two copies made alike apart. */
 export function copyId(info: CopyInfo, nonce: string): string {
   const maker = `${info.maker.kind === 'npc' ? 'n' : 'p'}${makerPart(info.maker.name)}`;
-  return [copyBase(info.of), info.bound ? BOUND_TAG : TAG, clampQuality(info.quality), maker, info.people ?? '', info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
+  // The people part is "<people>" or "<people>-<leading attribute>" when the maker chose their second one.
+  const people = info.people ? `${info.people}${info.lean && canLean(info.people, info.lean) && info.lean !== peopleLeanDefault(info.people) ? `-${info.lean}` : ''}` : '';
+  return [copyBase(info.of), info.bound ? BOUND_TAG : TAG, clampQuality(info.quality), maker, people, info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
 }
 
 /** A new copy's id, with a random nonce. */
@@ -116,18 +121,23 @@ export function newCopy(info: CopyInfo, random: () => number = Math.random): str
 export function parseCopy(id: string): CopyInfo | undefined {
   const p = id.split(MARK);
   if (p.length !== PARTS || (p[1] !== TAG && p[1] !== BOUND_TAG)) return undefined;
-  const [of, , quality, maker, people, trait, material] = p as [string, string, string, string, string, string, string];
+  const [of, , quality, maker, peoplePart, trait, material] = p as [string, string, string, string, string, string, string];
+  const [people, lean] = peoplePart.split('-');
   const q = Number(quality);
   if (!of || !Number.isInteger(q) || q !== clampQuality(q) || !/^[np]/.test(maker)) return undefined;
   return {
     of,
     quality: q,
     maker: { kind: maker[0] === 'n' ? 'npc' : 'player', name: decode(maker.slice(1)) },
-    ...(isRace(people) ? { people } : {}),
+    ...(isRace(people) ? { people, ...(canLean(people, lean) ? { lean } : {}) } : {}),
     ...(MATERIAL_TRAITS.includes(trait as MaterialTrait) ? { trait: trait as MaterialTrait } : {}),
     ...(material ? { material } : {}),
     ...(p[1] === BOUND_TAG ? { bound: true as const } : {}),
   };
+}
+
+function peopleLeanDefault(people: RaceId): keyof Stats {
+  return Object.keys(RACES[people].lift)[0] as keyof Stats;
 }
 
 /** A bonus scaled by quality; each part that was there stays at least 1. */
@@ -147,8 +157,9 @@ export function copyDef(items: Record<string, ItemDef>, id: string): ItemDef | u
   if (!info || !base || !makesCopies(base)) return undefined;
   const kept = made.get(id);
   if (kept?.base === base) return kept.def;
-  const bonus = scaled(base.bonus, info.quality);
   const rarity = info.quality >= FINER_QUALITY ? RARITIES[Math.min(RARITIES.length - 1, RARITIES.indexOf(base.rarity ?? 'common') + 1)] : base.rarity;
+  const parts = copyParts(base.bonus, info, rarity ?? 'common');
+  const bonus = parts.length ? parts.reduce<Bonus>((sum, part) => addBonus(sum, part.bonus), {}) : undefined;
   const def: ItemDef = {
     ...base,
     ...(bonus ? { bonus } : {}),
@@ -164,12 +175,44 @@ export function copyDef(items: Record<string, ItemDef>, id: string): ItemDef | u
 
 resolveCopiesWith(copyDef);
 
-/** A copy in plain words for its card, like "Tailored by Marina. Quality 112%." */
+/** One part of a copy's bonus and where it comes from, for its card. */
+export interface BonusPart {
+  /** Like "Quality 112%", "Ursine maker" or "Warm (Thorn Wolf Pelt)". */
+  from: string;
+  bonus: Bonus;
+}
+
+/**
+ * Where a copy's bonus comes from (Region fashion plan, F2): its base item
+ * scaled by quality, the maker's people lean and the main material's trait,
+ * the last two sized by the copy's rarity.
+ */
+export function copyParts(base: Bonus | undefined, info: CopyInfo, rarity: Rarity): BonusPart[] {
+  const parts: BonusPart[] = [];
+  const quality = scaled(base, info.quality);
+  if (quality && Object.keys(quality).length) parts.push({ from: `Quality ${info.quality}%`, bonus: quality });
+  if (info.people) parts.push({ from: `${RACES[info.people].name} maker`, bonus: peopleLean(info.people, rarity, info.lean) });
+  if (info.trait) {
+    const material = info.material ? ITEMS[info.material]?.name : undefined;
+    parts.push({ from: `${info.trait[0]!.toUpperCase()}${info.trait.slice(1)}${material ? ` (${material})` : ''}`, bonus: traitBonus(info.trait, rarity) });
+  }
+  return parts;
+}
+
+/**
+ * A piece of gear in plain words for its card, like "Tailored by Marina.
+ * Quality 112%. Quality 112%: +7 armour. Lutran maker: +1 Might." Gear from
+ * before copies, loot and quest rewards is "Tailored by unknown".
+ */
 export function copyWords(def: ItemDef | undefined): string {
-  const c = def?.copy;
-  if (!c) return '';
+  if (!def || !makesCopies(def)) return '';
+  const c = def.copy;
+  if (!c) return 'Tailored by unknown.';
   const binding = c.bound ? ' Bound to you.' : def.unique ? ' One of a kind: it binds to whoever first wears it.' : '';
-  return `Tailored by ${c.maker.name}. Quality ${c.quality}%.${binding}`;
+  const base = Object.hasOwn(ITEMS, c.of) ? ITEMS[c.of] : undefined;
+  const parts = copyParts(base?.bonus, c, def.rarity ?? 'common').filter((p) => bonusText(p.bonus));
+  const sources = parts.length > 1 ? ` ${parts.map((p) => `${p.from}: ${bonusText(p.bonus)}.`).join(' ')}` : '';
+  return `Tailored by ${c.maker.name}. Quality ${c.quality}%.${sources}${binding}`;
 }
 
 /**

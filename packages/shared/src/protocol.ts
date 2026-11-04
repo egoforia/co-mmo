@@ -184,6 +184,8 @@ export interface AbilityMessage {
 export interface CraftMessage {
   t: 'craft';
   recipe: string;
+  /** Which of their people's lifted attributes the maker leans toward (fashion.ts); the server checks it. */
+  lean?: keyof Stats;
 }
 
 /** Buy, sell, learn or take up a mastery at the NPC you are talking to. */
@@ -713,7 +715,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'choosePath') return isId(m.npc) && isId(m.path);
   if (m.t === 'ability') return isId(m.ability) && (m.target === undefined || isId(m.target));
   if (m.t === 'hotbar') return Array.isArray(m.slots) && m.slots.length <= 6 && m.slots.every((s) => s === '' || isId(s));
-  if (m.t === 'craft') return isId(m.recipe);
+  if (m.t === 'craft') return isId(m.recipe) && (m.lean === undefined || isStat(m.lean));
   if (m.t === 'shop') {
     return ['buy', 'sell', 'learn', 'master'].includes(m.action as string) && isId(m.npc) && isItemId(m.id) &&
       (m.replace === undefined || isId(m.replace)) &&

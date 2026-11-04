@@ -21,14 +21,14 @@ export function maxEnergy(c: Gear): number {
   return 20 + c.level * 2 + totalStats(c).wit * 3;
 }
 
-/** Energy regained per second, always (Spirit speeds it up). */
+/** Energy regained per second, always (Spirit speeds it up, and so do shimmering garments). */
 export function energyPerSecond(c: Worn): number {
-  return 1.5 + totalStats(c).spirit * 0.12;
+  return (1.5 + totalStats(c).spirit * 0.12) * (1 + gearBonus(c, 'energyRegen') / 100);
 }
 
-/** Health regained per second once out of combat. */
+/** Health regained per second once out of combat (warm garments add a share). */
 export function regenPerSecond(c: Worn): number {
-  return 1 + totalStats(c).spirit * 0.3;
+  return (1 + totalStats(c).spirit * 0.3) * (1 + gearBonus(c, 'regen') / 100);
 }
 
 /** Damage left after armour: each point of armour takes off a little, never all of it. */
@@ -49,9 +49,9 @@ export function attackPower(c: Gear): number {
   return Math.round(amount * (wieldsTrained(c) ? 1 : UNTRAINED_DAMAGE));
 }
 
-/** Seconds between attacks: the family's speed, up to 30% quicker with Agility, never under 0.35. */
+/** Seconds between attacks: the family's speed, up to 30% quicker with Agility (and a little more from supple garments), never under 0.35. */
 export function attackCooldown(c: Worn): number {
-  const bonus = Math.min(0.3, totalStats(c).agility * 0.01);
+  const bonus = Math.min(0.3, totalStats(c).agility * 0.01) + gearBonus(c, 'haste') / 100;
   return Math.max(0.35, Math.round((wieldedFamily(c).speed / (1 + bonus)) * 100) / 100);
 }
 
@@ -81,9 +81,9 @@ export function critChance(c: Worn): number {
   return Math.min(0.35, 0.05 + totalStats(c).agility * 0.004 + weapon);
 }
 
-/** Chance (0 to 0.2) to dodge a physical hit: Agility raises it. */
+/** Chance to dodge a physical hit: Agility raises it to 0.2, light garments a little past that, never over 0.3. */
 export function dodgeChance(c: Worn): number {
-  return Math.min(0.2, totalStats(c).agility * 0.0025);
+  return Math.min(0.3, Math.min(0.2, totalStats(c).agility * 0.0025) + gearBonus(c, 'dodge') / 100);
 }
 
 /** What ability rests are multiplied by: Wit shortens them, by at most a fifth. */

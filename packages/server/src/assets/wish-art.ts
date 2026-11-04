@@ -145,7 +145,9 @@ export async function paintWish(
   const sent: string[] = [];
   for (const ref of request.references) {
     try {
-      references.push({ mimeType: 'image/png', data: await readFile(resolve(anchorDir, `${ref}.png`)) });
+      const redone = await readFile(resolve(artDir, 'redone', `${ref}.png`)).catch(() => undefined);
+      const data = redone ?? await readFile(resolve(anchorDir, `${ref}.png`));
+      references.push({ mimeType: 'image/png', data });
       sent.push(ref);
     } catch {
       // A missing reference only weakens the style match.

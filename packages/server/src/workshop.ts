@@ -315,7 +315,11 @@ export class Workshop {
     const provider = this.options.ai.image('wishes');
     const pictures: PicturePreview[] = [];
     const picture = (label: string, prompt: string, wanted: string[], withRaw = false): void => {
-      const references = wanted.filter((ref) => existsSync(resolve(this.options.anchorDir, `${ref}.png`)) || (withRaw && existsSync(resolve(this.options.anchorDir, 'raw', `${ref}.png`))));
+      const references = wanted.filter((ref) =>
+        existsSync(resolve(this.options.artDir, 'redone', `${ref}.png`)) ||
+        existsSync(resolve(this.options.anchorDir, `${ref}.png`)) ||
+        (withRaw && existsSync(resolve(this.options.anchorDir, 'raw', `${ref}.png`))),
+      );
       const note = provider?.id === 'gemini' && references.length ? REFERENCE_NOTE : undefined;
       pictures.push({ label, prompt, references, ...(note ? { note } : {}) });
     };

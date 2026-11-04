@@ -109,6 +109,8 @@ export interface BuildingArtDirs {
   rawDir: string;
   /** Game-ready PNGs. */
   outDir: string;
+  /** Repainted game art (data/art/redone), checked first when an anchor or asset was redone. */
+  redoneDir?: string;
 }
 
 /** Paints one picture: asks the provider, keeps the raw image, writes the game copy. */
@@ -126,7 +128,8 @@ export async function paintBuildingArt(
   for (const ref of job.references) {
     // The shipped buildings' untouched pictures sit beside the anchors, for repainting a shipped building's inside.
     const shipped = resolve(dirs.anchorDir, '..', 'buildings', 'raw', `${ref}.png`);
-    for (const path of [resolve(dirs.rawDir, `${ref}.png`), shipped, resolve(dirs.anchorDir, 'raw', `${ref}.png`), resolve(dirs.anchorDir, `${ref}.png`)]) {
+    const redone = dirs.redoneDir ? resolve(dirs.redoneDir, `${ref}.png`) : resolve(dirs.outDir, '..', 'redone', `${ref}.png`);
+    for (const path of [redone, resolve(dirs.rawDir, `${ref}.png`), shipped, resolve(dirs.anchorDir, 'raw', `${ref}.png`), resolve(dirs.anchorDir, `${ref}.png`)]) {
       const data = await readFile(path).catch(() => undefined);
       if (!data) continue;
       references.push({ mimeType: 'image/png', data });

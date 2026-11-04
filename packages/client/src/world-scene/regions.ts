@@ -242,8 +242,8 @@ export function spotArt(scene: Phaser.Scene, kind: string): string | undefined {
   const def = SPOTS[kind];
   if (!def) return undefined;
   if (scene.textures.exists(def.art)) return def.art;
-  const icon = ITEMS[def.material]?.art;
-  return icon && scene.textures.exists(icon) ? icon : undefined;
+  const m = ITEMS[def.material];
+  return [m?.art, m?.standIn].find((key) => key && scene.textures.exists(key));
 }
 
 /** Gathering spots (gathering.ts), each standing on its tile; a spot painted later draws the land again (`kit`). */

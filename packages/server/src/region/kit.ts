@@ -8,6 +8,7 @@ import {
   crafted,
   shopMade,
   copyWords,
+  bindOnWear,
   CRAFTS,
   MAX_CRAFT_LEVEL,
   craftLevel,
@@ -47,9 +48,12 @@ export class Kit {
   /** Wears an item from the bag, or takes off what is in a slot. */
   wear(p: PlayerState, item?: string, slot?: EquipSlot): void {
     if (item) {
-      const why = equip(p.character, item);
+      // A unique piece binds to whoever first wears it.
+      const was = ITEMS[item];
+      const why = equip(p.character, item, (id) => bindOnWear(p.character, id));
       if (why) return this.s.notice(p, why);
-      this.s.notice(p, `You put on the ${ITEMS[item]!.name}.`);
+      const bound = was?.unique && !was.copy?.bound && was.copy;
+      this.s.notice(p, `You put on the ${was!.name}.${bound ? ' It binds to you.' : ''}`);
       this.s.credit(item, p, 'equip');
     } else if (slot && !unequip(p.character, slot)) {
       return;

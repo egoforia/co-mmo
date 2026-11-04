@@ -7,6 +7,7 @@ import {
   ITEMS,
   addItem,
   copyBase,
+  copyId,
   itemCount,
   newCharacter,
   regionDef,
@@ -160,6 +161,18 @@ describe('crafting on the server', () => {
     expect(itemCount(region.character('a')!, 'tonic')).toBe(1);
     expect(notices(conn).at(-1)).toMatch(/You made a Tonic/);
     expect(region.character('a')!.crafts?.herbalism?.xp).toBeGreaterThan(0);
+  });
+
+  it('binds a unique piece to whoever first wears it', () => {
+    const { region } = setup('sanctum');
+    const conn = fakeConn();
+    const c = newCharacter();
+    const bow = copyId({ of: 'demonhorn-bow', quality: 110, maker: { kind: 'player', name: 'Ilya' } }, 'abc');
+    addItem(c, bow);
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, c);
+    region.handle('a', { t: 'equip', item: bow });
+    expect(notices(conn).at(-1)).toMatch(/You put on the Demonhorn Bow\. It binds to you\./);
+    expect(ITEMS[region.character('a')!.equipment.weapon!]).toMatchObject({ bound: true });
   });
 
   it('gives a people its home tools once, and masters name you one of theirs', () => {

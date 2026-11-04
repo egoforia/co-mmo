@@ -16,6 +16,7 @@ import {
   type Character,
   type InventorySlot,
 } from './rpg.ts';
+import { EVERYWHERE_REGION } from './material-traits.ts';
 import { QUALITY_STANDARD, clampQuality, makesCopies, newCopy, type CopyInfo } from './copies.ts';
 import {
   CRAFTS,
@@ -45,6 +46,27 @@ export interface RecipeDef {
   craft?: CraftId;
   /** Craft level needed to make it, 1 to 20. */
   level: number;
+  /** Its tier when not worked out from its materials (recipeTier). */
+  tier?: RecipeTier;
+}
+
+/**
+ * How rare a recipe is (the plan's recipe tiers): common uses one land's
+ * materials (the Sanctum's count anywhere), rare mixes two or three lands,
+ * and unique needs a boss's or a quest's key item and a master to make it.
+ */
+export type RecipeTier = 'common' | 'rare' | 'unique';
+export const RECIPE_TIERS: readonly RecipeTier[] = ['common', 'rare', 'unique'];
+
+/** A recipe's tier: its own, else worked out from where its materials come from. */
+export function recipeTier(r: Pick<RecipeDef, 'materials' | 'tier'>): RecipeTier {
+  if (r.tier) return r.tier;
+  const infos = r.materials.map((m) => ITEMS[m.item]?.material);
+  if (infos.some((m) => m?.tier === 3)) return 'unique';
+  // The lands each material may count for; the Sanctum's count for any.
+  const lands = infos.map((m) => m?.homes ?? []).filter((h) => h.length && !h.includes(EVERYWHERE_REGION));
+  if (!lands.length) return 'common';
+  return lands[0]!.some((land) => lands.every((h) => h.includes(land))) ? 'common' : 'rare';
 }
 
 /** Recipes everyone knows; wishes add more, keyed by the wish's id. */
@@ -70,8 +92,8 @@ export function cannotCraft(c: Character, id: string): string | undefined {
     const name = CRAFTS[craft].name;
     const level = craftLevel(c, craft);
     if (level < r.level) return `You need ${name} level ${r.level} to make that; yours is ${level}.`;
-    // Tier 3 materials answer only to a master's hand.
-    if (!isMastered(c, craft) && r.materials.some((m) => ITEMS[m.item]!.material?.tier === 3)) return `Only a master of ${name} can work that.`;
+    // Tier 3 materials and unique pieces answer only to a master's hand.
+    if (!isMastered(c, craft) && (recipeTier(r) === 'unique' || r.materials.some((m) => ITEMS[m.item]!.material?.tier === 3))) return `Only a master of ${name} can make that.`;
     if (!bestTool(c, craft)) return `You need a ${CRAFTS[craft].tool.toLowerCase()} in your bag for ${name}.`;
   }
   const missing = r.materials.filter((m) => itemCount(c, m.item) < m.qty).map((m) => ITEMS[m.item]!.name);

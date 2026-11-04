@@ -36,14 +36,14 @@ const CREATURES: Record<string, CreatureDef> = {
 };
 
 /**
- * What Mushroom Hollow's creatures leave. Their own icons are painted with
- * the material icons (plan step 6); until then each shows a picture like it.
+ * What Mushroom Hollow's creatures leave. Each shows a picture like it until
+ * its own icon is painted (material-icon-anchors.ts).
  */
 const ITEMS: Record<string, ItemDef> = {
-  'spore-dust': { name: 'Spore Dust', kind: 'material', art: 'item-moth-dust', description: 'A pinch of fine violet dust that glimmers in the dark. It makes you sneeze, and it makes wishes stick.', value: 7, material: { family: 'wishstuff', homes: ['mushroom-hollow'], source: 'creature', tier: 1, traits: ['shimmering'] } },
-  'glowcap-chitin': { name: 'Glowcap Chitin', kind: 'material', art: 'item-crab-shell', description: 'A plate of beetle shell with a faint glow still in it. Hard enough to hammer into armour.', value: 12, material: { family: 'plate', homes: ['mushroom-hollow'], source: 'creature', tier: 2, traits: ['sturdy'] } },
-  'mushroom-fibre': { name: 'Mushroom Fibre', kind: 'material', art: 'item-ancient-linen', description: 'A hank of tough pale threads from a mycelid. Spun and woven, it makes a cloth that never rots.', value: 11, material: { family: 'fibre', homes: ['mushroom-hollow'], source: 'creature', tier: 1, traits: ['supple'] } },
-  'kings-mycelium': { name: 'King\'s Mycelium', kind: 'material', art: 'item-heartwood', rarity: 'rare', description: 'A knot of living threads from the Rootless King\'s heart. It still reaches for the ground. Only a master could work it.', value: 60, material: { family: 'herb', homes: ['mushroom-hollow'], source: 'boss', tier: 3, traits: ['shimmering'] } },
+  'spore-dust': { name: 'Spore Dust', kind: 'material', art: 'item-spore-dust', standIn: 'item-moth-dust', description: 'A pinch of fine violet dust that glimmers in the dark. It makes you sneeze, and it makes wishes stick.', value: 7, material: { family: 'wishstuff', homes: ['mushroom-hollow'], source: 'creature', tier: 1, traits: ['shimmering'] } },
+  'glowcap-chitin': { name: 'Glowcap Chitin', kind: 'material', art: 'item-glowcap-chitin', standIn: 'item-crab-shell', description: 'A plate of beetle shell with a faint glow still in it. Hard enough to hammer into armour.', value: 12, material: { family: 'plate', homes: ['mushroom-hollow'], source: 'creature', tier: 2, traits: ['sturdy'] } },
+  'mushroom-fibre': { name: 'Mushroom Fibre', kind: 'material', art: 'item-mushroom-fibre', standIn: 'item-ancient-linen', description: 'A hank of tough pale threads from a mycelid. Spun and woven, it makes a cloth that never rots.', value: 11, material: { family: 'fibre', homes: ['mushroom-hollow'], source: 'creature', tier: 1, traits: ['supple'] } },
+  'kings-mycelium': { name: 'King\'s Mycelium', kind: 'material', art: 'item-kings-mycelium', standIn: 'item-heartwood', rarity: 'rare', description: 'A knot of living threads from the Rootless King\'s heart. It still reaches for the ground. Only a master could work it.', value: 60, material: { family: 'herb', homes: ['mushroom-hollow'], source: 'boss', tier: 3, traits: ['shimmering'] } },
 };
 
 const QUESTS: Record<string, QuestDef> = {

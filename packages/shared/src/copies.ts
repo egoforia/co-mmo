@@ -1,6 +1,6 @@
 import { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
 import { isRace, type RaceId } from './races.ts';
-import { ITEMS, resolveCopiesWith, type Bonus, type ItemDef } from './rpg.ts';
+import { ITEMS, RARITIES, resolveCopiesWith, type Bonus, type ItemDef } from './rpg.ts';
 
 // Crafted copies (gather and craft plan, step 3). Every copy of a piece of
 // gear looks the same, but a crafted one is its own copy: who made it
@@ -32,10 +32,16 @@ export interface CopyInfo {
   trait?: MaterialTrait;
   /** The main material used, by item id. */
   material?: string;
+  /** A unique piece once worn: bound to its wearer, never traded or sold. */
+  bound?: true;
 }
 
 const MARK = '~';
 const TAG = 'c';
+/** The tag of a unique piece that has been worn and is bound. */
+const BOUND_TAG = 'b';
+/** From this quality a copy is one rarity finer than its base item (common to uncommon, rare to epic). */
+export const FINER_QUALITY = 115;
 const PARTS = 8;
 
 /** True when an id names a crafted copy. */
@@ -97,7 +103,7 @@ function makerPart(name: string): string {
 /** The id of a new copy; `nonce` keeps two copies made alike apart. */
 export function copyId(info: CopyInfo, nonce: string): string {
   const maker = `${info.maker.kind === 'npc' ? 'n' : 'p'}${makerPart(info.maker.name)}`;
-  return [copyBase(info.of), TAG, clampQuality(info.quality), maker, info.people ?? '', info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
+  return [copyBase(info.of), info.bound ? BOUND_TAG : TAG, clampQuality(info.quality), maker, info.people ?? '', info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
 }
 
 /** A new copy's id, with a random nonce. */
@@ -109,7 +115,7 @@ export function newCopy(info: CopyInfo, random: () => number = Math.random): str
 /** What a copy's id says, or undefined when it is not a well-formed copy. */
 export function parseCopy(id: string): CopyInfo | undefined {
   const p = id.split(MARK);
-  if (p.length !== PARTS || p[1] !== TAG) return undefined;
+  if (p.length !== PARTS || (p[1] !== TAG && p[1] !== BOUND_TAG)) return undefined;
   const [of, , quality, maker, people, trait, material] = p as [string, string, string, string, string, string, string];
   const q = Number(quality);
   if (!of || !Number.isInteger(q) || q !== clampQuality(q) || !/^[np]/.test(maker)) return undefined;
@@ -120,6 +126,7 @@ export function parseCopy(id: string): CopyInfo | undefined {
     ...(isRace(people) ? { people } : {}),
     ...(MATERIAL_TRAITS.includes(trait as MaterialTrait) ? { trait: trait as MaterialTrait } : {}),
     ...(material ? { material } : {}),
+    ...(p[1] === BOUND_TAG ? { bound: true as const } : {}),
   };
 }
 
@@ -141,10 +148,13 @@ export function copyDef(items: Record<string, ItemDef>, id: string): ItemDef | u
   const kept = made.get(id);
   if (kept?.base === base) return kept.def;
   const bonus = scaled(base.bonus, info.quality);
+  const rarity = info.quality >= FINER_QUALITY ? RARITIES[Math.min(RARITIES.length - 1, RARITIES.indexOf(base.rarity ?? 'common') + 1)] : base.rarity;
   const def: ItemDef = {
     ...base,
     ...(bonus ? { bonus } : {}),
     ...(base.value ? { value: Math.max(1, Math.round((base.value * info.quality) / 100)) } : {}),
+    ...(rarity ? { rarity } : {}),
+    ...(info.bound ? { bound: true } : {}),
     copy: info,
   };
   if (made.size > 20_000) made.clear();
@@ -158,7 +168,24 @@ resolveCopiesWith(copyDef);
 export function copyWords(def: ItemDef | undefined): string {
   const c = def?.copy;
   if (!c) return '';
-  return `Tailored by ${c.maker.name}. Quality ${c.quality}%.`;
+  const binding = c.bound ? ' Bound to you.' : def.unique ? ' One of a kind: it binds to whoever first wears it.' : '';
+  return `Tailored by ${c.maker.name}. Quality ${c.quality}%.${binding}`;
+}
+
+/**
+ * Before a piece is worn: a unique piece binds to its wearer, so the copy in
+ * the bag becomes its bound copy. Returns the id to wear.
+ */
+export function bindOnWear(c: { inventory: { item: string; qty: number }[] }, item: string): string {
+  const def = ITEMS[item];
+  const info = def?.copy;
+  if (!def?.unique || !info || info.bound) return item;
+  const p = item.split(MARK);
+  p[1] = BOUND_TAG;
+  const bound = p.join(MARK);
+  const slot = c.inventory.find((s) => s.item === item);
+  if (slot) slot.item = bound;
+  return bound;
 }
 
 /** Copies of one base item in a bag, for counting what a shop or recipe sees. */

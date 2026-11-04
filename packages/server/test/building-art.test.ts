@@ -149,7 +149,8 @@ describe('the shipped art', () => {
       // Frostpeak's and Mushroom Hollow's are painted the first time from the Art tab.
       for (const thing of [...map.creatures, ...map.npcs]) if (!(thing.asset in manifest) && !homeLandBox(thing.asset)) missing.add(thing.asset);
     }
-    for (const item of Object.values(LAND_ITEMS)) if (!(item.art in manifest)) missing.add(item.art);
+    // An item still waiting for its own picture shows a shipped stand-in.
+    for (const item of Object.values(LAND_ITEMS)) if (!((item.standIn ?? item.art) in manifest)) missing.add(item.art);
     if (!('bridge-planks' in manifest)) missing.add('bridge-planks');
     expect([...missing]).toEqual([]);
   });

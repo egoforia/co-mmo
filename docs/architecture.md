@@ -157,6 +157,18 @@ picture, or its material's icon until it is painted
 (`world-scene/regions.ts`), and the Cervid's Mycelial Sense (`sensesSpots`)
 puts spots on the mini map. Spot pictures are in
 `server/src/assets/gather-spot-anchors.ts`.
+Recipe tiers (`recipeTier` in `kit.ts`): common uses one land's materials
+(the Sanctum's count anywhere), rare mixes lands, and unique needs a tier 3
+or key item and a master. Shared `recipes.ts` holds the starting recipes:
+every tool in three tiers (Smithing), common and rare recipes from each
+land's materials, and five unique pieces (`ItemDef.unique`). A unique copy
+binds to whoever first wears it: its id's tag turns from `c` to `b`
+(`bindOnWear`), and a bound copy is never sold, traded or dropped. A copy of
+quality 115 or more is one rarity finer than its base item. A wished recipe
+that is rare or unique goes before the Stewards (`wishes/cards.ts`). Items may
+name a `standIn`, a shipped picture shown in the bag and the hand until
+their own is painted; the materials' and unique pieces' own icons are in
+`server/src/assets/material-icon-anchors.ts`.
 Shared `weapons.ts` holds the weapon and off-hand families, damage types,
 creature Armor and Ward, and `trainedIn`, which says whether a Calling is
 trained in a family (`docs/classes.md#weapons`).

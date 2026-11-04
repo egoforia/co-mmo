@@ -35,14 +35,14 @@ const CREATURES: Record<string, CreatureDef> = {
 };
 
 /**
- * What Frostpeak's creatures leave. Their own icons are painted with the
- * material icons (plan step 6); until then each shows a picture like it.
+ * What Frostpeak's creatures leave. Each shows a picture like it until its
+ * own icon is painted (material-icon-anchors.ts).
  */
 const ITEMS: Record<string, ItemDef> = {
-  'snow-hare-fur': { name: 'Snow Hare Fur', kind: 'material', art: 'item-wolf-pelt', description: 'A soft white pelt, warmer than it looks. Tailors and leatherworkers both want it.', value: 9, material: { family: 'hide', homes: ['frostpeak'], source: 'creature', tier: 1, traits: ['warm'] } },
-  'mountain-wool': { name: 'Mountain Wool', kind: 'material', art: 'item-ancient-linen', description: 'A thick grey fleece from a crag ram, still smelling of snow. It spins into the warmest yarn there is.', value: 11, material: { family: 'fibre', homes: ['frostpeak'], source: 'creature', tier: 1, traits: ['warm'] } },
-  'ice-crystal': { name: 'Ice Crystal', kind: 'material', art: 'item-pearl', description: 'A shard of ice from an ice wisp\'s heart. It never melts, and it is always cold to hold.', value: 16, material: { family: 'gem', homes: ['frostpeak'], source: 'creature', tier: 2, traits: ['warding'] } },
-  'roc-plume': { name: 'Roc Plume', kind: 'material', art: 'item-gull-feather', rarity: 'rare', description: 'A long white plume from the Hoarfrost Roc, rimed with frost that never thaws. Only a master could work it.', value: 60, material: { family: 'feather', homes: ['frostpeak'], source: 'boss', tier: 3, traits: ['light'] } },
+  'snow-hare-fur': { name: 'Snow Hare Fur', kind: 'material', art: 'item-snow-hare-fur', standIn: 'item-wolf-pelt', description: 'A soft white pelt, warmer than it looks. Tailors and leatherworkers both want it.', value: 9, material: { family: 'hide', homes: ['frostpeak'], source: 'creature', tier: 1, traits: ['warm'] } },
+  'mountain-wool': { name: 'Mountain Wool', kind: 'material', art: 'item-mountain-wool', standIn: 'item-ancient-linen', description: 'A thick grey fleece from a crag ram, still smelling of snow. It spins into the warmest yarn there is.', value: 11, material: { family: 'fibre', homes: ['frostpeak'], source: 'creature', tier: 1, traits: ['warm'] } },
+  'ice-crystal': { name: 'Ice Crystal', kind: 'material', art: 'item-ice-crystal', standIn: 'item-pearl', description: 'A shard of ice from an ice wisp\'s heart. It never melts, and it is always cold to hold.', value: 16, material: { family: 'gem', homes: ['frostpeak'], source: 'creature', tier: 2, traits: ['warding'] } },
+  'roc-plume': { name: 'Roc Plume', kind: 'material', art: 'item-roc-plume', standIn: 'item-gull-feather', rarity: 'rare', description: 'A long white plume from the Hoarfrost Roc, rimed with frost that never thaws. Only a master could work it.', value: 60, material: { family: 'feather', homes: ['frostpeak'], source: 'boss', tier: 3, traits: ['light'] } },
 };
 
 const QUESTS: Record<string, QuestDef> = {

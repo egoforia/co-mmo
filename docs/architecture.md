@@ -132,6 +132,10 @@ main material's trait, and `ITEMS[id]` works the copy's ItemDef out from the
 id, so bags, trades, saves and every server agree with nothing to sync.
 Copies never show when ITEMS is listed, and ids holding `~` are refused
 wherever a wish or rule names an item, so only crafting and shops make them.
+Shared `fashion.ts`, `fashion-styles.ts` and `fashion-wishes.ts` are
+Region fashion (`docs/fashion.md`): a copy's people lean and material trait,
+the six region styles with their full-style bonuses (`STYLES`, `fullStyles`
+in `rpg.ts`), and the style and recipe a wished garment brings.
 Shared `crafts.ts` holds the seven crafts (Woodcarving, Leatherwork,
 Tailoring, Smithing, Fletching, Herbalism, Jewellery): the material families
 each works, a level from 1 to 20 per character (`Character.crafts`) that

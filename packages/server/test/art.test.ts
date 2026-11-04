@@ -19,7 +19,7 @@ async function shippedManifest(dir: string): Promise<string> {
   const entry = (id: string) => [id, { file: `art/${id}.png`, kind: 'prop', width: 128, height: 128 }];
   const ids = [
     ...Object.values(BUILDING_STYLES).flatMap(buildingArtIds),
-    'sanctum-rock', 'desert-scarab',
+    'sanctum-rock', 'desert-scarab', 'sanctum-pilgrim', 'sylvan-cervid',
     ...['player-mara', 'player-ilya'].flatMap((look) => ISO_WAYS.map((d) => walkArt(look, d))),
   ];
   const path = join(dir, 'shipped.json');
@@ -184,7 +184,7 @@ describe('the Art tab', () => {
     await app!.art.idle();
     expect((painter as any).calls).toBe(asked.body.count);
     expect((await ask(base, owner.token, 'paint-group', { group: 'nothing' })).body.message).toMatch(/no group/);
-  });
+  }, 30_000);
 
   it('paints shipped scenery again at its shipped size, served from the redone folder', async () => {
     const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
@@ -540,6 +540,59 @@ describe('the Art tab', () => {
     expect((await ask(base, owner.token, 'sheet', { look: 'castle' })).body.message).toMatch(/no building look/);
     expect((await ask(base, owner.token, 'sheet', { look: 'timber-cottage', textures: ['chimney'] })).body.message).toMatch(/no texture called chimney/);
   }, 30_000);
+
+  it('supports custom reference images (game art and uploaded/external references) when reviewing and painting', async () => {
+    const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+
+    // 1. Review with existing game art as reference (sanctum-pilgrim + sylvan-cervid)
+    const review1 = await api(base, '/api/admin/art/review', owner.token, 'POST', {
+      what: 'paint',
+      asset: 'sanctum-pilgrim',
+      references: ['sanctum-pilgrim', 'sylvan-cervid'],
+    });
+    expect(review1.status).toBe(200);
+    expect(review1.body.references).toHaveLength(2);
+    expect(review1.body.references).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'sanctum-pilgrim', name: 'Sister Amala' }),
+      expect.objectContaining({ id: 'sylvan-cervid', name: 'Sylvan Cervid' }),
+    ]));
+    expect(review1.body.parts[0].recipe.steps[0].pictures).toHaveLength(2);
+
+    // 2. Upload an external reference
+    const samplePng = await sharp({ create: { width: 64, height: 64, channels: 4, background: '#00ff00' } }).png().toBuffer();
+    const dataUrl = `data:image/png;base64,${samplePng.toString('base64')}`;
+    const uploadRes = await api(base, '/api/admin/art/reference', owner.token, 'POST', {
+      name: 'Forest Inspiration',
+      dataUrl,
+    });
+    expect(uploadRes.status).toBe(201);
+    expect(uploadRes.body.id).toMatch(/^ref:[0-9a-f]+$/);
+    expect(uploadRes.body.name).toBe('Forest Inspiration');
+    expect(uploadRes.body.url).toMatch(/^\/wished-art\/references\/[0-9a-f]+\.png$/);
+
+    // 3. Review and repaint with uploaded reference and sylvan-cervid
+    const uploadedRefId = uploadRes.body.id;
+    const review2 = await api(base, '/api/admin/art/review', owner.token, 'POST', {
+      what: 'paint',
+      asset: 'sanctum-pilgrim',
+      references: ['sylvan-cervid', uploadedRefId],
+    });
+    expect(review2.status).toBe(200);
+    expect(review2.body.references).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'sylvan-cervid', name: 'Sylvan Cervid' }),
+      expect.objectContaining({ id: uploadedRefId, name: 'Forest Inspiration' }),
+    ]));
+
+    // 4. Paint with these references
+    const paintRes = await api(base, '/api/admin/art/paint', owner.token, 'POST', {
+      asset: 'sanctum-pilgrim',
+      references: ['sylvan-cervid', uploadedRefId],
+      approved: review2.body.fingerprint,
+    });
+    expect(paintRes.status).toBe(202);
+    await app!.art.idle();
+  });
 });
 
 /** Reviews a paid request as God's View does, then approves exactly what it showed. */

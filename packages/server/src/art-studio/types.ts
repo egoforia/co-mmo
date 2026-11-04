@@ -93,9 +93,16 @@ export interface WalkStrip {
   versions: WalkVersion[];
 }
 
+/** A reference image sent along with a paint request to guide style, characters, or details. */
+export interface ArtReferenceInfo {
+  id: string;
+  name: string;
+  url?: string;
+}
+
 /** What an Owner asks to have painted or made, to review before it is approved. */
 export type ArtAsk =
-  | { kind: 'paint'; asset: string; note?: string }
+  | { kind: 'paint'; asset: string; note?: string; references?: string[] }
   | { kind: 'group'; group: string }
   | { kind: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   /** The isometric ways one walker, or every walker, has no standing picture for yet. */
@@ -113,6 +120,8 @@ export interface ArtReview {
   estimateUsd: number;
   /** Sent back with the approval; painting is refused if anything changed meanwhile. */
   fingerprint: string;
+  /** Active reference images sent to guide the painter. */
+  references?: ArtReferenceInfo[];
 }
 
 /** Something that can be made to walk, and how far along its walks are. */

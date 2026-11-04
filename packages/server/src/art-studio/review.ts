@@ -1,12 +1,15 @@
 // Dry-run recipe previews and request builders for every ArtAsk kind, using a
 // typed handler registry so new art kinds can be added in one place.
 
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import {
   BUILDING_STYLES,
 } from '@co-mmo/shared';
 import { plain } from '../art-jobs.ts';
 import { Previewed, dryImage, recipeUsd, type Recipe } from '../art-recipes.ts';
 import type { SheetGuide } from '../assets/building-kit/sheet.ts';
+import { pictureName } from '../assets/names.ts';
 import type { ImageProvider, ImageRequest } from '../assets/provider.ts';
 import { seaCaveBox } from '../assets/sea-cave-kit.ts';
 import { homeLandBox } from '../assets/home-land-art.ts';
@@ -17,6 +20,7 @@ import { facingWords } from '../walk-painter.ts';
 import type { ArtCatalog } from './catalog.ts';
 import {
   type ArtAsk,
+  type ArtReferenceInfo,
   ArtRequestError,
   type ArtReview,
   type ArtStudioOptions,
@@ -33,6 +37,7 @@ export async function previewPaint(
   options: ArtStudioOptions,
   catalog: ArtCatalog,
   redoneDir: string,
+  references?: string[],
 ): Promise<Recipe> {
   note = note.trim().slice(0, 1000);
   const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
@@ -50,7 +55,14 @@ export async function previewPaint(
   const provider = options.ai.image(useOf(kit));
   if (!provider) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
   const dry = dryImage(provider);
-  await paintKitAsset(withSelf(kit), dry, options.anchorDir, redoneDir, { box: { width: box.width, height: box.height }, note }).catch((err) => {
+  await paintKitAsset(withSelf(kit), dry, options.anchorDir, redoneDir, {
+    box: { width: box.width, height: box.height },
+    note,
+    references,
+    artDir: options.artDir,
+    readArt: options.readArt,
+    nameOf: (id) => catalog.nameOf(id),
+  }).catch((err) => {
     if (!(err instanceof Previewed)) throw err;
   });
   return { at: Date.now(), steps: [await options.recipes.imageStep(kit.name ?? asset, provider, dry.sent!, estimateImageUsd(provider.model))] };
@@ -112,15 +124,33 @@ type ReviewHandler<K extends ArtAsk['kind']> = (
   options: ArtStudioOptions,
   catalog: ArtCatalog,
   redoneDir: string,
-) => Promise<{ title: string; parts: ArtReview['parts'] }>;
+) => Promise<{ title: string; parts: ArtReview['parts']; references?: ArtReferenceInfo[] }>;
 
 /** Handler registry keyed by ArtAsk['kind']. Add new reviewable art asks here. */
 const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
   paint: async (ask, options, catalog, redoneDir) => {
     const name = await catalog.nameOf(ask.asset);
+    const kit = catalog.kitAsset(ask.asset);
+    const defaultRefs = kit ? withSelf(kit).references ?? [] : [];
+    const activeRefs = ask.references ?? defaultRefs;
+    const refInfos: ArtReferenceInfo[] = [];
+    for (const refId of activeRefs) {
+      if (refId.startsWith('ref:')) {
+        const hash = refId.slice(4);
+        const metaFile = resolve(options.artDir, 'references', 'meta.json');
+        const meta: Record<string, string> = await readFile(metaFile, 'utf8').then((t) => JSON.parse(t) as Record<string, string>, () => ({}));
+        refInfos.push({ id: refId, name: meta[hash] ?? `Reference ${hash.slice(0, 6)}`, url: `/wished-art/references/${hash}.png` });
+      } else {
+        const refName = await catalog.nameOf(refId);
+        const file = await catalog.pictureFile(refId);
+        const url = file ? (file.startsWith('assets/') ? `/${file}` : `/${file.replace(/^\/?/, '')}`) : `/art/${refId}.png`;
+        refInfos.push({ id: refId, name: refName || pictureName(refId), url });
+      }
+    }
     return {
       title: `Paint ${name} again`,
-      parts: [{ name, recipe: await previewPaint(ask.asset, ask.note ?? '', options, catalog, redoneDir) }],
+      parts: [{ name, recipe: await previewPaint(ask.asset, ask.note ?? '', options, catalog, redoneDir, ask.references) }],
+      references: refInfos,
     };
   },
   group: async (ask, options, catalog, redoneDir) => {
@@ -204,9 +234,9 @@ export async function reviewAsk(
 ): Promise<ArtReview> {
   try {
     const handler = REVIEW_HANDLERS[ask.kind] as ReviewHandler<typeof ask.kind>;
-    const { title, parts } = await handler(ask, options, catalog, redoneDir);
+    const { title, parts, references } = await handler(ask, options, catalog, redoneDir);
     const estimateUsd = parts.reduce((n, p) => n + recipeUsd(p.recipe), 0);
-    return { title, parts, estimateUsd, fingerprint: fingerprint(parts) };
+    return { title, parts, estimateUsd, fingerprint: fingerprint(parts), ...(references ? { references } : {}) };
   } catch (err) {
     if (err instanceof ArtRequestError) throw err;
     throw new ArtRequestError(plain(err));

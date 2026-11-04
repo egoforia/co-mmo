@@ -25,6 +25,7 @@ const ROUTES: ArtRoute[] = [
   { pattern: /^\/wished-art\/recipes\/pictures\/([0-9a-f]+\.webp)$/, file: (m) => ['recipes', 'pictures', m[1]!] },
   { pattern: /^\/wished-art\/sounds\/([\w-]+\.mp3)$/, file: (m) => ['sounds', m[1]!] },
   { pattern: /^\/wished-art\/biomes\/([\w-]+\.png)$/, file: (m) => ['biomes', m[1]!] },
+  { pattern: /^\/wished-art\/references\/([\w-]+)\.png$/, file: (m) => ['references', `${m[1]}.png`] },
   { pattern: /^\/wished-art\/kit-houses\/([\w-]+)\/([\w-]+\.png)$/, file: (m) => ['kit-houses', m[1]!, m[2]!] },
 ];
 

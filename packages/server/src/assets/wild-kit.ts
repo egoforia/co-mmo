@@ -137,24 +137,52 @@ export async function paintKitAsset(
   provider: ImageProvider,
   anchorDir: string,
   outDir: string,
-  /** A repaint's own size, and the Owner's added words or whole reworded prompt. */
-  extra: { box?: { width: number; height: number }; note?: string; prompt?: string } = {},
+  /** A repaint's own size, and the Owner's added words, custom references or whole reworded prompt. */
+  extra: {
+    box?: { width: number; height: number };
+    note?: string;
+    prompt?: string;
+    references?: string[];
+    artDir?: string;
+    readArt?: (file: string) => Promise<Buffer>;
+    nameOf?: (id: string) => Promise<string> | string;
+  } = {},
 ): Promise<{ image: GeneratedImage; entry: ArtEntry; prompt: string; references: string[] }> {
   const references: GeneratedImage[] = [];
   const sent: string[] = [];
-  for (const ref of asset.references ?? []) {
-    // Shipped anchors first; a piece painted in the Art tab (the sea cave's rock) after them.
-    for (const path of [resolve(anchorDir, 'raw', `${ref}.png`), resolve(anchorDir, `${ref}.png`), resolve(outDir, 'raw', `${ref}.png`), resolve(outDir, `${ref}.png`)]) {
-      const data = await readFile(path).catch(() => undefined);
-      if (!data) continue;
-      references.push({ mimeType: 'image/png', data });
-      sent.push(ref);
-      break;
+  const labels: string[] = [];
+  const refList = extra.references ?? asset.references ?? [];
+  for (const ref of refList) {
+    let data: Buffer | undefined;
+    let label = ref;
+    if (ref.startsWith('ref:')) {
+      const hash = ref.slice(4);
+      const refPath = extra.artDir
+        ? resolve(extra.artDir, 'references', `${hash}.png`)
+        : resolve(outDir, '..', 'references', `${hash}.png`);
+      data = await readFile(refPath).catch(() => undefined);
+      label = `Reference ${hash.slice(0, 6)}`;
+    } else {
+      // Shipped anchors first; a piece painted in the Art tab (the sea cave's rock) after them.
+      for (const path of [resolve(anchorDir, 'raw', `${ref}.png`), resolve(anchorDir, `${ref}.png`), resolve(outDir, 'raw', `${ref}.png`), resolve(outDir, `${ref}.png`)]) {
+        data = await readFile(path).catch(() => undefined);
+        if (data) break;
+      }
+      if (!data && extra.readArt) {
+        data = await extra.readArt(`assets/anchors/${ref}.png`).catch(() => undefined)
+          ?? await extra.readArt(`art/${ref}.png`).catch(() => undefined)
+          ?? await extra.readArt(ref).catch(() => undefined);
+      }
+      label = extra.nameOf ? (await extra.nameOf(ref)) : pictureName(ref);
     }
+    if (!data) continue;
+    references.push({ mimeType: 'image/png', data });
+    sent.push(ref);
+    labels.push(label);
   }
   const words = buildPrompt(asset, paintedFootprint(asset.id, asset.kind));
   const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${words}\nAlso: ${extra.note.trim()}` : words;
-  const image = await provider.generate({ prompt, references, labels: sent.map(pictureName) });
+  const image = await provider.generate({ prompt, references, labels });
   // The untouched picture is kept, so it can be processed again for free.
   await mkdir(resolve(outDir, 'raw'), { recursive: true });
   await writeFile(resolve(outDir, 'raw', `${asset.id}.png`), await sharp(image.data).png().toBuffer());

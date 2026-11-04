@@ -1,6 +1,6 @@
 import { ITEMS, type LootActionMessage, type LootView } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
-import { artSrc } from './wished.ts';
+import { artSrc, itemIcon } from './wished.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -103,7 +103,7 @@ export class LootUi {
       const def = ITEMS[s.item];
       const name = def?.name ?? s.item;
       return `<button type="button" class="slot${i === this.selected ? ' chosen' : ''}" data-index="${i}" title="${escapeHtml(def ? `${def.name}: ${def.description}` : name)}">
-        <img src="${escapeHtml(artSrc(def?.art ?? 'item-goat-horn', true))}" alt="">
+        <img src="${escapeHtml(def ? itemIcon(def) : artSrc('item-goat-horn', true))}" alt="">
         ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
         <span class="name rarity-${def?.rarity ?? 'common'}">${escapeHtml(name)}</span><span class="hint">${i === this.selected ? 'Enter to take' : 'Click to take'}</span></button>`;
     }).join('');

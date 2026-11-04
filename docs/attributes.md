@@ -43,7 +43,7 @@ that are **not** neighbours (see [races.md](races.md)).
 | --- | --- | --- |
 | **Might** | Strength | Damage of heavy weapons and might skills; block amount with a shield; stagger chance; +1 max HP per point |
 | **Agility** | Speed and precision | Damage of light and ranged weapons and agility skills; attack speed; critical hit chance; dodge |
-| **Wit** | Mind and magic | Damage of spells; max Energy; shorter cooldowns; crafting (recipes still ask for a Wit level) |
+| **Wit** | Mind and magic | Damage of spells; max Energy; shorter cooldowns; finer crafted pieces (quality; crafts have their own levels, `crafts.ts`) |
 | **Spirit** | Soul and faith | Healing done; Energy and health regeneration; Ward (defence against magic) |
 | **Vigor** | Toughness | Max HP (the main source); Armor; shorter harmful statuses |
 

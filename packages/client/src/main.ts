@@ -11,7 +11,7 @@ import { RpgUi } from './rpg-ui.ts';
 import { KitUi } from './kit-ui.ts';
 import { LootUi } from './loot-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
-import { onContent, updateContent } from './wished.ts';
+import { knowArt, onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
 import { EditorUi } from './editor-ui.ts';
@@ -144,6 +144,7 @@ function play(token: string): void {
     ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)),
   }));
   const art = allArt();
+  void art.then(knowArt);
 
   const connection = new GameConnection(token, onMessage, (reason, code) => {
     if (code === 4003) {
@@ -259,7 +260,10 @@ function play(token: string): void {
         break;
       case 'art':
         // New walks were painted: walkers on screen pick them up without a reload.
-        void allArt().then((m) => scene?.updateWalks(m, message.walks));
+        void allArt().then((m) => {
+          knowArt(m);
+          scene?.updateWalks(m, message.walks);
+        });
         break;
       case 'loot':
         loot?.show(message.loot);
@@ -368,7 +372,7 @@ function play(token: string): void {
       },
       hotbar: (slots) => connection.send({ t: 'hotbar', slots }),
       craft: (recipe) => connection.send({ t: 'craft', recipe }),
-      shop: (action, npc, id, qty) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}) }),
+      shop: (action, npc, id, qty, replace) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}), ...(replace ? { replace } : {}) }),
       trade: (m) => connection.send(m),
       typing: isTyping,
     });

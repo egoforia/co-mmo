@@ -81,6 +81,8 @@ describe('equipment', () => {
 describe('crafting', () => {
   it('turns materials into a thing, and says what is missing', () => {
     const c = newCharacter();
+    expect(craft(c, 'tonic')).toMatch(/need a sickle/);
+    c.inventory.push({ item: 'tool-herbalism-1', qty: 1 });
     expect(craft(c, 'tonic')).toMatch(/more Mushroom Cap/);
     c.inventory.push({ item: 'mushroom-cap', qty: 3 });
     expect(craft(c, 'tonic')).toBeUndefined();
@@ -88,11 +90,11 @@ describe('crafting', () => {
     expect(itemCount(c, 'tonic')).toBe(1);
   });
 
-  it('finer recipes need Wit, and a charm counts', () => {
+  it('finer recipes need a higher craft level, which practice brings', () => {
     const c = newCharacter();
-    c.inventory.push({ item: 'crab-shell', qty: 5 });
-    expect(craft(c, 'shell-mail')).toMatch(/need 5 Wit/);
-    c.stats.wit = 5;
+    c.inventory.push({ item: 'crab-shell', qty: 5 }, { item: 'tool-smithing-1', qty: 1 });
+    expect(craft(c, 'shell-mail')).toMatch(/need Smithing level 4/);
+    c.crafts = { smithing: { level: 4, xp: 0 } };
     expect(craft(c, 'shell-mail')).toBeUndefined();
     expect(itemCount(c, 'shell-mail')).toBe(1);
   });
@@ -167,7 +169,7 @@ describe('wished kit', () => {
     const d = validateDefinition({ kind: 'recipe', name: 'Horn Brew', materials: [{ item: 'goat-horn', qty: 1 }], result: { item: 'tonic', qty: 9 } });
     expect(d).toMatchObject({ result: { item: 'tonic', qty: 1 } });
     applyContent(entry('wrecipe', d));
-    expect(RECIPES.wrecipe).toMatchObject({ name: 'Horn Brew', wit: 0 });
+    expect(RECIPES.wrecipe).toMatchObject({ name: 'Horn Brew', level: 1 });
     removeContent(entry('wrecipe', d));
     expect(RECIPES.wrecipe).toBeUndefined();
   });

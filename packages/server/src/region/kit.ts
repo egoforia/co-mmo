@@ -8,6 +8,13 @@ import {
   crafted,
   shopMade,
   copyWords,
+  CRAFTS,
+  MAX_CRAFT_LEVEL,
+  craftLevel,
+  isCraft,
+  master,
+  practise,
+  type CraftId,
   equip,
   readScroll,
   sell,
@@ -65,7 +72,7 @@ export class Kit {
     p.dirty = true;
   }
 
-  /** Makes a recipe from what is in the bag. */
+  /** Makes a recipe from what is in the bag; the craft grows and the tool may wear out. */
   craft(p: PlayerState, recipe: string): void {
     const before = new Set(p.character.inventory.map((s) => s.item));
     const why = craft(p.character, recipe, crafted(p.character, p.info.name, recipe, this.s.random));
@@ -73,8 +80,22 @@ export class Kit {
     const r = RECIPES[recipe]!;
     // A crafted piece of gear says how well it came out.
     const copy = p.character.inventory.find((s) => !before.has(s.item) && ITEMS[s.item]?.copy);
-    this.s.notice(p, `You made ${r.result.qty > 1 ? `${r.result.qty} × ` : 'a '}${ITEMS[r.result.item]!.name}.${copy ? ` ${copyWords(ITEMS[copy.item])}` : ''}`);
+    const done = practise(p.character, recipe, this.s.random);
+    const grew = done.craft && done.level ? ` Your ${CRAFTS[done.craft].name} rises to level ${done.level}.` : '';
+    const broke = done.broke ? ` Your ${done.broke} wore out.` : '';
+    this.s.notice(p, `You made ${r.result.qty > 1 ? `${r.result.qty} × ` : 'a '}${ITEMS[r.result.item]!.name}.${copy ? ` ${copyWords(ITEMS[copy.item])}` : ''}${grew}${broke}`);
     this.s.credit(recipe, p, 'craft');
+    p.dirty = true;
+  }
+
+  /** Taking up a mastery, or changing one, with the craft's master. */
+  private master(p: PlayerState, m: ShopMessage): void {
+    const ch = p.character;
+    if (!isCraft(m.id) || (m.replace !== undefined && !isCraft(m.replace))) return;
+    const replace = m.replace as CraftId | undefined;
+    const why = master(ch, m.npc, m.id, replace);
+    if (why) return this.s.notice(p, why);
+    this.s.notice(p, `${npcName(m.npc)} names you a master of ${CRAFTS[m.id].name}. You can now rise to level ${MAX_CRAFT_LEVEL} and work the rarest materials.${replace ? ` Your ${CRAFTS[replace].name} drops back to level ${craftLevel(ch, replace)}.` : ''}`);
     p.dirty = true;
   }
 
@@ -84,6 +105,7 @@ export class Kit {
     if (!keeper || !SHOPS[m.npc] || keeper.floor !== p.floor || Math.hypot(keeper.x - p.x, keeper.y - p.y) > TALK_RANGE + 1) {
       return this.s.notice(p, `Walk up to ${npcName(m.npc)} to trade.`);
     }
+    if (m.action === 'master') return this.master(p, m);
     const ch = p.character;
     const before = ch.gold;
     const why = m.action === 'buy' ? buy(ch, m.npc, m.id, shopMade(npcName(m.npc), this.s.random)) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);

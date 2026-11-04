@@ -52,6 +52,8 @@ import {
   type PlayerStateSnapshot,
   type CreatureStateSnapshot,
   type EntityInspection,
+  giveHomeTools,
+  ITEMS,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
@@ -615,14 +617,18 @@ export class Region {
       if (free) ({ x, y } = free);
       else floor = 0;
     }
+    // A people's first tools for its home crafts come once (crafts.ts).
+    const gifts = giveHomeTools(character);
     const p: PlayerState = {
       info, conn, character, x, y, inputs: [], ack: 0, chatTimes: [], lastAttack: 0, lastHurt: 0, readyAt: new Map(), dirty: false, crowd: 0, phase: Math.floor(this.random() * MAX_SNAPSHOT_EVERY), statuses: [], ...carry, floor,
     };
     this.s.players.set(info.id, p);
     this.gauges.of(p);
+    if (gifts.length) p.dirty = true;
     // Walking into the next cell of the same land: nothing changes on the player's screen.
     if (handoff) return;
     this.welcome(p);
+    if (gifts.length) this.s.notice(p, `Your people's tools are in your bag: ${gifts.map((id) => ITEMS[id]!.name).join(' and ')}.`);
     // Every wished region carries a credit line (design doc, World structure).
     const wild = this.def.wild;
     if (wild) this.s.notice(p, `✦ ${this.def.name} was wished into being by ${wild.wisher}. Danger ${wild.danger} of 6.`);

@@ -68,7 +68,7 @@ describe('choosing a people and Calling', () => {
     store.accountById(mara.id)!.character = c;
     const player = await joined(ws, mara.token);
     await player.send({ t: 'spendPoint', stat: 'wit' });
-    const refused = await player.waitFor<NoticeMessage>((m) => m.t === 'notice');
+    const refused = await player.waitFor<NoticeMessage>((m) => m.t === 'notice' && /free points/.test(m.text));
     expect(refused.text).toMatch(/no free points/);
 
     const ilya = account(store, 'Ilya');

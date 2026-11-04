@@ -151,11 +151,32 @@ describe('crafting on the server', () => {
     const { region } = setup('woods');
     const conn = fakeConn();
     const c = newCharacter();
-    addItem(c, 'mushroom-cap', 2);
+    addItem(c, 'mushroom-cap', 4);
     region.join(info('a'), conn, { x: null, y: null }, c);
+    region.handle('a', { t: 'craft', recipe: 'tonic' });
+    expect(notices(conn).at(-1)).toMatch(/need a sickle/);
+    addItem(region.character('a')!, 'tool-herbalism-1');
     region.handle('a', { t: 'craft', recipe: 'tonic' });
     expect(itemCount(region.character('a')!, 'tonic')).toBe(1);
     expect(notices(conn).at(-1)).toMatch(/You made a Tonic/);
+    expect(region.character('a')!.crafts?.herbalism?.xp).toBeGreaterThan(0);
+  });
+
+  it('gives a people its home tools once, and masters name you one of theirs', () => {
+    const { region } = setup('woods');
+    const conn = fakeConn();
+    const c = newCharacter();
+    c.race = 'cervid';
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, c);
+    expect(notices(conn).at(-1)).toMatch(/tools are in your bag: Axe and Sickle|tools are in your bag: Sickle and Axe/);
+    const ch = region.character('a')!;
+    expect(itemCount(ch, 'tool-herbalism-1')).toBe(1);
+    besideNpc(region, 'a', 'old-bramble');
+    region.handle('a', { t: 'shop', action: 'master', npc: 'old-bramble', id: 'smithing' });
+    expect(notices(conn).at(-1)).toMatch(/cannot make you a master/);
+    region.handle('a', { t: 'shop', action: 'master', npc: 'old-bramble', id: 'herbalism' });
+    expect(notices(conn).at(-1)).toMatch(/names you a master of Herbalism/);
+    expect(ch.masteries).toEqual(['herbalism']);
   });
 });
 

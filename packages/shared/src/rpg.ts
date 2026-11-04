@@ -9,6 +9,7 @@ import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
 import type { MaterialInfo } from './materials.ts';
 import type { CopyInfo } from './copies.ts';
+import type { CraftId, CraftProgress, ToolTier } from './crafts.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
 import { levelUpStats } from './rpg/callings.ts';
 import { HOTBAR_SIZE, settleSkills, slotSkill, upgradeHotbar } from './rpg/skills.ts';
@@ -104,6 +105,12 @@ export interface Character {
   skillLooks?: Record<string, SkillLook>;
   /** Attribute points gained by levelling and not yet placed. */
   freePoints: number;
+  /** Levels in each craft practised so far; others are at their starting level (crafts.ts). */
+  crafts?: Partial<Record<CraftId, CraftProgress>>;
+  /** Up to two crafts mastered. */
+  masteries?: CraftId[];
+  /** Set once the free tools of their people's home crafts were given. */
+  homeTools?: boolean;
 }
 
 /** Favor a new character starts with: enough for a first small wish or two. */
@@ -277,7 +284,7 @@ export function discover(c: Character, id: string): void {
 
 export interface ItemDef {
   name: string;
-  kind: 'book' | 'consumable' | 'material' | 'equipment' | 'scroll';
+  kind: 'book' | 'consumable' | 'material' | 'equipment' | 'scroll' | 'tool';
   art: string;
   description: string;
   /** Cannot be dropped, sold, traded or destroyed. */
@@ -305,6 +312,10 @@ export interface ItemDef {
   material?: MaterialInfo;
   /** A crafted copy: who made it, its quality and what it carries (copies.ts). */
   copy?: CopyInfo;
+  /** A painted picture shown until its own `art` is painted (an icon like it). */
+  standIn?: string;
+  /** Tools: the craft they work and their tier (crafts.ts). */
+  tool?: { craft: CraftId; tier: ToolTier };
 }
 
 /**

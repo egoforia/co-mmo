@@ -186,14 +186,16 @@ export interface CraftMessage {
   recipe: string;
 }
 
-/** Buy, sell or learn at the NPC you are talking to. */
+/** Buy, sell, learn or take up a mastery at the NPC you are talking to. */
 export interface ShopMessage {
   t: 'shop';
-  action: 'buy' | 'sell' | 'learn';
+  action: 'buy' | 'sell' | 'learn' | 'master';
   npc: string;
-  /** Buy and sell: the item; learn: the ability. */
+  /** Buy and sell: the item; learn: the ability; master: the craft. */
   id: string;
   qty?: number;
+  /** Master: the mastery given up for it. */
+  replace?: string;
 }
 
 /**
@@ -705,7 +707,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'hotbar') return Array.isArray(m.slots) && m.slots.length <= 6 && m.slots.every((s) => s === '' || isId(s));
   if (m.t === 'craft') return isId(m.recipe);
   if (m.t === 'shop') {
-    return ['buy', 'sell', 'learn'].includes(m.action as string) && isId(m.npc) && isItemId(m.id) &&
+    return ['buy', 'sell', 'learn', 'master'].includes(m.action as string) && isId(m.npc) && isItemId(m.id) &&
+      (m.replace === undefined || isId(m.replace)) &&
       (m.qty === undefined || (Number.isInteger(m.qty) && (m.qty as number) > 0 && (m.qty as number) <= 99));
   }
   if (m.t === 'trade') {

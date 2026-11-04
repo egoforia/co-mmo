@@ -16,32 +16,97 @@ import {
 
 export interface CoherenceScore {
   asset: string;
-  at: number;
+  at?: number;
+  auditedAt?: number;
   score: number;
   status: 'coherent' | 'minor-drift' | 'off-style';
-  dimensions: {
+  rubric?: {
+    facets: number;
+    palette: number;
+    projection: number;
+    scale: number;
+    silhouette: number;
+  };
+  dimensions?: {
     facets: number;
     palette: number;
     isometric: number;
     scale: number;
     silhouette: number;
   };
-  findings: string[];
+  findings?: string[];
+  suggestedNote?: string;
   correctiveNote?: string;
 }
+
+export type ConsultationItem =
+  | { id?: string; at: number; question: string; answer: string; usd?: number }
+  | { role: 'user' | 'director'; text: string; at: number; references?: string[]; suggestedNote?: string };
 
 export interface StyleDirectorOverview {
   version: string;
   basePrompt: string;
   negatives: string[];
   biomes: Record<string, { name: string; colors: string[]; mood: string; anchors: string[] }>;
-  fashionStyles: Record<string, { name: string; region: string; colors: string[]; feel: string; anchors: string[] }>;
+  fashionStyles: Record<string, { name: string; region?: string; biome?: string; colors: string[]; feel: string; anchors: string[] }>;
   goldenAnchors: Record<string, string[]>;
   audits: Record<string, CoherenceScore>;
-  consultations: { id: string; at: number; question: string; answer: string; usd: number }[];
+  consultations: ConsultationItem[];
   overallScore: number;
   auditedCount: number;
   flaggedCount: number;
+}
+
+function normalizeRubric(audit: CoherenceScore): {
+  facets: number;
+  palette: number;
+  projection: number;
+  scale: number;
+  silhouette: number;
+} {
+  if (audit.rubric) {
+    return {
+      facets: audit.rubric.facets ?? 0,
+      palette: audit.rubric.palette ?? 0,
+      projection: audit.rubric.projection ?? 0,
+      scale: audit.rubric.scale ?? 0,
+      silhouette: audit.rubric.silhouette ?? 0,
+    };
+  }
+  if (audit.dimensions) {
+    return {
+      facets: (audit.dimensions.facets ?? 0) * 5,
+      palette: (audit.dimensions.palette ?? 0) * 5,
+      projection: (audit.dimensions.isometric ?? 0) * 5,
+      scale: (audit.dimensions.scale ?? 0) * 5,
+      silhouette: (audit.dimensions.silhouette ?? 0) * 5,
+    };
+  }
+  return { facets: 0, palette: 0, projection: 0, scale: 0, silhouette: 0 };
+}
+
+function normalizeConsultations(list: ConsultationItem[] | undefined): {
+  at: number;
+  question: string;
+  answer: string;
+  usd?: number;
+}[] {
+  if (!Array.isArray(list) || !list.length) return [];
+  const out: { at: number; question: string; answer: string; usd?: number }[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i]!;
+    if ('question' in item && 'answer' in item) {
+      out.push({ at: item.at, question: item.question, answer: item.answer, usd: item.usd });
+    } else if ('role' in item && item.role === 'user') {
+      const next = list[i + 1];
+      const answer = next && 'role' in next && next.role === 'director' ? next.text : '';
+      out.push({ at: item.at, question: item.text, answer });
+      if (answer) i++;
+    } else if ('role' in item && item.role === 'director') {
+      out.push({ at: item.at, question: 'Style Consultation', answer: item.text });
+    }
+  }
+  return out;
 }
 
 let directorState: StyleDirectorOverview | null = null;
@@ -135,7 +200,7 @@ export function artDirectorPage(): string {
               <span>
                 <select name="fashionStyle">
                   <option value="">None / Auto</option>
-                  ${Object.entries(d.fashionStyles).map(([id, f]) => `<option value="${esc(id)}">${esc(f.name)} (${esc(f.region)})</option>`).join('')}
+                  ${Object.entries(d.fashionStyles).map(([id, f]) => `<option value="${esc(id)}">${esc(f.name)} (${esc(f.region ?? f.biome ?? '')})</option>`).join('')}
                 </select>
               </span>
             </label>
@@ -156,13 +221,13 @@ export function artDirectorPage(): string {
           lastHarmonized
             ? `<div class="harmonized-box">
                 <div class="checklist-row">
-                  <span class="check-pill ${lastHarmonized.checklist.facets ? 'ok' : ''}">✓ Unlit Facets</span>
-                  <span class="check-pill ${lastHarmonized.checklist.palette ? 'ok' : ''}">✓ Biome/Fashion Palette</span>
-                  <span class="check-pill ${lastHarmonized.checklist.isometric ? 'ok' : ''}">✓ 2:1 Isometric</span>
-                  <span class="check-pill ${lastHarmonized.checklist.scale ? 'ok' : ''}">✓ Height-Tier Scale</span>
-                  <span class="check-pill ${lastHarmonized.checklist.negatives ? 'ok' : ''}">✓ Negative Guardrails</span>
+                  <span class="check-pill ${lastHarmonized.checklist?.facets ? 'ok' : ''}">✓ Unlit Facets</span>
+                  <span class="check-pill ${lastHarmonized.checklist?.palette ? 'ok' : ''}">✓ Biome/Fashion Palette</span>
+                  <span class="check-pill ${lastHarmonized.checklist?.isometric ? 'ok' : ''}">✓ 2:1 Isometric</span>
+                  <span class="check-pill ${lastHarmonized.checklist?.scale ? 'ok' : ''}">✓ Height-Tier Scale</span>
+                  <span class="check-pill ${lastHarmonized.checklist?.negatives ? 'ok' : ''}">✓ Negative Guardrails</span>
                 </div>
-                <p><small>Selected Golden Reference Anchors:</small> ${renderAnchorChips(lastHarmonized.references)}</p>
+                <p><small>Selected Golden Reference Anchors:</small> ${renderAnchorChips(lastHarmonized.references ?? [])}</p>
                 <pre class="prompt">${esc(lastHarmonized.harmonizedPrompt)}</pre>
               </div>`
             : ''
@@ -177,24 +242,25 @@ export function artDirectorPage(): string {
             </span>
           </label>
         </form>
-        ${
-          d.consultations.length
+        ${(() => {
+          const pairs = normalizeConsultations(d.consultations);
+          return pairs.length
             ? `<div class="consult-list">
-                ${[...d.consultations]
+                ${[...pairs]
                   .reverse()
                   .slice(0, 4)
                   .map(
                     (c) => `
                   <div class="consult-item">
-                    <small>${when(c.at)} · ${usd(c.usd)}</small>
+                    <small>${when(c.at)}${c.usd !== undefined ? ` · ${usd(c.usd)}` : ''}</small>
                     <p><b>Q:</b> ${esc(c.question)}</p>
                     <p class="director-answer"><b>Director:</b> ${esc(c.answer)}</p>
                   </div>`,
                   )
                   .join('')}
               </div>`
-            : ''
-        }
+            : '';
+        })()}
       </section>
 
       <!-- Right Column: Living Style Bible & Palettes -->
@@ -205,7 +271,7 @@ export function artDirectorPage(): string {
             <span><textarea name="basePrompt" rows="4">${esc(d.basePrompt)}</textarea></span>
           </label>
           <label>Negative Prompt Guardrails (comma-separated)
-            <span><input name="negatives" value="${esc(d.negatives.join(', '))}" /></span>
+            <span><input name="negatives" value="${esc((d.negatives ?? []).join(', '))}" /></span>
           </label>
           <button type="submit" class="quiet">Save Style Bible</button>
         </form>
@@ -217,13 +283,13 @@ export function artDirectorPage(): string {
               ([id, f]) => `
             <div class="palette-card">
               <div class="palette-head">
-                <b>${esc(f.name)}</b> <small>${esc(f.region)}</small>
+                <b>${esc(f.name)}</b> <small>${esc(f.region ?? f.biome ?? '')}</small>
               </div>
               <div class="swatches">
-                ${f.colors.map((c) => `<span class="swatch" style="background:${esc(c)}" title="${esc(c)}"></span>`).join('')}
+                ${(f.colors ?? []).map((c) => `<span class="swatch" style="background:${esc(c)}" title="${esc(c)}"></span>`).join('')}
               </div>
               <small class="note">${esc(f.feel)}</small>
-              <div class="anchor-row">${renderAnchorChips(f.anchors)}</div>
+              <div class="anchor-row">${renderAnchorChips(f.anchors ?? [])}</div>
               <button type="button" class="quiet mini-btn" data-director-filter="${esc(id)}">Inspect on Wall</button>
             </div>`,
             )
@@ -290,6 +356,8 @@ export function artDirectorPage(): string {
           .slice(0, 48)
           .map((item) => {
             const audit = d.audits[item.id];
+            const r = audit ? normalizeRubric(audit) : undefined;
+            const note = audit?.suggestedNote ?? audit?.correctiveNote;
             const scoreBadge = audit
               ? `<span class="coherence-badge ${audit.status}">${audit.score}/100 · ${audit.status}</span>`
               : '<span class="coherence-badge unaudited">Not audited yet</span>';
@@ -302,22 +370,22 @@ export function artDirectorPage(): string {
                   <b>${esc(item.name)}</b>
                   ${scoreBadge}
                   ${
-                    audit
-                      ? `<div class="dim-bars" title="Facets ${audit.dimensions.facets}/20 · Palette ${audit.dimensions.palette}/20 · Iso ${audit.dimensions.isometric}/20 · Scale ${audit.dimensions.scale}/20 · Silhouette ${audit.dimensions.silhouette}/20">
-                          <span style="width:${audit.dimensions.facets * 5}%"></span>
-                          <span style="width:${audit.dimensions.palette * 5}%"></span>
-                          <span style="width:${audit.dimensions.isometric * 5}%"></span>
-                          <span style="width:${audit.dimensions.scale * 5}%"></span>
-                          <span style="width:${audit.dimensions.silhouette * 5}%"></span>
+                    audit && r
+                      ? `<div class="dim-bars" title="Facets ${r.facets}/100 · Palette ${r.palette}/100 · Iso ${r.projection}/100 · Scale ${r.scale}/100 · Silhouette ${r.silhouette}/100">
+                          <span style="width:${r.facets}%"></span>
+                          <span style="width:${r.palette}%"></span>
+                          <span style="width:${r.projection}%"></span>
+                          <span style="width:${r.scale}%"></span>
+                          <span style="width:${r.silhouette}%"></span>
                         </div>
-                        <small class="note">${esc(audit.findings.join(' · '))}</small>`
+                        <small class="note">${esc((audit.findings ?? []).join(' · '))}</small>`
                       : `<small class="note">${esc(item.place.page)}${item.fashionStyle ? ` · ${esc(item.fashionStyle)}` : ''}</small>`
                   }
                   <div class="card-actions">
                     <button type="button" class="quiet" data-director-audit="${esc(JSON.stringify([item.id]))}">Audit</button>
                     ${
-                      audit?.correctiveNote && item.repaintable
-                        ? `<button type="button" class="quiet warn-btn" data-director-fix="${esc(item.id)}" data-director-note="${esc(audit.correctiveNote)}">+ Queue Fix</button>`
+                      note && item.repaintable
+                        ? `<button type="button" class="quiet warn-btn" data-director-fix="${esc(item.id)}" data-director-note="${esc(note)}">+ Queue Fix</button>`
                         : ''
                     }
                   </div>

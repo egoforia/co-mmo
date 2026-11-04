@@ -1095,3 +1095,78 @@ button.queue-add-btn.staged {
   background: var(--panel);
   border-top: 2px solid var(--gold);
 }
+
+/* --- Building Look Biome Scene Preview ------------------------------------ */
+
+.looks {
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+  gap: 14px;
+}
+
+.look-biome-preview {
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  padding: 8px 10px;
+  margin: 8px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.look-preview-toolbar,
+.look-preview-subbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.look-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.look-ctrl select {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--edge);
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.look-building-badge {
+  font-size: 12px;
+  color: var(--gold);
+}
+
+.look-scenery-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.look-biome-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.look-canvas-wrap {
+  background: #141020;
+  border: 1px solid var(--edge);
+  overflow: hidden;
+}
+
+.look-biome-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 560 / 360;
+}
+

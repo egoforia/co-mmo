@@ -4,6 +4,7 @@
 // Building looks (texture sheets), Sounds & music, and item/normal-map cards.
 
 import { BUILDING_STYLES } from '@co-mmo/shared';
+import { lookBiomePreviewHtml } from './look-preview.ts';
 import { queueButtonHtml } from './queue.ts';
 import {
   ASKED,
@@ -212,6 +213,7 @@ export function looksPage(): string {
       <div class="look" data-asset-card="${esc(v.look)}">
         <h3>${esc(v.name)}</h3>
         <p class="note">${usedBy.length ? `Builds ${usedBy.map(esc).join(', ')}. ` : ''}${v.paintings.length} sheet${v.paintings.length === 1 ? '' : 's'} painted. ${state}</p>
+        ${lookBiomePreviewHtml(v)}
         <ul class="textures">${v.textures.map(texture).join('')}</ul>
         <div class="card-actions">
           <button type="button" data-art-review="${esc(JSON.stringify({ what: 'sheet', look: v.look }))}" data-note="yes">Paint a sheet</button>

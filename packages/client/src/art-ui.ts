@@ -37,6 +37,11 @@ import {
 import { focusHandFinder, followHandStatus, handStatusLine, loadHandStatus, refreshHandStatus } from './art-ui/hand-status.ts';
 import { handleHudFxClick, hudFxPage } from './art-ui/hud-fx.ts';
 import {
+  handleLookPreviewChange,
+  handleLookPreviewClick,
+  mountLookBiomePreviews,
+} from './art-ui/look-preview.ts';
+import {
   handleMapEditorChange,
   handleMapEditorClick,
   handleMapEditorSubmit,
@@ -98,6 +103,7 @@ export function afterArtRender(): void {
   mountHandWorkbenches();
   mountSkillStages();
   mountMapEditorCanvas();
+  mountLookBiomePreviews();
   const { asset, walker } = where();
   const focusKey = asset ? `asset:${asset}` : walker ? `walker:${walker}` : '';
   if (focusKey && focusKey !== lastFocusedKey) {
@@ -130,7 +136,7 @@ export async function artPage(context: ArtContext): Promise<string> {
   artState.mirrored = asked.mirrored ?? {};
   const o = artState.data;
   const { sub, page } = where();
-  if (sub === 'buildings') await loadBuildings();
+  if (sub === 'buildings' || sub === 'looks') await loadBuildings();
   if (sub === 'art-director') await loadArtDirector();
   if (sub === 'map-editor') await loadMapEditorData();
   if (sub === 'models') await loadArtModels();
@@ -278,6 +284,7 @@ export function artClick(target: HTMLElement): boolean {
     handleDirectorClick(t) ||
     handleWorkbenchClick(t) ||
     handleSkillStageClick(t) ||
+    handleLookPreviewClick(t) ||
     handleHudFxClick(t) ||
     handleMapEditorClick(t) ||
     handleEntityFilterClick(t)
@@ -305,6 +312,7 @@ export function artChange(target: HTMLElement): boolean {
   if (
     handleWorkbenchChange(target) ||
     handleSkillStageChange(target) ||
+    handleLookPreviewChange(target) ||
     handleMapEditorChange(target) ||
     handleModelsChange(target)
   ) {

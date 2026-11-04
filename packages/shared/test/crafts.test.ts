@@ -18,6 +18,7 @@ import {
   craftXpToNext,
   gainCraftXp,
   giveHomeTools,
+  heldArts,
   itemCount,
   master,
   newCharacter,
@@ -39,6 +40,8 @@ describe('crafts', () => {
       expect(sells).not.toContain(toolId(k, 3));
     }
     expect(toolWords(ITEMS['tool-smithing-2'])).toBe('Smithing tool, tier 2.');
+    // Until a tool's own picture is painted, it shows a shipped one like it, in the bag and in the hand.
+    expect(heldArts('tool-woodcarving-1')).toEqual(['item-tool-woodcarving', 'held-axe']);
   });
 
   it('work the families of materials, and every shipped recipe belongs to one', () => {

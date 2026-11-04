@@ -31,7 +31,7 @@ import {
 } from '@co-mmo/shared';
 import { SpellbookUi } from './spellbook-ui.ts';
 import { escapeHtml } from './ui.ts';
-import { artSrc } from './wished.ts';
+import { itemIcon } from './wished.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -50,7 +50,7 @@ export interface KitActions {
 export function itemLabel(id: string): string {
   const def = ITEMS[id];
   if (!def) return escapeHtml(id);
-  return `<img src="${escapeHtml(artSrc(def.art, true))}" alt=""><b class="rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}</b>`;
+  return `<img src="${escapeHtml(itemIcon(def))}" alt=""><b class="rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}</b>`;
 }
 
 /**
@@ -341,7 +341,7 @@ export class KitUi {
     const bag = this.character.inventory
       .filter((s) => !ITEMS[s.item]?.bound && ITEMS[s.item])
       .map((s) => `<button type="button" class="slot" data-add="${escapeHtml(s.item)}" title="Add one to your side">
-        <img src="${escapeHtml(artSrc(ITEMS[s.item]!.art, true))}" alt="">${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
+        <img src="${escapeHtml(itemIcon(ITEMS[s.item]!))}" alt="">${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
         <span class="name">${escapeHtml(ITEMS[s.item]!.name)}</span><span class="hint">Add one</span></button>`)
       .join('');
     $('trade').innerHTML = `

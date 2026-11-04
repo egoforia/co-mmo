@@ -25,17 +25,19 @@ export interface CraftDef {
   tool: string;
   /** Peoples who start ahead in it. */
   peoples: RaceId[];
+  /** The shipped icon its tools show until their own picture is painted. */
+  standIn: string;
 }
 
 /** The seven crafts (the plan's table). Bone and horn are carved, so they go with wood. */
 export const CRAFTS: Record<CraftId, CraftDef> = {
-  woodcarving: { name: 'Woodcarving', families: ['wood', 'bone'], tool: 'Axe', peoples: ['ursine', 'cervid'] },
-  leatherwork: { name: 'Leatherwork', families: ['hide'], tool: 'Skinning Knife', peoples: ['ursine'] },
-  tailoring: { name: 'Tailoring', families: ['fibre'], tool: 'Shears', peoples: ['scorpid', 'falcon'] },
-  smithing: { name: 'Smithing', families: ['ore', 'plate'], tool: 'Pick', peoples: ['scorpid', 'lutran'] },
-  fletching: { name: 'Fletching', families: ['feather'], tool: 'Fletching Knife', peoples: ['falcon'] },
-  herbalism: { name: 'Herbalism', families: ['herb'], tool: 'Sickle', peoples: ['cervid'] },
-  jewellery: { name: 'Jewellery', families: ['gem'], tool: 'Pliers', peoples: ['lutran'] },
+  woodcarving: { name: 'Woodcarving', families: ['wood', 'bone'], tool: 'Axe', peoples: ['ursine', 'cervid'], standIn: 'held-axe' },
+  leatherwork: { name: 'Leatherwork', families: ['hide'], tool: 'Skinning Knife', peoples: ['ursine'], standIn: 'held-sword' },
+  tailoring: { name: 'Tailoring', families: ['fibre'], tool: 'Shears', peoples: ['scorpid', 'falcon'], standIn: 'held-twin-blades' },
+  smithing: { name: 'Smithing', families: ['ore', 'plate'], tool: 'Pick', peoples: ['scorpid', 'lutran'], standIn: 'held-hammer' },
+  fletching: { name: 'Fletching', families: ['feather'], tool: 'Fletching Knife', peoples: ['falcon'], standIn: 'held-bow' },
+  herbalism: { name: 'Herbalism', families: ['herb'], tool: 'Sickle', peoples: ['cervid'], standIn: 'held-sword' },
+  jewellery: { name: 'Jewellery', families: ['gem'], tool: 'Pliers', peoples: ['lutran'], standIn: 'item-scarab-charm' },
 };
 
 /** Levels: everyone starts at 1, a home craft at 3; past 10 needs a mastery. */
@@ -153,6 +155,7 @@ export const TOOLS: Record<string, ItemDef> = Object.fromEntries(CRAFT_IDS.flatM
   name: `${TOOL_TIER_NAMES[tier]}${CRAFTS[craft].tool}`,
   kind: 'tool',
   art: `item-tool-${craft}`,
+  standIn: CRAFTS[craft].standIn,
   description: `A ${CRAFTS[craft].name.toLowerCase()} tool${tier > 1 ? ' of finer make' : ''}. Keep it in your bag to work and gather ${CRAFTS[craft].families.join(' and ')}. It wears out in time.`,
   value: TOOL_VALUE[tier],
   tool: { craft, tier },

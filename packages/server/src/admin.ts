@@ -731,7 +731,7 @@ export async function handleAdmin(
           const resC = await ctx.art.director.consult(question, assets);
           return json(res, 200, { ok: true, ...resC, overview: await ctx.art.director.overview() }), true;
         }
-        if (action === 'style-bible') {
+        if (action === 'style-bible' || action === 'update-bible') {
           const updated = await ctx.art.director.updateStyleBible((body ?? {}) as Parameters<typeof ctx.art.director.updateStyleBible>[0]);
           return json(res, 200, { ok: true, ...updated }), true;
         }

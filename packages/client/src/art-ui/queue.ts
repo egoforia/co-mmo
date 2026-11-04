@@ -12,6 +12,7 @@ import {
   type UpNextEntry,
   type UpNextState,
   artState,
+  assetHref,
   budgetLine,
   esc,
   usd,
@@ -50,6 +51,7 @@ export function queuePage(): string {
   const doneCount = q.items.filter((i) => i.status === 'done' || i.status === 'failed').length;
 
   const row = (item: UpNextEntry, idx: number) => {
+    const href = assetHref(item.targetId, item.kind === 'clip' ? 'clip' : item.kind === 'sound' ? 'sound' : 'picture');
     const statusBadge =
       item.status === 'running'
         ? '<span class="job painting">Running…</span>'
@@ -71,7 +73,7 @@ export function queuePage(): string {
           </div>
         </td>
         <td>
-          <b>${esc(item.label)}</b> <small class="tag-pill">${esc(item.category)}</small> <small>(${esc(item.kind)}${item.direction ? ` · ${esc(item.direction)}` : ''})</small>
+          <b>${href ? `<a href="${esc(href)}" data-art-go>${esc(item.label)}</a>` : esc(item.label)}</b> <small class="tag-pill">${esc(item.category)}</small> <small>(${esc(item.kind)}${item.direction ? ` · ${esc(item.direction)}` : ''})</small>
           ${refs}
           <form class="queue-note-form" data-queue-id="${esc(item.id)}">
             <input name="note" value="${esc(item.note ?? '')}" placeholder="Optional note or custom brief (e.g. warmer rim light, heavier frost)…" />
@@ -83,6 +85,7 @@ export function queuePage(): string {
         <td>${statusBadge}${item.reason ? `<br><small class="bad">${esc(item.reason)}</small>` : ''}</td>
         <td>about ${usd(item.estimateUsd)}</td>
         <td class="card-actions">
+          ${href ? `<a class="button quiet" href="${esc(href)}" data-art-go>Go to art →</a>` : ''}
           <button type="button" class="quiet" data-queue-review="${esc(item.id)}">Review &amp; Paint</button>
           <button type="button" class="quiet" data-queue-remove="${esc(item.id)}" title="Remove from queue">✕</button>
         </td>

@@ -19,6 +19,7 @@ import {
   STATUS,
   type SoundItem,
   artState,
+  assetHref,
   budgetLine,
   esc,
   isOpen,
@@ -26,6 +27,7 @@ import {
   pagesNav,
   usd,
   when,
+  where,
 } from './state.ts';
 
 export function nowPage(): string {
@@ -37,13 +39,17 @@ export function jobsHtml(jobs: ArtJob[], b: Budget): string {
   const open = jobs.filter(isOpen);
   const done = jobs.filter((j) => !open.includes(j)).slice(0, 30);
   const waiting = open.reduce((n, j) => n + j.estimateUsd, 0);
-  const row = (j: ArtJob) => `
+  const row = (j: ArtJob) => {
+    const href = assetHref(j.asset, j.media);
+    return `
     <tr class="${j.status}">
       <td>${when(j.endedAt ?? j.startedAt ?? j.queuedAt)}</td>
-      <td><b>${esc(j.label)}</b><br><small>${MEDIA[j.media]} · asked by ${ASKED[j.source]}</small></td>
+      <td><b>${href ? `<a href="${esc(href)}" data-art-go>${esc(j.label)}</a>` : esc(j.label)}</b><br><small>${MEDIA[j.media]} · asked by ${ASKED[j.source]}</small></td>
       <td><span class="job ${j.status}">${STATUS[j.status]}</span>${j.reason ? `<br><small>${esc(j.reason)}</small>` : ''}</td>
       <td>${j.usd !== undefined ? usd(j.usd) : `about ${usd(j.estimateUsd)}`}</td>
+      <td class="card-actions">${href ? `<a class="button quiet" href="${esc(href)}" data-art-go>${j.status === 'done' ? 'View painted art →' : 'Go to art →'}</a>` : ''}</td>
     </tr>`;
+  };
   return `
     <p class="note">Each model is asked only as often as Google allows (video: 2 clips a minute, one at a time), so some requests wait their turn. Requests still waiting when the server restarts are painted after it starts again.</p>
     <p>${budgetLine(b)}${open.length ? ` · ${open.length} waiting or painting, about ${usd(waiting)} more` : ''}</p>
@@ -79,6 +85,16 @@ export function itemsPage(page?: string): string {
   if (!kinds.length) return '<p class="note">No items yet.</p>';
   const chosen = page && kinds.includes(page) ? page : kinds[0]!;
   let inPage = items.filter((i) => i.place.page === chosen);
+  const targetAsset = where().asset;
+  if (targetAsset && inPage.some((i) => i.id === targetAsset)) {
+    const targetItem = inPage.find((i) => i.id === targetAsset)!;
+    if (artState.itemFashionFilter !== 'all' && targetItem.fashionStyle !== artState.itemFashionFilter) {
+      artState.itemFashionFilter = 'all';
+    }
+    if (artState.itemStandInOnly && !targetItem.standIn) {
+      artState.itemStandInOnly = false;
+    }
+  }
   if (artState.itemFashionFilter !== 'all') {
     inPage = inPage.filter((i) => i.fashionStyle === artState.itemFashionFilter);
   }
@@ -165,7 +181,7 @@ export function itemHtml(item: ArtItem): string {
     ? `<button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [item.id] }))}">Find grip</button>`
     : '';
   const details = item.source !== 'missing' ? `<button type="button" class="quiet" data-art-versions="${esc(item.id)}">${older ? `Versions (${older + 1})` : 'What made it'}</button>` : '';
-  return `<figure class="art-item ${item.source}${item.standIn ? ' standin' : ''}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b> ${tags}<br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${standInNote}${check}${gripHtml}<div class="card-actions">${paint}${queueBtn}${findGripBtn}${details}</div>${normalHtml(item)}</figcaption></figure>`;
+  return `<figure class="art-item ${item.source}${item.standIn ? ' standin' : ''}${item.check && !item.check.pass ? ' flagged' : ''}" data-asset-card="${esc(item.id)}">${picture}<figcaption><b>${esc(item.name)}</b> ${tags}<br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${standInNote}${check}${gripHtml}<div class="card-actions">${paint}${queueBtn}${findGripBtn}${details}</div>${normalHtml(item)}</figcaption></figure>`;
 }
 
 /** Its normal map: worked out by the game, or painted, with buttons to paint one or go back. */
@@ -193,7 +209,7 @@ export function looksPage(): string {
       ? `<button type="button" class="quiet" data-art-review="${esc(JSON.stringify({ what: 'sheet', look: v.look, textures: failing.map((t) => t.name) }))}" data-note="yes">Paint the ${failing.length} failing again</button>`
       : '';
     return `
-      <div class="look">
+      <div class="look" data-asset-card="${esc(v.look)}">
         <h3>${esc(v.name)}</h3>
         <p class="note">${usedBy.length ? `Builds ${usedBy.map(esc).join(', ')}. ` : ''}${v.paintings.length} sheet${v.paintings.length === 1 ? '' : 's'} painted. ${state}</p>
         <ul class="textures">${v.textures.map(texture).join('')}</ul>
@@ -212,7 +228,7 @@ export function looksPage(): string {
 export function soundsPage(): string {
   const o = artState.data!;
   const sound = (s: SoundItem) => `
-    <div class="sound ${s.url ? '' : 'missing'}">
+    <div class="sound ${s.url ? '' : 'missing'}" data-asset-card="${esc(s.id)}">
       <b>${esc(s.name)}</b> <small>${s.kind === 'music' ? 'music' : 'effect'}${s.url ? '' : ' · not made yet'}</small>
       ${s.url ? `<audio controls preload="none" src="${esc(s.url)}"${s.kind === 'music' ? ' loop' : ''}></audio>` : ''}
       <div class="card-actions">

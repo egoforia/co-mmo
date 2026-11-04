@@ -126,6 +126,9 @@ export const CHAPTERS: Chapter[] = [
       <p>When other players fight what you wished for, talk to it, wear it, use it, craft with it, learn from it or walk into the land you wished, you earn <b>Creator XP</b>. Each Creator level brings 3 Favor, so making things people love pays for more wishes.</p>
       <h3>Gear</h3>
       <p>Weapons, hats, coats, cloaks, boots and charms add to your stats, damage and armour. Rarity runs from Common through Uncommon, Rare and Epic to Legendary. The world sets how strong wished gear is from its rarity; wishes reach Rare at most, and the rest must be earned.</p>
+      <h3>Region styles</h3>
+      <p>Every land has its own clothes, made by Tailoring and Leatherwork from its own materials: <b>Pilgrim</b> (the Sanctum), <b>Barkwarden</b> (Whispering Woods), <b>Pearlcoat</b> (Sunlit Shore), <b>Sunwrap</b> (Mirage Desert), <b>Windfelt</b> (Frostpeak) and <b>Sporeweave</b> (Mushroom Hollow). Each home tailor sells their land's style. Wear three pieces of one style (head, body, cloak, feet) for its bonus, anywhere.</p>
+      <p>Who made a garment matters. Each says who tailored it. The maker's people leans it toward that people's two attributes, more the rarer it is, and the maker picks which one leads. The main material adds a side effect: warm pelts and wool help you heal, light feathers and felt help you dodge. A maker working a material their people loves makes finer things.</p>
       <h3>Roles</h3>
       <ul>
         <li><b>The Owner</b> keeps the world and its budget.</li>

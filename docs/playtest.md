@@ -20,6 +20,7 @@ alongside the others.
 | `world.play.ts` | Walk every road between every region, both ways, and check each region can be walked: people, roads, doors, creatures and the spawn point all in reach. Also lays out 60 wished lands and checks the same. |
 | `journey.play.ts` | Play the first quests as a new player: Sister Amala, Old Bramble in the Woods, four mushrooms with their loot, Power Strike, then Marina's shop on the Shore. |
 | `wishes.play.ts` | Pray, then wish for a thing to wear, a creature (and fight it), a person (and talk to them), a power (learn and cast it), a drop and a new land (and walk into it). A player without Favor is turned away. |
+| `fashion.play.ts` | In Frostpeak a Falcon tailors a Windfelt hood, a tunic leaning toward Spirit and a cloak, wears the three for the full-style bonus, and buys boots from Ysolde. |
 | `mods.play.ts` | The Owner switches a wished creature and a wished ring off and on again in God's View while another player watches, then undoes the creature for good. |
 | `together.play.ts` | Two players see each other, chat, form a party, share a fight's XP and trade. |
 | `crafting.play.ts` | A Cervid gathers sage with the sickle their people gave them and brews a tonic, fells an oak branch and trades it to a Scorpid, who digs copper with their own pick and smiths a pair of pliers. |

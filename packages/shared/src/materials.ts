@@ -19,7 +19,7 @@ export const MATERIAL_SOURCES: readonly MaterialSource[] = ['gathered', 'creatur
 export type MaterialTier = 1 | 2 | 3;
 
 export { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
-import { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
+import { EVERYWHERE_REGION, MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
 
 
 /** A material's data, on its ItemDef as `material`. */
@@ -33,8 +33,7 @@ export interface MaterialInfo {
   traits: MaterialTrait[];
 }
 
-/** The region whose materials count as every region's (the crossroads). */
-export const EVERYWHERE_REGION = 'sanctum';
+export { EVERYWHERE_REGION } from './material-traits.ts';
 
 /** Highest tier a wished material can have: tier 3 comes only from bosses, quests and masters. */
 export const MAX_WISHED_MATERIAL_TIER: MaterialTier = 2;

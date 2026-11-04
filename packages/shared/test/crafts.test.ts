@@ -127,7 +127,7 @@ describe('crafts', () => {
     const e = newCharacter();
     addItem(e, 'roc-plume');
     addItem(e, toolId('fletching', 1));
-    expect(craft(e, 'test-roc')).toMatch(/Only a master of Fletching/);
+    expect(craft(e, 'test-roc')).toMatch(/Only a master of Fletching can make that/);
     e.masteries = ['fletching'];
     expect(craft(e, 'test-roc')).toBeUndefined();
     delete RECIPES['test-roc'];

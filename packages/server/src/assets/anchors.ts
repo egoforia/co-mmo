@@ -4,6 +4,7 @@ import { LAND_ANCHORS } from './land-anchors.ts';
 import { HOME_LAND_ANCHORS } from './home-land-anchors.ts';
 import { CRAFT_TOOL_ANCHORS } from './craft-tool-anchors.ts';
 import { GATHER_SPOT_ANCHORS } from './gather-spot-anchors.ts';
+import { materialIconAnchors } from './material-icon-anchors.ts';
 import { SKILL_ANCHORS, type TieredAsset } from './skill-anchors.ts';
 
 /**
@@ -259,6 +260,7 @@ export const ANCHORS: (AssetDescription & { id: string; references?: string[]; t
   ...HOME_LAND_ANCHORS,
   ...CRAFT_TOOL_ANCHORS,
   ...GATHER_SPOT_ANCHORS,
+  ...materialIconAnchors(),
   // Skill effects, status icons, and the creatures skills bring.
   ...SKILL_ANCHORS,
 ];

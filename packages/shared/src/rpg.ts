@@ -312,6 +312,8 @@ export interface ItemDef {
   material?: MaterialInfo;
   /** A crafted copy: who made it, its quality and what it carries (copies.ts). */
   copy?: CopyInfo;
+  /** One of a kind (a unique recipe's piece): each copy binds to whoever first wears it (copies.ts). */
+  unique?: boolean;
   /** A painted picture shown until its own `art` is painted (an icon like it). */
   standIn?: string;
   /** Tools: the craft they work and their tier (crafts.ts). */
@@ -502,11 +504,16 @@ export function learnAbility(c: Character, id: string): boolean {
  * Wears an item from the bag, putting back whatever was in its slot.
  * Returns why not, or undefined when done.
  */
-export function equip(c: Character, item: string): string | undefined {
-  const def = ITEMS[item];
+export function equip(c: Character, worn: string, bind?: (item: string) => string): string | undefined {
+  const def = ITEMS[worn];
   if (!def?.slot) return 'That is not something you can wear.';
-  if (itemCount(c, item) === 0) return 'That is not in your bag.';
-  takeItem(c, item);
+  if (itemCount(c, worn) === 0) return 'That is not in your bag.';
+  // A unique piece may bind to its wearer as it goes on (copies.ts bindOnWear), and is worn as its bound copy.
+  const item = bind ? bind(worn) : worn;
+  // Out of the bag directly: takeItem keeps bound things in, so they are never dropped or sold.
+  const slot = c.inventory.find((s) => s.item === item)!;
+  slot.qty -= 1;
+  if (slot.qty === 0) c.inventory.splice(c.inventory.indexOf(slot), 1);
   const old = c.equipment[def.slot];
   c.equipment[def.slot] = item;
   if (old) addItem(c, old);

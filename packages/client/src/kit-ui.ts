@@ -20,6 +20,8 @@ import {
   craftXpToNext,
   isMastered,
   recipeCraft,
+  recipeTier,
+  recipeTierWords,
   type CraftId,
   type RecipeDef,
   type ShopMessage,
@@ -235,7 +237,7 @@ export class KitUi {
       const name = recipeName(id);
       return `<li>${itemLabel(r.result.item)}${r.result.qty > 1 ? ` × ${r.result.qty}` : ''}
         ${name !== made.name ? `<i>${escapeHtml(name)}</i>` : ''}
-        <span class="info">${needs}${recipeCraft(r) && r.level > 1 ? ` · level ${r.level}` : ''}${made.bonus ? ` · ${escapeHtml(bonusText(made.bonus))}` : ''}</span>
+        <span class="info">${needs}${recipeCraft(r) && r.level > 1 ? ` · level ${r.level}` : ''}${recipeTier(r) !== 'common' ? ` · ${escapeHtml(recipeTierWords(recipeTier(r)))}` : ''}${made.bonus ? ` · ${escapeHtml(bonusText(made.bonus))}` : ''}</span>
         <button type="button" data-recipe="${escapeHtml(id)}"${why ? ` disabled title="${escapeHtml(why)}"` : ''}>Make</button></li>`;
     };
     // The book is grouped by craft, each with how far along you are and the tool you hold.

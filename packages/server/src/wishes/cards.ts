@@ -4,6 +4,7 @@ import {
   WISH_COSTS,
   WishError,
   contentTier,
+  recipeTier,
   validateDefinition,
   regionDef,
   callingChangeProblem,
@@ -143,6 +144,8 @@ export class WishCards {
       }
       // Things for your bag are minor; creatures, people and abilities moderate, whatever the model said.
       if (definition) tier = contentTier(definition);
+      // A recipe mixing lands (rare), or one needing a key item (unique), goes before the Stewards.
+      if (definition?.kind === 'recipe' && recipeTier(definition) !== 'common') tier = 'major';
     }
     // A new region grows beyond the open edge of this one nearest the player.
     let edge: OpenCard['edge'];

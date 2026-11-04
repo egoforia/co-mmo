@@ -8,3 +8,6 @@
  */
 export type MaterialTrait = 'sturdy' | 'warding' | 'warm' | 'light' | 'supple' | 'shimmering';
 export const MATERIAL_TRAITS: readonly MaterialTrait[] = ['sturdy', 'warding', 'warm', 'light', 'supple', 'shimmering'];
+
+/** The region whose materials count as every region's (the crossroads); here so recipes (kit.ts) can read it without loading the world. */
+export const EVERYWHERE_REGION = 'sanctum';

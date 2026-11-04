@@ -21,6 +21,7 @@ export * from './materials.ts';
 export * from './copies.ts';
 export * from './gathering.ts';
 export * from './crafts.ts';
+export * from './recipes.ts';
 export * from './workshop.ts';
 export * from './walk-rig.ts';
 export * from './walk.ts';

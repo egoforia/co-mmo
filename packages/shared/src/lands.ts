@@ -123,11 +123,11 @@ export const LAND_ITEMS: Record<string, ItemDef> = {
     description: 'A crusty, hearty loaf baked by Mother Elena at the Pilgrim\'s Haven. Restores 20 health.', value: 5,
   },
   'ancient-bone': {
-    name: 'Ancient Bone', kind: 'material', art: 'item-goat-horn', description: 'A bleached bone from the forgotten crypts below the cathedral.', value: 10,
+    name: 'Ancient Bone', kind: 'material', art: 'item-ancient-bone', standIn: 'item-goat-horn', description: 'A bleached bone from the forgotten crypts below the cathedral.', value: 10,
     material: { family: 'bone', homes: ['sanctum'], source: 'creature', tier: 1, traits: [] },
   },
   'demon-horn': {
-    name: 'Demon Horn', kind: 'material', art: 'item-goat-horn', rarity: 'rare',
+    name: 'Demon Horn', kind: 'material', art: 'item-demon-horn', standIn: 'item-goat-horn', rarity: 'rare',
     description: 'A twisted obsidian horn radiating dark abyssal heat.', value: 50,
     material: { family: 'bone', homes: ['sanctum'], source: 'boss', tier: 3, traits: ['warding'] },
   },

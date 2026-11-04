@@ -43,15 +43,15 @@ const SPOTS_PER_KIND = 12;
 /** No spot stands this near the middle, where everyone arrives. */
 const CLEAR_MIDDLE = 10;
 
-const gathered = (name: string, family: MaterialFamily, home: string, tier: 1 | 2, art: string, description: string, trait?: MaterialTrait): ItemDef => ({
-  name, kind: 'material', art, description, value: tier === 1 ? 6 : 14,
+const gathered = (name: string, family: MaterialFamily, home: string, tier: 1 | 2, standIn: string, description: string, trait?: MaterialTrait): ItemDef => ({
+  // Its own icon (`item-<id>`, set below) once painted; until then an icon like it.
+  name, kind: 'material', art: '', standIn, description, value: tier === 1 ? 6 : 14,
   material: { family, homes: [home], source: 'gathered', tier, traits: trait ? [trait] : [] },
 });
 
 /**
- * The materials only gathering gives. Their own icons are painted with the
- * material icons (plan step 6); until then each shows the icon of a material
- * like it.
+ * The materials only gathering gives. Each shows the icon of a material like
+ * it until its own is painted (material-icon-anchors.ts on the server).
  */
 export const GATHERED_MATERIALS: Record<string, ItemDef> = {
   'temple-sage': gathered('Temple Sage', 'herb', 'sanctum', 1, 'item-mushroom-cap', 'Silver-green leaves from the shrine gardens. Burned, they smell of rain and quiet.', 'warding'),
@@ -73,6 +73,7 @@ export const GATHERED_MATERIALS: Record<string, ItemDef> = {
   'hollow-amethyst': gathered('Hollow Amethyst', 'gem', 'mushroom-hollow', 2, 'item-pearl', 'A violet crystal grown in the dark under the caps. It hums when held.', 'shimmering'),
   'cave-truffle': gathered('Cave Truffle', 'herb', 'mushroom-hollow', 1, 'item-mushroom-cap', 'A knobbly black truffle with a smell that fills a room.', 'warm'),
 };
+for (const [id, def] of Object.entries(GATHERED_MATERIALS)) def.art = `item-${id}`;
 Object.assign(ITEMS, GATHERED_MATERIALS);
 
 const spot = (name: string, biome: BiomeId, material: string, id: string): [string, SpotDef] => [id, { name, biome, material, art: `spot-${id}` }];

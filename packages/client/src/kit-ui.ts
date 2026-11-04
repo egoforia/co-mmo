@@ -10,6 +10,19 @@ import {
   itemCount,
   recipeName,
   sellPrice,
+  CRAFTS,
+  CRAFT_IDS,
+  MASTERY_CHANGE_GOLD,
+  MAX_MASTERIES,
+  bestTool,
+  craftLevel,
+  craftLevelCap,
+  craftXpToNext,
+  isMastered,
+  recipeCraft,
+  type CraftId,
+  type RecipeDef,
+  type ShopMessage,
   type Character,
   type TradeActionMessage,
   type TradeOffer,
@@ -27,7 +40,7 @@ export interface KitActions {
   /** Arrange keys 1 to 6: an ability id per key, or '' for none. */
   hotbar(slots: string[]): void;
   craft(recipe: string): void;
-  shop(action: 'buy' | 'sell' | 'learn', npc: string, id: string, qty?: number): void;
+  shop(action: ShopMessage['action'], npc: string, id: string, qty?: number, replace?: string): void;
   trade(message: TradeActionMessage): void;
   /** True while typing in chat, so keys are not shortcuts. */
   typing(): boolean;
@@ -82,7 +95,7 @@ export class KitUi {
       const button = target.closest<HTMLElement>('[data-action]');
       if (button && this.shopNpc) {
         const qty = button.dataset.qty ? Number(button.dataset.qty) : undefined;
-        actions.shop(button.dataset.action as 'buy' | 'sell' | 'learn', this.shopNpc.id, button.dataset.id!, qty);
+        actions.shop(button.dataset.action as ShopMessage['action'], this.shopNpc.id, button.dataset.id!, qty, button.dataset.replace);
       }
       if (target.closest('[data-close]')) this.closeShop();
     });
@@ -212,25 +225,53 @@ export class KitUi {
 
   private renderCrafting(): void {
     const c = this.character;
-    const rows = Object.entries(RECIPES)
-      .filter(([, r]) => ITEMS[r.result.item] && r.materials.every((m) => ITEMS[m.item]))
-      .map(([id, r]) => {
-        const why = cannotCraft(c, id);
-        const needs = r.materials
-          .map((m) => `<span class="${itemCount(c, m.item) >= m.qty ? 'have' : 'need'}">${itemCount(c, m.item)}/${m.qty} ${escapeHtml(ITEMS[m.item]!.name)}</span>`)
-          .join(', ');
-        const made = ITEMS[r.result.item]!;
-        const name = recipeName(id);
-        return `<li>${itemLabel(r.result.item)}${r.result.qty > 1 ? ` × ${r.result.qty}` : ''}
-          ${name !== made.name ? `<i>${escapeHtml(name)}</i>` : ''}
-          <span class="info">${needs}${r.wit ? ` · needs ${r.wit} Wit` : ''}${made.bonus ? ` · ${escapeHtml(bonusText(made.bonus))}` : ''}</span>
-          <button type="button" data-recipe="${escapeHtml(id)}"${why ? ` disabled title="${escapeHtml(why)}"` : ''}>Make</button></li>`;
-      })
-      .join('');
+    const known = Object.entries(RECIPES).filter(([, r]) => ITEMS[r.result.item] && r.materials.every((m) => ITEMS[m.item]));
+    const row = ([id, r]: [string, RecipeDef]) => {
+      const why = cannotCraft(c, id);
+      const needs = r.materials
+        .map((m) => `<span class="${itemCount(c, m.item) >= m.qty ? 'have' : 'need'}">${itemCount(c, m.item)}/${m.qty} ${escapeHtml(ITEMS[m.item]!.name)}</span>`)
+        .join(', ');
+      const made = ITEMS[r.result.item]!;
+      const name = recipeName(id);
+      return `<li>${itemLabel(r.result.item)}${r.result.qty > 1 ? ` × ${r.result.qty}` : ''}
+        ${name !== made.name ? `<i>${escapeHtml(name)}</i>` : ''}
+        <span class="info">${needs}${recipeCraft(r) && r.level > 1 ? ` · level ${r.level}` : ''}${made.bonus ? ` · ${escapeHtml(bonusText(made.bonus))}` : ''}</span>
+        <button type="button" data-recipe="${escapeHtml(id)}"${why ? ` disabled title="${escapeHtml(why)}"` : ''}>Make</button></li>`;
+    };
+    // The book is grouped by craft, each with how far along you are and the tool you hold.
+    const groups = [...CRAFT_IDS, undefined].map((k) => {
+      const rows = known.filter(([, r]) => recipeCraft(r) === k).sort(([, a], [, b]) => a.level - b.level);
+      if (!rows.length) return '';
+      return `<h3>${k ? escapeHtml(this.craftLine(k)) : 'Anyone can make'}</h3><ul class="rows">${rows.map(row).join('')}</ul>`;
+    }).join('');
     $('crafting').innerHTML = `
       <h2>Crafting book <button type="button" class="close" data-close aria-label="Close">×</button></h2>
-      <p class="note">Creatures drop materials. Wit (and a good charm) lets you make finer things. New recipes can be wished for.</p>
-      <ul class="rows">${rows}</ul>`;
+      <p class="note">Each craft needs its tool in your bag and grows as you practise it. Anyone can reach level 10; a master goes on to 20. Wit makes finer things.</p>
+      ${groups}`;
+  }
+
+  /** A craft's heading: its level, practice toward the next, mastery and tool. */
+  private craftLine(k: CraftId): string {
+    const c = this.character;
+    const level = craftLevel(c, k);
+    const xp = c.crafts?.[k]?.xp ?? 0;
+    const tool = bestTool(c, k);
+    const toward = level < craftLevelCap(c, k) ? ` (${xp}/${craftXpToNext(level)})` : '';
+    return `${CRAFTS[k].name}: level ${level}${toward}${isMastered(c, k) ? ', master' : ''}, ${tool ? ITEMS[tool.id]!.name.toLowerCase() : `no ${CRAFTS[k].tool.toLowerCase()}`}`;
+  }
+
+  /** What a master offers: taking up their craft, or changing a mastery for it. */
+  private masteryRows(crafts: CraftId[]): string[] {
+    const c = this.character;
+    const held = c.masteries ?? [];
+    return crafts.map((k) => {
+      const name = escapeHtml(CRAFTS[k].name);
+      const info = `<span class="info">Rise past level 10 in ${name}, work the rarest materials and make the finest pieces.</span>`;
+      if (isMastered(c, k)) return `<li><b>${name}</b>${info}<button type="button" disabled>You are a master</button></li>`;
+      if (held.length < MAX_MASTERIES) return `<li><b>${name}</b>${info}<button type="button" data-action="master" data-id="${k}">Become a master</button></li>`;
+      return `<li><b>${name}</b>${info}${held.map((old) => `<button type="button" data-action="master" data-id="${k}" data-replace="${old}"${c.gold < MASTERY_CHANGE_GOLD ? ' disabled' : ''}
+        title="${escapeHtml(`Your ${CRAFTS[old].name} drops back to level 10.`)}">Give up ${escapeHtml(CRAFTS[old].name)} · ${MASTERY_CHANGE_GOLD} gold</button>`).join('')}</li>`;
+    });
   }
 
   private renderShop(): void {
@@ -262,6 +303,7 @@ export class KitUi {
       <h2>${escapeHtml(npc.name)} <small>${c.gold} gold</small> <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       ${sells.length ? `<h3>For sale</h3><ul class="rows">${sells.join('')}</ul>` : ''}
       ${teaches.length ? `<h3>Lessons</h3><ul class="rows">${teaches.join('')}</ul>` : ''}
+      ${shop.masters?.length ? `<h3>Mastery</h3><ul class="rows">${this.masteryRows(shop.masters).join('')}</ul>` : ''}
       ${shop.buys ? `<h3>Sell your things</h3>${buys.length ? `<ul class="rows">${buys.join('')}</ul>` : '<p class="note">Nothing to sell. Worn gear must be taken off first.</p>'}` : ''}`;
   }
 

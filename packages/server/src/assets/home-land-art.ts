@@ -1,6 +1,7 @@
 import { CREATURE_HEIGHTS, type CreatureSizeTier } from '@co-mmo/shared';
 import type { KitAsset } from './kit.ts';
 import { HOME_LAND_ANCHORS } from './home-land-anchors.ts';
+import { CRAFT_TOOL_ANCHORS } from './craft-tool-anchors.ts';
 import { wildKit } from './wild-kit.ts';
 
 // The pictures Frostpeak and Mushroom Hollow need (gather and craft plan,
@@ -28,12 +29,14 @@ const TIER_BOX: Record<CreatureSizeTier, { width: number; height: number }> = {
 
 /**
  * The size a home land picture is painted at the first time, or undefined
- * for any other picture: tiles as the launch tiles, trees and rocks as the
+ * for any other picture: tiles and tools as the launch tiles and items, trees and rocks as the
  * launch kit's, people as tall as everyone, creatures by their height tier.
  */
 export function homeLandBox(id: string): { width: number; height: number } | undefined {
   const kit = homeLandKit().find((a) => a.id === id);
   if (kit) return kit.kind === 'tile' || id.endsWith('-rock') ? { width: 128, height: 128 } : { width: 192, height: 256 };
+  // The craft tools (step 4), at the launch items' size.
+  if (CRAFT_TOOL_ANCHORS.some((a) => a.id === id)) return { width: 128, height: 128 };
   const anchor = HOME_LAND_ANCHORS.find((a) => a.id === id);
   if (!anchor) return undefined;
   return anchor.kind === 'npc' ? { width: 128, height: 192 } : TIER_BOX[anchor.tier ?? 'medium'];

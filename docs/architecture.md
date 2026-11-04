@@ -132,6 +132,17 @@ main material's trait, and `ITEMS[id]` works the copy's ItemDef out from the
 id, so bags, trades, saves and every server agree with nothing to sync.
 Copies never show when ITEMS is listed, and ids holding `~` are refused
 wherever a wish or rule names an item, so only crafting and shops make them.
+Shared `crafts.ts` holds the seven crafts (Woodcarving, Leatherwork,
+Tailoring, Smithing, Fletching, Herbalism, Jewellery): the material families
+each works, a level from 1 to 20 per character (`Character.crafts`) that
+grows by practice, two masteries (`Character.masteries`, taken from a
+craft's master, a shop with `masters`; past level 10, tier 3 materials and
+the top quality need one), a people's home crafts (start at level 3, +10
+quality, their first tool free once) and the tools, `tool-<craft>-<tier>`,
+which every craft needs in the bag and which wear out now and then. A recipe
+names its craft and level (`RecipeDef.craft`, `level`); a wished one takes
+its main material's craft (`recipeCraft`). Tool pictures are in
+`server/src/assets/craft-tool-anchors.ts`, painted first from the Art tab.
 Shared `weapons.ts` holds the weapon and off-hand families, damage types,
 creature Armor and Ward, and `trainedIn`, which says whether a Calling is
 trained in a family (`docs/classes.md#weapons`).

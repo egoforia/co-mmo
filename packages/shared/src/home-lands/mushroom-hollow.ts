@@ -3,6 +3,7 @@ import { levelledCreature } from '../lands.ts';
 import { rand2, valueNoise } from '../random.ts';
 import { WOODS_WEST_GATE, Tile, creatures, disc, road, scatter, type RegionMap } from '../world.ts';
 import type { HomeLand } from './types.ts';
+import { toolOffers } from '../crafts.ts';
 
 // Mushroom Hollow, west of the Whispering Woods: the Cervid's home under the
 // forest beyond the Woods (the gather and craft plan, step 1). Giant
@@ -92,7 +93,7 @@ export const MUSHROOM_HOLLOW: HomeLand = {
     'mother-morel': {
       name: 'Mother Morel',
       greeting: 'Hush now, and listen. Can you hear the ground talking? No? It used to. Come, sit under my cap, and I will tell you what it said.',
-      shop: { sells: [{ item: 'tonic', price: 10 }], teaches: [], buys: true },
+      shop: { sells: [{ item: 'tonic', price: 10 }, ...toolOffers('woodcarving')], teaches: [], buys: true, masters: ['woodcarving'] },
     },
   },
   quests: QUESTS,

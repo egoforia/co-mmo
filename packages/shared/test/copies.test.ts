@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   ITEMS,
-  QUALITY_MAX,
-  QUALITY_MIN,
-  RECIPES,
   addItem,
   buy,
   copyBase,
   copyId,
   copyWords,
   craft,
-  craftQuality,
   crafted,
   discover,
   isClientMessage,
@@ -70,12 +66,9 @@ describe('crafted copies', () => {
     buy(c, 'marina', 'tonic', shopMade('Marina', () => 0.5));
     expect(c.inventory.some((s) => s.item === 'tonic')).toBe(true);
 
-    const r = RECIPES['shell-mail']!;
-    expect(craftQuality(r.wit, r, () => 0.5)).toBe(100);
-    expect(craftQuality(r.wit + 100, r, () => 0.5)).toBe(QUALITY_MAX);
-    expect(craftQuality(r.wit - 20, r, () => 0)).toBe(QUALITY_MIN);
-    c.stats.wit = 20;
     c.race = 'lutran';
+    c.crafts = { smithing: { level: 5, xp: 0 } };
+    addItem(c, 'tool-smithing-1');
     addItem(c, 'crab-shell', 5);
     expect(craft(c, 'shell-mail', crafted(c, 'Mara', 'shell-mail', () => 0.5))).toBeUndefined();
     const mail = c.inventory.find((s) => copyBase(s.item) === 'shell-mail')!;

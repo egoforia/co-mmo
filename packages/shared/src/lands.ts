@@ -2,6 +2,7 @@ import { FLAME_LIGHT } from './light.ts';
 import { CREATURES, ITEMS, NPC_GREETINGS, NPC_NAMES, QUESTS, type CreatureDef, type ItemDef, type QuestDef } from './rpg.ts';
 import { RECIPES, SHOPS, type RecipeDef, type ShopDef } from './kit.ts';
 import { creatureDefence } from './weapons.ts';
+import { toolOffers } from './crafts.ts';
 import type { CallingId } from './classes.ts';
 
 // What lives in the great places of the bigger lands (places.ts): their
@@ -138,8 +139,8 @@ export const LAND_ITEMS: Record<string, ItemDef> = {
 
 /** New ways to make things from the bigger lands' finds. */
 export const LAND_RECIPES: Record<string, RecipeDef> = {
-  'pelt-cloak': { materials: [{ item: 'wolf-pelt', qty: 4 }], result: { item: 'pelt-cloak', qty: 1 }, wit: 4 },
-  'temple-lantern': { materials: [{ item: 'moth-dust', qty: 3 }, { item: 'crab-shell', qty: 1 }], result: { item: 'temple-lantern', qty: 1 }, wit: 2 },
+  'pelt-cloak': { materials: [{ item: 'wolf-pelt', qty: 4 }], result: { item: 'pelt-cloak', qty: 1 }, craft: 'leatherwork', level: 3 },
+  'temple-lantern': { materials: [{ item: 'moth-dust', qty: 3 }, { item: 'crab-shell', qty: 1 }], result: { item: 'temple-lantern', qty: 1 }, craft: 'smithing', level: 2 },
 };
 
 /**
@@ -151,7 +152,7 @@ export const LAND_PEOPLE: Record<string, { name: string; greeting: string; shop?
     name: 'Brother Tolle',
     pathMentor: 'bellkeeper',
     greeting: 'Every bell in this temple rings for a wish someone made. Listen, and you can hear the world growing.',
-    shop: { sells: [{ item: 'temple-lantern', price: 25 }, { item: 'tonic', price: 8 }], teaches: [], buys: true },
+    shop: { sells: [{ item: 'temple-lantern', price: 25 }, { item: 'tonic', price: 8 }, ...toolOffers('smithing')], teaches: [], buys: true, masters: ['smithing'] },
   },
   'sir-alder': { name: 'Sir Alder', pathMentor: 'warden', greeting: 'Mossgate fell long ago, but someone must still keep the gate. I am the last knight. Perhaps you will be the next.' },
   'queen-nerissa': {
@@ -164,7 +165,7 @@ export const LAND_PEOPLE: Record<string, { name: string; greeting: string; shop?
     name: 'Sultana Zahra',
     pathMentor: 'duelist',
     greeting: 'The Mirage Palace is real enough, traveller, whatever the dunes tell you. Sit, drink, and tell me of the world beyond the sand.',
-    shop: { sells: [{ item: 'tonic', price: 12 }, { item: 'scroll-firebolt', price: 45 }], teaches: [], buys: true },
+    shop: { sells: [{ item: 'tonic', price: 12 }, { item: 'scroll-firebolt', price: 45 }, ...toolOffers('jewellery')], teaches: [], buys: true, masters: ['jewellery'] },
   },
   'high-priest-cassian': {
     name: 'High Priest Cassian',
@@ -179,7 +180,7 @@ export const LAND_PEOPLE: Record<string, { name: string; greeting: string; shop?
   'mother-elena': {
     name: 'Mother Elena',
     greeting: 'Welcome to the Pilgrim\'s Haven! Rest your weary feet, traveller. A bowl of hot stew and fresh bread will do you good.',
-    shop: { sells: [{ item: 'pilgrim-bread', price: 5 }, { item: 'tonic', price: 8 }], teaches: [], buys: true },
+    shop: { sells: [{ item: 'pilgrim-bread', price: 5 }, { item: 'tonic', price: 8 }, ...toolOffers('tailoring')], teaches: [], buys: true, masters: ['tailoring'] },
   },
   'gravedigger-joshua': {
     name: 'Gravedigger Joshua',

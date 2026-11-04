@@ -875,7 +875,7 @@ export function applyContent(entry: ContentEntry): void {
   else if (d.kind === 'creature') CREATURES[entry.id] = creatureFromWish(entry.id, d);
   else if (d.kind === 'npc') NPC_GREETINGS[entry.id] = d.greeting;
   else if (d.kind === 'loot') applyLoot({ id: entry.id, at: entry.at, creature: d.creature, mode: d.mode, drops: d.drops });
-  else if (d.kind === 'recipe') RECIPES[entry.id] = { name: d.name, materials: d.materials, result: d.result, wit: 0 };
+  else if (d.kind === 'recipe') RECIPES[entry.id] = { name: d.name, materials: d.materials, result: d.result, level: 1 };
   else if (d.kind === 'ability') {
     ABILITIES[entry.id] = abilityFromWish(d);
     ITEMS[entry.id] = scrollFromWish(entry.id, d);

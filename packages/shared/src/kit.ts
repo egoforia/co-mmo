@@ -12,10 +12,26 @@ import {
   replacedWords,
   takeItem,
   totalStats,
+  STARTING_STATS,
   type Character,
   type InventorySlot,
 } from './rpg.ts';
 import { QUALITY_STANDARD, clampQuality, makesCopies, newCopy, type CopyInfo } from './copies.ts';
+import {
+  CRAFTS,
+  HOME_CRAFT_QUALITY,
+  UNMASTERED_QUALITY_MAX,
+  bestTool,
+  craftLevel,
+  craftOfFamily,
+  gainCraftXp,
+  isHomeCraft,
+  isMastered,
+  toolOffers,
+  wearTool,
+  chooseMastery,
+  type CraftId,
+} from './crafts.ts';
 
 // --- Crafting ------------------------------------------------------------------
 
@@ -25,25 +41,39 @@ export interface RecipeDef {
   name?: string;
   materials: InventorySlot[];
   result: InventorySlot;
-  /** Wit needed to make it. */
-  wit: number;
+  /** The craft it belongs to; when missing, the main material's (recipeCraft). */
+  craft?: CraftId;
+  /** Craft level needed to make it, 1 to 20. */
+  level: number;
 }
 
 /** Recipes everyone knows; wishes add more, keyed by the wish's id. */
 export const RECIPES: Record<string, RecipeDef> = {
-  tonic: { materials: [{ item: 'mushroom-cap', qty: 2 }], result: { item: 'tonic', qty: 1 }, wit: 0 },
-  'mushroom-hat': { materials: [{ item: 'mushroom-cap', qty: 4 }], result: { item: 'mushroom-hat', qty: 1 }, wit: 3 },
-  'crab-lance': { materials: [{ item: 'crab-shell', qty: 3 }, { item: 'goat-horn', qty: 1 }], result: { item: 'crab-lance', qty: 1 }, wit: 5 },
-  'shell-mail': { materials: [{ item: 'crab-shell', qty: 5 }], result: { item: 'shell-mail', qty: 1 }, wit: 5 },
-  'scarab-charm': { materials: [{ item: 'scarab-shell', qty: 3 }, { item: 'goat-horn', qty: 1 }], result: { item: 'scarab-charm', qty: 1 }, wit: 7 },
+  tonic: { materials: [{ item: 'mushroom-cap', qty: 2 }], result: { item: 'tonic', qty: 1 }, craft: 'herbalism', level: 1 },
+  'mushroom-hat': { materials: [{ item: 'mushroom-cap', qty: 4 }], result: { item: 'mushroom-hat', qty: 1 }, craft: 'tailoring', level: 2 },
+  'crab-lance': { materials: [{ item: 'crab-shell', qty: 3 }, { item: 'goat-horn', qty: 1 }], result: { item: 'crab-lance', qty: 1 }, craft: 'smithing', level: 4 },
+  'shell-mail': { materials: [{ item: 'crab-shell', qty: 5 }], result: { item: 'shell-mail', qty: 1 }, craft: 'smithing', level: 4 },
+  'scarab-charm': { materials: [{ item: 'scarab-shell', qty: 3 }, { item: 'goat-horn', qty: 1 }], result: { item: 'scarab-charm', qty: 1 }, craft: 'jewellery', level: 5 },
 };
+
+/** The craft a recipe belongs to: its own, else the craft that works its main material; undefined when none does (anyone can make it). */
+export function recipeCraft(r: RecipeDef): CraftId | undefined {
+  return r.craft ?? craftOfFamily(ITEMS[mainMaterial(r) ?? '']?.material?.family);
+}
 
 /** Why this character cannot craft a recipe now, or undefined when they can. */
 export function cannotCraft(c: Character, id: string): string | undefined {
   const r = RECIPES[id];
   if (!r || !ITEMS[r.result.item] || r.materials.some((m) => !ITEMS[m.item])) return 'Nobody knows that recipe any more.';
-  const wit = totalStats(c).wit;
-  if (wit < r.wit) return `You need ${r.wit} Wit to make that; you have ${wit}.`;
+  const craft = recipeCraft(r);
+  if (craft) {
+    const name = CRAFTS[craft].name;
+    const level = craftLevel(c, craft);
+    if (level < r.level) return `You need ${name} level ${r.level} to make that; yours is ${level}.`;
+    // Tier 3 materials answer only to a master's hand.
+    if (!isMastered(c, craft) && r.materials.some((m) => ITEMS[m.item]!.material?.tier === 3)) return `Only a master of ${name} can work that.`;
+    if (!bestTool(c, craft)) return `You need a ${CRAFTS[craft].tool.toLowerCase()} in your bag for ${name}.`;
+  }
   const missing = r.materials.filter((m) => itemCount(c, m.item) < m.qty).map((m) => ITEMS[m.item]!.name);
   if (missing.length) return `You need more ${missing.join(' and ')}.`;
   if (itemCount(c, r.result.item) + r.result.qty > MAX_STACK) return 'Your bag cannot hold any more of those.';
@@ -80,12 +110,49 @@ export function mainMaterial(recipe: RecipeDef): string | undefined {
 }
 
 /**
- * Quality of a piece a player crafts: standard at the recipe's Wit, two
- * points better for each Wit above it, and a little luck either way. (The
- * crafts' levels and tools take over in plan step 4.)
+ * Quality of a piece a player crafts: standard at the recipe's level, two
+ * points better for each craft level above it, one for each Wit above the
+ * start, five for each tool tier above the first, ten in a home craft, and
+ * a little luck either way. Only a master reaches the very top.
  */
-export function craftQuality(wit: number, recipe: RecipeDef, random: () => number): number {
-  return clampQuality(QUALITY_STANDARD + (wit - recipe.wit) * 2 + Math.round((random() - 0.5) * 16));
+export function craftQuality(c: Character, recipe: RecipeDef, random: () => number): number {
+  const craft = recipeCraft(recipe);
+  const luck = Math.round((random() - 0.5) * 16);
+  const wit = totalStats(c).wit - STARTING_STATS.wit;
+  if (!craft) return clampQuality(Math.min(UNMASTERED_QUALITY_MAX, QUALITY_STANDARD + wit + luck));
+  const q = QUALITY_STANDARD
+    + (craftLevel(c, craft) - recipe.level) * 2
+    + wit
+    + ((bestTool(c, craft)?.tier ?? 1) - 1) * 5
+    + (isHomeCraft(c, craft) ? HOME_CRAFT_QUALITY : 0)
+    + luck;
+  return clampQuality(isMastered(c, craft) ? q : Math.min(UNMASTERED_QUALITY_MAX, q));
+}
+
+/** Practice a craft gives: more for harder recipes, little for ones far below your level. */
+export function craftPractice(c: Character, recipe: RecipeDef): number {
+  const craft = recipeCraft(recipe);
+  if (!craft) return 0;
+  const xp = 8 + 4 * recipe.level;
+  return craftLevel(c, craft) - recipe.level >= 5 ? Math.ceil(xp / 4) : xp;
+}
+
+/** What working a recipe did beyond making it: a new craft level, a worn-out tool. */
+export interface Practised {
+  craft?: CraftId;
+  level?: number;
+  broke?: string;
+}
+
+/** After a recipe is made: the craft grows and the tool may wear out. */
+export function practise(c: Character, recipeId: string, random: () => number): Practised {
+  const r = RECIPES[recipeId];
+  const craft = r && recipeCraft(r);
+  if (!r || !craft) return {};
+  const level = gainCraftXp(c, craft, craftPractice(c, r));
+  const tool = bestTool(c, craft);
+  const broke = tool ? wearTool(c, tool, random) : undefined;
+  return { craft, ...(level ? { level } : {}), ...(broke ? { broke } : {}) };
 }
 
 /** The copy a player makes of a recipe's result: their name, people, quality and the main material's trait. */
@@ -95,7 +162,7 @@ export function crafted(c: Character, maker: string, recipeId: string, random: (
   const trait = material ? ITEMS[material]?.material?.traits[0] : undefined;
   return (base) => newCopy({
     of: base,
-    quality: craftQuality(totalStats(c).wit, r, random),
+    quality: craftQuality(c, r, random),
     maker: { kind: 'player', name: maker },
     ...(c.race ? { people: c.race } : {}),
     ...(trait ? { trait } : {}),
@@ -116,15 +183,21 @@ export interface ShopDef {
   teaches: { ability: string; price: number }[];
   /** They buy what players bring, at half its value. */
   buys: boolean;
+  /** Crafts they are the master of: players take up a mastery with them (crafts.ts). */
+  masters?: CraftId[];
 }
 
 /** NPC shops and trainers (design doc, Gold: spent at NPC shops). */
 export const SHOPS: Record<string, ShopDef> = {
   marina: {
-    sells: [{ item: 'tonic', price: 8 }, { item: 'wooden-sword', price: 15 }, { item: 'traveller-coat', price: 20 }],
+    sells: [{ item: 'tonic', price: 8 }, { item: 'wooden-sword', price: 15 }, { item: 'traveller-coat', price: 20 }, ...toolOffers('fletching')],
     teaches: [],
     buys: true,
+    // Gull feathers come in with every tide.
+    masters: ['fletching'],
   },
+  // The Woods' herbalist.
+  'old-bramble': { sells: toolOffers('herbalism'), teaches: [], buys: false, masters: ['herbalism'] },
   'cactus-elder': {
     sells: [{ item: 'scroll-firebolt', price: 40 }, { item: 'tonic', price: 10 }],
     teaches: [],
@@ -177,6 +250,12 @@ export function train(c: Character, npc: string, ability: string): string | unde
   c.gold -= offer.price;
   learnAbility(c, ability);
   return undefined;
+}
+
+/** Takes up a mastery with its master, or trades `replace` for it. Returns why not. */
+export function master(c: Character, npc: string, craft: CraftId, replace?: CraftId): string | undefined {
+  if (!SHOPS[npc]?.masters?.includes(craft)) return 'They cannot make you a master of that.';
+  return chooseMastery(c, craft, replace);
 }
 
 /** Reads a scroll: learns its ability and uses the scroll up. Returns why not. */

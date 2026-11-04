@@ -368,7 +368,7 @@ function play(token: string): void {
       },
       hotbar: (slots) => connection.send({ t: 'hotbar', slots }),
       craft: (recipe) => connection.send({ t: 'craft', recipe }),
-      shop: (action, npc, id, qty) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}) }),
+      shop: (action, npc, id, qty, replace) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}), ...(replace ? { replace } : {}) }),
       trade: (m) => connection.send(m),
       typing: isTyping,
     });

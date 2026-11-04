@@ -3,6 +3,7 @@ import { levelledCreature } from '../lands.ts';
 import { rand2, valueNoise } from '../random.ts';
 import { SANCTUM_NORTH_GATE, Tile, creatures, disc, road, scatter, type RegionMap } from '../world.ts';
 import type { HomeLand } from './types.ts';
+import { toolOffers } from '../crafts.ts';
 
 // Frostpeak, north of the Sanctum: the Falcon's home on the cliffs (the
 // gather and craft plan, step 1). Snow, frosted pines, frozen lakes and
@@ -91,7 +92,7 @@ export const FROSTPEAK: HomeLand = {
     ysolde: {
       name: 'Ysolde',
       greeting: 'You climbed all this way? Then you have the legs of a Falcon, whatever your feathers. Sit by the fire, and mind the edge.',
-      shop: { sells: [{ item: 'tonic', price: 11 }], teaches: [], buys: true },
+      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('leatherwork')], teaches: [], buys: true, masters: ['leatherwork'] },
     },
   },
   quests: QUESTS,

@@ -4,6 +4,7 @@
 // - art-studio/review.ts: dry-run Recipe previews and handler registry keyed by ArtAsk['kind']
 // Put new catalog queries in art-studio/catalog.ts and new review previews in art-studio/review.ts.
 
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
@@ -24,6 +25,7 @@ import {
   type ArtAsk,
   type ArtGroup,
   type ArtItem,
+  type ArtReferenceInfo,
   ArtRequestError,
   type ArtReview,
   type ArtStudioOptions,
@@ -227,9 +229,9 @@ export class ArtStudio {
   /**
    * Paints one picture again: a building's, shipped scenery or a shipped
    * character or item, or a granted wish's (`<wish id>:<picture id>`).
-   * The Owner's `note` is added to the prompt.
+   * The Owner's `note` and `references` are sent to the image model.
    */
-  async repaint(asset: string, note = ''): Promise<{ estimateUsd: number }> {
+  async repaint(asset: string, note = '', references?: string[]): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     note = note.trim().slice(0, 1000);
     const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
@@ -255,7 +257,7 @@ export class ArtStudio {
       this.enqueue(async () => {
         await this.keepCurrent(asset);
         await this.options.buildings.repaint(asset, note, handle);
-      }, handle, { kind: 'repaint', asset, note });
+      }, handle, { kind: 'repaint', asset, note, ...(references ? { references } : {}) });
       return { estimateUsd };
     }
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
@@ -264,8 +266,8 @@ export class ArtStudio {
     const handle = this.options.jobs.add(asset, kit.name ?? asset, 'picture', 'gods-view', estimateUsd);
     this.enqueue(async () => {
       await this.keepCurrent(asset);
-      await this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle);
-    }, handle, { kind: 'repaint', asset, note });
+      await this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle, references);
+    }, handle, { kind: 'repaint', asset, note, ...(references ? { references } : {}) });
     return { estimateUsd };
   }
 
@@ -442,7 +444,7 @@ export class ArtStudio {
     if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
     if (request.kind === 'ways') return this.paintWays(request.walker);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
-    if (request.kind === 'repaint') return this.repaint(request.asset, request.note);
+    if (request.kind === 'repaint') return this.repaint(request.asset, request.note, request.references);
     if (request.kind === 'sheet') return this.paintSheet(request.look, request.textures, request.note);
     return undefined;
   }
@@ -485,12 +487,25 @@ export class ArtStudio {
   }
 
   /** Paints a shipped scenery piece, character or item again, at its shipped size. */
-  private async repaintShipped(asset: KitAsset, box: { width: number; height: number }, note: string, handle: ArtJobHandle): Promise<void> {
+  private async repaintShipped(
+    asset: KitAsset,
+    box: { width: number; height: number },
+    note: string,
+    handle: ArtJobHandle,
+    references?: string[],
+  ): Promise<void> {
     const provider = this.options.ai.image(useOf(asset));
     if (!provider) return handle.skip("No image model is set in God's View.");
     handle.start();
     const sent = keepingImage(watched(provider, handle));
-    const { image, entry } = await paintKitAsset(withSelf(asset), sent, this.options.anchorDir, this.redoneDir, { box, note });
+    const { image, entry } = await paintKitAsset(withSelf(asset), sent, this.options.anchorDir, this.redoneDir, {
+      box,
+      note,
+      references,
+      artDir: this.options.artDir,
+      readArt: this.options.readArt,
+      nameOf: (id) => this.catalog.nameOf(id),
+    });
     const usd = imageUsd(provider.model, image);
     if (sent.sent) await this.options.recipes.record(asset.id, { at: Date.now(), steps: [await this.options.recipes.imageStep(asset.name ?? asset.id, provider, sent.sent, usd)] });
     this.options.budget.spend('image', { provider: provider.id, model: provider.model }, usd);
@@ -500,6 +515,46 @@ export class ArtStudio {
     await mkdir(this.redoneDir, { recursive: true });
     await writeFile(resolve(this.redoneDir, 'manifest.json'), JSON.stringify(this.redone, null, 2));
     handle.done(usd);
+  }
+
+  /** Saves an uploaded image data URL or image fetched from a URL into the art references directory. */
+  async saveReference(input: { dataUrl?: string; url?: string; name?: string }): Promise<ArtReferenceInfo> {
+    let buffer: Buffer;
+    let name = input.name?.trim();
+    if (input.dataUrl) {
+      const match = input.dataUrl.match(/^data:image\/[a-zA-Z+.-]+;base64,(.+)$/);
+      if (!match) throw new ArtRequestError('Invalid image data URL.');
+      buffer = Buffer.from(match[1]!, 'base64');
+    } else if (input.url) {
+      const res = await fetch(input.url);
+      if (!res.ok) throw new ArtRequestError(`Failed to fetch image from URL: ${res.statusText}`);
+      buffer = Buffer.from(await res.arrayBuffer());
+      if (!name) {
+        try {
+          name = new URL(input.url).pathname.split('/').pop()?.replace(/\.[^/.]+$/, '');
+        } catch {}
+      }
+    } else {
+      throw new ArtRequestError('No image provided.');
+    }
+    const png = await sharp(buffer)
+      .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toBuffer();
+    const hash = createHash('sha1').update(png).digest('hex').slice(0, 16);
+    const dir = resolve(this.options.artDir, 'references');
+    await mkdir(dir, { recursive: true });
+    await writeFile(resolve(dir, `${hash}.png`), png);
+    const refName = name || `Reference ${hash.slice(0, 6)}`;
+    const metaFile = resolve(dir, 'meta.json');
+    const meta: Record<string, string> = await readFile(metaFile, 'utf8').then((t) => JSON.parse(t) as Record<string, string>, () => ({}));
+    meta[hash] = refName;
+    await writeFile(metaFile, JSON.stringify(meta, null, 2));
+    return {
+      id: `ref:${hash}`,
+      name: refName,
+      url: `/wished-art/references/${hash}.png`,
+    };
   }
 
   private async load(): Promise<void> {

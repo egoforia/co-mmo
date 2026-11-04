@@ -143,9 +143,16 @@ export interface KitSheetView {
   textures: { name: string; ok: boolean; painting?: string; failed: string[] }[];
 }
 
+/** A reference image sent along with a paint request. */
+export interface ArtReferenceInfo {
+  id: string;
+  name: string;
+  url?: string;
+}
+
 /** A paid request, as the server's review and approval take it. */
 export type Ask =
-  | { what: 'paint'; asset: string }
+  | { what: 'paint'; asset: string; references?: string[] }
   | { what: 'paint-group'; group: string }
   | { what: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   | { what: 'ways'; walker?: string }
@@ -159,6 +166,7 @@ export interface Review {
   parts: { name: string; recipe: Recipe }[];
   estimateUsd: number;
   fingerprint: string;
+  references?: ArtReferenceInfo[];
 }
 
 /** The questions the hand finder asks: one for a look's own picture, which faces us, and one per way of facing. */

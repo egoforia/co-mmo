@@ -8,6 +8,7 @@ describe('painted file URLs', () => {
     expect(artFilePath('/art', '/wished-art/walks/views/mara-left.png')).toBe(join('/art', 'walks', 'views', 'mara-left.png'));
     expect(artFilePath('/art', '/wished-art/history/player-mara~walk/1a2b/strip.png')).toBe(join('/art', 'history', 'player-mara~walk', '1a2b', 'strip.png'));
     expect(artFilePath('/art', '/wished-art/sounds/hit.mp3')).toBe(join('/art', 'sounds', 'hit.mp3'));
+    expect(artFilePath('/art', '/wished-art/references/a1b2c3d4.png')).toBe(join('/art', 'references', 'a1b2c3d4.png'));
   });
 
   it('name nothing outside the art directory or of another type', () => {

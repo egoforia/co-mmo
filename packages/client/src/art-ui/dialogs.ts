@@ -7,6 +7,7 @@ import {
 } from '@co-mmo/shared';
 import {
   type ArtItem,
+  type ArtReferenceInfo,
   type Ask,
   MEDIA,
   type Recipe,
@@ -79,6 +80,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
     <div class="dialog-body">
       <p class="note">This is everything that will be sent to the AI model${many ? 's' : ''}. Nothing is painted until you approve it.</p>
       ${ask.what === 'view' ? sourcesHtml(ask) : ''}
+      ${review.references ? referencesHtml(review) : ''}
       ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
         <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button><button type="button" class="quiet director-btn" data-harmonize-prompt>✦ Harmonize with Art Director</button>${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
       ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><div class="card-actions"><button type="submit" class="quiet">Show with these words</button><button type="button" class="quiet director-btn" data-harmonize-note>✦ Harmonize with Art Director</button></div></form>` : ''}
@@ -89,7 +91,70 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       <button type="button" class="quiet" data-close>Cancel</button>
       <button type="button" data-approve>Approve and paint</button>
     </footer>`;
+  const withRefs = (newRefs: string[]): Ask => (ask.what === 'paint' ? { ...ask, references: newRefs } : ask);
   for (const b of d.querySelectorAll('[data-close]')) b.addEventListener('click', () => d.close());
+  for (const b of d.querySelectorAll('[data-remove-ref]')) {
+    b.addEventListener('click', () => {
+      const id = b.getAttribute('data-remove-ref');
+      const cur = (review.references ?? []).map((r) => r.id);
+      const next = cur.filter((x) => x !== id);
+      void openReview(withRefs(next), takesNote, note);
+    });
+  }
+  const refPicker = d.querySelector<HTMLSelectElement>('.ref-picker');
+  refPicker?.addEventListener('change', () => {
+    const id = refPicker.value;
+    if (!id) return;
+    const cur = (review.references ?? []).map((r) => r.id);
+    if (!cur.includes(id)) {
+      void openReview(withRefs([...cur, id]), takesNote, note);
+    }
+  });
+  const fileInput = d.querySelector<HTMLInputElement>('.ref-file-input');
+  fileInput?.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const dataUrl = reader.result as string;
+        const res = await ctx.api<ArtReferenceInfo>('art/reference', 'POST', { name: file.name, dataUrl });
+        const cur = (review.references ?? []).map((r) => r.id);
+        void openReview(withRefs([...cur, res.id]), takesNote, note);
+      } catch (err) {
+        ctx.toast((err as Error).message);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  const urlInput = d.querySelector<HTMLInputElement>('.ref-url-input');
+  const urlSubmit = d.querySelector<HTMLButtonElement>('.ref-url-submit');
+  const submitUrl = async () => {
+    const url = urlInput?.value.trim();
+    if (!url) return ctx.toast('Please enter an image URL.');
+    try {
+      if (urlSubmit) {
+        urlSubmit.disabled = true;
+        urlSubmit.textContent = 'Adding…';
+      }
+      const res = await ctx.api<ArtReferenceInfo>('art/reference', 'POST', { url });
+      const cur = (review.references ?? []).map((r) => r.id);
+      void openReview(withRefs([...cur, res.id]), takesNote, note);
+    } catch (err) {
+      if (urlSubmit) {
+        urlSubmit.disabled = false;
+        urlSubmit.textContent = 'Add link';
+      }
+      ctx.toast((err as Error).message);
+    }
+  };
+  urlSubmit?.addEventListener('click', submitUrl);
+  urlInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void submitUrl();
+    }
+  });
   d.querySelector('form.review-sources')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const from = new FormData(e.target as HTMLFormElement).getAll('from').map(String);
@@ -153,7 +218,8 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
     const button = e.target as HTMLButtonElement;
     button.disabled = true;
     try {
-      await ctx.api(`art/${ask.what}`, 'POST', { ...ask, ...(note ? { note } : {}), approved: review.fingerprint });
+      const refIds = review.references ? review.references.map((r) => r.id) : undefined;
+      await ctx.api(`art/${ask.what}`, 'POST', { ...ask, ...(note ? { note } : {}), ...(refIds ? { references: refIds } : {}), approved: review.fingerprint });
       d.close();
       ctx.toast(ask.what === 'clip' ? 'Approved. Clips take a minute or two each; follow them under Painting now.' : ask.what === 'view' ? 'Approved. The picture shows here once it is painted; then make the clip from it.' : ask.what === 'ways' ? 'Approved. Each picture shows here as it is painted; follow them under Painting now.' : 'Approved. Follow it under Painting now.');
       ctx.rerender();
@@ -162,6 +228,59 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       ctx.toast((err as Error).message);
     }
   });
+}
+
+/** Reference images selection and upload controls for painting recipes. */
+export function referencesHtml(review: Review): string {
+  const currentRefs = review.references ?? [];
+  const existingIds = new Set(currentRefs.map((r) => r.id));
+
+  // Collect game art options from artState.data
+  const walkers = artState.data?.walkers ?? [];
+  const items = artState.data?.items ?? [];
+
+  // Group walkers into characters vs creatures/monsters
+  const characters = walkers.filter((w) => !existingIds.has(w.id) && (w.kind === 'player look' || w.kind === 'person'));
+  const creatures = walkers.filter((w) => !existingIds.has(w.id) && (w.kind === 'creature' || w.kind === 'monster'));
+  const gameItems = items.filter((i) => !existingIds.has(i.id) && !i.id.includes(':'));
+
+  // Sort them
+  characters.sort((a, b) => a.name.localeCompare(b.name));
+  creatures.sort((a, b) => a.name.localeCompare(b.name));
+  gameItems.sort((a, b) => a.name.localeCompare(b.name));
+
+  return `
+    <div class="review-references">
+      <div class="ref-header">
+        <label><strong>Reference Images</strong> <small>(${currentRefs.length})</small></label>
+        <span class="note">Guide character design, palette, and style.</span>
+      </div>
+      <div class="ref-chips">
+        ${currentRefs.length ? currentRefs.map((ref) => `
+          <div class="ref-chip">
+            ${ref.url ? `<img src="${esc(ref.url)}" alt="" class="ref-chip-img">` : '<span class="ph">?</span>'}
+            <span class="ref-chip-name" title="${esc(ref.name)}">${esc(ref.name)}</span>
+            <button type="button" class="quiet ref-remove-btn" title="Remove reference" data-remove-ref="${esc(ref.id)}">✕</button>
+          </div>
+        `).join('') : '<p class="note">No references currently selected.</p>'}
+      </div>
+      <div class="ref-actions">
+        <select class="ref-picker">
+          <option value="">+ Add game art as reference…</option>
+          ${characters.length ? `<optgroup label="Characters & Walkers">${characters.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</optgroup>` : ''}
+          ${creatures.length ? `<optgroup label="NPCs & Creatures">${creatures.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</optgroup>` : ''}
+          ${gameItems.length ? `<optgroup label="Items & Equipment">${gameItems.map((i) => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('')}</optgroup>` : ''}
+        </select>
+        <label class="ref-upload-btn button quiet">
+          <span>📁 Upload image</span>
+          <input type="file" class="ref-file-input" accept="image/png,image/jpeg,image/webp" style="display:none">
+        </label>
+        <div class="ref-url-bar">
+          <input type="url" class="ref-url-input" placeholder="Paste image link…">
+          <button type="button" class="quiet ref-url-submit">Add link</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 /** Which pictures a standing picture is painted from: the approved picture and any standing pictures already kept. */

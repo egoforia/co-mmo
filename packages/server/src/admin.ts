@@ -504,9 +504,11 @@ export async function handleAdmin(
     const walker = typeof body?.walker === 'string' && body.walker ? body.walker : undefined;
     // A building sheet's textures to paint again; none paints the whole sheet.
     const textures = Array.isArray(body?.textures) ? body.textures.filter((t): t is string => typeof t === 'string').slice(0, 20) : [];
+    // Custom reference images sent along to guide the painter.
+    const references = Array.isArray(body?.references) ? body.references.filter((r): r is string => typeof r === 'string' && r.trim().length > 0) : undefined;
     // Each paid request is one of these; the Owner reviews it, then approves exactly that.
     const asks: Record<string, () => ArtAsk> = {
-      'art/paint': () => ({ kind: 'paint', asset: String(body?.asset ?? ''), note }),
+      'art/paint': () => ({ kind: 'paint', asset: String(body?.asset ?? ''), note, ...(references ? { references } : {}) }),
       'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
       'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
@@ -516,6 +518,14 @@ export async function handleAdmin(
       'art/sheet': () => ({ kind: 'sheet', look: String(body?.look ?? ''), textures, note }),
     };
     try {
+      if (route === 'art/reference' && method === 'POST') {
+        const ref = await ctx.art.saveReference({
+          dataUrl: typeof body?.dataUrl === 'string' ? body.dataUrl : undefined,
+          url: typeof body?.url === 'string' ? body.url : undefined,
+          name: typeof body?.name === 'string' ? body.name : undefined,
+        });
+        return json(res, 201, ref), true;
+      }
       if (route === 'art/review' && method === 'POST') {
         const ask = asks[`art/${String(body?.what ?? '')}`];
         if (!ask) return json(res, 400, { error: 'bad_request', message: 'There is nothing like that to review.' }), true;
@@ -523,7 +533,7 @@ export async function handleAdmin(
       }
       if (asks[route] && method === 'POST') await ctx.art.approved(asks[route]!(), body?.approved);
       if (route === 'art/paint' && method === 'POST') {
-        const done = await ctx.art.repaint(String(body?.asset ?? ''), note);
+        const done = await ctx.art.repaint(String(body?.asset ?? ''), note, references);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/paint-group' && method === 'POST') {

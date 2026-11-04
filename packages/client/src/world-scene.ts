@@ -10,6 +10,7 @@
 import Phaser from 'phaser';
 import {
   Predictor,
+  bodiesSeen,
   TICK_SECONDS,
   WALK_FRAMES,
   generateRegion,
@@ -411,6 +412,8 @@ export class WorldScene extends Phaser.Scene {
     if (!this.predictor || !this.sys.isActive()) return;
     // Slowed, Rooted or Stunned: predict our steps at the pace the server allows.
     this.predictor.pace = paceFor((snapshot.statuses ?? []).map((s) => s.id));
+    // Creatures stand in our way as they stand in the server's (hit-boxes.ts).
+    this.predictor.bodies = bodiesSeen(snapshot.creatures);
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
     const now = performance.now();
     const load = (k: string, u: string) => this.loadArt(k, u);

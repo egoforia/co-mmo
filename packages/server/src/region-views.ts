@@ -36,7 +36,8 @@ export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: 
 
 /** A living creature, what it is up to when that shows (asleep, running away), and its running statuses. */
 export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number }, mood?: CreatureMood, statuses?: StatusId[]): CreatureState {
-  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...(mood ? { mood } : {}), ...statusesOf(statuses) };
+  const size = c.def.size && c.def.size !== 'medium' ? { size: c.def.size } : {};
+  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...size, ...(mood ? { mood } : {}), ...statusesOf(statuses) };
 }
 
 /** A defeated creature's body; `loot` says whether the viewer may search it here. */

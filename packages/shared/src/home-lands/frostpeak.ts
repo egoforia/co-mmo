@@ -13,7 +13,7 @@ import { toolOffers } from '../crafts.ts';
 /** Snow hares, crag rams and ice wisps roam the snow; the Hoarfrost Roc keeps to its nest. */
 const CREATURES: Record<string, CreatureDef> = {
   'snow-hare': levelledCreature({
-    name: 'Snow Hare', art: 'frostpeak-snow-hare', description: 'A round white hare with ears as long as its body. It bolts across the drifts at the first footstep.',
+    name: 'Snow Hare', art: 'frostpeak-snow-hare', size: 'small', description: 'A round white hare with ears as long as its body. It bolts across the drifts at the first footstep.',
     behavior: 'timid', level: 3, speed: 3.4, notice: 3.5, drops: [{ item: 'snow-hare-fur', chance: 0.7 }],
   }),
   'crag-ram': levelledCreature({
@@ -21,12 +21,12 @@ const CREATURES: Record<string, CreatureDef> = {
     behavior: 'guard', level: 4, speed: 2.6, notice: 3.5, tough: 1.4, drops: [{ item: 'mountain-wool', chance: 0.7 }, { item: 'tonic', chance: 0.1 }],
   }),
   'ice-wisp': levelledCreature({
-    name: 'Ice Wisp', art: 'frostpeak-ice-wisp', description: 'A drifting knot of cold blue light with a heart of ice. Ice wisps come out when the moon is up and freeze what they touch.',
+    name: 'Ice Wisp', art: 'frostpeak-ice-wisp', size: 'small', description: 'A drifting knot of cold blue light with a heart of ice. Ice wisps come out when the moon is up and freeze what they touch.',
     behavior: 'patrol', active: 'night', level: 5, speed: 2.4, notice: 4, drops: [{ item: 'ice-crystal', chance: 0.6 }],
   }),
   'hoarfrost-roc': {
     ...levelledCreature({
-      name: 'Hoarfrost Roc', art: 'frostpeak-hoarfrost-roc', description: 'A great white bird with frost in its feathers. It was once the Falcon\'s guardian, and it has forgotten.',
+      name: 'Hoarfrost Roc', art: 'frostpeak-hoarfrost-roc', size: 'colossal', description: 'A great white bird with frost in its feathers. It was once the Falcon\'s guardian, and it has forgotten.',
       behavior: 'guard', level: 8, speed: 2.8, notice: 5, tough: 3.5, drops: [{ item: 'roc-plume', chance: 0.9 }, { item: 'mountain-wool', qty: 3, chance: 0.6 }],
     }),
     // A boss: once beaten, it takes a long while to come back.

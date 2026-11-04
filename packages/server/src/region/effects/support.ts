@@ -1,4 +1,4 @@
-import { POISONED_HEALING, STATUSES, cleanse as clear, maxHp, statusOf } from '@co-mmo/shared';
+import { POISONED_HEALING, STATUSES, cleanse as clear, gearBonus, maxHp, statusOf } from '@co-mmo/shared';
 import { healThreat } from '../../threat.ts';
 import { afflictPlayer } from '../statuses.ts';
 import type { PlayerState } from '../state.ts';
@@ -30,14 +30,15 @@ export const heal: Effect = {
 };
 
 /**
- * Heals one player for `healer` (less while Poisoned, never past full): the
+ * Heals one player for `healer` (less while Poisoned, more in a full Pilgrim
+ * style, never past full): the
  * creatures fighting them take threat from the healer, and a Bellkeeper's
  * heal leaves an Echo. Returns the health restored.
  */
 export function mend(kit: EffectKit, healer: PlayerState, m: PlayerState, amount: number): number {
   const ch = m.character;
   const poisoned = statusOf(m, 'poisoned', kit.s.now()) ? POISONED_HEALING : 1;
-  const wanted = Math.round(amount * poisoned);
+  const wanted = Math.round(amount * poisoned * (1 + gearBonus(ch, 'healing') / 100));
   const healed = Math.max(0, Math.min(maxHp(ch) - ch.hp, wanted));
   ch.hp += healed;
   m.dirty = true;

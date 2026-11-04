@@ -36,6 +36,7 @@ export * from './sky.ts';
 export * from './routines.ts';
 export * from './lands.ts';
 export * from './home-lands.ts';
+export * from './fashion-styles.ts';
 export * from './trials.ts';
 export * from './calling-wish.ts';
 export * from './places.ts';

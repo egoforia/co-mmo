@@ -103,12 +103,12 @@ export interface StatusView {
 
 /**
  * How long a status lasts on someone, in ms: harmful ones are shortened by
- * Vigor (× 100 / (100 + 3 × Vigor), docs/attributes.md), and a stun is
- * never longer than MAX_STUN_MS.
+ * Vigor (× 100 / (100 + 3 × Vigor), docs/attributes.md) and by `shorter`
+ * percent (a full Sunwrap style), and a stun is never longer than MAX_STUN_MS.
  */
-export function statusLength(id: StatusId, seconds: number, vigor = 0): number {
+export function statusLength(id: StatusId, seconds: number, vigor = 0, shorter = 0): number {
   let ms = seconds * 1000;
-  if (STATUSES[id].harmful) ms *= 100 / (100 + 3 * Math.max(0, vigor));
+  if (STATUSES[id].harmful) ms *= (100 / (100 + 3 * Math.max(0, vigor))) * (1 - Math.min(50, Math.max(0, shorter)) / 100);
   if (id === 'stunned') ms = Math.min(ms, MAX_STUN_MS);
   return Math.round(ms);
 }

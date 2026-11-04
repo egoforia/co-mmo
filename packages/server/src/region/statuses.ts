@@ -1,4 +1,5 @@
 import {
+  gearBonus,
   STATUSES,
   absorb,
   afflict,
@@ -24,7 +25,7 @@ export interface StatusFrom {
  */
 export function afflictPlayer(s: RegionState, p: PlayerState, id: StatusId, seconds: number | undefined, from: StatusFrom = {}): boolean {
   if (shrugs(p, id, s.now())) return false;
-  const ms = statusLength(id, seconds ?? STATUSES[id].seconds, totalStats(p.character).vigor);
+  const ms = statusLength(id, seconds ?? STATUSES[id].seconds, totalStats(p.character).vigor, gearBonus(p.character, 'shorter'));
   return afflict(p, id, ms, s.now(), from);
 }
 

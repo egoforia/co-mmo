@@ -22,6 +22,11 @@ import {
   questProgressText,
   materialWords,
   copyWords,
+  fullStyles,
+  regionDef,
+  styleBonusWords,
+  styleWords,
+  STYLES,
   toolWords,
   totalStats,
   ward,
@@ -256,7 +261,7 @@ export class RpgUi {
             : def.slot ? `Wear: ${[familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · ') || SLOT_NAMES[def.slot]}`
               : def.teaches ? 'Click to read and learn'
                 : ruled ? 'Click to use' : 'For crafting and trade';
-        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}${copyWords(def) ? ` ${copyWords(def)}` : ''}${def.tool ? ` ${toolWords(def)}` : ''}`)}">
+        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}${copyWords(def) ? ` ${copyWords(def)}` : ''}${def.style ? ` ${styleWords(def, regionName)}` : ''}${def.tool ? ` ${toolWords(def)}` : ''}`)}">
           <img src="${escapeHtml(itemIcon(def))}" alt="">
           ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
           <span class="name rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}</span><span class="hint">${escapeHtml(hint)}</span></button>`;
@@ -287,6 +292,7 @@ export class RpgUi {
       <h3>Carried</h3>
       <div class="slots">${slots}</div>
       ${calling}
+      ${fullStyles(c).map((st) => `<p class="calling">Full ${escapeHtml(STYLES[st]!.name)} style: ${escapeHtml(styleBonusWords(st))}</p>`).join('')}
       <dl class="sheet">
         ${stat('Might', 'might')}${stat('Agility', 'agility')}${stat('Wit', 'wit')}${stat('Spirit', 'spirit')}${stat('Vigor', 'vigor')}
         <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Reach</dt><dd>${one(attackReach(c))}<small>steps</small></dd></div><div><dt>Attack every</dt><dd>${attackCooldown(c).toFixed(2)}<small>s</small></dd></div><div><dt>Armour</dt><dd>${one(armor(c))}</dd></div><div><dt>Ward</dt><dd>${one(ward(c))}</dd></div>
@@ -307,4 +313,9 @@ export class RpgUi {
       <article>${chapter.html(this.character)}</article>
       <button type="button" class="close" data-close aria-label="Close">×</button>`;
   }
+}
+
+/** A region's name for a style's card. */
+function regionName(id: string): string {
+  return regionDef(id)?.name ?? id;
 }

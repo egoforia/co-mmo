@@ -268,7 +268,7 @@ export function where(): { sub: Subtab; page?: string } {
 }
 
 export function go(sub: Subtab, page?: string): string {
-  return `#${sub}${page ? `/${encodeURIComponent(page)}` : ''}`;
+  return `#art/${sub}${page ? `/${encodeURIComponent(page)}` : ''}`;
 }
 
 export function openCount(jobs: ArtJob[]): string {

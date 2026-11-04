@@ -1,4 +1,4 @@
-import { RACES, applyContent, hashString, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ContentEntry, type PicturedWish, type RaceId, type RuleItem } from '@co-mmo/shared';
+import { RACES, applyContent, hashString, placeholderArt, regionPictures, ruleItemId, standing, wishArtKey, type ArtManifest, type ContentEntry, type ItemDef, type PicturedWish, type RaceId, type RuleItem } from '@co-mmo/shared';
 
 // Everything the God has made, as this client knows it: the content log, and
 // a picture for each wished thing. Until the image model paints a wish's own
@@ -72,6 +72,25 @@ export function sceneArt(): [string, string][] {
     }
   }
   return art;
+}
+
+/** Every picture the game knows of, shipped and painted since (main.ts keeps it current). */
+let knownArt: ArtManifest = {};
+
+/** Tells item icons which pictures exist now, after the art manifest loads or changes. */
+export function knowArt(manifest: ArtManifest): void {
+  knownArt = manifest;
+}
+
+/**
+ * An item's icon: its own once painted (a picture painted again in God's
+ * View comes from where it was saved), else its stand-in, an icon like it.
+ */
+export function itemIcon(def: Pick<ItemDef, 'art' | 'standIn'>): string {
+  const own = knownArt[def.art];
+  if (own?.redone) return own.file;
+  if (own || !def.standIn || def.art.startsWith('wished-')) return artSrc(def.art, true);
+  return artSrc(def.standIn, true);
 }
 
 /** Picture for an asset key, wished or built-in. */

@@ -56,7 +56,8 @@ export function heldArts(item: string): string[] {
   const def = ITEMS[item];
   if (!def) return [];
   const family = def.weapon ?? def.offhand;
-  return family ? [def.art, familyArt(family)] : [def.art];
+  // A tool shows its stand-in (a family's picture) until its own is painted.
+  return family ? [def.art, familyArt(family)] : def.standIn ? [def.art, def.standIn] : [def.art];
 }
 
 /** Points by art id, as the server serves them. */

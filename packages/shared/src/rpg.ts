@@ -312,6 +312,8 @@ export interface ItemDef {
   material?: MaterialInfo;
   /** A crafted copy: who made it, its quality and what it carries (copies.ts). */
   copy?: CopyInfo;
+  /** A painted picture shown until its own `art` is painted (an icon like it). */
+  standIn?: string;
   /** Tools: the craft they work and their tier (crafts.ts). */
   tool?: { craft: CraftId; tier: ToolTier };
 }

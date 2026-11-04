@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREATURES, addItem, gainXp, maxHp, newCharacter, questOffered, rollDrops, takeItem, upgradeCharacter, xpToNext } from '../src/index.ts';
+import { CREATURES, EQUIP_SLOTS, GARMENT_SLOTS, addItem, equip, equipmentBonus, gainXp, maxHp, newCharacter, questOffered, rollDrops, takeItem, upgradeCharacter, xpToNext } from '../src/index.ts';
 
 describe('drops', () => {
   it('roll each item on a creature’s list against its own chance', () => {
@@ -52,5 +52,29 @@ describe('characters', () => {
     c.quests.push({ id: 'meet-bramble', count: 0, done: true });
     expect(questOffered(c, 'old-bramble')).toBe('mushroom-trouble');
     expect(questOffered(c, 'marina')).toBe('crab-tolls');
+  });
+});
+
+describe('cloak and feet slots', () => {
+  it('make a full outfit four garments, each worn in its own slot', () => {
+    expect(GARMENT_SLOTS).toEqual(['head', 'body', 'cloak', 'feet']);
+    for (const s of GARMENT_SLOTS) expect(EQUIP_SLOTS).toContain(s);
+    const c = newCharacter();
+    addItem(c, 'pelt-cloak');
+    addItem(c, 'traveller-coat');
+    expect(equip(c, 'pelt-cloak')).toBeUndefined();
+    expect(equip(c, 'traveller-coat')).toBeUndefined();
+    expect(c.equipment).toMatchObject({ cloak: 'pelt-cloak', body: 'traveller-coat' });
+  });
+
+  it('send a cloak saved in the body slot back to the bag', () => {
+    const c = upgradeCharacter({ ...newCharacter(), equipment: { body: 'pelt-cloak' } });
+    expect(c.equipment.body).toBeUndefined();
+    expect(c.inventory.some((s) => s.item === 'pelt-cloak')).toBe(true);
+  });
+
+  it('give wished cloaks and boots armour like a hat', () => {
+    expect(equipmentBonus('cloak', 'common')).toEqual(equipmentBonus('head', 'common'));
+    expect(equipmentBonus('feet', 'rare', 'agility')).toEqual({ armor: 3, agility: 2 });
   });
 });

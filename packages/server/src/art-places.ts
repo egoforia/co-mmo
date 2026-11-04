@@ -42,7 +42,7 @@ export function wishedItemPage(kind: ItemWish['itemKind']): (typeof ITEM_PAGES)[
   if (kind === 'material') return 'Materials';
   if (kind === 'weapon') return 'Weapons';
   if (kind === 'offhand') return 'Shields';
-  if (kind === 'head' || kind === 'body') return 'Armour';
+  if (kind === 'head' || kind === 'body' || kind === 'cloak' || kind === 'feet') return 'Armour';
   return 'Charms';
 }
 

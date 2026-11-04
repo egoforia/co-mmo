@@ -107,7 +107,7 @@ export const LAND_ITEMS: Record<string, ItemDef> = {
     description: 'A warm orange stone in a gold sun-shaped setting, from the tomb of the Sun King.', value: 90,
   },
   'pelt-cloak': {
-    name: 'Thorn Pelt Cloak', kind: 'equipment', art: 'item-pelt-cloak', slot: 'body', rarity: 'uncommon', bonus: { armor: 4, agility: 1 },
+    name: 'Thorn Pelt Cloak', kind: 'equipment', art: 'item-pelt-cloak', slot: 'cloak', rarity: 'uncommon', bonus: { armor: 4, agility: 1 },
     description: 'A hooded cloak of thorn wolf pelts, thorns picked out. It keeps the night chill off.', value: 40,
   },
   'holy-water': {

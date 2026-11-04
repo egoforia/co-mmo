@@ -8,6 +8,7 @@ import {
 import {
   type ArtItem,
   type ArtReferenceInfo,
+  type ArtReferenceVersion,
   type Ask,
   MEDIA,
   type Recipe,
@@ -99,6 +100,19 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       const cur = (review.references ?? []).map((r) => r.id);
       const next = cur.filter((x) => x !== id);
       void openReview(withRefs(next), takesNote, note);
+    });
+  }
+  for (const sel of d.querySelectorAll<HTMLSelectElement>('.ref-version-select')) {
+    sel.addEventListener('change', () => {
+      const idx = Number(sel.getAttribute('data-ref-index'));
+      const chosen = sel.value;
+      const cur = (review.references ?? []).map((r) => r.id);
+      const target = review.references?.[idx];
+      if (!target) return;
+      const baseId = target.assetId ?? target.id.split('@')[0]!;
+      const newId = chosen === 'current' ? baseId : `${baseId}@${chosen}`;
+      cur[idx] = newId;
+      void openReview(withRefs(cur), takesNote, note);
     });
   }
   const refPicker = d.querySelector<HTMLSelectElement>('.ref-picker');
@@ -233,7 +247,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
 /** Reference images selection and upload controls for painting recipes. */
 export function referencesHtml(review: Review): string {
   const currentRefs = review.references ?? [];
-  const existingIds = new Set(currentRefs.map((r) => r.id));
+  const existingIds = new Set(currentRefs.map((r) => r.assetId ?? r.id.split('@')[0]!));
 
   // Collect game art options from artState.data
   const walkers = artState.data?.walkers ?? [];
@@ -249,17 +263,42 @@ export function referencesHtml(review: Review): string {
   creatures.sort((a, b) => a.name.localeCompare(b.name));
   gameItems.sort((a, b) => a.name.localeCompare(b.name));
 
+  const renderPickerOption = (id: string, name: string) => {
+    const item = items.find((it) => it.id === id);
+    const versions = item?.versions ?? [];
+    const hasShipped = Boolean(item?.shipped);
+    if (!versions.length && !hasShipped) {
+      return `<option value="${esc(id)}">${esc(name)}</option>`;
+    }
+    return `
+      <option value="${esc(id)}">${esc(name)} (Current)</option>
+      ${versions.map((v) => `<option value="${esc(id)}@${esc(v.id)}">  ↳ ${esc(name)} (Earlier: ${esc(v.id)})</option>`).join('')}
+      ${hasShipped ? `<option value="${esc(id)}@shipped">  ↳ ${esc(name)} (Original Shipped)</option>` : ''}
+    `;
+  };
+
   return `
     <div class="review-references">
       <div class="ref-header">
         <label><strong>Reference Images</strong> <small>(${currentRefs.length})</small></label>
-        <span class="note">Guide character design, palette, and style.</span>
+        <span class="note">Guide character design, palette, and style. Choose a specific version when multiple exist.</span>
       </div>
       <div class="ref-chips">
-        ${currentRefs.length ? currentRefs.map((ref) => `
-          <div class="ref-chip">
+        ${currentRefs.length ? currentRefs.map((ref, idx) => `
+          <div class="ref-chip" data-ref-id="${esc(ref.id)}">
             ${ref.url ? `<img src="${esc(ref.url)}" alt="" class="ref-chip-img">` : '<span class="ph">?</span>'}
-            <span class="ref-chip-name" title="${esc(ref.name)}">${esc(ref.name)}</span>
+            <div class="ref-chip-body">
+              <span class="ref-chip-name" title="${esc(ref.name)}">${esc(ref.name)}</span>
+              ${ref.availableVersions && ref.availableVersions.length > 1 ? `
+                <select class="ref-version-select" data-ref-index="${idx}" title="Select reference version">
+                  ${ref.availableVersions.map((v) => `
+                    <option value="${esc(v.id)}" ${v.id === (ref.versionId ?? 'current') ? 'selected' : ''}>
+                      ${esc(v.label)}
+                    </option>
+                  `).join('')}
+                </select>
+              ` : ''}
+            </div>
             <button type="button" class="quiet ref-remove-btn" title="Remove reference" data-remove-ref="${esc(ref.id)}">✕</button>
           </div>
         `).join('') : '<p class="note">No references currently selected.</p>'}
@@ -267,9 +306,9 @@ export function referencesHtml(review: Review): string {
       <div class="ref-actions">
         <select class="ref-picker">
           <option value="">+ Add game art as reference…</option>
-          ${characters.length ? `<optgroup label="Characters & Walkers">${characters.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</optgroup>` : ''}
-          ${creatures.length ? `<optgroup label="NPCs & Creatures">${creatures.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('')}</optgroup>` : ''}
-          ${gameItems.length ? `<optgroup label="Items & Equipment">${gameItems.map((i) => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('')}</optgroup>` : ''}
+          ${characters.length ? `<optgroup label="Characters & Walkers">${characters.map((w) => renderPickerOption(w.id, w.name)).join('')}</optgroup>` : ''}
+          ${creatures.length ? `<optgroup label="NPCs & Creatures">${creatures.map((w) => renderPickerOption(w.id, w.name)).join('')}</optgroup>` : ''}
+          ${gameItems.length ? `<optgroup label="Items & Equipment">${gameItems.map((i) => renderPickerOption(i.id, i.name)).join('')}</optgroup>` : ''}
         </select>
         <label class="ref-upload-btn button quiet">
           <span>📁 Upload image</span>

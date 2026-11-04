@@ -43,4 +43,56 @@ describe('review references UI', () => {
     expect(html).toContain('class="ref-url-input"');
     expect(html).toContain('ref-url-submit');
   });
+
+  it('renders version dropdown on reference chip and in game art picker when versions exist', () => {
+    artState.data = {
+      walkers: [
+        { id: 'sylvan-cervid', name: 'Sylvan Cervid', kind: 'creature', url: '/wished-art/redone/sylvan-cervid.png' } as unknown as WalkerView,
+      ],
+      items: [
+        {
+          id: 'sylvan-cervid',
+          name: 'Sylvan Cervid',
+          url: '/wished-art/redone/sylvan-cervid.png',
+          source: 'redone',
+          versions: [{ id: 'v2', url: '/wished-art/history/sylvan-cervid/v2.png' }],
+          shipped: { url: '/art/sylvan-cervid.png' },
+        } as unknown as ArtItem,
+      ],
+    } as unknown as typeof artState.data;
+
+    const review: Review = {
+      title: 'Paint Sister Amala again',
+      parts: [],
+      estimateUsd: 0.04,
+      fingerprint: 'fp-123',
+      references: [
+        {
+          id: 'sanctum-pilgrim@v1',
+          assetId: 'sanctum-pilgrim',
+          versionId: 'v1',
+          name: 'Sister Amala (v1)',
+          url: '/wished-art/history/sanctum-pilgrim/v1.png',
+          availableVersions: [
+            { id: 'current', label: 'Current version', url: '/wished-art/redone/sanctum-pilgrim.png' },
+            { id: 'v1', label: 'Earlier (Oct 24)', url: '/wished-art/history/sanctum-pilgrim/v1.png' },
+            { id: 'shipped', label: 'Original shipped version', url: '/art/sanctum-pilgrim.png' },
+          ],
+        },
+      ],
+    };
+
+    const html = referencesHtml(review);
+
+    // Chip renders version select with selected version
+    expect(html).toContain('class="ref-version-select"');
+    expect(html).toContain('value="v1" selected');
+    expect(html).toContain('Earlier (Oct 24)');
+    expect(html).toContain('Original shipped version');
+
+    // Picker lists sub-options for earlier versions and shipped version
+    expect(html).toContain('value="sylvan-cervid">Sylvan Cervid (Current)</option>');
+    expect(html).toContain('value="sylvan-cervid@v2">  ↳ Sylvan Cervid (Earlier: v2)</option>');
+    expect(html).toContain('value="sylvan-cervid@shipped">  ↳ Sylvan Cervid (Original Shipped)</option>');
+  });
 });

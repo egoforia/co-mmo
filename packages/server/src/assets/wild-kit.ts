@@ -163,17 +163,66 @@ export async function paintKitAsset(
       data = await readFile(refPath).catch(() => undefined);
       label = `Reference ${hash.slice(0, 6)}`;
     } else {
-      // Shipped anchors first; a piece painted in the Art tab (the sea cave's rock) after them.
-      for (const path of [resolve(anchorDir, 'raw', `${ref}.png`), resolve(anchorDir, `${ref}.png`), resolve(outDir, 'raw', `${ref}.png`), resolve(outDir, `${ref}.png`)]) {
-        data = await readFile(path).catch(() => undefined);
-        if (data) break;
+      const [assetId, versionId] = ref.includes('@') ? ref.split('@', 2) : [ref, undefined];
+      const baseLabel = extra.nameOf ? (await extra.nameOf(assetId!)) : pictureName(assetId!);
+
+      if (versionId === 'shipped') {
+        // Shipped original anchor explicitly requested
+        label = `${baseLabel} (Shipped)`;
+        for (const path of [
+          resolve(anchorDir, `${assetId}.png`),
+          resolve(anchorDir, 'raw', `${assetId}.png`),
+        ]) {
+          data = await readFile(path).catch(() => undefined);
+          if (data) break;
+        }
+        if (!data && extra.readArt) {
+          data = await extra.readArt(`assets/anchors/${assetId}.png`).catch(() => undefined)
+            ?? await extra.readArt(`art/${assetId}.png`).catch(() => undefined);
+        }
+      } else if (versionId && versionId !== 'current') {
+        // Specific history version requested (e.g. mw2hffyk)
+        label = `${baseLabel} (${versionId})`;
+        const histDir = extra.artDir
+          ? resolve(extra.artDir, 'history', assetId!.replace(/:/g, '~'))
+          : resolve(outDir, '..', 'history', assetId!.replace(/:/g, '~'));
+        for (const file of [`${versionId}.png`, `${versionId}.webp`]) {
+          data = await readFile(resolve(histDir, file)).catch(() => undefined);
+          if (data) break;
+        }
+        if (!data && extra.readArt) {
+          data = await extra.readArt(`wished-art/history/${assetId!.replace(/:/g, '~')}/${versionId}.png`).catch(() => undefined)
+            ?? await extra.readArt(`wished-art/history/${assetId!.replace(/:/g, '~')}/${versionId}.webp`).catch(() => undefined);
+        }
+      } else {
+        // Current / latest version: check outDir (redone / painted in art studio) FIRST!
+        label = baseLabel;
+        for (const path of [
+          resolve(outDir, `${assetId}.png`),
+          resolve(outDir, 'raw', `${assetId}.png`),
+        ]) {
+          data = await readFile(path).catch(() => undefined);
+          if (data) break;
+        }
+        if (!data && extra.readArt) {
+          data = await extra.readArt(`wished-art/redone/${assetId}.png`).catch(() => undefined);
+        }
+        // Fallback to shipped anchors only if not redone yet
+        if (!data) {
+          for (const path of [
+            resolve(anchorDir, `${assetId}.png`),
+            resolve(anchorDir, 'raw', `${assetId}.png`),
+          ]) {
+            data = await readFile(path).catch(() => undefined);
+            if (data) break;
+          }
+          if (!data && extra.readArt) {
+            data = await extra.readArt(`assets/anchors/${assetId}.png`).catch(() => undefined)
+              ?? await extra.readArt(`art/${assetId}.png`).catch(() => undefined)
+              ?? await extra.readArt(assetId!).catch(() => undefined);
+          }
+        }
       }
-      if (!data && extra.readArt) {
-        data = await extra.readArt(`assets/anchors/${ref}.png`).catch(() => undefined)
-          ?? await extra.readArt(`art/${ref}.png`).catch(() => undefined)
-          ?? await extra.readArt(ref).catch(() => undefined);
-      }
-      label = extra.nameOf ? (await extra.nameOf(ref)) : pictureName(ref);
     }
     if (!data) continue;
     references.push({ mimeType: 'image/png', data });

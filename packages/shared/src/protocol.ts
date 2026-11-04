@@ -678,9 +678,9 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'loot') {
     return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&
       (m.index === undefined || (Number.isInteger(m.index) && (m.index as number) >= 0 && (m.index as number) < 100)) &&
-      (m.item === undefined || isId(m.item));
+      (m.item === undefined || isItemId(m.item));
   }
-  if (m.t === 'use') return typeof m.item === 'string' && m.item.length <= 64;
+  if (m.t === 'use') return isItemId(m.item);
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   if (m.t === 'pray') return typeof m.text === 'string';
   if (m.t === 'report') {
@@ -696,7 +696,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       (m.fields === undefined || (typeof m.fields === 'object' && m.fields !== null && JSON.stringify(m.fields).length <= 8000));
   }
   if (m.t === 'equip') {
-    return (typeof m.item === 'string' && m.item.length <= 64) || EQUIP_SLOTS.includes(m.slot as EquipSlot);
+    return isItemId(m.item) || EQUIP_SLOTS.includes(m.slot as EquipSlot);
   }
   if (m.t === 'spendPoint') return isStat(m.stat);
   if (m.t === 'chooseCalling') return isRace(m.race) && isCalling(m.calling);
@@ -705,7 +705,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'hotbar') return Array.isArray(m.slots) && m.slots.length <= 6 && m.slots.every((s) => s === '' || isId(s));
   if (m.t === 'craft') return isId(m.recipe);
   if (m.t === 'shop') {
-    return ['buy', 'sell', 'learn'].includes(m.action as string) && isId(m.npc) && isId(m.id) &&
+    return ['buy', 'sell', 'learn'].includes(m.action as string) && isId(m.npc) && isItemId(m.id) &&
       (m.qty === undefined || (Number.isInteger(m.qty) && (m.qty as number) > 0 && (m.qty as number) <= 99));
   }
   if (m.t === 'trade') {
@@ -726,6 +726,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
 
 function isId(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= 64;
+}
+
+/** An item id, which may be a crafted copy's (copies.ts): those carry their maker and material, so they run longer. */
+function isItemId(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0 && v.length <= 200;
 }
 
 function isAxis(v: unknown): v is number {

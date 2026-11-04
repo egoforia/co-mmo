@@ -125,6 +125,13 @@ Shared `materials.ts` gives every material its data (`ItemDef.material`:
 family, home regions, source, tier 1 to 3, at most one trait) and works out
 each region's materials from it; a wished material is cleaned by
 `cleanMaterial` (tier 1 or 2, homes default to where the wisher stands).
+Shared `copies.ts` makes crafted and shop-bought gear its own copy: the item
+id `<base>~c~<quality>~<maker>~<people>~<trait>~<material>~<nonce>` carries
+who made it, how well (quality 80 to 130 sizes its bonus and value) and the
+main material's trait, and `ITEMS[id]` works the copy's ItemDef out from the
+id, so bags, trades, saves and every server agree with nothing to sync.
+Copies never show when ITEMS is listed, and ids holding `~` are refused
+wherever a wish or rule names an item, so only crafting and shops make them.
 Shared `weapons.ts` holds the weapon and off-hand families, damage types,
 creature Armor and Ward, and `trainedIn`, which says whether a Calling is
 trained in a family (`docs/classes.md#weapons`).

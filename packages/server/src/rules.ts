@@ -6,7 +6,7 @@
 // limits. A rule that keeps failing or hits its limits is paused on its own.
 
 import { getQuickJS, shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime, type QuickJSWASMModule } from 'quickjs-emscripten';
-import { ITEMS, addItem, dayPart, discover, gameHour, itemCount, maxHp, ruleItemId, takeItem, type DayPart, type RuleWish, type Weather } from '@co-mmo/shared';
+import { ITEMS, addItem, isCopyId, dayPart, discover, gameHour, itemCount, maxHp, ruleItemId, takeItem, type DayPart, type RuleWish, type Weather } from '@co-mmo/shared';
 import { TILE_NAMES } from './region.ts';
 import type { World } from './world.ts';
 import type { CharacterOp } from './character-ops.ts';
@@ -444,7 +444,8 @@ export class RuleRuntime {
   private item(raw: unknown): string {
     const key = str(raw, 64);
     if (this.def.items[key]) return ruleItemId(this.id, key);
-    const def = ITEMS[key];
+    // A crafted copy is only ever made by a player or shopkeeper, never handed out by a rule.
+    const def = isCopyId(key) ? undefined : ITEMS[key];
     if (def && !def.bound) return key;
     throw new RuleError(`Unknown item "${key}". This rule's items: ${Object.keys(this.def.items).join(', ') || 'none'}.`);
   }

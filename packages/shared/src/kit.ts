@@ -15,6 +15,7 @@ import {
   type Character,
   type InventorySlot,
 } from './rpg.ts';
+import { QUALITY_STANDARD, clampQuality, makesCopies, newCopy, type CopyInfo } from './copies.ts';
 
 // --- Crafting ------------------------------------------------------------------
 
@@ -55,14 +56,56 @@ export function recipeName(id: string): string {
   return r?.name ?? ITEMS[r?.result.item ?? '']?.name ?? id;
 }
 
-/** Makes a recipe: takes the materials and adds the result. Returns why not. */
-export function craft(c: Character, id: string): string | undefined {
+/** Turns a made or bought piece of gear into its own copy; gives back the id it goes in the bag under. */
+export type Mint = (base: string) => string;
+
+/**
+ * Makes a recipe: takes the materials and adds the result. Gear comes out as
+ * a copy when `mint` is given (the server always gives one), each piece its
+ * own. Returns why not, or the ids of what was made.
+ */
+export function craft(c: Character, id: string, mint?: Mint): string | undefined {
   const why = cannotCraft(c, id);
   if (why) return why;
   const r = RECIPES[id]!;
   for (const m of r.materials) takeItem(c, m.item, m.qty);
-  addItem(c, r.result.item, r.result.qty);
+  if (mint && makesCopies(ITEMS[r.result.item])) for (let i = 0; i < r.result.qty; i++) addItem(c, mint(r.result.item));
+  else addItem(c, r.result.item, r.result.qty);
   return undefined;
+}
+
+/** The recipe material used most, which gives a crafted copy its trait. */
+export function mainMaterial(recipe: RecipeDef): string | undefined {
+  return [...recipe.materials].sort((a, b) => b.qty - a.qty)[0]?.item;
+}
+
+/**
+ * Quality of a piece a player crafts: standard at the recipe's Wit, two
+ * points better for each Wit above it, and a little luck either way. (The
+ * crafts' levels and tools take over in plan step 4.)
+ */
+export function craftQuality(wit: number, recipe: RecipeDef, random: () => number): number {
+  return clampQuality(QUALITY_STANDARD + (wit - recipe.wit) * 2 + Math.round((random() - 0.5) * 16));
+}
+
+/** The copy a player makes of a recipe's result: their name, people, quality and the main material's trait. */
+export function crafted(c: Character, maker: string, recipeId: string, random: () => number): Mint {
+  const r = RECIPES[recipeId]!;
+  const material = mainMaterial(r);
+  const trait = material ? ITEMS[material]?.material?.traits[0] : undefined;
+  return (base) => newCopy({
+    of: base,
+    quality: craftQuality(totalStats(c).wit, r, random),
+    maker: { kind: 'player', name: maker },
+    ...(c.race ? { people: c.race } : {}),
+    ...(trait ? { trait } : {}),
+    ...(material ? { material } : {}),
+  } satisfies CopyInfo, random);
+}
+
+/** The copy a shopkeeper sells: standard quality, made by them. */
+export function shopMade(npcName: string, random: () => number): Mint {
+  return (base) => newCopy({ of: base, quality: QUALITY_STANDARD, maker: { kind: 'npc', name: npcName } }, random);
 }
 
 // --- Shops and trainers ----------------------------------------------------------
@@ -101,14 +144,14 @@ export function sellPrice(item: string): number {
   return Math.max(1, Math.floor((def.value ?? 2) / 2));
 }
 
-/** Buys one item from a shop. Returns why not. */
-export function buy(c: Character, npc: string, item: string): string | undefined {
+/** Buys one item from a shop; gear comes as a copy made by the shopkeeper when `mint` is given. Returns why not. */
+export function buy(c: Character, npc: string, item: string, mint?: Mint): string | undefined {
   const offer = SHOPS[npc]?.sells.find((s) => s.item === item);
   if (!offer || !ITEMS[item]) return 'That is not for sale here.';
   if (c.gold < offer.price) return `That costs ${offer.price} gold; you have ${c.gold}.`;
   if (itemCount(c, item) >= MAX_STACK) return 'Your bag cannot hold any more of those.';
   c.gold -= offer.price;
-  addItem(c, item);
+  addItem(c, mint && makesCopies(ITEMS[item]) ? mint(item) : item);
   return undefined;
 }
 

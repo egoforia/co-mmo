@@ -1,5 +1,5 @@
-import { TICK_RATE, dayPart, routineOf, routineWords, stairsMiddle, stairsToward, takeStairs, type DayPart, type NpcPlacement, type Placed, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
-import { findPath, findSpots, moveToward, wander, type Walker } from './walkers.ts';
+import { PERSON_RADIUS, TICK_RATE, dayPart, routineOf, routineWords, stairsMiddle, stairsToward, takeStairs, type DayPart, type Among, type Bodies, type NpcPlacement, type Placed, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
+import { findPath, findSpots, moveToward, standClear, wander, type Walker } from './walkers.ts';
 
 // The people of a region going about their day (routines.ts): walking to
 // work at dawn, out to the square at dusk, home to sleep at night, and
@@ -37,6 +37,8 @@ export interface Town {
   phase: number;
   /** Someone stands close enough to talk, so they wait. */
   listening: boolean;
+  /** Everyone standing in the region (hit-boxes.ts), so people walk round others; none, and they pass through. */
+  bodies?: Bodies;
 }
 
 /**
@@ -66,6 +68,9 @@ export function live(n: Townsperson, town: Town): void {
     n.target = null;
     n.path = plan(town.map, n, spot);
   }
+  // Someone walked into them: they step aside first, even while stopped to talk.
+  const among: Among | undefined = town.bodies && { self: { r: PERSON_RADIUS, kind: 'npc', floor: n.floor, of: n }, bodies: town.bodies };
+  if (among) standClear(town.map, n, STROLL_SPEED, among, town.random);
   if (town.listening) {
     n.target = null;
     n.rest = TICK_RATE;
@@ -75,7 +80,7 @@ export function live(n: Townsperson, town: Town): void {
   if (next) {
     const before = { x: n.x, y: n.y };
     // Something in the way (a new building, a wished thing) skips to the next bend.
-    if (moveToward(town.map, n, next.x, next.y, WALK_SPEED) || (n.x === before.x && n.y === before.y)) n.path.shift();
+    if (moveToward(town.map, n, next.x, next.y, WALK_SPEED, among) || (n.x === before.x && n.y === before.y)) n.path.shift();
     // At the stairs on the way (the end of this leg): up or down them, then on from the landing.
     if (n.floor !== spot.floor && !n.path.length) {
       const landed = takeStairs(town.map, n);
@@ -92,7 +97,7 @@ export function live(n: Townsperson, town: Town): void {
     return;
   }
   // Kept from their spot's floor (its stairs gone), they stroll where they are.
-  wander(town.map, n, STROLL_SPEED, STROLL_RADIUS, town.random, spot.floor === n.floor ? spot : n.home.floor === n.floor ? n.home : n);
+  wander(town.map, n, STROLL_SPEED, STROLL_RADIUS, town.random, spot.floor === n.floor ? spot : n.home.floor === n.floor ? n.home : n, among);
 }
 
 /** The way to walk to a spot: there on this floor, or to the stairs that lead toward its floor; none when close by. */

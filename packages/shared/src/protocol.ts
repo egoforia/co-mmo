@@ -13,6 +13,7 @@ import type { DamageType } from './weapons.ts';
 import type { StatusId, StatusView } from './rpg/statuses.ts';
 import type { GaugeId } from './rpg/gauges.ts';
 import type { PathChoice } from './trials.ts';
+import type { CreatureSizeTier } from './walk.ts';
 
 /**
  * Say: players nearby. Region: everyone in your region. Party: your party.
@@ -333,6 +334,8 @@ export interface CreatureState {
   /** The floor it is on (floors.ts), when not the ground. */
   floor?: number;
   health: number;
+  /** How big it stands (hit-boxes.ts), when not medium: the browser keeps its player out of its body. */
+  size?: CreatureSizeTier;
   mood?: CreatureMood;
   /** Its running statuses (rpg/statuses.ts), when it has any. */
   statuses?: StatusId[];

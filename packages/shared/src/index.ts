@@ -5,6 +5,7 @@ export * from './palette.ts';
 export * from './world.ts';
 export * from './movement.ts';
 export * from './floors.ts';
+export * from './hit-boxes.ts';
 export * from './names.ts';
 export * from './prediction.ts';
 export * from './biomes.ts';

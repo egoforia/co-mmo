@@ -92,7 +92,13 @@ snapshots and split-region borders send), `split-region.ts`, the
 patrol, timid, pack; sleep out of its hours, fleeing) with `threat.ts`
 (who it fights: the threat list, the 10% rule, taunts), `townsfolk.ts`
 (people keeping their day) and `walkers.ts` (moving and path finding both
-use). The hour and weather come from shared `sky.ts`, worked out from the
+use). Hit boxes: shared `hit-boxes.ts` gives every player, creature and
+person a round body (creature width from `CreatureDef.size`) and says who
+stops whom (creatures stop everyone; players walk through players and
+people step aside for them); `region/crowd.ts` gathers the region's bodies into a grid each tick
+(neighbour cells' ghosts too), players step with it (`walkOn`, predicted the
+same in the browser from the snapshot), and walkers steer round it, so only
+a ring of creatures can reach one player at once. The hour and weather come from shared `sky.ts`, worked out from the
 clock and the region alone, so every server, cell and browser agrees
 without being told; people's days are in shared `routines.ts`.
 Character rules are shared `rpg.ts`, a face over `rpg/`: `attributes.ts`

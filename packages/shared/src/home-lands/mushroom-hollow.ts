@@ -14,20 +14,20 @@ import { toolOffers } from '../crafts.ts';
 /** Spore puffs, glowcap beetles and mycelid stalkers, with the Woods' walking mushrooms and lantern moths. */
 const CREATURES: Record<string, CreatureDef> = {
   'spore-puff': levelledCreature({
-    name: 'Spore Puff', art: 'hollow-spore-puff', description: 'A round puffball on two stubby legs that bursts into a cloud of spores and waddles off when anyone comes near.',
+    name: 'Spore Puff', art: 'hollow-spore-puff', size: 'small', description: 'A round puffball on two stubby legs that bursts into a cloud of spores and waddles off when anyone comes near.',
     behavior: 'timid', level: 3, speed: 2.6, notice: 3, drops: [{ item: 'spore-dust', chance: 0.7 }],
   }),
   'glowcap-beetle': levelledCreature({
-    name: 'Glowcap Beetle', art: 'hollow-glowcap-beetle', description: 'A beetle as big as a dog with a glowing mushroom growing from its back. They swarm out together after dark.',
+    name: 'Glowcap Beetle', art: 'hollow-glowcap-beetle', size: 'small', description: 'A beetle as big as a dog with a glowing mushroom growing from its back. They swarm out together after dark.',
     behavior: 'pack', active: 'night', level: 4, speed: 3, notice: 4.5, drops: [{ item: 'glowcap-chitin', chance: 0.5 }, { item: 'tonic', chance: 0.1 }],
   }),
   mycelid: levelledCreature({
-    name: 'Mycelid Stalker', art: 'hollow-mycelid', description: 'A tall thin figure of woven mushroom threads that walks the same rounds every day, listening to the ground.',
+    name: 'Mycelid Stalker', art: 'hollow-mycelid', size: 'high', description: 'A tall thin figure of woven mushroom threads that walks the same rounds every day, listening to the ground.',
     behavior: 'patrol', level: 5, speed: 2.2, notice: 4, tough: 1.3, drops: [{ item: 'mushroom-fibre', chance: 0.7 }],
   }),
   'rootless-king': {
     ...levelledCreature({
-      name: 'Rootless King', art: 'hollow-rootless-king', description: 'A giant walking mushroom with a crown of shelf fungus. The Hush cut it off from the mycelium, and it has gone mad with the silence.',
+      name: 'Rootless King', art: 'hollow-rootless-king', size: 'colossal', description: 'A giant walking mushroom with a crown of shelf fungus. The Hush cut it off from the mycelium, and it has gone mad with the silence.',
       behavior: 'guard', level: 8, speed: 1.8, notice: 4.5, tough: 3.5, drops: [{ item: 'kings-mycelium', chance: 0.9 }, { item: 'mushroom-fibre', qty: 3, chance: 0.6 }],
     }),
     // A boss: once beaten, it takes a long while to come back.

@@ -1,4 +1,5 @@
 import { collides, step } from './movement.ts';
+import type { Among } from './hit-boxes.ts';
 import { Tile, block, isBlocking, set, storeyAt, tileAt, type RegionMap, type TileArt } from './world.ts';
 
 // Floors above and below the ground. The ground is floor 0; a building's
@@ -236,10 +237,11 @@ export function takeStairs(map: RegionMap, at: Placed, climbs = true): Placed | 
 /**
  * One tick of a player's input on their floor, taking any stairs they step
  * onto. The server moves players with it and each browser predicts its own
- * player with it, so both change floors on the same step.
+ * player with it, so both change floors on the same step. `among` stops it
+ * at other bodies (hit-boxes.ts).
  */
-export function walkOn(map: RegionMap, at: Placed, dx: number, dy: number, pace = 1): Placed {
-  const next = step(map, at, dx, dy, at.floor, pace);
+export function walkOn(map: RegionMap, at: Placed, dx: number, dy: number, pace = 1, among?: Among): Placed {
+  const next = step(map, at, dx, dy, at.floor, pace, among);
   if (next.x === at.x && next.y === at.y) return at;
   const moved = { x: next.x, y: next.y, floor: at.floor };
   return takeStairs(map, moved) ?? moved;

@@ -1,4 +1,5 @@
 import { PLAYER_RADIUS, PLAYER_SPEED, TICK_SECONDS } from './constants.ts';
+import { roomFor, type Among } from './hit-boxes.ts';
 import { OPPOSITE, isBlocking, tileAt, type RegionMap, type Side } from './world.ts';
 
 export interface Vec2 {
@@ -11,8 +12,10 @@ export interface Vec2 {
  * authoritative) and the client (which predicts its own movement with it).
  * Axes are resolved separately so players slide along walls. `pace` is the
  * share of full speed statuses allow (paceOf: Slowed, Rooted, Stunned).
+ * `among` stops the step at other bodies (hit-boxes.ts): creatures and
+ * people, for a player.
  */
-export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 0, pace = 1): Vec2 {
+export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 0, pace = 1, among?: Among): Vec2 {
   if ((dx === 0 && dy === 0) || pace <= 0) return pos;
   const len = Math.hypot(dx, dy);
   const dist = PLAYER_SPEED * TICK_SECONDS * pace;
@@ -21,8 +24,9 @@ export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 
 
   let x = pos.x;
   let y = pos.y;
-  if (!collides(map, x + mx, y, floor)) x += mx;
-  if (!collides(map, x, y + my, floor)) y += my;
+  const free = (to: Vec2) => !among || roomFor(among.self, { x, y }, to, among.bodies);
+  if (!collides(map, x + mx, y, floor) && free({ x: x + mx, y })) x += mx;
+  if (!collides(map, x, y + my, floor) && free({ x, y: y + my })) y += my;
   return { x, y };
 }
 

@@ -1,6 +1,6 @@
-import { TICK_RATE, awake, collides, noticeScale, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
+import { TICK_RATE, awake, collides, creatureRadius, noticeScale, sizeReach, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
 import { addThreat, chooseTarget } from './threat.ts';
-import { canReach, goTo, moveAway, moveToward, wander, type Walker } from './walkers.ts';
+import { canReach, goTo, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
 
 // How creatures behave, one tick at a time: sleeping out of their hours,
 // noticing players (less in the dark and the fog, more if they carry a
@@ -9,7 +9,9 @@ import { canReach, goTo, moveAway, moveToward, wander, type Walker } from './wal
 // decides what each creature does next. Creatures only notice and strike
 // those on their own floor; one chasing someone follows them up or down
 // stairs (never a ladder) while they stay within its leash. Who it fights
-// is chosen by threat (threat.ts).
+// is chosen by threat (threat.ts). Each stands in a body (hit-boxes.ts) and
+// walks round the others, so only as many as fit about a player can reach
+// them at once.
 
 type Spot = { x: number; y: number };
 
@@ -18,8 +20,12 @@ const WANDER_SPEED = 1.5;
 const WANDER_RADIUS = 4;
 /** A chasing creature gives up this far from home and walks back. */
 export const LEASH = 8;
-/** Creatures strike from this close. */
-export const CREATURE_REACH = 1.2;
+/**
+ * A player-sized creature strikes from this close, middle to middle; bigger
+ * ones from as much farther as they are wider (sizeReach). Bodies touch at
+ * 0.6, so about six fit in reach of one player at once.
+ */
+export const CREATURE_REACH = 1;
 /** Pack creatures this close to one another roam and hunt together. */
 export const PACK_RADIUS = 6;
 /** A frightened creature runs for at most this long before heading home. */
@@ -56,6 +62,8 @@ export interface Creature extends Walker {
   stunImmuneUntil?: number;
   /** Share of its speed its statuses allow this tick (paceOf); full when missing. */
   pace?: number;
+  /** While held up by a crowd about the player it fights, how far round them it aims (radians, see close). */
+  flank?: number;
 }
 
 /** A player as creatures see them. */
@@ -83,6 +91,8 @@ export interface Habitat {
   creatures: Creature[];
   /** The creature strikes this player (the region deals the damage). */
   hurt(c: Creature, playerId: string): void;
+  /** Everyone standing in the region (hit-boxes.ts), so creatures walk round each other and the players; none, and they pass through. */
+  bodies?: Bodies;
 }
 
 /** A new live creature of a kind, at its home spot. */
@@ -100,12 +110,15 @@ export function think(c: Creature, h: Habitat): void {
     Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, threat: {}, fleeing: null, asleep: false });
     return;
   }
+  // Put on one spot with others, or someone came to stand on it: step clear first.
+  const among = amid(c, h);
+  if (among) standClear(h.map, c, WANDER_SPEED, among, h.random);
   const up = awake(c.def.active, h.phase);
   if (up && !c.aggro && !c.fleeing && !c.returning) notice(c, h);
   if (c.fleeing) return run(c, h);
   if (c.aggro) return fight(c, h);
   if (c.returning) {
-    if (goTo(h.map, c, c.home, speedOf(c)) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) {
+    if (goTo(h.map, c, c.home, speedOf(c), false, amid(c, h)) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) {
       c.returning = false;
       c.hp = c.def.hp;
     }
@@ -116,9 +129,19 @@ export function think(c: Creature, h: Habitat): void {
   if (c.def.behavior === 'patrol') return patrol(c, h);
   if (c.def.behavior === 'pack') {
     const leader = packLeader(c, h.creatures);
-    if (leader !== c) return wander(h.map, c, WANDER_SPEED * (c.pace ?? 1) * 1.2, 2.5, h.random, leader);
+    if (leader !== c) return wander(h.map, c, WANDER_SPEED * (c.pace ?? 1) * 1.2, 2.5, h.random, leader, amid(c, h));
   }
-  wander(h.map, c, WANDER_SPEED * (c.pace ?? 1), WANDER_RADIUS, h.random);
+  wander(h.map, c, WANDER_SPEED * (c.pace ?? 1), WANDER_RADIUS, h.random, c.home, amid(c, h));
+}
+
+/** The creature's body among everyone else's this tick, when the region keeps bodies. */
+function amid(c: Creature, h: Habitat): Among | undefined {
+  return h.bodies && { self: { r: creatureRadius(c.def.size), kind: 'creature', floor: c.floor, of: c }, bodies: h.bodies };
+}
+
+/** How close it must be to strike, middle to middle: farther for a bigger creature. */
+export function reachOf(def: CreatureDef): number {
+  return CREATURE_REACH + sizeReach(def.size);
 }
 
 /** How fast it moves when in a hurry, as its statuses allow (Slowed, Rooted). */
@@ -196,15 +219,45 @@ function fight(c: Creature, h: Habitat): void {
   // Gone up or down: after them by the stairs, or give up if only a ladder leads there.
   if (p.floor !== c.floor) {
     if (!canReach(h.map, c, p)) return giveUp(c);
-    goTo(h.map, c, p, speedOf(c));
+    goTo(h.map, c, p, speedOf(c), false, amid(c, h));
     return;
   }
   const d = Math.hypot(p.x - c.x, p.y - c.y);
-  if (d > CREATURE_REACH * 0.8) moveToward(h.map, c, p.x, p.y, speedOf(c));
-  if (d <= CREATURE_REACH && h.now - c.lastAttack >= c.def.cooldown * 1000) {
+  const reach = reachOf(c.def);
+  if (d > reach * 0.8) close(c, p, reach, h);
+  if (Math.hypot(p.x - c.x, p.y - c.y) <= reach && h.now - c.lastAttack >= c.def.cooldown * 1000) {
     c.lastAttack = h.now;
     h.hurt(c, p.id);
   }
+}
+
+/** How far its way in turns each tick it is held up, while it looks for a gap about a crowded player (radians). */
+const FLANK_TURN = 0.25;
+
+/**
+ * Closes in on a player. Held up by others already about them, it does not
+ * wait behind: it works its way round the crowd, aiming for a spot beside
+ * the player further round each tick it gets no nearer, until it finds a
+ * gap or comes round to the far side.
+ */
+function close(c: Creature, p: Prey, reach: number, h: Habitat): void {
+  const among = amid(c, h);
+  const flank = c.flank ?? 0;
+  let to: Spot = p;
+  if (among && flank !== 0) {
+    const a = Math.atan2(c.y - p.y, c.x - p.x) + flank;
+    to = { x: p.x + Math.cos(a) * reach * 0.7, y: p.y + Math.sin(a) * reach * 0.7 };
+  }
+  const before = { x: c.x, y: c.y };
+  moveToward(h.map, c, to.x, to.y, speedOf(c), among);
+  if (!among) return;
+  if (!stalled(before, c, p)) {
+    c.flank = 0;
+    return;
+  }
+  // Each goes round its own way, so a crowd fans out to both sides.
+  const way = c.id.length % 2 === 0 ? 1 : -1;
+  c.flank = Math.abs(flank) >= Math.PI / 2 ? -flank : flank + way * FLANK_TURN;
 }
 
 /** Runs from whoever frightened it until it is safe, then heads home. */
@@ -212,7 +265,7 @@ function run(c: Creature, h: Habitat): void {
   const p = h.players.find((x) => x.id === c.fleeing);
   const safe = !p || !p.alive || p.floor !== c.floor || Math.hypot(p.x - c.x, p.y - c.y) > c.def.notice + 6;
   if (safe || h.now > c.fleeUntil || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH * 1.5) return giveUp(c);
-  moveAway(h.map, c, p.x, p.y, speedOf(c) * 1.1);
+  moveAway(h.map, c, p.x, p.y, speedOf(c) * 1.1, amid(c, h));
 }
 
 /** Out of its hours: walks home and sleeps there. */
@@ -220,19 +273,19 @@ function sleep(c: Creature, h: Habitat): void {
   c.target = null;
   const away = c.floor !== c.home.floor || Math.hypot(c.x - c.home.x, c.y - c.home.y) > 0.5;
   // One that cannot find its way home (no stairs back) sleeps where it is.
-  if (away && canReach(h.map, c, c.home) && !goTo(h.map, c, c.home, WANDER_SPEED * (c.pace ?? 1))) return;
+  if (away && canReach(h.map, c, c.home) && !goTo(h.map, c, c.home, WANDER_SPEED * (c.pace ?? 1), false, amid(c, h))) return;
   c.asleep = true;
 }
 
 /** Walks rounds about its spot, corner to corner, pausing at each. */
 function patrol(c: Creature, h: Habitat): void {
   c.route ??= rounds(c, h);
-  if (c.route.length < 2) return wander(h.map, c, WANDER_SPEED * (c.pace ?? 1), WANDER_RADIUS, h.random);
+  if (c.route.length < 2) return wander(h.map, c, WANDER_SPEED * (c.pace ?? 1), WANDER_RADIUS, h.random, c.home, amid(c, h));
   if (c.rest-- > 0) return;
   const to = c.route[c.leg % c.route.length]!;
   const before = { x: c.x, y: c.y };
   // A creature that cannot get round the corner (something stands in the way) tries the next one.
-  if (moveToward(h.map, c, to.x, to.y, WANDER_SPEED * (c.pace ?? 1)) || (c.x === before.x && c.y === before.y)) {
+  if (moveToward(h.map, c, to.x, to.y, WANDER_SPEED * (c.pace ?? 1), amid(c, h)) || stalled(before, c, to)) {
     c.leg = (c.leg + 1) % c.route.length;
     c.rest = Math.floor(TICK_RATE / 2);
   }

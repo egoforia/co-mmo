@@ -5,6 +5,7 @@
 import type { Light } from './light.ts';
 import { SLEEPING_ABILITIES } from './mods.ts';
 import type { Active } from './sky.ts';
+import type { CreatureSizeTier } from './walk.ts';
 import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
 import type { MaterialInfo } from './materials.ts';
@@ -667,6 +668,8 @@ export interface CreatureDef {
   gold: [number, number];
   drops: Drop[];
   respawnSeconds: number;
+  /** How big it stands (walk.ts tiers): its body's width (hit-boxes.ts) and reach. Medium, a player's size, unless said. */
+  size?: CreatureSizeTier;
 }
 
 /** A defeated creature's body stays this long, in seconds, for its finders to search. */

@@ -1,4 +1,6 @@
 import { walkOn, type Placed } from './floors.ts';
+import { PERSON_RADIUS, bodyList, creatureRadius, type Among, type HitBody } from './hit-boxes.ts';
+import type { CreatureState } from './protocol.ts';
 import type { Vec2 } from './movement.ts';
 import type { RegionMap } from './world.ts';
 
@@ -13,7 +15,8 @@ export interface PendingInput {
  * immediately, and each server snapshot rewinds to the authoritative
  * position and replays the inputs the server has not applied yet. Stairs
  * are taken here exactly as the server takes them (walkOn), so the floor
- * changes on the same step on both.
+ * changes on the same step on both. Creatures stop it where the last
+ * snapshot showed them (hit-boxes.ts), as the server stops the player.
  */
 export class Predictor {
   private pending: PendingInput[] = [];
@@ -21,6 +24,8 @@ export class Predictor {
   position: Placed;
   /** Share of full speed our statuses allow (paceOf), as the last snapshot said; the server applies the same. */
   pace = 1;
+  /** Creatures in the way, where the last snapshot showed them (bodiesSeen). */
+  bodies: HitBody[] = [];
 
   /**
    * `lastSeq` carries numbering over when the player changes region, since
@@ -51,7 +56,7 @@ export class Predictor {
   apply(dx: number, dy: number): PendingInput {
     const input = { seq: ++this.seq, dx, dy };
     this.pending.push(input);
-    this.position = walkOn(this.map, this.position, dx, dy, this.pace);
+    this.position = walkOn(this.map, this.position, dx, dy, this.pace, this.among(this.position.floor));
     return input;
   }
 
@@ -59,13 +64,23 @@ export class Predictor {
   reconcile(ack: number, server: Vec2 & { floor?: number }): void {
     this.pending = this.pending.filter((i) => i.seq > ack);
     let pos: Placed = { x: server.x, y: server.y, floor: server.floor ?? 0 };
-    for (const input of this.pending) pos = walkOn(this.map, pos, input.dx, input.dy, this.pace);
+    for (const input of this.pending) pos = walkOn(this.map, pos, input.dx, input.dy, this.pace, this.among(pos.floor));
     this.position = pos;
+  }
+
+  /** Our player among the bodies about them, on their floor. */
+  private among(floor: number): Among | undefined {
+    return this.bodies.length ? { self: { r: PERSON_RADIUS, kind: 'player', floor }, bodies: bodyList(this.bodies) } : undefined;
   }
 
   get unacknowledged(): number {
     return this.pending.length;
   }
+}
+
+/** The bodies a snapshot shows that stand in a player's way: its creatures (people make way, players pass through). */
+export function bodiesSeen(creatures: CreatureState[] = []): HitBody[] {
+  return creatures.map((c): HitBody => ({ x: c.x, y: c.y, floor: c.floor ?? 0, r: creatureRadius(c.size), kind: 'creature' }));
 }
 
 interface Sample {

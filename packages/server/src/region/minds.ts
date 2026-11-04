@@ -3,6 +3,7 @@ import { forget, think, type Creature, type Habitat, type Prey } from '../creatu
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { Combat } from './combat.ts';
 import type { CombatLogger } from './combat-logger.ts';
+import type { Crowd } from './crowd.ts';
 import type { Gauges } from './gauges.ts';
 import type { Paths } from './paths/index.ts';
 import type { PlayerState, RegionState } from './state.ts';
@@ -20,6 +21,8 @@ export class Minds {
     private readonly gauges: Gauges,
     private readonly combat: Pick<Combat, 'strike'>,
     private readonly paths: Paths,
+    /** Everyone standing in the region this tick, so nobody walks into anyone (hit-boxes.ts). */
+    private readonly crowd?: Crowd,
   ) {}
 
   /**
@@ -38,7 +41,7 @@ export class Minds {
 
   /** NPCs go about their day, but wait while someone is close enough to talk. */
   live(phase: number): void {
-    for (const n of this.s.townsfolk) live(n, { map: this.s.map, random: this.s.random, phase, listening: this.listening(n) });
+    for (const n of this.s.townsfolk) live(n, { map: this.s.map, random: this.s.random, phase, listening: this.listening(n), bodies: this.crowd?.bodies });
   }
 
   /** The land as its creatures find it this tick. */
@@ -50,7 +53,7 @@ export class Minds {
       players.push({ id: p.info.id, x: p.x, y: p.y, floor: p.floor, alive: p.character.hp > 0 && !this.paths.hidden(p, now), lit });
     }
     return {
-      map: this.s.map, now, tick: this.s.tickCount, random: this.s.random, phase, weather, players, creatures: this.s.creatures,
+      map: this.s.map, now, tick: this.s.tickCount, random: this.s.random, phase, weather, players, creatures: this.s.creatures, bodies: this.crowd?.bodies,
       hurt: (c, id) => {
         const p = this.s.players.get(id);
         if (p) this.hurt(p, c, now);

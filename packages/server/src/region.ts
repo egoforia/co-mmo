@@ -74,6 +74,7 @@ import { inspectEntity } from './region/inspect.ts';
 import { Kit } from './region/kit.ts';
 import { Gathering } from './region/gathering.ts';
 import { Minds } from './region/minds.ts';
+import { Crowd, spreadHomes } from './region/crowd.ts';
 import { Quests } from './region/quests.ts';
 import { RegionState, type Body, type PlayerState } from './region/state.ts';
 import { afflictCreature, afflictPlayer, type StatusFrom } from './region/statuses.ts';
@@ -228,6 +229,8 @@ export class Region {
   private readonly talk: Chat;
   private readonly fallen: Fallen;
   private readonly paths: Paths;
+  /** Who stands where this tick (hit-boxes.ts): nobody walks into anyone. */
+  private readonly crowd: Crowd;
   /** The weather over this land as players last heard it. */
   private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
@@ -262,11 +265,13 @@ export class Region {
     this.paths = new Paths(this.s, this.gauges, () => this.combat);
     this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen, this.paths);
     this.combat.logger = this.logger;
-    this.minds = new Minds(this.s, this.gauges, this.combat, this.paths);
+    this.crowd = new Crowd(this.s, (p) => p.character.hp <= 0 || this.fallen.is(p) || this.paths.hidden(p, this.now()));
+    this.minds = new Minds(this.s, this.gauges, this.combat, this.paths, this.crowd);
     this.minds.logger = this.logger;
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
+    spreadHomes(this.map, this.s.creatures);
     this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
       character: (id) => this.s.players.get(id)?.character,
@@ -317,6 +322,7 @@ export class Region {
   /** Places a wished creature kind at these spots; `n` keeps a spot's number when a cell gets only some of them. */
   addCreatures(kind: string, spots: { x: number; y: number; n?: number }[]): void {
     spots.forEach((s, i) => this.s.creatures.push(...this.makeCreature(`${kind}-${s.n ?? i}`, kind, s.x, s.y)));
+    spreadHomes(this.map, this.s.creatures);
   }
 
   /** Places a wished NPC, who strolls about that spot. */
@@ -727,6 +733,8 @@ export class Region {
     this.s.tickCount++;
     const now = this.now();
 
+    phase('crowd', () => this.crowd.gather(this.ghosts.values()));
+
     const departures = phase('inputs', () => {
       const list: Departure[] = [];
       for (const p of this.s.players.values()) {
@@ -738,7 +746,8 @@ export class Region {
             continue;
           }
           // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
-          const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now));
+          // Creatures stand in the way; people make way and players pass through (hit-boxes.ts).
+          const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now), this.crowd.forPlayer(p));
           if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
           const len = Math.hypot(input.dx, input.dy);
           if (len > 0) p.facing = { dx: input.dx / len, dy: input.dy / len };

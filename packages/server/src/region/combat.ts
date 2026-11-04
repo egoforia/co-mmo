@@ -1,4 +1,5 @@
 import {
+  sizeReach,
   ABILITIES,
   MARK_BONUS,
   abilityAmount,
@@ -117,10 +118,10 @@ export class Combat implements EffectKit {
     }
   }
 
-  /** Live creatures on the player's floor within `range` of a point, nearest first. */
+  /** Live creatures on the player's floor within `range` of a point (of their edge, for big ones), nearest first. */
   creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[] {
     return this.s.creatures
-      .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) <= range)
+      .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) - sizeReach(c.def.size) <= range)
       .sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
   }
 
@@ -130,13 +131,17 @@ export class Combat implements EffectKit {
     c.lastAttack = Math.max(c.lastAttack, this.s.now() - rest) + rest;
   }
 
-  /** The nearest live creature within reach, or the one asked for if it is in reach. */
+  /**
+   * The nearest live creature within reach, or the one asked for if it is in
+   * reach. A big creature is reached at its edge: its body keeps players
+   * farther from its middle (hit-boxes.ts).
+   */
   creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined {
     let target: Creature | undefined;
     let best = range;
     for (const c of this.s.creatures) {
       if (c.respawnAt !== null || c.floor !== p.floor || (id && c.id !== id)) continue;
-      const d = Math.hypot(c.x - p.x, c.y - p.y);
+      const d = Math.hypot(c.x - p.x, c.y - p.y) - sizeReach(c.def.size);
       if (d <= best) {
         best = d;
         target = c;

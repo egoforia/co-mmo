@@ -83,15 +83,16 @@ export function viewPrompt(name: string, gear: Carried[], direction: IsoWay, ref
 
 /**
  * The prompt for painting a look standing in all four isometric ways at
- * once, side by side in ISO_WAYS order: painted together, the four keep one
+ * once, side by side in turntable order (clockwise: front-left, front-right,
+ * back-right, back-left): painted together, the four keep one
  * look (one picture per way drifted in colours and details).
  */
-export function waysSheetPrompt(name: string, gear: Carried[], references = 1): string {
+export function waysSheetPrompt(name: string, gear: Carried[], references = 1, order: readonly IsoWay[] = TURNTABLE_WAYS): string {
   const from = references > 1 ? `from the ${references} reference images alone (all of them show ${name})` : 'from the reference image alone';
   return [
     STYLE.base,
     `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the same size and standing on the same line, evenly spaced with wide empty gaps so no two touch. From left to right:`,
-    ...ISO_WAYS.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
+    ...order.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
     `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`,
     'Paint them in the style described above, even where the reference images are painted in another style.',
     `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
@@ -99,8 +100,8 @@ export function waysSheetPrompt(name: string, gear: Carried[], references = 1): 
   ].join('\n');
 }
 
-/** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to ISO_WAYS or custom order such as TURNTABLE_WAYS). */
-export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = ISO_WAYS): Promise<Record<IsoWay, Buffer>> {
+/** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to TURNTABLE_WAYS: Col 0 front-left, Col 1 front-right, Col 2 back-right, Col 3 back-left). */
+export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = TURNTABLE_WAYS): Promise<Record<IsoWay, Buffer>> {
   const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
   const clean = await removeKeySpill(png);
   const count = await countFigures(clean, { dropEdgeBits: true });

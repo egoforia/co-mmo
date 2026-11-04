@@ -132,6 +132,107 @@ function box(asset: KitAsset): { width: number; height: number } {
  * to repeat without seams; a sprite has its key background removed and is
  * fitted to its box. Writes `<id>.png` into `outDir`.
  */
+export interface ResolveRefOptions {
+  anchorDir: string;
+  outDir?: string;
+  artDir?: string;
+  readArt?: (file: string) => Promise<Buffer>;
+  nameOf?: (id: string) => Promise<string> | string;
+}
+
+/** Resolves reference image data and display label from assetId, versionId, or ref hash. */
+export async function resolveReferenceImage(
+  ref: string,
+  options: ResolveRefOptions,
+): Promise<{ data: Buffer; label: string } | undefined> {
+  const { anchorDir, outDir, artDir, readArt, nameOf } = options;
+  let data: Buffer | undefined;
+  let label = ref;
+
+  if (ref.startsWith('ref:')) {
+    const hash = ref.slice(4);
+    const refPath = artDir
+      ? resolve(artDir, 'references', `${hash}.png`)
+      : outDir
+        ? resolve(outDir, '..', 'references', `${hash}.png`)
+        : undefined;
+    if (refPath) data = await readFile(refPath).catch(() => undefined);
+    label = `Reference ${hash.slice(0, 6)}`;
+  } else {
+    const [assetId, versionId] = ref.includes('@') ? ref.split('@', 2) : [ref, undefined];
+    const baseLabel = nameOf ? (await nameOf(assetId!)) : pictureName(assetId!);
+
+    if (versionId === 'shipped') {
+      label = `${baseLabel} (Shipped)`;
+      for (const path of [
+        resolve(anchorDir, `${assetId}.png`),
+        resolve(anchorDir, 'raw', `${assetId}.png`),
+      ]) {
+        data = await readFile(path).catch(() => undefined);
+        if (data) break;
+      }
+      if (!data && readArt) {
+        data = await readArt(`assets/anchors/${assetId}.png`).catch(() => undefined)
+          ?? await readArt(`art/${assetId}.png`).catch(() => undefined);
+      }
+    } else if (versionId && versionId !== 'current') {
+      label = `${baseLabel} (${versionId})`;
+      const histDir = artDir
+        ? resolve(artDir, 'history', assetId!.replace(/:/g, '~'))
+        : outDir
+          ? resolve(outDir, '..', 'history', assetId!.replace(/:/g, '~'))
+          : undefined;
+      if (histDir) {
+        for (const file of [`${versionId}.png`, `${versionId}.webp`]) {
+          data = await readFile(resolve(histDir, file)).catch(() => undefined);
+          if (data) break;
+        }
+      }
+      if (!data && readArt) {
+        data = await readArt(`wished-art/history/${assetId!.replace(/:/g, '~')}/${versionId}.png`).catch(() => undefined)
+          ?? await readArt(`wished-art/history/${assetId!.replace(/:/g, '~')}/${versionId}.webp`).catch(() => undefined);
+      }
+    } else {
+      // Current / latest version: check outDir / redone FIRST!
+      label = baseLabel;
+      const redoneDirs = [
+        outDir,
+        artDir ? resolve(artDir, 'redone') : undefined,
+        artDir,
+      ].filter(Boolean) as string[];
+      for (const dir of redoneDirs) {
+        for (const path of [resolve(dir, `${assetId}.png`), resolve(dir, 'raw', `${assetId}.png`)]) {
+          data = await readFile(path).catch(() => undefined);
+          if (data) break;
+        }
+        if (data) break;
+      }
+      if (!data && readArt) {
+        data = await readArt(`wished-art/redone/${assetId}.png`).catch(() => undefined)
+          ?? await readArt(`wished-art/${assetId}.png`).catch(() => undefined);
+      }
+      // Fallback to shipped anchors only if not redone yet
+      if (!data) {
+        for (const path of [
+          resolve(anchorDir, `${assetId}.png`),
+          resolve(anchorDir, 'raw', `${assetId}.png`),
+        ]) {
+          data = await readFile(path).catch(() => undefined);
+          if (data) break;
+        }
+        if (!data && readArt) {
+          data = await readArt(`assets/anchors/${assetId}.png`).catch(() => undefined)
+            ?? await readArt(`art/${assetId}.png`).catch(() => undefined)
+            ?? await readArt(assetId!).catch(() => undefined);
+        }
+      }
+    }
+  }
+
+  if (!data) return undefined;
+  return { data, label };
+}
+
 export async function paintKitAsset(
   asset: KitAsset,
   provider: ImageProvider,
@@ -153,81 +254,17 @@ export async function paintKitAsset(
   const labels: string[] = [];
   const refList = extra.references ?? asset.references ?? [];
   for (const ref of refList) {
-    let data: Buffer | undefined;
-    let label = ref;
-    if (ref.startsWith('ref:')) {
-      const hash = ref.slice(4);
-      const refPath = extra.artDir
-        ? resolve(extra.artDir, 'references', `${hash}.png`)
-        : resolve(outDir, '..', 'references', `${hash}.png`);
-      data = await readFile(refPath).catch(() => undefined);
-      label = `Reference ${hash.slice(0, 6)}`;
-    } else {
-      const [assetId, versionId] = ref.includes('@') ? ref.split('@', 2) : [ref, undefined];
-      const baseLabel = extra.nameOf ? (await extra.nameOf(assetId!)) : pictureName(assetId!);
-
-      if (versionId === 'shipped') {
-        // Shipped original anchor explicitly requested
-        label = `${baseLabel} (Shipped)`;
-        for (const path of [
-          resolve(anchorDir, `${assetId}.png`),
-          resolve(anchorDir, 'raw', `${assetId}.png`),
-        ]) {
-          data = await readFile(path).catch(() => undefined);
-          if (data) break;
-        }
-        if (!data && extra.readArt) {
-          data = await extra.readArt(`assets/anchors/${assetId}.png`).catch(() => undefined)
-            ?? await extra.readArt(`art/${assetId}.png`).catch(() => undefined);
-        }
-      } else if (versionId && versionId !== 'current') {
-        // Specific history version requested (e.g. mw2hffyk)
-        label = `${baseLabel} (${versionId})`;
-        const histDir = extra.artDir
-          ? resolve(extra.artDir, 'history', assetId!.replace(/:/g, '~'))
-          : resolve(outDir, '..', 'history', assetId!.replace(/:/g, '~'));
-        for (const file of [`${versionId}.png`, `${versionId}.webp`]) {
-          data = await readFile(resolve(histDir, file)).catch(() => undefined);
-          if (data) break;
-        }
-        if (!data && extra.readArt) {
-          data = await extra.readArt(`wished-art/history/${assetId!.replace(/:/g, '~')}/${versionId}.png`).catch(() => undefined)
-            ?? await extra.readArt(`wished-art/history/${assetId!.replace(/:/g, '~')}/${versionId}.webp`).catch(() => undefined);
-        }
-      } else {
-        // Current / latest version: check outDir (redone / painted in art studio) FIRST!
-        label = baseLabel;
-        for (const path of [
-          resolve(outDir, `${assetId}.png`),
-          resolve(outDir, 'raw', `${assetId}.png`),
-        ]) {
-          data = await readFile(path).catch(() => undefined);
-          if (data) break;
-        }
-        if (!data && extra.readArt) {
-          data = await extra.readArt(`wished-art/redone/${assetId}.png`).catch(() => undefined);
-        }
-        // Fallback to shipped anchors only if not redone yet
-        if (!data) {
-          for (const path of [
-            resolve(anchorDir, `${assetId}.png`),
-            resolve(anchorDir, 'raw', `${assetId}.png`),
-          ]) {
-            data = await readFile(path).catch(() => undefined);
-            if (data) break;
-          }
-          if (!data && extra.readArt) {
-            data = await extra.readArt(`assets/anchors/${assetId}.png`).catch(() => undefined)
-              ?? await extra.readArt(`art/${assetId}.png`).catch(() => undefined)
-              ?? await extra.readArt(assetId!).catch(() => undefined);
-          }
-        }
-      }
-    }
-    if (!data) continue;
-    references.push({ mimeType: 'image/png', data });
+    const resolved = await resolveReferenceImage(ref, {
+      anchorDir,
+      outDir,
+      artDir: extra.artDir,
+      readArt: extra.readArt,
+      nameOf: extra.nameOf,
+    });
+    if (!resolved) continue;
+    references.push({ mimeType: 'image/png', data: resolved.data });
     sent.push(ref);
-    labels.push(label);
+    labels.push(resolved.label);
   }
   const words = buildPrompt(asset, paintedFootprint(asset.id, asset.kind));
   const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${words}\nAlso: ${extra.note.trim()}` : words;

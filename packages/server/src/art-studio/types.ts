@@ -116,7 +116,7 @@ export type ArtAsk =
   | { kind: 'group'; group: string }
   | { kind: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   /** The isometric ways one walker, or every walker, has no standing picture for yet. */
-  | { kind: 'ways'; walker?: string }
+  | { kind: 'ways'; walker?: string; note?: string; prompt?: string; references?: string[] }
   | { kind: 'clip'; walker: string; body: string; direction: Facing; prompt?: string }
   | { kind: 'sound'; sound: string; note?: string }
   | { kind: 'normal'; asset: string; prompt?: string }

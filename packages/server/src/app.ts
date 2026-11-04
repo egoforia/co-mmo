@@ -328,7 +328,7 @@ export function createApp(options: AppOptions): App {
     wish: (request) => wishes.resumePaint(request),
     repaint: (request) => artStudio.repaint(request.asset, request.note),
     view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt, request.from),
-    ways: (request) => artStudio.paintWays(request.walker),
+    ways: (request) => artStudio.paintWays(request.walker, request.note, request.references),
     clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),
     sheet: (request) => artStudio.paintSheet(request.look, request.textures, request.note),
   });

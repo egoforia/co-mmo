@@ -9,6 +9,7 @@ import { DEFAULT_VIDEO_MODEL, videoUsd, type VideoProvider } from './assets/vide
 import { checkWalk } from './assets/walk-checks.ts';
 import { normalizeWalk } from './assets/walk-frames.ts';
 import { LOOK_GEAR, soleFigure, type Carried, startFrame, videoFrames, viewPrompt, walkFromFrames, walkVideoPrompt, waysFromSheet, waysSheetPrompt } from './assets/walk-video.ts';
+import { resolveReferenceImage } from './assets/wild-kit.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource } from './art-jobs.ts';
 import { ArtHistory, historyFolder, type ArtVersion } from './art-history.ts';
@@ -211,15 +212,22 @@ export class WalkPainter {
 
   /** A walker for one of the approved anchors: a player look, a creature or a person. */
   anchorWalker(id: string, body = 'two-legged'): Walker {
-    const anchor = ANCHORS.find((a) => a.id === id);
+    const [baseId] = id.split('@');
+    const anchor = ANCHORS.find((a) => a.id === baseId);
     return {
-      id,
+      id: baseId!,
       name: anchor?.name ?? 'the hero',
-      gear: LOOK_GEAR[id] ?? [],
+      gear: LOOK_GEAR[baseId!] ?? [],
       body,
       reference: async () => {
-        const raw = await readFile(resolve(this.options.anchorDir, 'raw', `${id}.png`)).catch(() => undefined);
-        return raw ?? readFile(resolve(this.options.anchorDir, `${id}.png`));
+        const resolved = await resolveReferenceImage(id, {
+          anchorDir: this.options.anchorDir,
+          artDir: this.options.artDir,
+          outDir: resolve(this.options.artDir, 'redone'),
+        });
+        if (resolved) return resolved.data;
+        const raw = await readFile(resolve(this.options.anchorDir, 'raw', `${baseId}.png`)).catch(() => undefined);
+        return raw ?? readFile(resolve(this.options.anchorDir, `${baseId}.png`));
       },
     };
   }
@@ -238,10 +246,10 @@ export class WalkPainter {
   }
 
   /** Exactly what painting a walker's four isometric ways together on one sheet would send. */
-  async previewWays(walker: Walker): Promise<Recipe> {
+  async previewWays(walker: Walker, prompt?: string, customRefs?: { data: Buffer; label: string }[]): Promise<Recipe> {
     const image = this.options.provider();
     if (!image) throw new Error(stopReason(this.options));
-    const step = await this.options.recipes!.imageStep(`${walker.name} standing in the four isometric ways, side by side`, image, await this.waysRequest(walker), estimateImageUsd(image.model));
+    const step = await this.options.recipes!.imageStep(`${walker.name} standing in the four isometric ways, side by side`, image, await this.waysRequest(walker, prompt, customRefs), estimateImageUsd(image.model));
     return {
       at: Date.now(),
       steps: [step],
@@ -299,13 +307,13 @@ export class WalkPainter {
    * sheet and keeps each as that way's standing picture; the pictures they
    * replace are kept as versions.
    */
-  async paintWays(walker: Walker, handle?: ArtJobHandle): Promise<boolean> {
+  async paintWays(walker: Walker, handle?: ArtJobHandle, prompt?: string, customRefs?: { data: Buffer; label: string }[]): Promise<boolean> {
     handle?.start();
     let usd = 0;
     for (let attempt = 0; attempt < 2; attempt++) {
       const provider = this.options.provider();
       if (!provider || this.options.overBudget()) return handle?.skip(stopReason(this.options)), false;
-      const request = await this.waysRequest(walker);
+      const request = await this.waysRequest(walker, prompt, customRefs);
       const image = await watched(provider, handle).generate(request);
       const cost = imageUsd(provider.model, image);
       usd += cost;
@@ -482,11 +490,28 @@ export class WalkPainter {
 
 
   /** What painting the four isometric ways on one sheet sends: the approved picture, and the sheet's words. */
-  private async waysRequest(walker: Walker): Promise<ImageRequest> {
+  private async waysRequest(walker: Walker, prompt?: string, customRefs?: { data: Buffer; label: string }[]): Promise<ImageRequest> {
+    const refs: ImageRequest['references'] = [];
+    const labels: string[] = [];
+
+    if (customRefs && customRefs.length > 0) {
+      for (const ref of customRefs) {
+        refs.push({ mimeType: 'image/png', data: ref.data });
+        labels.push(ref.label);
+      }
+    } else {
+      refs.push({ mimeType: 'image/png', data: await this.onMagenta(walker) });
+      labels.push(`${walker.name}'s approved picture, on magenta`);
+    }
+
+    const fullPrompt = prompt
+      ? (prompt.includes('Stylised low-poly') ? prompt : `${waysSheetPrompt(walker.name, walker.gear, refs.length)}\n\n${prompt}`)
+      : waysSheetPrompt(walker.name, walker.gear, refs.length);
+
     return {
-      prompt: waysSheetPrompt(walker.name, walker.gear),
-      references: [{ mimeType: 'image/png', data: await this.onMagenta(walker) }],
-      labels: [`${walker.name}'s approved picture, on magenta`],
+      prompt: fullPrompt,
+      references: refs,
+      labels,
       edit: true,
       // Four standing figures in a row, with room between them.
       aspectRatio: '16:9',

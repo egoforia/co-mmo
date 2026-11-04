@@ -40,7 +40,8 @@ import type { KitSheetView } from './assets/building-kit/kit-sheets.ts';
 import type { KitAsset } from './assets/kit.ts';
 import { seaCaveBox } from './assets/sea-cave-kit.ts';
 import { homeLandBox } from './assets/home-land-art.ts';
-import { paintKitAsset } from './assets/wild-kit.ts';
+import { KEY_COLOR } from './assets/style.ts';
+import { paintKitAsset, resolveReferenceImage } from './assets/wild-kit.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import type { BudgetState } from './budget.ts';
 import { fitNormalMap, normalMapId } from './normal-painter.ts';
@@ -293,7 +294,7 @@ export class ArtStudio {
    * Paints the four isometric ways of one walker, or of every walker missing
    * some, together on one sheet a walker, so each walker keeps one look.
    */
-  async paintWays(walkerId?: string): Promise<{ estimateUsd: number; count: number }> {
+  async paintWays(walkerId?: string, note?: string, references?: string[]): Promise<{ estimateUsd: number; count: number }> {
     this.refuseWhenSpent();
     const image = this.options.ai.image('walks');
     if (!image) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');
@@ -302,7 +303,26 @@ export class ArtStudio {
     const usd = estimateImageUsd(image.model);
     for (const walker of todo) {
       const handle = this.options.jobs.add(`${walker.id}-ways`, `${walker.name} standing in the four isometric ways`, 'picture', 'gods-view', usd);
-      this.enqueue(() => this.options.walks.paintWays(walker, handle), handle, { kind: 'ways', walker: walker.id });
+      this.enqueue(async () => {
+        let customRefBuffers: { data: Buffer; label: string }[] | undefined;
+        if (references && references.length > 0) {
+          customRefBuffers = [];
+          for (const ref of references) {
+            const resolved = await resolveReferenceImage(ref, {
+              anchorDir: this.options.anchorDir,
+              artDir: this.options.artDir,
+              outDir: this.redoneDir,
+              readArt: this.options.readArt,
+              nameOf: (id) => this.catalog.nameOf(id),
+            });
+            if (resolved) {
+              const magentaBuf = await sharp(resolved.data).flatten({ background: KEY_COLOR.hex }).png().toBuffer();
+              customRefBuffers.push({ data: magentaBuf, label: `${resolved.label}'s approved picture, on magenta` });
+            }
+          }
+        }
+        return this.options.walks.paintWays(walker, handle, note, customRefBuffers);
+      }, handle, { kind: 'ways', walker: walker.id, note, references });
     }
     return { estimateUsd: usd * todo.length, count: todo.length };
   }
@@ -442,7 +462,7 @@ export class ArtStudio {
 
   private async again(request: PaintRequest): Promise<unknown> {
     if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
-    if (request.kind === 'ways') return this.paintWays(request.walker);
+    if (request.kind === 'ways') return this.paintWays(request.walker, request.note, request.references);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
     if (request.kind === 'repaint') return this.repaint(request.asset, request.note, request.references);
     if (request.kind === 'sheet') return this.paintSheet(request.look, request.textures, request.note);

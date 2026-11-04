@@ -154,4 +154,81 @@ describe('walk painter', () => {
     expect(painter.manifest()).toEqual({});
     expect(Object.keys(await painter.standingManifest())).toEqual([walkStandArt('player-mara', 'front-left')]);
   }, 60_000);
+
+  it('uses current redone version of an anchor walker for ways painting and reference resolution', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'walks-'));
+    const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');
+    await mkdir(join(anchorDir, 'raw'), { recursive: true });
+    await mkdir(join(artDir, 'redone'), { recursive: true });
+
+    // Shipped anchor: red figure
+    const shippedPng = await sharp({
+      create: { width: 100, height: 100, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
+    }).png().toBuffer();
+    await writeFile(join(anchorDir, 'raw', 'sanctum-pilgrim.png'), shippedPng);
+
+    // Redone current version: blue figure
+    const redonePng = await sharp({
+      create: { width: 100, height: 100, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 1 } },
+    }).png().toBuffer();
+    await writeFile(join(artDir, 'redone', 'sanctum-pilgrim.png'), redonePng);
+
+    const asked: ImageRequest[] = [];
+    const images: ImageProvider = {
+      id: 'gemini',
+      model: 'gemini-3.1-flash-image',
+      generate: async (r) => {
+        asked.push(r);
+        return { mimeType: 'image/png', data: shippedPng };
+      },
+    };
+    const recipes = {
+      imageStep: async (_title: string, _provider: any, request: ImageRequest, usd: number) => ({
+        title: _title,
+        kind: 'image' as const,
+        provider: 'gemini',
+        model: 'gemini-3.1-flash-image',
+        prompt: request.prompt,
+        pictures: (request.references ?? []).map((ref, i) => ({
+          name: request.labels?.[i] ?? `ref-${i}`,
+          data: ref.data,
+          mimeType: ref.mimeType,
+        })),
+        usd,
+      }),
+    };
+
+    const painter = new WalkPainter({
+      provider: () => images,
+      video: () => undefined,
+      overBudget: () => false,
+      spend: () => {},
+      spendVideo: () => {},
+      anchorDir,
+      artDir,
+      shipped: async () => ({}),
+      recipes: recipes as any,
+    });
+    await painter.load();
+
+    const amala = painter.anchorWalker('sanctum-pilgrim');
+    // anchorWalker reference() returns the redone image (blue), not the shipped one (red)
+    const refData = await amala.reference();
+    expect(refData).toEqual(redonePng);
+
+    // previewWays passes the redone image on magenta
+    const preview = await painter.previewWays(amala);
+    expect(preview.steps).toHaveLength(1);
+    const sentRef = (preview.steps[0]!.pictures[0] as any).data;
+    // Flattened on magenta: red should be 0, blue should be 255 in the pixel
+    const rawPixels = await sharp(sentRef).raw().toBuffer();
+    // In our blue 100x100 square, first pixel has blue 255
+    expect(rawPixels[0]).toBe(0); // r
+    expect(rawPixels[2]).toBe(255); // b
+
+    // Explicitly requesting shipped anchor uses the shipped version
+    const shippedWalker = painter.anchorWalker('sanctum-pilgrim@shipped');
+    const shippedRef = await shippedWalker.reference();
+    expect(shippedRef).toEqual(shippedPng);
+  });
 });

@@ -2,6 +2,7 @@ import { BUILDING_STYLES } from './buildings.ts';
 import { hashString, rand2 } from './random.ts';
 import { setPiece } from './sea-cave-kit.ts';
 import { MAX_FLOORS, buildFloors } from './floors.ts';
+import { SPOTS } from './gathering.ts';
 import { block, building, isBlocking, road, set, Tile, type Building, type Landmark, type RegionMap } from './world.ts';
 
 // The Owner and Stewards edit the world in the game: move a tree or a set
@@ -45,7 +46,9 @@ export type WorldEditDraft =
   /** Gives the building over `at` floors above and below the ground (floors.ts), joined by stairs or ladders; 0 and 0 takes them off. */
   | { kind: 'floors'; at: TilePoint; up: number; down: number; ladders?: boolean }
   /** Gives the set piece or piece of furniture over `at` the tiles it blocks and stands on, still centred under its picture (the Art tab's hit boxes). */
-  | { kind: 'footprint'; at: TilePoint; footprint: [width: number, height: number] };
+  | { kind: 'footprint'; at: TilePoint; footprint: [width: number, height: number] }
+  /** Stands a gathering spot of a kind (gathering.ts) on a tile, or takes away the one there when `spot` is null. */
+  | { kind: 'spot'; spot: string | null; at: TilePoint };
 
 /** Who made an edit and when, plus a spawn's name and picture, filled in by the server. */
 export interface EditStamp {
@@ -96,7 +99,12 @@ export function applyEdits(map: RegionMap, edits: readonly WorldEdit[]): void {
 export function applyEdit(map: RegionMap, edit: WorldEdit): void {
   switch (edit.kind) {
     case 'paint':
-      return paint(map, edit.tile, edit.tiles);
+      paint(map, edit.tile, edit.tiles);
+      // A spot painted over is gone.
+      map.spots = map.spots.filter((p) => tileOf(map, [p.x, p.y]) === Tile.Blocked);
+      return;
+    case 'spot':
+      return placeSpot(map, edit);
     case 'move':
       return move(map, edit.from, edit.to);
     case 'road':
@@ -118,6 +126,22 @@ export function applyEdit(map: RegionMap, edit: WorldEdit): void {
     case 'footprint':
       return refit(map, edit.at, edit.footprint);
   }
+}
+
+/** Stands a gathering spot on its tile, or takes the one there away. */
+function placeSpot(map: RegionMap, edit: Extract<WorldEdit, { kind: 'spot' }>): void {
+  const [x, y] = edit.at;
+  const here = (p: { x: number; y: number }) => p.x === x && p.y === y;
+  if (edit.spot === null) {
+    if (!map.spots.some(here)) return;
+    map.spots = map.spots.filter((p) => !here(p));
+    set(map, x, y, Tile.Ground);
+    return;
+  }
+  const t = tileOf(map, edit.at);
+  if (!SPOTS[edit.spot] || map.spots.some(here) || (t !== Tile.Ground && t !== Tile.Path)) return;
+  map.spots.push({ id: edit.id, kind: edit.spot, x, y });
+  set(map, x, y, Tile.Blocked);
 }
 
 /** The building whose walls stand over a tile. */
@@ -187,6 +211,14 @@ export function checkEdit(map: RegionMap, edit: WorldEditDraft, creatures: Recor
       // Tried on a copy: the stairs need room on every floor they join.
       const copy = { ...map, storeys: [...map.storeys], stairways: [...map.stairways] };
       return buildFloors(copy, b, edit.up, edit.down, edit.ladders ? 'ladder' : 'stairs') ? undefined : 'There is no room for the stairs in this building. Move some furniture, or try a bigger one.';
+    }
+    case 'spot': {
+      if (!inside(edit.at)) return off;
+      const there = map.spots.some((p) => p.x === edit.at[0] && p.y === edit.at[1]);
+      if (edit.spot === null) return there ? undefined : 'There is no gathering spot there.';
+      if (typeof edit.spot !== 'string' || !SPOTS[edit.spot]) return 'There is no gathering spot of that kind.';
+      if (there) return 'A gathering spot already stands there.';
+      return tileOf(map, edit.at) === Tile.Ground || tileOf(map, edit.at) === Tile.Path ? undefined : 'Gathering spots stand on open ground. Pick another spot.';
     }
     case 'footprint': {
       if (!inside(edit.at)) return off;

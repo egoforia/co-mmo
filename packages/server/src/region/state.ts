@@ -38,6 +38,8 @@ export interface PlayerState {
   y: number;
   /** The floor they are on (floors.ts): 0 the ground. */
   floor: number;
+  /** Gathering at a spot (region/gathering.ts): which, since and until when, and the tool in hand. */
+  gathering?: { spot: string; started: number; until: number; tool: string };
   inputs: { seq: number; dx: number; dy: number }[];
   ack: number;
   chatTimes: number[];

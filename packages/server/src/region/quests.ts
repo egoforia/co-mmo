@@ -36,6 +36,8 @@ export class Quests {
     private readonly looting: Bodies,
     /** Where the day is now (sky.ts dayPhase). */
     private readonly phase: () => number,
+    /** Starts gathering at a spot beside the player; false when there is none (region/gathering.ts). */
+    private readonly gather: (p: PlayerState) => boolean = () => false,
   ) {}
 
   /** Pressing E: an NPC close by talks, else a body is searched, else the land is acted on. */
@@ -52,6 +54,7 @@ export class Quests {
     }
     if (npc) this.s.credit(npc.id, p, 'talk');
     if (!npc && this.looting.search(p)) return;
+    if (!npc && this.gather(p)) return;
     if (!npc) {
       // Nobody to talk to: the player is acting on the land (fishing at water, say).
       const spot = this.s.nearestTile(p.x, p.y, [Tile.Water, Tile.Tree, Tile.Rock], 1.6, p.floor);

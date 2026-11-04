@@ -33,7 +33,7 @@ describe('materials as data', () => {
 
   it('works out each region\'s materials from them', () => {
     for (const def of WORLD_REGIONS) expect(regionMaterials(def.id).length, def.id).toBeGreaterThanOrEqual(3);
-    expect(regionMaterials('frostpeak').sort()).toEqual(['ice-crystal', 'mountain-wool', 'roc-plume', 'snow-hare-fur']);
+    expect(regionMaterials('frostpeak').sort()).toEqual(['frost-pine', 'ice-crystal', 'mountain-wool', 'roc-plume', 'silver-ore', 'snow-hare-fur', 'snowbell']);
     expect(regionMaterials('mushroom-hollow')).toContain('kings-mycelium');
     expect(materialHomes('pearl')).toEqual(['shore']);
     expect(materialHomes('tonic')).toEqual([]);

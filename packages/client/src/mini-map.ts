@@ -15,7 +15,7 @@ import type { MiniMapView } from './world-scene.ts';
 /** How often the map is drawn again, in milliseconds: often enough to follow a walk. */
 const REDRAW_MS = 100;
 /** How tall people are drawn on the map, in its pixels: you a little bigger, so you stand out. */
-const FIGURE_PX = { me: 22, player: 15, npc: 13, creature: 13 } as const;
+const FIGURE_PX = { me: 22, player: 15, npc: 13, creature: 13, spot: 11 } as const;
 /** How much the land below shows through around a floor above it. */
 const BELOW_ALPHA = 0.4;
 

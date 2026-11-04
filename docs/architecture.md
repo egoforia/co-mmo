@@ -143,6 +143,20 @@ which every craft needs in the bag and which wear out now and then. A recipe
 names its craft and level (`RecipeDef.craft`, `level`); a wished one takes
 its main material's craft (`recipeCraft`). Tool pictures are in
 `server/src/assets/craft-tool-anchors.ts`, painted first from the Art tab.
+Shared `gathering.ts` holds the gathering spots: four kinds per shipped
+biome (`SPOTS`), the materials only gathering gives, and `layOutSpots`,
+which `layOut` (world.ts) calls so every land of a biome gets its spots on
+open ground (`RegionMap.spots`, each blocking its tile); the world editor's
+`spot` edit stands or takes one away. The server's `region/gathering.ts`
+starts gathering when E finds no one to talk to or loot beside a spot (the
+right craft's tool, fine enough for the material's tier), finishes it after
+`GATHER_MS` unless the player was hit or walked off, and keeps each player's
+own regrow timer per spot. While gathering, the tool shows in the hand
+(`gather` messages, and `held` in the player view). The browser draws a spot's
+picture, or its material's icon until it is painted
+(`world-scene/regions.ts`), and the Cervid's Mycelial Sense (`sensesSpots`)
+puts spots on the mini map. Spot pictures are in
+`server/src/assets/gather-spot-anchors.ts`.
 Shared `weapons.ts` holds the weapon and off-hand families, damage types,
 creature Armor and Ward, and `trainedIn`, which says whether a Calling is
 trained in a family (`docs/classes.md#weapons`).

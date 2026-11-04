@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import {
   BUILDING_STYLES,
   CREATURES,
+  ITEMS,
+  SPOTS,
   KIT_HOUSE_FLOORS,
   MAX_CLEAR_RADIUS,
   MAX_FLOORS,
@@ -31,7 +33,7 @@ import type { WorldScene } from './world-scene.ts';
 // everyone there; undo takes it back. The outlines it draws over the world
 // are the editor's own marks, seen only while it is open, never game art.
 
-type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'floors' | 'piece' | 'spawn' | 'clear';
+type Tool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'floors' | 'piece' | 'spawn' | 'clear' | 'spot';
 
 const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'look', name: 'Look', hint: 'Point at the world to see what is there.' },
@@ -44,6 +46,7 @@ const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'piece', name: 'Set piece', hint: 'Click open ground or a floor to stand a sea cave piece there. It shows once its picture is painted in the Art tab.' },
   { id: 'spawn', name: 'Monsters', hint: 'Click open ground where the monsters should live. They come back there after they fall.' },
   { id: 'clear', name: 'Clear', hint: 'Click to send away every monster living near that spot.' },
+  { id: 'spot', name: 'Gathering', hint: 'Click open ground to stand a gathering spot there, or choose Take away and click a spot.' },
 ];
 
 const PAINT_NAMES: Record<PaintTile, string> = { ground: 'Ground', path: 'Path', water: 'Water', tree: 'Tree', rock: 'Rock', wall: 'Wall' };
@@ -77,6 +80,8 @@ export class EditorUi {
   private ladders = false;
   private piece = '';
   private creature = '';
+  /** The kind of gathering spot to stand; '' takes one away. */
+  private spot = Object.keys(SPOTS)[0] ?? '';
   private count = 4;
   private radius = 6;
   /** The land whose edits the list shows: the one last edited, or the one we are in. */
@@ -226,6 +231,8 @@ export class EditorUi {
         return void this.act({ edit: { kind: 'spawn', creature: this.creature, at, count: this.count } }, region);
       case 'clear':
         return void this.act({ edit: { kind: 'clear', at, radius: this.radius } }, region);
+      case 'spot':
+        return void this.act({ edit: { kind: 'spot', spot: this.spot || null, at } }, region);
     }
   }
 
@@ -405,6 +412,7 @@ export class EditorUi {
     else if (input.name === 'way') this.ladders = value === 'ladders';
     else if (input.name === 'piece') this.piece = value;
     else if (input.name === 'creature') this.creature = value;
+    else if (input.name === 'spot') this.spot = value;
     else if (input.name === 'count') this.count = Math.max(1, Math.min(MAX_SPAWN, Number(value) || 1));
     else if (input.name === 'radius') this.radius = Math.max(1, Math.min(MAX_CLEAR_RADIUS, Number(value) || 1));
     else if (input.name === 'hitboxes') {
@@ -441,6 +449,7 @@ export class EditorUi {
       spawn: `<label>Monster <select name="creature">${creatures.map(([id, c]) => option(id, `${c.name} (level ${c.level})`, id === this.creature)).join('')}</select></label>
         <label>How many <input name="count" type="number" min="1" max="${MAX_SPAWN}" value="${this.count}" /></label>`,
       clear: `<label>Tiles around <input name="radius" type="number" min="1" max="${MAX_CLEAR_RADIUS}" value="${this.radius}" /></label>`,
+      spot: `<label>Spot <select name="spot">${option('', 'Take away', !this.spot)}${Object.entries(SPOTS).map(([id, d]) => option(id, `${d.name} (${ITEMS[d.material]?.name ?? d.material})`, id === this.spot)).join('')}</select></label>`,
     };
     const edits = [...this.log.edits].reverse().map((e) => `<li><span>${escapeHtml(editWords(e))}</span><span class="by">${escapeHtml(e.by)}</span>
       <button type="button" class="quiet" data-remove="${escapeHtml(e.id)}" aria-label="Take this edit out" title="Take this edit out">×</button></li>`).join('');
@@ -478,6 +487,7 @@ export function editWords(e: WorldEdit): string {
     case 'spawn': return `${e.count} ${e.name ?? e.creature} at ${e.at.join(', ')}`;
     case 'clear': return `Cleared monsters within ${e.radius} of ${e.at.join(', ')}`;
     case 'piece': return `${setPiece(e.piece)?.name ?? 'A set piece'} at ${e.at.join(', ')}`;
+    case 'spot': return e.spot ? `${SPOTS[e.spot]?.name ?? 'A gathering spot'} at ${e.at.join(', ')}` : `Took away the gathering spot at ${e.at.join(', ')}`;
     case 'footprint': return `Footprint of what stands at ${e.at.join(', ')} set to ${e.footprint[0]} × ${e.footprint[1]}`;
     case 'floors': return e.up || e.down ? `${e.up} floor${e.up === 1 ? '' : 's'} up and ${e.down} down by ${e.ladders ? 'ladders' : 'stairs'}, at ${e.at.join(', ')}` : `Took the floors off the building at ${e.at.join(', ')}`;
   }

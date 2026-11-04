@@ -4,6 +4,8 @@
 import Phaser from 'phaser';
 import {
   Tile,
+  ITEMS,
+  SPOTS,
   WINDOW_LIGHT,
   biomeLook,
   buildingKit,
@@ -206,6 +208,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
     };
   });
   placeLandmarks(scene, map, ox, oy, views, floors, art);
+  placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);
   const objects = scene.children.list.filter((o) => !before.has(o));
   const lamps = placeLamps(scene, map, ox, oy, views);
@@ -231,6 +234,27 @@ export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, 
     const [tx, ty] = [Math.floor(l.x), Math.floor(l.y - 0.01)];
     if (l.floor) floorAt(floors, tx, ty, l.floor)?.objects.push(...parts);
     else views.find((v) => within(v.building, tx, ty))?.inside.push(...parts);
+  }
+}
+
+/** The picture a gathering spot shows: its own once painted, else its material's icon. */
+export function spotArt(scene: Phaser.Scene, kind: string): string | undefined {
+  const def = SPOTS[kind];
+  if (!def) return undefined;
+  if (scene.textures.exists(def.art)) return def.art;
+  const m = ITEMS[def.material];
+  return [m?.art, m?.standIn].find((key) => key && scene.textures.exists(key));
+}
+
+/** Gathering spots (gathering.ts), each standing on its tile; a spot painted later draws the land again (`kit`). */
+export function placeSpots(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, art: ArtManifest, kit: Set<string>): void {
+  for (const s of map.spots) {
+    const def = SPOTS[s.kind];
+    if (def) kit.add(def.art);
+    const key = spotArt(scene, s.kind);
+    if (!key) continue;
+    const tiles = { left: ox + s.x, top: oy + s.y, right: ox + s.x + 1, bottom: oy + s.y + 1 };
+    standOnTiles(scene, key, tiles, art[key]?.view === 'isometric');
   }
 }
 

@@ -535,6 +535,13 @@ export interface NoticeMessage {
   text: string;
 }
 
+/** Gathering at a spot (gathering.ts) began, with the tool shown in the hand and how long it takes; without a tool, it stopped. */
+export interface GatherMessage {
+  t: 'gather';
+  tool?: string;
+  ms?: number;
+}
+
 export interface DialogueMessage {
   t: 'dialogue';
   npc: { id: string; name: string; asset: string };
@@ -631,6 +638,7 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | GatherMessage
   | SkyMessage
   | LootMessage
   | DraftUpdateMessage

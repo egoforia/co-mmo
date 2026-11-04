@@ -17,6 +17,7 @@ Read the matching skill or guide before making changes:
 | Running the game, Scale mode & robot playtests | `.claude/skills/co-mmo-run/SKILL.md`, `docs/playtest.md`, `docs/scale.md` |
 | Pull requests, conflicts & merge rules | `.claude/skills/steward/SKILL.md` |
 | Product decisions, Wish Workshop, mods & milestones | `docs/design.md`, `docs/building-wishes.md`, `docs/sign-in.md` |
+| Gathering, crafts, recipes & crafted copies | `docs/crafting.md` |
 
 ## Checks
 

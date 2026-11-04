@@ -62,10 +62,15 @@ export const RARITIES: readonly Rarity[] = ['common', 'uncommon', 'rare', 'epic'
  * ward, and (from material traits, Region fashion plan) percentages: dodge
  * chance, attack speed, health and Energy regeneration.
  */
-export type Bonus = Partial<Stats> & { attack?: number; armor?: number; ward?: number; dodge?: number; haste?: number; regen?: number; energyRegen?: number };
+export type Bonus = Partial<Stats> & {
+  attack?: number; armor?: number; ward?: number;
+  dodge?: number; haste?: number; regen?: number; energyRegen?: number;
+  /** Full-style bonuses: more healing received, and harmful statuses shorter, in percent. */
+  healing?: number; shorter?: number;
+};
 
 /** The parts of a Bonus that are not attributes, summed over everything worn by `gearBonus`. */
-export type GearKey = 'attack' | 'armor' | 'ward' | 'dodge' | 'haste' | 'regen' | 'energyRegen';
+export type GearKey = 'attack' | 'armor' | 'ward' | 'dodge' | 'haste' | 'regen' | 'energyRegen' | 'healing' | 'shorter';
 
 export interface InventorySlot {
   item: string;
@@ -212,11 +217,44 @@ export function totalStats(c: Pick<Character, 'stats'> & Partial<Pick<Character,
   return total;
 }
 
-/** Weapon damage, armour, ward or a percentage from everything worn. */
+/** Weapon damage, armour, ward or a percentage from everything worn, full-style bonuses included. */
 export function gearBonus(c: Partial<Pick<Character, 'equipment'>>, key: GearKey): number {
   let sum = 0;
   for (const id of Object.values(c.equipment ?? {})) sum += (id ? ITEMS[id]?.bonus?.[key] : 0) ?? 0;
+  for (const style of fullStyles(c)) sum += STYLES[style]?.bonus[key] ?? 0;
   return sum;
+}
+
+// --- Region styles (Region fashion plan, F3) ----------------------------------------
+
+/** A region's line of garments; fashion-styles.ts fills STYLES. */
+export interface StyleDef {
+  name: string;
+  /** The region it comes from, by id. */
+  region: string;
+  /** What it looks like, for its card and the painter. */
+  feel: string;
+  /** What wearing FULL_STYLE_PIECES or more of it adds, anywhere. */
+  bonus: Bonus;
+  /** The shopkeeper who sells it at home, by NPC id. */
+  tailor: string;
+}
+
+/** Every region style, by id. */
+export const STYLES: Record<string, StyleDef> = {};
+
+/** Garments of one style worn together for its full-style bonus. */
+export const FULL_STYLE_PIECES = 3;
+
+/** The styles a character wears enough of for their full-style bonus. */
+export function fullStyles(c: Partial<Pick<Character, 'equipment'>>): string[] {
+  const counts = new Map<string, number>();
+  for (const slot of GARMENT_SLOTS) {
+    const id = c.equipment?.[slot];
+    const style = id ? ITEMS[id]?.style : undefined;
+    if (style) counts.set(style, (counts.get(style) ?? 0) + 1);
+  }
+  return [...counts].filter(([style, n]) => n >= FULL_STYLE_PIECES && STYLES[style]).map(([style]) => style);
 }
 
 type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipment'>>;
@@ -331,6 +369,8 @@ export interface ItemDef {
   standIn?: string;
   /** Tools: the craft they work and their tier (crafts.ts). */
   tool?: { craft: CraftId; tier: ToolTier };
+  /** Garments: the region style it belongs to (STYLES), which counts toward a full-style bonus. */
+  style?: string;
 }
 
 /**
@@ -556,8 +596,9 @@ function clampVitals(c: Character): void {
 const BONUS_NAMES: Record<string, string> = {
   attack: 'damage', armor: 'armour', ward: 'ward', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor',
   dodge: 'dodge', haste: 'attack speed', regen: 'health regeneration', energyRegen: 'Energy regeneration',
+  healing: 'healing received', shorter: 'shorter harmful statuses',
 };
-const PERCENT_KEYS = new Set(['dodge', 'haste', 'regen', 'energyRegen']);
+const PERCENT_KEYS = new Set(['dodge', 'haste', 'regen', 'energyRegen', 'healing', 'shorter']);
 
 /** A short line of what an item adds, e.g. "+2 damage, +1 Spirit, +5% health regeneration". */
 export function bonusText(bonus: Bonus | undefined): string {

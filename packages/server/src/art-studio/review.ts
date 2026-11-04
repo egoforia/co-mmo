@@ -3,6 +3,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import sharp from 'sharp';
 import {
   BUILDING_STYLES,
 } from '@co-mmo/shared';
@@ -13,7 +14,8 @@ import { pictureName } from '../assets/names.ts';
 import type { ImageProvider, ImageRequest } from '../assets/provider.ts';
 import { seaCaveBox } from '../assets/sea-cave-kit.ts';
 import { homeLandBox } from '../assets/home-land-art.ts';
-import { paintKitAsset } from '../assets/wild-kit.ts';
+import { KEY_COLOR } from '../assets/style.ts';
+import { paintKitAsset, resolveReferenceImage } from '../assets/wild-kit.ts';
 import { estimateImageUsd } from '../assets/wish-art.ts';
 import { normalRequest } from '../normal-painter.ts';
 import { facingWords } from '../walk-painter.ts';
@@ -224,15 +226,120 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
       parts: [{ name: walker.name, recipe: await options.walks.previewView(walker, direction, ownPrompt(ask.prompt), await catalog.sourcesFor(walker, direction, ask.from)) }],
     };
   },
-  ways: async (ask, options, catalog) => {
+  ways: async (ask, options, catalog, redoneDir) => {
     const todo = await catalog.waysToPaint(ask.walker);
     if (!todo.length) throw new ArtRequestError('Every walker already has a standing picture for every isometric way.');
     const title = ask.walker
       ? `Paint ${todo[0]!.name} standing in the four isometric ways, together on one sheet`
       : `Paint the four isometric ways of every walker missing some: ${todo.length} sheet${todo.length > 1 ? 's' : ''}`;
     const parts: ArtReview['parts'] = [];
-    for (const walker of todo) parts.push({ name: walker.name, recipe: await options.walks.previewWays(walker) });
-    return { title, parts };
+    const prompt = ownPrompt(ask.prompt ?? ask.note);
+    let refInfos: ArtReferenceInfo[] | undefined;
+
+    if (ask.walker && todo.length === 1) {
+      const walker = todo[0]!;
+      const rawRefs = ask.references && ask.references.length > 0 ? ask.references : [walker.id];
+      refInfos = [];
+      const customRefBuffers: { data: Buffer; label: string }[] = [];
+
+      for (const refId of rawRefs) {
+        if (refId.startsWith('ref:')) {
+          const hash = refId.slice(4);
+          const refFile = resolve(options.artDir, 'references', `${hash}.png`);
+          const data = await readFile(refFile).catch(() => undefined);
+          if (data) {
+            refInfos.push({
+              id: refId,
+              name: `Reference image (${hash.slice(0, 6)})`,
+              url: `/wished-art/references/${hash}.png`,
+            });
+            const magentaBuf = await sharp(data).flatten({ background: KEY_COLOR.hex }).png().toBuffer();
+            customRefBuffers.push({ data: magentaBuf, label: `Reference image (${hash.slice(0, 6)}), on magenta` });
+          }
+        } else {
+          const [assetId, versionId = 'current'] = refId.includes('@') ? refId.split('@', 2) : [refId, 'current'];
+          const baseName = await catalog.nameOf(assetId!);
+          const key = assetId!.replace(/:/g, '~');
+          const versions = await catalog.history.versions(key);
+
+          const shipped = await options.shipped();
+          const hasShipped = Boolean(shipped[assetId!]);
+          const shippedFile = shipped[assetId!]?.file;
+          const shippedUrl = shippedFile ? (shippedFile.startsWith('assets/') ? `/${shippedFile}` : `/${shippedFile.replace(/^\/?/, '')}`) : `/art/${assetId}.png`;
+
+          const redone = await catalog.getRedone();
+          const isRedone = Boolean(redone[assetId!]);
+          const currentFile = await catalog.pictureFile(assetId!);
+          const currentUrl = currentFile ? (currentFile.startsWith('assets/') ? `/${currentFile}` : `/${currentFile.replace(/^\/?/, '')}`) : `/art/${assetId}.png`;
+
+          const availableVersions: ArtReferenceVersion[] = [
+            { id: 'current', label: 'Current version', url: currentUrl },
+          ];
+          for (const v of versions) {
+            const timeStr = v.recipe?.at ? new Date(v.recipe.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : v.id;
+            availableVersions.push({
+              id: v.id,
+              label: `Earlier (${timeStr})`,
+              url: v.url,
+            });
+          }
+          if (hasShipped && (isRedone || versions.length > 0)) {
+            availableVersions.push({
+              id: 'shipped',
+              label: 'Original shipped version',
+              url: shippedUrl,
+            });
+          }
+
+          let refDisplayName = baseName;
+          let url = currentUrl;
+          if (versionId === 'shipped') {
+            url = shippedUrl;
+            refDisplayName = `${baseName} (Shipped)`;
+          } else if (versionId !== 'current') {
+            const vMatch = versions.find((v) => v.id === versionId);
+            if (vMatch) {
+              url = vMatch.url;
+              refDisplayName = `${baseName} (${versionId})`;
+            }
+          } else if (availableVersions.length > 1) {
+            refDisplayName = `${baseName} (Current)`;
+          }
+
+          refInfos.push({
+            id: refId,
+            assetId,
+            versionId,
+            name: refDisplayName,
+            url,
+            availableVersions: availableVersions.length > 1 ? availableVersions : undefined,
+          });
+
+          const resolved = await resolveReferenceImage(refId, {
+            anchorDir: options.anchorDir,
+            artDir: options.artDir,
+            outDir: redoneDir,
+            readArt: options.readArt,
+            nameOf: (id) => catalog.nameOf(id),
+          });
+          if (resolved) {
+            const magentaBuf = await sharp(resolved.data).flatten({ background: KEY_COLOR.hex }).png().toBuffer();
+            customRefBuffers.push({ data: magentaBuf, label: `${resolved.label}'s approved picture, on magenta` });
+          }
+        }
+      }
+
+      parts.push({
+        name: walker.name,
+        recipe: await options.walks.previewWays(walker, prompt, customRefBuffers.length > 0 ? customRefBuffers : undefined),
+      });
+    } else {
+      for (const walker of todo) {
+        parts.push({ name: walker.name, recipe: await options.walks.previewWays(walker, prompt) });
+      }
+    }
+
+    return { title, parts, ...(refInfos ? { references: refInfos } : {}) };
   },
   clip: async (ask, options, catalog) => {
     const walker = catalog.walker(ask.walker, ask.body);

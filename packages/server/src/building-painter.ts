@@ -117,7 +117,12 @@ export class BuildingPainter {
   }
 
   private dirs() {
-    return { anchorDir: this.options.anchorDir, rawDir: resolve(this.dir, 'raw'), outDir: this.dir };
+    return {
+      anchorDir: this.options.anchorDir,
+      rawDir: resolve(this.dir, 'raw'),
+      outDir: this.dir,
+      redoneDir: resolve(this.options.artDir, 'redone'),
+    };
   }
 
   /** The file of a building picture painted here, if there is one. */

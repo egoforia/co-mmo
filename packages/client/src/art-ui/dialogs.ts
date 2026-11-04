@@ -92,7 +92,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       <button type="button" class="quiet" data-close>Cancel</button>
       <button type="button" data-approve>Approve and paint</button>
     </footer>`;
-  const withRefs = (newRefs: string[]): Ask => (ask.what === 'paint' ? { ...ask, references: newRefs } : ask);
+  const withRefs = (newRefs: string[]): Ask => (ask.what === 'paint' || ask.what === 'ways' ? { ...ask, references: newRefs } : ask);
   for (const b of d.querySelectorAll('[data-close]')) b.addEventListener('click', () => d.close());
   for (const b of d.querySelectorAll('[data-remove-ref]')) {
     b.addEventListener('click', () => {

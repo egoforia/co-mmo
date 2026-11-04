@@ -165,7 +165,7 @@ export type Ask =
   | { what: 'paint'; asset: string; references?: string[] }
   | { what: 'paint-group'; group: string }
   | { what: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
-  | { what: 'ways'; walker?: string }
+  | { what: 'ways'; walker?: string; references?: string[]; prompt?: string }
   | { what: 'clip'; walker: string; body: string; direction: Facing; prompt?: string }
   | { what: 'sound'; sound: string }
   | { what: 'normal'; asset: string; prompt?: string }

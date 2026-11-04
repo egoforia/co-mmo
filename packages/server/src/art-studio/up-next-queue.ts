@@ -203,7 +203,7 @@ async function dispatchAsk(studio: ArtStudio, ask: ArtAsk): Promise<{ estimateUs
     case 'view':
       return studio.paintView(ask.walker, ask.direction, ask.prompt, ask.from);
     case 'ways':
-      return studio.paintWays(ask.walker);
+      return studio.paintWays(ask.walker, ask.note, ask.references);
     case 'clip':
       return studio.makeClip(ask.walker, ask.body, ask.direction, ask.prompt);
     case 'sound':

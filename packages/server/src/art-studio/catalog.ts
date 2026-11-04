@@ -178,6 +178,7 @@ export class ArtCatalog {
   async walkerViews(shipped: ArtManifest, painted: ArtManifest, picture: number): Promise<WalkerView[]> {
     const clip = estimateClipUsd(this.options.ai.video()?.model ?? '');
     const views: WalkerView[] = [];
+    const redone = await this.getRedone();
     for (const w of this.walkerList()) {
       const walks: WalkerView['walks'] = {};
       const runs: WalkerView['runs'] = {};
@@ -211,7 +212,8 @@ export class ArtCatalog {
       // What its isometric ways still need: one sheet for the missing pictures, and a clip for each way that does not walk.
       const sheet = ISO_WAYS.some((d) => !standing[d].url) ? picture : 0;
       const estimateUsd = sheet + ISO_WAYS.filter((d) => !walks[d]).length * clip;
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body });
+      const currentUrl = redone[w.id] ? `/${redone[w.id]!.file}` : w.url;
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(currentUrl ? { url: currentUrl } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body });
     }
     return views;
   }
@@ -228,10 +230,16 @@ export class ArtCatalog {
 
   /** A walker by id, with the body type chosen. */
   walker(walkerId: string, body: string): Walker {
-    const found = this.walkerList().find((w) => w.id === walkerId);
+    const baseId = walkerId.split('@')[0]!;
+    const found = this.walkerList().find((w) => w.id === baseId);
     if (!found) throw new ArtRequestError('There is nothing by that name to make walk.');
     if (!BODY_TYPES[body]) throw new ArtRequestError('That body type is unknown.');
-    return { ...found, body };
+    const isAnchor = ANCHORS.some((a) => a.id === baseId);
+    return {
+      ...found,
+      body,
+      reference: isAnchor ? this.options.walks.anchorWalker(walkerId, body).reference : found.reference,
+    };
   }
 
   /** A way a walk painted before can face: a top-down direction or an isometric way. */
@@ -327,9 +335,10 @@ export class ArtCatalog {
     const record = wishId ? this.options.store.contentById(wishId) : undefined;
     const p = pictureId ? record?.artPrompts?.[pictureId] : undefined;
     if (!p) return undefined;
+    const redone = await this.getRedone();
     return {
       at: p.at, partial: true,
-      steps: [{ label: await this.nameOf(asset), media: 'picture', provider: p.provider, model: p.model, prompt: p.prompt, ...(p.note ? { note: p.note } : {}), pictures: p.references.map((r) => ({ name: pictureName(r), url: `/art/${r}.png` })), settings: [], usd: p.usd ?? 0 }],
+      steps: [{ label: await this.nameOf(asset), media: 'picture', provider: p.provider, model: p.model, prompt: p.prompt, ...(p.note ? { note: p.note } : {}), pictures: p.references.map((r) => ({ name: pictureName(r), url: redone[r] ? `/${redone[r]!.file}` : `/art/${r}.png` })), settings: [], usd: p.usd ?? 0 }],
       ...(p.reused ? { notes: [`Shows the picture of ${p.reused.name}.`] } : {}),
     };
   }
@@ -341,7 +350,11 @@ export class ArtCatalog {
     if (!notes) return undefined;
     // A reference is shown as the game has it, when the game has it; "player-ilya (before)" and the like were not kept.
     const shipped = await this.options.shipped();
-    const pictures = (notes.references ?? []).map((r) => ({ name: pictureName(r), ...(shipped[r] ? { url: slash(shipped[r]!.file) } : {}) }));
+    const redone = await this.getRedone();
+    const pictures = (notes.references ?? []).map((r) => ({
+      name: pictureName(r),
+      ...(redone[r] ? { url: `/${redone[r]!.file}` } : (shipped[r] ? { url: slash(shipped[r]!.file) } : {})),
+    }));
     return {
       at: notes.createdAt ? Date.parse(notes.createdAt) : 0, partial: true,
       steps: [{ label: pictureName(asset), media: 'picture', provider: notes.provider, model: notes.model, prompt: notes.prompt, pictures, settings: [], usd: estimateImageUsd(notes.model) }],

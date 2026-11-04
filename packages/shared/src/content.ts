@@ -9,6 +9,8 @@ import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
 import { WISHED_MATERIAL_VALUE, cleanMaterial, type MaterialInfo } from './materials.ts';
 import { isCopyId } from './copies.ts';
+import { garmentMaterials, garmentRecipe, isGarmentSlot, wishedStyle } from './fashion-wishes.ts';
+import { STYLE_CHOICES } from './fashion.ts';
 import { RACES, isRace, type RaceId } from './races.ts';
 import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
@@ -79,6 +81,10 @@ export interface ItemWish {
   light?: Light;
   /** Materials: family, tier (1 or 2), at most one trait, home regions (materials.ts). */
   material?: MaterialInfo;
+  /** Garments (head, body, cloak, feet): the region style it belongs to (fashion-wishes.ts). */
+  style?: string;
+  /** Garments: what its recipe takes, from its style's region. */
+  materials?: InventorySlot[];
   look: WishLook;
 }
 
@@ -547,7 +553,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
  * returns a cleaned copy: lengths trimmed, numbers clamped, unknown drops
  * dropped. Throws with a message the God can relay when it cannot be fixed.
  */
-export function validateDefinition(raw: unknown): WishDefinition {
+export function validateDefinition(raw: unknown, opts: { styleOptional?: boolean } = {}): WishDefinition {
   const d = (raw ?? {}) as Record<string, unknown>;
   if (d.kind === 'loot') return validateLoot(d, false);
   const name = text(d.name, 40);
@@ -566,7 +572,9 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const focus = (['might', 'agility', 'wit', 'spirit', 'vigor'] as const).find((k) => k === d.focus);
     const light = cleanLight(d.light);
     const family = slot === 'weapon' ? weaponFamily(d.family, `${name} ${description}`) : slot === 'offhand' ? offhandFamily(d.family, `${name} ${description}`) : undefined;
-    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(family ? { family } : {}), ...(light ? { light } : {}), look };
+    // A garment belongs to a region's style and is made from that region's materials (Region fashion plan).
+    const garment = isGarmentSlot(slot) ? wishedGarment(d, `${name} ${description}`, slot, opts.styleOptional) : {};
+    return { kind: 'item', name, description, itemKind, rarity, ...(focus ? { focus } : {}), ...(family ? { family } : {}), ...(light ? { light } : {}), ...garment, look };
   }
   if (d.kind === 'ability') {
     const effect = wishedEffect(d.effect);
@@ -686,6 +694,16 @@ export function validateLoot(raw: unknown, gods: boolean): LootWish {
   };
 }
 
+/** A wished garment's style and recipe materials; a garment naming no style cannot be made as content. */
+function wishedGarment(d: Record<string, unknown>, words: string, slot: EquipSlot, optional = false): Pick<ItemWish, 'style' | 'materials'> {
+  const style = wishedStyle(d.style, words);
+  // A scripted rule's own items need no style: the Stewards review the rule.
+  if (!style && optional) return {};
+  if (!style) throw new WishError(`A hat, coat, cloak or pair of boots belongs to one region's style: ${STYLE_CHOICES.map(([, label]) => label).join(', ')}. Which is it?`);
+  const materials = garmentMaterials(d.materials, style, slot);
+  return { style, ...(materials.length ? { materials } : {}) };
+}
+
 /** A recipe must use things that exist, and give back no more than it takes. */
 function validateRecipe(name: string, description: string, d: Record<string, unknown>): RecipeWish {
   // Never a crafted copy: only the people who make one can say how good it is.
@@ -723,7 +741,7 @@ export function validateRule(raw: unknown): RuleWish {
   for (const [key, value] of Object.entries(rawItems).slice(0, MAX_RULE_ITEMS)) {
     const k = key.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24);
     if (!k) continue;
-    const { kind: _k, ...item } = validateDefinition({ ...(value as object), kind: 'item' }) as ItemWish;
+    const { kind: _k, ...item } = validateDefinition({ ...(value as object), kind: 'item' }, { styleOptional: true }) as ItemWish;
     items[k] = item;
   }
   return {
@@ -795,6 +813,7 @@ export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
       ...gearFamily(slot, rarity, w),
       value: 10 * (RARITIES.indexOf(rarity) + 1),
       ...(w.light ? { light: w.light } : {}),
+      ...('style' in w && w.style ? { style: w.style } : {}),
     };
   }
   return {
@@ -871,7 +890,11 @@ export function applyContent(entry: ContentEntry): void {
       ITEMS[ruleItemId(entry.id, key)] = itemFromWish(ruleItemId(entry.id, key), item);
       WISHERS.set(ruleItemId(entry.id, key), entry.wisher.id);
     }
-  } else if (d.kind === 'item') ITEMS[entry.id] = itemFromWish(entry.id, d);
+  } else if (d.kind === 'item') {
+    ITEMS[entry.id] = itemFromWish(entry.id, d);
+    // A wished garment brings its recipe, under the same id, so switching the wish off takes both.
+    if (d.style && d.materials?.length) RECIPES[entry.id] = garmentRecipe(entry.id, d.materials, d.rarity);
+  }
   else if (d.kind === 'creature') CREATURES[entry.id] = creatureFromWish(entry.id, d);
   else if (d.kind === 'npc') NPC_GREETINGS[entry.id] = d.greeting;
   else if (d.kind === 'loot') applyLoot({ id: entry.id, at: entry.at, creature: d.creature, mode: d.mode, drops: d.drops });

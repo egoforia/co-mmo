@@ -9,6 +9,7 @@ import { chanceText, lootTable } from './loot.ts';
 import { RACES, RACE_IDS } from './races.ts';
 import { CALLINGS, CALLING_IDS } from './classes.ts';
 import { OFFHAND_FAMILIES, WEAPON_FAMILIES, WEAPON_FAMILY_IDS, type OffhandFamily } from './weapons.ts';
+import { STYLE_CHOICES } from './fashion.ts';
 import {
   REGION_WISH_COST,
   WISH_COSTS,
@@ -105,6 +106,7 @@ export const WISH_CATEGORIES: WishCategory[] = [
           choice('rarity', 'How rare', [['common', 'Common'], ['uncommon', 'Uncommon'], ['rare', 'Rare']]),
           choice('family', 'What kind of weapon or off-hand item', FAMILY_CHOICES, true),
           choice('focus', 'The stat it helps', [['might', 'Might'], ['agility', 'Agility'], ['wit', 'Wit'], ['spirit', 'Spirit'], ['vigor', 'Vigor']], true),
+          choice('style', 'Region style (hats, clothes, cloaks and boots)', STYLE_CHOICES.map(([id, label]) => [id, label]), true),
           ...LOOK] },
     ],
   },
@@ -305,7 +307,7 @@ function rawDefinition(sub: WishSubcategory, f: DraftFields): Record<string, unk
   const base = { kind: sub.makes, name: str(f.name), description: str(f.description), ...sub.fixed };
   const look = { hook: str(f.hook), body: str(f.body), color: str(f.color), mood: str(f.mood) };
   switch (sub.makes) {
-    case 'item': return { ...base, itemKind: sub.fixed?.itemKind ?? str(f.itemKind), heal: num(f.heal), rarity: str(f.rarity), focus: str(f.focus), family: str(f.family), look };
+    case 'item': return { ...base, itemKind: sub.fixed?.itemKind ?? str(f.itemKind), heal: num(f.heal), rarity: str(f.rarity), focus: str(f.focus), family: str(f.family), style: str(f.style), look };
     case 'recipe': return { ...base, materials: materials(f.materials), result: { item: str(f.result), qty: num(f.qty) ?? 1 } };
     case 'ability': return { ...base, effect: str(f.effect), look };
     case 'creature': return { ...base, behavior: str(f.behavior), active: str(f.active), level: num(f.level), count: num(f.count), drops: list(f.drops), look };
@@ -426,7 +428,7 @@ export function draftFromDefinition(def: WishDefinition): { category: string; su
       if (kind === 'consumable') return pick('carry', 'potion', { heal: def.heal });
       if (kind === 'trinket') return pick('carry', 'keepsake', {});
       if (kind === 'material') return pick('carry', 'material', {});
-      return pick('carry', 'gear', { itemKind: kind, rarity: def.rarity, focus: def.focus, family: def.family });
+      return pick('carry', 'gear', { itemKind: kind, rarity: def.rarity, focus: def.focus, family: def.family, style: def.style });
     }
     case 'recipe': return pick('know', 'recipe', { materials: def.materials, result: def.result.item, qty: def.result.qty });
     case 'ability': return pick('know', 'ability', { effect: def.effect });

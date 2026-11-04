@@ -5,6 +5,10 @@ import {
   WishError,
   contentTier,
   recipeTier,
+  isGarmentSlot,
+  regionStyle,
+  wishedStyle,
+  type EquipSlot,
   validateDefinition,
   regionDef,
   callingChangeProblem,
@@ -132,7 +136,7 @@ export class WishCards {
         // A new look is painted as one of the player's people.
         const race = this.world.regionOf(playerId)?.character(playerId)?.race;
         definition = look && raw?.kind === 'player' ? validateLookWish({ ...raw, ...(race ? { race } : {}) })
-          : look && raw?.kind === 'calling' ? validateCallingWish(raw) : validateDefinition(raw);
+          : look && raw?.kind === 'calling' ? validateCallingWish(raw) : validateDefinition(this.styled(playerId, raw));
       } catch (err) {
         if (!(err instanceof WishError)) throw err;
         // Not buildable as content: a person will have to build it.
@@ -146,6 +150,8 @@ export class WishCards {
       if (definition) tier = contentTier(definition);
       // A recipe mixing lands (rare), or one needing a key item (unique), goes before the Stewards.
       if (definition?.kind === 'recipe' && recipeTier(definition) !== 'common') tier = 'major';
+      // So does a rare garment (Region fashion plan); unique ones are never wished.
+      if (definition?.kind === 'item' && definition.style && definition.rarity === 'rare') tier = 'major';
     }
     // A new region grows beyond the open edge of this one nearest the player.
     let edge: OpenCard['edge'];
@@ -174,6 +180,14 @@ export class WishCards {
       instant,
     };
     return { card, ...(definition ? { definition } : {}), ...(edge ? { edge } : {}) };
+  }
+
+  /** A garment wish that names no style takes the style of the region the wisher stands in (fashion-wishes.ts). */
+  private styled(playerId: string, raw: unknown): unknown {
+    const d = raw as { kind?: unknown; itemKind?: unknown; style?: unknown; name?: unknown; description?: unknown } | undefined;
+    if (d?.kind !== 'item' || !isGarmentSlot(d.itemKind as EquipSlot) || wishedStyle(d.style, `${String(d.name ?? '')} ${String(d.description ?? '')}`)) return raw;
+    const style = regionStyle(this.world.regionOf(playerId)?.def.id ?? '');
+    return style ? { ...d, style } : raw;
   }
 
   /**

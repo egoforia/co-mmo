@@ -101,3 +101,13 @@ export const NPC_PEOPLES: Record<string, RaceId> = {
   'queen-nerissa': 'lutran',
   'sister-amala': 'falcon',
 };
+
+/** The region styles a garment wish may name, by id, with their region (fashion-styles.ts gives the rest). */
+export const STYLE_CHOICES: readonly [id: string, label: string][] = [
+  ['pilgrim', 'Pilgrim (the Sanctum)'],
+  ['barkwarden', 'Barkwarden (Whispering Woods)'],
+  ['pearlcoat', 'Pearlcoat (Sunlit Shore)'],
+  ['sunwrap', 'Sunwrap (Mirage Desert)'],
+  ['windfelt', 'Windfelt (Frostpeak)'],
+  ['sporeweave', 'Sporeweave (Mushroom Hollow)'],
+];

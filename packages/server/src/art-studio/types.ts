@@ -61,8 +61,8 @@ export interface ArtItem {
   normalMap?: string;
   /** Whether a normal map can be painted for it here. */
   normalPaintable?: boolean;
-  /** Temporary stand-in asset ID shown by the game until this picture is painted. */
-  standIn?: string;
+  /** Temporary stand-in asset shown by the game until this picture is painted. */
+  standIn?: { id: string; name?: string; url?: string };
   /** Region fashion style ID when this item is a styled garment (pilgrim, barkwarden, etc.). */
   fashionStyle?: string;
   /** Equipment slot when wearable or wieldable (head, body, cloak, feet, weapon, offhand, charm). */

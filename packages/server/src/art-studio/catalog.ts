@@ -83,8 +83,9 @@ export class ArtCatalog {
       // A home land's creatures and people, craft tools, spots, materials and skill effects are painted the first time here.
       const paintable = Boolean(shipped[a.id] || homeLandBox(a.id));
       const repaintable = paintable;
-      const meta = anchorMeta(a);
-      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, biome: a.biome, kind: a.kind, ...meta, ...(paintable ? {} : { why: 'Not part of the game yet.' }) });
+      const resolvedUrl = url(a.id);
+      const meta = anchorMeta(a, resolvedUrl.source === 'missing', (id) => url(id).url);
+      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...resolvedUrl, estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, biome: a.biome, kind: a.kind, ...meta, ...(paintable ? {} : { why: 'Not part of the game yet.' }) });
     }
     // Lands' buildings after their scenery, so each land's page and the list of lands start with the launch kit.
     for (const style of Object.values(BUILDING_STYLES)) {
@@ -383,24 +384,33 @@ export class ArtCatalog {
 }
 
 /** Metadata tags for an anchor asset: stand-in fallback, fashion style, slot, and sub-category. */
-function anchorMeta(a: (typeof ANCHORS)[number]): Pick<ArtItem, 'standIn' | 'fashionStyle' | 'slot' | 'category'> {
+function anchorMeta(
+  a: (typeof ANCHORS)[number],
+  isMissing: boolean,
+  urlOf: (id: string) => string | undefined,
+): Pick<ArtItem, 'standIn' | 'fashionStyle' | 'slot' | 'category'> {
   const item = Object.values(ITEMS).find((i) => i.art === a.id);
   const spot = Object.values(SPOTS).find((s) => s.art === a.id);
-  let standIn: string | undefined;
-  if (item?.standIn && item.standIn !== a.id) {
-    standIn = item.standIn;
-  } else if (spot) {
-    const mat = ITEMS[spot.material];
-    standIn = mat?.standIn ?? mat?.art;
-  } else if (HOME_LAND_ANCHORS.some((h) => h.id === a.id)) {
-    standIn = a.kind === 'npc' ? 'sanctum-pilgrim' : 'woods-mushroom';
+  let standInId: string | undefined;
+  if (isMissing) {
+    if (item?.standIn && item.standIn !== a.id) {
+      standInId = item.standIn;
+    } else if (spot) {
+      const mat = ITEMS[spot.material];
+      standInId = mat?.standIn ?? mat?.art;
+    } else if (HOME_LAND_ANCHORS.some((h) => h.id === a.id)) {
+      standInId = a.kind === 'npc' ? 'sanctum-pilgrim' : 'woods-mushroom';
+    }
   }
+  const standIn = standInId
+    ? { id: standInId, name: pictureName(standInId), ...(urlOf(standInId) ? { url: urlOf(standInId) } : {}) }
+    : undefined;
   const fashionStyle = item?.style;
   const slot = item?.slot;
   let category: string | undefined;
-  if (a.id.startsWith('item-tool-') || item?.kind === 'tool') category = 'tool';
-  else if (spot) category = 'gathering-spot';
-  else if (item?.unique) category = 'unique';
+  if (a.id.startsWith('item-tool-') || item?.kind === 'tool') category = 'craft-tool';
+  else if (spot) category = 'gather-spot';
+  else if (item?.unique) category = 'boss-unique';
   else if (item?.style) category = 'garment';
   else if (item?.kind === 'material') category = 'material';
   else if (a.kind === 'effect') category = a.id.startsWith('status-') ? 'status-icon' : 'skill-fx';

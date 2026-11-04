@@ -49,6 +49,13 @@ export function entitiesPage(page?: string): string {
     return true;
   };
 
+  if (page && entityKindFilter !== 'all') {
+    const existsInFiltered = allWalkers.some((w) => matchesFilter(w) && w.place.page === page);
+    if (!existsInFiltered && (allWalkers.some((w) => w.place.page === page) || allItems.some((i) => i.place.page === page))) {
+      entityKindFilter = 'all';
+    }
+  }
+
   const walkers = allWalkers.filter(matchesFilter);
   const walkerPages = new Set(walkers.map((w) => w.place.page));
   const items = allItems.filter((i) => entityKindFilter === 'all' || walkerPages.has(i.place.page));

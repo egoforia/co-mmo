@@ -8,6 +8,16 @@ import { ArtRequestError, type ArtAsk } from './types.ts';
 export interface UpNextItem {
   id: string;
   ask: ArtAsk;
+  kind: string;
+  targetId: string;
+  direction?: string;
+  body?: string;
+  note?: string;
+  prompt?: string;
+  harmonizedPrompt?: string;
+  references?: string[];
+  status: 'staged' | 'running' | 'done' | 'failed';
+  reason?: string;
   label: string;
   category: string;
   estimateUsd: number;
@@ -51,8 +61,9 @@ export class UpNextQueue {
 
   async list(): Promise<{ items: UpNextItem[]; running: boolean; totalUsd: number }> {
     await this.load();
-    const totalUsd = Math.round(this.items.reduce((sum, i) => sum + (i.estimateUsd || 0), 0) * 1000) / 1000;
-    return { items: [...this.items], running: this.running, totalUsd };
+    const normalized = this.items.map(normalizeItem);
+    const totalUsd = Math.round(normalized.reduce((sum, i) => sum + (i.estimateUsd || 0), 0) * 1000) / 1000;
+    return { items: normalized, running: this.running, totalUsd };
   }
 
   async add(
@@ -60,15 +71,18 @@ export class UpNextQueue {
     meta?: { label?: string; category?: string; estimateUsd?: number; harmonized?: boolean },
   ): Promise<UpNextItem> {
     await this.load();
-    const item: UpNextItem = {
+    const item = normalizeItem({
       id: randomUUID().slice(0, 8),
       ask,
+      kind: ask.kind === 'group' ? 'paint-group' : ask.kind,
+      targetId: targetIdOf(ask),
+      status: 'staged',
       label: meta?.label?.trim() || defaultLabel(ask),
       category: meta?.category || ask.kind,
       estimateUsd: typeof meta?.estimateUsd === 'number' && Number.isFinite(meta.estimateUsd) ? meta.estimateUsd : defaultUsd(ask),
       ...(meta?.harmonized ? { harmonized: true } : {}),
       addedAt: Date.now(),
-    };
+    });
     this.items.push(item);
     await this.save();
     return item;
@@ -102,19 +116,21 @@ export class UpNextQueue {
 
   async update(
     id: string,
-    patch: { note?: string; prompt?: string; harmonized?: boolean; label?: string },
+    patch: { note?: string; prompt?: string; harmonized?: boolean; harmonizedPrompt?: string; references?: string[]; label?: string },
   ): Promise<UpNextItem | undefined> {
     await this.load();
     const item = this.items.find((i) => i.id === id);
     if (!item) return undefined;
     if (patch.note !== undefined) {
       const note = patch.note.trim().slice(0, 1000);
+      item.note = note || undefined;
       if (item.ask.kind === 'paint' || item.ask.kind === 'sound' || item.ask.kind === 'sheet') {
         item.ask = { ...item.ask, ...(note ? { note } : { note: undefined }) };
       }
     }
     if (patch.prompt !== undefined) {
       const prompt = patch.prompt.trim().slice(0, 4000);
+      item.prompt = prompt || undefined;
       if (item.ask.kind === 'view' || item.ask.kind === 'clip' || item.ask.kind === 'normal') {
         item.ask = { ...item.ask, ...(prompt ? { prompt } : { prompt: undefined }) };
       } else if (item.ask.kind === 'paint') {
@@ -122,9 +138,11 @@ export class UpNextQueue {
       }
     }
     if (patch.harmonized !== undefined) item.harmonized = patch.harmonized;
+    if (patch.harmonizedPrompt !== undefined) item.harmonizedPrompt = patch.harmonizedPrompt.trim() || undefined;
+    if (Array.isArray(patch.references)) item.references = patch.references;
     if (patch.label !== undefined && patch.label.trim()) item.label = patch.label.trim();
     await this.save();
-    return item;
+    return normalizeItem(item);
   }
 
   async clear(): Promise<void> {
@@ -221,4 +239,43 @@ function defaultLabel(ask: ArtAsk): string {
 function defaultUsd(ask: ArtAsk): number {
   if (ask.kind === 'clip') return 0.4;
   return 0.039;
+}
+
+function targetIdOf(ask: ArtAsk): string {
+  switch (ask.kind) {
+    case 'paint':
+    case 'normal':
+      return ask.asset;
+    case 'group':
+      return ask.group;
+    case 'view':
+    case 'clip':
+      return ask.walker;
+    case 'ways':
+      return ask.walker ?? 'all';
+    case 'sound':
+      return ask.sound;
+    case 'sheet':
+      return ask.look;
+  }
+}
+
+function normalizeItem(item: UpNextItem): UpNextItem {
+  const ask = item.ask;
+  const kind = item.kind || (ask.kind === 'group' ? 'paint-group' : ask.kind);
+  const targetId = item.targetId || targetIdOf(ask);
+  const direction = item.direction ?? (ask.kind === 'view' || ask.kind === 'clip' ? ask.direction : undefined);
+  const body = item.body ?? (ask.kind === 'clip' ? ask.body : undefined);
+  const note = item.note ?? (ask.kind === 'paint' || ask.kind === 'sound' || ask.kind === 'sheet' ? ask.note : undefined);
+  const prompt = item.prompt ?? (ask.kind === 'view' || ask.kind === 'clip' || ask.kind === 'normal' ? ask.prompt : undefined);
+  return {
+    ...item,
+    kind,
+    targetId,
+    ...(direction ? { direction } : {}),
+    ...(body ? { body } : {}),
+    ...(note ? { note } : {}),
+    ...(prompt ? { prompt } : {}),
+    status: item.status ?? 'staged',
+  };
 }

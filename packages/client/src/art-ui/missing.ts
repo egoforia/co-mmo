@@ -60,7 +60,31 @@ export function collectMissingGaps(): MissingGapItem[] {
           ? go('entities', item.place.page)
           : go(item.place.tab, item.place.page);
 
-    if (item.source === 'missing') {
+    if (item.standIn) {
+      gaps.push({
+        id: `standin-${item.id}`,
+        title: item.name,
+        subtitle: `${item.place.page} · currently borrowing stand-in "${item.standIn.name ?? item.standIn.id}" (${item.id})`,
+        category: 'Using Stand-In',
+        badge: `Stand-in: ${item.standIn.name ?? item.standIn.id}`,
+        badgeClass: 'standin',
+        studioHref: tabHref,
+        thumbUrl: item.url ?? item.standIn.url,
+        standInUrl: item.standIn.url,
+        standInName: item.standIn.name ?? item.standIn.id,
+        ...(item.repaintable
+          ? {
+              queueEntry: {
+                kind: 'paint',
+                targetId: item.id,
+                label: `Paint dedicated icon for ${item.name} (replace stand-in ${item.standIn.id})`,
+                category: 'Using Stand-In',
+                estimateUsd: item.estimateUsd,
+              },
+            }
+          : {}),
+      });
+    } else if (item.source === 'missing') {
       const cat = item.place.tab === 'hud' ? 'HUD & Skill FX' : 'Missing Pictures';
       gaps.push({
         id: `missing-${item.id}`,
@@ -77,30 +101,6 @@ export function collectMissingGaps(): MissingGapItem[] {
                 targetId: item.id,
                 label: `Paint ${item.name}`,
                 category: cat,
-                estimateUsd: item.estimateUsd,
-              },
-            }
-          : {}),
-      });
-    } else if (item.standIn) {
-      gaps.push({
-        id: `standin-${item.id}`,
-        title: item.name,
-        subtitle: `${item.place.page} · currently borrowing stand-in "${item.standIn.name ?? item.standIn.id}" (${item.id})`,
-        category: 'Using Stand-In',
-        badge: `Stand-in: ${item.standIn.name ?? item.standIn.id}`,
-        badgeClass: 'standin',
-        studioHref: tabHref,
-        thumbUrl: item.url,
-        standInUrl: item.standIn.url,
-        standInName: item.standIn.name ?? item.standIn.id,
-        ...(item.repaintable
-          ? {
-              queueEntry: {
-                kind: 'paint',
-                targetId: item.id,
-                label: `Paint dedicated icon for ${item.name} (replace stand-in ${item.standIn.id})`,
-                category: 'Using Stand-In',
                 estimateUsd: item.estimateUsd,
               },
             }

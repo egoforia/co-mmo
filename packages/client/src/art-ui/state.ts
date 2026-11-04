@@ -3,6 +3,8 @@
 
 import type { BuildingView } from './buildings.ts';
 import {
+  ISO_WAYS,
+  movingArt,
   type ArtPointsManifest,
   type Facing,
   type IsoWay,
@@ -255,22 +257,83 @@ export const artState: {
 };
 
 /** Where the Art Studio is: its tab and page, from the address (#<tab>/<page> or legacy #art/<tab>/<page>). */
-export function where(): { sub: Subtab; page?: string; walker?: string } {
+export function where(): { sub: Subtab; page?: string; walker?: string; asset?: string } {
   const [hashPath, queryString] = location.hash.slice(1).split('?');
   const raw = (hashPath ?? '').split('/').filter(Boolean);
   const parts = raw[0] === 'art' ? raw.slice(1) : raw;
   const subRaw = parts[0] ?? 'entities';
   const page = parts.length > 1 ? decodeURIComponent(parts.slice(1).join('/')) : undefined;
-  const walker = queryString ? (new URLSearchParams(queryString).get('walker') ?? undefined) : undefined;
+  const params = queryString ? new URLSearchParams(queryString) : undefined;
+  const walker = params?.get('walker') ?? undefined;
+  const asset = params?.get('asset') ?? undefined;
   const mapped: Subtab =
     subRaw === 'now' ? 'queue' :
     subRaw === 'characters' || subRaw === 'monsters' ? (subRaw as Subtab) :
     SUBTABS.some(([id]) => id === subRaw) ? (subRaw as Subtab) : 'entities';
-  return { sub: mapped, ...(page ? { page } : {}), ...(walker ? { walker } : {}) };
+  return { sub: mapped, ...(page ? { page } : {}), ...(walker ? { walker } : {}), ...(asset ? { asset } : {}) };
 }
 
 export function go(sub: Subtab, page?: string): string {
   return `#art/${sub}${page ? `/${encodeURIComponent(page)}` : ''}`;
+}
+
+/** Resolves any ArtJob asset ID or queued target ID to its deep link in the AI Art Studio. */
+export function assetHref(asset: string | undefined, media?: 'picture' | 'clip' | 'sound'): string | undefined {
+  if (!asset) return undefined;
+  const data = artState.data;
+  if (!data) return undefined;
+
+  if (media === 'sound' || data.sounds.some((s) => s.id === asset)) {
+    return `${go('sounds')}?asset=${encodeURIComponent(asset)}`;
+  }
+
+  if (asset.startsWith('kit-sheet-') || data.sheets?.some((s) => s.look === asset)) {
+    const look = asset.replace(/^kit-sheet-/, '');
+    return `${go('looks')}?asset=${encodeURIComponent(look)}`;
+  }
+
+  const group = data.groups.find((g) => g.id === asset);
+  if (group?.items[0]) {
+    const first = group.items[0];
+    const tab =
+      first.place.tab === 'hud'
+        ? 'hud-fx'
+        : first.place.tab === 'characters' || first.place.tab === 'monsters'
+          ? 'entities'
+          : first.place.tab;
+    return `${go(tab, first.place.page)}?asset=${encodeURIComponent(first.id)}`;
+  }
+
+  const base = asset.replace(/-normal$/, '');
+  const moving = movingArt(base);
+  const waySuffix = ISO_WAYS.find((d) => base.endsWith(`-${d}`));
+  const walkerId = base.endsWith('-ways')
+    ? base.slice(0, -'-ways'.length)
+    : moving
+      ? moving.look
+      : waySuffix
+        ? base.slice(0, -(waySuffix.length + 1))
+        : undefined;
+  if (walkerId) {
+    const w = data.walkers.find((x) => x.id === walkerId);
+    if (w) return `${go('entities', w.place.page)}?walker=${encodeURIComponent(w.id)}`;
+  }
+
+  const item = data.items.find((i) => i.id === base || i.id.endsWith(`:${base}`));
+  if (item) {
+    const tab =
+      item.place.tab === 'hud'
+        ? 'hud-fx'
+        : item.place.tab === 'characters' || item.place.tab === 'monsters'
+          ? 'entities'
+          : item.place.tab;
+    return `${go(tab, item.place.page)}?asset=${encodeURIComponent(item.id)}`;
+  }
+
+  const w = data.walkers.find((x) => x.id === base);
+  if (w) return `${go('entities', w.place.page)}?walker=${encodeURIComponent(w.id)}`;
+
+  return undefined;
 }
 
 export function openCount(jobs: ArtJob[]): string {

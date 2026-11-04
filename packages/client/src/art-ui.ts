@@ -90,12 +90,29 @@ import { workedOutNormalMap } from './normal-preview.ts';
 
 export { focusHandFinder, refreshArtJobs, refreshHandStatus, type ArtContext };
 
+let lastFocusedKey = '';
+
 /** Mounts interactive canvases (Hand Workbench, Attack/Skill Stage, Map Editor) after DOM render. */
 export function afterArtRender(): void {
   focusHandFinder();
   mountHandWorkbenches();
   mountSkillStages();
   mountMapEditorCanvas();
+  const { asset, walker } = where();
+  const focusKey = asset ? `asset:${asset}` : walker ? `walker:${walker}` : '';
+  if (focusKey && focusKey !== lastFocusedKey) {
+    lastFocusedKey = focusKey;
+    const el = asset
+      ? document.querySelector<HTMLElement>(`[data-asset-card="${CSS.escape(asset)}"]`)
+      : walker
+        ? document.querySelector<HTMLElement>(`.walker[data-walker="${CSS.escape(walker)}"]`)
+        : null;
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  } else if (!focusKey) {
+    lastFocusedKey = '';
+  }
 }
 
 /** Renders the AI Art Studio page as HTML. */

@@ -18,13 +18,9 @@ export const MATERIAL_SOURCES: readonly MaterialSource[] = ['gathered', 'creatur
 /** 1 anyone can work, 2 takes practice, 3 needs a mastery. */
 export type MaterialTier = 1 | 2 | 3;
 
-/**
- * What a material lends the thing made from it (Region fashion plan): sturdy
- * Armor, warding Ward, warm health regeneration, light dodge, supple attack
- * speed, shimmering Energy regeneration. The numbers come with fashion.
- */
-export type MaterialTrait = 'sturdy' | 'warding' | 'warm' | 'light' | 'supple' | 'shimmering';
-export const MATERIAL_TRAITS: readonly MaterialTrait[] = ['sturdy', 'warding', 'warm', 'light', 'supple', 'shimmering'];
+export { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
+import { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
+
 
 /** A material's data, on its ItemDef as `material`. */
 export interface MaterialInfo {

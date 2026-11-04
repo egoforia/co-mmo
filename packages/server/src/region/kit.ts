@@ -5,6 +5,9 @@ import {
   SHOPS,
   buy,
   craft,
+  crafted,
+  shopMade,
+  copyWords,
   equip,
   readScroll,
   sell,
@@ -64,10 +67,13 @@ export class Kit {
 
   /** Makes a recipe from what is in the bag. */
   craft(p: PlayerState, recipe: string): void {
-    const why = craft(p.character, recipe);
+    const before = new Set(p.character.inventory.map((s) => s.item));
+    const why = craft(p.character, recipe, crafted(p.character, p.info.name, recipe, this.s.random));
     if (why) return this.s.notice(p, why);
     const r = RECIPES[recipe]!;
-    this.s.notice(p, `You made ${r.result.qty > 1 ? `${r.result.qty} × ` : 'a '}${ITEMS[r.result.item]!.name}.`);
+    // A crafted piece of gear says how well it came out.
+    const copy = p.character.inventory.find((s) => !before.has(s.item) && ITEMS[s.item]?.copy);
+    this.s.notice(p, `You made ${r.result.qty > 1 ? `${r.result.qty} × ` : 'a '}${ITEMS[r.result.item]!.name}.${copy ? ` ${copyWords(ITEMS[copy.item])}` : ''}`);
     this.s.credit(recipe, p, 'craft');
     p.dirty = true;
   }
@@ -80,7 +86,7 @@ export class Kit {
     }
     const ch = p.character;
     const before = ch.gold;
-    const why = m.action === 'buy' ? buy(ch, m.npc, m.id) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);
+    const why = m.action === 'buy' ? buy(ch, m.npc, m.id, shopMade(npcName(m.npc), this.s.random)) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);
     if (why) return this.s.notice(p, why);
     const name = m.action === 'learn' ? ABILITIES[m.id]!.name : ITEMS[m.id]?.name ?? m.id;
     this.s.notice(p, m.action === 'buy'

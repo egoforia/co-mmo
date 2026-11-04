@@ -3,6 +3,7 @@ import {
   coreSkillsAt,
   keyWords,
   wisherOf,
+  copyBase,
   VIEW_RADIUS,
   Tile,
   type Character,
@@ -175,7 +176,9 @@ export class RegionState {
 
   /** Someone enjoyed a wished thing; its wisher earns Creator XP (the world decides how much). */
   credit(thing: string, p: PlayerState, credit: CreatorCredit): void {
-    if (wisherOf(thing)) this.hooks.creator?.(thing, p.info.id, credit);
+    // A crafted copy of a wished thing counts as the thing.
+    const id = copyBase(thing);
+    if (wisherOf(id)) this.hooks.creator?.(id, p.info.id, credit);
   }
 
   /** Tells the player, the region and the feed about levels gained. */

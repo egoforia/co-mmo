@@ -8,6 +8,7 @@ import { RECIPES } from './kit.ts';
 import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
 import { WISHED_MATERIAL_VALUE, cleanMaterial, type MaterialInfo } from './materials.ts';
+import { isCopyId } from './copies.ts';
 import { RACES, isRace, type RaceId } from './races.ts';
 import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
@@ -576,7 +577,7 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const behavior: Behavior = BEHAVIORS.find((b) => b === d.behavior) ?? 'wander';
     const active = d.active === 'day' || d.active === 'night' ? d.active : undefined;
     const drops = Array.isArray(d.drops)
-      ? d.drops.filter((i): i is string => typeof i === 'string' && !!ITEMS[i] && !ITEMS[i]!.bound).slice(0, 3)
+      ? d.drops.filter((i): i is string => typeof i === 'string' && !isCopyId(i) && !!ITEMS[i] && !ITEMS[i]!.bound).slice(0, 3)
       : [];
     return {
       kind: 'creature',
@@ -662,7 +663,7 @@ export function validateLoot(raw: unknown, gods: boolean): LootWish {
   for (const raw of Array.isArray(d.drops) ? d.drops : []) {
     const r = (typeof raw === 'string' ? { item: raw } : raw ?? {}) as Record<string, unknown>;
     const item = typeof r.item === 'string' ? r.item : '';
-    if (!ITEMS[item] || (!gods && ITEMS[item]!.bound) || drops.some((x) => x.item === item)) continue;
+    if (isCopyId(item) || !ITEMS[item] || (!gods && ITEMS[item]!.bound) || drops.some((x) => x.item === item)) continue;
     const chance = Number(r.chance);
     drops.push({
       item,
@@ -687,7 +688,8 @@ export function validateLoot(raw: unknown, gods: boolean): LootWish {
 
 /** A recipe must use things that exist, and give back no more than it takes. */
 function validateRecipe(name: string, description: string, d: Record<string, unknown>): RecipeWish {
-  const tradable = (id: unknown): id is string => typeof id === 'string' && !!ITEMS[id] && !ITEMS[id]!.bound;
+  // Never a crafted copy: only the people who make one can say how good it is.
+  const tradable = (id: unknown): id is string => typeof id === 'string' && !isCopyId(id) && !!ITEMS[id] && !ITEMS[id]!.bound;
   const materials: InventorySlot[] = [];
   for (const m of Array.isArray(d.materials) ? d.materials : []) {
     const slot = (m ?? {}) as Record<string, unknown>;

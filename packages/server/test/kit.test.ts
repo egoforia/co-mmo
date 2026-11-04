@@ -6,6 +6,7 @@ import {
   CREATOR_XP,
   ITEMS,
   addItem,
+  copyBase,
   itemCount,
   newCharacter,
   regionDef,
@@ -57,7 +58,10 @@ describe('shops and trainers', () => {
     region.handle('a', { t: 'shop', action: 'buy', npc: 'marina', id: 'wooden-sword' });
     region.handle('a', { t: 'shop', action: 'sell', npc: 'marina', id: 'crab-shell', qty: 4 });
     const ch = region.character('a')!;
-    expect(itemCount(ch, 'wooden-sword')).toBe(1);
+    // What a shop sells is its own copy, made by the shopkeeper at standard quality.
+    const swords = ch.inventory.filter((s) => copyBase(s.item) === 'wooden-sword');
+    expect(swords).toHaveLength(1);
+    expect(ITEMS[swords[0]!.item]!.copy).toMatchObject({ of: 'wooden-sword', quality: 100, maker: { kind: 'npc' } });
     expect(itemCount(ch, 'crab-shell')).toBe(0);
     expect(ch.gold).toBe(30 - 15 + 4 * 2);
     expect(of(conn, 'character').at(-1)!.character.gold).toBe(ch.gold);

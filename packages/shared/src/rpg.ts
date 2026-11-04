@@ -8,6 +8,7 @@ import type { Active } from './sky.ts';
 import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
 import type { MaterialInfo } from './materials.ts';
+import type { CopyInfo } from './copies.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
 import { levelUpStats } from './rpg/callings.ts';
 import { HOTBAR_SIZE, settleSkills, slotSkill, upgradeHotbar } from './rpg/skills.ts';
@@ -266,7 +267,10 @@ export function takeItem(c: Character, item: string, qty = 1): boolean {
 }
 
 export function discover(c: Character, id: string): void {
-  if (!c.discovered.includes(id)) c.discovered.push(id);
+  // A crafted copy is met as the item it copies, for the Armoury.
+  const at = id.indexOf('~');
+  const base = at < 0 ? id : id.slice(0, at);
+  if (!c.discovered.includes(base)) c.discovered.push(base);
 }
 
 // --- Items -----------------------------------------------------------------
@@ -299,9 +303,16 @@ export interface ItemDef {
   light?: Light;
   /** Materials: family, home regions, source, tier and trait (materials.ts). */
   material?: MaterialInfo;
+  /** A crafted copy: who made it, its quality and what it carries (copies.ts). */
+  copy?: CopyInfo;
 }
 
-export const ITEMS: Record<string, ItemDef> = {
+/**
+ * Every item by id. A crafted copy's id (copies.ts) is not stored here: it is
+ * worked out from the id when asked, so every server and browser knows it.
+ * Listing ITEMS lists only the items themselves.
+ */
+export const ITEMS: Record<string, ItemDef> = new Proxy<Record<string, ItemDef>>({
   bible: {
     name: 'The Bible',
     kind: 'book',
@@ -419,7 +430,18 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Read it to learn Firebolt: a spark of Wit flung at a creature up to five steps away.',
     value: 40,
   },
-};
+}, {
+  get: (items, id) => (typeof id === 'string' && !Object.hasOwn(items, id) && id.includes('~') ? copyResolver?.(items, id) : Reflect.get(items, id)),
+  has: (items, id) => Reflect.has(items, id) || (typeof id === 'string' && id.includes('~') && Boolean(copyResolver?.(items, id))),
+});
+
+/** Works out a crafted copy's ItemDef from its id (copies.ts registers it as the game loads). */
+let copyResolver: ((items: Record<string, ItemDef>, id: string) => ItemDef | undefined) | undefined;
+
+/** Lets copies.ts teach ITEMS how to read a copy's id. */
+export function resolveCopiesWith(resolve: (items: Record<string, ItemDef>, id: string) => ItemDef | undefined): void {
+  copyResolver = resolve;
+}
 
 // --- Abilities ---------------------------------------------------------------
 

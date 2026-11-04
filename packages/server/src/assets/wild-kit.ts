@@ -150,6 +150,7 @@ export async function paintKitAsset(
 ): Promise<{ image: GeneratedImage; entry: ArtEntry; prompt: string; references: string[] }> {
   const references: GeneratedImage[] = [];
   const sent: string[] = [];
+  const labels: string[] = [];
   const refList = extra.references ?? asset.references ?? [];
   for (const ref of refList) {
     let data: Buffer | undefined;
@@ -176,11 +177,12 @@ export async function paintKitAsset(
     }
     if (!data) continue;
     references.push({ mimeType: 'image/png', data });
-    sent.push(label);
+    sent.push(ref);
+    labels.push(label);
   }
   const words = buildPrompt(asset, paintedFootprint(asset.id, asset.kind));
   const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${words}\nAlso: ${extra.note.trim()}` : words;
-  const image = await provider.generate({ prompt, references, labels: sent });
+  const image = await provider.generate({ prompt, references, labels });
   // The untouched picture is kept, so it can be processed again for free.
   await mkdir(resolve(outDir, 'raw'), { recursive: true });
   await writeFile(resolve(outDir, 'raw', `${asset.id}.png`), await sharp(image.data).png().toBuffer());

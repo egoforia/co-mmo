@@ -66,6 +66,7 @@ import {
   raiseHouses,
   revealBuildings,
   undrawRegion,
+  spotArt,
 } from './world-scene/regions.ts';
 import {
   type Avatar,
@@ -97,6 +98,8 @@ export class WorldScene extends Phaser.Scene {
   private lastSeq = 0;
   private me!: Avatar;
   private remotes = new Map<string, Remote>();
+  /** Gathering spots show on the mini map (the Cervid's Mycelial Sense). */
+  private spotSense = false;
   /** Each player's people, as snapshots tell it, for the body they wear without a look of their own. */
   private races = new Map<string, RaceId>();
   private creatures = new Map<string, Remote>();
@@ -387,7 +390,21 @@ export class WorldScene extends Phaser.Scene {
     add(this.remotes, 'player');
     add(this.creatures, 'creature');
     add(this.npcs, 'npc');
+    // The Cervid's Mycelial Sense: gathering spots show on the map, beneath everyone.
+    if (this.spotSense && !this.floor) {
+      const spots: MapFigure[] = [];
+      for (const s of this.map.spots) {
+        const art = spotArt(this, s.kind);
+        if (art) spots.push({ x: s.x + 0.5, y: s.y + 1, art, kind: 'spot' });
+      }
+      figures.splice(1, 0, ...spots);
+    }
     return { scene: this, map: this.map, artLoaded: this.artLoaded, floor: this.floor, figures };
+  }
+
+  /** Whether gathering spots show on the mini map (sensesSpots). */
+  setSpotSense(on: boolean): void {
+    this.spotSense = on;
   }
 
   onSnapshot(snapshot: SnapshotMessage): void {

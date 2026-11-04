@@ -72,6 +72,7 @@ import { Paths } from './region/paths/index.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
 import { inspectEntity } from './region/inspect.ts';
 import { Kit } from './region/kit.ts';
+import { Gathering } from './region/gathering.ts';
 import { Minds } from './region/minds.ts';
 import { Quests } from './region/quests.ts';
 import { RegionState, type Body, type PlayerState } from './region/state.ts';
@@ -221,6 +222,7 @@ export class Region {
   private readonly minds: Minds;
   private readonly gauges: Gauges;
   private readonly kit: Kit;
+  private readonly gathering: Gathering;
   private readonly quests: Quests;
   private readonly looting: Bodies;
   private readonly talk: Chat;
@@ -253,7 +255,8 @@ export class Region {
     this.map = generateRegion(def);
     this.s = new RegionState(this.map, this.hooks, this.now, this.random);
     this.looting = new Bodies(this.s);
-    this.quests = new Quests(this.s, this.looting, () => this.sky().phase);
+    this.gathering = new Gathering(this.s);
+    this.quests = new Quests(this.s, this.looting, () => this.sky().phase, (p) => this.gathering.start(p));
     this.gauges = new Gauges(this.s);
     this.fallen = new Fallen(this.s);
     this.paths = new Paths(this.s, this.gauges, () => this.combat);
@@ -773,6 +776,7 @@ export class Region {
     });
 
     phase('combat', () => this.combat.tick(now));
+    phase('gathering', () => this.gathering.tick(now));
     phase('minds_think', () => this.minds.think(now, skyPhase, weather));
 
     phase('bodies', () => {

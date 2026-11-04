@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem } from '@co-mmo/shared';
+import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem, sensesSpots } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
@@ -110,6 +110,8 @@ function play(token: string): void {
   soundControls(sound);
   void sound.refresh(true);
   let character: Character | null = null;
+  /** The tool in hand while gathering at a spot. */
+  let gatheringWith: string | undefined;
   /** Wishes of yours already granted, so only a new one rings. */
   const granted = new Set<string>();
   onContent(() => {
@@ -238,7 +240,13 @@ function play(token: string): void {
         kit?.setCharacter(message.character);
         gauge.setCharacter(message.character);
         prayer?.setFavor(message.character.favor);
-        scene?.setMyHeld(heldItem(message.character), offHandItem(message.character));
+        scene?.setMyHeld(gatheringWith ?? heldItem(message.character), offHandItem(message.character));
+        scene?.setSpotSense(sensesSpots(message.character));
+        break;
+      case 'gather':
+        // While gathering, the tool shows in the hand.
+        gatheringWith = message.tool;
+        if (character) scene?.setMyHeld(gatheringWith ?? heldItem(character), offHandItem(character));
         break;
       case 'god':
         sound.play('god-speaks');

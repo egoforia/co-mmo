@@ -20,8 +20,9 @@ function statusesOf(statuses: StatusId[] | undefined): { statuses?: StatusId[] }
 }
 
 /** Another player as seen by those nearby, with their running statuses (statusIds). */
-export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: number; character: Character }, statuses?: StatusId[]): EntityState {
-  const held = heldItem(p.character);
+export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: number; character: Character; gathering?: { tool: string } }, statuses?: StatusId[]): EntityState {
+  // While gathering, the tool shows in the hand.
+  const held = p.gathering?.tool ?? heldItem(p.character);
   const offHeld = offHandItem(p.character);
   return {
     id: p.info.id, name: p.info.name, color: p.info.color, x: round(p.x), y: round(p.y), ...floorOf(p.floor), health: round(p.character.hp / maxHp(p.character)),

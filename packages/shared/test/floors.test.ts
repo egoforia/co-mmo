@@ -29,7 +29,7 @@ function land(): RegionMap {
   const map: RegionMap = {
     def: { id: 'test', name: 'Test', biome: 'sanctum', seed: 1, exits: {}, at: { x: 0, y: 0 } },
     width: 32, height: 32, seed: 1, tiles: new Uint8Array(32 * 32), spawn: { x: 16, y: 28 }, entries: {},
-    landmarks: [], buildings: [], storeys: [], stairways: [], npcs: [], creatures: [],
+    landmarks: [], buildings: [], storeys: [], stairways: [], npcs: [], creatures: [], spots: [],
   };
   map.buildings.push(building(map, 4, 4, 10, 8, 'sanctum-arcanum'));
   return map;

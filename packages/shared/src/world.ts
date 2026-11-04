@@ -6,6 +6,7 @@ import { layPlaces } from './places.ts';
 import { homeLandLayout } from './home-lands.ts';
 import { applyEdits, type WorldEdit } from './world-edits.ts';
 import type { Stairway, Storey } from './floors.ts';
+import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
 
 export enum Tile {
@@ -238,6 +239,8 @@ export interface RegionMap {
   stairways: Stairway[];
   npcs: NpcPlacement[];
   creatures: CreatureSpawn[];
+  /** Gathering spots on the ground floor (gathering.ts); each blocks its tile. */
+  spots: GatherSpot[];
   /**
    * Where along an edge its road meets it, in tiles, when not the middle: a
    * layout sets one when a building stands in the middle road's way, and the
@@ -288,6 +291,7 @@ function layOut(def: RegionDef, size: number): RegionMap {
     stairways: [],
     npcs: [],
     creatures: [],
+    spots: [],
   };
   const c = Math.floor(size / 2);
   const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? homeLandLayout(def.biome) ?? sanctumLayout;
@@ -309,6 +313,9 @@ function layOut(def: RegionDef, size: number): RegionMap {
   // NPCs stroll around their spot, so only landmarks block tiles. Those on other floors blocked theirs when placed.
   for (const l of map.landmarks) if (!l.floor) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
   openUp(map);
+  // The biome's gathering spots, on open ground the trails leave alone.
+  map.spots = layOutSpots({ width: size, height: size, seed: map.seed, biome: def.biome, open: (x, y) => map.tiles[y * size + x] === Tile.Ground });
+  for (const s of map.spots) set(map, s.x, s.y, Tile.Blocked);
   // After the trails are cut, so a tree an editor planted stays where it was put.
   if (def.edits?.length) applyEdits(map, def.edits);
   settle(map);

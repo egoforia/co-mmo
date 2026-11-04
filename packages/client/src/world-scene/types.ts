@@ -176,7 +176,7 @@ export interface MapFigure {
   x: number;
   y: number;
   art: string;
-  kind: 'me' | 'player' | 'creature' | 'npc';
+  kind: 'me' | 'player' | 'creature' | 'npc' | 'spot';
 }
 
 /** What the mini map needs to draw our floor and look at the others. */

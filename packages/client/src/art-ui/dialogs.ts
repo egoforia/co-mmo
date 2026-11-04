@@ -80,8 +80,8 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       <p class="note">This is everything that will be sent to the AI model${many ? 's' : ''}. Nothing is painted until you approve it.</p>
       ${ask.what === 'view' ? sourcesHtml(ask) : ''}
       ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
-        <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button>${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
-      ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><button type="submit" class="quiet">Show with these words</button></form>` : ''}
+        <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button><button type="button" class="quiet director-btn" data-harmonize-prompt>✦ Harmonize with Art Director</button>${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
+      ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><div class="card-actions"><button type="submit" class="quiet">Show with these words</button><button type="button" class="quiet director-btn" data-harmonize-note>✦ Harmonize with Art Director</button></div></form>` : ''}
       ${review.parts.map((p) => `${many ? `<details><summary><b>${esc(p.name)}</b> · about ${usd(p.recipe.steps.reduce((n, s) => n + s.usd, 0))}</summary>${recipeHtml(p.recipe, undefined, true)}</details>` : recipeHtml(p.recipe, undefined, true)}`).join('')}
     </div>
     <footer>
@@ -109,6 +109,45 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
     e.preventDefault();
     const words = String(new FormData(e.target as HTMLFormElement).get('note') ?? '').trim();
     void openReview(ask, takesNote, words);
+  });
+  d.querySelector<HTMLButtonElement>('[data-harmonize-note]')?.addEventListener('click', async (e) => {
+    const btn = e.target as HTMLButtonElement;
+    const textarea = d.querySelector<HTMLTextAreaElement>('form.review-note textarea[name="note"]');
+    btn.disabled = true;
+    btn.textContent = '✦ Harmonizing…';
+    const asset = 'asset' in ask ? ask.asset : 'walker' in ask ? ask.walker : undefined;
+    try {
+      const res = await ctx.api<{ harmonizedNote: string }>('art/director', 'POST', {
+        action: 'harmonize',
+        asset,
+        note: textarea?.value ?? note,
+      });
+      void openReview(ask, takesNote, res.harmonizedNote);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '✦ Harmonize with Art Director';
+      ctx.toast((err as Error).message);
+    }
+  });
+  d.querySelector<HTMLButtonElement>('[data-harmonize-prompt]')?.addEventListener('click', async (e) => {
+    const btn = e.target as HTMLButtonElement;
+    const textarea = d.querySelector<HTMLTextAreaElement>('form.review-prompt textarea[name="prompt"]');
+    if (!editable || !textarea) return;
+    btn.disabled = true;
+    btn.textContent = '✦ Harmonizing…';
+    const asset = 'asset' in editable ? editable.asset : 'walker' in editable ? editable.walker : undefined;
+    try {
+      const res = await ctx.api<{ harmonizedPrompt: string }>('art/director', 'POST', {
+        action: 'harmonize',
+        asset,
+        prompt: textarea.value,
+      });
+      void openReview({ ...editable, prompt: res.harmonizedPrompt }, false);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '✦ Harmonize with Art Director';
+      ctx.toast((err as Error).message);
+    }
   });
   d.querySelector<HTMLButtonElement>('[data-approve]')!.addEventListener('click', async (e) => {
     const button = e.target as HTMLButtonElement;

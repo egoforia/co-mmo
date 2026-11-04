@@ -375,7 +375,7 @@ export function createApp(options: AppOptions): App {
 
     if (await handleKitHouses(req, res, url, authenticate(req), { world, houses: kitHouses })) return;
 
-    if (await handleWorldEdits(req, res, url, authenticate(req), worldEditor)) return;
+    if (await handleWorldEdits(req, res, url, authenticate(req), worldEditor, { ai, budget })) return;
 
     // Building art and wished biomes' kits painted here, beyond what ships with the game.
     if (path === '/api/art' && req.method === 'GET') return json(res, 200, await paintedArt());

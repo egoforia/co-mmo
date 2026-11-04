@@ -16,8 +16,10 @@ import {
 import { ArtHistory } from './art-history.ts';
 import { plain, type ArtJob, type ArtJobHandle } from './art-jobs.ts';
 import { keepingImage } from './art-recipes.ts';
+import { ArtDirector } from './art-studio/art-director.ts';
 import { ArtCatalog } from './art-studio/catalog.ts';
 import { normalAsk, reviewAsk, sheetAsk } from './art-studio/review.ts';
+import { UpNextQueue } from './art-studio/up-next-queue.ts';
 import {
   type ArtAsk,
   type ArtGroup,
@@ -64,6 +66,8 @@ export class ArtStudio {
   private redone: ArtManifest = {};
   private readonly history: ArtHistory;
   private readonly catalog: ArtCatalog;
+  readonly upNext: UpNextQueue;
+  readonly director: ArtDirector;
   private loaded = false;
   /** Owner requests, one after another, behind any start-up painting. */
   private queue: Promise<void> = Promise.resolve();
@@ -75,6 +79,15 @@ export class ArtStudio {
   constructor(private readonly options: ArtStudioOptions) {
     this.history = new ArtHistory(options.artDir, options.recipes);
     this.catalog = new ArtCatalog(options, this.history, this.redoneDir, () => this.manifest());
+    this.upNext = new UpNextQueue(options.artDir);
+    this.director = new ArtDirector({
+      artDir: options.artDir,
+      anchorDir: options.anchorDir,
+      ai: options.ai,
+      budget: options.budget,
+      catalog: this.catalog,
+      readArt: options.readArt,
+    });
   }
 
   private get redoneDir(): string {

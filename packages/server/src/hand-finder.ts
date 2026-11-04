@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { isRetiredArt, type ArtPoints, type ArtPointsManifest } from '@co-mmo/shared';
+import { isRetiredArt, type ArtPoint, type ArtPoints, type ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
 import { GRIP, HAND_QUESTIONS, HAND_VIEWS, POINTS_VERSION, findHands, findPoint, handSystem, mirroredHands, steadyHands, stripFrames, type BothHands, type Facing, type HandView } from './assets/points.ts';
 
@@ -119,19 +119,93 @@ export class HandFinder {
   /**
    * Gives one walk the hands found in another, mirrored: costs nothing, and
    * is kept until that walk is painted again or its hands are looked for
-   * again. Refused, in plain words, when either walk or its hands are missing.
+   * again. Optionally mirrors a single frame (`options.frame`) or one hand side.
    */
-  async mirror(fromId: string, toId: string): Promise<void> {
+  async mirror(fromId: string, toId: string, options?: { frame?: number; fromFrame?: number; side?: 'both' | 'right' | 'left' }): Promise<void> {
     await this.load();
     const found = this.found[fromId];
     if (!found?.hands) throw new Error('No hands have been found in that animation yet, so there is nothing to mirror.');
     const target = (await this.options.sources()).find((s) => s.id === toId && s.kind === 'hands');
     const picture = await target?.read().catch(() => undefined);
     if (!target || !picture) throw new Error('That animation has not been painted yet.');
-    const hands = mirroredHands(found.hands, target.frames);
-    const leftHands = mirroredHands(found.leftHands, target.frames);
-    const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));
-    this.found[toId] = { from: this.stamp(target, picture), hands, ...(found.leftHands ? { leftHands } : {}), both, mirrored: fromId };
+    const flippedR = mirroredHands(found.hands, target.frames);
+    const flippedL = mirroredHands(found.leftHands, target.frames);
+    const side = options?.side ?? 'both';
+    if (options?.frame === undefined && side === 'both') {
+      const both = flippedR.map((right, i) => ({ ...(right ? { right } : {}), ...(flippedL[i] ? { left: flippedL[i]! } : {}) }));
+      this.found[toId] = { from: this.stamp(target, picture), hands: flippedR, ...(found.leftHands ? { leftHands: flippedL } : {}), both, mirrored: fromId };
+    } else {
+      const existing = this.found[toId];
+      const hands = Array.from({ length: target.frames }, (_, i) => existing?.hands?.[i] ?? null);
+      const leftHands = Array.from({ length: target.frames }, (_, i) => existing?.leftHands?.[i] ?? null);
+      if (options?.frame !== undefined) {
+        const f = options.frame;
+        const srcF = options.fromFrame ?? f;
+        if (f >= 0 && f < target.frames) {
+          const srcR = found.hands[srcF] ? ([Math.round((1 - found.hands[srcF]![0]) * 1000) / 1000, found.hands[srcF]![1]] as ArtPoint) : null;
+          const srcL = found.leftHands?.[srcF] ? ([Math.round((1 - found.leftHands[srcF]![0]) * 1000) / 1000, found.leftHands[srcF]![1]] as ArtPoint) : null;
+          if (side === 'both' || side === 'right') hands[f] = srcR;
+          if (side === 'both' || side === 'left') leftHands[f] = srcL;
+        }
+      } else {
+        for (let i = 0; i < target.frames; i++) {
+          if (side === 'both' || side === 'right') hands[i] = flippedR[i] ?? null;
+          if (side === 'both' || side === 'left') leftHands[i] = flippedL[i] ?? null;
+        }
+      }
+      const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));
+      this.found[toId] = { from: this.stamp(target, picture), hands, leftHands, both, mirrored: fromId };
+    }
+    await mkdir(this.options.artDir, { recursive: true });
+    await writeFile(this.file, JSON.stringify(this.found, null, 2));
+  }
+
+  /**
+   * Manually sets or clears hand coordinates (for a single frame or full strip)
+   * or an item's grip point, stamping the current picture so automatic runs preserve it.
+   */
+  async setPoints(
+    id: string,
+    update: {
+      frame?: number;
+      right?: ArtPoint | null;
+      left?: ArtPoint | null;
+      hands?: (ArtPoint | null)[];
+      leftHands?: (ArtPoint | null)[];
+      grip?: ArtPoint | null;
+    },
+  ): Promise<void> {
+    await this.load();
+    const source = (await this.options.sources()).find((s) => s.id === id);
+    const picture = await source?.read().catch(() => undefined);
+    const from = source && picture ? this.stamp(source, picture) : (this.found[id]?.from ?? `${id}#manual#v${POINTS_VERSION}`);
+    const clamp = (pt: ArtPoint | null | undefined): ArtPoint | null => {
+      if (!pt || !Array.isArray(pt) || pt.length < 2) return null;
+      const x = Number(pt[0]), y = Number(pt[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return [Math.max(0, Math.min(1, Math.round(x * 1000) / 1000)), Math.max(0, Math.min(1, Math.round(y * 1000) / 1000))];
+    };
+    if (source?.kind === 'grip' || update.grip !== undefined) {
+      const grip = clamp(update.grip);
+      this.found[id] = { from, ...(grip ? { grip } : {}) };
+    } else {
+      const existing = this.found[id];
+      const frames = source?.frames ?? Math.max(existing?.hands?.length ?? 1, update.hands?.length ?? 0, (update.frame ?? 0) + 1);
+      const hands = Array.from({ length: frames }, (_, i) => existing?.hands?.[i] ?? null);
+      const leftHands = Array.from({ length: frames }, (_, i) => existing?.leftHands?.[i] ?? null);
+      if (Array.isArray(update.hands)) {
+        for (let i = 0; i < frames; i++) hands[i] = clamp(update.hands[i]);
+      }
+      if (Array.isArray(update.leftHands)) {
+        for (let i = 0; i < frames; i++) leftHands[i] = clamp(update.leftHands[i]);
+      }
+      if (update.frame !== undefined && update.frame >= 0 && update.frame < frames) {
+        if ('right' in update) hands[update.frame] = clamp(update.right);
+        if ('left' in update) leftHands[update.frame] = clamp(update.left);
+      }
+      const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));
+      this.found[id] = { from, hands, leftHands, both };
+    }
     await mkdir(this.options.artDir, { recursive: true });
     await writeFile(this.file, JSON.stringify(this.found, null, 2));
   }

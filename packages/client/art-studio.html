@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Art Studio · co-MMO</title>
+    <link rel="stylesheet" href="/src/art-studio.css" />
+  </head>
+  <body>
+    <header class="studio-header">
+      <h1>✦ AI Art Studio</h1>
+      <span id="you"></span>
+      <div class="header-links">
+        <button type="button" class="quiet" id="toggle-api-log">📡 Art API Call Log</button>
+        <a href="/gods-view.html">God's View</a>
+        <a href="/">Back to the world</a>
+      </div>
+    </header>
+    <main id="main"><p class="note">Loading AI Art Studio…</p></main>
+    <section id="studio-api-log-drawer" class="api-log-drawer" hidden>
+      <header class="studio-split-header">
+        <h2>📡 Art &amp; Media API Call Log</h2>
+        <button type="button" class="quiet" id="close-api-log">Close ✕</button>
+      </header>
+      <div id="studio-api-log-body"></div>
+    </section>
+    <div id="toast" role="status" hidden></div>
+    <script type="module" src="/src/art-studio.ts"></script>
+  </body>
+</html>

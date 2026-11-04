@@ -8,6 +8,8 @@ import {
   BUILDING_STYLES,
   FACINGS,
   ISO_WAYS,
+  ITEMS,
+  SPOTS,
   WALK_CYCLE_SECONDS,
   WALK_FRAMES,
   isFacing,
@@ -31,7 +33,7 @@ import type { KitAsset } from '../assets/kit.ts';
 import { pictureName } from '../assets/names.ts';
 import { kitPieces } from '../assets/sea-cave-kit.ts';
 import { wildKit } from '../assets/wild-kit.ts';
-import { homeLandBox } from '../assets/home-land-art.ts';
+import { HOME_LAND_ANCHORS, homeLandBox } from '../assets/home-land-art.ts';
 import { artRequest, estimateImageUsd } from '../assets/wish-art.ts';
 import { normalMapId } from '../normal-painter.ts';
 import type { ArtUse } from '../settings.ts';
@@ -75,19 +77,20 @@ export class ArtCatalog {
     };
     const items: ArtItem[] = [];
     for (const a of kitPieces().filter(repaintableKit)) {
-      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd('scenery'), repaintable: true, takesNote: true });
+      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd('scenery'), repaintable: true, takesNote: true, biome: a.biome, kind: a.kind });
     }
     for (const a of ANCHORS) {
-      // A home land's creatures and people are painted the first time here.
+      // A home land's creatures and people, craft tools, spots, materials and skill effects are painted the first time here.
       const paintable = Boolean(shipped[a.id] || homeLandBox(a.id));
-      const repaintable = paintable && a.kind !== 'effect';
-      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, ...(paintable ? {} : { why: 'Not part of the game yet.' }) });
+      const repaintable = paintable;
+      const meta = anchorMeta(a);
+      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...url(a.id), estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, biome: a.biome, kind: a.kind, ...meta, ...(paintable ? {} : { why: 'Not part of the game yet.' }) });
     }
     // Lands' buildings after their scenery, so each land's page and the list of lands start with the launch kit.
     for (const style of Object.values(BUILDING_STYLES)) {
       for (const job of buildingArtJobs(style)) {
         const name = job.id.slice(style.id.length + 1).replace(/^furniture-/, '').replace(/-/g, ' ').replace(/^exterior$/, 'outside');
-        items.push({ id: job.id, name, place: buildingPlace(style.id), ...url(job.id), estimateUsd: this.pictureUsd('buildings'), repaintable: true, takesNote: true });
+        items.push({ id: job.id, name, place: buildingPlace(style.id), ...url(job.id), estimateUsd: this.pictureUsd('buildings'), repaintable: true, takesNote: true, biome: style.biome, kind: 'building' });
       }
     }
     items.push(...this.wishedItems(this.pictureUsd('wishes')));
@@ -142,11 +145,11 @@ export class ArtCatalog {
   }
 
   /** Everything that can walk: the approved people and creatures, then wished ones. */
-  walkerList(): (Walker & { kind: string; url?: string; place: ArtPlace })[] {
-    const list: (Walker & { kind: string; url?: string; place: ArtPlace })[] = [];
+  walkerList(): (Walker & { kind: string; url?: string; place: ArtPlace; tier?: string; biome?: string })[] {
+    const list: (Walker & { kind: string; url?: string; place: ArtPlace; tier?: string; biome?: string })[] = [];
     for (const a of ANCHORS) {
       if (a.kind !== 'player' && a.kind !== 'npc' && a.kind !== 'monster') continue;
-      list.push({ ...this.options.walks.anchorWalker(a.id), kind: a.kind === 'player' ? 'player look' : a.kind === 'npc' ? 'person' : 'creature', url: `/art/${a.id}.png`, place: shippedPlace(a) });
+      list.push({ ...this.options.walks.anchorWalker(a.id), kind: a.kind === 'player' ? 'player look' : a.kind === 'npc' ? 'person' : 'creature', url: `/art/${a.id}.png`, place: shippedPlace(a), ...(a.tier ? { tier: a.tier } : {}), biome: a.biome });
     }
     for (const record of this.options.store.content) {
       const def = record.definition;
@@ -163,6 +166,7 @@ export class ArtCatalog {
           place: wishedPlace(p.def),
           gear: [],
           body: 'two-legged',
+          ...(def.kind === 'region' ? { biome: def.biome } : {}),
           reference: () => readFile(resolve(this.options.artDir, `${p.id}.png`)),
         });
       }
@@ -206,7 +210,7 @@ export class ArtCatalog {
       // What its isometric ways still need: one sheet for the missing pictures, and a clip for each way that does not walk.
       const sheet = ISO_WAYS.some((d) => !standing[d].url) ? picture : 0;
       const estimateUsd = sheet + ISO_WAYS.filter((d) => !walks[d]).length * clip;
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd, clipUsd: clip, viewUsd: picture });
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(w.url ? { url: w.url } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body });
     }
     return views;
   }
@@ -275,9 +279,9 @@ export class ArtCatalog {
     return from;
   }
 
-  /** A shipped scenery piece, character or item that can be painted again. */
+  /** A shipped scenery piece, character, item or effect that can be painted again. */
   kitAsset(asset: string): KitAsset | undefined {
-    return [...kitPieces().filter(repaintableKit), ...ANCHORS.filter((a) => a.kind !== 'effect')].find((a) => a.id === asset) as KitAsset | undefined;
+    return [...kitPieces().filter(repaintableKit), ...ANCHORS].find((a) => a.id === asset) as KitAsset | undefined;
   }
 
   /** A picture's name, for a review's title. */
@@ -376,4 +380,35 @@ export class ArtCatalog {
     const kit = this.kitAsset(asset);
     return kit ? useOf(kit) : 'wishes';
   }
+}
+
+/** Metadata tags for an anchor asset: stand-in fallback, fashion style, slot, and sub-category. */
+function anchorMeta(a: (typeof ANCHORS)[number]): Pick<ArtItem, 'standIn' | 'fashionStyle' | 'slot' | 'category'> {
+  const item = Object.values(ITEMS).find((i) => i.art === a.id);
+  const spot = Object.values(SPOTS).find((s) => s.art === a.id);
+  let standIn: string | undefined;
+  if (item?.standIn && item.standIn !== a.id) {
+    standIn = item.standIn;
+  } else if (spot) {
+    const mat = ITEMS[spot.material];
+    standIn = mat?.standIn ?? mat?.art;
+  } else if (HOME_LAND_ANCHORS.some((h) => h.id === a.id)) {
+    standIn = a.kind === 'npc' ? 'sanctum-pilgrim' : 'woods-mushroom';
+  }
+  const fashionStyle = item?.style;
+  const slot = item?.slot;
+  let category: string | undefined;
+  if (a.id.startsWith('item-tool-') || item?.kind === 'tool') category = 'tool';
+  else if (spot) category = 'gathering-spot';
+  else if (item?.unique) category = 'unique';
+  else if (item?.style) category = 'garment';
+  else if (item?.kind === 'material') category = 'material';
+  else if (a.kind === 'effect') category = a.id.startsWith('status-') ? 'status-icon' : 'skill-fx';
+
+  return {
+    ...(standIn ? { standIn } : {}),
+    ...(fashionStyle ? { fashionStyle } : {}),
+    ...(slot ? { slot } : {}),
+    ...(category ? { category } : {}),
+  };
 }

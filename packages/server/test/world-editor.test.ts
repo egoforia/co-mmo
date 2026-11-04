@@ -56,6 +56,28 @@ describe('the world editor', () => {
     expect(nothing).toMatchObject({ status: 400, body: { message: 'There is nothing to redo in this land.' } });
     const listed = await api(base, '/api/world-edits?region=sanctum', steward.token);
     expect(listed.body.edits).toHaveLength(1);
+
+    // In-Studio Region Map Preview & AI Map Architect endpoints:
+    const withMap = await api(base, '/api/world-edits?region=sanctum&includeMap=1', steward.token);
+    expect(withMap.status).toBe(200);
+    expect(withMap.body.map.def.id).toBe('sanctum');
+    expect(withMap.body.regions.some((r: { id: string }) => r.id === 'frostpeak')).toBe(true);
+
+    const preview = await api(base, '/api/world-edits/ai-preview', steward.token, 'POST', {
+      region: 'sanctum',
+      prompt: 'Lay a stone road and place a gathering spot',
+    });
+    expect(preview.status).toBe(200);
+    expect(preview.body.steps.length).toBeGreaterThan(0);
+
+    const validSpot = openGround(app!.world.home.map, [110, 140]);
+    const batchApply = await api(base, '/api/world-edits/ai-apply', steward.token, 'POST', {
+      region: 'sanctum',
+      drafts: [{ kind: 'paint', tile: 'path', tiles: [validSpot] }],
+    });
+    expect(batchApply.status).toBe(200);
+    expect(batchApply.body.applied).toBe(1);
+    expect(tile(app!.world.home.map, validSpot)).toBe(Tile.Path);
   });
 
   it('refuses edits that do not fit, in plain words, and never blocks where players arrive', async () => {

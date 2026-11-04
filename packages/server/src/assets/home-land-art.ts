@@ -4,6 +4,7 @@ import { HOME_LAND_ANCHORS } from './home-land-anchors.ts';
 import { CRAFT_TOOL_ANCHORS } from './craft-tool-anchors.ts';
 import { GATHER_SPOT_ANCHORS } from './gather-spot-anchors.ts';
 import { materialIconAnchors } from './material-icon-anchors.ts';
+import { SKILL_ANCHORS } from './skill-anchors.ts';
 import { wildKit } from './wild-kit.ts';
 
 // The pictures Frostpeak and Mushroom Hollow need (gather and craft plan,
@@ -43,6 +44,8 @@ export function homeLandBox(id: string): { width: number; height: number } | und
   if (GATHER_SPOT_ANCHORS.some((a) => a.id === id)) return { width: 128, height: 128 };
   // Material icons (step 6), as the launch items.
   if (materialIconAnchors().some((a) => a.id === id)) return { width: 128, height: 128 };
+  const skill = SKILL_ANCHORS.find((a) => a.id === id);
+  if (skill) return skill.kind === 'effect' ? { width: 128, height: 128 } : TIER_BOX[skill.tier ?? 'medium'];
   const anchor = HOME_LAND_ANCHORS.find((a) => a.id === id);
   if (!anchor) return undefined;
   return anchor.kind === 'npc' ? { width: 128, height: 192 } : TIER_BOX[anchor.tier ?? 'medium'];

@@ -1,14 +1,17 @@
-// Sub-tab renderers for God's View's Art tab: Painting now (jobs), Items,
-// Biomes (scenery & buildings), Building looks (texture sheets), Sounds &
-// music, and item/normal-map cards.
+// Sub-tab renderers for the AI Art Studio: Painting now (jobs), Items (with Region
+// Fashion Style & Stand-In filters, Craft Tools, Boss Uniques), Biomes (Gathering Spots,
+// Scenery & Buildings across all lands including Frostpeak & Mushroom Hollow),
+// Building looks (texture sheets), Sounds & music, and item/normal-map cards.
 
 import { BUILDING_STYLES } from '@co-mmo/shared';
+import { queueButtonHtml } from './queue.ts';
 import {
   ASKED,
   type ArtContext,
   type ArtItem,
   type ArtJob,
   type Budget,
+  HOLDABLE,
   ITEM_ORDER,
   type KitSheetView,
   MEDIA,
@@ -60,12 +63,41 @@ export async function refreshArtJobs(context: ArtContext): Promise<void> {
   if (details && open !== undefined) details.open = open;
 }
 
+const FASHION_FILTERS = [
+  ['all', 'All Styles'],
+  ['pilgrim', 'Pilgrim'],
+  ['barkwarden', 'Barkwarden'],
+  ['pearlcoat', 'Pearlcoat'],
+  ['sunwrap', 'Sunwrap'],
+  ['windfelt', 'Windfelt'],
+  ['sporeweave', 'Sporeweave'],
+] as const;
+
 export function itemsPage(page?: string): string {
   const items = artState.data!.items.filter((i) => i.place.tab === 'items');
   const kinds = ITEM_ORDER.filter((k) => items.some((i) => i.place.page === k));
   if (!kinds.length) return '<p class="note">No items yet.</p>';
   const chosen = page && kinds.includes(page) ? page : kinds[0]!;
-  return `${pagesNav('items', kinds, chosen)}${sectionHtml(chosen, items.filter((i) => i.place.page === chosen))}`;
+  let inPage = items.filter((i) => i.place.page === chosen);
+  if (artState.itemFashionFilter !== 'all') {
+    inPage = inPage.filter((i) => i.fashionStyle === artState.itemFashionFilter);
+  }
+  if (artState.itemStandInOnly) {
+    inPage = inPage.filter((i) => !!i.standIn);
+  }
+
+  const filterBar = `
+    <div class="studio-filter-bar">
+      <div class="btn-group">
+        ${FASHION_FILTERS.map(
+          ([id, label]) =>
+            `<button type="button" class="quiet${artState.itemFashionFilter === id ? ' active-pill' : ''}" data-item-fashion="${id}">${esc(label)}</button>`,
+        ).join('')}
+      </div>
+      <label class="check"><input type="checkbox" data-item-standin-only${artState.itemStandInOnly ? ' checked' : ''}> Only show items using a Stand-In (${items.filter((i) => i.place.page === chosen && i.standIn).length})</label>
+    </div>`;
+
+  return `${pagesNav('items', kinds, chosen)}${filterBar}${sectionHtml(chosen, inPage)}`;
 }
 
 export function biomesPage(page?: string): string {
@@ -74,11 +106,13 @@ export function biomesPage(page?: string): string {
   if (!lands.length) return '<p class="note">No lands yet.</p>';
   const chosen = page && lands.includes(page) ? page : lands[0]!;
   const here = items.filter((i) => i.place.page === chosen);
-  const scenery = here.filter((i) => i.place.section === 'Scenery');
+  const spots = here.filter((i) => i.category === 'gather-spot');
+  const scenery = here.filter((i) => i.place.section === 'Scenery' && i.category !== 'gather-spot');
   const buildings = [...new Set(here.filter((i) => i.place.section !== 'Scenery').map((i) => i.place.section!))];
   return `
     ${pagesNav('biomes', lands, chosen)}
-    ${scenery.length ? `<h2>Scenery</h2>${sectionHtml(null, scenery)}` : ''}
+    ${spots.length ? `<h2>Gathering Spots (${spots.length})</h2><p class="note">Interactive harvest nodes placed in ${esc(chosen)}. Spots borrowing a scenery prop as a stand-in are marked below until their dedicated sprite is painted.</p>${sectionHtml(null, spots)}` : ''}
+    ${scenery.length ? `<h2>Scenery &amp; Tiles</h2>${sectionHtml(null, scenery)}` : ''}
     ${buildings.length ? `<h2>Buildings</h2><p class="note">The inside of a building is painted to match its outside, so after painting the outside again you may want the inside again too.</p>
       ${buildings.map((b) => sectionHtml(b, here.filter((i) => i.place.section === b), 'h3')).join('')}` : ''}`;
 }
@@ -98,12 +132,40 @@ export function itemHtml(item: ArtItem): string {
   const check = item.reused ? `<br><small>Shows the picture of ${esc(item.reused)}</small>`
     : item.check && !item.check.pass ? `<br><small class="bad">Style check not passed after ${item.check.tries} ${item.check.tries === 1 ? 'try' : 'tries'}: ${esc(item.check.why ?? '')}</small>`
     : item.check ? `<br><small>Style check passed${item.check.tries > 1 ? ` on try ${item.check.tries}` : ''}</small>` : '';
+  const standInNote = item.standIn
+    ? `<br><small class="standin-badge">Stand-in: <b>${esc(item.standIn.name ?? item.standIn.id)}</b></small>`
+    : '';
+  const tags = [
+    item.fashionStyle ? `<span class="tag-pill">${esc(item.fashionStyle)}</span>` : '',
+    item.slot ? `<span class="tag-pill">${esc(item.slot)}</span>` : '',
+    item.category === 'boss-unique' ? '<span class="tag-pill unique-pill">Boss Unique</span>' : '',
+    item.category === 'craft-tool' ? '<span class="tag-pill">Craft Tool</span>' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const isHoldable = item.place.tab === 'items' && HOLDABLE.includes(item.place.page);
+  const grip = isHoldable ? artState.points[item.id]?.grip : undefined;
+  const gripHtml = isHoldable && item.url
+    ? `<br><small>${grip ? `Grip: [${grip[0].toFixed(2)}, ${grip[1].toFixed(2)}]` : 'Grip: not found yet'}</small>`
+    : '';
   const older = (item.versions?.length ?? 0) + (item.shipped ? 1 : 0);
   const paint = item.repaintable
-    ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'paint', asset: item.id }))}" data-note="${item.takesNote ? 'yes' : ''}">${item.source === 'missing' ? 'Paint' : 'Paint again'} · about ${usd(item.estimateUsd)}</button>`
+    ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'paint', asset: item.id }))}" data-note="${item.takesNote ? 'yes' : ''}">${item.source === 'missing' ? 'Paint' : item.standIn ? 'Paint Dedicated' : 'Paint again'} · about ${usd(item.estimateUsd)}</button>`
     : item.why ? `<small>${esc(item.why)}</small>` : '';
+  const queueBtn = item.repaintable
+    ? queueButtonHtml({
+        kind: 'paint',
+        targetId: item.id,
+        label: `${item.source === 'missing' || item.standIn ? 'Paint' : 'Repaint'} ${item.name}`,
+        category: item.place.page,
+        estimateUsd: item.estimateUsd,
+      })
+    : '';
+  const findGripBtn = isHoldable && item.url && !grip
+    ? `<button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [item.id] }))}">Find grip</button>`
+    : '';
   const details = item.source !== 'missing' ? `<button type="button" class="quiet" data-art-versions="${esc(item.id)}">${older ? `Versions (${older + 1})` : 'What made it'}</button>` : '';
-  return `<figure class="art-item ${item.source}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b><br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${check}<div class="card-actions">${paint}${details}</div>${normalHtml(item)}</figcaption></figure>`;
+  return `<figure class="art-item ${item.source}${item.standIn ? ' standin' : ''}${item.check && !item.check.pass ? ' flagged' : ''}">${picture}<figcaption><b>${esc(item.name)}</b> ${tags}<br><small>${SOURCE[item.source]}${model ? ` · ${esc(model)}` : ''}</small>${standInNote}${check}${gripHtml}<div class="card-actions">${paint}${queueBtn}${findGripBtn}${details}</div>${normalHtml(item)}</figcaption></figure>`;
 }
 
 /** Its normal map: worked out by the game, or painted, with buttons to paint one or go back. */
@@ -135,7 +197,11 @@ export function looksPage(): string {
         <h3>${esc(v.name)}</h3>
         <p class="note">${usedBy.length ? `Builds ${usedBy.map(esc).join(', ')}. ` : ''}${v.paintings.length} sheet${v.paintings.length === 1 ? '' : 's'} painted. ${state}</p>
         <ul class="textures">${v.textures.map(texture).join('')}</ul>
-        <div class="card-actions"><button type="button" data-art-review="${esc(JSON.stringify({ what: 'sheet', look: v.look }))}" data-note="yes">Paint a sheet</button>${again}</div>
+        <div class="card-actions">
+          <button type="button" data-art-review="${esc(JSON.stringify({ what: 'sheet', look: v.look }))}" data-note="yes">Paint a sheet</button>
+          ${again}
+          ${queueButtonHtml({ kind: 'sheet', targetId: v.look, label: `Kit sheet: ${v.name}`, category: 'Building Kit', estimateUsd: 0.04 })}
+        </div>
       </div>`;
   };
   return `
@@ -151,6 +217,7 @@ export function soundsPage(): string {
       ${s.url ? `<audio controls preload="none" src="${esc(s.url)}"${s.kind === 'music' ? ' loop' : ''}></audio>` : ''}
       <div class="card-actions">
         ${s.makeable ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'sound', sound: s.id }))}" data-note="yes">${s.url ? 'Make again' : 'Make'} · about ${usd(s.estimateUsd)}</button>` : `<small>${esc(s.why ?? '')}</small>`}
+        ${s.makeable ? queueButtonHtml({ kind: 'sound', targetId: s.id, label: `Sound: ${s.name}`, category: 'Sounds', estimateUsd: s.estimateUsd }) : ''}
         ${s.url ? `<button type="button" class="quiet" data-sound-versions="${esc(s.id)}">${s.versions.length ? `Versions (${s.versions.length + 1})` : 'What made it'}</button>` : ''}
       </div>
     </div>`;

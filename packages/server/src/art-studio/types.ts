@@ -61,6 +61,18 @@ export interface ArtItem {
   normalMap?: string;
   /** Whether a normal map can be painted for it here. */
   normalPaintable?: boolean;
+  /** Temporary stand-in asset ID shown by the game until this picture is painted. */
+  standIn?: string;
+  /** Region fashion style ID when this item is a styled garment (pilgrim, barkwarden, etc.). */
+  fashionStyle?: string;
+  /** Equipment slot when wearable or wieldable (head, body, cloak, feet, weapon, offhand, charm). */
+  slot?: string;
+  /** Sub-category tag (tool, gathering-spot, garment, unique, material, status-icon, skill-fx). */
+  category?: string;
+  /** Biome this asset belongs to. */
+  biome?: string;
+  /** Underlying asset kind (player, npc, monster, item, prop, tile, set-piece, effect, building). */
+  kind?: string;
 }
 
 /** A group of pictures in the Art tab that can be painted again together: one heading on one page. */
@@ -127,6 +139,12 @@ export interface WalkerView {
   clipUsd: number;
   /** About what painting one standing view costs. */
   viewUsd: number;
+  /** Creature size tier (tiny, small, medium, high, colossal) for the height ruler. */
+  tier?: string;
+  /** Biome this walker belongs to. */
+  biome?: string;
+  /** Default body type (two-legged, four-legged, six-legged, etc.). */
+  body?: string;
 }
 
 export interface ArtStudioOptions {

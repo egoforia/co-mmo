@@ -7,7 +7,7 @@
 import { loadToken, rejoinWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 import { apiLogPage, wireApiLog } from './api-log-ui.ts';
-import { artChange, artClick, artPage, artSubmit, focusHandFinder, refreshArtJobs, refreshHandStatus, type ArtContext } from './art-ui.ts';
+import { type ArtContext } from './art-ui.ts';
 import { lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { GameDown, api, rerender, toast, view, type Tab } from './gods-view/core.ts';
 import { worldTab } from './gods-view/world.ts';
@@ -26,7 +26,7 @@ const main = document.getElementById('main')!;
 
 const artContext: ArtContext = { api, toast, rerender };
 
-/** Every tab, in the order the tab bar shows them. */
+/** Every tab, in the order the tab bar shows them. Art has moved to /art-studio.html. */
 const TABS: Tab[] = [
   worldTab,
   wishesTab,
@@ -35,7 +35,6 @@ const TABS: Tab[] = [
   { id: 'loot', label: 'Loot', page: () => lootPage(artContext) },
   reportsTab,
   playersTab,
-  { id: 'art', label: 'Art', ownerOnly: true, page: () => artPage(artContext), after: focusHandFinder },
   aiTab,
   budgetTab,
   serversTab,
@@ -84,15 +83,17 @@ async function boot(): Promise<void> {
   for (const t of tabs) {
     if (t.refreshMs) setInterval(() => view.tab === t.id && document.visibilityState === 'visible' && void render(), t.refreshMs);
   }
-  // Painting moves on its own; keep the log fresh without touching the forms below it.
-  setInterval(() => view.tab === 'art' && document.visibilityState === 'visible' && void refreshArtJobs(artContext), 3000);
-  // The hand finder runs on its own too; its "Finding hands" line follows it.
-  setInterval(() => view.tab === 'art' && document.visibilityState === 'visible' && void refreshHandStatus(artContext), 3000);
 }
 
-/** Opens a tab; the Art tab's own pages follow it in the address (#art/items/Weapons). */
+/** Opens a tab; legacy #art hashes redirect to the standalone AI Art Studio. */
 function show(id: string): void {
-  view.tab = id.split('/')[0]!;
+  const root = id.split('/')[0]!;
+  if (root === 'art') {
+    const rest = id.slice(4);
+    location.replace(`/art-studio.html${rest ? `#${rest}` : ''}`);
+    return;
+  }
+  view.tab = root;
   if (location.hash.slice(1) !== id) history.replaceState(null, '', `#${id}`);
   for (const b of main.querySelectorAll<HTMLElement>('[data-tab]')) b.toggleAttribute('aria-current', b.dataset.tab === view.tab);
   void render();
@@ -119,7 +120,6 @@ async function render(): Promise<void> {
 // --- Actions: each goes to the tabs in turn until one handles it ---------------
 
 main.addEventListener('click', async (e) => {
-  if (view.tab === 'art' && artClick(e.target as HTMLElement)) return;
   if (view.tab === 'loot' && lootClick(e.target as HTMLElement, artContext)) return;
   const t = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
   if (!t) return;
@@ -138,7 +138,7 @@ main.addEventListener('click', async (e) => {
 main.addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target as HTMLFormElement;
-  if (artSubmit(form) || lootSubmit(form, artContext)) return;
+  if (lootSubmit(form, artContext)) return;
   const fields = Object.fromEntries(new FormData(form)) as Record<string, string>;
   try {
     for (const tab of TABS) {
@@ -154,7 +154,6 @@ main.addEventListener('submit', async (e) => {
 });
 
 main.addEventListener('change', (e) => {
-  if (view.tab === 'art' && artChange(e.target as HTMLElement)) return;
   for (const tab of TABS) if (tab.change?.(e.target as HTMLElement)) return;
 });
 

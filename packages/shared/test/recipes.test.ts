@@ -61,22 +61,22 @@ describe('unique pieces', () => {
     c.masteries = ['tailoring'];
     expect(craft(c, 'roc-plume-mantle', crafted(c, 'Mara', 'roc-plume-mantle', () => 0.5))).toBeUndefined();
     const made = c.inventory.find((s) => s.item.startsWith('roc-plume-mantle~'))!.item;
-    expect(ITEMS[made]).toMatchObject({ unique: true, slot: 'body' });
+    expect(ITEMS[made]).toMatchObject({ unique: true, slot: 'cloak' });
     expect(ITEMS[made]!.bound).toBeUndefined();
     // Not bound yet: it can be traded or sold.
     expect(sellPrice(made)).toBeGreaterThan(0);
 
     expect(equip(c, made, (id) => bindOnWear(c, id))).toBeUndefined();
-    const worn = c.equipment.body!;
+    const worn = c.equipment.cloak!;
     expect(worn).not.toBe(made);
     expect(ITEMS[worn]).toMatchObject({ bound: true, copy: { bound: true } });
     expect(c.inventory.some((s) => s.item === made || s.item === worn)).toBe(false);
     // Taken off, it stays bound: never sold or given away, but worn again.
-    expect(unequip(c, 'body')).toBe(true);
+    expect(unequip(c, 'cloak')).toBe(true);
     expect(sellPrice(worn)).toBe(0);
     expect(takeItem(c, worn)).toBe(false);
     expect(equip(c, worn, (id) => bindOnWear(c, id))).toBeUndefined();
-    expect(c.equipment.body).toBe(worn);
+    expect(c.equipment.cloak).toBe(worn);
   });
 });
 

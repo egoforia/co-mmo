@@ -79,7 +79,7 @@ ${WORLD_STORY}
 Players talk to you from anywhere. Chat, answer questions about the world, and help shape vague ideas into concrete wishes by asking one short question at a time. Only offer a wish when the player clearly wants something made and you know enough to build it.
 
 Wish tiers:
-- minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a shield or other off-hand item, a hat, armour, a charm), or a new crafting recipe that everyone can use. You can build these now.
+- minor: a single new item (a potion, a trinket, or gear to wear: a weapon, a shield or other off-hand item, a hat, armour, a cloak, boots, a charm), or a new crafting recipe that everyone can use. You can build these now.
 - moderate: a new creature (appears near the player), a new person (NPC) who stands beside them, a new ability (it arrives as a scroll in their bag; reading it teaches it, and it can be traded or sold), a new region of wild land beyond the world's edge (costs ${REGION_WISH_COST} Favor; only where the player stands at the world's edge), or new loot for a creature that already lives in the world (things it may drop when defeated, added to what it drops now). You can build these now.
 - major: a new system or place that is more than wild land (fishing, mounts, weather, a dungeon, a quest line, a town). A Steward must review it; it is recorded, not built now.
 - engine: something the game cannot do yet (new physics, new rendering). The Owner reviews it.
@@ -95,7 +95,7 @@ or, when offering a wish:
 {"say": "<what you say>", "wish": {"tier": "minor|moderate|major|engine|refused", "title": "<a few words>", "summary": "<one plain sentence of what will be made>", "definition": <definition or null>}}
 
 Definitions (only for minor and moderate):
-item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit|vigor (gear only: the stat it helps)","family":"${WEAPON_FAMILY_IDS.join('|')} (weapons only: what kind of weapon it is) or shield|tome|orb|lantern (offhand only)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"material":{"family":"${MATERIAL_FAMILIES.join('|')}","tier":<1 common or 2 fine>,"traits":[<none, or one of ${MATERIAL_TRAITS.join('|')}>],"homes":[<ids of the regions it comes from, usually the one the wisher stands in>]} (materials only),"look":LOOK}
+item: {"kind":"item","name":"...","description":"<one or two sentences>","itemKind":"consumable|material|trinket|weapon|offhand|head|body|cloak|feet|charm","heal":<5-${MAX_WISHED_HEAL}, consumables only>,"rarity":"common|uncommon|rare (gear only)","focus":"might|agility|wit|spirit|vigor (gear only: the stat it helps)","family":"${WEAPON_FAMILY_IDS.join('|')} (weapons only: what kind of weapon it is) or shield|tome|orb|lantern (offhand only)","light":{"color":"#rrggbb","radius":<1-${MAX_LIGHT_RADIUS} tiles>,"flicker":<true for flames>} (only gear that burns or glows: it lights the ground around whoever holds it),"material":{"family":"${MATERIAL_FAMILIES.join('|')}","tier":<1 common or 2 fine>,"traits":[<none, or one of ${MATERIAL_TRAITS.join('|')}>],"homes":[<ids of the regions it comes from, usually the one the wisher stands in>]} (materials only),"look":LOOK}
 recipe: {"kind":"recipe","name":"...","description":"...","materials":[{"item":"<id>","qty":<1-10>}],"result":{"item":"<id>","qty":<1-${MAX_RECIPE_RESULT}>}} (ids from: ${'%ITEMS%'}; it may not make more things than it uses)
 ability: {"kind":"ability","name":"...","description":"...","effect":"${ABILITY_EFFECTS.join('|')}","status":"<optional: one of ${WISHED_AILMENTS.join('|')} for what it hits (damage effects and debuff), or shielded for buff and stance>","look":LOOK} (strike: a blow at a creature in reach; bolt: hits one up to five steps away; heal: mends the user; area: hits all around a spot; cone: hits all in front; line: hits all in a line ahead; dash: rush to a creature and strike; blink: vanish and appear a few steps on; shield: absorbs damage; buff: a status on the user and party; debuff: marks or ails one creature; taunt: creatures nearby turn on the user; trap: set at the user's feet, springs on a creature; summon: a helper fights beside the user for a while; stance: held until used again, draining Energy; cleanse: washes ailments away. The world sets the numbers)
 creature: {"kind":"creature","name":"...","description":"...","behavior":"wander|guard|chase|patrol|timid|pack","active":"day|night (leave out for creatures about at all hours)","level":<1-${MAX_WISHED_LEVEL}>,"count":<1-${MAX_WISHED_COUNT}>,"drops":[<ids from: ${'%ITEMS%'}>],"look":LOOK}
@@ -464,7 +464,9 @@ export class OfflineGod implements ChatModel {
     const slot = /\b(sword|axe|spear|lance|bow|staff|dagger|hammer|club|mace|blade)\b/.test(text) ? 'weapon'
       : /\b(shield|buckler|torch|lantern)\b/.test(text) ? 'offhand'
       : /\b(hat|helmet|helm|hood|crown|cap)\b/.test(text) ? 'head'
-        : /\b(armou?r|coat|cloak|robe|vest|mail|tunic)\b/.test(text) ? 'body'
+        : /\b(cloak|cape|mantle|shawl)\b/.test(text) ? 'cloak'
+          : /\b(boots?|shoes?|sandals?|slippers?|greaves)\b/.test(text) ? 'feet'
+          : /\b(armou?r|coat|robe|vest|mail|tunic)\b/.test(text) ? 'body'
           : /\b(ring|amulet|charm|necklace|pendant|talisman)\b/.test(text) ? 'charm' : undefined;
     // Fire and lamps light the ground around whoever holds them.
     const lit = /\b(torch|lantern|lamp|candle|fire|flaming|burning|blazing|glowing)\b/.test(text);

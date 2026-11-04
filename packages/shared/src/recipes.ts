@@ -65,7 +65,7 @@ const unique = (name: string, standIn: string, description: string, rest: Omit<I
 /** The pieces only unique recipes make: one of a kind, bound to whoever first wears each. */
 export const UNIQUE_ITEMS: Record<string, ItemDef> = {
   'roc-plume-mantle': unique('Roc Plume Mantle', 'item-pelt-cloak', 'A mantle of mountain wool trimmed with a single plume of the Hoarfrost Roc. The wind seems to lift whoever wears it.', {
-    slot: 'body', rarity: 'epic', bonus: { armor: 7, agility: 3 }, value: 260,
+    slot: 'cloak', rarity: 'epic', bonus: { armor: 7, agility: 3 }, value: 260,
   }),
   'rootless-crown': unique('Crown of the Rootless King', 'item-mushroom-hat', 'A circlet of living mycelium set with amethyst. It whispers what the ground used to say.', {
     slot: 'head', rarity: 'epic', bonus: { armor: 2, spirit: 4, wit: 3 }, value: 260,

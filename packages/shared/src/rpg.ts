@@ -42,10 +42,16 @@ export interface Stats {
   vigor: number;
 }
 
-/** Where equipment is worn (design doc, Items: equipment slots). */
-export type EquipSlot = 'weapon' | 'offhand' | 'head' | 'body' | 'charm';
-export const EQUIP_SLOTS: readonly EquipSlot[] = ['weapon', 'offhand', 'head', 'body', 'charm'];
-export const SLOT_NAMES: Record<EquipSlot, string> = { weapon: 'Weapon', offhand: 'Off hand', head: 'Head', body: 'Body', charm: 'Charm' };
+/**
+ * Where equipment is worn (design doc, Items: equipment slots). Cloak and feet
+ * came with the Region fashion plan, so a full outfit is four garments: head,
+ * body, cloak and feet.
+ */
+export type EquipSlot = 'weapon' | 'offhand' | 'head' | 'body' | 'cloak' | 'feet' | 'charm';
+export const EQUIP_SLOTS: readonly EquipSlot[] = ['weapon', 'offhand', 'head', 'body', 'cloak', 'feet', 'charm'];
+export const SLOT_NAMES: Record<EquipSlot, string> = { weapon: 'Weapon', offhand: 'Off hand', head: 'Head', body: 'Body', cloak: 'Cloak', feet: 'Feet', charm: 'Charm' };
+/** The four slots a garment is worn in (Region fashion plan). */
+export const GARMENT_SLOTS: readonly EquipSlot[] = ['head', 'body', 'cloak', 'feet'];
 
 /** Rarity from Common to Legendary (design doc, Items). */
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
@@ -553,7 +559,7 @@ export function bonusText(bonus: Bonus | undefined): string {
  */
 export function equipmentBonus(slot: EquipSlot, rarity: Rarity, focus?: keyof Stats): Bonus {
   const tier = RARITIES.indexOf(rarity) + 1;
-  // An off-hand item (a shield, a torch) guards like a hat does.
+  // An off-hand item (a shield, a torch), a cloak and boots guard like a hat does.
   const bonus: Bonus = slot === 'weapon' ? { attack: 1 + tier } : slot === 'charm' ? {} : { armor: tier + (slot === 'body' ? 1 : 0) };
   const stat = focus ?? (slot === 'weapon' ? 'might' : slot === 'charm' ? 'wit' : 'spirit');
   const extra = slot === 'charm' ? tier + 1 : tier - 1;

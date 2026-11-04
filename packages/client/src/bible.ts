@@ -68,7 +68,7 @@ export const CHAPTERS: Chapter[] = [
       </ul>
       <h3>Your things</h3>
       <ul>
-        <li><b>I</b> opens your bag. Click a Tonic to drink it, a weapon, hat, coat or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off.</li>
+        <li><b>I</b> opens your bag. Click a Tonic to drink it, a weapon, hat, coat, cloak, boots or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off.</li>
         <li><b>E</b> beside a defeated creature searches its body, which lies there for five minutes. Each kind carries its own finds, each with its own chance, kept for whoever won the fight and their party.</li>
         <li><b>C</b> opens the crafting book. Creatures drop materials (mushroom caps, crab shells, scarab wing cases) that become Tonics and gear. Finer things need more Wit.</li>
         <li><b>Trade</b> with Marina on the Shore or the Cactus Elder in the desert to buy, and to sell what you found. Sister Amala gives lessons.</li>
@@ -123,7 +123,7 @@ export const CHAPTERS: Chapter[] = [
       <h3>Creator XP</h3>
       <p>When other players fight what you wished for, talk to it, wear it, use it, craft with it, learn from it or walk into the land you wished, you earn <b>Creator XP</b>. Each Creator level brings 3 Favor, so making things people love pays for more wishes.</p>
       <h3>Gear</h3>
-      <p>Weapons, hats, coats and charms add to your stats, damage and armour. Rarity runs from Common through Uncommon, Rare and Epic to Legendary. The world sets how strong wished gear is from its rarity; wishes reach Rare at most, and the rest must be earned.</p>
+      <p>Weapons, hats, coats, cloaks, boots and charms add to your stats, damage and armour. Rarity runs from Common through Uncommon, Rare and Epic to Legendary. The world sets how strong wished gear is from its rarity; wishes reach Rare at most, and the rest must be earned.</p>
       <h3>Roles</h3>
       <ul>
         <li><b>The Owner</b> keeps the world and its budget.</li>

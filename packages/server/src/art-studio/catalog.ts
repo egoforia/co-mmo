@@ -55,9 +55,9 @@ import {
 export class ArtCatalog {
   constructor(
     private readonly options: ArtStudioOptions,
-    private readonly history: ArtHistory,
+    readonly history: ArtHistory,
     private readonly redoneDir: string,
-    private readonly getRedone: () => Promise<ArtManifest>,
+    readonly getRedone: () => Promise<ArtManifest>,
   ) {}
 
   /** About what one picture of this kind costs with its model. */

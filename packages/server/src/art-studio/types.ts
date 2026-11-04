@@ -93,11 +93,21 @@ export interface WalkStrip {
   versions: WalkVersion[];
 }
 
+/** A selectable version of an art reference (current, earlier history version, or shipped original). */
+export interface ArtReferenceVersion {
+  id: string;
+  label: string;
+  url?: string;
+}
+
 /** A reference image sent along with a paint request to guide style, characters, or details. */
 export interface ArtReferenceInfo {
   id: string;
+  assetId?: string;
+  versionId?: string;
   name: string;
   url?: string;
+  availableVersions?: ArtReferenceVersion[];
 }
 
 /** What an Owner asks to have painted or made, to review before it is approved. */

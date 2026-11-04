@@ -143,11 +143,21 @@ export interface KitSheetView {
   textures: { name: string; ok: boolean; painting?: string; failed: string[] }[];
 }
 
+/** A selectable version of an art reference (current, earlier history version, or shipped original). */
+export interface ArtReferenceVersion {
+  id: string;
+  label: string;
+  url?: string;
+}
+
 /** A reference image sent along with a paint request. */
 export interface ArtReferenceInfo {
   id: string;
+  assetId?: string;
+  versionId?: string;
   name: string;
   url?: string;
+  availableVersions?: ArtReferenceVersion[];
 }
 
 /** A paid request, as the server's review and approval take it. */

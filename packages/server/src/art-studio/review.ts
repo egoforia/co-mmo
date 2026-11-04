@@ -21,6 +21,7 @@ import type { ArtCatalog } from './catalog.ts';
 import {
   type ArtAsk,
   type ArtReferenceInfo,
+  type ArtReferenceVersion,
   ArtRequestError,
   type ArtReview,
   type ArtStudioOptions,
@@ -141,10 +142,63 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
         const meta: Record<string, string> = await readFile(metaFile, 'utf8').then((t) => JSON.parse(t) as Record<string, string>, () => ({}));
         refInfos.push({ id: refId, name: meta[hash] ?? `Reference ${hash.slice(0, 6)}`, url: `/wished-art/references/${hash}.png` });
       } else {
-        const refName = await catalog.nameOf(refId);
-        const file = await catalog.pictureFile(refId);
-        const url = file ? (file.startsWith('assets/') ? `/${file}` : `/${file.replace(/^\/?/, '')}`) : `/art/${refId}.png`;
-        refInfos.push({ id: refId, name: refName || pictureName(refId), url });
+        const [assetId, ver] = refId.includes('@') ? refId.split('@', 2) : [refId, undefined];
+        const versionId = ver || 'current';
+        const baseName = (await catalog.nameOf(assetId!)) || pictureName(assetId!);
+
+        const versions = await catalog.history.versions(assetId!);
+        const shipped = await options.shipped();
+        const hasShipped = Boolean(shipped[assetId!]);
+        const shippedFile = shipped[assetId!]?.file;
+        const shippedUrl = shippedFile ? (shippedFile.startsWith('assets/') ? `/${shippedFile}` : `/${shippedFile.replace(/^\/?/, '')}`) : `/art/${assetId}.png`;
+
+        const redone = await catalog.getRedone();
+        const isRedone = Boolean(redone[assetId!]);
+        const currentFile = await catalog.pictureFile(assetId!);
+        const currentUrl = currentFile ? (currentFile.startsWith('assets/') ? `/${currentFile}` : `/${currentFile.replace(/^\/?/, '')}`) : `/art/${assetId}.png`;
+
+        const availableVersions: ArtReferenceVersion[] = [
+          { id: 'current', label: 'Current version', url: currentUrl },
+        ];
+        for (const v of versions) {
+          const timeStr = v.recipe?.at ? new Date(v.recipe.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : v.id;
+          availableVersions.push({
+            id: v.id,
+            label: `Earlier (${timeStr})`,
+            url: v.url,
+          });
+        }
+        if (hasShipped && (isRedone || versions.length > 0)) {
+          availableVersions.push({
+            id: 'shipped',
+            label: 'Original shipped version',
+            url: shippedUrl,
+          });
+        }
+
+        let refDisplayName = baseName;
+        let url = currentUrl;
+        if (versionId === 'shipped') {
+          url = shippedUrl;
+          refDisplayName = `${baseName} (Shipped)`;
+        } else if (versionId !== 'current') {
+          const vMatch = versions.find((v) => v.id === versionId);
+          if (vMatch) {
+            url = vMatch.url;
+            refDisplayName = `${baseName} (${versionId})`;
+          }
+        } else if (availableVersions.length > 1) {
+          refDisplayName = `${baseName} (Current)`;
+        }
+
+        refInfos.push({
+          id: refId,
+          assetId,
+          versionId,
+          name: refDisplayName,
+          url,
+          availableVersions: availableVersions.length > 1 ? availableVersions : undefined,
+        });
       }
     }
     return {

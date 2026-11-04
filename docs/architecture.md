@@ -121,6 +121,10 @@ peoples and Callings themselves are plain data in shared `races.ts` and
 A character saved before Callings is held at `game-socket.ts` with a
 `callingNeeded` message until it answers `chooseCalling`; changing people or
 Calling later is a `calling` wish made only in the Workshop, like a new look.
+Shared `materials.ts` gives every material its data (`ItemDef.material`:
+family, home regions, source, tier 1 to 3, at most one trait) and works out
+each region's materials from it; a wished material is cleaned by
+`cleanMaterial` (tier 1 or 2, homes default to where the wisher stands).
 Shared `weapons.ts` holds the weapon and off-hand families, damage types,
 creature Armor and Ward, and `trainedIn`, which says whether a Calling is
 trained in a family (`docs/classes.md#weapons`).

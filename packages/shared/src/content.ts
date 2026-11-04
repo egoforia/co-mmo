@@ -7,6 +7,7 @@ import { BIOMES, type BiomeId } from './biomes.ts';
 import { RECIPES } from './kit.ts';
 import { WISHED_REGIONS, type RegionDef } from './world.ts';
 import { hashString } from './random.ts';
+import { WISHED_MATERIAL_VALUE, cleanMaterial, type MaterialInfo } from './materials.ts';
 import { RACES, isRace, type RaceId } from './races.ts';
 import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
@@ -75,6 +76,8 @@ export interface ItemWish {
   family?: WeaponFamily | OffhandFamily;
   /** Gear that burns or glows: the light it casts while held. */
   light?: Light;
+  /** Materials: family, tier (1 or 2), at most one trait, home regions (materials.ts). */
+  material?: MaterialInfo;
   look: WishLook;
 }
 
@@ -555,7 +558,9 @@ export function validateDefinition(raw: unknown): WishDefinition {
     const slot = EQUIP_SLOTS.find((s) => s === d.itemKind);
     const itemKind = d.itemKind === 'consumable' || d.itemKind === 'material' ? d.itemKind : slot ?? 'trinket';
     const heal = itemKind === 'consumable' ? clamp(Math.round(Number(d.heal) || 20), 5, MAX_WISHED_HEAL) : undefined;
-    if (!slot) return { kind: 'item', name, description, itemKind, ...(heal ? { heal } : {}), look };
+    // A wished material says its family, tier, trait and home regions, so recipes and crafts can use it.
+    const material = itemKind === 'material' ? cleanMaterial(d.material, `${name} ${description}`) : undefined;
+    if (!slot) return { kind: 'item', name, description, itemKind, ...(heal ? { heal } : {}), ...(material ? { material } : {}), look };
     const rarity = RARITIES.slice(0, RARITIES.indexOf(MAX_WISHED_RARITY) + 1).find((r) => r === d.rarity) ?? 'common';
     const focus = (['might', 'agility', 'wit', 'spirit', 'vigor'] as const).find((k) => k === d.focus);
     const light = cleanLight(d.light);
@@ -796,7 +801,14 @@ export function itemFromWish(id: string, w: ItemWish | RuleItem): ItemDef {
     art: wishArtKey(id),
     description: w.description,
     ...(w.heal ? { heal: w.heal } : {}),
+    ...(w.itemKind === 'material' ? wishedMaterial(w) : {}),
   };
+}
+
+/** A wished material's data and value; one wished before materials had data gets it from its words. */
+function wishedMaterial(w: ItemWish | RuleItem): Pick<ItemDef, 'material' | 'value'> {
+  const material = w.material ?? cleanMaterial(undefined, `${w.name} ${w.description}`);
+  return { material, value: WISHED_MATERIAL_VALUE[material.tier] };
 }
 
 /** A wished weapon's family (older wishes get theirs from their words), or a shield's block. */

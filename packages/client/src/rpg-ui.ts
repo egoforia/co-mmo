@@ -20,6 +20,7 @@ import {
   maxEnergy,
   maxHp,
   questProgressText,
+  materialWords,
   totalStats,
   ward,
   xpToNext,
@@ -253,7 +254,7 @@ export class RpgUi {
             : def.slot ? `Wear: ${[familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · ') || SLOT_NAMES[def.slot]}`
               : def.teaches ? 'Click to read and learn'
                 : ruled ? 'Click to use' : 'For crafting and trade';
-        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}`)}">
+        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}`)}">
           <img src="${escapeHtml(artSrc(def.art, true))}" alt="">
           ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
           <span class="name rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}</span><span class="hint">${escapeHtml(hint)}</span></button>`;

@@ -10,9 +10,17 @@ Postgres built into it (PGlite), kept in `data/db/`, and without
 
 The server keeps the whole world in memory and writes what changed behind
 it, so play never waits on the database. Each kind of thing has its own
-table (`accounts`, `invites`, `content` for wishes, `reports`, `spend`,
-`journal`, `drafts`, `rule_data`, `world_edits`, `settings`), each row a
-key and the thing as JSON, so any Postgres tool can read them.
+table (`accounts`, `invites`, `content` for wishes, `reports`, `drafts`,
+`rule_data`, `world_edits`, `settings`), each row a key and the thing as
+JSON, so any Postgres tool can read them.
+
+Spending (`spend_log`) and the journal (`journal_log`) only grow, so they
+are append-only: each line is written once, with its time (and, for
+spending, its dollars and reference) in columns of their own. Memory keeps
+only this month's and last month's spending, which is all the budget needs,
+and the latest 500 journal lines; older lines stay in the database
+(`Store.spendBetween` reads any span). An older database's `spend` and
+`journal` tables are moved into the logs on the first start.
 
 **Where the database is.** With `DATABASE_URL` set, the server uses that
 Postgres server; region servers and several machines can share it. Without

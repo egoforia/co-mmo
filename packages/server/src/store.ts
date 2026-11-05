@@ -5,7 +5,8 @@ import type { ChatTurn } from './ai/chat.ts';
 import { defaultSettings, type Settings } from './settings.ts';
 import type { RuleTestReport } from './rule-test.ts';
 import type { Sql } from './db.ts';
-import { PostgresTables, migrate, type Row } from './store-postgres.ts';
+import { PostgresTables, migrate } from './store-postgres.ts';
+import { PostgresLogs, keptSpendFrom, type LogOp } from './store-logs.ts';
 
 /** Days a Workshop draft is kept after its last change. */
 const DRAFT_DAYS = 7;
@@ -157,8 +158,10 @@ export interface WorldEditLog {
 export interface StoreBackend {
   /** What was saved before, or nothing on a first run. */
   load(): Promise<Partial<Data> | null>;
-  /** Saves the whole store; a backend may write only what changed. */
-  save(data: Data): Promise<void>;
+  /** Saves the whole store and the logs' new lines; a backend may write only what changed. */
+  save(data: Data, logs: readonly LogOp[]): Promise<void>;
+  /** Spending between two times, including what is no longer kept in memory. */
+  spendBetween(since: number, until: number): Promise<SpendRecord[]>;
   close(): Promise<void>;
   /** Shown in the console at start-up: where the world is kept. */
   readonly label: string;
@@ -174,6 +177,8 @@ export class Store {
   private saving: Promise<void> = Promise.resolve();
   /** A save is waiting its turn; later changes ride along with it. */
   private queued = false;
+  /** New spending and journal lines not yet saved (store-logs.ts). */
+  private logs: LogOp[] = [];
 
   private constructor(private readonly backend: StoreBackend | null) {}
 
@@ -190,7 +195,10 @@ export class Store {
       const old = await readWorldFile(importFrom);
       if (old) {
         store.data = { ...store.data, ...old };
-        await backend.save(store.data);
+        const logs: LogOp[] = [...(old.spend ?? []).map((record) => ({ t: 'spend' as const, record })), ...(old.journal ?? []).map((entry) => ({ t: 'journal' as const, entry }))];
+        store.data.spend = store.data.spend.filter((s) => s.at >= keptSpendFrom(Date.now()));
+        store.data.journal = store.data.journal.slice(-MAX_JOURNAL);
+        await backend.save(store.data, logs);
         console.log(`Brought the world in ${importFrom} (${plural(store.data.accounts.length, 'player')}, ${plural(store.data.content.length, 'wish', 'wishes')}) into Postgres. The file is left as it was.`);
       }
     }
@@ -348,9 +356,10 @@ export class Store {
   // --- While you were away ------------------------------------------------------
 
   addJournal(text: string, playerId: string | null, at = Date.now()): void {
-    this.data.journal.push({ at, text, playerId });
+    const entry = { at, text, playerId };
+    this.data.journal.push(entry);
     if (this.data.journal.length > MAX_JOURNAL) this.data.journal.splice(0, this.data.journal.length - MAX_JOURNAL);
-    this.persist();
+    this.log({ t: 'journal', entry });
   }
 
   journalSince(since: number): JournalEntry[] {
@@ -505,7 +514,8 @@ export class Store {
     if (record.usd <= 0) return;
     if (record.ref && this.data.spend.some((s) => s.ref === record.ref)) return;
     this.data.spend.push(record);
-    this.persist();
+    this.forgetOldSpend(record.at);
+    this.log({ t: 'spend', record });
   }
 
   /**
@@ -515,8 +525,37 @@ export class Store {
   settleSpend(estimateRef: string, record: SpendRecord): void {
     if (record.ref && this.data.spend.some((s) => s.ref === record.ref)) return;
     const i = this.data.spend.findIndex((s) => s.ref === estimateRef && s.estimate);
-    if (i >= 0) this.data.spend.splice(i, 1);
-    if (record.usd > 0) this.data.spend.push(record);
+    if (i >= 0) {
+      this.data.spend.splice(i, 1);
+      this.logs.push({ t: 'unspend', ref: estimateRef });
+    }
+    if (record.usd > 0) {
+      this.data.spend.push(record);
+      this.logs.push({ t: 'spend', record });
+    }
+    this.persist();
+  }
+
+  /**
+   * Spending between two times, oldest first, from the database when one
+   * keeps it: memory holds only this month's and last month's.
+   */
+  async spendBetween(since: number, until: number): Promise<SpendRecord[]> {
+    await this.flush();
+    if (this.backend) return this.backend.spendBetween(since, until);
+    return this.data.spend.filter((s) => s.at >= since && s.at <= until);
+  }
+
+  /** Lets go of spending from before last month: the database keeps it, the budget no longer needs it. */
+  private forgetOldSpend(now: number): void {
+    if (!this.backend) return;
+    const from = keptSpendFrom(now);
+    if (this.data.spend[0] && this.data.spend[0].at < from) this.data.spend = this.data.spend.filter((s) => s.at >= from);
+  }
+
+  /** Adds a line to the logs and saves it with the next save. */
+  private log(op: LogOp): void {
+    this.logs.push(op);
     this.persist();
   }
 
@@ -575,9 +614,13 @@ export class Store {
     this.queued = true;
     this.saving = this.saving.then(async () => {
       this.queued = false;
+      const logs = this.logs;
+      this.logs = [];
       try {
-        await backend.save(this.data);
+        await backend.save(this.data, logs);
       } catch (err) {
+        // Unsaved log lines go first next time, so the order is kept.
+        this.logs = [...logs, ...this.logs];
         // The game keeps running from memory; the next change tries again.
         console.error(`Could not save the world (${backend.label}):`, (err as Error).message);
       }
@@ -596,39 +639,36 @@ async function readWorldFile(path: string): Promise<Partial<Data> | null> {
 }
 
 /**
- * The world in Postgres, one table per kind of thing. Spending and journal
- * lines have no ids of their own, so each gets a number the first time it is
- * saved, remembered beside it.
+ * The world in Postgres: one table per kind of thing (store-postgres.ts),
+ * and append-only logs for spending and the journal (store-logs.ts).
  */
 class PostgresBackend implements StoreBackend {
-  private readonly keys = new WeakMap<object, string>();
   /** The database had nothing in it when the game started. */
   wasEmpty = false;
+  private readonly logs: PostgresLogs;
 
-  private constructor(private readonly sql: Sql, private readonly tables: PostgresTables, readonly label: string) {}
+  private constructor(private readonly sql: Sql, private readonly tables: PostgresTables, readonly label: string) {
+    this.logs = new PostgresLogs(sql);
+  }
 
   static async open(sql: Sql, label: string): Promise<PostgresBackend> {
     await migrate(sql);
     const backend = new PostgresBackend(sql, new PostgresTables(sql), label);
-    backend.wasEmpty = await backend.tables.empty();
+    backend.wasEmpty = (await backend.tables.empty()) && (await backend.logs.empty());
     return backend;
   }
 
   async load(): Promise<Partial<Data> | null> {
     const t = await this.tables.load();
     if (this.wasEmpty) return null;
-    const numbered = <T extends object>(rows: Row[]): T[] => rows.map((r) => {
-      this.keys.set(r.data as object, r.key);
-      return r.data as T;
-    });
     const settings = t.settings.find((r) => r.key === 'settings')?.data as Settings | undefined;
     return {
       accounts: t.accounts.map((r) => r.data as Account),
       invites: t.invites.map((r) => r.data as Invite),
       content: t.content.map((r) => r.data as ContentRecord),
       reports: t.reports.map((r) => r.data as Report),
-      spend: numbered<SpendRecord>(t.spend),
-      journal: numbered<JournalEntry>(t.journal),
+      spend: await this.logs.spendSince(keptSpendFrom(Date.now())),
+      journal: await this.logs.latestJournal(MAX_JOURNAL),
       drafts: Object.fromEntries(t.drafts.map((r) => [r.key, r.data as WishDraft])),
       ruleData: Object.fromEntries(t.rule_data.map((r) => [r.key, r.data as Record<string, Record<string, unknown>>])),
       worldEdits: Object.fromEntries(t.world_edits.map((r) => [r.key, r.data as WorldEditLog])),
@@ -636,27 +676,21 @@ class PostgresBackend implements StoreBackend {
     };
   }
 
-  async save(data: Data): Promise<void> {
-    const numbered = (items: object[]): Row[] => items.map((item) => {
-      let key = this.keys.get(item);
-      if (!key) {
-        key = String(this.tables.takeNumber());
-        this.keys.set(item, key);
-      }
-      return { key, data: item };
-    });
+  async save(data: Data, logs: readonly LogOp[]): Promise<void> {
     await this.tables.save({
       accounts: data.accounts.map((a) => ({ key: a.id, data: a })),
       invites: data.invites.map((i) => ({ key: i.code, data: i })),
       content: data.content.map((c) => ({ key: c.id, data: c })),
       reports: data.reports.map((r) => ({ key: r.id, data: r })),
-      spend: numbered(data.spend),
-      journal: numbered(data.journal),
       drafts: Object.entries(data.drafts ?? {}).map(([key, d]) => ({ key, data: d })),
       rule_data: Object.entries(data.ruleData).map(([key, d]) => ({ key, data: d })),
       world_edits: Object.entries(data.worldEdits ?? {}).map(([key, d]) => ({ key, data: d })),
       settings: [{ key: 'settings', data: data.settings }],
-    });
+    }, logs.length ? (q) => this.logs.write(q, logs) : undefined);
+  }
+
+  spendBetween(since: number, until: number): Promise<SpendRecord[]> {
+    return this.logs.spendBetween(since, until);
   }
 
   close(): Promise<void> {

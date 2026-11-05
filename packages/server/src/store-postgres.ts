@@ -1,12 +1,14 @@
 import type { Sql, SqlQuery } from './db.ts';
+import { migrateLogs } from './store-logs.ts';
 
 /**
  * Each part of the saved world gets its own table of the same shape: a key,
  * the order things were added in, and the thing itself as JSON. People can
  * read the tables with any Postgres tool; the game keeps a copy in memory
- * and writes only what changed.
+ * and writes only what changed. Spending and the journal, which only grow,
+ * are append-only logs instead (store-logs.ts).
  */
-export const TABLES = ['accounts', 'invites', 'content', 'reports', 'spend', 'journal', 'drafts', 'rule_data', 'world_edits', 'settings'] as const;
+export const TABLES = ['accounts', 'invites', 'content', 'reports', 'drafts', 'rule_data', 'world_edits', 'settings'] as const;
 export type Table = (typeof TABLES)[number];
 
 /** One saved thing: its key, its place in the order, and its JSON. */
@@ -16,7 +18,7 @@ export interface Row {
 }
 
 /** Bumped when the tables change shape, so an older database is brought up to date. */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /** Makes the tables if they are missing. */
 export async function migrate(sql: Sql): Promise<void> {
@@ -26,6 +28,7 @@ export async function migrate(sql: Sql): Promise<void> {
       await q.query(`CREATE TABLE IF NOT EXISTS ${table} (key text PRIMARY KEY, n bigint NOT NULL, data jsonb NOT NULL)`);
       await q.query(`CREATE INDEX IF NOT EXISTS ${table}_n ON ${table} (n)`);
     }
+    await migrateLogs(q);
     await q.query(
       `INSERT INTO co_mmo_meta (key, value) VALUES ('schema', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [String(SCHEMA_VERSION)],
@@ -72,17 +75,12 @@ export class PostgresTables {
     return true;
   }
 
-  /** Highest order number handed out so far, for keys made from it. */
-  takeNumber(): number {
-    return this.next++;
-  }
-
   /**
    * Writes the tables to match `now`, in one transaction. Only what changed
    * is sent; if the write fails nothing is marked saved, so the next save
-   * tries again.
+   * tries again. `also` runs in the same transaction (the logs' new lines).
    */
-  async save(now: Record<Table, Row[]>): Promise<number> {
+  async save(now: Record<Table, Row[]>, also?: (q: SqlQuery) => Promise<void>): Promise<number> {
     const writes: { table: Table; key: string; json: string; n: number }[] = [];
     const deletes: { table: Table; key: string }[] = [];
     for (const table of TABLES) {
@@ -97,8 +95,9 @@ export class PostgresTables {
       }
       for (const key of saved.keys()) if (!seen.has(key)) deletes.push({ table, key });
     }
-    if (!writes.length && !deletes.length) return 0;
+    if (!writes.length && !deletes.length && !also) return 0;
     await this.sql.transaction(async (q: SqlQuery) => {
+      await also?.(q);
       for (const w of writes) {
         await q.query(
           `INSERT INTO ${w.table} (key, n, data) VALUES ($1, $2, $3::jsonb) ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data`,

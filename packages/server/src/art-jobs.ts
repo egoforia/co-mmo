@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto';
+import type { Kept } from './kept.ts';
 
 // Every picture and clip the server paints passes through here, so God's View
 // can show what is waiting, what is being painted now, what came out and what
-// failed, with what each cost. The log lives in memory: after a restart it
-// starts again with whatever start-up painting there is, and the requests
-// kept in PaintRequests.
+// failed, with what each cost. The log lives in memory, and each finished job
+// is also kept in the database (kept.ts), so after a restart God's View still
+// shows what was painted before it; unfinished work is asked again through
+// the requests kept in PaintRequests.
 
 /** Who asked for a painting. */
 export type ArtJobSource = 'start-up' | 'gods-view' | 'wish';
@@ -47,6 +49,8 @@ export interface ArtJobHandle {
 
 /** Jobs kept in the log; the oldest finished ones go first. */
 const KEEP = 200;
+/** Kind of the kept documents holding finished jobs, one per job. */
+export const ART_JOBS = 'art-job';
 
 /** The painting log God's View shows. */
 export class ArtJobs {
@@ -54,7 +58,25 @@ export class ArtJobs {
   /** Told whenever a job changes, so God's View can refresh. */
   onChange?: () => void;
 
-  constructor(private readonly now: () => number = Date.now) {}
+  private writing: Promise<void> = Promise.resolve();
+
+  /** `kept` keeps finished jobs across a restart; without it the log lives in memory only. */
+  constructor(private readonly now: () => number = Date.now, private readonly kept?: Kept) {}
+
+  /** Brings back the finished jobs kept before a restart, older than anything logged since. */
+  async restore(): Promise<void> {
+    if (!this.kept) return;
+    const known = new Set(this.jobs.map((j) => j.id));
+    const old = (await this.kept.list<ArtJob>(ART_JOBS)).map((r) => r.data).filter((j) => !known.has(j.id)).sort((a, b) => a.queuedAt - b.queuedAt);
+    this.jobs.unshift(...old);
+    this.trim();
+    if (old.length) this.onChange?.();
+  }
+
+  /** Resolves once every finished job is kept. */
+  async flush(): Promise<void> {
+    await this.writing;
+  }
 
   /** Adds a job as waiting its turn. */
   add(asset: string, label: string, media: ArtJob['media'], source: ArtJobSource, estimateUsd: number): ArtJobHandle {
@@ -64,6 +86,7 @@ export class ArtJobs {
     const end = (status: ArtJobStatus, patch: Partial<ArtJob>) => {
       if (finished(job)) return;
       Object.assign(job, { status, endedAt: this.now(), ...patch });
+      this.keep((kept) => kept.put(ART_JOBS, job.id, job));
       this.onChange?.();
     };
     this.onChange?.();
@@ -115,8 +138,16 @@ export class ArtJobs {
     while (this.jobs.length > KEEP) {
       const i = this.jobs.findIndex(finished);
       if (i < 0) return;
-      this.jobs.splice(i, 1);
+      const [gone] = this.jobs.splice(i, 1);
+      this.keep((kept) => kept.delete(ART_JOBS, gone!.id));
     }
+  }
+
+  /** Writes to the database in order; the log carries on if a write fails. */
+  private keep(step: (kept: Kept) => Promise<void>): void {
+    const kept = this.kept;
+    if (!kept) return;
+    this.writing = this.writing.then(() => step(kept)).catch((err) => console.error('Keeping the painting log failed:', (err as Error).message));
   }
 }
 

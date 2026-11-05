@@ -7,6 +7,7 @@ import { MemoryKept, PostgresKept, type Kept } from '../src/kept.ts';
 import { Auth } from '../src/auth.ts';
 import { KeptDoc } from '../src/kept-doc.ts';
 import { RecipeBook } from '../src/art-recipes.ts';
+import { ArtJobs } from '../src/art-jobs.ts';
 import { Store } from '../src/store.ts';
 import { fakeMailer } from './helpers.ts';
 import { testSql, type TestSql } from './sql.ts';
@@ -94,5 +95,27 @@ describe('art bookkeeping kept in the database', () => {
     // Nothing was written beside the art.
     expect(existsSync(join(dir, 'recipes'))).toBe(false);
     expect(existsSync(join(dir, 'history'))).toBe(false);
+  });
+});
+
+describe('the painting log kept across a restart', () => {
+  it('brings back finished jobs, older than anything logged since, and not unfinished ones', async () => {
+    const kept = new MemoryKept();
+    let t = 1000;
+    const before = new ArtJobs(() => t++, kept);
+    before.add('sanctum-rock', 'Sanctum rock', 'picture', 'gods-view', 0.04).done(0.039);
+    before.add('woods-tree-a', 'Woods tree', 'picture', 'wish', 0.04).fail('The model said no.');
+    before.add('desert-ruin', 'Desert ruin', 'picture', 'start-up', 0.04);
+    await before.flush();
+
+    const after = new ArtJobs(() => t++, kept);
+    after.add('shore-palm-a', 'Shore palm', 'picture', 'gods-view', 0.04);
+    await after.restore();
+    expect(after.list().map((j) => [j.asset, j.status])).toEqual([
+      ['shore-palm-a', 'queued'],
+      ['woods-tree-a', 'failed'],
+      ['sanctum-rock', 'done'],
+    ]);
+    expect(after.list()[2]!.usd).toBe(0.039);
   });
 });

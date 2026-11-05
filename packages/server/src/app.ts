@@ -177,7 +177,8 @@ export function createApp(options: AppOptions): App {
     },
   });
   // The painting log God's View shows, paintings kept across a restart, and what was sent to make each picture.
-  const artJobs = new ArtJobs();
+  const artJobs = new ArtJobs(Date.now, store.kept);
+  void artJobs.restore().catch((err: Error) => console.error('The painting log from before the restart could not be read:', err.message));
   const paintRequests = new KeptPaintRequests(store.kept, resolve(options.wishes.artDir, 'paint-requests.json'));
   const recipes = new RecipeBook(options.wishes.artDir, store.kept);
   const wishes = new Wishes(store, world, rules, options.wishes, { ai, budget, artJobs, paintRequests, recipes });
@@ -474,6 +475,7 @@ export function createApp(options: AppOptions): App {
       await store.flush();
       unwatchFetch();
       await apiLog.flush();
+      await artJobs.flush();
     },
   };
 }

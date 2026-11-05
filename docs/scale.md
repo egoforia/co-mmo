@@ -35,7 +35,8 @@ waiting on a limit (`paint-request`, one per request), the Up Next queue
 (`art-up-next`), the Art Director's notes (`art-director`), the hands and
 grips found and the Owner's hand questions (`art-hands`), and the recipe of
 every picture's current and earlier versions (`art-recipe`,
-`art-recipe-version`). On first use each is brought in from its old JSON
+`art-recipe-version`), and the painting log's finished jobs (`art-job`, the
+latest 200), so God's View still shows what was painted before a restart. On first use each is brought in from its old JSON
 file under `data/art/`, which is renamed `<name>.in-db` as a backup. The
 pictures, clips and sounds themselves stay files, and so do the manifests
 that list them, since they describe those files and the art tools read them.

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Tile, WORLD_REGIONS, collides, floorChecks, generateRegion, stairwayAt, storeyAt } from '../src/index.ts';
+import { BUILDING_STYLES, Tile, WORLD_REGIONS, buildingKit, collides, floorChecks, generateRegion, stairwayAt, storeyAt } from '../src/index.ts';
 import { FROSTPEAK } from '../src/home-lands/frostpeak.ts';
+
+const { KIT_LOOKS } = buildingKit;
 
 describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
   const frostpeakDef = WORLD_REGIONS.find((r) => r.id === 'frostpeak')!;
@@ -150,5 +152,32 @@ describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
     expect(quests['frostpeak-sunken-drafts'].giver).toBe('kip');
     expect(quests['frostpeak-feather-mantle'].giver).toBe('sula');
     expect(quests['frostpeak-roc-vigil'].giver).toBe('vail');
+  });
+
+  it('uses dedicated building kit zephyr-marble and custom architectural styles with furniture', () => {
+    // Verify building styles
+    const eyrieBuilding = map.buildings.find((b) => b.style === 'frostpeak-eyrie');
+    expect(eyrieBuilding, 'The Eyrie should use dedicated frostpeak-eyrie style').toBeDefined();
+
+    const whiteledgeHouses = map.buildings.filter((b) => b.style === 'frostpeak-whiteledge-house');
+    expect(whiteledgeHouses.length, 'Whiteledge town should have terrace houses').toBeGreaterThanOrEqual(3);
+
+    // Verify dedicated building kit
+    const eyrieStyle = BUILDING_STYLES['frostpeak-eyrie'];
+    expect(eyrieStyle?.kit).toBe('zephyr-marble');
+    expect(KIT_LOOKS['zephyr-marble']).toBeDefined();
+
+    // Verify subterranean storeys use sunken drafts style
+    for (let f = -1; f >= -4; f--) {
+      const subStoreys = map.storeys.filter((s) => s.floor === f);
+      expect(subStoreys.every((s) => s.style === 'frostpeak-sunken-drafts')).toBe(true);
+    }
+
+    // Verify landmarks/furniture inside buildings
+    const eyrieFurniture = map.landmarks.filter((l) => l.asset.startsWith('frostpeak-eyrie-furniture-'));
+    expect(eyrieFurniture.length).toBeGreaterThanOrEqual(4);
+
+    const houseFurniture = map.landmarks.filter((l) => l.asset.startsWith('frostpeak-whiteledge-house-furniture-'));
+    expect(houseFurniture.length).toBeGreaterThanOrEqual(4);
   });
 });

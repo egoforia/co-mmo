@@ -233,4 +233,64 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       'sun-statue': { name: 'sun statue', look: 'a small stone statue of a kneeling figure holding up a golden sun disc', width: 1 },
     },
   },
+  'frostpeak-eyrie': {
+    id: 'frostpeak-eyrie',
+    name: 'The Eyrie of the First Watch',
+    biome: 'frostpeak',
+    kit: 'zephyr-marble',
+    kitShape: { roof: 'flat', battlements: true, towers: [{ corner: 'front-left' }, { corner: 'front-right' }], numStoreys: 3 },
+    references: ['zephyr-falcon'],
+    exterior:
+      'a soaring mountain redoubt carved into the highest crest of Mount Zephyr: pure white marble colonnades, silver-rimed battlements, ' +
+      'a wide ceremonial staircase leading to arched silver-bound double doors, tall lancet windows glowing pale icy blue, and high roosting aeries facing the northern winds',
+    floor: 'polished white mountain marble flagstones inlaid with pale silver-blue falcon-wing motifs and thin frost-veined lines',
+    wall: 'the top of a thick redoubt wall of cyclopean white marble blocks faced with cold-forged silver parapets',
+    door: 'a grand double-width mountain threshold of carved granite with inlaid silver feather engravings and a polished silver step',
+    furniture: {
+      'wind-throne': { name: 'wind throne', look: 'a majestic high throne carved from solid white marble with sweeping falcon wing backrests and midnight-blue velvet cushions', width: 2 },
+      'silver-brazier': { name: 'silver brazier', look: 'a tall silver tripod brazier burning with pale blue wind-defying flames', width: 1 },
+      'falcon-perch': { name: 'falcon roost perch', look: 'a tall carved cedar roosting post with iron crossbars and silver bells for hunting birds', width: 1.5 },
+      'astrolabe-pedestal': { name: 'wind astrolabe', look: 'an intricate brass and silver armillary sphere on a fluted marble pedestal showing air currents', width: 2 },
+    },
+  },
+  'frostpeak-whiteledge-house': {
+    id: 'frostpeak-whiteledge-house',
+    name: 'Whiteledge Terrace House',
+    biome: 'frostpeak',
+    kit: 'zephyr-marble',
+    kitShape: { numStoreys: 1 },
+    references: ['zephyr-falcon'],
+    exterior:
+      'a sturdy mountain home built on a sculpted rock terrace: white marble ashlar walls, a steep silver-grey slate roof with frost along the eaves, ' +
+      'a carved mountain cedar door with cold-forged silver straps, and warm glowing leaded windows',
+    floor: 'smooth white marble flagstones laid in clean rows, warmed by thick mountain wool runners',
+    wall: 'the top of a thick terrace wall of dressed white marble blocks with a smooth bevelled coping stone',
+    door: 'a sturdy cedar threshold bound with a broad silver strap and set flush with the marble flagstones',
+    furniture: {
+      'mason-bench': { name: 'stonemason bench', look: 'a heavy oak workbench cluttered with iron chisels, wooden mallets, and marble dust', width: 2 },
+      loom: { name: 'upright loom', look: 'a tall standing wooden loom strung with fine white and blue wool threads and silver shuttles', width: 2.5 },
+      'mountain-hearth': { name: 'mountain hearth', look: 'a deep stone fireplace built into the living rock with a crackling birch fire and kettle', width: 2 },
+      'fur-bed': { name: 'fur-lined bed', look: 'a sturdy wooden bed piled high with thick mountain sheep fleece and snow hare fur blankets', width: 2 },
+    },
+  },
+  'frostpeak-sunken-drafts': {
+    id: 'frostpeak-sunken-drafts',
+    name: 'The Sunken Drafts',
+    biome: 'frostpeak',
+    kit: 'zephyr-marble',
+    kitShape: { roof: 'flat', numStoreys: 1 },
+    references: ['zephyr-falcon'],
+    exterior:
+      'a cavernous mine entrance carved into the sheer mountain bedrock: rough-hewn stone arches reinforced with heavy cedar timbers, ' +
+      'iron rail tracks leading into the deep whistling subterranean darkness, and flickering oil lanterns',
+    floor: 'chiseled silver-veined permafrost and dark slate flagstones, slick with mountain moisture and cold to the touch',
+    wall: 'the top of a rough-hewn subterranean wall of living mountain rock banded with raw silver ore and glacial ice',
+    door: 'a low arched doorway framed by heavy squared timbers with iron reinforcement brackets',
+    furniture: {
+      'ore-cart': { name: 'mine cart', look: 'a rusted iron mine cart heaped with raw silver ore and glittering quartz crystals', width: 2 },
+      'stalagmite-cluster': { name: 'ice stalagmites', look: 'a cluster of sharp glacial ice stalagmites rising from the frozen rock floor', width: 1.5 },
+      'mining-rig': { name: 'spelunker rig', look: 'a wooden hoist rig with coiled hemp rope, iron pickaxes, and hanging miner lanterns', width: 2 },
+      'relic-sarcophagus': { name: 'ancient watcher sarcophagus', look: 'a massive carved stone sarcophagus bearing the falcon crest of the First Watch', width: 2.5 },
+    },
+  },
 };

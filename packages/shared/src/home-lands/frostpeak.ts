@@ -1,7 +1,7 @@
 import type { CreatureDef, ItemDef, QuestDef } from '../rpg.ts';
 import { levelledCreature } from '../lands.ts';
 import { rand2, valueNoise } from '../random.ts';
-import { CATHEDRAL_SIZE, SANCTUM_NORTH_GATE, Tile, building, creatures, disc, road, scatter, type RegionMap } from '../world.ts';
+import { CATHEDRAL_SIZE, SANCTUM_NORTH_GATE, Tile, building, creatures, disc, placer, road, scatter, type RegionMap } from '../world.ts';
 import { addStairs, addStorey, setOn } from '../floors.ts';
 import type { HomeLand } from './types.ts';
 import { toolOffers } from '../crafts.ts';
@@ -166,20 +166,33 @@ function layout(map: RegionMap, c: number): void {
   disc(map, 64, 112, 8, Tile.Ground);
   disc(map, 64, 128, 8, Tile.Ground);
 
-  // Talon-Mason Kaen's workshop (10x6 marble cathedral building)
-  const masonShop = building(map, 48, 128, 10, 6, 'sanctum-cathedral');
+  // Talon-Mason Kaen's workshop (10x6 marble building)
+  const masonShop = building(map, 48, 128, 10, 6, 'frostpeak-whiteledge-house');
   map.buildings.push(masonShop);
   road(map, 56, 120, masonShop.door.x, masonShop.door.y + 1);
 
   // Whiteledge Weaving House (10x6 marble building)
-  const weavingHouse = building(map, 64, 112, 10, 6, 'sanctum-cathedral');
+  const weavingHouse = building(map, 64, 112, 10, 6, 'frostpeak-whiteledge-house');
   map.buildings.push(weavingHouse);
   road(map, 56, 120, weavingHouse.door.x, weavingHouse.door.y + 1);
 
   // Whiteledge Delver's Shelter (10x6 marble building)
-  const delversLodge = building(map, 64, 128, 10, 6, 'sanctum-cathedral');
+  const delversLodge = building(map, 64, 128, 10, 6, 'frostpeak-whiteledge-house');
   map.buildings.push(delversLodge);
   road(map, 56, 120, delversLodge.door.x, delversLodge.door.y + 1);
+
+  // Furnish Whiteledge workshops and homes
+  const putMason = placer(map, 'frostpeak-whiteledge-house', masonShop.x + 1, masonShop.y + 1);
+  putMason('mason-bench', 1.5, 1, 2, 1);
+  putMason('mountain-hearth', 5.5, 1, 2, 1);
+
+  const putWeave = placer(map, 'frostpeak-whiteledge-house', weavingHouse.x + 1, weavingHouse.y + 1);
+  putWeave('loom', 1.5, 1, 2.5, 1);
+  putWeave('fur-bed', 5.5, 1, 2, 1);
+
+  const putLodge = placer(map, 'frostpeak-whiteledge-house', delversLodge.x + 1, delversLodge.y + 1);
+  putLodge('mountain-hearth', 1.5, 1, 2, 1);
+  putLodge('fur-bed', 5.5, 1, 2, 1);
 
   map.npcs.push({ id: 'kaen', name: 'Talon-Mason Kaen', asset: 'frostpeak-kaen', x: 56.5, y: 119.5 });
 
@@ -190,9 +203,17 @@ function layout(map: RegionMap, c: number): void {
   // The Eyrie of the First Watch: Monumental base on Floor 0 (18x12)
   const eyrieLeft = 34;
   const eyrieTop = 82;
-  const eyrie = building(map, eyrieLeft, eyrieTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
+  const eyrie = building(map, eyrieLeft, eyrieTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'frostpeak-eyrie');
   map.buildings.push(eyrie);
   road(map, 43, 95, eyrie.door.x, eyrie.door.y + 1);
+
+  // Furnish The Eyrie Great Hall on Floor 0
+  const putEyrie = placer(map, 'frostpeak-eyrie', eyrie.x + 1, eyrie.y + 1);
+  putEyrie('wind-throne', 7, 2, 2, 1);
+  putEyrie('silver-brazier', 2, 2, 1, 1);
+  putEyrie('silver-brazier', 13, 2, 1, 1);
+  putEyrie('astrolabe-pedestal', 2, 7, 2, 1);
+  putEyrie('falcon-perch', 13, 4, 1.5, 1);
 
   // -------------------------------------------------------------
   // Storeys and Mountain Tunnels: Floors +1 to +8 and -1 to -4
@@ -283,11 +304,11 @@ function layout(map: RegionMap, c: number): void {
 
   // Subterranean Depths (-1 to -4): The Sunken Drafts
   // Floor -1: Upper Silver Veins, North Lode, South Ore Depot, and Mine Tunnels
-  const sub1Central = addStorey(map, { x: 30, y: 78, width: 28, height: 18 }, -1, eyrie.style);
-  const sub1North = addStorey(map, { x: 30, y: 30, width: 24, height: 16 }, -1, eyrie.style);
-  const sub1TunnelN = addStorey(map, { x: 38, y: 46, width: 8, height: 32 }, -1, eyrie.style);
-  const sub1South = addStorey(map, { x: 30, y: 126, width: 24, height: 16 }, -1, eyrie.style);
-  const sub1TunnelS = addStorey(map, { x: 38, y: 96, width: 8, height: 30 }, -1, eyrie.style);
+  const sub1Central = addStorey(map, { x: 30, y: 78, width: 28, height: 18 }, -1, 'frostpeak-sunken-drafts');
+  const sub1North = addStorey(map, { x: 30, y: 30, width: 24, height: 16 }, -1, 'frostpeak-sunken-drafts');
+  const sub1TunnelN = addStorey(map, { x: 38, y: 46, width: 8, height: 32 }, -1, 'frostpeak-sunken-drafts');
+  const sub1South = addStorey(map, { x: 30, y: 126, width: 24, height: 16 }, -1, 'frostpeak-sunken-drafts');
+  const sub1TunnelS = addStorey(map, { x: 38, y: 96, width: 8, height: 30 }, -1, 'frostpeak-sunken-drafts');
 
   connectVertical(map, -1, sub1North, sub1TunnelN, 41);
   connectVertical(map, -1, sub1TunnelN, sub1Central, 41);
@@ -295,11 +316,11 @@ function layout(map: RegionMap, c: number): void {
   connectVertical(map, -1, sub1TunnelS, sub1South, 41);
 
   // Floor -2: Whispering Tunnels, North Den, South Stalker Lair, and Tunnels
-  const sub2Central = addStorey(map, { x: 29, y: 77, width: 30, height: 20 }, -2, eyrie.style);
-  const sub2North = addStorey(map, { x: 29, y: 29, width: 26, height: 16 }, -2, eyrie.style);
-  const sub2TunnelN = addStorey(map, { x: 38, y: 45, width: 8, height: 32 }, -2, eyrie.style);
-  const sub2South = addStorey(map, { x: 29, y: 127, width: 26, height: 16 }, -2, eyrie.style);
-  const sub2TunnelS = addStorey(map, { x: 38, y: 97, width: 8, height: 30 }, -2, eyrie.style);
+  const sub2Central = addStorey(map, { x: 29, y: 77, width: 30, height: 20 }, -2, 'frostpeak-sunken-drafts');
+  const sub2North = addStorey(map, { x: 29, y: 29, width: 26, height: 16 }, -2, 'frostpeak-sunken-drafts');
+  const sub2TunnelN = addStorey(map, { x: 38, y: 45, width: 8, height: 32 }, -2, 'frostpeak-sunken-drafts');
+  const sub2South = addStorey(map, { x: 29, y: 127, width: 26, height: 16 }, -2, 'frostpeak-sunken-drafts');
+  const sub2TunnelS = addStorey(map, { x: 38, y: 97, width: 8, height: 30 }, -2, 'frostpeak-sunken-drafts');
 
   connectVertical(map, -2, sub2North, sub2TunnelN, 41);
   connectVertical(map, -2, sub2TunnelN, sub2Central, 41);
@@ -307,11 +328,11 @@ function layout(map: RegionMap, c: number): void {
   connectVertical(map, -2, sub2TunnelS, sub2South, 41);
 
   // Floor -3: Crypt of the First Watchers, North Tomb Vault, South Sarcophagus Hall, and Tunnels
-  const sub3Central = addStorey(map, { x: 30, y: 78, width: 28, height: 18 }, -3, eyrie.style);
-  const sub3North = addStorey(map, { x: 30, y: 30, width: 24, height: 16 }, -3, eyrie.style);
-  const sub3TunnelN = addStorey(map, { x: 38, y: 46, width: 8, height: 32 }, -3, eyrie.style);
-  const sub3South = addStorey(map, { x: 30, y: 126, width: 24, height: 16 }, -3, eyrie.style);
-  const sub3TunnelS = addStorey(map, { x: 38, y: 96, width: 8, height: 30 }, -3, eyrie.style);
+  const sub3Central = addStorey(map, { x: 30, y: 78, width: 28, height: 18 }, -3, 'frostpeak-sunken-drafts');
+  const sub3North = addStorey(map, { x: 30, y: 30, width: 24, height: 16 }, -3, 'frostpeak-sunken-drafts');
+  const sub3TunnelN = addStorey(map, { x: 38, y: 46, width: 8, height: 32 }, -3, 'frostpeak-sunken-drafts');
+  const sub3South = addStorey(map, { x: 30, y: 126, width: 24, height: 16 }, -3, 'frostpeak-sunken-drafts');
+  const sub3TunnelS = addStorey(map, { x: 38, y: 96, width: 8, height: 30 }, -3, 'frostpeak-sunken-drafts');
 
   connectVertical(map, -3, sub3North, sub3TunnelN, 41);
   connectVertical(map, -3, sub3TunnelN, sub3Central, 41);
@@ -319,11 +340,11 @@ function layout(map: RegionMap, c: number): void {
   connectVertical(map, -3, sub3TunnelS, sub3South, 41);
 
   // Floor -4: The Hoarfrost Well, North Deep Cavern, South Frost Sump, and Glacial Tunnels
-  const sub4Central = addStorey(map, { x: 31, y: 79, width: 26, height: 16 }, -4, eyrie.style);
-  const sub4North = addStorey(map, { x: 31, y: 31, width: 22, height: 14 }, -4, eyrie.style);
-  const sub4TunnelN = addStorey(map, { x: 38, y: 45, width: 8, height: 34 }, -4, eyrie.style);
-  const sub4South = addStorey(map, { x: 31, y: 125, width: 22, height: 14 }, -4, eyrie.style);
-  const sub4TunnelS = addStorey(map, { x: 38, y: 95, width: 8, height: 30 }, -4, eyrie.style);
+  const sub4Central = addStorey(map, { x: 31, y: 79, width: 26, height: 16 }, -4, 'frostpeak-sunken-drafts');
+  const sub4North = addStorey(map, { x: 31, y: 31, width: 22, height: 14 }, -4, 'frostpeak-sunken-drafts');
+  const sub4TunnelN = addStorey(map, { x: 38, y: 45, width: 8, height: 34 }, -4, 'frostpeak-sunken-drafts');
+  const sub4South = addStorey(map, { x: 31, y: 125, width: 22, height: 14 }, -4, 'frostpeak-sunken-drafts');
+  const sub4TunnelS = addStorey(map, { x: 38, y: 95, width: 8, height: 30 }, -4, 'frostpeak-sunken-drafts');
 
   connectVertical(map, -4, sub4North, sub4TunnelN, 41);
   connectVertical(map, -4, sub4TunnelN, sub4Central, 41);

@@ -26,6 +26,8 @@ import {
   isBlocking,
   floorChecks,
   canSeeAcrossFloors,
+  floorDrawnFrom,
+  seenFromGround,
   nearBuilding,
   outsideSide,
   step,
@@ -99,7 +101,7 @@ describe('world layout', () => {
 
   it('opens edges only where a region lies beyond', () => {
     const c = sanctum.width / 2;
-    const frostpeak = maps.find((m) => m.def.id === 'frostpeak')!;
+    const frostpeak = maps[WORLD_REGIONS.findIndex((d) => d.id === 'frostpeak')]!;
     expect(tileAt(sanctum, -0.5, c + 0.5)).toBe(Tile.Path);
     expect(tileAt(sanctum, c + 0.5, -0.5)).toBe(Tile.Path);
     expect(tileAt(frostpeak, c + 0.5, -0.5)).toBe(Tile.Water);
@@ -306,6 +308,25 @@ describe('the Sanctum City District', () => {
     const insideGround = { x: inn.x + 2, y: inn.y + 2, floor: 0 };
     const upstairsEnclosed = { x: inn.x + 2, y: inn.y + 2, floor: 1 };
     expect(canSeeAcrossFloors(sanctum, insideGround, upstairsEnclosed)).toBe(false);
+  });
+
+  it('draws only our floor, the floors below us, and from the ground open terraces', () => {
+    const frostpeak = maps[WORLD_REGIONS.findIndex((d) => d.id === 'frostpeak')]!;
+    const vail = frostpeak.npcs.find((n) => n.id === 'vail')!;
+    // From the Belfry (floor 7), the Crown above (floor 8) is not drawn, so Watcher Vail must not show.
+    expect(floorDrawnFrom(frostpeak, 7, vail.floor ?? 0, vail.x, vail.y)).toBe(false);
+    expect(floorDrawnFrom(frostpeak, 8, 8, vail.x, vail.y)).toBe(true);
+    expect(floorDrawnFrom(frostpeak, 7, 6, vail.x, vail.y)).toBe(true);
+    expect(floorDrawnFrom(frostpeak, 7, 0, vail.x, vail.y)).toBe(true);
+    expect(floorDrawnFrom(frostpeak, 7, -1, vail.x, vail.y)).toBe(false);
+    expect(floorDrawnFrom(frostpeak, -1, 0, vail.x, vail.y)).toBe(false);
+    // From the ground, an open terrace over no building shows; a building's upper floors never do.
+    const terrace = maps.flatMap((m) => m.storeys.filter((s) => seenFromGround(m, s)).map((s) => ({ m, s })))[0];
+    expect(terrace).toBeDefined();
+    expect(floorDrawnFrom(terrace!.m, 0, terrace!.s.floor, terrace!.s.x + 0.5, terrace!.s.y + 0.5)).toBe(true);
+    const belfry = { x: cathedral.door.x, y: cathedral.door.y - 7 };
+    expect(floorDrawnFrom(sanctum, 0, 2, belfry.x, belfry.y)).toBe(false);
+    expect(floorDrawnFrom(sanctum, 0, 1, inn.x + 2, inn.y + 2)).toBe(false);
   });
 
   it('houses subterranean catacombs and the chained demon vault below ground', () => {

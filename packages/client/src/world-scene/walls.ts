@@ -177,5 +177,7 @@ export function rockWalls(
       parts.push(img);
     }
   }));
+  // Tagged so a cutaway can hide the walls of every floor but the one we stand on.
+  for (const p of parts) p.setData('wall', true);
   return parts;
 }

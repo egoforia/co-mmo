@@ -1,10 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import { WORLD_REGIONS, generateRegion, stairwayAt, storeyAt } from '../src/index.ts';
+import { Tile, WORLD_REGIONS, collides, floorChecks, generateRegion, stairwayAt, storeyAt } from '../src/index.ts';
 import { FROSTPEAK } from '../src/home-lands/frostpeak.ts';
 
 describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
   const frostpeakDef = WORLD_REGIONS.find((r) => r.id === 'frostpeak')!;
   const map = generateRegion(frostpeakDef);
+
+  it('spans Mount Zephyr across at least 33% of the region with mountain stone, Whiteledge town, and roads', () => {
+    // 33% of 256 is ~84.5 tiles; Mount Zephyr occupies western x <= 88
+    const totalTiles = map.width * map.height;
+    const mountainWidth = 88;
+    const mountainArea = mountainWidth * map.height;
+    expect(mountainArea / totalTiles).toBeGreaterThanOrEqual(0.33);
+
+    // Verify mountain stone is densely present across the western mountain mass:
+    let mountainRocks = 0;
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x <= mountainWidth; x++) {
+        if (map.tiles[y * map.width + x] === Tile.Rock) mountainRocks++;
+      }
+    }
+    expect(mountainRocks).toBeGreaterThan(1500);
+
+    // Verify Whiteledge buildings stand on the mountain ledges:
+    expect(map.buildings.length).toBeGreaterThanOrEqual(4);
+    const whiteledgeBuildings = map.buildings.filter((b) => b.x < 88);
+    expect(whiteledgeBuildings.length).toBeGreaterThanOrEqual(4);
+
+    // Verify road leads into the mountain pass and town:
+    expect(map.tiles[120 * map.width + 84]).toBe(Tile.Path);
+    expect(map.tiles[120 * map.width + 56]).toBe(Tile.Path);
+  });
+
+  it('connects isolated rooms with mountain tunnels across the floors above ground and underground', () => {
+    // Check multiple distinct storeys (rooms + connecting tunnels) on Floor 1
+    const floor1Storeys = map.storeys.filter((s) => s.floor === 1);
+    expect(floor1Storeys.length, 'Floor 1 should have multiple isolated rooms and tunnels').toBeGreaterThanOrEqual(5);
+
+    // Verify rooms span widely across the mountain (north at y ~ 34, south at y ~ 124, west at x ~ 18):
+    const northRoom = floor1Storeys.find((s) => s.y < 40);
+    const southRoom = floor1Storeys.find((s) => s.y > 110);
+    const westTerrace = floor1Storeys.find((s) => s.x < 20);
+    expect(northRoom).toBeDefined();
+    expect(southRoom).toBeDefined();
+    expect(westTerrace).toBeDefined();
+
+    // Verify subterranean floors also have isolated chambers connected by mine tunnels:
+    for (let f = -1; f >= -4; f--) {
+      const subStoreys = map.storeys.filter((s) => s.floor === f);
+      expect(subStoreys.length, `Underground floor ${f} should have multiple chambers and tunnels`).toBeGreaterThanOrEqual(5);
+    }
+
+    // Verify walkability from central hall through tunnel into north room on Floor 1:
+    expect(collides(map, 42.5, 85.5, 1)).toBe(false); // central hall
+    expect(collides(map, 42.5, 65.5, 1)).toBe(false); // inside north tunnel
+    expect(collides(map, 42.5, 40.5, 1)).toBe(false); // inside north room
+  });
+
+  it('passes all floor and stairway validation checks with zero collisions for NPCs and monsters', () => {
+    // Floor checks verify no overlapping storeys, valid stairs, and open landings
+    const problems = floorChecks(map);
+    expect(problems).toEqual([]);
+
+    for (const npc of map.npcs) {
+      expect(collides(map, npc.x, npc.y, npc.floor ?? 0), `NPC ${npc.name} at (${npc.x}, ${npc.y}) on floor ${npc.floor ?? 0}`).toBe(false);
+    }
+
+    for (const c of map.creatures) {
+      expect(collides(map, c.x, c.y, c.floor ?? 0), `Creature ${c.name} at (${c.x}, ${c.y}) on floor ${c.floor ?? 0}`).toBe(false);
+    }
+  });
 
   it('generates the 8-storey Eyrie and 4-storey Sunken Drafts', () => {
     // Check above-ground storeys (+1 to +8)

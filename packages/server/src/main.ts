@@ -31,10 +31,11 @@ const clientDir = process.env.CLIENT_DIR
 // game starts with nothing installed. A first run brings in the world from
 // an older game's JSON file, if there is one.
 const databaseUrl = process.env.DATABASE_URL;
-const store = await (databaseUrl
-  ? connectPostgres(databaseUrl).then((sql) => Store.postgres(sql, dataFile, `Postgres on ${hostOf(databaseUrl)}`))
-  : openBuiltInPostgres(dbDir).then((sql) => Store.postgres(sql, dataFile, `the built-in Postgres in ${dbDir}`))
-).catch((err: Error) => {
+const sql = await (databaseUrl ? connectPostgres(databaseUrl) : openBuiltInPostgres(dbDir)).catch((err: Error) => {
+  console.error(err.message);
+  process.exit(1);
+});
+const store = await Store.postgres(sql, dataFile, databaseUrl ? `Postgres on ${hostOf(databaseUrl)}` : `the built-in Postgres in ${dbDir}`).catch((err: Error) => {
   console.error(err.message);
   process.exit(1);
 });
@@ -57,10 +58,12 @@ const updater = new Updater({
   requestFile: process.env.CO_MMO_UPDATE_REQUEST,
   resultFile: process.env.CO_MMO_UPDATE_RESULT,
 });
-// Every request to an outside service, kept beside the world for God's View's API Log,
-// for API_LOG_DAYS days and API_LOG_MAX_MB megabytes at most.
+// Every request to an outside service, kept in the database for God's View's API Log,
+// for API_LOG_DAYS days and API_LOG_MAX_MB megabytes at most. An older game's
+// log files (API_LOG_DIR) are brought in once.
 const apiLog = await ApiLog.open({
-  dir: resolve(process.env.API_LOG_DIR ?? resolve(dirname(dataFile), 'api-log')),
+  sql,
+  importFrom: resolve(process.env.API_LOG_DIR ?? resolve(dirname(dataFile), 'api-log')),
   keepDays: positive('API_LOG_DAYS', KEEP_DAYS),
   maxBytes: positive('API_LOG_MAX_MB', MAX_BYTES / 1024 / 1024) * 1024 * 1024,
 });

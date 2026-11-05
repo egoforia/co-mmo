@@ -1,8 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
-import { existsSync, statSync } from 'node:fs';
-import { appendFile, mkdir, open, readdir, readFile, stat, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import type { Sql } from './db.ts';
+import { dropDay, importDayFiles, insertCall, loadCalls, migrateApiLog, readCall, type StoredCall } from './api-log-db.ts';
 
 // Every request the server sends to a service outside this machine (the AI
 // models, GitHub, sign-in providers, email) passes through one wrapper around
@@ -414,11 +413,13 @@ export interface ApiLogPage {
 }
 
 export interface ApiLogOptions {
-  /** Where the log is kept, one file a day; in memory only when absent. */
-  dir?: string;
+  /** The database the log is kept in (api-log-db.ts); in memory only when absent. */
+  sql?: Sql;
+  /** A folder of `<day>.jsonl` files an older game kept the log in, brought into the database once. */
+  importFrom?: string;
   /** Days kept before the oldest go. */
   keepDays?: number;
-  /** Bytes kept on disk in all; the oldest days go first. */
+  /** Bytes kept in all; the oldest days go first. */
   maxBytes?: number;
   /** Secrets in here are masked wherever they turn up. */
   env?: Record<string, string | undefined>;
@@ -427,14 +428,10 @@ export interface ApiLogOptions {
 
 export const KEEP_DAYS = 14;
 export const MAX_BYTES = 200 * 1024 * 1024;
-/** Calls kept when there is no folder to keep them in. */
+/** Calls kept when there is no database to keep them in. */
 const KEEP_IN_MEMORY = 1000;
 
-interface Kept {
-  summary: ApiCallSummary;
-  day: string;
-  offset: number;
-  length: number;
+interface Kept extends StoredCall {
   /** The whole call, when the log lives in memory. */
   call?: ApiCall;
 }
@@ -442,9 +439,10 @@ interface Kept {
 const dayOf = (at: number) => new Date(at).toISOString().slice(0, 10);
 
 /**
- * The API Log: one JSON line per call in `<dir>/<day>.jsonl`, with a small
- * index file beside it, so the list loads without reading every body. Days
- * past `keepDays`, and the oldest days once the folder passes `maxBytes`, are
+ * The API Log: one row per call in the database (api-log-db.ts), with the
+ * calls' summaries also in memory, so the list and its filters never wait on
+ * the database; a whole call is read when it is opened. Days past
+ * `keepDays`, and the oldest days once the log passes `maxBytes`, are
  * deleted.
  */
 export class ApiLog implements ApiSink {
@@ -465,19 +463,24 @@ export class ApiLog implements ApiSink {
     this.now = options.now ?? Date.now;
   }
 
-  /** A log in `options.dir` (made if missing), with what is already there; in memory without a folder. */
+  /** A log in the database, with what is already there (and an older game's files brought in); in memory without one. */
   static async open(options: ApiLogOptions = {}): Promise<ApiLog> {
     const log = new ApiLog(options);
-    if (options.dir) {
-      await mkdir(options.dir, { recursive: true });
-      await log.load();
+    const sql = options.sql;
+    if (sql) {
+      await migrateApiLog(sql);
+      if (options.importFrom) {
+        const count = await importDayFiles(sql, options.importFrom, (call) => ({ summary: summary(call), day: dayOf(call.at), bytes: Buffer.byteLength(JSON.stringify(call)) }));
+        if (count) console.log(`Brought ${count} API Log calls from ${options.importFrom} into the database.`);
+      }
+      await log.load(sql);
       await log.prune();
     }
     return log;
   }
 
   /** A log in memory only, for tests and tools. */
-  static memory(options: Omit<ApiLogOptions, 'dir'> = {}): ApiLog {
+  static memory(options: Omit<ApiLogOptions, 'sql' | 'importFrom'> = {}): ApiLog {
     return new ApiLog(options);
   }
 
@@ -490,9 +493,9 @@ export class ApiLog implements ApiSink {
       return;
     }
     const day = dayOf(call.at);
-    const dir = this.options.dir;
-    if (!dir) {
-      this.kept.set(call.id, { summary: summary(call), day, offset: 0, length: 0, call });
+    const sql = this.options.sql;
+    if (!sql) {
+      this.kept.set(call.id, { summary: summary(call), day, bytes: 0, call });
       while (this.kept.size > KEEP_IN_MEMORY) this.kept.delete(this.kept.keys().next().value!);
       return;
     }
@@ -500,20 +503,14 @@ export class ApiLog implements ApiSink {
       this.today = day;
       this.writing = this.writing.then(() => this.prune());
     }
-    // A full folder still lists each call; only its headers and bodies are left out.
+    // A full log still lists each call; only its headers and bodies are left out.
     const full = this.usedBytes() > this.maxBytes;
     const stored = full ? { ...call, requestHeaders: {}, responseHeaders: {}, requestBody: '[not kept: the API Log is full for today]', responseBody: '[not kept: the API Log is full for today]' } : call;
-    const line = `${JSON.stringify(stored)}\n`;
-    const offset = this.size(day);
-    const length = Buffer.byteLength(line);
-    const kept: Kept = { summary: summary(call), day, offset, length };
-    const index = `${JSON.stringify({ s: kept.summary, o: offset, l: length })}\n`;
-    this.sizes.set(day, offset + length);
-    this.sizes.set(`${day}.index`, this.size(`${day}.index`) + Buffer.byteLength(index));
+    const kept: Kept = { summary: summary(call), day, bytes: Buffer.byteLength(JSON.stringify(stored)) };
+    this.sizes.set(day, (this.sizes.get(day) ?? 0) + kept.bytes);
     this.kept.set(call.id, kept);
     this.writing = this.writing
-      .then(() => appendFile(join(dir, `${day}.jsonl`), line))
-      .then(() => appendFile(join(dir, `${day}.index.jsonl`), index))
+      .then(() => insertCall(sql, kept, stored))
       .catch((err: Error) => {
         if (!this.warned) console.warn(`The API Log could not be written: ${err.message}`);
         this.warned = true;
@@ -526,16 +523,7 @@ export class ApiLog implements ApiSink {
     if (!kept) return undefined;
     if (kept.call) return kept.call;
     await this.writing;
-    const file = await open(join(this.options.dir!, `${kept.day}.jsonl`), 'r');
-    try {
-      const buffer = Buffer.alloc(kept.length);
-      await file.read(buffer, 0, kept.length, kept.offset);
-      return JSON.parse(buffer.toString('utf8')) as ApiCall;
-    } catch {
-      return undefined;
-    } finally {
-      await file.close();
-    }
+    return readCall(this.options.sql!, id).catch(() => undefined);
   }
 
   query(filter: ApiLogFilter = {}): ApiLogPage {
@@ -576,7 +564,7 @@ export class ApiLog implements ApiSink {
         methods: unique(inTime.map((c) => c.method)).sort(),
         statuses: unique(inTime.map((c) => c.status)).sort((a, b) => a - b),
       },
-      keeping: { days: this.keepDays, maxBytes: this.maxBytes, usedBytes: this.usedBytes(), onDisk: Boolean(this.options.dir) },
+      keeping: { days: this.keepDays, maxBytes: this.maxBytes, usedBytes: this.usedBytes(), onDisk: Boolean(this.options.sql) },
     };
   }
 
@@ -585,57 +573,28 @@ export class ApiLog implements ApiSink {
     await this.writing;
   }
 
-  private size(name: string): number {
-    let size = this.sizes.get(name);
-    if (size === undefined) {
-      const path = join(this.options.dir!, `${name}.jsonl`);
-      size = existsSync(path) ? statSync(path).size : 0;
-      this.sizes.set(name, size);
-    }
-    return size;
-  }
-
   private usedBytes(): number {
     let n = 0;
     for (const size of this.sizes.values()) n += size;
     return n;
   }
 
-  private async days(): Promise<string[]> {
-    const names = await readdir(this.options.dir!);
-    return names.map((n) => n.match(/^(\d{4}-\d{2}-\d{2})\.jsonl$/)?.[1]).filter((d): d is string => Boolean(d)).sort();
-  }
-
-  private async load(): Promise<void> {
-    const dir = this.options.dir!;
-    for (const day of await this.days()) {
-      this.sizes.set(day, (await stat(join(dir, `${day}.jsonl`))).size);
-      const indexFile = join(dir, `${day}.index.jsonl`);
-      const index = await readFile(indexFile, 'utf8').catch(() => '');
-      this.sizes.set(`${day}.index`, Buffer.byteLength(index));
-      for (const line of index.split('\n')) {
-        if (!line) continue;
-        try {
-          const { s, o, l } = JSON.parse(line) as { s: ApiCallSummary; o: number; l: number };
-          this.kept.set(s.id, { summary: s, day, offset: o, length: l });
-        } catch {
-          // A line cut short by a crash; the calls after it are still read.
-        }
-      }
+  private async load(sql: Sql): Promise<void> {
+    for (const kept of await loadCalls(sql)) {
+      this.kept.set(kept.summary.id, kept);
+      this.sizes.set(kept.day, (this.sizes.get(kept.day) ?? 0) + kept.bytes);
     }
   }
 
-  /** Deletes days past `keepDays`, then the oldest days while the folder is over `maxBytes` (never today). */
+  /** Deletes days past `keepDays`, then the oldest days while the log is over `maxBytes` (never today). */
   private async prune(): Promise<void> {
-    const dir = this.options.dir!;
+    const sql = this.options.sql!;
     const today = dayOf(this.now());
     const oldest = dayOf(this.now() - (this.keepDays - 1) * 86_400_000);
-    const days = await this.days();
+    const days = [...this.sizes.keys()].sort();
     const drop = async (day: string) => {
-      await unlink(join(dir, `${day}.jsonl`)).catch(() => undefined);
-      await unlink(join(dir, `${day}.index.jsonl`)).catch(() => undefined);
+      await dropDay(sql, day);
       this.sizes.delete(day);
-      this.sizes.delete(`${day}.index`);
       for (const [id, k] of this.kept) if (k.day === day) this.kept.delete(id);
     };
     for (const day of days) if (day < oldest) await drop(day);

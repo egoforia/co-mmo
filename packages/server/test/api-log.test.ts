@@ -8,6 +8,7 @@ import { AnthropicChat } from '../src/ai/chat.ts';
 import { createMailer } from '../src/auth.ts';
 import { MemoryPaintQueue, queuedImages, watched } from '../src/paint-queue.ts';
 import { account, api, app, start } from './helpers.ts';
+import { testSql } from './sql.ts';
 
 const KEY = 'AIzaSyTESTKEY-0123456789abcdefWXYZ';
 const PICTURE = Buffer.alloc(3000, 7).toString('base64');
@@ -116,25 +117,31 @@ describe('the API Log', () => {
     expect(isExternal('https://api.openai.com/v1/chat/completions')).toBe(true);
   });
 
-  it('keeps the log on disk across restarts, filters it, and lets old days go', async () => {
+  it('keeps the log in the database across restarts, filters it, and lets old days go', async () => {
+    const db = await testSql();
     const dir = await mkdtemp(join(tmpdir(), 'co-mmo-api-log-'));
     const day = 86_400_000;
     const now = Date.parse('2026-10-16T12:00:00Z');
-    // A day older than the log keeps.
-    await writeFile(join(dir, '2026-09-01.jsonl'), '{}\n');
-    await writeFile(join(dir, '2026-09-01.index.jsonl'), '');
-    const log = await ApiLog.open({ dir, now: () => now });
     const raw = (at: number, model: string, status: number): RawCall => ({
       at, ms: 800, method: 'POST', url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       requestHeaders: {}, requestBody: '{"contents":[]}', requestBytes: 15, status, responseHeaders: {}, responseText: status === 200 ? '{}' : '{"error":{"message":"You exceeded your current quota"}}', responseBytes: 2,
     });
-    log.record(raw(now - day, 'gemini-3.8-flash', 200));
+    // An older game's files: one day the log still keeps, and one older than it keeps.
+    const old = ApiLog.memory();
+    old.record(raw(now - day, 'gemini-3.8-flash', 200));
+    const oldCall = await old.get(old.query().calls[0]!.id);
+    await writeFile(join(dir, '2026-10-15.jsonl'), `${JSON.stringify(oldCall)}\n`);
+    await writeFile(join(dir, '2026-10-15.index.jsonl'), '');
+    await writeFile(join(dir, '2026-09-01.jsonl'), `${JSON.stringify({ ...oldCall, id: 'ancient', at: Date.parse('2026-09-01T10:00:00Z') })}\n`);
+
+    const log = await ApiLog.open({ sql: db, importFrom: dir, now: () => now });
     log.record(raw(now - 60_000, 'gemini-2.5-flash-image', 429));
     log.record(raw(now, 'gemini-3.8-flash', 200));
     await log.flush();
-    expect((await readdir(dir)).sort()).toEqual(['2026-10-15.index.jsonl', '2026-10-15.jsonl', '2026-10-16.index.jsonl', '2026-10-16.jsonl']);
+    // Brought in once, the files are kept as a backup.
+    expect((await readdir(dir)).sort()).toEqual(['2026-09-01.jsonl.in-db', '2026-10-15.index.jsonl.in-db', '2026-10-15.jsonl.in-db']);
 
-    const again = await ApiLog.open({ dir, now: () => now });
+    const again = await ApiLog.open({ sql: db, importFrom: dir, now: () => now });
     expect(again.query().matched).toBe(3);
     expect(again.query({ model: 'gemini-3.8-flash' }).matched).toBe(2);
     expect(again.query({ from: now - 3_600_000 }).choices.models).toEqual(['gemini-2.5-flash-image', 'gemini-3.8-flash']);
@@ -144,9 +151,12 @@ describe('the API Log', () => {
     expect(again.query({ text: 'quota' }).matched).toBe(1);
 
     // On the last day the log keeps, the older day is gone.
-    const later = await ApiLog.open({ dir, now: () => now + 13 * day });
+    const later = await ApiLog.open({ sql: db, now: () => now + 13 * day });
     expect(later.query().matched).toBe(2);
-  });
+    const { rows } = await db.query('SELECT 1 FROM api_log');
+    expect(rows).toHaveLength(2);
+    await db.end();
+  }, 30_000);
 
   it('is shown to the Owner only', async () => {
     const { store, base } = await start();

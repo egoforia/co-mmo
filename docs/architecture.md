@@ -58,7 +58,7 @@ on another object after it is built). `region-main.ts` starts a region server.
   that pays calls `budget.spend`, and checks `budget.paused()` first.
 - `ai/services.ts`: picks every chat, image, video, music and effects service
   from settings, keys and the budget; tests override one at a time.
-- `api-log.ts`: records every request to an outside service, secrets masked.
+- `api-log.ts`: records every request to an outside service, secrets masked; kept in the `api_log` table (`api-log-db.ts`).
 
 **How hard it works.** `load-meter.ts` times each tick, ticks a second,
 the event loop's delay and memory, in the gateway and every region server;

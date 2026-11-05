@@ -130,6 +130,22 @@ export function seenFromGround(map: RegionMap, storey: Storey): boolean {
   return !map.buildings.some((b) => storey.x < b.x + b.width && b.x < storey.x + storey.width && storey.y < b.y + b.height && b.y < storey.y + storey.height);
 }
 
+/**
+ * True when a thing on `floor` at a tile is drawn for someone standing on
+ * `mine`: our own floor always; from the ground, only open terraces over no
+ * building; from upstairs, the floors below down to the ground. Floors above
+ * us and underground floors other than our own are never drawn, so whoever
+ * stands there must not float in the air either.
+ */
+export function floorDrawnFrom(map: RegionMap, mine: number, floor: number, x: number, y: number): boolean {
+  if (floor === mine) return true;
+  if (mine === 0) {
+    const s = storeyAt(map, Math.floor(x), Math.floor(y), floor);
+    return Boolean(s && seenFromGround(map, s));
+  }
+  return mine > 0 && floor >= 0 && floor < mine;
+}
+
 /** Sets one tile on a floor; off the ground, only where a storey of that floor lies. */
 export function setOn(map: RegionMap, floor: number, x: number, y: number, tile: Tile): void {
   if (floor === 0) return set(map, x, y, tile);

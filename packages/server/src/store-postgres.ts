@@ -1,5 +1,6 @@
 import type { Sql, SqlQuery } from './db.ts';
 import { migrateLogs } from './store-logs.ts';
+import { migrateKept } from './kept.ts';
 
 /**
  * Each part of the saved world gets its own table of the same shape: a key,
@@ -29,6 +30,7 @@ export async function migrate(sql: Sql): Promise<void> {
       await q.query(`CREATE INDEX IF NOT EXISTS ${table}_n ON ${table} (n)`);
     }
     await migrateLogs(q);
+    await migrateKept(q);
     await q.query(
       `INSERT INTO co_mmo_meta (key, value) VALUES ('schema', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [String(SCHEMA_VERSION)],

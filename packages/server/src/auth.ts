@@ -60,13 +60,18 @@ interface OAuthState {
 type Json = (res: ServerResponse, status: number, body: unknown) => void;
 type ReadJson = (req: IncomingMessage) => Promise<Record<string, unknown> | null>;
 
+/** Kinds of kept documents (kept.ts): sign-in links by code hash, provider sign-ins by state, recent emails by address and browser. */
+const KEPT_LINK = 'sign-in-link';
+const KEPT_STATE = 'sign-in-state';
+const KEPT_SENT = 'sign-in-sent';
+
 const PROVIDER_NAME: Record<LoginProvider, string> = { google: 'Google', github: 'GitHub' };
 
 /** Sign-in by email link and by Google or GitHub. */
 export class Auth {
-  private readonly pending = new Map<string, Pending>();
-  private readonly states = new Map<string, OAuthState>();
-  private readonly sent = new Map<string, number[]>();
+  // Links waiting to be opened, sign-ins waiting on Google or GitHub, and
+  // emails recently sent are kept in the database (kept.ts), so a restart
+  // does not break a link just sent and every game server agrees on them.
   readonly mailer: Mailer;
   private readonly fetch: typeof fetch;
   private readonly now: () => number;
@@ -96,8 +101,8 @@ export class Auth {
     if (!email) throw new StoreError('email_invalid', 'That does not look like an email address.');
     const other = this.options.store.accountByEmail(email);
     if (other && other.id !== account.id) throw new StoreError('email_taken', 'Another player already signs in with that email.');
-    if (!this.allowSend(email, client)) throw new StoreError('email_rate', 'Too many emails asked for. Try again in a few minutes.');
-    const link = this.link({ purpose: 'confirm', accountId: account.id, email });
+    if (!(await this.allowSend(email, client))) throw new StoreError('email_rate', 'Too many emails asked for. Try again in a few minutes.');
+    const link = await this.link({ purpose: 'confirm', accountId: account.id, email });
     await this.mailer.send({
       to: email,
       subject: 'Confirm your email for co-MMO',
@@ -112,8 +117,8 @@ export class Auth {
     if (!email) throw new StoreError('email_invalid', 'That does not look like an email address.');
     const said = `If a player signs in with ${email}, a sign-in link is on its way. It works for 15 minutes.`;
     const account = this.options.store.accountByEmail(email);
-    if (!account || !this.allowSend(email, client)) return said;
-    const link = this.link({ purpose: 'login', accountId: account.id });
+    if (!account || !(await this.allowSend(email, client))) return said;
+    const link = await this.link({ purpose: 'login', accountId: account.id });
     await this.mailer.send({
       to: email,
       subject: 'Your co-MMO sign-in link',
@@ -123,10 +128,8 @@ export class Auth {
   }
 
   /** Trades a one-time code from a link for a session token. */
-  redeem(code: string): { account: Account; token: string } {
-    const key = hash(code);
-    const pending = this.pending.get(key);
-    this.pending.delete(key);
+  async redeem(code: string): Promise<{ account: Account; token: string }> {
+    const pending = await this.options.store.kept.take<Pending>(KEPT_LINK, hash(code));
     if (!pending || pending.expires < this.now()) {
       throw new StoreError('link_invalid', 'This sign-in link has run out or was already used. Ask for a new one.');
     }
@@ -139,11 +142,12 @@ export class Auth {
   }
 
   /** Where to send the browser to sign in with a provider, or undefined if it is not set up. */
-  startUrl(provider: LoginProvider, mode: 'login' | 'link', accountId?: string): string | undefined {
+  async startUrl(provider: LoginProvider, mode: 'login' | 'link', accountId?: string): Promise<string | undefined> {
     if (!this.providers()[provider]) return undefined;
     const state = randomBytes(18).toString('base64url');
-    this.sweep();
-    this.states.set(state, { provider, mode, ...(accountId ? { accountId } : {}), expires: this.now() + STATE_MS });
+    await this.sweep();
+    const expires = this.now() + STATE_MS;
+    await this.options.store.kept.put(KEPT_STATE, state, { provider, mode, ...(accountId ? { accountId } : {}), expires } satisfies OAuthState, expires);
     const env = this.options.env;
     const redirect = this.callbackUrl(provider);
     if (provider === 'google') {
@@ -161,8 +165,7 @@ export class Auth {
    * the game with a one-time code, or to the sign-in page with a message.
    */
   async callback(provider: LoginProvider, code: string, stateKey: string): Promise<string> {
-    const state = this.states.get(stateKey);
-    this.states.delete(stateKey);
+    const state = stateKey ? await this.options.store.kept.take<OAuthState>(KEPT_STATE, stateKey) : undefined;
     if (!state || state.provider !== provider || state.expires < this.now() || !code) {
       return this.page({ signin_error: 'That sign-in took too long or was interrupted. Please try again.' });
     }
@@ -196,7 +199,7 @@ export class Auth {
     if (!account) {
       return this.page({ signin_error: `No player uses this ${name} account yet. Join with a friend's invite link first, then link ${name} from Account in the game.` });
     }
-    return this.page({ login: this.code({ purpose: 'login', accountId: account.id }) });
+    return this.page({ login: await this.code({ purpose: 'login', accountId: account.id }) });
   }
 
   /** Handles the sign-in routes; false when the path is not one of them. */
@@ -220,7 +223,7 @@ export class Auth {
     if (path === '/api/auth/redeem' && req.method === 'POST') {
       const body = await readJson(req);
       try {
-        const { account: signedIn, token } = this.redeem(String(body?.code ?? ''));
+        const { account: signedIn, token } = await this.redeem(String(body?.code ?? ''));
         json(res, 200, { token, name: signedIn.name });
       } catch (err) {
         if (!(err instanceof StoreError)) throw err;
@@ -259,13 +262,13 @@ export class Auth {
           json(res, 401, { error: 'unauthorized', message: 'Please sign in again.' });
           return true;
         }
-        const target = this.startUrl(provider, 'link', account.id);
+        const target = await this.startUrl(provider, 'link', account.id);
         if (!target) json(res, 400, { error: 'not_set_up', message: `${PROVIDER_NAME[provider]} sign-in is not set up yet. The Owner can turn it on.` });
         else json(res, 200, { url: target });
         return true;
       }
       if (req.method !== 'GET') return false;
-      const target = this.startUrl(provider, 'login');
+      const target = await this.startUrl(provider, 'login');
       redirect(res, target ?? this.page({ signin_error: `${PROVIDER_NAME[provider]} sign-in is not set up yet.` }));
       return true;
     }
@@ -292,33 +295,35 @@ export class Auth {
     return `${this.options.publicUrl.replace(/\/$/, '')}/?${new URLSearchParams(params)}`;
   }
 
-  private code(pending: Omit<Pending, 'expires'>): string {
-    this.sweep();
+  /** A one-time sign-in code; only its hash is kept. */
+  private async code(pending: Omit<Pending, 'expires'>): Promise<string> {
+    await this.sweep();
     const code = randomBytes(24).toString('base64url');
-    this.pending.set(hash(code), { ...pending, expires: this.now() + LINK_MS });
+    const expires = this.now() + LINK_MS;
+    await this.options.store.kept.put(KEPT_LINK, hash(code), { ...pending, expires } satisfies Pending, expires);
     return code;
   }
 
-  private link(pending: Omit<Pending, 'expires'>): string {
-    return this.page({ login: this.code(pending) });
+  private async link(pending: Omit<Pending, 'expires'>): Promise<string> {
+    return this.page({ login: await this.code(pending) });
   }
 
-  private allowSend(email: string, client: string): boolean {
+  /** True, and counted, when this address and this browser may be sent another email now. */
+  private async allowSend(email: string, client: string): Promise<boolean> {
     const now = this.now();
-    const recent = (key: string) => (this.sent.get(key) ?? []).filter((t) => now - t < EMAIL_WINDOW_MS);
-    const byEmail = recent(`e:${email}`);
-    const byClient = recent(`c:${client}`);
+    const kept = this.options.store.kept;
+    const recent = async (key: string) => ((await kept.get<number[]>(KEPT_SENT, key)) ?? []).filter((t) => now - t < EMAIL_WINDOW_MS);
+    const byEmail = await recent(`e:${email}`);
+    const byClient = await recent(`c:${client}`);
     if (byEmail.length >= EMAILS_PER_ADDRESS || byClient.length >= EMAILS_PER_CLIENT) return false;
-    this.sent.set(`e:${email}`, [...byEmail, now]);
-    this.sent.set(`c:${client}`, [...byClient, now]);
+    await kept.put(KEPT_SENT, `e:${email}`, [...byEmail, now], now + EMAIL_WINDOW_MS);
+    await kept.put(KEPT_SENT, `c:${client}`, [...byClient, now], now + EMAIL_WINDOW_MS);
     return true;
   }
 
-  /** Forgets codes and states that ran out. */
-  private sweep(): void {
-    const now = this.now();
-    for (const [k, p] of this.pending) if (p.expires < now) this.pending.delete(k);
-    for (const [k, s] of this.states) if (s.expires < now) this.states.delete(k);
+  /** Forgets codes, states and send counts that ran out. */
+  private async sweep(): Promise<void> {
+    await this.options.store.kept.sweep(this.now());
   }
 
   /** Trades the provider's code for who the player is there. */

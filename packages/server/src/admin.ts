@@ -572,6 +572,10 @@ export async function handleAdmin(
         const done = await ctx.art.makeClip(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), String(body?.direction ?? ''), prompt);
         return json(res, 202, { ok: true, ...done }), true;
       }
+      if (route === 'art/adopt-denied-walk' && method === 'POST') {
+        const done = await ctx.art.adoptDeniedClip(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), String(body?.direction ?? ''), Boolean(body?.retry));
+        return json(res, 200, { ok: done }), true;
+      }
       if (route === 'art/restore-view' && method === 'POST') {
         await ctx.art.restoreView(String(body?.walker ?? ''), String(body?.direction ?? ''), String(body?.version ?? ''));
         return json(res, 200, { ok: true }), true;

@@ -184,6 +184,7 @@ export class ArtCatalog {
       const runs: WalkerView['runs'] = {};
       const attacks: WalkerView['attacks'] = {};
       const lost: WalkerView['lost'] = {};
+      const deniedWalks: NonNullable<WalkerView['denied']> = {};
       for (const d of FACINGS) {
         const id = walkArt(w.id, d);
         const entry = painted[id] ?? shipped[id];
@@ -193,6 +194,11 @@ export class ArtCatalog {
           walks[d] = { url: slash(entry.file), frames: entry.frames ?? WALK_FRAMES, width: entry.width, height: entry.height, cycleSeconds: entry.cycleSeconds ?? WALK_CYCLE_SECONDS, ...(recipe ? { recipe } : {}), versions };
         } else if (versions.length) {
           lost[d] = versions;
+        }
+
+        const denied = await this.options.walks.deniedClip(w.id, d);
+        if (denied && !entry) {
+          deniedWalks[d] = denied;
         }
 
         const runId = `${w.id}-run-${d}`;
@@ -213,7 +219,7 @@ export class ArtCatalog {
       const sheet = ISO_WAYS.some((d) => !standing[d].url) ? picture : 0;
       const estimateUsd = sheet + ISO_WAYS.filter((d) => !walks[d]).length * clip;
       const currentUrl = redone[w.id] ? `/${redone[w.id]!.file}` : w.url;
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(currentUrl ? { url: currentUrl } : {}), place: w.place, walks, runs, attacks, lost, standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body });
+      views.push({ id: w.id, name: w.name, kind: w.kind, ...(currentUrl ? { url: currentUrl } : {}), place: w.place, walks, runs, attacks, lost, ...(Object.keys(deniedWalks).length ? { denied: deniedWalks } : {}), standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body });
     }
     return views;
   }

@@ -86,6 +86,18 @@ export interface WalkVersion { id: string; url: string; frames: number; width: n
 export interface WalkStrip { url: string; frames: number; width: number; height: number; cycleSeconds: number; recipe?: Recipe; versions: WalkVersion[] }
 export interface StandingView { url?: string; recipe?: Recipe; versions: { id: string; url: string; recipe?: Recipe }[] }
 
+export interface DeniedWalkClip {
+  walkerId: string;
+  direction: Facing;
+  at: number;
+  videoUrl: string;
+  retryVideoUrl?: string;
+  problems: string[];
+  distinctPoses?: number;
+  prompt?: string;
+  reason?: string;
+}
+
 export interface WalkerView {
   id: string;
   name: string;
@@ -96,6 +108,7 @@ export interface WalkerView {
   runs?: Partial<Record<Facing, WalkStrip>>;
   attacks?: Partial<Record<Facing, WalkStrip>>;
   lost: Partial<Record<Facing, WalkVersion[]>>;
+  denied?: Partial<Record<Facing, DeniedWalkClip>>;
   standing: Record<Facing, StandingView>;
   estimateUsd: number;
   clipUsd: number;

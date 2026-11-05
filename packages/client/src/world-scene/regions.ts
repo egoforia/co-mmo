@@ -53,6 +53,7 @@ import {
   within,
 } from './types.ts';
 import { groundLayer, rockWalls, wallFaceKey } from './walls.ts';
+import { closedWallsIn, showFloorsBelow } from './below.ts';
 
 export function dropChunk(chunk: Chunk): void {
   for (const o of chunk.objects) o.destroy();
@@ -464,6 +465,7 @@ export function applyFloorView(
     }
     for (const f of region.floors) for (const o of f.objects) managed.add(o);
     for (const o of region.stairs) managed.add(o);
+    for (const o of closedWallsIn(region)) managed.add(o);
     for (const o of region.objects) {
       if (managed.has(o)) continue;
       setShown(o, !under);
@@ -512,5 +514,7 @@ export function applyFloorView(
         setDepthShade(o, Math.max(0, delta));
       }
     }
+    // Upstairs, the floors beneath stand on closed full-height walls instead of their cutaways.
+    showFloorsBelow(scene, region, current, mine, here);
   }
 }

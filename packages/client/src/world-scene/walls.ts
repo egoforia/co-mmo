@@ -148,8 +148,8 @@ export function rockWalls(
       tilemaps.push(cap.tilemap);
       parts.push(cap);
     };
-    makeHalfCap(true, storeyRise, depthOff - 0.3);
-    if (cutaway) makeHalfCap(false, cutRise, depthOff - 0.4);
+    makeHalfCap(true, storeyRise, depthOff + PROJECTION.depth(left, top) - 0.3);
+    if (cutaway) makeHalfCap(false, cutRise, depthOff + PROJECTION.depth(left, top) - 0.4);
   }
 
   rows.forEach((row, y) => row.forEach((_, x) => {

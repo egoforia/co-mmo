@@ -7,6 +7,7 @@ import type { RuleTestReport } from './rule-test.ts';
 import type { Sql } from './db.ts';
 import { PostgresTables, migrate } from './store-postgres.ts';
 import { PostgresLogs, keptSpendFrom, type LogOp } from './store-logs.ts';
+import { MemoryKept, PostgresKept, type Kept } from './kept.ts';
 
 /** Days a Workshop draft is kept after its last change. */
 const DRAFT_DAYS = 7;
@@ -180,7 +181,12 @@ export class Store {
   /** New spending and journal lines not yet saved (store-logs.ts). */
   private logs: LogOp[] = [];
 
-  private constructor(private readonly backend: StoreBackend | null) {}
+  /** Small documents kept beside the world, written straight through (kept.ts). */
+  readonly kept: Kept;
+
+  private constructor(private readonly backend: StoreBackend | null, kept?: Kept) {
+    this.kept = kept ?? new MemoryKept();
+  }
 
   /**
    * A store kept in Postgres. On its first run, while the database is still
@@ -190,7 +196,7 @@ export class Store {
    */
   static async postgres(sql: Sql, importFrom?: string, label = 'Postgres'): Promise<Store> {
     const backend = await PostgresBackend.open(sql, label);
-    const store = await Store.withBackend(backend);
+    const store = await Store.withBackend(backend, new PostgresKept(sql));
     if (importFrom && backend.wasEmpty) {
       const old = await readWorldFile(importFrom);
       if (old) {
@@ -205,8 +211,8 @@ export class Store {
     return store;
   }
 
-  private static async withBackend(backend: StoreBackend): Promise<Store> {
-    const store = new Store(backend);
+  private static async withBackend(backend: StoreBackend, kept: Kept): Promise<Store> {
+    const store = new Store(backend, kept);
     const saved = await backend.load();
     if (saved) store.data = { ...store.data, ...saved };
     return store;

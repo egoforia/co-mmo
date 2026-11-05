@@ -22,6 +22,14 @@ and the latest 500 journal lines; older lines stay in the database
 (`Store.spendBetween` reads any span). An older database's `spend` and
 `journal` tables are moved into the logs on the first start.
 
+Small things kept beside the world go in one `kept` table (`kept.ts`): a
+JSON document under a kind and a key, written straight through so every
+game server sees the same one, with an expiry for things that run out.
+Sign-in uses it for email links waiting to be opened (`sign-in-link`, by
+the hash of the code), Google and GitHub sign-ins in progress
+(`sign-in-state`) and recent emails for the send limits (`sign-in-sent`),
+so a restart no longer breaks a link that was just sent.
+
 **Where the database is.** With `DATABASE_URL` set, the server uses that
 Postgres server; region servers and several machines can share it. Without
 it, the server opens the Postgres built into the game in `DB_DIR`

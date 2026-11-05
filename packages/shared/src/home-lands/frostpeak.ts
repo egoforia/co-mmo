@@ -1,7 +1,7 @@
 import type { CreatureDef, ItemDef, QuestDef } from '../rpg.ts';
 import { levelledCreature } from '../lands.ts';
 import { rand2, valueNoise } from '../random.ts';
-import { SANCTUM_NORTH_GATE, Tile, building, creatures, disc, road, scatter, type RegionMap } from '../world.ts';
+import { CATHEDRAL_SIZE, SANCTUM_NORTH_GATE, Tile, building, creatures, disc, road, scatter, type RegionMap } from '../world.ts';
 import { addStairs, addStorey } from '../floors.ts';
 import type { HomeLand } from './types.ts';
 import { toolOffers } from '../crafts.ts';
@@ -29,7 +29,7 @@ const CREATURES: Record<string, CreatureDef> = {
   }),
   'rime-stalker': levelledCreature({
     name: 'Rime Stalker', art: 'frostpeak-rime-stalker', size: 'medium', description: 'A sleek frost-predator with razor ice claws that prowls the Sunken Drafts.',
-    behavior: 'patrol', level: 6, speed: 3.2, notice: 4.5, tough: 1.6, drops: [{ item: 'rime-shard', chance: 0.8 }, { item: 'ice-crystal', chance: 0.5 }],
+    behavior: 'patrol', level: 6, speed: 3.2, notice: 4.5, tough: 1.6, drops: [{ item: 'ice-crystal', chance: 0.8 }, { item: 'silver-ore', chance: 0.5 }],
   }),
   'deep-matriarch': levelledCreature({
     name: 'Deep Crag Matriarch', art: 'frostpeak-deep-matriarch', size: 'high', description: 'An ancient subterranean ram with silver horns that guards the silent crypts.',
@@ -53,10 +53,9 @@ const ITEMS: Record<string, ItemDef> = {
   'snow-hare-fur': { name: 'Snow Hare Fur', kind: 'material', art: 'item-snow-hare-fur', standIn: 'item-wolf-pelt', description: 'A soft white pelt, warmer than it looks. Tailors and leatherworkers both want it.', value: 9, material: { family: 'hide', homes: ['frostpeak'], source: 'creature', tier: 1, traits: ['warm'] } },
   'mountain-wool': { name: 'Mountain Wool', kind: 'material', art: 'item-mountain-wool', standIn: 'item-ancient-linen', description: 'A thick grey fleece from a crag ram, still smelling of snow. It spins into the warmest yarn there is.', value: 11, material: { family: 'fibre', homes: ['frostpeak'], source: 'creature', tier: 1, traits: ['warm'] } },
   'ice-crystal': { name: 'Ice Crystal', kind: 'material', art: 'item-ice-crystal', standIn: 'item-pearl', description: 'A shard of ice from an ice wisp\'s heart. It never melts, and it is always cold to hold.', value: 16, material: { family: 'gem', homes: ['frostpeak'], source: 'creature', tier: 2, traits: ['warding'] } },
-  'rime-shard': { name: 'Rime Shard', kind: 'material', art: 'item-rime-shard', standIn: 'item-pearl', rarity: 'uncommon', description: 'A sharp shard of permafrost from a rime stalker.', value: 24, material: { family: 'gem', homes: ['frostpeak'], source: 'creature', tier: 2, traits: ['warding'] } },
-  'guardian-harness': { name: "Guardian's Silver Harness", kind: 'material', art: 'item-guardian-harness', standIn: 'item-scarab-charm', rarity: 'rare', description: 'An ancient silver harness once worn by the Hoarfrost Roc, recovered from the Sunken Drafts.', value: 80, material: { family: 'gem', homes: ['frostpeak'], source: 'creature', tier: 3, traits: ['warding', 'light'] } },
-  'zephyr-mantle': { name: 'Zephyr Plume Mantle', kind: 'equipment', slot: 'cloak', rarity: 'rare', art: 'item-zephyr-mantle', standIn: 'item-pelt-cloak', bonus: { armor: 3, agility: 2, spirit: 2 }, description: 'A ceremonial Falcon mantle woven from mountain wool, snow hare down, and ancient silver thread. It keeps the coldest winds away.', value: 120 },
   'roc-plume': { name: 'Roc Plume', kind: 'material', art: 'item-roc-plume', standIn: 'item-gull-feather', rarity: 'rare', description: 'A long white plume from the Hoarfrost Roc, rimed with frost that never thaws. Only a master could work it.', value: 60, material: { family: 'feather', homes: ['frostpeak'], source: 'boss', tier: 3, traits: ['light'] } },
+  'guardian-harness': { name: "Guardian's Silver Harness", kind: 'equipment', slot: 'offhand', offhand: 'tome', rarity: 'rare', art: 'item-guardian-harness', standIn: 'item-scarab-charm', bonus: { armor: 2, spirit: 3 }, description: 'An ancient silver harness once worn by the Hoarfrost Roc, recovered from the Sunken Drafts.', value: 80 },
+  'zephyr-mantle': { name: 'Zephyr Plume Mantle', kind: 'equipment', slot: 'cloak', rarity: 'rare', art: 'item-zephyr-mantle', standIn: 'item-pelt-cloak', bonus: { armor: 3, agility: 2, spirit: 2 }, description: 'A ceremonial Falcon mantle woven from mountain wool, snow hare down, and ancient silver thread. It keeps the coldest winds away.', value: 120 },
 };
 
 const QUESTS: Record<string, QuestDef> = {
@@ -125,75 +124,78 @@ function layout(map: RegionMap, c: number): void {
   // Mount Zephyr & Whiteledge on the West
   // -------------------------------------------------------------
   const town = { x: c - 50, y: c - 10 };
-  disc(map, town.x, town.y, 10, Tile.Ground);
-  road(map, c - 6, c, town.x + 8, town.y);
+  disc(map, town.x, town.y, 14, Tile.Ground);
+  road(map, c, c, town.x, town.y);
 
   // Whiteledge Masonry: Talon-Mason Kaen's stone workshop.
-  const masonShop = building(map, town.x - 4, town.y + 6, 8, 6, 'sanctum-cathedral');
+  // Using 10x6 so it aligns with two-tile bays for kit houses.
+  const masonShop = building(map, town.x - 5, town.y + 6, 10, 6, 'sanctum-cathedral');
   map.buildings.push(masonShop);
+  road(map, town.x, town.y, masonShop.door.x, masonShop.door.y + 1);
   map.npcs.push({ id: 'kaen', name: 'Talon-Mason Kaen', asset: 'frostpeak-kaen', x: town.x + 0.5, y: town.y - 0.5 });
 
   // The Eyrie of the First Watch: 8 Storeys High, 4 Storeys Underground.
-  const eyrieLeft = town.x - 10;
+  // Using CATHEDRAL_SIZE (18x12) so it passes all bay alignment checks.
+  const eyrieLeft = town.x - 9;
   const eyrieTop = town.y - 28;
-  disc(map, eyrieLeft + 9, eyrieTop + 7, 13, Tile.Ground);
-  road(map, town.x, town.y - 8, eyrieLeft + 8, eyrieTop + 14);
+  disc(map, eyrieLeft + 9, eyrieTop + 6, 18, Tile.Ground);
 
-  const eyrie = building(map, eyrieLeft, eyrieTop, 16, 12, 'sanctum-cathedral');
+  const eyrie = building(map, eyrieLeft, eyrieTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
   map.buildings.push(eyrie);
+  road(map, town.x, town.y, eyrie.door.x, eyrie.door.y + 1);
 
   // Above Ground (+1 to +8):
   addStorey(map, eyrie, 1, eyrie.style);
   addStairs(map, { kind: 'stairs', x: eyrieLeft + 3, y: eyrieTop + 3, width: 2, height: 1, from: 0, names: { lower: 'Marble Hall', upper: 'Grand Portico' } });
 
-  addStorey(map, { x: eyrieLeft + 1, y: eyrieTop + 1, width: 16, height: 12 }, 2, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 13, y: eyrieTop + 3, width: 2, height: 1, from: 1, names: { lower: 'Grand Portico', upper: 'Loom-Terraces' } });
+  addStorey(map, { x: eyrieLeft + 1, y: eyrieTop + 1, width: 18, height: 12 }, 2, eyrie.style);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 15, y: eyrieTop + 3, width: 2, height: 1, from: 1, names: { lower: 'Grand Portico', upper: 'Loom-Terraces' } });
 
-  addStorey(map, { x: eyrieLeft + 2, y: eyrieTop + 2, width: 14, height: 10 }, 3, eyrie.style);
+  addStorey(map, { x: eyrieLeft + 2, y: eyrieTop + 2, width: 16, height: 10 }, 3, eyrie.style);
   addStairs(map, { kind: 'stairs', x: eyrieLeft + 4, y: eyrieTop + 6, width: 2, height: 1, from: 2, names: { lower: 'Loom-Terraces', upper: 'Wind-Scriptorium' } });
 
-  addStorey(map, { x: eyrieLeft + 3, y: eyrieTop + 3, width: 12, height: 8 }, 4, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 11, y: eyrieTop + 6, width: 2, height: 1, from: 3, names: { lower: 'Wind-Scriptorium', upper: 'Steaming Marble Baths' } });
+  addStorey(map, { x: eyrieLeft + 3, y: eyrieTop + 3, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 13, y: eyrieTop + 6, width: 2, height: 1, from: 3, names: { lower: 'Wind-Scriptorium', upper: 'Steaming Marble Baths' } });
 
-  addStorey(map, { x: eyrieLeft + 4, y: eyrieTop + 3, width: 10, height: 8 }, 5, eyrie.style, undefined, true);
+  addStorey(map, { x: eyrieLeft + 4, y: eyrieTop + 3, width: 12, height: 8 }, 5, eyrie.style, undefined, true);
   addStairs(map, { kind: 'stairs', x: eyrieLeft + 5, y: eyrieTop + 5, width: 2, height: 1, from: 4, names: { lower: 'Steaming Marble Baths', upper: "Master Falconer's Roost" } });
 
-  addStorey(map, { x: eyrieLeft + 5, y: eyrieTop + 4, width: 8, height: 6 }, 6, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 10, y: eyrieTop + 5, width: 2, height: 1, from: 5, names: { lower: "Master Falconer's Roost", upper: 'High Council Chamber' } });
+  addStorey(map, { x: eyrieLeft + 5, y: eyrieTop + 4, width: 10, height: 6 }, 6, eyrie.style);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 12, y: eyrieTop + 5, width: 2, height: 1, from: 5, names: { lower: "Master Falconer's Roost", upper: 'High Council Chamber' } });
 
-  addStorey(map, { x: eyrieLeft + 5, y: eyrieTop + 4, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'ladder', x: eyrieLeft + 7, y: eyrieTop + 6, width: 1, height: 1, from: 6, names: { lower: 'High Council Chamber', upper: 'Belfry of Zephyrs' } });
+  addStorey(map, { x: eyrieLeft + 6, y: eyrieTop + 4, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
+  addStairs(map, { kind: 'ladder', x: eyrieLeft + 8, y: eyrieTop + 6, width: 1, height: 1, from: 6, names: { lower: 'High Council Chamber', upper: 'Belfry of Zephyrs' } });
 
-  addStorey(map, { x: eyrieLeft + 5, y: eyrieTop + 4, width: 8, height: 6 }, 8, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'ladder', x: eyrieLeft + 9, y: eyrieTop + 6, width: 1, height: 1, from: 7, names: { lower: 'Belfry of Zephyrs', upper: 'The Crown of the Wind' } });
+  addStorey(map, { x: eyrieLeft + 6, y: eyrieTop + 4, width: 8, height: 6 }, 8, eyrie.style, undefined, true);
+  addStairs(map, { kind: 'ladder', x: eyrieLeft + 11, y: eyrieTop + 6, width: 1, height: 1, from: 7, names: { lower: 'Belfry of Zephyrs', upper: 'The Crown of the Wind' } });
 
   // Subterranean Depths (-1 to -4): The Sunken Drafts
-  addStorey(map, { x: eyrieLeft - 6, y: eyrieTop - 4, width: 30, height: 22 }, -1, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 13, y: eyrieTop + 9, width: 2, height: 1, from: -1, names: { lower: 'Upper Silver Veins', upper: 'Marble Hall' } });
+  addStorey(map, { x: eyrieLeft - 4, y: eyrieTop - 2, width: 28, height: 18 }, -1, eyrie.style);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 14, y: eyrieTop + 9, width: 2, height: 1, from: -1, names: { lower: 'Upper Silver Veins', upper: 'Marble Hall' } });
 
-  addStorey(map, { x: eyrieLeft - 10, y: eyrieTop - 8, width: 38, height: 30 }, -2, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft - 2, y: eyrieTop + 4, width: 2, height: 1, from: -2, names: { lower: 'Whispering Tunnels', upper: 'Upper Silver Veins' } });
+  addStorey(map, { x: eyrieLeft - 5, y: eyrieTop - 3, width: 30, height: 20 }, -2, eyrie.style);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft - 1, y: eyrieTop + 4, width: 2, height: 1, from: -2, names: { lower: 'Whispering Tunnels', upper: 'Upper Silver Veins' } });
 
-  addStorey(map, { x: eyrieLeft - 8, y: eyrieTop - 6, width: 34, height: 26 }, -3, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 8, y: eyrieTop + 10, width: 2, height: 1, from: -3, names: { lower: 'Crypt of the First Watchers', upper: 'Whispering Tunnels' } });
+  addStorey(map, { x: eyrieLeft - 4, y: eyrieTop - 2, width: 28, height: 18 }, -3, eyrie.style);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 10, y: eyrieTop + 10, width: 2, height: 1, from: -3, names: { lower: 'Crypt of the First Watchers', upper: 'Whispering Tunnels' } });
 
-  addStorey(map, { x: eyrieLeft - 5, y: eyrieTop - 3, width: 28, height: 20 }, -4, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 1, y: eyrieTop + 2, width: 2, height: 1, from: -4, names: { lower: 'The Hoarfrost Well', upper: 'Crypt of the First Watchers' } });
+  addStorey(map, { x: eyrieLeft - 3, y: eyrieTop - 1, width: 26, height: 16 }, -4, eyrie.style);
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 2, y: eyrieTop + 2, width: 2, height: 1, from: -4, names: { lower: 'The Hoarfrost Well', upper: 'Crypt of the First Watchers' } });
 
-  // Eyrie NPCs
+  // Eyrie NPCs (placed inside the open floor footprint of their levels)
   map.npcs.push({ id: 'kip', name: 'Kip the Spelunker', asset: 'frostpeak-kip', x: eyrieLeft + 10.5, y: eyrieTop + 7.5, floor: -1 });
-  map.npcs.push({ id: 'sula', name: 'Sula Feather-Weaver', asset: 'frostpeak-sula', x: eyrieLeft + 8.5, y: eyrieTop + 6.5, floor: 2 });
-  map.npcs.push({ id: 'aurius', name: 'Elder Aurius', asset: 'frostpeak-aurius', x: eyrieLeft + 8.5, y: eyrieTop + 6.5, floor: 6 });
-  map.npcs.push({ id: 'vail', name: 'Watcher Vail', asset: 'frostpeak-vail', x: eyrieLeft + 7.5, y: eyrieTop + 5.5, floor: 8 });
+  map.npcs.push({ id: 'sula', name: 'Sula the Feather-Weaver', asset: 'frostpeak-sula', x: eyrieLeft + 8.5, y: eyrieTop + 6.5, floor: 2 });
+  map.npcs.push({ id: 'aurius', name: 'Elder Aurius the Keen', asset: 'frostpeak-aurius', x: eyrieLeft + 8.5, y: eyrieTop + 6.5, floor: 6 });
+  map.npcs.push({ id: 'vail', name: 'Watcher Vail', asset: 'frostpeak-vail', x: eyrieLeft + 9.5, y: eyrieTop + 5.5, floor: 8 });
 
-  // Subterranean Monsters
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft - 2 + i * 4, y: eyrieTop + 2, floor: -1 });
-  for (let i = 0; i < 6; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft - 6 + i * 4, y: eyrieTop + 1, floor: -2 });
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: eyrieLeft - 5 + i * 5, y: eyrieTop + 8, floor: -2 });
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'deep-matriarch', name: 'Deep Crag Matriarch', asset: 'frostpeak-deep-matriarch', x: eyrieLeft - 4 + i * 5, y: eyrieTop + 3, floor: -3 });
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft - 3 + i * 4, y: eyrieTop + 9, floor: -3 });
-  for (let i = 0; i < 6; i++) map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: eyrieLeft - 2 + i * 4, y: eyrieTop + 5, floor: -4 });
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + i * 4, y: eyrieTop + 8, floor: -4 });
+  // Subterranean Monsters (placed inside the cleared open footprint)
+  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 2 + i * 3, y: eyrieTop + 3, floor: -1 });
+  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 2 + i * 3, y: eyrieTop + 4, floor: -2 });
+  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: eyrieLeft + 3 + i * 4, y: eyrieTop + 7, floor: -2 });
+  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'deep-matriarch', name: 'Deep Crag Matriarch', asset: 'frostpeak-deep-matriarch', x: eyrieLeft + 3 + i * 4, y: eyrieTop + 3, floor: -3 });
+  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 4 + i * 3, y: eyrieTop + 8, floor: -3 });
+  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: eyrieLeft + 2 + i * 3, y: eyrieTop + 5, floor: -4 });
+  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 3 + i * 3, y: eyrieTop + 7, floor: -4 });
 
   // Surface creatures
   creatures(map, 'snow-hare', 'Snow Hare', 'frostpeak-snow-hare', 32);

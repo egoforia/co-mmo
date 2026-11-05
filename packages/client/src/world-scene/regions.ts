@@ -399,8 +399,8 @@ export async function raiseHouses(
     const view = region.buildings[info.building];
     if (info.status !== 'ready' || !info.frame || !view || view.kit) continue;
     const [outside, inside] = await Promise.all([houseArt.view(info, 'outside'), houseArt.view(info, 'storey-1')]);
-    // Drawn again or let go while the pictures loaded.
-    if (!outside || !inside || drawn.get(id) !== region) continue;
+    // Drawn again, let go, or already stood by another try while the pictures loaded.
+    if (!outside || !inside || drawn.get(id) !== region || view.kit) continue;
     standKitHouse(scene, region, view, info.frame, outside, inside, onPlaced);
   }
   // By the wall clock: the server's drawing does not wait for our frames.

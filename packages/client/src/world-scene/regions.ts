@@ -434,6 +434,11 @@ export function revealBuildings(
   return changed;
 }
 
+/** True for a wall picture rockWalls stood (walls.ts tags them). */
+function isWall(o: Phaser.GameObjects.GameObject): boolean {
+  return Boolean(o.getData('wall'));
+}
+
 /**
  * Shows what can be seen from the floor we are on. On the ground, the land
  * as ever. Upstairs in the isometric camera, upper storeys stand elevated
@@ -481,7 +486,8 @@ export function applyFloorView(
         if (!scene.tweens.isTweening(o)) o.setAlpha(v.open ? 0 : 1);
       }
       for (const o of v.inside) {
-        o.setVisible(!under && (!covered || showUnder));
+        // Off the ground, the ground floor's walls stay hidden: a cutaway shows only our own floor's walls.
+        o.setVisible(!under && (!covered || showUnder) && !(mine !== 0 && isWall(o)));
         setDepthShade(o, groundDelta, !showUnder);
         if (!showUnder && !scene.tweens.isTweening(o)) o.setAlpha(v.open ? 1 : 0);
       }
@@ -499,8 +505,10 @@ export function applyFloorView(
       const delta = mine - f.storey.floor;
       // From the ground a building's upper floors never show, near or far: outside only its roof, close by only its ground-floor cutaway.
       const visible = current && (f.storey.floor === mine || (mine === 0 && seenFromGround(region.map, f.storey)) || (mine > f.storey.floor && f.storey.floor > 0 && !under));
+      // In a cutaway (off the ground) only our own floor's walls stand; the floors below show just their floor and furniture.
+      const walls = f.storey.floor === mine || mine === 0;
       for (const o of f.objects) {
-        setShown(o, visible);
+        setShown(o, visible && (walls || !isWall(o)));
         setDepthShade(o, Math.max(0, delta));
       }
     }

@@ -461,6 +461,162 @@
     "frames": 12,
     "cycleSeconds": 0.9
   },
+  "frostpeak-eyrie-door": {
+    "file": "art/frostpeak-eyrie-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-eyrie-exterior": {
+    "file": "art/frostpeak-eyrie-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2304
+  },
+  "frostpeak-eyrie-floor": {
+    "file": "art/frostpeak-eyrie-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-eyrie-furniture-astrolabe-pedestal": {
+    "file": "art/frostpeak-eyrie-furniture-astrolabe-pedestal.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 284,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-falcon-perch": {
+    "file": "art/frostpeak-eyrie-furniture-falcon-perch.png",
+    "kind": "furniture",
+    "width": 200,
+    "height": 280,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-silver-brazier": {
+    "file": "art/frostpeak-eyrie-furniture-silver-brazier.png",
+    "kind": "furniture",
+    "width": 160,
+    "height": 228,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-wind-throne": {
+    "file": "art/frostpeak-eyrie-furniture-wind-throne.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 288,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-wall": {
+    "file": "art/frostpeak-eyrie-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-sunken-drafts-door": {
+    "file": "art/frostpeak-sunken-drafts-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-sunken-drafts-exterior": {
+    "file": "art/frostpeak-sunken-drafts-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2304
+  },
+  "frostpeak-sunken-drafts-floor": {
+    "file": "art/frostpeak-sunken-drafts-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-sunken-drafts-furniture-mining-rig": {
+    "file": "art/frostpeak-sunken-drafts-furniture-mining-rig.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 236,
+    "view": "isometric"
+  },
+  "frostpeak-sunken-drafts-furniture-ore-cart": {
+    "file": "art/frostpeak-sunken-drafts-furniture-ore-cart.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 232,
+    "view": "isometric"
+  },
+  "frostpeak-sunken-drafts-furniture-relic-sarcophagus": {
+    "file": "art/frostpeak-sunken-drafts-furniture-relic-sarcophagus.png",
+    "kind": "furniture",
+    "width": 280,
+    "height": 244,
+    "view": "isometric"
+  },
+  "frostpeak-sunken-drafts-furniture-stalagmite-cluster": {
+    "file": "art/frostpeak-sunken-drafts-furniture-stalagmite-cluster.png",
+    "kind": "furniture",
+    "width": 200,
+    "height": 212,
+    "view": "isometric"
+  },
+  "frostpeak-sunken-drafts-wall": {
+    "file": "art/frostpeak-sunken-drafts-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-whiteledge-house-door": {
+    "file": "art/frostpeak-whiteledge-house-door.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-whiteledge-house-exterior": {
+    "file": "art/frostpeak-whiteledge-house-exterior.webp",
+    "kind": "building",
+    "width": 1856,
+    "height": 2108
+  },
+  "frostpeak-whiteledge-house-floor": {
+    "file": "art/frostpeak-whiteledge-house-floor.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
+  "frostpeak-whiteledge-house-furniture-fur-bed": {
+    "file": "art/frostpeak-whiteledge-house-furniture-fur-bed.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 224,
+    "view": "isometric"
+  },
+  "frostpeak-whiteledge-house-furniture-loom": {
+    "file": "art/frostpeak-whiteledge-house-furniture-loom.png",
+    "kind": "furniture",
+    "width": 280,
+    "height": 276,
+    "view": "isometric"
+  },
+  "frostpeak-whiteledge-house-furniture-mason-bench": {
+    "file": "art/frostpeak-whiteledge-house-furniture-mason-bench.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 212,
+    "view": "isometric"
+  },
+  "frostpeak-whiteledge-house-furniture-mountain-hearth": {
+    "file": "art/frostpeak-whiteledge-house-furniture-mountain-hearth.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 288,
+    "view": "isometric"
+  },
+  "frostpeak-whiteledge-house-wall": {
+    "file": "art/frostpeak-whiteledge-house-wall.png",
+    "kind": "tile",
+    "width": 128,
+    "height": 128
+  },
   "fx-bell": {
     "file": "art/fx-bell.png",
     "kind": "effect",

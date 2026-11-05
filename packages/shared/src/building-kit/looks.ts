@@ -100,5 +100,24 @@ export const DESERT_SANDSTONE: KitLook = {
   },
 };
 
+/** Mount Zephyr and Whiteledge: sculpted mountain marble, frosted glass, and cold-forged silver. */
+export const ZEPHYR_MARBLE: KitLook = {
+  id: 'zephyr-marble',
+  name: 'Carved mountain marble',
+  words: {
+    panel: 'one outside wall section of an alpine mountain redoubt, between two carved stone pillars: polished pure white marble blocks veined with pale silver-blue, with a frieze of swooping falcon wings along the upper edge.',
+    inside: 'the same wall seen from inside the mountain hall: smooth polished white marble on the upper two thirds, and fluted silver-grey slate wainscoting on the lower third.',
+    door: 'a tall double door of frost-rimed mountain cedar bound with cold-forged silver straps, filling the whole arch, with twin silver falcon talons for handles.',
+    window: 'a high lancet window of pale icy blue glass divided by a slim silver mullion that reaches all four edges; clear frostwork along the edges, no outer frame.',
+    plaster: 'plain smooth white alpine marble with a few very faint cool-grey facets, nothing else.',
+    floor: 'a mountain hall floor of large diamond-cut white marble tiles alternating with pale blue rime-stone, four rows from top to bottom, with thin even silver-grey joints.',
+    roof: 'weathered silver-grey slate shingles in rows running from left to right, overlapping flat rectangular mountain slates dusted with light frost, six rows from top to bottom, joints offset from row to row.',
+    stone: 'a thick bastion wall of cyclopean white marble ashlar blocks, four rows from top to bottom, four or five blocks in each row, joints offset from row to row, thin pale mortar lines all equally thick.',
+    timber: 'one long beam of pale carved white marble with a fine straight grain and a silver falcon-feather chevron running from left to right along the strip.',
+  },
+};
+
 /** Every kit look the game ships with, by id. */
-export const KIT_LOOKS: Record<string, KitLook> = Object.fromEntries([TIMBER_COTTAGE, TEMPLE_STONE, CASTLE_STONE, CORAL_PALACE, DESERT_SANDSTONE].map((l) => [l.id, l]));
+export const KIT_LOOKS: Record<string, KitLook> = Object.fromEntries(
+  [TIMBER_COTTAGE, TEMPLE_STONE, CASTLE_STONE, CORAL_PALACE, DESERT_SANDSTONE, ZEPHYR_MARBLE].map((l) => [l.id, l]),
+);

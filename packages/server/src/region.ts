@@ -354,7 +354,7 @@ export class Region {
     const near = (o: { x: number; y: number; floor: number }, r: number) => canSeeAcrossFloors(this.map, p, o) && Math.hypot(o.x - p.x, o.y - p.y) <= r;
     if (p.floor) lines.push(`They are on ${floorName(p.floor)}.`);
     for (const other of this.s.players.values()) if (other !== p && near(other, 10)) lines.push(`${other.info.name} (player)`);
-    for (const n of this.s.townsfolk) if (near(n, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
+    for (const n of this.s.townsfolk) if (n.floor === p.floor && near(n, 10)) lines.push(`${n.name} (NPC${n.asleep ? ', asleep' : ''})`);
     const kinds = new Map<string, number>();
     for (const c of this.s.creatures) if (c.respawnAt === null && near(c, 10)) kinds.set(c.def.name, (kinds.get(c.def.name) ?? 0) + 1);
     for (const [name, n] of kinds) lines.push(`${n} ${name}${n > 1 ? 's' : ''}`);
@@ -834,16 +834,18 @@ export class Region {
           if (!near(b)) continue;
           bodies.push(bodyView(b, b.loot.length > 0));
         }
+        // NPCs are seen only on the player's own floor, never across open terraces.
+        const npcNear = (o: { x: number; y: number; floor?: number }) => (o.floor ?? 0) === p.floor && near(o);
         const npcs: NpcState[] = [];
         for (const n of this.s.townsfolk) {
-          if (near(n)) npcs.push(npcView(n));
+          if (npcNear(n)) npcs.push(npcView(n));
         }
         // What the cells beside this one show across the border.
         for (const g of this.ghosts.values()) {
           for (const e of g.players) if (e.id !== p.info.id && near(e)) players.push(e);
           for (const e of g.creatures) if (near(e)) creatures.push(e);
           for (const e of g.bodies) if (near(e)) bodies.push(e);
-          for (const e of g.npcs) if (near(e)) npcs.push(e);
+          for (const e of g.npcs) if (npcNear(e)) npcs.push(e);
         }
         p.crowd = players.length + creatures.length;
         const marks = allMarks.filter(near);

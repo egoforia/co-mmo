@@ -12,6 +12,7 @@ import {
   Predictor,
   bodiesSeen,
   TICK_SECONDS,
+  floorDrawnFrom,
   WALK_FRAMES,
   generateRegion,
   heldItem,
@@ -523,11 +524,14 @@ export class WorldScene extends Phaser.Scene {
         // People indoors stay out of sight until we come close enough to see in.
         // Upstairs on a terrace or rooftop over no building they remain visible;
         // a building's upper floors are hidden from outside, and so is whoever is on them.
+        // NPCs show only on our own floor, and no player stands on a floor that is not drawn.
         if (group === this.remotes || group === this.npcs) {
           const floor = remote.floor ?? 0;
+          const [wx, wy] = [this.origin.x + pos.x, this.origin.y + pos.y];
+          const onDrawnFloor = group === this.npcs ? floor === this.floor : floorDrawnFrom(this.map, this.floor, floor, wx, wy);
           const sameIndoor = floor !== 0 && floor === this.floor;
-          const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && !this.map.buildings.some((b) => overlaps(s, b)) && within(s, Math.floor(this.origin.x + pos.x), Math.floor(this.origin.y + pos.y)));
-          const seen = sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(this.origin.x + pos.x - v.ox), Math.floor(this.origin.y + pos.y - v.oy)));
+          const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && !this.map.buildings.some((b) => overlaps(s, b)) && within(s, Math.floor(wx), Math.floor(wy)));
+          const seen = onDrawnFloor && (sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(wx - v.ox), Math.floor(wy - v.oy))));
           for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
         }
         const delta = Math.max(0, this.floor - (remote.floor ?? 0));

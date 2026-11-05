@@ -27,9 +27,12 @@ Rules from the Owner, all binding:
   normalization), and style checks must remain AI model and API agnostic so
   that visual, geometric, and anatomical coherence is preserved regardless of
   which model generated the image or video (`docs/art-pipeline.md`).
-- **Reviewable before paying.** Anything that costs money shows the exact
-  prompt and references in the Art tab and waits for approval; paid calls go
-  through the paint queue and `budget.ts`.
+- **Reviewable before paying & free-first tools.** Anything that costs money
+  shows the exact prompt and references in the Art tab and waits for approval;
+  paid calls go through the paint queue and `budget.ts`. For building and world
+  art generation, prefer free IDE subagents/tools with `--dry-run` and
+  `--process-only` before calling external billable APIs. Never consume `.env`
+  API keys without explicit user consent.
 - Character looks have empty hands; weapons and off-hand items are separate
   held items placed by the hand finder.
 

@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-sunken-drafts-furniture-relic-sarcophagus",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nFlat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.\nNO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.\nA small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.\nA single sprite in classic 2:1 isometric view, looking down at about 30 degrees from one corner, standing upright, centred, with empty margin all around it.\nBackground: one flat solid pure magenta (#FF00FF) filling everything behind the subject, with no floor, gradient, glow or shadow on it. No magenta anywhere in the subject.\nFire and light have no glow or halo spilling outside the object.\nSubject: the ancient watcher sarcophagus inside The Sunken Drafts: a massive carved stone sarcophagus bearing the falcon crest of the First Watch.\nFootprint: it stands on a diamond-shaped patch of ground 2.5 tiles from the left corner down to the front corner, and one tile from the front corner up to the right corner. Its base fills that patch exactly, from the patch's left corner to its right corner, and nothing on the ground reaches past it.\nColours: match the reference painting of the same building from outside.",
+  "references": [
+    "frostpeak-sunken-drafts-exterior"
+  ],
+  "provider": "gemini",
+  "model": "gemini-3-pro-image",
+  "createdAt": "2026-11-05T19:28:35.813Z"
+}

@@ -16,9 +16,15 @@ type Frame = NonNullable<KitHouseInfo['frame']>;
 /** A region's kit houses, as the server offers them. */
 export type HouseSource = (region: string) => Promise<KitHouseInfo[]>;
 
-/** Loads the pictures and normal maps of kit house views, each once, by the URL it came from. */
+/**
+ * Loads the pictures and normal maps of kit house views, each once, by the URL it came from.
+ * Regions drawn side by side can share a house look (the same key), and each
+ * asks for it at once: they share one load, because a second load of the same
+ * picture would swap the texture out from under the strips the first already
+ * stood, and drawing those stops the game.
+ */
 export class HouseArt {
-  private readonly loaded = new Map<string, string>();
+  private readonly loaded = new Map<string, { url: string; done: Promise<boolean> }>();
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -32,9 +38,20 @@ export class HouseArt {
     return ok ? key : undefined;
   }
 
-  private async load(key: string, url: string): Promise<boolean> {
+  private load(key: string, url: string): Promise<boolean> {
+    const known = this.loaded.get(key);
+    if (known?.url === url) return known.done;
+    const done = this.fetch(key, url);
+    this.loaded.set(key, { url, done });
+    // A picture that would not load may be asked for again later.
+    void done.then((ok) => {
+      if (!ok && this.loaded.get(key)?.done === done) this.loaded.delete(key);
+    });
+    return done;
+  }
+
+  private async fetch(key: string, url: string): Promise<boolean> {
     const { textures } = this.scene;
-    if (this.loaded.get(key) === url && textures.exists(key)) return true;
     const img = new Image();
     img.src = url;
     try {
@@ -42,9 +59,10 @@ export class HouseArt {
     } catch {
       return false;
     }
+    // A newer picture for this key was asked for while this one loaded.
+    if (this.loaded.get(key)?.url !== url) return false;
     if (textures.exists(key)) textures.remove(key);
     textures.addImage(key, img);
-    this.loaded.set(key, url);
     return true;
   }
 }

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { KeptDoc } from './kept-doc.ts';
+import type { Kept } from './kept.ts';
 import { resolve } from 'node:path';
 import { isRetiredArt, type ArtPoint, type ArtPoints, type ArtPointsManifest } from '@co-mmo/shared';
 import type { ChatModel } from './ai/chat.ts';
@@ -27,6 +28,8 @@ export interface PointSource {
 
 export interface HandFinderOptions {
   artDir: string;
+  /** Where the points and the Owner's questions are kept (the database); without it, files in artDir. */
+  kept?: Kept;
   /** A model that can see pictures (the style check's judge), or none. */
   model: () => ChatModel | undefined;
   /** Every picture that may need points: walkers, walk strips and held items. */
@@ -91,14 +94,15 @@ export class HandFinder {
 
   constructor(private readonly options: HandFinderOptions) {}
 
-  private get file(): string {
-    return resolve(this.options.artDir, 'points.json');
+  /** Hands and grips found so far. */
+  private get points(): KeptDoc<Record<string, Found>> {
+    return new KeptDoc(this.options.kept, 'art-hands', 'points', resolve(this.options.artDir, 'points.json'));
   }
 
   private load(): Promise<void> {
-    this.loaded ??= readFile(this.file, 'utf8').then(
+    this.loaded ??= this.points.read().then(
       // Points found in walks facing a retired way are dropped: nothing shows those walks any more.
-      (text) => void (this.found = Object.fromEntries(Object.entries(JSON.parse(text) as Record<string, Found>).filter(([id]) => !isRetiredArt(id)))),
+      (saved) => void (saved && (this.found = Object.fromEntries(Object.entries(saved).filter(([id]) => !isRetiredArt(id))))),
       () => undefined,
     );
     return this.loaded;
@@ -156,8 +160,7 @@ export class HandFinder {
       const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));
       this.found[toId] = { from: this.stamp(target, picture), hands, leftHands, both, mirrored: fromId };
     }
-    await mkdir(this.options.artDir, { recursive: true });
-    await writeFile(this.file, JSON.stringify(this.found, null, 2));
+    await this.points.write(this.found);
   }
 
   /**
@@ -206,8 +209,7 @@ export class HandFinder {
       const both = hands.map((right, i) => ({ ...(right ? { right } : {}), ...(leftHands[i] ? { left: leftHands[i]! } : {}) }));
       this.found[id] = { from, hands, leftHands, both };
     }
-    await mkdir(this.options.artDir, { recursive: true });
-    await writeFile(this.file, JSON.stringify(this.found, null, 2));
+    await this.points.write(this.found);
   }
 
   /** Looks at every picture with no points yet, or painted again since. */
@@ -314,12 +316,12 @@ export class HandFinder {
       const { right, left } = steadyHands(both);
       this.found[source.id] = { from, hands: right, leftHands: left, both };
     }
-    await mkdir(this.options.artDir, { recursive: true });
-    await writeFile(this.file, JSON.stringify(this.found, null, 2));
+    await this.points.write(this.found);
   }
 
-  private get questionsFile(): string {
-    return resolve(this.options.artDir, 'hand-questions.json');
+  /** The Owner's own words for the hand questions. */
+  private get questionsDoc(): KeptDoc<Record<string, string>> {
+    return new KeptDoc(this.options.kept, 'art-hands', 'questions', resolve(this.options.artDir, 'hand-questions.json'));
   }
 
   /** The question asked for a look's picture and each way of facing, with the usual words beside the Owner's. */
@@ -334,8 +336,7 @@ export class HandFinder {
     const text = prompt.trim().slice(0, 2000);
     if (text && text !== HAND_QUESTIONS[facing]) own[facing] = text;
     else delete own[facing];
-    await mkdir(this.options.artDir, { recursive: true });
-    await writeFile(this.questionsFile, JSON.stringify(own, null, 2));
+    await this.questionsDoc.write(own);
   }
 
   /**
@@ -344,7 +345,7 @@ export class HandFinder {
    * those words are kept for it; questions for the other retired ways are dropped.
    */
   private async ownQuestions(): Promise<Partial<Record<HandView, string>>> {
-    const saved = JSON.parse(await readFile(this.questionsFile, 'utf8').catch(() => '{}')) as Record<string, string>;
+    const saved = (await this.questionsDoc.read().catch(() => undefined)) ?? {};
     const own: Partial<Record<HandView, string>> = {};
     for (const facing of HAND_VIEWS) {
       const words = saved[facing] ?? (facing === 'look' ? saved.front : undefined);

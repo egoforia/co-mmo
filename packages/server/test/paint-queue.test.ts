@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GeminiVideoProvider } from '../src/assets/video.ts';
 import { googleError, ProviderError } from '../src/assets/provider.ts';
 import { DailyClips, MemoryPaintQueue, PaintStopped, limitFor, nextDailyReset, queuedVideo, refusal, type PaintTurnWatcher } from '../src/paint-queue.ts';
-import { FilePaintRequests, type PaintRequest } from '../src/paint-requests.ts';
+import { KeptPaintRequests, PAINT_REQUESTS, type PaintRequest } from '../src/paint-requests.ts';
+import { MemoryKept } from '../src/kept.ts';
 import { MemoryTurnLedger, SharedPaintQueue } from '../src/shared-paint-queue.ts';
 
 type QueueOptions = ConstructorParameters<typeof MemoryPaintQueue>[0];
@@ -261,7 +262,8 @@ describe('paint requests kept across a restart', () => {
     const path = join(await mkdtemp(join(tmpdir(), 'co-mmo-requests-')), 'paint-requests.json');
     const asked: PaintRequest = { kind: 'repaint', asset: 'sanctum-rock', note: 'mossier' };
     await writeFile(path, JSON.stringify([asked]));
-    const requests = new FilePaintRequests(path);
+    const kept = new MemoryKept();
+    const requests = new KeptPaintRequests(kept, path);
     let finish!: () => void;
     const resumed: PaintRequest[] = [];
     await requests.resume({
@@ -275,11 +277,14 @@ describe('paint requests kept across a restart', () => {
       clip: () => undefined,
       sheet: () => undefined,
     });
+    // The older game's file was brought in once, and kept as a backup.
     expect(resumed).toEqual([asked]);
-    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual([asked]);
+    expect(JSON.parse(await readFile(`${path}.in-db`, 'utf8'))).toEqual([asked]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await kept.list(PAINT_REQUESTS)).map((r) => r.data)).toEqual([asked]);
     finish();
     await new Promise((r) => setTimeout(r, 20));
     await requests.close();
-    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual([]);
+    expect(await kept.list(PAINT_REQUESTS)).toEqual([]);
   });
 });

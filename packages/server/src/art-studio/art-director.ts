@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { KeptDoc } from '../kept-doc.ts';
+import type { Kept } from '../kept.ts';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { BIOMES, STYLES, type BiomeId } from '@co-mmo/shared';
@@ -67,7 +68,7 @@ export interface DirectorConsultation {
   suggestedNote?: string;
 }
 
-/** Persisted state of the AI Art Director (`style-director.json`). */
+/** Persisted state of the AI Art Director, kept in the database (without one, `style-director.json`). */
 export interface StyleDirectorState {
   version: string;
   basePrompt: string;
@@ -225,6 +226,8 @@ export class ArtDirector {
   constructor(
     private readonly options: {
       artDir: string;
+      /** Where the state is kept (the database); without it, a file in artDir. */
+      kept?: Kept;
       anchorDir: string;
       ai: AiServices;
       budget: Budget;
@@ -233,14 +236,15 @@ export class ArtDirector {
     },
   ) {}
 
-  private get file(): string {
-    return resolve(this.options.artDir, 'style-director.json');
+  private get doc(): KeptDoc<Partial<StyleDirectorState>> {
+    return new KeptDoc(this.options.kept, 'art-director', 'state', resolve(this.options.artDir, 'style-director.json'));
   }
 
   private async load(): Promise<void> {
     if (this.loaded) return;
     try {
-      const parsed = JSON.parse(await readFile(this.file, 'utf8')) as Partial<StyleDirectorState>;
+      const parsed = await this.doc.read();
+      if (!parsed) throw new Error('nothing kept yet');
       this.state = {
         version: parsed.version ?? String(STYLE.version),
         basePrompt: parsed.basePrompt ?? STYLE.base,
@@ -267,8 +271,7 @@ export class ArtDirector {
   }
 
   private async save(): Promise<void> {
-    await mkdir(this.options.artDir, { recursive: true });
-    await writeFile(this.file, JSON.stringify(this.state, null, 2));
+    await this.doc.write(this.state);
   }
 
   /** Overview of the Living Style Bible, Golden Anchors, Coherence Scores, and Consultations. */

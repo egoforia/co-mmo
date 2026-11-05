@@ -30,6 +30,16 @@ the hash of the code), Google and GitHub sign-ins in progress
 (`sign-in-state`) and recent emails for the send limits (`sign-in-sent`),
 so a restart no longer breaks a link that was just sent.
 
+The Art tab's bookkeeping is kept there too (`kept-doc.ts`): paint requests
+waiting on a limit (`paint-request`, one per request), the Up Next queue
+(`art-up-next`), the Art Director's notes (`art-director`), the hands and
+grips found and the Owner's hand questions (`art-hands`), and the recipe of
+every picture's current and earlier versions (`art-recipe`,
+`art-recipe-version`). On first use each is brought in from its old JSON
+file under `data/art/`, which is renamed `<name>.in-db` as a backup. The
+pictures, clips and sounds themselves stay files, and so do the manifests
+that list them, since they describe those files and the art tools read them.
+
 **Where the database is.** With `DATABASE_URL` set, the server uses that
 Postgres server; region servers and several machines can share it. Without
 it, the server opens the Postgres built into the game in `DB_DIR`

@@ -1,6 +1,7 @@
 import type { Sql, SqlQuery } from './db.ts';
 import { migrateLogs } from './store-logs.ts';
 import { migrateKept } from './kept.ts';
+import { migrateCharacters } from './store-characters.ts';
 
 /**
  * Each part of the saved world gets its own table of the same shape: a key,
@@ -31,6 +32,7 @@ export async function migrate(sql: Sql): Promise<void> {
     }
     await migrateLogs(q);
     await migrateKept(q);
+    await migrateCharacters(q);
     await q.query(
       `INSERT INTO co_mmo_meta (key, value) VALUES ('schema', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [String(SCHEMA_VERSION)],

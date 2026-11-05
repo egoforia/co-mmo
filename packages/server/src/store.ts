@@ -4,10 +4,11 @@ import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildT
 import type { ChatTurn } from './ai/chat.ts';
 import { defaultSettings, type Settings } from './settings.ts';
 import type { RuleTestReport } from './rule-test.ts';
-import type { Sql } from './db.ts';
+import type { Sql, SqlQuery } from './db.ts';
 import { PostgresTables, migrate } from './store-postgres.ts';
 import { PostgresLogs, keptSpendFrom, type LogOp } from './store-logs.ts';
 import { MemoryKept, PostgresKept, type Kept } from './kept.ts';
+import { PostgresCharacters, holdingsOf, type Holding } from './store-characters.ts';
 
 /** Days a Workshop draft is kept after its last change. */
 const DRAFT_DAYS = 7;
@@ -163,6 +164,8 @@ export interface StoreBackend {
   save(data: Data, logs: readonly LogOp[]): Promise<void>;
   /** Spending between two times, including what is no longer kept in memory. */
   spendBetween(since: number, until: number): Promise<SpendRecord[]>;
+  /** Everyone holding an item, as last saved. */
+  holders(item: string): Promise<Holding[]>;
   close(): Promise<void>;
   /** Shown in the console at start-up: where the world is kept. */
   readonly label: string;
@@ -552,6 +555,16 @@ export class Store {
     return this.data.spend.filter((s) => s.at >= since && s.at <= until);
   }
 
+  /**
+   * Everyone holding `item` (an item id), in their bag or worn, as last
+   * saved: the database answers it from the `holdings` table.
+   */
+  async holders(item: string): Promise<Holding[]> {
+    await this.flush();
+    if (this.backend) return this.backend.holders(item);
+    return this.data.accounts.flatMap((a) => (a.character ? holdingsOf(a.id, a.character) : [])).filter((h) => h.item === item);
+  }
+
   /** Lets go of spending from before last month: the database keeps it, the budget no longer needs it. */
   private forgetOldSpend(now: number): void {
     if (!this.backend) return;
@@ -646,15 +659,18 @@ async function readWorldFile(path: string): Promise<Partial<Data> | null> {
 
 /**
  * The world in Postgres: one table per kind of thing (store-postgres.ts),
- * and append-only logs for spending and the journal (store-logs.ts).
+ * append-only logs for spending and the journal (store-logs.ts), and
+ * characters apart from their accounts (store-characters.ts).
  */
 class PostgresBackend implements StoreBackend {
   /** The database had nothing in it when the game started. */
   wasEmpty = false;
   private readonly logs: PostgresLogs;
+  private readonly characters: PostgresCharacters;
 
   private constructor(private readonly sql: Sql, private readonly tables: PostgresTables, readonly label: string) {
     this.logs = new PostgresLogs(sql);
+    this.characters = new PostgresCharacters(sql);
   }
 
   static async open(sql: Sql, label: string): Promise<PostgresBackend> {
@@ -666,10 +682,16 @@ class PostgresBackend implements StoreBackend {
 
   async load(): Promise<Partial<Data> | null> {
     const t = await this.tables.load();
+    const characters = await this.characters.load();
     if (this.wasEmpty) return null;
     const settings = t.settings.find((r) => r.key === 'settings')?.data as Settings | undefined;
     return {
-      accounts: t.accounts.map((r) => r.data as Account),
+      // Older saves kept the character inside the account; a saved character row wins.
+      accounts: t.accounts.map((r) => {
+        const account = r.data as Account;
+        const character = characters.get(account.id) ?? account.character;
+        return character ? { ...account, character } : account;
+      }),
       invites: t.invites.map((r) => r.data as Invite),
       content: t.content.map((r) => r.data as ContentRecord),
       reports: t.reports.map((r) => r.data as Report),
@@ -683,8 +705,15 @@ class PostgresBackend implements StoreBackend {
   }
 
   async save(data: Data, logs: readonly LogOp[]): Promise<void> {
+    const chars = this.characters.changes(new Map(data.accounts.flatMap((a) => (a.character ? [[a.id, a.character] as const] : []))));
+    const also = logs.length || chars
+      ? async (q: SqlQuery) => {
+        if (logs.length) await this.logs.write(q, logs);
+        await chars?.write(q);
+      }
+      : undefined;
     await this.tables.save({
-      accounts: data.accounts.map((a) => ({ key: a.id, data: a })),
+      accounts: data.accounts.map((a) => ({ key: a.id, data: withoutCharacter(a) })),
       invites: data.invites.map((i) => ({ key: i.code, data: i })),
       content: data.content.map((c) => ({ key: c.id, data: c })),
       reports: data.reports.map((r) => ({ key: r.id, data: r })),
@@ -692,7 +721,12 @@ class PostgresBackend implements StoreBackend {
       rule_data: Object.entries(data.ruleData).map(([key, d]) => ({ key, data: d })),
       world_edits: Object.entries(data.worldEdits ?? {}).map(([key, d]) => ({ key, data: d })),
       settings: [{ key: 'settings', data: data.settings }],
-    }, logs.length ? (q) => this.logs.write(q, logs) : undefined);
+    }, also);
+    chars?.done();
+  }
+
+  holders(item: string): Promise<Holding[]> {
+    return this.characters.holders(item);
   }
 
   spendBetween(since: number, until: number): Promise<SpendRecord[]> {
@@ -702,6 +736,12 @@ class PostgresBackend implements StoreBackend {
   close(): Promise<void> {
     return this.sql.close();
   }
+}
+
+/** An account as its row keeps it: the character has a table of its own. */
+function withoutCharacter(account: Account): Omit<Account, 'character'> {
+  const { character: _character, ...rest } = account;
+  return rest;
 }
 
 export class StoreError extends Error {

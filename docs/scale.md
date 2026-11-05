@@ -48,6 +48,17 @@ one `DELETE` (`API_LOG_DAYS`, `API_LOG_MAX_MB`). An older game's
 `data/api-log/<day>.jsonl` files are brought in on the first start and
 renamed `<name>.in-db`.
 
+Characters have tables of their own (`store-characters.ts`), apart from
+their accounts: `characters` holds one row per character with its level,
+XP, gold, Favor, people, Calling and Path in columns and the whole character
+as JSON, and `holdings` holds one row per bag stack and per worn item, with
+an index on the item. Only a character that changed since its last save is
+written again. God's View can ask who holds an item
+(`GET /api/admin/holders?item=<id>`, Stewards and the Owner), and any
+Postgres tool can ask things like `SELECT account_id, gold FROM characters
+ORDER BY gold DESC`. An older database's characters, kept inside the
+account rows, move out on the first save.
+
 **Where the database is.** With `DATABASE_URL` set, the server uses that
 Postgres server; region servers and several machines can share it. Without
 it, the server opens the Postgres built into the game in `DB_DIR`

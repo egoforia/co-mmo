@@ -2,6 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { newCharacter } from '@co-mmo/shared';
 import { Store } from '../src/store.ts';
 import { defaultSettings } from '../src/settings.ts';
 import { openBuiltInPostgres, type Sql } from '../src/db.ts';
@@ -193,4 +194,47 @@ describe('the Postgres built into the game', () => {
     expect(again.accountByName('Mara')).toBeTruthy();
     await again.close();
   }, 60_000);
+});
+
+describe('characters apart from their accounts', () => {
+  it('keeps each character in its own row, with what it holds, and rewrites only the ones that changed', async () => {
+    const { sql, writes } = counting(db);
+    const store = await Store.postgres(sql);
+    const owner = store.createInvite(null, 'owner');
+    const mara = store.acceptInvite(owner.code, 'Mara', 'sanctum', { ...newCharacter(), gold: 40, inventory: [{ item: 'wooden-sword', qty: 1 }, { item: 'tonic', qty: 3 }], equipment: { head: 'straw-hat' } }).account;
+    const ilya = store.acceptInvite(store.createInvite(mara.id).code, 'Ilya', 'sanctum', { ...newCharacter(), inventory: [{ item: 'tonic', qty: 1 }] }).account;
+    await store.flush();
+
+    const { rows: accountRows } = await db.query<{ data: Record<string, unknown> }>('SELECT data FROM accounts');
+    expect(accountRows.every((r) => !('character' in r.data))).toBe(true);
+    const { rows: gold } = await db.query<{ gold: string }>('SELECT gold FROM characters WHERE account_id = $1', [mara.id]);
+    expect(Number(gold[0]!.gold)).toBe(40);
+    expect((await store.holders('tonic')).map((h) => [h.accountId, h.qty])).toEqual([[mara.id, 3], [ilya.id, 1]].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+    expect(await store.holders('straw-hat')).toEqual([{ accountId: mara.id, place: 'worn', slot: 'head', item: 'straw-hat', qty: 1 }]);
+
+    writes.length = 0;
+    store.saveCharacter(ilya.id, { ...store.accountById(ilya.id)!.character!, inventory: [] });
+    await store.close();
+    expect(writes.filter((w) => w === 'characters')).toHaveLength(1);
+
+    const again = await Store.postgres(db);
+    expect(again.accountByName('Mara')!.character).toMatchObject({ gold: 40, equipment: { head: 'straw-hat' } });
+    expect(again.accountByName('Ilya')!.character!.inventory).toEqual([]);
+    expect(await again.holders('tonic')).toHaveLength(1);
+  });
+
+  it('moves characters out of account rows from an older database', async () => {
+    await db.query('CREATE TABLE accounts (key text PRIMARY KEY, n bigint NOT NULL, data jsonb NOT NULL)');
+    const character = { ...newCharacter(), gold: 7, inventory: [{ item: 'goat-horn', qty: 2 }] };
+    await db.query(`INSERT INTO accounts VALUES ('a1', 1, $1)`, [JSON.stringify({ id: 'a1', name: 'Amala', role: 'owner', color: 0, createdAt: 1, invitedBy: null, tokenHash: '', regionId: 'sanctum', x: null, y: null, character })]);
+    const store = await Store.postgres(db);
+    expect(store.accountByName('Amala')!.character!.gold).toBe(7);
+    store.savePosition('a1', 3, 4);
+    await store.close();
+    const { rows } = await db.query<{ data: Record<string, unknown> }>(`SELECT data FROM accounts WHERE key = 'a1'`);
+    expect('character' in rows[0]!.data).toBe(false);
+    const again = await Store.postgres(db);
+    expect(again.accountByName('Amala')!.character!.gold).toBe(7);
+    expect((await again.holders('goat-horn'))[0]).toMatchObject({ accountId: 'a1', qty: 2 });
+  });
 });

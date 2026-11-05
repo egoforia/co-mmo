@@ -337,6 +337,14 @@ export async function handleAdmin(
     return json(res, 200, { ok: true }), true;
   }
 
+  // Who holds an item, in their bag or worn, as last saved (the holdings table).
+  if (route === 'holders' && method === 'GET') {
+    const item = new URL(req.url ?? '', 'http://x').searchParams.get('item')?.trim() ?? '';
+    if (!item) return json(res, 400, { error: 'no_item', message: 'Say which item to look for.' }), true;
+    const holders = (await store.holders(item)).map((h) => ({ ...h, name: store.accountById(h.accountId)?.name ?? 'someone' }));
+    return json(res, 200, { item, holders }), true;
+  }
+
   if (route === 'reports' && method === 'GET') {
     const list = [...store.reports].sort((a, b) => Number(b.status === 'open') - Number(a.status === 'open') || b.at - a.at).slice(0, 200);
     const named = list.map((r) => (r.closed ? { ...r, closed: { ...r.closed, by: store.accountById(r.closed.by)?.name ?? 'someone' } } : r));

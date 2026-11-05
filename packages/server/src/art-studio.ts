@@ -341,6 +341,13 @@ export class ArtStudio {
     return { estimateUsd };
   }
 
+  /** Adopts a denied walk clip that was previously flagged by automated consistency checks. */
+  async adoptDeniedClip(walkerId: string, body: string, direction: string, useRetry = false): Promise<boolean> {
+    const walker = this.catalog.walker(walkerId, body);
+    const d = this.catalog.way(direction);
+    return this.options.walks.adoptDeniedClip(walker, d, useRetry);
+  }
+
   /**
    * Makes a sound effect or a land's music again, with the Owner's `note`
    * added to its description. Sounds are quick, so they do not wait behind

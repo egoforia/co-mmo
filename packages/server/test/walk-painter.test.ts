@@ -231,4 +231,57 @@ describe('walk painter', () => {
     const shippedRef = await shippedWalker.reference();
     expect(shippedRef).toEqual(shippedPng);
   });
+
+  it('manages denied walk clips and allows adopting them into the game', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'walks-denied-'));
+    const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');
+    await mkdir(join(anchorDir, 'raw'), { recursive: true });
+    await writeFile(join(anchorDir, 'raw', 'player-mara.png'), await picture(300, 300, walker(150, 280)));
+
+    const painter = new WalkPainter({
+      provider: () => undefined,
+      video: () => undefined,
+      overBudget: () => false,
+      spend: () => {},
+      spendVideo: () => {},
+      anchorDir,
+      artDir,
+      shipped: async () => ({}),
+      toFrames: frames,
+    });
+    await painter.load();
+
+    // 1. Manually write a mock denied walk record
+    await painter.saveDenied('player-mara', 'front-left', {
+      walkerId: 'player-mara',
+      direction: 'front-left',
+      at: 1700000000000,
+      videoUrl: '/wished-art/walks/raw/player-mara-walk-front-left.mp4',
+      problems: ['Frame 3 has less red than reference'],
+      distinctPoses: 12,
+      reason: 'Frame 3 has less red than reference',
+    });
+
+    const denied = await painter.deniedClip('player-mara', 'front-left');
+    expect(denied).toBeDefined();
+    expect(denied?.videoUrl).toBe('/wished-art/walks/raw/player-mara-walk-front-left.mp4');
+    expect(denied?.problems).toContain('Frame 3 has less red than reference');
+
+    // 2. Put a mock raw mp4 in place and a standing view
+    await mkdir(join(artDir, 'walks', 'raw'), { recursive: true });
+    await mkdir(join(artDir, 'walks', 'views'), { recursive: true });
+    const viewPng = await picture(300, 300, walker(150, 280));
+    await writeFile(join(artDir, 'walks', 'views', 'player-mara-front-left.png'), viewPng);
+    await writeFile(join(artDir, 'walks', 'raw', 'player-mara-walk-front-left.mp4'), viewPng);
+
+    // 3. Adopt the denied clip
+    const mara = painter.anchorWalker('player-mara');
+    const adopted = await painter.adoptDeniedClip(mara, 'front-left');
+    expect(adopted).toBe(true);
+
+    // After adopting, it is admitted in painted manifest and denied record is cleaned up
+    expect(painter.manifest()['player-mara-walk-front-left']).toBeDefined();
+    const after = await painter.deniedClip('player-mara', 'front-left');
+    expect(after).toBeUndefined();
+  }, 30_000);
 });

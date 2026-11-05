@@ -169,10 +169,19 @@ export function waysHtml(w: WalkerView): string {
     const walkVersions = strip || older ? `<button type="button" class="quiet" data-walk-versions="${esc(w.id)}" data-direction="${d}">${older ? `Walk versions (${older + (strip ? 1 : 0)})` : 'What made the walk'}</button>` : '';
     const clip = view.url ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'clip', walker: w.id, body: w.body ?? 'two-legged', direction: d }))}" data-walker-body>${strip ? 'Make clip again' : 'Make walk clip'} · about ${usd(w.clipUsd)}</button>` : '';
     const queueClip = view.url && !strip ? queueButtonHtml({ kind: 'clip', targetId: w.id, direction: d, body: w.body ?? 'two-legged', label: `Walk clip: ${w.name} (${label})`, category: 'Walk Clips', estimateUsd: w.clipUsd }) : '';
+    const denied = w.denied?.[d];
+    const deniedNotice = !strip && denied ? `
+      <div class="denied-notice" style="margin: 6px 0; padding: 6px 8px; border: 1px dashed var(--bad, #d9534f); border-radius: 4px; background: rgba(217, 83, 79, 0.08); font-size: 11px;">
+        <span style="color: var(--bad, #d9534f); font-weight: bold;">⚠️ Walk clip denied:</span> ${esc(denied.problems[0] ?? denied.reason ?? 'Failed consistency check')}
+        <div style="margin-top: 4px;">
+          <button type="button" class="quiet" data-review-denied="${esc(JSON.stringify({ walker: w.id, direction: d }))}" style="font-size: 11px; padding: 2px 6px; cursor: pointer;">Review & Decide →</button>
+        </div>
+      </div>` : '';
     return `
       <div class="direction">
         <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${esc(label)}${found ? ` · ${found}` : ''}</small></div>
         ${stripHtml(strip, label, 110)}
+        ${deniedNotice}
         <div class="card-actions"><button type="button" data-art-review="${esc(JSON.stringify({ what: 'view', walker: w.id, direction: d }))}">${view.url ? 'Paint again' : 'Paint'} · about ${usd(w.viewUsd)}</button>${versions}${clip}${queueClip}${walkVersions}${view.url ? `<button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [id] }))}">Find hands again</button>` : ''}</div>
       </div>`;
   };

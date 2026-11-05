@@ -5,6 +5,7 @@ import { artFilePath } from '../src/art-files.ts';
 describe('painted file URLs', () => {
   it('map each kind of painted file to its folder in the art directory', () => {
     expect(artFilePath('/art', '/wished-art/c-abc.png')).toBe(join('/art', 'c-abc.png'));
+    expect(artFilePath('/art', '/wished-art/walks/raw/mara-walk-front-left.mp4')).toBe(join('/art', 'walks', 'raw', 'mara-walk-front-left.mp4'));
     expect(artFilePath('/art', '/wished-art/walks/views/mara-left.png')).toBe(join('/art', 'walks', 'views', 'mara-left.png'));
     expect(artFilePath('/art', '/wished-art/history/player-mara~walk/1a2b/strip.png')).toBe(join('/art', 'history', 'player-mara~walk', '1a2b', 'strip.png'));
     expect(artFilePath('/art', '/wished-art/sounds/hit.mp3')).toBe(join('/art', 'sounds', 'hit.mp3'));

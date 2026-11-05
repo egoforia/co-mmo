@@ -21,6 +21,7 @@ const MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
 };
 
 /** Answers with a JSON body that is never cached. */

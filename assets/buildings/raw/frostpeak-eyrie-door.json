@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-eyrie-door",
+  "kind": "tile",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nFlat faceted shapes built from a few large flat planes with crisp hard edges, like cut paper or a clean vector illustration.\nNO LIGHTING AT ALL: every material is one single flat base colour on all its facets, with no lit side, no shadow side, no highlights, no gradients and no glow; facets are shown only by a very thin, slightly darker seam where two planes meet. No outlines, no texture, no noise.\nA small harmonious palette of soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass). No writing anywhere.\nA floor or wall texture seen square-on, filling the entire square frame edge to edge.\nVery low contrast, small flat facets spread evenly with no single big feature or object,\nso it repeats seamlessly on all four edges. No border, frame, perspective, wall face or shadow at the edges.\nSubject: inside The Eyrie of the First Watch, a grand double-width mountain threshold of carved granite with inlaid silver feather engravings and a polished silver step.\nColours: match the reference painting of the same building from outside.",
+  "references": [
+    "frostpeak-eyrie-exterior"
+  ],
+  "provider": "gemini",
+  "model": "gemini-3-pro-image",
+  "createdAt": "2026-11-05T19:21:29.800Z"
+}

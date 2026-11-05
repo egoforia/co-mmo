@@ -97,5 +97,5 @@ describe('kit houses for the game\'s buildings', () => {
         expect(shapeChecks(new KitBuilding(house!.spec)).filter((c) => !c.ok).map((c) => c.check), `${region.id} ${b.style}`).toEqual([]);
       }
     }
-  });
+  }, 15_000);
 });

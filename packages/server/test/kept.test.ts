@@ -1,6 +1,12 @@
+import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MemoryKept, PostgresKept, type Kept } from '../src/kept.ts';
 import { Auth } from '../src/auth.ts';
+import { KeptDoc } from '../src/kept-doc.ts';
+import { RecipeBook } from '../src/art-recipes.ts';
 import { Store } from '../src/store.ts';
 import { fakeMailer } from './helpers.ts';
 import { testSql, type TestSql } from './sql.ts';
@@ -57,5 +63,36 @@ describe('sign-in kept in the database', () => {
     const code = new URL(mailer.sent[0]!.text.match(/https?:\/\/\S+/)![0]).searchParams.get('login')!;
     expect((await auth.redeem(code)).account.name).toBe('Mara');
     await expect(auth.redeem(code)).rejects.toThrow();
+  });
+});
+
+describe('art bookkeeping kept in the database', () => {
+  it('brings in an old file once, keeps it as a backup, and works from the database after', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'co-mmo-kept-'));
+    const file = join(dir, 'up-next-queue.json');
+    await writeFile(file, JSON.stringify([{ id: 'a' }]));
+    const kept = new MemoryKept();
+    const doc = new KeptDoc<{ id: string }[]>(kept, 'art-up-next', 'queue', file);
+    expect(await doc.read()).toEqual([{ id: 'a' }]);
+    expect(existsSync(file)).toBe(false);
+    expect(JSON.parse(await readFile(`${file}.in-db`, 'utf8'))).toEqual([{ id: 'a' }]);
+    await doc.write([]);
+    expect(await new KeptDoc(kept, 'art-up-next', 'queue', file).read()).toEqual([]);
+  });
+
+  it('keeps recipes of earlier versions, and brings one back', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'co-mmo-kept-'));
+    const kept = new MemoryKept();
+    const book = new RecipeBook(dir, kept);
+    const recipe = (prompt: string) => ({ at: 1, steps: [{ label: 'Paint', media: 'picture', provider: 'p', model: 'm', prompt, pictures: [], settings: [], usd: 0.04 }] }) as never;
+    await book.record('sanctum-rock', recipe('first'));
+    await book.putAside('sanctum-rock', 'v1');
+    expect(await book.current('sanctum-rock')).toBeUndefined();
+    expect(await book.ofVersion('sanctum-rock', 'v1')).toEqual(recipe('first'));
+    await book.bringBack('sanctum-rock', 'v1');
+    expect(await book.current('sanctum-rock')).toEqual(recipe('first'));
+    // Nothing was written beside the art.
+    expect(existsSync(join(dir, 'recipes'))).toBe(false);
+    expect(existsSync(join(dir, 'history'))).toBe(false);
   });
 });

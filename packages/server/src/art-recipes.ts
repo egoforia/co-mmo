@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { KeptDoc } from './kept-doc.ts';
+import type { Kept } from './kept.ts';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { REFERENCE_NOTE } from './assets/gemini.ts';
@@ -106,9 +108,23 @@ export function keepingVideo(provider: VideoProvider): VideoProvider & { sent?: 
   return kept;
 }
 
-/** Recipes of the current versions, and copies of the pictures they sent. */
+/**
+ * Recipes of the current versions and of earlier ones, kept in the database
+ * (without one, as files in artDir), and copies of the pictures they sent,
+ * which stay files so they can be served.
+ */
 export class RecipeBook {
-  constructor(private readonly artDir: string) {}
+  constructor(private readonly artDir: string, private readonly kept?: Kept) {}
+
+  /** The recipe of what is shown now. */
+  private doc(asset: string): KeptDoc<Recipe> {
+    return new KeptDoc(this.kept, 'art-recipe', asset, this.file(asset));
+  }
+
+  /** An earlier version's recipe. */
+  private versionDoc(asset: string, version: string): KeptDoc<Recipe> {
+    return new KeptDoc(this.kept, 'art-recipe-version', `${asset}@${version}`, this.versionFile(asset, version));
+  }
 
   private get picturesDir(): string {
     return resolve(this.artDir, 'recipes', 'pictures');
@@ -158,45 +174,36 @@ export class RecipeBook {
 
   /** The recipe of what is shown now, when it was kept. */
   async current(asset: string): Promise<Recipe | undefined> {
-    return readJson(this.file(asset));
+    return this.doc(asset).read();
   }
 
   /** Keeps the recipe of what was just made. */
   async record(asset: string, recipe: Recipe): Promise<void> {
-    await mkdir(resolve(this.artDir, 'recipes'), { recursive: true });
-    await writeFile(this.file(asset), JSON.stringify(recipe, null, 2));
+    await this.doc(asset).write(recipe);
   }
 
   /** Moves the current recipe beside an earlier version that was just put aside; `fallback` when none was kept. */
   async putAside(asset: string, version: string, fallback?: Recipe): Promise<void> {
-    const current = this.file(asset);
-    if (await stat(current).then(() => true, () => false)) {
-      await mkdir(resolve(this.artDir, 'history', historyFolder(asset)), { recursive: true });
-      await rename(current, this.versionFile(asset, version));
-    } else if (fallback) {
-      await writeFile(this.versionFile(asset, version), JSON.stringify(fallback, null, 2));
-    }
+    const current = await this.doc(asset).read();
+    const recipe = current ?? fallback;
+    if (recipe) await this.versionDoc(asset, version).write(recipe);
+    if (current) await this.doc(asset).remove();
   }
 
   /** An earlier version's recipe. */
   async ofVersion(asset: string, version: string): Promise<Recipe | undefined> {
-    return readJson(this.versionFile(asset, version));
+    return this.versionDoc(asset, version).read();
   }
 
   /** Makes an earlier version's recipe the current one again, after that version was put back. */
   async bringBack(asset: string, version: string): Promise<void> {
     const recipe = await this.ofVersion(asset, version);
     if (recipe) await this.record(asset, recipe);
-    else await rm(this.file(asset), { force: true });
+    else await this.doc(asset).remove();
   }
 
   /** Forgets the current recipe, when what it made is gone (the shipped picture shows again). */
   async forget(asset: string): Promise<void> {
-    await rm(this.file(asset), { force: true });
+    await this.doc(asset).remove();
   }
-}
-
-async function readJson<T>(path: string): Promise<T | undefined> {
-  const text = await readFile(path, 'utf8').catch(() => undefined);
-  return text === undefined ? undefined : (JSON.parse(text) as T);
 }

@@ -451,7 +451,7 @@ describe('the Art tab', () => {
     const { body: jobs } = await api(base, '/api/admin/art/jobs', owner.token);
     expect(jobs.jobs.filter((j: any) => j.media === 'clip' && j.status === 'skipped')).toHaveLength(1);
     // Kept, so a restart meanwhile still asks for it.
-    const kept = await until(async () => JSON.parse(await readFile(join(artDir, 'paint-requests.json'), 'utf8').catch(() => '[]')).length);
+    const kept = await until(async () => (await store.kept.list('paint-request')).length);
     expect(kept).toBe(1);
 
     const { body } = await api(base, '/api/admin/ai', owner.token);
@@ -486,7 +486,7 @@ describe('the Art tab', () => {
 
     // Shutting down does not wait out the limit; the request is kept and asked for again.
     await stop();
-    const kept = JSON.parse(await readFile(join(first.artDir, 'paint-requests.json'), 'utf8'));
+    const kept = (await first.store.kept.list('paint-request')).map((r) => r.data);
     expect(kept).toEqual([{ kind: 'repaint', asset: 'bramble-cottage-furniture-bed', note: '' }]);
     const again = await start({ shippedArt, anchorDir, store: first.store, artDir: first.artDir, paintQueue: once() });
     await until(async () => (await api(again.base, '/api/art', owner.token)).body['bramble-cottage-furniture-bed']?.redone);

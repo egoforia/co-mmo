@@ -38,7 +38,7 @@ import { DailyClips, MemoryPaintQueue, nextDailyReset, type PaintQueue } from '.
 import { SoundMaker } from './sound-maker.ts';
 import type { SoundProvider } from './assets/sound.ts';
 import type { FinishedSound } from './assets/sound-finish.ts';
-import { FilePaintRequests } from './paint-requests.ts';
+import { KeptPaintRequests } from './paint-requests.ts';
 import { HandFinder } from './hand-finder.ts';
 import type { Bus } from './bus.ts';
 import { RegionServers } from './region-servers.ts';
@@ -178,8 +178,8 @@ export function createApp(options: AppOptions): App {
   });
   // The painting log God's View shows, paintings kept across a restart, and what was sent to make each picture.
   const artJobs = new ArtJobs();
-  const paintRequests = new FilePaintRequests(resolve(options.wishes.artDir, 'paint-requests.json'));
-  const recipes = new RecipeBook(options.wishes.artDir);
+  const paintRequests = new KeptPaintRequests(store.kept, resolve(options.wishes.artDir, 'paint-requests.json'));
+  const recipes = new RecipeBook(options.wishes.artDir, store.kept);
   const wishes = new Wishes(store, world, rules, options.wishes, { ai, budget, artJobs, paintRequests, recipes });
   const slowTicks = new SlowTickBuffer();
   const rulesProfiler = new TickProfiler();
@@ -314,6 +314,7 @@ export function createApp(options: AppOptions): App {
   const paintedArt = async (): Promise<ArtManifest> => ({ ...(await wishes.kitManifest()), ...buildingPainter.manifest(), ...(await walkPainter.standingManifest()), ...walkPainter.manifest(), ...(await artStudio.manifest()) });
   const handFinder = new HandFinder({
     artDir: options.wishes.artDir,
+    kept: store.kept,
     model: () => ai.judgeModel(),
     paused: () => budget.paused(),
     spend: (usd, model) => budget.spend('chat', model, usd),

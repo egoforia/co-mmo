@@ -82,9 +82,10 @@ export class ArtStudio {
   constructor(private readonly options: ArtStudioOptions) {
     this.history = new ArtHistory(options.artDir, options.recipes);
     this.catalog = new ArtCatalog(options, this.history, this.redoneDir, () => this.manifest());
-    this.upNext = new UpNextQueue(options.artDir);
+    this.upNext = new UpNextQueue(options.artDir, options.store.kept);
     this.director = new ArtDirector({
       artDir: options.artDir,
+      kept: options.store.kept,
       anchorDir: options.anchorDir,
       ai: options.ai,
       budget: options.budget,

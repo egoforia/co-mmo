@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { KeptDoc } from '../kept-doc.ts';
+import type { Kept } from '../kept.ts';
 import { resolve } from 'node:path';
 import type { ArtStudio } from '../art-studio.ts';
 import { ArtRequestError, type ArtAsk } from './types.ts';
@@ -26,7 +27,8 @@ export interface UpNextItem {
 }
 
 /**
- * Persistent "Up Next" staged queue (`up-next-queue.json` in `artDir`).
+ * Persistent "Up Next" staged queue, kept in the database (without one,
+ * `up-next-queue.json` in `artDir`).
  * Lets the Owner stage missing or redone art items, reorder priorities,
  * edit notes/prompts or harmonize with the AI Art Director, and run the
  * queue sequentially or one item at a time.
@@ -37,17 +39,17 @@ export class UpNextQueue {
   private running = false;
   private pauseRequested = false;
 
-  constructor(private readonly artDir: string) {}
+  private readonly doc: KeptDoc<UpNextItem[]>;
 
-  private get file(): string {
-    return resolve(this.artDir, 'up-next-queue.json');
+  constructor(artDir: string, kept?: Kept) {
+    this.doc = new KeptDoc(kept, 'art-up-next', 'queue', resolve(artDir, 'up-next-queue.json'));
   }
 
   private async load(): Promise<void> {
     if (this.loaded) return;
     try {
-      const raw = JSON.parse(await readFile(this.file, 'utf8'));
-      if (Array.isArray(raw)) this.items = raw as UpNextItem[];
+      const raw = await this.doc.read();
+      this.items = Array.isArray(raw) ? raw : [];
     } catch {
       this.items = [];
     }
@@ -55,8 +57,7 @@ export class UpNextQueue {
   }
 
   private async save(): Promise<void> {
-    await mkdir(this.artDir, { recursive: true });
-    await writeFile(this.file, JSON.stringify(this.items, null, 2));
+    await this.doc.write(this.items);
   }
 
   async list(): Promise<{ items: UpNextItem[]; running: boolean; totalUsd: number }> {

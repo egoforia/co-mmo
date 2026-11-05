@@ -1,4 +1,7 @@
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import pg from 'pg';
+import type { PGlite } from '@electric-sql/pglite';
 
 /** One query against the database, inside or outside a transaction. */
 export interface SqlQuery {
@@ -6,8 +9,9 @@ export interface SqlQuery {
 }
 
 /**
- * The little the game asks of a SQL database: Postgres in play, or an
- * embedded Postgres (PGlite) in tests, which speaks the same SQL.
+ * The little the game asks of a SQL database: a Postgres server
+ * (DATABASE_URL), or the Postgres built into the game (PGlite) when there is
+ * none, which speaks the same SQL.
  */
 export interface Sql extends SqlQuery {
   /** Runs `work` in one transaction: all of it is saved, or none of it. */
@@ -54,5 +58,60 @@ export function safeUrl(url: string): string {
     return u.toString();
   } catch {
     return 'the DATABASE_URL address';
+  }
+}
+
+/** File in the built-in database's folder naming the process that has it open. */
+const LOCK = 'co-mmo-server.pid';
+
+/**
+ * Opens the Postgres built into the game (PGlite), kept in the folder `dir`
+ * and made on first use, so the game starts with nothing installed. Only one
+ * process may have it open: a second game server on the same folder is
+ * refused rather than let it damage the saved world.
+ */
+export async function openBuiltInPostgres(dir: string): Promise<Sql> {
+  await mkdir(dir, { recursive: true });
+  const lock = join(dir, LOCK);
+  const holder = Number.parseInt(await readFile(lock, 'utf8').catch(() => ''), 10);
+  if (holder && holder !== process.pid && running(holder)) {
+    throw new Error(`Another game server (process ${holder}) is already using the world in ${dir}. Stop it first, or set DATABASE_URL to share a Postgres server (docs/scale.md).`);
+  }
+  await writeFile(lock, String(process.pid));
+  const { PGlite } = await import('@electric-sql/pglite');
+  let db: PGlite;
+  try {
+    db = await PGlite.create(dir);
+  } catch (err) {
+    await rm(lock, { force: true });
+    throw new Error(`Could not open the saved world in ${dir}: ${(err as Error).message}`);
+  }
+  const sql = pgliteSql(db);
+  return {
+    ...sql,
+    close: async () => {
+      await sql.close();
+      await rm(lock, { force: true });
+    },
+  };
+}
+
+/** A PGlite database as the game's Sql: the built-in one, or one in memory for tests. */
+export function pgliteSql(db: PGlite): Sql {
+  return {
+    query: (text, params) => db.query(text, params) as never,
+    transaction: (work) => db.transaction((tx) => work({ query: (text, params) => tx.query(text, params) as never })),
+    close: () => db.close(),
+  };
+}
+
+/** True while a process with this id is alive. */
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: alive, but someone else's.
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }

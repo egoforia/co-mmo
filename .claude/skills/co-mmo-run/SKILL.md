@@ -16,9 +16,10 @@ browser play the real game with fake AI: every region, the first quests,
 fights, loot, wishes, two players, and God's View. A new feature gets a
 `packages/server/playtest/<name>.play.ts`; see `docs/playtest.md`.
 
-**File mode** (nothing installed): `npm run dev`. The game is at
+**Plain mode** (nothing installed): `npm run dev`. The game is at
 http://localhost:5173 and God's View at http://localhost:5173/gods-view.html.
-The world is kept in `data/world.json`. On first start the server prints an
+The world is kept in the Postgres built into the game, in `data/db/`
+(`DB_DIR`); only one server may open it at a time. On first start the server prints an
 invite link that makes its user the Owner; open it to sign in.
 
 **Scale mode:** `docker compose up -d`, then set in `.env` (or the shell):
@@ -31,5 +32,6 @@ Check the Server health tab shows the region servers. Details in
 (do not run `playwright install`). Open the invite link, take a screenshot of
 the game and of God's View, and look at them before saying a change works.
 
-The server needs ffmpeg for walks and sounds. Use a scratch `DATA_FILE` and
-`ART_DIR` so a test run does not touch the real world.
+The server needs ffmpeg for walks and sounds. Use a scratch `DATA_FILE` (its
+folder also holds `db/`) and `ART_DIR` so a test run does not touch the real
+world.

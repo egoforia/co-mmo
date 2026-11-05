@@ -24,7 +24,7 @@ adapter) and picking it in the place named under "Chosen in".
 
 | Part | Contract | Implementations | Chosen in |
 | --- | --- | --- | --- |
-| Saved world | `StoreBackend` (`server/src/store.ts`) | JSON file, Postgres (`store-postgres.ts`) | `main.ts` (`DATABASE_URL`) |
+| Saved world | `StoreBackend` (`server/src/store.ts`) | Postgres (`store-postgres.ts`): a server, or built in (PGlite, `db.ts`) | `main.ts` (`DATABASE_URL`, `DB_DIR`) |
 | Messages between servers | `Bus` (`bus.ts`) | `MemoryBus`, `RedisBus` | `main.ts` (`REDIS_URL`) |
 | Paint queue | `PaintQueue` (`paint-queue.ts`) | `MemoryPaintQueue`, `SharedPaintQueue` (Redis) | `main.ts` |
 | Where regions run | `Hosting` (`world.ts`), `RegionHandle` (`region-link.ts`) | in process, `RegionServers` + `RemoteRegion` | `main.ts` (`REDIS_URL`); `scripts/dev.mjs` starts `REGION_SERVERS` of them |

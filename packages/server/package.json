@@ -12,6 +12,7 @@
     "region-server": "tsx src/region-main.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "ioredis": "^5.11.1",
     "pg": "^8.23.1",
     "quickjs-emscripten": "^0.32.0",
@@ -19,7 +20,6 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
     "@types/pg": "^8.23.1"
   }
 }

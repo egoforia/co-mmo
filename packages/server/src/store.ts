@@ -1,6 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
 import { defaultSettings, type Settings } from './settings.ts';
@@ -151,9 +150,9 @@ export interface WorldEditLog {
 }
 
 /**
- * Where the store keeps the world between runs: Postgres when DATABASE_URL
- * is set (design doc, Technical architecture), else one JSON file, so local
- * development needs nothing installed.
+ * Where the store keeps the world between runs: Postgres, either the server
+ * at DATABASE_URL (design doc, Technical architecture) or the one built into
+ * the game, so local development needs nothing installed.
  */
 export interface StoreBackend {
   /** What was saved before, or nothing on a first run. */
@@ -178,20 +177,17 @@ export class Store {
 
   private constructor(private readonly backend: StoreBackend | null) {}
 
-  /** A store backed by a JSON file, created if missing. */
-  static async open(path: string): Promise<Store> {
-    return Store.withBackend(new FileBackend(path));
-  }
-
   /**
    * A store kept in Postgres. On its first run, while the database is still
-   * empty, the world in `importFrom` (the old JSON file) is brought in.
+   * empty, the world in `importFrom` (the old JSON file, from before the
+   * world was always kept in Postgres) is brought in. `label` says where the
+   * database is, for the start-up message.
    */
-  static async postgres(sql: Sql, importFrom?: string): Promise<Store> {
-    const backend = await PostgresBackend.open(sql);
+  static async postgres(sql: Sql, importFrom?: string, label = 'Postgres'): Promise<Store> {
+    const backend = await PostgresBackend.open(sql, label);
     const store = await Store.withBackend(backend);
     if (importFrom && backend.wasEmpty) {
-      const old = await new FileBackend(importFrom).load();
+      const old = await readWorldFile(importFrom);
       if (old) {
         store.data = { ...store.data, ...old };
         await backend.save(store.data);
@@ -589,31 +585,14 @@ export class Store {
   }
 }
 
-/** The whole world in one JSON file, written through a temp file so a crash mid-write cannot corrupt it. */
-class FileBackend implements StoreBackend {
-  constructor(private readonly path: string) {}
-
-  get label(): string {
-    return this.path;
+/** The world as an older game kept it, in one JSON file; nothing when there is no file. */
+async function readWorldFile(path: string): Promise<Partial<Data> | null> {
+  try {
+    return JSON.parse(await readFile(path, 'utf8')) as Partial<Data>;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    return null;
   }
-
-  async load(): Promise<Partial<Data> | null> {
-    try {
-      return JSON.parse(await readFile(this.path, 'utf8')) as Partial<Data>;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-      return null;
-    }
-  }
-
-  async save(data: Data): Promise<void> {
-    await mkdir(dirname(this.path), { recursive: true });
-    const tmp = `${this.path}.tmp`;
-    await writeFile(tmp, JSON.stringify(data, null, 2));
-    await rename(tmp, this.path);
-  }
-
-  async close(): Promise<void> {}
 }
 
 /**
@@ -622,16 +601,15 @@ class FileBackend implements StoreBackend {
  * saved, remembered beside it.
  */
 class PostgresBackend implements StoreBackend {
-  readonly label = 'Postgres';
   private readonly keys = new WeakMap<object, string>();
   /** The database had nothing in it when the game started. */
   wasEmpty = false;
 
-  private constructor(private readonly sql: Sql, private readonly tables: PostgresTables) {}
+  private constructor(private readonly sql: Sql, private readonly tables: PostgresTables, readonly label: string) {}
 
-  static async open(sql: Sql): Promise<PostgresBackend> {
+  static async open(sql: Sql, label: string): Promise<PostgresBackend> {
     await migrate(sql);
-    const backend = new PostgresBackend(sql, new PostgresTables(sql));
+    const backend = new PostgresBackend(sql, new PostgresTables(sql), label);
     backend.wasEmpty = await backend.tables.empty();
     return backend;
   }

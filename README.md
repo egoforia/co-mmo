@@ -239,13 +239,14 @@ PUBLIC_URL=http://localhost:3001 npm start
 | --- | --- | --- |
 | `PORT` | `3001` | Server port |
 | `PUBLIC_URL` | `http://localhost:5173` | Base URL used in invite links |
-| `DATABASE_URL` | none | Postgres for the saved world ([docs/scale.md](docs/scale.md)); without it the world is kept in `DATA_FILE` |
+| `DATABASE_URL` | none | A Postgres server for the saved world ([docs/scale.md](docs/scale.md)); without it the world is kept in the Postgres built into the game, in `DB_DIR` |
+| `DB_DIR` | `db/` next to `DATA_FILE` | Folder of the built-in Postgres, used when `DATABASE_URL` is not set |
 | `REDIS_URL` | none | Redis for the paint queue, shared by servers and kept across restarts ([docs/scale.md](docs/scale.md)) |
 | `REGION_SERVERS` | none | How many region servers `npm run dev` starts beside the game (needs `REDIS_URL`; [docs/scale.md](docs/scale.md)) |
 | `DAY_MINUTES` | `60` | Real minutes in one game day, dawn to dawn |
 | `WEATHER_MINUTES` | `20` | Real minutes each spell of weather lasts before it may turn |
 | `WEATHER` | on | `off` keeps every land's sky clear |
-| `DATA_FILE` | `data/world.json` | Where accounts, invites and positions are stored without Postgres (and brought in from on Postgres's first run) |
+| `DATA_FILE` | `data/world.json` | An older game's world file, brought into Postgres on its first run; its folder holds `db/`, `art/` and `api-log/` |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
 | `API_LOG_DIR` | `api-log/` next to `DATA_FILE` | Where God's View's API Log keeps every request sent to an outside service |
@@ -271,10 +272,10 @@ in God's View, not in code.
 ## Host it
 
 The `Dockerfile` builds one container that serves the game on port 8080.
-Mount a persistent volume at `/data` (accounts, invites and positions are
-stored there) and set `PUBLIC_URL` to the address players will use, so
+Mount a persistent volume at `/data` (the built-in Postgres keeps the world
+there, in `/data/db`) and set `PUBLIC_URL` to the address players will use, so
 invite links point to it. On first start the logs print the Owner invite.
-Set `DATABASE_URL` to keep the world in Postgres instead ([docs/scale.md](docs/scale.md));
+Set `DATABASE_URL` to keep the world in a Postgres server instead ([docs/scale.md](docs/scale.md));
 the volume still holds painted art.
 
 ```sh
@@ -343,6 +344,6 @@ The server and the client generate the map from the same seed with the same
 code, and run the same `step()` movement function, so prediction matches the
 server exactly unless something else (another wish, lag) intervenes.
 
-Storage uses a JSON file (`data/world.json`) by default behind the `Store`
-class so local development needs no database, or Postgres when `DATABASE_URL`
-is set ([docs/scale.md](docs/scale.md)).
+Storage is Postgres behind the `Store` class: the server at `DATABASE_URL`,
+or else the Postgres built into the game (PGlite, in `data/db/`), so local
+development needs nothing installed ([docs/scale.md](docs/scale.md)).

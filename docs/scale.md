@@ -1,23 +1,31 @@
 # Running at scale: Postgres and Redis
 
-Milestone 11 moves the saved world out of one JSON file and into Postgres,
-and keeps the paint queue in Redis (later steps also pass messages between
-servers through it). Both are optional for local development: without
-`DATABASE_URL` the game keeps using `data/world.json`, and without
-`REDIS_URL` the paint queue lives in memory, exactly as before.
+The saved world is always kept in Postgres, and the paint queue can be
+kept in Redis (which also passes messages between servers). Neither needs
+installing for local development: without `DATABASE_URL` the game uses the
+Postgres built into it (PGlite), kept in `data/db/`, and without
+`REDIS_URL` the paint queue lives in memory.
 
 ## Postgres
 
 The server keeps the whole world in memory and writes what changed behind
 it, so play never waits on the database. Each kind of thing has its own
 table (`accounts`, `invites`, `content` for wishes, `reports`, `spend`,
-`journal`, `drafts`, `rule_data`, `settings`), each row a key and the thing
-as JSON, so any Postgres tool can read them.
+`journal`, `drafts`, `rule_data`, `world_edits`, `settings`), each row a
+key and the thing as JSON, so any Postgres tool can read them.
+
+**Where the database is.** With `DATABASE_URL` set, the server uses that
+Postgres server; region servers and several machines can share it. Without
+it, the server opens the Postgres built into the game in `DB_DIR`
+(`data/db/` by default, next to `DATA_FILE`), made on first start. Only one
+game server may have that folder open at a time; a second one stops with a
+message saying so. Back it up by copying the folder while the game is
+stopped.
 
 On its first start with an empty database, the server copies everything
-from the JSON file (`DATA_FILE`, `data/world.json` by default) into Postgres
-and says so in the console. The file is left as it was, as a backup; later
-starts ignore it.
+from an older game's world file (`DATA_FILE`, `data/world.json` by
+default), if there is one, and says so in the console. The file is left as
+it was, as a backup; later starts ignore it. The game no longer writes it.
 
 If a save fails (the database restarted, say) the game keeps running and the
 next change saves everything that was missed.
@@ -47,12 +55,13 @@ Then add this line to `.env` and start the game as usual (`npm run dev`, or
 DATABASE_URL=postgres://co_mmo:co_mmo@localhost:5432/co_mmo
 ```
 
-The console says `The world is kept in Postgres.` and, the first time, that
-it brought the world in from `data/world.json`. If Postgres is not running
-the server stops with a message saying it could not reach it.
+The console says `The world is kept in Postgres on localhost:5432.` and,
+the first time, that it brought the world in from `data/world.json`. If
+Postgres is not running the server stops with a message saying it could not
+reach it.
 
-To go back to the file, remove the line. The file does not have what was
-saved in Postgres since; nothing copies it back.
+Removing the line goes back to the built-in Postgres in `data/db/`, which
+is a separate world: nothing is copied between the two.
 
 ## Redis
 
@@ -160,7 +169,9 @@ Without region servers, Restart still works on the game server.
 ## Hosting
 
 Any Postgres 14 or newer works (Fly.io, Neon, Supabase, a VPS). Set
-`DATABASE_URL` on the server; the tables are made on first start. Any Redis
+`DATABASE_URL` on the server; the tables are made on first start. A single
+server can also run on the built-in Postgres, with `DB_DIR` on a lasting
+volume. Any Redis
 6.2 or newer works for `REDIS_URL` (Upstash, Fly.io, a VPS).
 
 ## Tests

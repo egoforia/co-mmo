@@ -106,18 +106,22 @@ function layout(map: RegionMap, c: number): void {
   const connectVertical = (map: RegionMap, floor: number, topStorey: { x: number; y: number; width: number; height: number }, bottomStorey: { x: number; y: number; width: number; height: number }, cx: number) => {
     const y1 = topStorey.y + topStorey.height - 1;
     const y2 = bottomStorey.y;
-    for (const dx of [0, 1]) {
-      setOn(map, floor, cx + dx, y1, Tile.Floor);
-      setOn(map, floor, cx + dx, y2, Tile.Floor);
+    const startX = Math.max(topStorey.x + 1, bottomStorey.x + 1, cx - 1);
+    const endX = Math.min(topStorey.x + topStorey.width - 2, bottomStorey.x + bottomStorey.width - 2, cx + 2);
+    for (let x = startX; x <= endX; x++) {
+      setOn(map, floor, x, y1, Tile.Floor);
+      setOn(map, floor, x, y2, Tile.Floor);
     }
   };
 
   const connectHorizontal = (map: RegionMap, floor: number, leftStorey: { x: number; y: number; width: number; height: number }, rightStorey: { x: number; y: number; width: number; height: number }, cy: number) => {
     const x1 = leftStorey.x + leftStorey.width - 1;
     const x2 = rightStorey.x;
-    for (const dy of [0, 1]) {
-      setOn(map, floor, x1, cy + dy, Tile.Floor);
-      setOn(map, floor, x2, cy + dy, Tile.Floor);
+    const startY = Math.max(leftStorey.y + 1, rightStorey.y + 1, cy - 1);
+    const endY = Math.min(leftStorey.y + leftStorey.height - 2, rightStorey.y + rightStorey.height - 2, cy + 2);
+    for (let y = startY; y <= endY; y++) {
+      setOn(map, floor, x1, y, Tile.Floor);
+      setOn(map, floor, x2, y, Tile.Floor);
     }
   };
 

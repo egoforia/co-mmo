@@ -169,46 +169,74 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
     const floorRows = hasWall ? inside.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : inside;
     const floor = groundLayer(scene, floorRows, ox + b.x, oy + b.y, roomFloorDepth(ox + b.x, oy + b.y, 0), registerKitTileset(scene, b.style, b.art)).setData('shell', true);
     tilemaps.push(floor.tilemap);
-    // Modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
-    const closedUpper = map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor);
-    const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = hasWall
-      ? [
-        ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0),
-        ...closedUpper.flatMap((s, idx) => {
-          const sRows: number[][] = [];
-          for (let y = 0; y < s.height; y++) sRows.push(Array.from(s.tiles.subarray(y * s.width, (y + 1) * s.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
-          return rockWalls(scene, sRows, ox + s.x, oy + s.y, s.style, s.art, tilemaps, true, false, idx === closedUpper.length - 1, s.floor);
-        }),
-      ]
-      : [];
-    const view: BuildingView = {
-      building: b,
-      ox,
-      oy,
-      outside,
-      inside: [floor, ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, true, false, 0)],
-      open: !outside.length,
-    };
-    return view;
-  });
-  // Each floor off the ground on a layer of its own over its rectangle, furniture drawn as floor beneath it.
-  const floors: FloorView[] = map.storeys.map((storey) => {
-    const rows: number[][] = [];
-    for (let y = 0; y < storey.height; y++) {
-      rows.push(Array.from(storey.tiles.subarray(y * storey.width, (y + 1) * storey.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
-    }
-    const hasWall = Boolean(wallFaceKey(scene, storey.style, storey.art));
-    const floorRows = hasWall ? rows.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : rows;
-    const lift = floorLift(storey.floor);
-    const depthOff = floorDepthOffset(storey.floor);
-    const layer = groundLayer(scene, floorRows, ox + storey.x, oy + storey.y, roomFloorDepth(ox + storey.x, oy + storey.y, storey.floor), registerStoreyTileset(scene, storey));
-    layer.y -= lift;
-    tilemaps.push(layer.tilemap);
-    return {
-      storey,
-      objects: [layer, ...rockWalls(scene, rows, ox + storey.x, oy + storey.y, storey.style, storey.art, tilemaps, storey.floor > 0 || Boolean(storey.open), true, false, storey.floor)],
-    };
-  });
+  const neighbourTile = (wx: number, wy: number, floor: number): Tile | undefined => {
+    const s = storeyAt(map, wx, wy, floor);
+    if (!s) return undefined;
+    return s.tiles[(wy - s.y) * s.width + (wx - s.x)] as Tile;
+  };
+
+  // Modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
+  const closedUpper = map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor);
+  const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = hasWall
+    ? [
+      ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0),
+      ...closedUpper.flatMap((s, idx) => {
+        const sRows: number[][] = [];
+        for (let y = 0; y < s.height; y++) sRows.push(Array.from(s.tiles.subarray(y * s.width, (y + 1) * s.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
+        return rockWalls(scene, sRows, ox + s.x, oy + s.y, s.style, s.art, tilemaps, true, false, idx === closedUpper.length - 1, s.floor, Boolean(s.open), (wx, wy) => neighbourTile(wx - ox, wy - oy, s.floor));
+      }),
+    ]
+    : [];
+  const view: BuildingView = {
+    building: b,
+    ox,
+    oy,
+    outside,
+    inside: [floor, ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, true, false, 0)],
+    open: !outside.length,
+  };
+  return view;
+});
+// Each floor off the ground on a layer of its own over its rectangle, furniture drawn as floor beneath it.
+const floors: FloorView[] = map.storeys.map((storey) => {
+  const rows: number[][] = [];
+  for (let y = 0; y < storey.height; y++) {
+    rows.push(Array.from(storey.tiles.subarray(y * storey.width, (y + 1) * storey.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
+  }
+  const hasWall = Boolean(wallFaceKey(scene, storey.style, storey.art));
+  const floorRows = hasWall ? rows.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : rows;
+  const lift = floorLift(storey.floor);
+  const depthOff = floorDepthOffset(storey.floor);
+  const layer = groundLayer(scene, floorRows, ox + storey.x, oy + storey.y, roomFloorDepth(ox + storey.x, oy + storey.y, storey.floor), registerStoreyTileset(scene, storey));
+  layer.y -= lift;
+  tilemaps.push(layer.tilemap);
+  const neighbourTile = (wx: number, wy: number): Tile | undefined => {
+    const s = storeyAt(map, wx, wy, storey.floor);
+    if (!s) return undefined;
+    return s.tiles[(wy - s.y) * s.width + (wx - s.x)] as Tile;
+  };
+  return {
+    storey,
+    objects: [
+      layer,
+      ...rockWalls(
+        scene,
+        rows,
+        ox + storey.x,
+        oy + storey.y,
+        storey.style,
+        storey.art,
+        tilemaps,
+        storey.floor > 0 || Boolean(storey.open),
+        true,
+        false,
+        storey.floor,
+        Boolean(storey.open),
+        (wx, wy) => neighbourTile(wx - ox, wy - oy),
+      ),
+    ],
+  };
+});
   placeLandmarks(scene, map, ox, oy, views, floors, art);
   placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);

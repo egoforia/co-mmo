@@ -89,6 +89,8 @@ export function rockWalls(
   cutaway = true,
   roofCap = false,
   floor = 0,
+  openTerrace = false,
+  neighbourTile?: (wx: number, wy: number) => number | undefined,
 ): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
   const ground = PROJECTION.ground;
   const face = wallFaceKey(scene, style, art);
@@ -103,22 +105,38 @@ export function rockWalls(
   const lowEast = cutaway ? registerWallFace(scene, face, 'east', ground.width, ground.height, cutRise) : fullEast;
   if (!fullSouth || !fullEast || !lowSouth || !lowEast) return [];
 
-  const wall = (x: number, y: number) => rows[y]?.[x] === Tile.Wall;
-  const open = (x: number, y: number) => (rows[y]?.[x] === undefined ? outward : !wall(x, y));
-  const indoor = (x: number, y: number) => rows[y]?.[x] !== undefined && rows[y]![x] !== Tile.Wall;
+  const h = rows.length;
+  const w = rows[0]?.length ?? 0;
+
+  const getTile = (x: number, y: number): number | undefined => {
+    if (x >= 0 && x < w && y >= 0 && y < h) return rows[y]?.[x];
+    if (neighbourTile) return neighbourTile(left + x, top + y);
+    return undefined;
+  };
+
+  const wall = (x: number, y: number): boolean => getTile(x, y) === Tile.Wall;
+  const indoor = (x: number, y: number): boolean => {
+    const t = getTile(x, y);
+    return t !== undefined && t !== Tile.Wall && t !== Tile.Blocked;
+  };
+  const open = (x: number, y: number): boolean => {
+    const t = getTile(x, y);
+    if (t === undefined || t === Tile.Blocked) return outward;
+    return t !== Tile.Wall;
+  };
+
   // Far North/West walls (with no indoor floor to their North/West, and indoor floor to their South/East) stand tall;
-  // near South/East walls and South/East corridor flanks cut low.
-  const isFull = (x: number, y: number) =>
-    !cutaway ||
-    (!indoor(x, y - 1) && !indoor(x - 1, y) && !indoor(x - 1, y - 1) && (indoor(x, y + 1) || indoor(x + 1, y) || indoor(x + 1, y + 1)));
+  // near South/East walls and South/East corridor flanks cut low. Open-air terraces always stay low parapets.
+  const isFull = (x: number, y: number): boolean =>
+    !openTerrace &&
+    (!cutaway ||
+      (!indoor(x, y - 1) && !indoor(x - 1, y) && !indoor(x - 1, y - 1) && (indoor(x, y + 1) || indoor(x + 1, y) || indoor(x + 1, y + 1))));
 
   const parts: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = [];
   const tilesetKey = registerKitTileset(scene, style, art);
   const halfGround = { width: ground.width / 2, height: ground.height / 2 };
   const halfTileset = registerDiamondTileset(scene, tilesetKey, halfGround.width, halfGround.height);
   const atTop = PROJECTION.toScreen(left, top);
-  const h = rows.length;
-  const w = rows[0]?.length ?? 0;
 
   if (roofCap && !cutaway) {
     const roof = rows.map((row) => row.map((t) => (t >= 0 ? Tile.Wall : -1)));
@@ -134,12 +152,45 @@ export function rockWalls(
         for (let x = 0; x < w; x++) {
           if (!wall(x, y) || isFull(x, y) !== wantFull) continue;
           any = true;
-          halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
-          if (open(x, y + 1) || wall(x - 1, y) || rows[y]?.[x - 1] === Tile.Door || (!wall(x, y - 1) && !wall(x, y + 1))) {
+
+          const openN = open(x, y - 1);
+          const openS = open(x, y + 1);
+          const openW = open(x - 1, y);
+          const openE = open(x + 1, y);
+
+          // Sub-diamonds for tile (x, y):
+          // (2x, 2y): North tip (along North-East & North-West edges)
+          // (2x + 1, 2y): East tip (along North-East & South-East edges)
+          // (2x, 2y + 1): West tip (along North-West & South-West edges)
+          // (2x + 1, 2y + 1): South tip (along South-West & South-East edges)
+          if (openN) {
+            halfRows[y * 2]![x * 2] = Tile.Wall;
+            halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
+          }
+          if (openS) {
+            halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
+            halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+          }
+          if (openW) {
+            halfRows[y * 2]![x * 2] = Tile.Wall;
             halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
           }
-          if (open(x + 1, y) || wall(x, y - 1) || rows[y - 1]?.[x] === Tile.Door || (!wall(x - 1, y) && !wall(x + 1, y))) {
+          if (openE) {
             halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
+            halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+          }
+
+          if (!openN && !openS && !openW && !openE) {
+            if (open(x - 1, y - 1)) halfRows[y * 2]![x * 2] = Tile.Wall;
+            if (open(x + 1, y - 1)) halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
+            if (open(x - 1, y + 1)) halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
+            if (open(x + 1, y + 1)) halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+            if (!open(x - 1, y - 1) && !open(x + 1, y - 1) && !open(x - 1, y + 1) && !open(x + 1, y + 1)) {
+              halfRows[y * 2]![x * 2] = Tile.Wall;
+              halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
+              halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
+              halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+            }
           }
         }
       }

@@ -9,7 +9,7 @@ type SavedSettings = { ai?: { image?: { provider?: string; model?: string } } };
 
 /**
  * The image provider and model chosen in God's View, read from the game's
- * saved world (Postgres when DATABASE_URL is set, else the data file), so
+ * saved world (the Postgres at DATABASE_URL, else an older world file), so
  * art tools paint with the same model wishes do.
  */
 export async function savedImageChoice(repoRoot: string): Promise<{ provider?: string; model?: string }> {
@@ -64,6 +64,9 @@ async function savedSettings(repoRoot: string): Promise<SavedSettings | undefine
       return undefined;
     }
   }
+  // The built-in Postgres may only be opened by the game server itself, so
+  // without DATABASE_URL a tool reads the choice from an older world file,
+  // if one is left, and otherwise paints with --provider/--model or Gemini.
   const file = resolve(process.env.DATA_FILE ?? resolve(repoRoot, 'data/world.json'));
   try {
     return (JSON.parse(await readFile(file, 'utf8')) as { settings?: SavedSettings }).settings;

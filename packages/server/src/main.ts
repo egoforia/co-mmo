@@ -5,7 +5,7 @@ import { createApp } from './app.ts';
 import { DEFAULT_SKY, cleanSky } from '@co-mmo/shared';
 import { inviteUrl } from './account-routes.ts';
 import { Store } from './store.ts';
-import { connectPostgres } from './db.ts';
+import { connectPostgres, openBuiltInPostgres } from './db.ts';
 import { connectRedis } from './redis.ts';
 import { RedisTurnLedger, SharedPaintQueue } from './shared-paint-queue.ts';
 import { RedisBus } from './bus.ts';
@@ -14,7 +14,10 @@ import { ApiLog, KEEP_DAYS, MAX_BYTES } from './api-log.ts';
 
 const port = Number(process.env.PORT ?? 3001);
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+// Saved things that are not in the database (painted art, the API Log) live
+// beside it; DATA_FILE also names an older game's world file to bring in.
 const dataFile = resolve(process.env.DATA_FILE ?? resolve(repoRoot, 'data/world.json'));
+const dbDir = resolve(process.env.DB_DIR ?? resolve(dirname(dataFile), 'db'));
 // In development the browser talks to Vite (5173), which proxies to us.
 const publicUrl = process.env.PUBLIC_URL ?? 'http://localhost:5173';
 // Serve the built client when there is one (npm run build); Vite serves it in dev.
@@ -23,11 +26,15 @@ const clientDir = process.env.CLIENT_DIR
   ? resolve(process.env.CLIENT_DIR)
   : existsSync(builtClient) ? builtClient : undefined;
 
-// Postgres when DATABASE_URL is set (docs/scale.md); otherwise one JSON file,
-// so the game starts with nothing installed. Postgres's first run brings in
-// whatever the file held.
+// The world is always kept in Postgres (docs/scale.md): the server at
+// DATABASE_URL, or else the Postgres built into the game, in DB_DIR, so the
+// game starts with nothing installed. A first run brings in the world from
+// an older game's JSON file, if there is one.
 const databaseUrl = process.env.DATABASE_URL;
-const store = await (databaseUrl ? connectPostgres(databaseUrl).then((sql) => Store.postgres(sql, dataFile)) : Store.open(dataFile)).catch((err: Error) => {
+const store = await (databaseUrl
+  ? connectPostgres(databaseUrl).then((sql) => Store.postgres(sql, dataFile, `Postgres on ${hostOf(databaseUrl)}`))
+  : openBuiltInPostgres(dbDir).then((sql) => Store.postgres(sql, dataFile, `the built-in Postgres in ${dbDir}`))
+).catch((err: Error) => {
   console.error(err.message);
   process.exit(1);
 });
@@ -111,4 +118,13 @@ function positive(name: string, fallback: number): number {
   if (Number.isFinite(value) && value > 0) return value;
   console.warn(`${name}=${raw} is not a positive number, so ${fallback} is used.`);
   return fallback;
+}
+
+/** Where a database address points (host and port), never its user or password. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host || 'this machine';
+  } catch {
+    return 'the DATABASE_URL server';
+  }
 }

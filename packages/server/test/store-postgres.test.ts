@@ -1,10 +1,10 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/store.ts';
 import { defaultSettings } from '../src/settings.ts';
-import type { Sql } from '../src/db.ts';
+import { openBuiltInPostgres, type Sql } from '../src/db.ts';
 import { testSql, type TestSql } from './sql.ts';
 
 // One embedded Postgres for the file: it takes a few seconds to start.
@@ -84,11 +84,12 @@ describe('the world in Postgres', () => {
   it('brings in the old world file on its first run only', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'co-mmo-import-'));
     const file = join(dir, 'world.json');
-    const old = await Store.open(file);
-    const invite = old.createInvite(null, 'owner');
-    old.acceptInvite(invite.code, 'Amala', 'sanctum');
-    old.recordSpend({ at: 5, usd: 0.2, kind: 'video', provider: 'gemini', model: 'veo', playerId: null });
-    await old.close();
+    // As an older game wrote it, before the world was always kept in Postgres.
+    await writeFile(file, JSON.stringify({
+      accounts: [{ id: 'a1', name: 'Amala', role: 'owner', color: 0, createdAt: 1, invitedBy: null, tokenHash: '', regionId: 'sanctum', x: null, y: null }],
+      invites: [],
+      spend: [{ at: 5, usd: 0.2, kind: 'video', provider: 'gemini', model: 'veo', playerId: null }],
+    }));
 
     const store = await Store.postgres(db, file);
     expect(store.accountByName('Amala')).toBeTruthy();
@@ -117,4 +118,28 @@ describe('the world in Postgres', () => {
     const again = await Store.postgres(db);
     expect(again.accountByName('Mara')).toBeTruthy();
   });
+});
+
+describe('the Postgres built into the game', () => {
+  it('keeps the world in its folder across a restart, and lets only one server open it', async () => {
+    const dir = join(await mkdtemp(join(tmpdir(), 'co-mmo-db-')), 'db');
+    const sql = await openBuiltInPostgres(dir);
+    const store = await Store.postgres(sql, undefined, 'built in');
+    const invite = store.createInvite(null, 'owner');
+    store.acceptInvite(invite.code, 'Mara', 'sanctum');
+    await store.flush();
+
+    // A live process (here the test runner's parent) holding the folder keeps a second server out.
+    const lock = join(dir, 'co-mmo-server.pid');
+    expect(await readFile(lock, 'utf8')).toBe(String(process.pid));
+    await writeFile(lock, String(process.ppid));
+    await expect(openBuiltInPostgres(dir)).rejects.toThrow(/already using the world/);
+    await writeFile(lock, String(process.pid));
+    await store.close();
+
+    const again = await Store.postgres(await openBuiltInPostgres(dir), undefined, 'built in');
+    expect(again.label).toBe('built in');
+    expect(again.accountByName('Mara')).toBeTruthy();
+    await again.close();
+  }, 60_000);
 });

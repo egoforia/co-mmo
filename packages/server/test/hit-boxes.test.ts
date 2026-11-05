@@ -113,6 +113,22 @@ describe('hit boxes', () => {
     expect(Math.hypot(npc.x - me.x, npc.y - me.y)).toBeGreaterThan(PERSON_RADIUS);
   });
 
+  it('a player wedged in something solid is nudged free', () => {
+    const { region, ticks } = setup('woods');
+    region.join(info('a'), conn(), none, newCharacter());
+    const map = region.map;
+    // A spot on an open tile's edge that touches a tree beside it, like a player the land changed under.
+    let wedged: { x: number; y: number } | undefined;
+    for (let y = 10; y < map.height - 10 && !wedged; y++) for (let x = 10; x < map.width - 10 && !wedged; x++) {
+      if (!collides(map, x + 0.5, y + 0.5) && collides(map, x + 0.5, y + 0.05)) wedged = { x: x + 0.5, y: y + 0.05 };
+    }
+    region.placePlayer('a', wedged!.x, wedged!.y);
+    ticks(1);
+    const me = region.position('a')!;
+    expect(collides(map, me.x, me.y)).toBe(false);
+    expect(Math.hypot(me.x - wedged!.x, me.y - wedged!.y)).toBeLessThan(4);
+  });
+
   it('creatures put on one spot get homes of their own', () => {
     CREATURES['test-biter'] = { ...BITER, behavior: 'wander' };
     const { region } = setup();

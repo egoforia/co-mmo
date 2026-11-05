@@ -738,6 +738,7 @@ export class Region {
     const departures = phase('inputs', () => {
       const list: Departure[] = [];
       for (const p of this.s.players.values()) {
+        this.unstick(p);
         const batch = p.inputs.splice(0, MAX_INPUTS_PER_TICK);
         for (const input of batch) {
           // The Fallen lie still where they fell; their steps are counted but not taken.
@@ -855,6 +856,21 @@ export class Region {
 
     this.recorder?.recordTick(this.s.tickCount, now, departures);
     return departures;
+  }
+
+  /**
+   * A player standing inside something solid (a tree, a wall) cannot take a
+   * single step, since every step still touches it. However they got there
+   * (the land changed under them, an old save, a blink), they are moved to
+   * the nearest open spot at once instead of being left stuck.
+   */
+  private unstick(p: PlayerState): void {
+    if (!collides(this.map, p.x, p.y, p.floor)) return;
+    const free = nearestOpen(this.map, p.x, p.y, p.floor) ?? (p.floor === 0 ? { ...this.map.spawn } : undefined);
+    if (!free) return;
+    p.x = free.x;
+    p.y = free.y;
+    this.s.notice(p, 'You were wedged somewhere you could not move, so the world nudged you free.');
   }
 
   /** What players in the cells beside this one may see of it: everything within view of a border. */

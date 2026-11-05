@@ -159,9 +159,7 @@ export interface WorldSceneOptions {
 export const T = TILE_PIXELS;
 /** A Firebolt's flame, smaller than a torch's. */
 export const BOLT_LIGHT: Light = { ...FLAME_LIGHT, radius: 2 };
-export const LABEL_DEPTH = 1_000_000;
-/** Depth offset between stacked upper storeys so upper floors always draw in front of lower floors. */
-export const FLOOR_DEPTH = 50_000;
+export { LABEL_DEPTH, FLOOR_DEPTH, GROUND_DEPTH, floorLift, floorDepthOffset, roomFloorDepth, wallCapDepth } from './depth.ts';
 /** How high low-cut cutaway walls stand in the isometric camera, as a share of a ground diamond's height (~20px). */
 export const WALL_RISE = 0.25;
 /** Subtle cool-grey directional shade applied to east-facing walls so 90° corners read clearly. */
@@ -234,19 +232,6 @@ export function overlaps(a: TileRect, b: { x: number; y: number; width: number; 
 /** Shows or hides anything drawn that can be. */
 export function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void {
   (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
-}
-
-/** Vertical screen lift (in pixels) for an upper floor (`floor > 0`) in the isometric camera. */
-export function floorLift(floor: number): number {
-  const ground = PROJECTION.ground;
-  if (ground.kind !== 'diamond' || floor <= 0) return 0;
-  return Math.round(ground.height * 2.0) * floor;
-}
-
-/** Depth offset for an upper floor (`floor > 0`) so upper storeys sort cleanly above lower storeys. */
-export function floorDepthOffset(floor: number): number {
-  if (PROJECTION.ground.kind !== 'diamond' || floor <= 0) return 0;
-  return floor * FLOOR_DEPTH;
 }
 
 /**

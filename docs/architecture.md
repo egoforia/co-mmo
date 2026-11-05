@@ -306,7 +306,8 @@ walkers face its `ways`: the four isometric ways show standing pictures
 until walks are made for them, and a walker with no isometric pictures yet
 glides in its own picture, turned to the side it faces; the
 ground, trees and rocks are drawn in chunks near the player) + `world-scene/`:
-`types.ts` (view interfaces, floor depth and shade helpers), `walls.ts`
+`types.ts` (view interfaces and shade helpers), `depth.ts` (draw order: ground,
+room floors, wall caps, storeys and labels, safe at negative world coordinates), `walls.ts`
 (`rockWalls` half-tile coping and vertical wall extrusion), `regions.ts`
 (terrain chunks, building shells, `KitHouse` upgrade and `applyFloorView`),
 `avatars.ts` (player, NPC, creature and loot views, `FigureMetricsCache` for

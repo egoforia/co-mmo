@@ -19,6 +19,7 @@ import {
   WALL_RISE,
   floorDepthOffset,
   floorLift,
+  wallCapDepth,
 } from './types.ts';
 
 /**
@@ -148,8 +149,8 @@ export function rockWalls(
       tilemaps.push(cap.tilemap);
       parts.push(cap);
     };
-    makeHalfCap(true, storeyRise, depthOff - 0.3);
-    if (cutaway) makeHalfCap(false, cutRise, depthOff - 0.4);
+    makeHalfCap(true, storeyRise, wallCapDepth(left, top, floor, true));
+    if (cutaway) makeHalfCap(false, cutRise, wallCapDepth(left, top, floor, false));
   }
 
   rows.forEach((row, y) => row.forEach((_, x) => {

@@ -5,10 +5,10 @@
 // - 5-Point Multimodal Coherence Audit & Side-by-Side "Coherence Wall"
 // - Interactive Art Director Consultation
 
+import type { Facing } from '@co-mmo/shared';
 import { openReview } from './dialogs.ts';
 import {
   type DeniedWalkClip,
-  type Facing,
   type UpNextState,
   type WalkerView,
   artState,

@@ -9,6 +9,7 @@ import {
   type Facing,
   type IsoWay,
 } from '@co-mmo/shared';
+export type { Facing, IsoWay };
 import { escapeHtml } from '../ui.ts';
 
 /** What the Art tab needs from God's View. */

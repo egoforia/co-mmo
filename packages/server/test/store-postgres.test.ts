@@ -48,7 +48,8 @@ describe('the world in Postgres', () => {
     expect(again.label).toBe('Postgres');
     expect(again.accountByToken(token)).toMatchObject({ name: 'Mara', regionId: 'woods', x: 12, y: 34 });
     expect(again.findInvite(owner.code)?.usedBy).toBe(account.id);
-    expect(again.spendSince(0).map((s) => s.usd)).toEqual([0.04, 0.5]);
+    expect(await again.spendBetween(0, Date.now())).toHaveLength(2);
+    expect((await again.spendBetween(0, Date.now())).map((s) => s.usd)).toEqual([0.04, 0.5]);
     expect(again.journalSince(0).map((j) => j.text)).toEqual(['Mara joined the world.']);
     expect(again.ruleData('rule-1')).toEqual({ _: { fish: 3 } });
     expect(again.draftOf(account.id)).toBeTruthy();
@@ -75,10 +76,10 @@ describe('the world in Postgres', () => {
     store.settleSpend('run-1', { at: 10, usd: 1.2, kind: 'build', provider: 'claude', model: 'm', playerId: null, ref: 'run-1/real' });
     store.saveDraft(account.id, null);
     await store.close();
-    expect(writes.filter((w) => w === 'spend')).toHaveLength(3);
+    expect(writes.filter((w) => w === 'spend_log')).toHaveLength(3);
 
     const again = await Store.postgres(db);
-    expect(again.spendSince(0).map((s) => s.usd)).toEqual([0.01, 0.01, 0.01, 0.01, 0.01, 1.2]);
+    expect((await again.spendBetween(0, Date.now())).map((s) => s.usd)).toEqual([0.01, 0.01, 0.01, 0.01, 0.01, 1.2]);
   });
 
   it('brings in the old world file on its first run only', async () => {
@@ -93,14 +94,14 @@ describe('the world in Postgres', () => {
 
     const store = await Store.postgres(db, file);
     expect(store.accountByName('Amala')).toBeTruthy();
-    expect(store.spendSince(0)).toHaveLength(1);
+    expect(await store.spendBetween(0, Date.now())).toHaveLength(1);
     await store.close();
 
     // Later the file is left alone, even if it changes.
     await writeFile(file, JSON.stringify({ accounts: [], settings: defaultSettings({}) }));
     const again = await Store.postgres(db, file);
     expect(again.accountByName('Amala')).toBeTruthy();
-    expect(again.spendSince(0)).toHaveLength(1);
+    expect(await again.spendBetween(0, Date.now())).toHaveLength(1);
   });
 
   it('keeps playing when a save fails, and saves on the next change', async () => {
@@ -117,6 +118,56 @@ describe('the world in Postgres', () => {
 
     const again = await Store.postgres(db);
     expect(again.accountByName('Mara')).toBeTruthy();
+  });
+});
+
+describe('spending and the journal', () => {
+  it('adds each line once, and keeps only recent spending in memory', async () => {
+    const { sql, writes } = counting(db);
+    const store = await Store.postgres(sql);
+    const now = Date.now();
+    const longAgo = now - 400 * 24 * 3600 * 1000;
+    store.recordSpend({ at: longAgo, usd: 2, kind: 'image', provider: 'p', model: 'm', playerId: null });
+    store.recordSpend({ at: now, usd: 0.1, kind: 'image', provider: 'p', model: 'm', playerId: null });
+    store.addJournal('Ilya found the cave.', null, now);
+    await store.flush();
+    writes.length = 0;
+
+    // Later saves send only the new line, never the old ones again.
+    store.recordSpend({ at: now + 1, usd: 0.2, kind: 'chat', provider: 'p', model: 'm', playerId: null });
+    await store.close();
+    expect(writes).toEqual(['spend_log']);
+
+    const again = await Store.postgres(db);
+    expect(again.spendSince(0).map((s) => s.usd)).toEqual([0.1, 0.2]);
+    expect((await again.spendBetween(0, now + 1)).map((s) => s.usd)).toEqual([2, 0.1, 0.2]);
+    expect(again.journalSince(0).map((j) => j.text)).toEqual(['Ilya found the cave.']);
+  });
+
+  it('moves spending and journal lines out of an older database', async () => {
+    await db.query('CREATE TABLE spend (key text PRIMARY KEY, n bigint NOT NULL, data jsonb NOT NULL)');
+    await db.query('CREATE TABLE journal (key text PRIMARY KEY, n bigint NOT NULL, data jsonb NOT NULL)');
+    await db.query('CREATE TABLE accounts (key text PRIMARY KEY, n bigint NOT NULL, data jsonb NOT NULL)');
+    const at = Date.now();
+    await db.query(`INSERT INTO spend VALUES ('2', 2, $1), ('1', 1, $2)`, [
+      JSON.stringify({ at: at + 1, usd: 0.3, kind: 'chat', provider: 'p', model: 'm', playerId: null }),
+      JSON.stringify({ at, usd: 0.7, kind: 'image', provider: 'p', model: 'm', playerId: null, ref: 'r', estimate: true }),
+    ]);
+    await db.query(`INSERT INTO journal VALUES ('3', 3, $1)`, [JSON.stringify({ at, text: 'Mara joined the world.', playerId: 'a1' })]);
+    await db.query(`INSERT INTO accounts VALUES ('a1', 4, $1)`, [JSON.stringify({ id: 'a1', name: 'Mara', role: 'owner', color: 0, createdAt: 1, invitedBy: null, tokenHash: '', regionId: 'sanctum', x: null, y: null })]);
+
+    const store = await Store.postgres(db);
+    expect(store.accountByName('Mara')).toBeTruthy();
+    expect(store.spendSince(0).map((s) => s.usd)).toEqual([0.7, 0.3]);
+    expect(store.journalSince(0).map((j) => j.text)).toEqual(['Mara joined the world.']);
+    const { rows } = await db.query<{ found: string | null }>(`SELECT to_regclass('public.spend')::text AS found`);
+    expect(rows[0]?.found).toBeNull();
+
+    // The old guess can still be settled after the move.
+    store.settleSpend('r', { at: at + 2, usd: 0.5, kind: 'build', provider: 'p', model: 'm', playerId: null, ref: 'r/real' });
+    await store.close();
+    const again = await Store.postgres(db);
+    expect(again.spendSince(0).map((s) => s.usd)).toEqual([0.3, 0.5]);
   });
 });
 

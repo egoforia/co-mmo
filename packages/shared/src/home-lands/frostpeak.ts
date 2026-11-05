@@ -223,7 +223,7 @@ export const FROSTPEAK: HomeLand = {
     kaen: {
       name: 'Talon-Mason Kaen',
       greeting: 'Mind the marble dust, traveler. On Mount Zephyr we do not build with clay; we release what the stone was already dreaming.',
-      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('smithing')], teaches: [], buys: true, masters: ['smithing'] },
+      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('smithing')], teaches: [], buys: true },
     },
     kip: {
       name: 'Kip the Spelunker',
@@ -233,7 +233,7 @@ export const FROSTPEAK: HomeLand = {
     sula: {
       name: 'Sula the Feather-Weaver',
       greeting: 'Welcome to the Loom-Terraces. The high wind sings through the warp, and mountain wool remembers the snow.',
-      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('tailoring'), ...toolOffers('fletching')], teaches: [], buys: true, masters: ['tailoring', 'fletching'] },
+      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('tailoring'), ...toolOffers('fletching')], teaches: [], buys: true },
     },
     aurius: {
       name: 'Elder Aurius the Keen',

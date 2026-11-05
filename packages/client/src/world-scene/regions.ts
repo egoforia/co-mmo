@@ -373,6 +373,7 @@ export function standKitHouse(
   v.outside = standHouse(scene, outside, frame, floor, true);
   v.inside = [...cutaway, ...furniture];
   v.kit = true;
+  v.kitOutside = { texture: outside, frame, floor, storeys: house.spec.storeys.length };
   region.objects.push(...v.outside, ...cutaway);
   onPlaced();
 }

@@ -37,6 +37,7 @@ import {
   FORGET_REACH,
   type FloorView,
   GROUND_DEPTH,
+  roomFloorDepth,
   HOUSE_RETRY_MS,
   HOUSE_TRIES,
   LABEL_DEPTH,
@@ -166,7 +167,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
     const hasWall = Boolean(wallFaceKey(scene, b.style, b.art));
     // With 0.5-tile walls, the inner half of each wall tile exposes the room's floor seamlessly.
     const floorRows = hasWall ? inside.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : inside;
-    const floor = groundLayer(scene, floorRows, ox + b.x, oy + b.y, PROJECTION.depth(ox + b.x, oy + b.y) - 0.5, registerKitTileset(scene, b.style, b.art)).setData('shell', true);
+    const floor = groundLayer(scene, floorRows, ox + b.x, oy + b.y, roomFloorDepth(ox + b.x, oy + b.y, 0), registerKitTileset(scene, b.style, b.art)).setData('shell', true);
     tilemaps.push(floor.tilemap);
     // Modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
     const closedUpper = map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor);
@@ -200,7 +201,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
     const floorRows = hasWall ? rows.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : rows;
     const lift = floorLift(storey.floor);
     const depthOff = floorDepthOffset(storey.floor);
-    const layer = groundLayer(scene, floorRows, ox + storey.x, oy + storey.y, depthOff + PROJECTION.depth(ox + storey.x, oy + storey.y) - 0.5, registerStoreyTileset(scene, storey));
+    const layer = groundLayer(scene, floorRows, ox + storey.x, oy + storey.y, roomFloorDepth(ox + storey.x, oy + storey.y, storey.floor), registerStoreyTileset(scene, storey));
     layer.y -= lift;
     tilemaps.push(layer.tilemap);
     return {

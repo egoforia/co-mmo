@@ -41,7 +41,7 @@ co-MMO uses a 2.5D diamond isometric camera projection (`ISOMETRIC`, 45° angle,
 
 ## 3. Rendering Pipeline in `world-scene/` & `textures.ts`
 
-Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`packages/client/src/world-scene/walls.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/walls.ts), region/floor assembly in [`packages/client/src/world-scene/regions.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/regions.ts), depth helpers in [`packages/client/src/world-scene/types.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/types.ts), and `registerWallFace()` / `registerDiamondTileset()` in [`packages/client/src/textures.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/textures.ts):
+Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`packages/client/src/world-scene/walls.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/walls.ts), region/floor assembly in [`packages/client/src/world-scene/regions.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/regions.ts), depth helpers in [`packages/client/src/world-scene/depth.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/world-scene/depth.ts), and `registerWallFace()` / `registerDiamondTileset()` in [`packages/client/src/textures.ts`](file:///home/egoforia/dev/co-mmo/packages/client/src/textures.ts):
 
 ### 1. Single Wall Asset Rule (`<style>-wall.png`)
 - Every building style uses **1 seamless $128\times 128$ texture (`<style>-wall.png`)** for both the top coping cap and vertical wall faces (no separate `*-wall-face.png` assets).
@@ -66,6 +66,12 @@ Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`
 ### 4. Multi-Floor Vertical Stacking (`floorLift` & `floorDepthOffset`)
 - Upper storeys (`floor > 0`) are vertically elevated on screen by `floorLift(floor) = floor * Math.round(ground.height * 2.0)` ($160\text{px}$ per storey) and sorted above lower storeys via `floorDepthOffset(floor) = floor * 50_000`.
 - When standing on an upper floor (`mine > 0`), lower storeys (`0 .. mine - 1`, including the building's `v.inside` cutaway and surrounding ground) remain visible and dimmed underneath via `setDepthShade()`.
+
+### 5. Draw Order (`depth.ts`)
+- Phaser draws lower depths first. Anything upright sorts at its feet, `PROJECTION.depth(x, y) = (x + y) * 40`, which is **negative north-west of the world origin** (Frostpeak, Whispering Woods, Mushroom Hollow). Never give a world layer a small fixed depth like `-1`: it ends up in front of everyone standing where `x + y < 0`.
+- Floor-0 ground chunks sit at `GROUND_DEPTH = -500_000`, under everything as long as `x + y > -12_500` tiles.
+- Flat room layers sort just under their own north corner, the lowest `x + y` they cover: `roomFloorDepth(left, top, floor)` (corner − 0.5), then `wallCapDepth(..., full)` (low caps − 0.4, tall caps − 0.3). Anything standing in the room is drawn over them.
+- `packages/client/test/depth-sorting.test.ts` checks these rules for every launch region.
 
 ---
 

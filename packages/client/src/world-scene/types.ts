@@ -159,7 +159,7 @@ export interface WorldSceneOptions {
 export const T = TILE_PIXELS;
 /** A Firebolt's flame, smaller than a torch's. */
 export const BOLT_LIGHT: Light = { ...FLAME_LIGHT, radius: 2 };
-export { LABEL_DEPTH, FLOOR_DEPTH, GROUND_DEPTH, floorLift, floorDepthOffset } from './depth.ts';
+export { LABEL_DEPTH, FLOOR_DEPTH, GROUND_DEPTH, floorLift, floorDepthOffset, roomFloorDepth, wallCapDepth } from './depth.ts';
 /** How high low-cut cutaway walls stand in the isometric camera, as a share of a ground diamond's height (~20px). */
 export const WALL_RISE = 0.25;
 /** Subtle cool-grey directional shade applied to east-facing walls so 90° corners read clearly. */

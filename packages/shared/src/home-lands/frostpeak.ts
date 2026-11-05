@@ -1,8 +1,8 @@
 import type { CreatureDef, ItemDef, QuestDef } from '../rpg.ts';
 import { levelledCreature } from '../lands.ts';
 import { rand2, valueNoise } from '../random.ts';
-import { CATHEDRAL_SIZE, SANCTUM_NORTH_GATE, Tile, building, creatures, disc, road, scatter, type RegionMap } from '../world.ts';
-import { addStairs, addStorey } from '../floors.ts';
+import { CATHEDRAL_SIZE, SANCTUM_NORTH_GATE, Tile, building, creatures, disc, placer, road, scatter, type RegionMap } from '../world.ts';
+import { addStairs, addStorey, setOn } from '../floors.ts';
 import type { HomeLand } from './types.ts';
 import { toolOffers } from '../crafts.ts';
 
@@ -100,13 +100,42 @@ const QUESTS: Record<string, QuestDef> = {
   },
 };
 
-/** How Frostpeak is laid out: snowfields broken by rock ridges, pine groves, frozen lakes, and Mount Zephyr on the west. */
+/** How Frostpeak is laid out: Mount Zephyr on the western third, and snowfields broken by rock ridges, pine groves, and frozen lakes to the east. */
 function layout(map: RegionMap, c: number): void {
+  // Helpers to connect abutting storeys with an open 2-tile doorway through their perimeter walls
+  const connectVertical = (map: RegionMap, floor: number, topStorey: { x: number; y: number; width: number; height: number }, bottomStorey: { x: number; y: number; width: number; height: number }, cx: number) => {
+    const y1 = topStorey.y + topStorey.height - 1;
+    const y2 = bottomStorey.y;
+    for (const dx of [0, 1]) {
+      setOn(map, floor, cx + dx, y1, Tile.Floor);
+      setOn(map, floor, cx + dx, y2, Tile.Floor);
+    }
+  };
+
+  const connectHorizontal = (map: RegionMap, floor: number, leftStorey: { x: number; y: number; width: number; height: number }, rightStorey: { x: number; y: number; width: number; height: number }, cy: number) => {
+    const x1 = leftStorey.x + leftStorey.width - 1;
+    const x2 = rightStorey.x;
+    for (const dy of [0, 1]) {
+      setOn(map, floor, x1, cy + dy, Tile.Floor);
+      setOn(map, floor, x2, cy + dy, Tile.Floor);
+    }
+  };
+
   scatter(map, (x, y) => {
+    // Mount Zephyr occupies the western 34% of the region (x <= 88, 22,528 tiles)
+    if (x <= 88) {
+      // The sheer eastern cliff face of Mount Zephyr, broken by the mountain pass at y = 120
+      if (x >= 82 && x <= 86 && Math.abs(y - 120) > 6) return Tile.Rock;
+      // High mountain ridges and living marble peaks
+      if (valueNoise(x, y, map.seed + 4, 9) > 0.40 || rand2(x, y, map.seed + 5) < 0.08) return Tile.Rock;
+      // Alpine frosted pines in sheltered mountain clefts
+      if (rand2(x, y, map.seed + 1) < 0.04) return Tile.Tree;
+      return Tile.Ground;
+    }
+
+    // Eastern Frostpeak: snowfields, frozen lakes, pine groves
     if (valueNoise(x, y, map.seed, 11) < 0.15) return Tile.Water;
-    // Jagged ridges of rock, and a few loose boulders.
     if (valueNoise(x, y, map.seed + 4, 9) > 0.74 || rand2(x, y, map.seed + 5) < 0.012) return Tile.Rock;
-    // Frosted pines grow in groves, thinning out between them.
     if (rand2(x, y, map.seed + 1) < 0.1 * (0.3 + valueNoise(x, y, map.seed + 2, 7) * 1.4)) return Tile.Tree;
     return Tile.Ground;
   });
@@ -121,81 +150,261 @@ function layout(map: RegionMap, c: number): void {
   map.npcs.push({ id: 'ysolde', name: 'Ysolde', asset: 'frostpeak-ysolde', x: c - 2.5, y: c + 3.5 });
 
   // -------------------------------------------------------------
-  // Mount Zephyr & Whiteledge on the West
+  // Mount Zephyr: Mountain Pass, Whiteledge, and The Eyrie
   // -------------------------------------------------------------
-  const town = { x: c - 50, y: c - 10 };
-  disc(map, town.x, town.y, 14, Tile.Ground);
-  road(map, c, c, town.x, town.y);
 
-  // Whiteledge Masonry: Talon-Mason Kaen's stone workshop.
-  // Using 10x6 so it aligns with two-tile bays for kit houses.
-  const masonShop = building(map, town.x - 5, town.y + 6, 10, 6, 'sanctum-cathedral');
+  // 1. Mountain Pass through the eastern cliffs:
+  disc(map, 84, 120, 6, Tile.Ground);
+  road(map, c, c, 84, 120);
+
+  // 2. Sculpted mountain road ascending into Whiteledge Town:
+  road(map, 84, 120, 56, 120);
+
+  // 3. Whiteledge Town Plaza (Floor 0):
+  disc(map, 56, 120, 16, Tile.Ground);
+  disc(map, 48, 128, 8, Tile.Ground);
+  disc(map, 64, 112, 8, Tile.Ground);
+  disc(map, 64, 128, 8, Tile.Ground);
+
+  // Talon-Mason Kaen's workshop (10x6 marble building)
+  const masonShop = building(map, 48, 128, 10, 6, 'frostpeak-whiteledge-house');
   map.buildings.push(masonShop);
-  road(map, town.x, town.y, masonShop.door.x, masonShop.door.y + 1);
-  map.npcs.push({ id: 'kaen', name: 'Talon-Mason Kaen', asset: 'frostpeak-kaen', x: town.x + 0.5, y: town.y - 0.5 });
+  road(map, 56, 120, masonShop.door.x, masonShop.door.y + 1);
 
-  // The Eyrie of the First Watch: 8 Storeys High, 4 Storeys Underground.
-  // Using CATHEDRAL_SIZE (18x12) so it passes all bay alignment checks.
-  const eyrieLeft = town.x - 9;
-  const eyrieTop = town.y - 28;
-  disc(map, eyrieLeft + 9, eyrieTop + 6, 18, Tile.Ground);
+  // Whiteledge Weaving House (10x6 marble building)
+  const weavingHouse = building(map, 64, 112, 10, 6, 'frostpeak-whiteledge-house');
+  map.buildings.push(weavingHouse);
+  road(map, 56, 120, weavingHouse.door.x, weavingHouse.door.y + 1);
 
-  const eyrie = building(map, eyrieLeft, eyrieTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'sanctum-cathedral');
+  // Whiteledge Delver's Shelter (10x6 marble building)
+  const delversLodge = building(map, 64, 128, 10, 6, 'frostpeak-whiteledge-house');
+  map.buildings.push(delversLodge);
+  road(map, 56, 120, delversLodge.door.x, delversLodge.door.y + 1);
+
+  // Furnish Whiteledge workshops and homes
+  const putMason = placer(map, 'frostpeak-whiteledge-house', masonShop.x + 1, masonShop.y + 1);
+  putMason('mason-bench', 1.5, 1, 2, 1);
+  putMason('mountain-hearth', 5.5, 1, 2, 1);
+
+  const putWeave = placer(map, 'frostpeak-whiteledge-house', weavingHouse.x + 1, weavingHouse.y + 1);
+  putWeave('loom', 1.5, 1, 2.5, 1);
+  putWeave('fur-bed', 5.5, 1, 2, 1);
+
+  const putLodge = placer(map, 'frostpeak-whiteledge-house', delversLodge.x + 1, delversLodge.y + 1);
+  putLodge('mountain-hearth', 1.5, 1, 2, 1);
+  putLodge('fur-bed', 5.5, 1, 2, 1);
+
+  map.npcs.push({ id: 'kaen', name: 'Talon-Mason Kaen', asset: 'frostpeak-kaen', x: 56.5, y: 119.5 });
+
+  // 4. Switchback mountain road to The Eyrie Forecourt:
+  road(map, 56, 120, 43, 95);
+  disc(map, 43, 95, 12, Tile.Ground);
+
+  // The Eyrie of the First Watch: Monumental base on Floor 0 (18x12)
+  const eyrieLeft = 34;
+  const eyrieTop = 82;
+  const eyrie = building(map, eyrieLeft, eyrieTop, CATHEDRAL_SIZE.width, CATHEDRAL_SIZE.height, 'frostpeak-eyrie');
   map.buildings.push(eyrie);
-  road(map, town.x, town.y, eyrie.door.x, eyrie.door.y + 1);
+  road(map, 43, 95, eyrie.door.x, eyrie.door.y + 1);
 
-  // Above Ground (+1 to +8):
-  addStorey(map, eyrie, 1, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 3, y: eyrieTop + 3, width: 2, height: 1, from: 0, names: { lower: 'Marble Hall', upper: 'Grand Portico' } });
+  // Furnish The Eyrie Great Hall on Floor 0
+  const putEyrie = placer(map, 'frostpeak-eyrie', eyrie.x + 1, eyrie.y + 1);
+  putEyrie('wind-throne', 7, 2, 2, 1);
+  putEyrie('silver-brazier', 2, 2, 1, 1);
+  putEyrie('silver-brazier', 13, 2, 1, 1);
+  putEyrie('astrolabe-pedestal', 2, 7, 2, 1);
+  putEyrie('falcon-perch', 13, 4, 1.5, 1);
 
-  addStorey(map, { x: eyrieLeft + 1, y: eyrieTop + 1, width: 18, height: 12 }, 2, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 15, y: eyrieTop + 3, width: 2, height: 1, from: 1, names: { lower: 'Grand Portico', upper: 'Loom-Terraces' } });
+  // -------------------------------------------------------------
+  // Storeys and Mountain Tunnels: Floors +1 to +8 and -1 to -4
+  // -------------------------------------------------------------
 
-  addStorey(map, { x: eyrieLeft + 2, y: eyrieTop + 2, width: 16, height: 10 }, 3, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 4, y: eyrieTop + 6, width: 2, height: 1, from: 2, names: { lower: 'Loom-Terraces', upper: 'Wind-Scriptorium' } });
+  // Floor +1: Grand Portico, North Scriptorium, South Bastion, West Vista, and Tunnels
+  const f1Central = addStorey(map, { x: 34, y: 82, width: 18, height: 12 }, 1, eyrie.style);
+  const f1North = addStorey(map, { x: 32, y: 34, width: 20, height: 14 }, 1, eyrie.style);
+  const f1TunnelN = addStorey(map, { x: 40, y: 48, width: 6, height: 34 }, 1, eyrie.style);
+  const f1South = addStorey(map, { x: 32, y: 124, width: 20, height: 14 }, 1, eyrie.style);
+  const f1TunnelS = addStorey(map, { x: 40, y: 94, width: 6, height: 30 }, 1, eyrie.style);
+  const f1West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 1, eyrie.style, undefined, true);
+  const f1TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 1, eyrie.style);
 
-  addStorey(map, { x: eyrieLeft + 3, y: eyrieTop + 3, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 13, y: eyrieTop + 6, width: 2, height: 1, from: 3, names: { lower: 'Wind-Scriptorium', upper: 'Steaming Marble Baths' } });
+  connectVertical(map, 1, f1North, f1TunnelN, 42);
+  connectVertical(map, 1, f1TunnelN, f1Central, 42);
+  connectVertical(map, 1, f1Central, f1TunnelS, 42);
+  connectVertical(map, 1, f1TunnelS, f1South, 42);
+  connectHorizontal(map, 1, f1West, f1TunnelW, 87);
+  connectHorizontal(map, 1, f1TunnelW, f1Central, 87);
 
-  addStorey(map, { x: eyrieLeft + 4, y: eyrieTop + 3, width: 12, height: 8 }, 5, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 5, y: eyrieTop + 5, width: 2, height: 1, from: 4, names: { lower: 'Steaming Marble Baths', upper: "Master Falconer's Roost" } });
+  // Floor +2: The Loom-Terraces, North Falconer's Sky-Roost, South Feather-Cache, West Cloud Terrace
+  const f2Central = addStorey(map, { x: 34, y: 82, width: 18, height: 12 }, 2, eyrie.style);
+  const f2North = addStorey(map, { x: 32, y: 34, width: 18, height: 14 }, 2, eyrie.style);
+  const f2TunnelN = addStorey(map, { x: 40, y: 48, width: 6, height: 34 }, 2, eyrie.style);
+  const f2South = addStorey(map, { x: 32, y: 124, width: 18, height: 14 }, 2, eyrie.style);
+  const f2TunnelS = addStorey(map, { x: 40, y: 94, width: 6, height: 30 }, 2, eyrie.style);
+  const f2West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 2, eyrie.style, undefined, true);
+  const f2TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 2, eyrie.style);
 
-  addStorey(map, { x: eyrieLeft + 5, y: eyrieTop + 4, width: 10, height: 6 }, 6, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 12, y: eyrieTop + 5, width: 2, height: 1, from: 5, names: { lower: "Master Falconer's Roost", upper: 'High Council Chamber' } });
+  connectVertical(map, 2, f2North, f2TunnelN, 42);
+  connectVertical(map, 2, f2TunnelN, f2Central, 42);
+  connectVertical(map, 2, f2Central, f2TunnelS, 42);
+  connectVertical(map, 2, f2TunnelS, f2South, 42);
+  connectHorizontal(map, 2, f2West, f2TunnelW, 87);
+  connectHorizontal(map, 2, f2TunnelW, f2Central, 87);
 
-  addStorey(map, { x: eyrieLeft + 6, y: eyrieTop + 4, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'ladder', x: eyrieLeft + 8, y: eyrieTop + 6, width: 1, height: 1, from: 6, names: { lower: 'High Council Chamber', upper: 'Belfry of Zephyrs' } });
+  // Floor +3: Wind-Scriptorium, North Draft Sanctuary, South Observation Deck, and Tunnels
+  const f3Central = addStorey(map, { x: 35, y: 83, width: 16, height: 10 }, 3, eyrie.style);
+  const f3North = addStorey(map, { x: 33, y: 35, width: 16, height: 12 }, 3, eyrie.style);
+  const f3TunnelN = addStorey(map, { x: 40, y: 47, width: 6, height: 36 }, 3, eyrie.style);
+  const f3South = addStorey(map, { x: 33, y: 123, width: 16, height: 12 }, 3, eyrie.style);
+  const f3TunnelS = addStorey(map, { x: 40, y: 93, width: 6, height: 30 }, 3, eyrie.style);
 
-  addStorey(map, { x: eyrieLeft + 6, y: eyrieTop + 4, width: 8, height: 6 }, 8, eyrie.style, undefined, true);
-  addStairs(map, { kind: 'ladder', x: eyrieLeft + 11, y: eyrieTop + 6, width: 1, height: 1, from: 7, names: { lower: 'Belfry of Zephyrs', upper: 'The Crown of the Wind' } });
+  connectVertical(map, 3, f3North, f3TunnelN, 42);
+  connectVertical(map, 3, f3TunnelN, f3Central, 42);
+  connectVertical(map, 3, f3Central, f3TunnelS, 42);
+  connectVertical(map, 3, f3TunnelS, f3South, 42);
+
+  // Floor +4: Steaming Marble Baths, Cold Plunge, Mist Terrace, and Tunnels (open)
+  const f4Central = addStorey(map, { x: 36, y: 84, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
+  const f4North = addStorey(map, { x: 34, y: 38, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
+  const f4TunnelN = addStorey(map, { x: 40, y: 46, width: 6, height: 38 }, 4, eyrie.style, undefined, true);
+  const f4South = addStorey(map, { x: 34, y: 122, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
+  const f4TunnelS = addStorey(map, { x: 40, y: 92, width: 6, height: 30 }, 4, eyrie.style, undefined, true);
+
+  connectVertical(map, 4, f4North, f4TunnelN, 42);
+  connectVertical(map, 4, f4TunnelN, f4Central, 42);
+  connectVertical(map, 4, f4Central, f4TunnelS, 42);
+  connectVertical(map, 4, f4TunnelS, f4South, 42);
+
+  // Floor +5: Master Falconer's Roost, North High Aerie, and Ridge Tunnel (open)
+  const f5Central = addStorey(map, { x: 37, y: 84, width: 12, height: 8 }, 5, eyrie.style, undefined, true);
+  const f5North = addStorey(map, { x: 35, y: 42, width: 12, height: 8 }, 5, eyrie.style, undefined, true);
+  const f5TunnelN = addStorey(map, { x: 40, y: 50, width: 6, height: 34 }, 5, eyrie.style, undefined, true);
+
+  connectVertical(map, 5, f5North, f5TunnelN, 42);
+  connectVertical(map, 5, f5TunnelN, f5Central, 42);
+
+  // Floor +6: High Council Chamber, Elder's Solarium, and Council Tunnel
+  const f6Central = addStorey(map, { x: 38, y: 85, width: 10, height: 6 }, 6, eyrie.style);
+  const f6North = addStorey(map, { x: 38, y: 52, width: 10, height: 6 }, 6, eyrie.style);
+  const f6TunnelN = addStorey(map, { x: 40, y: 58, width: 6, height: 27 }, 6, eyrie.style);
+
+  connectVertical(map, 6, f6North, f6TunnelN, 42);
+  connectVertical(map, 6, f6TunnelN, f6Central, 42);
+
+  // Floor +7: Belfry of Zephyrs, North Lookout Bastion, and Belfry Bridge (open)
+  const f7Central = addStorey(map, { x: 39, y: 85, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
+  const f7North = addStorey(map, { x: 39, y: 62, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
+  const f7TunnelN = addStorey(map, { x: 40, y: 68, width: 6, height: 17 }, 7, eyrie.style, undefined, true);
+
+  connectVertical(map, 7, f7North, f7TunnelN, 42);
+  connectVertical(map, 7, f7TunnelN, f7Central, 42);
+
+  // Floor +8: The Crown of the Wind (open summit peak)
+  addStorey(map, { x: 39, y: 85, width: 8, height: 6 }, 8, eyrie.style, undefined, true);
 
   // Subterranean Depths (-1 to -4): The Sunken Drafts
-  addStorey(map, { x: eyrieLeft - 4, y: eyrieTop - 2, width: 28, height: 18 }, -1, eyrie.style);
-  addStairs(map, { kind: 'stairs', x: eyrieLeft + 14, y: eyrieTop + 9, width: 2, height: 1, from: -1, names: { lower: 'Upper Silver Veins', upper: 'Marble Hall' } });
+  // Floor -1: Upper Silver Veins, North Lode, South Ore Depot, and Mine Tunnels
+  const sub1Central = addStorey(map, { x: 30, y: 78, width: 28, height: 18 }, -1, 'frostpeak-sunken-drafts');
+  const sub1North = addStorey(map, { x: 30, y: 30, width: 24, height: 16 }, -1, 'frostpeak-sunken-drafts');
+  const sub1TunnelN = addStorey(map, { x: 38, y: 46, width: 8, height: 32 }, -1, 'frostpeak-sunken-drafts');
+  const sub1South = addStorey(map, { x: 30, y: 126, width: 24, height: 16 }, -1, 'frostpeak-sunken-drafts');
+  const sub1TunnelS = addStorey(map, { x: 38, y: 96, width: 8, height: 30 }, -1, 'frostpeak-sunken-drafts');
 
-  addStorey(map, { x: eyrieLeft - 5, y: eyrieTop - 3, width: 30, height: 20 }, -2, eyrie.style);
+  connectVertical(map, -1, sub1North, sub1TunnelN, 41);
+  connectVertical(map, -1, sub1TunnelN, sub1Central, 41);
+  connectVertical(map, -1, sub1Central, sub1TunnelS, 41);
+  connectVertical(map, -1, sub1TunnelS, sub1South, 41);
+
+  // Floor -2: Whispering Tunnels, North Den, South Stalker Lair, and Tunnels
+  const sub2Central = addStorey(map, { x: 29, y: 77, width: 30, height: 20 }, -2, 'frostpeak-sunken-drafts');
+  const sub2North = addStorey(map, { x: 29, y: 29, width: 26, height: 16 }, -2, 'frostpeak-sunken-drafts');
+  const sub2TunnelN = addStorey(map, { x: 38, y: 45, width: 8, height: 32 }, -2, 'frostpeak-sunken-drafts');
+  const sub2South = addStorey(map, { x: 29, y: 127, width: 26, height: 16 }, -2, 'frostpeak-sunken-drafts');
+  const sub2TunnelS = addStorey(map, { x: 38, y: 97, width: 8, height: 30 }, -2, 'frostpeak-sunken-drafts');
+
+  connectVertical(map, -2, sub2North, sub2TunnelN, 41);
+  connectVertical(map, -2, sub2TunnelN, sub2Central, 41);
+  connectVertical(map, -2, sub2Central, sub2TunnelS, 41);
+  connectVertical(map, -2, sub2TunnelS, sub2South, 41);
+
+  // Floor -3: Crypt of the First Watchers, North Tomb Vault, South Sarcophagus Hall, and Tunnels
+  const sub3Central = addStorey(map, { x: 30, y: 78, width: 28, height: 18 }, -3, 'frostpeak-sunken-drafts');
+  const sub3North = addStorey(map, { x: 30, y: 30, width: 24, height: 16 }, -3, 'frostpeak-sunken-drafts');
+  const sub3TunnelN = addStorey(map, { x: 38, y: 46, width: 8, height: 32 }, -3, 'frostpeak-sunken-drafts');
+  const sub3South = addStorey(map, { x: 30, y: 126, width: 24, height: 16 }, -3, 'frostpeak-sunken-drafts');
+  const sub3TunnelS = addStorey(map, { x: 38, y: 96, width: 8, height: 30 }, -3, 'frostpeak-sunken-drafts');
+
+  connectVertical(map, -3, sub3North, sub3TunnelN, 41);
+  connectVertical(map, -3, sub3TunnelN, sub3Central, 41);
+  connectVertical(map, -3, sub3Central, sub3TunnelS, 41);
+  connectVertical(map, -3, sub3TunnelS, sub3South, 41);
+
+  // Floor -4: The Hoarfrost Well, North Deep Cavern, South Frost Sump, and Glacial Tunnels
+  const sub4Central = addStorey(map, { x: 31, y: 79, width: 26, height: 16 }, -4, 'frostpeak-sunken-drafts');
+  const sub4North = addStorey(map, { x: 31, y: 31, width: 22, height: 14 }, -4, 'frostpeak-sunken-drafts');
+  const sub4TunnelN = addStorey(map, { x: 38, y: 45, width: 8, height: 34 }, -4, 'frostpeak-sunken-drafts');
+  const sub4South = addStorey(map, { x: 31, y: 125, width: 22, height: 14 }, -4, 'frostpeak-sunken-drafts');
+  const sub4TunnelS = addStorey(map, { x: 38, y: 95, width: 8, height: 30 }, -4, 'frostpeak-sunken-drafts');
+
+  connectVertical(map, -4, sub4North, sub4TunnelN, 41);
+  connectVertical(map, -4, sub4TunnelN, sub4Central, 41);
+  connectVertical(map, -4, sub4Central, sub4TunnelS, 41);
+  connectVertical(map, -4, sub4TunnelS, sub4South, 41);
+
+  // -------------------------------------------------------------
+  // Stairways and Ladders (Connecting all 13 Levels)
+  // -------------------------------------------------------------
+
+  // Above Ground (+1 to +8):
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 2, y: eyrieTop + 3, width: 2, height: 1, from: 0, names: { lower: 'Marble Hall', upper: 'Grand Portico' } });
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 14, y: eyrieTop + 3, width: 2, height: 1, from: 1, names: { lower: 'Grand Portico', upper: 'Loom-Terraces' } });
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 3, y: eyrieTop + 6, width: 2, height: 1, from: 2, names: { lower: 'Loom-Terraces', upper: 'Wind-Scriptorium' } });
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 13, y: eyrieTop + 6, width: 2, height: 1, from: 3, names: { lower: 'Wind-Scriptorium', upper: 'Steaming Marble Baths' } });
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 4, y: eyrieTop + 5, width: 2, height: 1, from: 4, names: { lower: 'Steaming Marble Baths', upper: "Master Falconer's Roost" } });
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 12, y: eyrieTop + 5, width: 2, height: 1, from: 5, names: { lower: "Master Falconer's Roost", upper: 'High Council Chamber' } });
+  addStairs(map, { kind: 'ladder', x: eyrieLeft + 6, y: eyrieTop + 5, width: 1, height: 1, from: 6, names: { lower: 'High Council Chamber', upper: 'Belfry of Zephyrs' } });
+  addStairs(map, { kind: 'ladder', x: eyrieLeft + 10, y: eyrieTop + 5, width: 1, height: 1, from: 7, names: { lower: 'Belfry of Zephyrs', upper: 'The Crown of the Wind' } });
+
+  // Subterranean (-1 to -4):
+  addStairs(map, { kind: 'stairs', x: eyrieLeft + 14, y: eyrieTop + 8, width: 2, height: 1, from: -1, names: { lower: 'Upper Silver Veins', upper: 'Marble Hall' } });
   addStairs(map, { kind: 'stairs', x: eyrieLeft - 1, y: eyrieTop + 4, width: 2, height: 1, from: -2, names: { lower: 'Whispering Tunnels', upper: 'Upper Silver Veins' } });
-
-  addStorey(map, { x: eyrieLeft - 4, y: eyrieTop - 2, width: 28, height: 18 }, -3, eyrie.style);
   addStairs(map, { kind: 'stairs', x: eyrieLeft + 10, y: eyrieTop + 10, width: 2, height: 1, from: -3, names: { lower: 'Crypt of the First Watchers', upper: 'Whispering Tunnels' } });
-
-  addStorey(map, { x: eyrieLeft - 3, y: eyrieTop - 1, width: 26, height: 16 }, -4, eyrie.style);
   addStairs(map, { kind: 'stairs', x: eyrieLeft + 2, y: eyrieTop + 2, width: 2, height: 1, from: -4, names: { lower: 'The Hoarfrost Well', upper: 'Crypt of the First Watchers' } });
 
-  // Eyrie NPCs (placed inside the open floor footprint of their levels)
-  map.npcs.push({ id: 'kip', name: 'Kip the Spelunker', asset: 'frostpeak-kip', x: eyrieLeft + 10.5, y: eyrieTop + 7.5, floor: -1 });
-  map.npcs.push({ id: 'sula', name: 'Sula the Feather-Weaver', asset: 'frostpeak-sula', x: eyrieLeft + 8.5, y: eyrieTop + 6.5, floor: 2 });
-  map.npcs.push({ id: 'aurius', name: 'Elder Aurius the Keen', asset: 'frostpeak-aurius', x: eyrieLeft + 8.5, y: eyrieTop + 6.5, floor: 6 });
-  map.npcs.push({ id: 'vail', name: 'Watcher Vail', asset: 'frostpeak-vail', x: eyrieLeft + 9.5, y: eyrieTop + 5.5, floor: 8 });
+  // Eyrie NPCs
+  map.npcs.push({ id: 'kip', name: 'Kip the Spelunker', asset: 'frostpeak-kip', x: 43.5, y: 86.5, floor: -1 });
+  map.npcs.push({ id: 'sula', name: 'Sula the Feather-Weaver', asset: 'frostpeak-sula', x: 42.5, y: 88.5, floor: 2 });
+  map.npcs.push({ id: 'aurius', name: 'Elder Aurius the Keen', asset: 'frostpeak-aurius', x: 42.5, y: 87.5, floor: 6 });
+  map.npcs.push({ id: 'vail', name: 'Watcher Vail', asset: 'frostpeak-vail', x: 42.5, y: 87.5, floor: 8 });
 
-  // Subterranean Monsters (placed inside the cleared open footprint)
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 2 + i * 3, y: eyrieTop + 3, floor: -1 });
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 2 + i * 3, y: eyrieTop + 4, floor: -2 });
-  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: eyrieLeft + 3 + i * 4, y: eyrieTop + 7, floor: -2 });
-  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'deep-matriarch', name: 'Deep Crag Matriarch', asset: 'frostpeak-deep-matriarch', x: eyrieLeft + 3 + i * 4, y: eyrieTop + 3, floor: -3 });
-  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 4 + i * 3, y: eyrieTop + 8, floor: -3 });
-  for (let i = 0; i < 4; i++) map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: eyrieLeft + 2 + i * 3, y: eyrieTop + 5, floor: -4 });
-  for (let i = 0; i < 3; i++) map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: eyrieLeft + 3 + i * 3, y: eyrieTop + 7, floor: -4 });
+  // Subterranean Monsters: distributed across central halls, north chambers, south caverns, and connecting tunnels
+  // Floor -1 (Upper Silver Veins):
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 40.5, y: 85.5, floor: -1 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 45.5, y: 85.5, floor: -1 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 39.5, y: 87.5, floor: -1 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 45.5, y: 88.5, floor: -1 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 41.5, y: 90.5, floor: -1 });
+
+  // Floor -2 (Whispering Tunnels):
+  map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: 40.5, y: 85.5, floor: -2 });
+  map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: 45.5, y: 85.5, floor: -2 });
+  map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: 39.5, y: 87.5, floor: -2 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 45.5, y: 88.5, floor: -2 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 41.5, y: 90.5, floor: -2 });
+
+  // Floor -3 (Crypt of the First Watchers):
+  map.creatures.push({ kind: 'deep-matriarch', name: 'Deep Crag Matriarch', asset: 'frostpeak-deep-matriarch', x: 40.5, y: 85.5, floor: -3 });
+  map.creatures.push({ kind: 'deep-matriarch', name: 'Deep Crag Matriarch', asset: 'frostpeak-deep-matriarch', x: 45.5, y: 85.5, floor: -3 });
+  map.creatures.push({ kind: 'deep-matriarch', name: 'Deep Crag Matriarch', asset: 'frostpeak-deep-matriarch', x: 39.5, y: 87.5, floor: -3 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 45.5, y: 88.5, floor: -3 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 41.5, y: 90.5, floor: -3 });
+
+  // Floor -4 (The Hoarfrost Well):
+  map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: 40.5, y: 85.5, floor: -4 });
+  map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: 45.5, y: 85.5, floor: -4 });
+  map.creatures.push({ kind: 'rime-stalker', name: 'Rime Stalker', asset: 'frostpeak-rime-stalker', x: 39.5, y: 87.5, floor: -4 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 45.5, y: 88.5, floor: -4 });
+  map.creatures.push({ kind: 'ice-wisp', name: 'Ice Wisp', asset: 'frostpeak-ice-wisp', x: 41.5, y: 90.5, floor: -4 });
 
   // Surface creatures
   creatures(map, 'snow-hare', 'Snow Hare', 'frostpeak-snow-hare', 32);

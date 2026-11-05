@@ -40,6 +40,14 @@ file under `data/art/`, which is renamed `<name>.in-db` as a backup. The
 pictures, clips and sounds themselves stay files, and so do the manifests
 that list them, since they describe those files and the art tools read them.
 
+God's View's API Log keeps one row per call in `api_log` (`api-log-db.ts`):
+its id, time, day and size in columns, its summary and the whole call as
+JSON. The summaries are also in memory, so the list and filters never wait
+on the database; a whole call is read when it is opened. Old days go with
+one `DELETE` (`API_LOG_DAYS`, `API_LOG_MAX_MB`). An older game's
+`data/api-log/<day>.jsonl` files are brought in on the first start and
+renamed `<name>.in-db`.
+
 **Where the database is.** With `DATABASE_URL` set, the server uses that
 Postgres server; region servers and several machines can share it. Without
 it, the server opens the Postgres built into the game in `DB_DIR`

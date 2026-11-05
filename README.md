@@ -246,10 +246,10 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DAY_MINUTES` | `60` | Real minutes in one game day, dawn to dawn |
 | `WEATHER_MINUTES` | `20` | Real minutes each spell of weather lasts before it may turn |
 | `WEATHER` | on | `off` keeps every land's sky clear |
-| `DATA_FILE` | `data/world.json` | An older game's world file, brought into Postgres on its first run; its folder holds `db/`, `art/` and `api-log/` |
+| `DATA_FILE` | `data/world.json` | An older game's world file, brought into Postgres on its first run; its folder holds `db/` and `art/` |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |
-| `API_LOG_DIR` | `api-log/` next to `DATA_FILE` | Where God's View's API Log keeps every request sent to an outside service |
+| `API_LOG_DIR` | `api-log/` next to `DATA_FILE` | Where an older game kept God's View's API Log as files; they are brought into the database once (the log now lives in the `api_log` table) |
 | `API_LOG_DAYS` | `14` | Days the API Log keeps; older days are deleted |
 | `API_LOG_MAX_MB` | `200` | Megabytes the API Log may use; the oldest days go first |
 | `ART_STYLE` | `flat-isometric` | The art style every new picture is painted in (`packages/server/src/assets/style-profile.ts`); pictures already painted keep their style until repainted |

@@ -85,6 +85,8 @@ export interface BuildingView {
   open: boolean;
   /** True once a kit house stands in place of its painted picture. */
   kit?: boolean;
+  /** The kit house's outside picture and where it stands, so its ground storey can be stood again on its own (world-scene/below.ts). */
+  kitOutside?: { texture: string; frame: { width: number; height: number; origin: [number, number]; u: number }; floor: { left: number; top: number; right: number; bottom: number }; storeys: number };
 }
 
 /** A region drawn into the world: its layout and everything that pictures it. */

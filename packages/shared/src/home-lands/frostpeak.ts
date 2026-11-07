@@ -5,6 +5,7 @@ import { CATHEDRAL_SIZE, SANCTUM_NORTH_GATE, Tile, building, creatures, disc, pl
 import { addStairs, addStorey, setOn } from '../floors.ts';
 import type { HomeLand } from './types.ts';
 import { toolOffers } from '../crafts.ts';
+import { furnitureArt } from '../buildings.ts';
 
 // Frostpeak, north of the Sanctum: the Falcon's home on the cliffs (the
 // gather and craft plan, step 1). Snow, frosted pines, frozen lakes and
@@ -215,6 +216,13 @@ function layout(map: RegionMap, c: number): void {
   putEyrie('astrolabe-pedestal', 2, 7, 2, 1);
   putEyrie('falcon-perch', 13, 4, 1.5, 1);
 
+  // Eyrie Forecourt & Approach: Monumental Tunnel Portal, Braziers, and Viaduct Arches
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'tunnel-portal'), x: 39.5, y: 94.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'silver-brazier'), x: 37.5, y: 94.5, footprint: { width: 1, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'silver-brazier'), x: 46.5, y: 94.5, footprint: { width: 1, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 43, y: 104, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 43, y: 114, footprint: { width: 2, height: 1 } });
+
   // -------------------------------------------------------------
   // Storeys and Mountain Tunnels: Floors +1 to +8 and -1 to -4
   // -------------------------------------------------------------
@@ -235,14 +243,24 @@ function layout(map: RegionMap, c: number): void {
   connectHorizontal(map, 1, f1West, f1TunnelW, 87);
   connectHorizontal(map, 1, f1TunnelW, f1Central, 87);
 
-  // Floor +2: The Loom-Terraces, North Falconer's Sky-Roost, South Feather-Cache, West Cloud Terrace
+  // Floor +2: The Loom-Terraces, North Falconer's Sky-Roost, South Feather-Cache, West Cloud Terrace, and Open Viaduct Bridge
   const f2Central = addStorey(map, { x: 34, y: 82, width: 18, height: 12 }, 2, eyrie.style);
   const f2North = addStorey(map, { x: 32, y: 34, width: 18, height: 14 }, 2, eyrie.style);
   const f2TunnelN = addStorey(map, { x: 40, y: 48, width: 6, height: 34 }, 2, eyrie.style);
   const f2South = addStorey(map, { x: 32, y: 124, width: 18, height: 14 }, 2, eyrie.style);
-  const f2TunnelS = addStorey(map, { x: 40, y: 94, width: 6, height: 30 }, 2, eyrie.style);
+  const f2TunnelS = addStorey(map, { x: 40, y: 94, width: 6, height: 30 }, 2, eyrie.style, undefined, true);
   const f2West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 2, eyrie.style, undefined, true);
   const f2TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 2, eyrie.style);
+
+  // Viaduct Bridge Stone Balustrades along open bridge flanks (Floor 2)
+  for (const by of [98, 104, 110, 116]) {
+    map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'stone-balustrade'), x: 40.5, y: by, footprint: { width: 1, height: 1 }, floor: 2 });
+    map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'stone-balustrade'), x: 45.5, y: by, footprint: { width: 1, height: 1 }, floor: 2 });
+  }
+
+  // High Terrace Stone Balustrades along open summit observation deck (Floor 7)
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'stone-balustrade'), x: 39.5, y: 90.5, footprint: { width: 1, height: 1 }, floor: 7 });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'stone-balustrade'), x: 46.5, y: 90.5, footprint: { width: 1, height: 1 }, floor: 7 });
 
   connectVertical(map, 2, f2North, f2TunnelN, 42);
   connectVertical(map, 2, f2TunnelN, f2Central, 42);

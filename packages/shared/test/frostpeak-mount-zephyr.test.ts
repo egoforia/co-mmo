@@ -173,9 +173,23 @@ describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
       expect(subStoreys.every((s) => s.style === 'frostpeak-sunken-drafts')).toBe(true);
     }
 
-    // Verify landmarks/furniture inside buildings
+    // Verify landmarks/furniture inside buildings and mountain exterior
     const eyrieFurniture = map.landmarks.filter((l) => l.asset.startsWith('frostpeak-eyrie-furniture-'));
-    expect(eyrieFurniture.length).toBeGreaterThanOrEqual(4);
+    expect(eyrieFurniture.length).toBeGreaterThanOrEqual(7);
+
+    // Verify Phase 2 & 3 architectural assets: viaduct arch, tunnel portal, stone balustrades
+    const portal = map.landmarks.find((l) => l.asset === 'frostpeak-eyrie-furniture-tunnel-portal');
+    expect(portal, 'Expected mountain tunnel portal landmark at Eyrie approach').toBeDefined();
+
+    const viaductArches = map.landmarks.filter((l) => l.asset === 'frostpeak-eyrie-furniture-viaduct-arch');
+    expect(viaductArches.length, 'Expected viaduct bridge arches spanning the gorge').toBeGreaterThanOrEqual(2);
+
+    const balustrades = map.landmarks.filter((l) => l.asset === 'frostpeak-eyrie-furniture-stone-balustrade');
+    expect(balustrades.length, 'Expected stone balustrades on viaduct bridge and high terraces').toBeGreaterThanOrEqual(8);
+
+    // Verify Floor 2 has the open-air viaduct bridge
+    const f2Bridge = map.storeys.find((s) => s.floor === 2 && s.open && s.height >= 20);
+    expect(f2Bridge, 'Expected open-air viaduct bridge storey on Floor 2').toBeDefined();
 
     const houseFurniture = map.landmarks.filter((l) => l.asset.startsWith('frostpeak-whiteledge-house-furniture-'));
     expect(houseFurniture.length).toBeGreaterThanOrEqual(4);

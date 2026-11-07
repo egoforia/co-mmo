@@ -251,6 +251,9 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       'silver-brazier': { name: 'silver brazier', look: 'a tall silver tripod brazier burning with pale blue wind-defying flames', width: 1 },
       'falcon-perch': { name: 'falcon roost perch', look: 'a tall carved cedar roosting post with iron crossbars and silver bells for hunting birds', width: 1.5 },
       'astrolabe-pedestal': { name: 'wind astrolabe', look: 'an intricate brass and silver armillary sphere on a fluted marble pedestal showing air currents', width: 2 },
+      'stone-balustrade': { name: 'stone balustrade', look: 'a low carved stone parapet railing with stylized falcon feather balusters and flat snow-dusted marble coping', width: 1 },
+      'viaduct-arch': { name: 'viaduct arch', look: 'a monumental cyclopean white marble bridge arch support standing firmly on mountain rock', width: 2 },
+      'tunnel-portal': { name: 'mountain tunnel portal', look: 'a monumental carved stone portal arch with geometric falcon reliefs and iron-banded cedar doors set in cyclopean rock', width: 2 },
     },
   },
   'frostpeak-whiteledge-house': {

@@ -251,14 +251,14 @@ export function setDepthShade(o: Phaser.GameObjects.GameObject, deltaFloors: num
     else tintObj.setTint?.(0xffffff);
     return;
   }
-  // Darken and slightly cool-shift lower floors to create atmospheric aerial depth
-  const factor = deltaFloors === 1 ? 0.55 : 0.35;
-  const r = Math.round(255 * factor * 0.92);
-  const g = Math.round(255 * factor * 0.94);
-  const b = Math.round(255 * factor * 1.05);
+  // Gently cool-shift lower floors for atmospheric depth while keeping solid rock/ground 100% opaque
+  const factor = Math.max(0.75, 1 - deltaFloors * 0.04);
+  const r = Math.round(255 * factor * 0.95);
+  const g = Math.round(255 * factor * 0.97);
+  const b = Math.round(255 * Math.min(1, factor * 1.02));
   const tint = (r << 16) | (g << 8) | b;
   tintObj.setTint?.(tint);
-  if (!keepAlpha) alphaObj.setAlpha?.(deltaFloors === 1 ? 0.75 : 0.5);
+  if (!keepAlpha) alphaObj.setAlpha?.(1.0);
 }
 
 /** True when tile (x, y) lies within a building's walls (or a floor's rectangle). */

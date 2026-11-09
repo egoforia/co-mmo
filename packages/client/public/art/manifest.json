@@ -2076,7 +2076,10 @@
     "cycleSeconds": 0.9
   },
   "frostpeak-eyrie-furniture-falcon-frieze": {
-    "file": "frostpeak-eyrie-furniture-falcon-frieze.png",
+    "file": "art/frostpeak-eyrie-furniture-falcon-frieze.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 352,
     "provider": "subagent-free",
     "model": "ide-image-generator",
     "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the carved falcon relief frieze inside The Eyrie of the First Watch: a cyclopean white marble and dark slate cliff wall relief panel carved with geometric outspread falcon wings and silver First Watch runes.",
@@ -2084,7 +2087,10 @@
     "view": "isometric"
   },
   "frostpeak-eyrie-furniture-ice-cascade": {
-    "file": "frostpeak-eyrie-furniture-ice-cascade.png",
+    "file": "art/frostpeak-eyrie-furniture-ice-cascade.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 268,
     "provider": "subagent-free",
     "model": "ide-image-generator",
     "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the frozen waterfall cascade inside The Eyrie of the First Watch: a frozen alpine waterfall of faceted pale-blue glacier ice and white rime cascading down rough grey mountain slate rock.",
@@ -2092,7 +2098,10 @@
     "view": "isometric"
   },
   "frostpeak-eyrie-furniture-beacon-brazier": {
-    "file": "frostpeak-eyrie-furniture-beacon-brazier.png",
+    "file": "art/frostpeak-eyrie-furniture-beacon-brazier.png",
+    "kind": "furniture",
+    "width": 200,
+    "height": 424,
     "provider": "subagent-free",
     "model": "ide-image-generator",
     "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the mountain beacon brazier inside The Eyrie of the First Watch: a monumental carved white marble and silver pillar beacon burning with a tall wind-defying golden-amber and pale blue mountain fire.",
@@ -2100,7 +2109,10 @@
     "view": "isometric"
   },
   "frostpeak-whiteledge-house-furniture-cantilever-deck": {
-    "file": "frostpeak-whiteledge-house-furniture-cantilever-deck.png",
+    "file": "art/frostpeak-whiteledge-house-furniture-cantilever-deck.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 244,
     "provider": "subagent-free",
     "model": "ide-image-generator",
     "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the cantilevered timber deck inside Whiteledge Terrace House: a cantilevered mountain cedar plank lookout platform with heavy diagonal pine support struts and cold-forged silver-iron brackets.",

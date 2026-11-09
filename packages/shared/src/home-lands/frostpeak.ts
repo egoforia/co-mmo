@@ -104,11 +104,12 @@ const QUESTS: Record<string, QuestDef> = {
 /** How Frostpeak is laid out: Mount Zephyr on the western third, and snowfields broken by rock ridges, pine groves, and frozen lakes to the east. */
 function layout(map: RegionMap, c: number): void {
   // Helpers to connect abutting storeys with an open 2-tile doorway through their perimeter walls
-  const connectVertical = (map: RegionMap, floor: number, topStorey: { x: number; y: number; width: number; height: number }, bottomStorey: { x: number; y: number; width: number; height: number }, cx: number) => {
+  const connectVertical = (map: RegionMap, floor: number, topStorey: { x: number; y: number; width: number; height: number; open?: boolean }, bottomStorey: { x: number; y: number; width: number; height: number; open?: boolean }, cx: number) => {
     const y1 = topStorey.y + topStorey.height - 1;
     const y2 = bottomStorey.y;
-    const startX = Math.max(topStorey.x + 1, bottomStorey.x + 1, cx - 1);
-    const endX = Math.min(topStorey.x + topStorey.width - 2, bottomStorey.x + bottomStorey.width - 2, cx + 2);
+    const fullOpen = Boolean(topStorey.open && bottomStorey.open && topStorey.x === bottomStorey.x && topStorey.width === bottomStorey.width);
+    const startX = fullOpen ? topStorey.x + 1 : Math.max(topStorey.x + 1, bottomStorey.x + 1, cx - 1);
+    const endX = fullOpen ? topStorey.x + topStorey.width - 2 : Math.min(topStorey.x + topStorey.width - 2, bottomStorey.x + bottomStorey.width - 2, cx + 2);
     for (let x = startX; x <= endX; x++) {
       setOn(map, floor, x, y1, Tile.Floor);
       setOn(map, floor, x, y2, Tile.Floor);
@@ -173,9 +174,9 @@ function layout(map: RegionMap, c: number): void {
   disc(map, 64, 112, 8, Tile.Ground);
   disc(map, 64, 128, 8, Tile.Ground);
 
-  // Frozen mountain chasm stream running beneath the Viaduct Bridge (y = 106..111, west of switchback road):
-  for (let y = 106; y <= 111; y++) {
-    for (let x = 24; x <= 41; x++) {
+  // Frozen mountain chasm stream running beneath the Viaduct Bridge (y = 102..114, spanning under and west of the bridge):
+  for (let y = 102; y <= 114; y++) {
+    for (let x = 24; x <= 48; x++) {
       map.tiles[y * map.width + x] = Tile.Water;
     }
   }
@@ -238,10 +239,12 @@ function layout(map: RegionMap, c: number): void {
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'silver-brazier'), x: 46.5, y: 94.5, footprint: { width: 1, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 34.5, y: 96.5, footprint: { width: 1.5, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 51.5, y: 96.5, footprint: { width: 1.5, height: 1 } });
-  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 43, y: 104, footprint: { width: 2, height: 1 } });
-  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 43, y: 114, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 39.5, y: 105, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 39.5, y: 111, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 46, y: 106, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 46, y: 111, footprint: { width: 2, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'ice-cascade'), x: 35.5, y: 105.5, footprint: { width: 2, height: 1 } });
-  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'ice-cascade'), x: 35.5, y: 112.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'ice-cascade'), x: 47, y: 103.5, footprint: { width: 2, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-whiteledge-house', 'cantilever-deck'), x: 45, y: 125, footprint: { width: 2, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-whiteledge-house', 'cantilever-deck'), x: 61, y: 110, footprint: { width: 2, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'falcon-frieze'), x: 45, y: 129, footprint: { width: 2, height: 1 } });
@@ -256,29 +259,31 @@ function layout(map: RegionMap, c: number): void {
   // -------------------------------------------------------------
 
   // Floor +1: Grand Portico, North Scriptorium, South Bastion, West Vista, and Tunnels
-  const f1Central = addStorey(map, { x: 34, y: 82, width: 18, height: 12 }, 1, eyrie.style);
-  const f1North = addStorey(map, { x: 32, y: 34, width: 20, height: 14 }, 1, eyrie.style);
-  const f1TunnelN = addStorey(map, { x: 40, y: 48, width: 6, height: 34 }, 1, eyrie.style);
-  const f1South = addStorey(map, { x: 32, y: 124, width: 20, height: 14 }, 1, eyrie.style);
-  const f1TunnelS = addStorey(map, { x: 40, y: 94, width: 6, height: 30 }, 1, eyrie.style);
+  const f1Central = addStorey(map, { x: 34, y: 82, width: 18, height: 11 }, 1, eyrie.style, undefined, true);
+  const f1North = addStorey(map, { x: 34, y: 34, width: 18, height: 28 }, 1, eyrie.style, undefined, true);
+  const f1TunnelN = addStorey(map, { x: 34, y: 62, width: 18, height: 20 }, 1, eyrie.style, undefined, true);
+  const f1South = addStorey(map, { x: 32, y: 121, width: 26, height: 7 }, 1, eyrie.style, undefined, true);
+  const f1SouthWest = addStorey(map, { x: 32, y: 128, width: 16, height: 10 }, 1, eyrie.style, undefined, true);
+  const f1TunnelS = addStorey(map, { x: 34, y: 115, width: 12, height: 6 }, 1, eyrie.style, undefined, true);
   const f1West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 1, eyrie.style, undefined, true);
-  const f1TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 1, eyrie.style);
+  const f1TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 1, eyrie.style, undefined, true);
 
   connectVertical(map, 1, f1North, f1TunnelN, 42);
   connectVertical(map, 1, f1TunnelN, f1Central, 42);
-  connectVertical(map, 1, f1Central, f1TunnelS, 42);
-  connectVertical(map, 1, f1TunnelS, f1South, 42);
+  connectVertical(map, 1, f1TunnelS, f1South, 39);
+  connectVertical(map, 1, f1South, f1SouthWest, 38);
   connectHorizontal(map, 1, f1West, f1TunnelW, 87);
   connectHorizontal(map, 1, f1TunnelW, f1Central, 87);
 
   // Floor +2: The Loom-Terraces, North Falconer's Sky-Roost, South Feather-Cache, West Cloud Terrace, and Open Viaduct Bridge
-  const f2Central = addStorey(map, { x: 34, y: 82, width: 18, height: 12 }, 2, eyrie.style);
-  const f2North = addStorey(map, { x: 32, y: 34, width: 18, height: 14 }, 2, eyrie.style);
-  const f2TunnelN = addStorey(map, { x: 40, y: 48, width: 6, height: 34 }, 2, eyrie.style);
-  const f2South = addStorey(map, { x: 32, y: 124, width: 18, height: 14 }, 2, eyrie.style);
-  const f2TunnelS = addStorey(map, { x: 40, y: 94, width: 6, height: 30 }, 2, eyrie.style, undefined, true);
+  const f2Central = addStorey(map, { x: 34, y: 82, width: 17, height: 10 }, 2, eyrie.style, undefined, true);
+  const f2North = addStorey(map, { x: 34, y: 34, width: 17, height: 27 }, 2, eyrie.style, undefined, true);
+  const f2TunnelN = addStorey(map, { x: 34, y: 61, width: 17, height: 21 }, 2, eyrie.style, undefined, true);
+  const f2South = addStorey(map, { x: 32, y: 121, width: 24, height: 6 }, 2, eyrie.style, undefined, true);
+  const f2SouthWest = addStorey(map, { x: 32, y: 127, width: 15, height: 10 }, 2, eyrie.style, undefined, true);
+  const f2TunnelS = addStorey(map, { x: 40, y: 92, width: 6, height: 29 }, 2, eyrie.style, undefined, true);
   const f2West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 2, eyrie.style, undefined, true);
-  const f2TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 2, eyrie.style);
+  const f2TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 2, eyrie.style, undefined, true);
 
   // Viaduct Bridge Stone Balustrades along open bridge flanks (Floor 2)
   for (const by of [98, 104, 110, 116]) {
@@ -294,53 +299,50 @@ function layout(map: RegionMap, c: number): void {
   connectVertical(map, 2, f2TunnelN, f2Central, 42);
   connectVertical(map, 2, f2Central, f2TunnelS, 42);
   connectVertical(map, 2, f2TunnelS, f2South, 42);
+  connectVertical(map, 2, f2South, f2SouthWest, 38);
   connectHorizontal(map, 2, f2West, f2TunnelW, 87);
   connectHorizontal(map, 2, f2TunnelW, f2Central, 87);
 
   // Floor +3: Wind-Scriptorium, North Draft Sanctuary, South Observation Deck, and Tunnels
-  const f3Central = addStorey(map, { x: 35, y: 83, width: 16, height: 10 }, 3, eyrie.style);
-  const f3North = addStorey(map, { x: 33, y: 35, width: 16, height: 12 }, 3, eyrie.style);
-  const f3TunnelN = addStorey(map, { x: 40, y: 47, width: 6, height: 36 }, 3, eyrie.style);
-  const f3South = addStorey(map, { x: 33, y: 123, width: 16, height: 12 }, 3, eyrie.style);
-  const f3TunnelS = addStorey(map, { x: 40, y: 93, width: 6, height: 30 }, 3, eyrie.style);
+  const f3Central = addStorey(map, { x: 35, y: 83, width: 16, height: 9 }, 3, eyrie.style, undefined, true);
+  const f3North = addStorey(map, { x: 35, y: 35, width: 16, height: 25 }, 3, eyrie.style, undefined, true);
+  const f3TunnelN = addStorey(map, { x: 35, y: 60, width: 16, height: 23 }, 3, eyrie.style, undefined, true);
+  const f3South = addStorey(map, { x: 33, y: 121, width: 21, height: 5 }, 3, eyrie.style, undefined, true);
+  const f3SouthWest = addStorey(map, { x: 33, y: 126, width: 13, height: 10 }, 3, eyrie.style, undefined, true);
 
   connectVertical(map, 3, f3North, f3TunnelN, 42);
   connectVertical(map, 3, f3TunnelN, f3Central, 42);
-  connectVertical(map, 3, f3Central, f3TunnelS, 42);
-  connectVertical(map, 3, f3TunnelS, f3South, 42);
+  connectVertical(map, 3, f3South, f3SouthWest, 38);
 
   // Floor +4: Steaming Marble Baths, Cold Plunge, Mist Terrace, and Tunnels (open)
   const f4Central = addStorey(map, { x: 36, y: 84, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
-  const f4North = addStorey(map, { x: 34, y: 38, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
-  const f4TunnelN = addStorey(map, { x: 40, y: 46, width: 6, height: 38 }, 4, eyrie.style, undefined, true);
+  const f4North = addStorey(map, { x: 36, y: 36, width: 14, height: 23 }, 4, eyrie.style, undefined, true);
+  const f4TunnelN = addStorey(map, { x: 36, y: 59, width: 14, height: 25 }, 4, eyrie.style, undefined, true);
   const f4South = addStorey(map, { x: 34, y: 122, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
-  const f4TunnelS = addStorey(map, { x: 40, y: 92, width: 6, height: 30 }, 4, eyrie.style, undefined, true);
 
   connectVertical(map, 4, f4North, f4TunnelN, 42);
   connectVertical(map, 4, f4TunnelN, f4Central, 42);
-  connectVertical(map, 4, f4Central, f4TunnelS, 42);
-  connectVertical(map, 4, f4TunnelS, f4South, 42);
 
   // Floor +5: Master Falconer's Roost, North High Aerie, and Ridge Tunnel (open)
   const f5Central = addStorey(map, { x: 37, y: 84, width: 12, height: 8 }, 5, eyrie.style, undefined, true);
-  const f5North = addStorey(map, { x: 35, y: 42, width: 12, height: 8 }, 5, eyrie.style, undefined, true);
-  const f5TunnelN = addStorey(map, { x: 40, y: 50, width: 6, height: 34 }, 5, eyrie.style, undefined, true);
+  const f5North = addStorey(map, { x: 37, y: 37, width: 12, height: 21 }, 5, eyrie.style, undefined, true);
+  const f5TunnelN = addStorey(map, { x: 37, y: 58, width: 12, height: 26 }, 5, eyrie.style, undefined, true);
 
   connectVertical(map, 5, f5North, f5TunnelN, 42);
   connectVertical(map, 5, f5TunnelN, f5Central, 42);
 
   // Floor +6: High Council Chamber, Elder's Open Solarium Terrace, and Council Tunnel
-  const f6Central = addStorey(map, { x: 38, y: 85, width: 10, height: 6 }, 6, eyrie.style);
-  const f6North = addStorey(map, { x: 38, y: 52, width: 10, height: 6 }, 6, eyrie.style, undefined, true);
-  const f6TunnelN = addStorey(map, { x: 40, y: 58, width: 6, height: 27 }, 6, eyrie.style);
+  const f6Central = addStorey(map, { x: 38, y: 85, width: 10, height: 6 }, 6, eyrie.style, undefined, true);
+  const f6North = addStorey(map, { x: 38, y: 38, width: 10, height: 19 }, 6, eyrie.style, undefined, true);
+  const f6TunnelN = addStorey(map, { x: 38, y: 57, width: 10, height: 28 }, 6, eyrie.style, undefined, true);
 
   connectVertical(map, 6, f6North, f6TunnelN, 42);
   connectVertical(map, 6, f6TunnelN, f6Central, 42);
 
   // Floor +7: Belfry of Zephyrs, North Lookout Bastion, and Belfry Bridge (open)
   const f7Central = addStorey(map, { x: 39, y: 85, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
-  const f7North = addStorey(map, { x: 39, y: 62, width: 8, height: 6 }, 7, eyrie.style, undefined, true);
-  const f7TunnelN = addStorey(map, { x: 40, y: 68, width: 6, height: 17 }, 7, eyrie.style, undefined, true);
+  const f7North = addStorey(map, { x: 39, y: 39, width: 8, height: 17 }, 7, eyrie.style, undefined, true);
+  const f7TunnelN = addStorey(map, { x: 39, y: 56, width: 8, height: 29 }, 7, eyrie.style, undefined, true);
 
   connectVertical(map, 7, f7North, f7TunnelN, 42);
   connectVertical(map, 7, f7TunnelN, f7Central, 42);
@@ -407,10 +409,15 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-whiteledge-house', 'mason-bench', 37, 84, 2, 1, 1);
   putFloorProp('frostpeak-whiteledge-house', 'mountain-hearth', 49, 84, 2, 1, 1);
   putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 37, 91, 1.5, 1, 1);
-  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 36, 128, 1.5, 1, 1);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 36, 130, 1.5, 1, 1);
   putFloorProp('frostpeak-eyrie', 'falcon-frieze', 43, 84, 2, 1, 1);
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 36, 37, 1, 1, 1);
   putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 47, 37, 2, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 35, 60, 1.5, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 49, 60, 1.5, 1, 1);
+  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 51, 126, 2, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 49.5, 126.5, 1, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 55.5, 126.5, 1, 1, 1);
   putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 21, 86, 2, 1, 1);
   putFloorProp('frostpeak-eyrie', 'ice-cascade', 21, 91, 2, 1, 1);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 19.5, 91.5, 1, 1, 1);
@@ -418,11 +425,15 @@ function layout(map: RegionMap, c: number): void {
 
   // Floor +2 (Loom-Terraces, North Falconer's Sky-Roost, South Feather-Cache, West Cloud Terrace, Open Viaduct Bridge):
   putFloorProp('frostpeak-whiteledge-house', 'loom', 37.5, 84.5, 2.5, 1, 2);
-  putFloorProp('frostpeak-whiteledge-house', 'mountain-hearth', 49, 91, 2, 1, 2);
+  putFloorProp('frostpeak-whiteledge-house', 'mountain-hearth', 48, 90, 2, 1, 2);
   putFloorProp('frostpeak-eyrie', 'falcon-perch', 36, 37, 1.5, 1, 2);
   putFloorProp('frostpeak-eyrie', 'falcon-perch', 46, 37, 1.5, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 35, 59, 1, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 48, 59, 1, 1, 2);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 40.5, 96, 1.5, 1, 2);
-  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 45.5, 121, 1.5, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 45.5, 119, 1.5, 1, 2);
+  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 50, 125, 2, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'falcon-frieze', 46, 125, 2, 1, 2);
   putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 21, 86, 2, 1, 2);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 19.5, 91.5, 1, 1, 2);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 25.5, 91.5, 1, 1, 2);
@@ -433,13 +444,18 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 48, 85, 1, 1, 3);
   putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 37, 38, 2, 1, 3);
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 45, 38, 1, 1, 3);
-  putFloorProp('frostpeak-whiteledge-house', 'mason-bench', 37, 126, 2, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 36.5, 58.5, 1, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 47.5, 58.5, 1, 1, 3);
+  putFloorProp('frostpeak-whiteledge-house', 'mason-bench', 37, 128, 2, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 49, 124, 1.5, 1, 3);
 
   // Floor +4 (Steaming Marble Baths, Cold Plunge, Mist Terrace — open):
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 38.5, 86, 1, 1, 4);
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 47.5, 86, 1, 1, 4);
   putFloorProp('frostpeak-eyrie', 'ice-cascade', 37, 40, 2, 1, 4);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 45, 40, 1.5, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 36.5, 57.5, 1, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 47.5, 57.5, 1, 1, 4);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 36.5, 128.5, 1, 1, 4);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 128.5, 1, 1, 4);
 
@@ -448,6 +464,8 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-eyrie', 'falcon-perch', 46, 86, 1.5, 1, 5);
   putFloorProp('frostpeak-eyrie', 'falcon-perch', 38, 44, 1.5, 1, 5);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 44, 44, 1.5, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 37.5, 56.5, 1, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 46.5, 56.5, 1, 1, 5);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 37.5, 90.5, 1, 1, 5);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 46.5, 90.5, 1, 1, 5);
 
@@ -455,17 +473,17 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-eyrie', 'wind-throne', 43, 86.5, 2, 1, 6);
   putFloorProp('frostpeak-eyrie', 'falcon-frieze', 39.5, 86.5, 2, 1, 6);
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 46.5, 86.5, 1, 1, 6);
-  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 40.5, 54, 2, 1, 6);
-  putFloorProp('frostpeak-eyrie', 'silver-brazier', 45.5, 54, 1, 1, 6);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 39.5, 56.5, 1, 1, 6);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 46.5, 56.5, 1, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 40.5, 53, 2, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 45.5, 53, 1, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 39.5, 55.5, 1, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 46.5, 55.5, 1, 1, 6);
 
   // Floor +7 (Belfry of Zephyrs & North Lookout Bastion — open):
   putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 41, 86.5, 2, 1, 7);
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 45.5, 86.5, 1, 1, 7);
-  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 43, 64, 1.5, 1, 7);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 40.5, 66.5, 1, 1, 7);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 66.5, 1, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 43, 42, 1.5, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 40.5, 44.5, 1, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 44.5, 1, 1, 7);
 
   // Floor +8 (The Crown of the Wind — open summit peak):
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 40.5, 86.5, 1.5, 1, 8);

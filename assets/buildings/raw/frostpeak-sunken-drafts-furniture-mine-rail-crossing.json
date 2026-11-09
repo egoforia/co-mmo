@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-sunken-drafts-furniture-mine-rail-crossing",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the mine rail crossing inside The Sunken Drafts: a section of rusted iron mine cart rail tracks with heavy cedar timber sleepers crossing a glowing pale blue permafrost fissure.",
+  "references": [
+    "frostpeak-sunken-drafts-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T13:54:45.730Z"
+}

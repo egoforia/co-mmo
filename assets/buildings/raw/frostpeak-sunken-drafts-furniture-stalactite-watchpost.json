@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-sunken-drafts-furniture-stalactite-watchpost",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the stalactite watch-post inside The Sunken Drafts: a massive hollowed natural stone stalactite column carved into an underground watch-post with an arched window and hanging bronze miner lantern.",
+  "references": [
+    "frostpeak-sunken-drafts-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T13:54:45.822Z"
+}

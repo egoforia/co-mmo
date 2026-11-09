@@ -500,6 +500,27 @@
     "height": 228,
     "view": "isometric"
   },
+  "frostpeak-eyrie-furniture-stone-balustrade": {
+    "file": "art/frostpeak-eyrie-furniture-stone-balustrade.png",
+    "kind": "furniture",
+    "width": 160,
+    "height": 168,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-tunnel-portal": {
+    "file": "art/frostpeak-eyrie-furniture-tunnel-portal.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 268,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-viaduct-arch": {
+    "file": "art/frostpeak-eyrie-furniture-viaduct-arch.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 288,
+    "view": "isometric"
+  },
   "frostpeak-eyrie-furniture-wind-throne": {
     "file": "art/frostpeak-eyrie-furniture-wind-throne.png",
     "kind": "furniture",

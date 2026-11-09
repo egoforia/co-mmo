@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-eyrie-furniture-falcon-frieze",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the carved falcon relief frieze inside The Eyrie of the First Watch: a cyclopean white marble and dark slate cliff wall relief panel carved with geometric outspread falcon wings and silver First Watch runes.",
+  "references": [
+    "frostpeak-eyrie-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T16:05:37.301Z"
+}

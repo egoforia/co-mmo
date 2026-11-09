@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, Tile, WORLD_REGIONS, buildingKit, collides, floorChecks, generateRegion, stairwayAt, storeyAt } from '../src/index.ts';
+import { BUILDING_STYLES, Tile, WORLD_REGIONS, buildingKit, collides, floorChecks, generateRegion, glowOf, stairwayAt, storeyAt } from '../src/index.ts';
 import { FROSTPEAK } from '../src/home-lands/frostpeak.ts';
 
 const { KIT_LOOKS } = buildingKit;
@@ -213,5 +213,39 @@ describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
     expect(marbleRubble.length, 'Expected marble rubble in Floor +1 transition halls and subterranean caverns').toBeGreaterThanOrEqual(4);
     expect(marbleRubble.some((l) => l.floor === 1)).toBe(true);
     expect(marbleRubble.some((l) => (l.floor ?? 0) < 0)).toBe(true);
+
+    // Verify Step 4 & 5 cliff facades, ice cascades, cantilever decks, beacon braziers, and upper terrace furnishings:
+    expect(eyrieStyle?.furniture['falcon-frieze']).toBeDefined();
+    expect(eyrieStyle?.furniture['ice-cascade']).toBeDefined();
+    expect(eyrieStyle?.furniture['beacon-brazier']).toBeDefined();
+    expect(BUILDING_STYLES['frostpeak-whiteledge-house']?.furniture['cantilever-deck']).toBeDefined();
+
+    const falconFriezes = map.landmarks.filter((l) => l.asset === 'frostpeak-eyrie-furniture-falcon-frieze');
+    expect(falconFriezes.length, 'Expected carved falcon relief friezes along cliffs and halls').toBeGreaterThanOrEqual(5);
+
+    const iceCascades = map.landmarks.filter((l) => l.asset === 'frostpeak-eyrie-furniture-ice-cascade');
+    expect(iceCascades.length, 'Expected frozen waterfalls in chasm gorge and upper terraces').toBeGreaterThanOrEqual(3);
+
+    const beaconBraziers = map.landmarks.filter((l) => l.asset === 'frostpeak-eyrie-furniture-beacon-brazier');
+    expect(beaconBraziers.length, 'Expected monumental beacon braziers at pass, viaduct, and high peaks').toBeGreaterThanOrEqual(8);
+
+    const cantileverDecks = map.landmarks.filter((l) => l.asset === 'frostpeak-whiteledge-house-furniture-cantilever-deck');
+    expect(cantileverDecks.length, 'Expected cantilevered timber decks along Whiteledge and west terraces').toBeGreaterThanOrEqual(4);
+
+    // Verify frozen river gorge beneath the viaduct bridge on Floor 0:
+    expect(map.tiles[108 * map.width + 38]).toBe(Tile.Water);
+
+    // Verify every upper floor (+1 through +8) has dedicated architectural landmarks/furniture:
+    for (let f = 1; f <= 8; f++) {
+      const floorProps = map.landmarks.filter((l) => l.floor === f);
+      expect(floorProps.length, `Expected furniture/props on upper floor ${f}`).toBeGreaterThanOrEqual(3);
+    }
+
+    // Verify dynamic lighting (glowOf) for mountain braziers, hearths, and subterranean miner lanterns:
+    expect(glowOf('frostpeak-eyrie-furniture-beacon-brazier')).toBeDefined();
+    expect(glowOf('frostpeak-eyrie-furniture-silver-brazier')).toBeDefined();
+    expect(glowOf('frostpeak-whiteledge-house-furniture-mountain-hearth')).toBeDefined();
+    expect(glowOf('frostpeak-sunken-drafts-furniture-stalactite-watchpost')).toBeDefined();
+    expect(glowOf('frostpeak-sunken-drafts-furniture-mining-rig')).toBeDefined();
   });
 });

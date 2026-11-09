@@ -254,6 +254,9 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       'stone-balustrade': { name: 'stone balustrade', look: 'a low carved stone parapet railing with stylized falcon feather balusters and flat snow-dusted marble coping', width: 1 },
       'viaduct-arch': { name: 'viaduct arch', look: 'a monumental cyclopean white marble bridge arch support standing firmly on mountain rock', width: 2 },
       'tunnel-portal': { name: 'mountain tunnel portal', look: 'a monumental carved stone portal arch with geometric falcon reliefs and iron-banded cedar doors set in cyclopean rock', width: 2 },
+      'falcon-frieze': { name: 'carved falcon relief frieze', look: 'a cyclopean white marble and dark slate cliff wall relief panel carved with geometric outspread falcon wings and silver First Watch runes', width: 2 },
+      'ice-cascade': { name: 'frozen waterfall cascade', look: 'a frozen alpine waterfall of faceted pale-blue glacier ice and white rime cascading down rough grey mountain slate rock', width: 2 },
+      'beacon-brazier': { name: 'mountain beacon brazier', look: 'a monumental carved white marble and silver pillar beacon burning with a tall wind-defying golden-amber and pale blue mountain fire', width: 1.5 },
     },
   },
   'frostpeak-whiteledge-house': {
@@ -274,6 +277,7 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       loom: { name: 'upright loom', look: 'a tall standing wooden loom strung with fine white and blue wool threads and silver shuttles', width: 2.5 },
       'mountain-hearth': { name: 'mountain hearth', look: 'a deep stone fireplace built into the living rock with a crackling birch fire and kettle', width: 2 },
       'fur-bed': { name: 'fur-lined bed', look: 'a sturdy wooden bed piled high with thick mountain sheep fleece and snow hare fur blankets', width: 2 },
+      'cantilever-deck': { name: 'cantilevered timber deck', look: 'a cantilevered mountain cedar plank lookout platform with heavy diagonal pine support struts and cold-forged silver-iron brackets', width: 2 },
     },
   },
   'frostpeak-sunken-drafts': {

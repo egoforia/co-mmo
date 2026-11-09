@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-eyrie-furniture-beacon-brazier",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the mountain beacon brazier inside The Eyrie of the First Watch: a monumental carved white marble and silver pillar beacon burning with a tall wind-defying golden-amber and pale blue mountain fire.",
+  "references": [
+    "frostpeak-eyrie-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T16:05:37.457Z"
+}

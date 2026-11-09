@@ -179,14 +179,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
   // Modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
   const closedUpper = map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor);
   const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = hasWall
-    ? [
-      ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0),
-      ...closedUpper.flatMap((s, idx) => {
-        const sRows: number[][] = [];
-        for (let y = 0; y < s.height; y++) sRows.push(Array.from(s.tiles.subarray(y * s.width, (y + 1) * s.width), (t) => (t === Tile.Blocked ? Tile.Floor : t)));
-        return rockWalls(scene, sRows, ox + s.x, oy + s.y, s.style, s.art, tilemaps, true, false, idx === closedUpper.length - 1, s.floor, Boolean(s.open), (wx, wy) => neighbourTile(wx - ox, wy - oy, s.floor));
-      }),
-    ]
+    ? rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0)
     : [];
   const view: BuildingView = {
     building: b,
@@ -207,7 +200,6 @@ const floors: FloorView[] = map.storeys.map((storey) => {
   const hasWall = Boolean(wallFaceKey(scene, storey.style, storey.art));
   const floorRows = hasWall ? rows.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : rows;
   const lift = floorLift(storey.floor);
-  const depthOff = floorDepthOffset(storey.floor);
   const layer = groundLayer(scene, floorRows, ox + storey.x, oy + storey.y, roomFloorDepth(ox + storey.x, oy + storey.y, storey.floor), registerStoreyTileset(scene, storey));
   layer.y -= lift;
   tilemaps.push(layer.tilemap);
@@ -216,26 +208,55 @@ const floors: FloorView[] = map.storeys.map((storey) => {
     if (!s) return undefined;
     return s.tiles[(wy - s.y) * s.width + (wx - s.x)] as Tile;
   };
+  const cliffDrops = (wx: number, wy: number): number => {
+    const [mx, my] = [wx - ox, wy - oy];
+    if (map.tiles[my * map.width + mx] === Tile.Water || map.tiles[(my + 1) * map.width + mx] === Tile.Water) return 1;
+    let drops = 1;
+    for (let f = storey.floor - 1; f >= 1; f--) {
+      if (storeyAt(map, mx, my, f)) break;
+      drops++;
+    }
+    return drops;
+  };
+  const hasUpperAbove = map.storeys.some((s) => s.floor === storey.floor + 1 && overlaps(s, storey));
+  const cutawayWalls = rockWalls(
+    scene,
+    rows,
+    ox + storey.x,
+    oy + storey.y,
+    storey.style,
+    storey.art,
+    tilemaps,
+    storey.floor > 0 || Boolean(storey.open),
+    true,
+    false,
+    storey.floor,
+    Boolean(storey.open),
+    (wx, wy) => neighbourTile(wx - ox, wy - oy),
+    cliffDrops,
+  );
+  const upperShellWalls =
+    storey.floor > 0 && !storey.open
+      ? rockWalls(
+          scene,
+          rows,
+          ox + storey.x,
+          oy + storey.y,
+          storey.style,
+          storey.art,
+          tilemaps,
+          true,
+          false,
+          !hasUpperAbove,
+          storey.floor,
+          false,
+          (wx, wy) => neighbourTile(wx - ox, wy - oy),
+          () => 0,
+        ).map((o) => o.setData('upperShell', true))
+      : [];
   return {
     storey,
-    objects: [
-      layer,
-      ...rockWalls(
-        scene,
-        rows,
-        ox + storey.x,
-        oy + storey.y,
-        storey.style,
-        storey.art,
-        tilemaps,
-        storey.floor > 0 || Boolean(storey.open),
-        true,
-        false,
-        storey.floor,
-        Boolean(storey.open),
-        (wx, wy) => neighbourTile(wx - ox, wy - oy),
-      ),
-    ],
+    objects: [layer, ...cutawayWalls, ...upperShellWalls],
   };
 });
   placeLandmarks(scene, map, ox, oy, views, floors, art);
@@ -450,7 +471,7 @@ export function revealBuildings(
   let changed = false;
   for (const v of buildings) {
     if (!v.outside.length) continue;
-    const open = nearBuilding(v.building, worldX - v.ox, worldY - v.oy);
+    const open = nearBuilding(v.building, worldX - v.ox, worldY - v.oy, v.kit ? undefined : 1.2);
     if (open === v.open && !instant) continue;
     if (open !== v.open) changed = true;
     v.open = open;
@@ -464,15 +485,50 @@ export function revealBuildings(
   return changed;
 }
 
-/** True for a wall picture rockWalls stood (walls.ts tags them). */
-function isWall(o: Phaser.GameObjects.GameObject): boolean {
-  return Boolean(o.getData('wall'));
+/** True when an upper storey (`s.floor > mine`) would draw over and compromise the view of the player at `shown`. */
+function compromisesPlayerView(
+  s: RegionMap['storeys'][number],
+  region: DrawnRegion,
+  shown: { x: number; y: number },
+  mine: number,
+): boolean {
+  // Kit houses stand their own multi-storey sprite when closed and cut to floor 0 when open.
+  if (region.buildings.some((v) => v.kit && overlaps(s, v.building))) {
+    return !seenFromGround(region.map, s);
+  }
+  // Directly inside or entering the footprint of this upper storey on our floor.
+  if (shown.x >= s.x - 0.5 && shown.x <= s.x + s.width + 0.5 && shown.y >= s.y - 0.5 && shown.y <= s.y + s.height + 0.5) {
+    return true;
+  }
+  // Inside an open ground-floor building that this upper storey covers.
+  if (
+    mine === 0 &&
+    region.buildings.some((v) => v.open && overlaps(s, v.building) && within(v.building, Math.floor(shown.x), Math.floor(shown.y)))
+  ) {
+    return true;
+  }
+  // Screen-space check: if the player is behind (north-west of) the upper storey's front edges and its lifted walls cover the avatar.
+  if (shown.x < s.x + s.width + 0.8 && shown.y < s.y + s.height + 0.8) {
+    const ox = region.map.def.at.x * region.map.width;
+    const oy = region.map.def.at.y * region.map.height;
+    const pScreen = PROJECTION.toScreen(ox + shown.x, oy + shown.y);
+    const pY = pScreen.y - floorLift(mine);
+    const sTopY = PROJECTION.toScreen(ox + s.x, oy + s.y).y - floorLift(s.floor + 1);
+    const sBottomY = PROJECTION.toScreen(ox + s.x + s.width, oy + s.y + s.height).y - floorLift(s.floor);
+    const sLeftX = PROJECTION.toScreen(ox + s.x, oy + s.y + s.height).x;
+    const sRightX = PROJECTION.toScreen(ox + s.x + s.width, oy + s.y).x;
+    if (pScreen.x + 24 >= sLeftX && pScreen.x - 24 <= sRightX && pY + 12 >= sTopY && pY - 88 <= sBottomY) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
- * Shows what can be seen from the floor we are on. On the ground, the land
- * as ever. Upstairs in the isometric camera, upper storeys stand elevated
- * above the dimmed ground floor and street below. Underground, only our floor shows.
+ * Shows what can be seen from the floor we are on. On the ground and on upper
+ * terraces, lower floors and their cliff walls remain visible underneath us,
+ * while upper floors stay visible whenever they do not occlude the player.
+ * Underground, only our floor shows.
  */
 export function applyFloorView(
   scene: Phaser.Scene,
@@ -510,15 +566,14 @@ export function applyFloorView(
     }
     for (const v of region.buildings) {
       const covered = Boolean(current && here && overlaps(here, v.building));
-      const showUnder = mine > 0 && !under && (covered || v.open);
+      const showUnder = mine > 0 && !under;
       for (const o of v.outside) {
         o.setVisible(!under && !covered && !showUnder);
         setDepthShade(o, groundDelta, true);
         if (!scene.tweens.isTweening(o)) o.setAlpha(v.open ? 0 : 1);
       }
       for (const o of v.inside) {
-        // Off the ground, the ground floor's walls stay hidden: a cutaway shows only our own floor's walls.
-        o.setVisible(!under && (!covered || showUnder) && !(mine !== 0 && isWall(o)));
+        o.setVisible(!under && (!covered || showUnder));
         setDepthShade(o, groundDelta, !showUnder);
         if (!showUnder && !scene.tweens.isTweening(o)) o.setAlpha(v.open ? 1 : 0);
       }
@@ -527,19 +582,37 @@ export function applyFloorView(
       setShown(o, mine === 0);
       setDepthShade(o, groundDelta);
     }
-    // Lamps burn only on their own floor, and those on the ground show from upstairs unless the floor we stand on covers them.
+    // Lamps burn on their own floor, and outdoor/ground lamps show from other above-ground floors unless covered.
     for (const lamp of region.lamps) {
       const covered = Boolean(current && here && within(here, lamp.tile.x, lamp.tile.y));
-      lamp.hidden = lamp.floor === mine ? false : !(mine > 0 && lamp.floor === 0 && !covered);
+      lamp.hidden = lamp.floor === mine ? false : !(mine >= 0 && lamp.floor >= 0 && !covered);
     }
     for (const f of region.floors) {
-      const delta = mine - f.storey.floor;
-      // From the ground a building's upper floors never show, near or far: outside only its roof, close by only its ground-floor cutaway.
-      const visible = current && (f.storey.floor === mine || (mine === 0 && seenFromGround(region.map, f.storey)) || (mine > f.storey.floor && f.storey.floor > 0 && !under));
-      // In a cutaway (off the ground) only our own floor's walls stand; the floors below show just their floor and furniture.
-      const walls = f.storey.floor === mine || mine === 0;
+      const s = f.storey;
+      const delta = mine - s.floor;
+      const isUpper = !under && s.floor > mine && s.floor > 0;
+      const isLower = !under && s.floor > 0 && s.floor < mine;
+      const visible =
+        current &&
+        (s.floor === mine ||
+          isLower ||
+          (isUpper && !compromisesPlayerView(s, region, shown, mine)));
       for (const o of f.objects) {
-        setShown(o, visible && (walls || !isWall(o)));
+        const isUpperShell = Boolean(o.getData('upperShell'));
+        const isCutWall = Boolean(o.getData('wall')) && !isUpperShell;
+        const isSkirt = Boolean(o.getData('skirt'));
+        const isLayer = o instanceof Phaser.Tilemaps.TilemapLayer && !o.getData('shell');
+        let showObj = visible;
+        if (visible) {
+          if (isUpper && !s.open) {
+            // Closed upper storeys seen from below show their floor/roof cap, outer full-height walls, and cliff skirts.
+            showObj = isUpperShell || isSkirt || isLayer;
+          } else {
+            // Active floor, lower floors, and open upper terraces show their cutaway walls, skirts, floor, and furniture.
+            showObj = !isUpperShell && (isCutWall || isSkirt || isLayer || true);
+          }
+        }
+        setShown(o, showObj);
         setDepthShade(o, Math.max(0, delta));
       }
     }

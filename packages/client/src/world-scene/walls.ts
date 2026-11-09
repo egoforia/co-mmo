@@ -65,7 +65,12 @@ export function groundLayer(
 
 /** Resolves the single seamless wall texture key for a building style or kit art override. */
 export function wallFaceKey(scene: Phaser.Scene, style: string, art?: TileArt): string | undefined {
-  const key = art?.face ?? art?.wall ?? buildingArt(style, 'wall');
+  const key =
+    art?.face ??
+    art?.wall ??
+    (style === 'frostpeak-whiteledge-house' && scene.textures.exists('frostpeak-sunken-drafts-wall')
+      ? 'frostpeak-sunken-drafts-wall'
+      : buildingArt(style, 'wall'));
   return scene.textures.exists(key) ? key : undefined;
 }
 
@@ -76,6 +81,8 @@ export function wallFaceKey(scene: Phaser.Scene, style: string, art?: TileArt): 
  * - When `cutaway` is true (interior cutaway or active storey), far North/West back walls (and far North/West
  *   corridor flanks) stand at full storey height (`storeyRise`), while camera-facing South/East walls and near
  *   South/East corridor flanks cut low (`cutRise` ~20px) so the player and floor are never occluded.
+ * - For elevated storeys (`floor > 0`), vertical cliff/support walls (`skirt`) hang down beneath the outer
+ *   South and East ledges so upper floors visibly rest on solid mountain stone or masonry rather than floating.
  */
 export function rockWalls(
   scene: Phaser.Scene,
@@ -91,10 +98,16 @@ export function rockWalls(
   floor = 0,
   openTerrace = false,
   neighbourTile?: (wx: number, wy: number) => number | undefined,
+  cliffDrops?: (wx: number, wy: number) => number,
 ): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
   const ground = PROJECTION.ground;
   const face = wallFaceKey(scene, style, art);
   if (!face) return [];
+  const cliffFace =
+    (art?.face && scene.textures.exists(art.face) ? art.face : undefined) ??
+    (style.startsWith('frostpeak-') && scene.textures.exists('frostpeak-sunken-drafts-wall')
+      ? 'frostpeak-sunken-drafts-wall'
+      : face);
   const storeyRise = Math.round(ground.height * 2.0);
   const cutRise = Math.round(ground.height * WALL_RISE);
   const lift = floorLift(floor);
@@ -103,7 +116,9 @@ export function rockWalls(
   const fullEast = registerWallFace(scene, face, 'east', ground.width, ground.height, storeyRise);
   const lowSouth = cutaway ? registerWallFace(scene, face, 'south', ground.width, ground.height, cutRise) : fullSouth;
   const lowEast = cutaway ? registerWallFace(scene, face, 'east', ground.width, ground.height, cutRise) : fullEast;
-  if (!fullSouth || !fullEast || !lowSouth || !lowEast) return [];
+  const cliffSouth = registerWallFace(scene, cliffFace, 'south', ground.width, ground.height, storeyRise) ?? fullSouth;
+  const cliffEast = registerWallFace(scene, cliffFace, 'east', ground.width, ground.height, storeyRise) ?? fullEast;
+  if (!fullSouth || !fullEast || !lowSouth || !lowEast || !cliffSouth || !cliffEast) return [];
 
   const h = rows.length;
   const w = rows[0]?.length ?? 0;
@@ -201,34 +216,77 @@ export function rockWalls(
       parts.push(cap);
     };
     makeHalfCap(true, storeyRise, wallCapDepth(left, top, floor, true));
-    if (cutaway) makeHalfCap(false, cutRise, wallCapDepth(left, top, floor, false));
+    if (cutaway) makeHalfCap(false, openTerrace ? 0 : cutRise, wallCapDepth(left, top, floor, false));
   }
 
-  rows.forEach((row, y) => row.forEach((_, x) => {
-    if (!wall(x, y)) return;
-    const [tx, ty] = [left + x, top + y];
-    const full = isFull(x, y);
-    const rise = full ? storeyRise : cutRise;
-    const southKey = full ? fullSouth : lowSouth;
-    const eastKey = full ? fullEast : lowEast;
-    if (open(x, y + 1) || (full && wall(x, y + 1) && !isFull(x, y + 1))) {
-      const at = PROJECTION.toScreen(tx, ty + 1);
-      const img = scene.add.image(at.x, at.y - lift - rise, southKey).setOrigin(0, 0).setDepth(depthOff + PROJECTION.depth(tx + 0.5, ty + 1)).setData('shell', true);
-      parts.push(img);
-    }
-    if (open(x + 1, y) || (full && wall(x + 1, y) && !isFull(x + 1, y))) {
-      const at = PROJECTION.toScreen(tx + 1, ty);
-      const img = scene.add
-        .image(at.x - ground.width / 2, at.y - lift - rise, eastKey)
-        .setOrigin(0, 0)
-        .setDepth(depthOff + PROJECTION.depth(tx + 1, ty + 0.5))
-        .setTint(EAST_WALL_TINT)
-        .setData('baseTint', EAST_WALL_TINT)
-        .setData('shell', true);
-      parts.push(img);
-    }
-  }));
-  // Tagged so a cutaway can hide the walls of every floor but the one we stand on.
+  if (!openTerrace) {
+    rows.forEach((row, y) => row.forEach((_, x) => {
+      if (!wall(x, y)) return;
+      const [tx, ty] = [left + x, top + y];
+      const full = isFull(x, y);
+      const rise = full ? storeyRise : cutRise;
+      const southKey = full ? fullSouth : lowSouth;
+      const eastKey = full ? fullEast : lowEast;
+      if (open(x, y + 1) || (full && wall(x, y + 1) && !isFull(x, y + 1))) {
+        const at = PROJECTION.toScreen(tx, ty + 1);
+        const img = scene.add.image(at.x, at.y - lift - rise, southKey).setOrigin(0, 0).setDepth(depthOff + PROJECTION.depth(tx + 0.5, ty + 1)).setData('shell', true);
+        parts.push(img);
+      }
+      if (open(x + 1, y) || (full && wall(x + 1, y) && !isFull(x + 1, y))) {
+        const at = PROJECTION.toScreen(tx + 1, ty);
+        const img = scene.add
+          .image(at.x - ground.width / 2, at.y - lift - rise, eastKey)
+          .setOrigin(0, 0)
+          .setDepth(depthOff + PROJECTION.depth(tx + 1, ty + 0.5))
+          .setTint(EAST_WALL_TINT)
+          .setData('baseTint', EAST_WALL_TINT)
+          .setData('shell', true);
+        parts.push(img);
+      }
+    }));
+  }
+  // Tagged so a cutaway can hide interior walls while keeping under-ledge cliff skirts visible.
   for (const p of parts) p.setData('wall', true);
+
+  // Vertical cliff/support walls beneath the outer South and East ledges of elevated storeys (`floor > 0`).
+  if (floor > 0) {
+    rows.forEach((row, y) => row.forEach((_, x) => {
+      if (getTile(x, y) === undefined) return;
+      const [tx, ty] = [left + x, top + y];
+      const southEdge = y === h - 1 && getTile(x, y + 1) === undefined;
+      const eastEdge = x === w - 1 && getTile(x + 1, y) === undefined;
+      if (!southEdge && !eastEdge) return;
+      const drops = Math.max(1, cliffDrops ? cliffDrops(tx, ty) : 1);
+      for (let d = 0; d < drops; d++) {
+        const f = floor - d;
+        if (f <= 0) break;
+        const fLift = floorLift(f);
+        const fDepthOff = floorDepthOffset(f - 1);
+        if (southEdge) {
+          const at = PROJECTION.toScreen(tx, ty + 1);
+          const skirt = scene.add
+            .image(at.x, at.y - fLift, cliffSouth)
+            .setOrigin(0, 0)
+            .setDepth(fDepthOff + PROJECTION.depth(tx + 0.5, ty + 1))
+            .setData('shell', true)
+            .setData('skirt', true);
+          parts.push(skirt);
+        }
+        if (eastEdge) {
+          const at = PROJECTION.toScreen(tx + 1, ty);
+          const skirt = scene.add
+            .image(at.x - ground.width / 2, at.y - fLift, cliffEast)
+            .setOrigin(0, 0)
+            .setDepth(fDepthOff + PROJECTION.depth(tx + 1, ty + 0.5))
+            .setTint(EAST_WALL_TINT)
+            .setData('baseTint', EAST_WALL_TINT)
+            .setData('shell', true)
+            .setData('skirt', true);
+          parts.push(skirt);
+        }
+      }
+    }));
+  }
+
   return parts;
 }

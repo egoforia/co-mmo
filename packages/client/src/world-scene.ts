@@ -642,9 +642,8 @@ export class WorldScene extends Phaser.Scene {
 
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
-    if (revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant)) {
-      this.applyFloor();
-    }
+    revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant);
+    this.applyFloor();
   }
 
   private readInput(): { dx: number; dy: number } {

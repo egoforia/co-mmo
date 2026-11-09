@@ -92,6 +92,46 @@ export function standHouse(scene: Phaser.Scene, texture: string, frame: Frame, f
 }
 
 /**
+ * Stands only the bottom of a house's outside: in each strip, its near walls
+ * from the ground up `rise` screen pixels, everything above (upper storeys,
+ * roof) cut away. Seen from upstairs, this is the ground floor under us, in
+ * the walls the house shows from outside; the storey above covers the cut.
+ * Each strip is cut level at the highest point its near edge reaches, so the
+ * cut never falls below the top of the walls.
+ */
+export function standHouseBottom(scene: Phaser.Scene, texture: string, frame: Frame, floor: Floor, rise: number): Phaser.GameObjects.Image[] {
+  const { left: L, top: T, right: R, bottom: B } = floor;
+  const corner = PROJECTION.toScreen(R, B);
+  const scale = (PROJECTION.toScreen(R, B - buildingKit.BAY_TILES).x - corner.x) / frame.u;
+  const run: [number, number][] = [[L, B], [R, B], [R, T]];
+  const edge = run.map(([x, y]) => PROJECTION.toScreen(x, y));
+  // The ground line of the near walls at screen x, between the run's ends.
+  const groundAt = (x: number): number => {
+    if (x <= edge[0]!.x) return edge[0]!.y;
+    for (let i = 1; i < edge.length; i++) {
+      const [a, b] = [edge[i - 1]!, edge[i]!];
+      if (x <= b.x) return a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x || 1);
+    }
+    return edge[edge.length - 1]!.y;
+  };
+  const strips: Phaser.GameObjects.Image[] = [];
+  for (let x0 = 0; x0 < frame.width; x0 += STRIP) {
+    const w = Math.min(STRIP, frame.width - x0);
+    const [sx0, sx1] = [corner.x + (x0 - frame.origin[0]) * scale, corner.x + (x0 + w - frame.origin[0]) * scale];
+    const inside = edge.filter((p) => p.x > sx0 && p.x < sx1).map((p) => p.y);
+    const highest = Math.min(groundAt(sx0), groundAt(sx1), ...inside);
+    // From screen y to the picture's own rows.
+    const cut = Math.max(0, Math.floor(frame.origin[1] + (highest - rise - corner.y) / scale));
+    if (cut >= frame.height) continue;
+    const middle = (sx0 + sx1) / 2;
+    const strip = scene.add.image(corner.x, corner.y, texture).setOrigin(frame.origin[0] / frame.width, frame.origin[1] / frame.height);
+    strip.setScale(scale).setCrop(x0, cut, w, frame.height - cut).setDepth(depthAt(middle, run));
+    strips.push(strip);
+  }
+  return strips;
+}
+
+/**
  * Stands a picture of a thing on the tiles it covers, as `standing` plans
  * it: one picture, or upright strips sorted by the near edges of its tiles.
  */

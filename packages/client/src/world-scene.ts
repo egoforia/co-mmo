@@ -60,6 +60,7 @@ import { Marks } from './world-scene/marks.ts';
 import { setStatusIcons } from './world-scene/status-icons.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
 import { Targeting } from './world-scene/targeting.ts';
+import { cullOffscreen } from './world-scene/cull.ts';
 import {
   applyFloorView,
   drawNearChunks,
@@ -301,6 +302,8 @@ export class WorldScene extends Phaser.Scene {
     this.fitTint();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitTint, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, this.fitTint, this));
+    // Pictures well off screen are not drawn: each would cost a draw call.
+    cullOffscreen(this);
   }
 
   /**

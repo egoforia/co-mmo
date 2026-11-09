@@ -88,7 +88,7 @@ export const WINDOW_LIGHT: Light = { color: '#ffc477', radius: 2.5 };
 export function glowOf(asset: string): Light | undefined {
   if (/moth|firebolt|item-|scroll-/.test(asset)) return undefined;
   if (/brazier|hearth|campfire|bonfire|torch|forge|fire-?pit|fireplace/.test(asset)) return FLAME_LIGHT;
-  if (/lantern|lamp|candle/.test(asset)) return LAMP_LIGHT;
+  if (/lantern|lamp|candle|watchpost|mining-rig/.test(asset)) return LAMP_LIGHT;
   if (/shrine|altar/.test(asset)) return HOLY_LIGHT;
   return undefined;
 }

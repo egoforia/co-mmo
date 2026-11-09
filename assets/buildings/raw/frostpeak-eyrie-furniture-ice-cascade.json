@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-eyrie-furniture-ice-cascade",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the frozen waterfall cascade inside The Eyrie of the First Watch: a frozen alpine waterfall of faceted pale-blue glacier ice and white rime cascading down rough grey mountain slate rock.",
+  "references": [
+    "frostpeak-eyrie-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T16:05:37.378Z"
+}

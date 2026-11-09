@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-whiteledge-house-furniture-cantilever-deck",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the cantilevered timber deck inside Whiteledge Terrace House: a cantilevered mountain cedar plank lookout platform with heavy diagonal pine support struts and cold-forged silver-iron brackets.",
+  "references": [
+    "frostpeak-whiteledge-house-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T16:05:37.530Z"
+}

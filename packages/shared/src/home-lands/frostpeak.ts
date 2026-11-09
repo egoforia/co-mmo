@@ -158,9 +158,11 @@ function layout(map: RegionMap, c: number): void {
   // Mount Zephyr: Mountain Pass, Whiteledge, and The Eyrie
   // -------------------------------------------------------------
 
-  // 1. Mountain Pass through the eastern cliffs:
+  // 1. Mountain Pass through the eastern cliffs, flanked by monumental beacon braziers:
   disc(map, 84, 120, 6, Tile.Ground);
   road(map, c, c, 84, 120);
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 81.5, y: 116.5, footprint: { width: 1.5, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 81.5, y: 123.5, footprint: { width: 1.5, height: 1 } });
 
   // 2. Sculpted mountain road ascending into Whiteledge Town:
   road(map, 84, 120, 56, 120);
@@ -170,6 +172,13 @@ function layout(map: RegionMap, c: number): void {
   disc(map, 48, 128, 8, Tile.Ground);
   disc(map, 64, 112, 8, Tile.Ground);
   disc(map, 64, 128, 8, Tile.Ground);
+
+  // Frozen mountain chasm stream running beneath the Viaduct Bridge (y = 106..111, west of switchback road):
+  for (let y = 106; y <= 111; y++) {
+    for (let x = 24; x <= 41; x++) {
+      map.tiles[y * map.width + x] = Tile.Water;
+    }
+  }
 
   // Talon-Mason Kaen's workshop (10x6 marble building)
   const masonShop = building(map, 48, 128, 10, 6, 'frostpeak-whiteledge-house');
@@ -220,12 +229,27 @@ function layout(map: RegionMap, c: number): void {
   putEyrie('astrolabe-pedestal', 2, 7, 2, 1);
   putEyrie('falcon-perch', 13, 4, 1.5, 1);
 
-  // Eyrie Forecourt & Approach: Monumental Tunnel Portal, Braziers, and Viaduct Arches
+  // Eyrie Forecourt, Chasm Gorge & Whiteledge Cliff Terraces:
+  // Monumental Tunnel Portals, Falcon Relief Friezes, Ice Cascades, Cantilever Decks, Beacon Braziers, and Viaduct Arches
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'tunnel-portal'), x: 39.5, y: 94.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'falcon-frieze'), x: 35.5, y: 94.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'falcon-frieze'), x: 49.5, y: 94.5, footprint: { width: 2, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'silver-brazier'), x: 37.5, y: 94.5, footprint: { width: 1, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'silver-brazier'), x: 46.5, y: 94.5, footprint: { width: 1, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 34.5, y: 96.5, footprint: { width: 1.5, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 51.5, y: 96.5, footprint: { width: 1.5, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 43, y: 104, footprint: { width: 2, height: 1 } });
   map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'viaduct-arch'), x: 43, y: 114, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'ice-cascade'), x: 35.5, y: 105.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'ice-cascade'), x: 35.5, y: 112.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-whiteledge-house', 'cantilever-deck'), x: 45, y: 125, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-whiteledge-house', 'cantilever-deck'), x: 61, y: 110, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'falcon-frieze'), x: 45, y: 129, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'beacon-brazier'), x: 53.5, y: 117.5, footprint: { width: 1.5, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'silver-brazier'), x: 60.5, y: 117.5, footprint: { width: 1, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'tunnel-portal'), x: 42, y: 138.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'falcon-frieze'), x: 36, y: 138.5, footprint: { width: 2, height: 1 } });
+  map.landmarks.push({ asset: furnitureArt('frostpeak-eyrie', 'falcon-frieze'), x: 48, y: 138.5, footprint: { width: 2, height: 1 } });
 
   // -------------------------------------------------------------
   // Storeys and Mountain Tunnels: Floors +1 to +8 and -1 to -4
@@ -305,9 +329,9 @@ function layout(map: RegionMap, c: number): void {
   connectVertical(map, 5, f5North, f5TunnelN, 42);
   connectVertical(map, 5, f5TunnelN, f5Central, 42);
 
-  // Floor +6: High Council Chamber, Elder's Solarium, and Council Tunnel
+  // Floor +6: High Council Chamber, Elder's Open Solarium Terrace, and Council Tunnel
   const f6Central = addStorey(map, { x: 38, y: 85, width: 10, height: 6 }, 6, eyrie.style);
-  const f6North = addStorey(map, { x: 38, y: 52, width: 10, height: 6 }, 6, eyrie.style);
+  const f6North = addStorey(map, { x: 38, y: 52, width: 10, height: 6 }, 6, eyrie.style, undefined, true);
   const f6TunnelN = addStorey(map, { x: 40, y: 58, width: 6, height: 27 }, 6, eyrie.style);
 
   connectVertical(map, 6, f6North, f6TunnelN, 42);
@@ -379,11 +403,75 @@ function layout(map: RegionMap, c: number): void {
   const putFloorProp = (style: string, key: string, x: number, y: number, width: number, height: number, floor: number) =>
     map.landmarks.push({ asset: furnitureArt(style, key), x, y, footprint: { width, height }, floor });
 
-  // Mixed Marble & Living Stone Chamber Details on Floor +1 (Grand Portico & South Bastion)
+  // Mixed Marble & Living Stone Chamber Details on Floor +1 (Grand Portico, North Scriptorium, South Bastion, West Vista)
   putFloorProp('frostpeak-whiteledge-house', 'mason-bench', 37, 84, 2, 1, 1);
   putFloorProp('frostpeak-whiteledge-house', 'mountain-hearth', 49, 84, 2, 1, 1);
   putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 37, 91, 1.5, 1, 1);
   putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 36, 128, 1.5, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'falcon-frieze', 43, 84, 2, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 36, 37, 1, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 47, 37, 2, 1, 1);
+  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 21, 86, 2, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'ice-cascade', 21, 91, 2, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 19.5, 91.5, 1, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 25.5, 91.5, 1, 1, 1);
+
+  // Floor +2 (Loom-Terraces, North Falconer's Sky-Roost, South Feather-Cache, West Cloud Terrace, Open Viaduct Bridge):
+  putFloorProp('frostpeak-whiteledge-house', 'loom', 37.5, 84.5, 2.5, 1, 2);
+  putFloorProp('frostpeak-whiteledge-house', 'mountain-hearth', 49, 91, 2, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'falcon-perch', 36, 37, 1.5, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'falcon-perch', 46, 37, 1.5, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 40.5, 96, 1.5, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 45.5, 121, 1.5, 1, 2);
+  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 21, 86, 2, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 19.5, 91.5, 1, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 25.5, 91.5, 1, 1, 2);
+
+  // Floor +3 (Wind-Scriptorium, North Draft Sanctuary, South Observation Deck):
+  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 38, 85, 2, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'falcon-frieze', 43, 85, 2, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 48, 85, 1, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 37, 38, 2, 1, 3);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 45, 38, 1, 1, 3);
+  putFloorProp('frostpeak-whiteledge-house', 'mason-bench', 37, 126, 2, 1, 3);
+
+  // Floor +4 (Steaming Marble Baths, Cold Plunge, Mist Terrace — open):
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 38.5, 86, 1, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 47.5, 86, 1, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'ice-cascade', 37, 40, 2, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 45, 40, 1.5, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 36.5, 128.5, 1, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 128.5, 1, 1, 4);
+
+  // Floor +5 (Master Falconer's Roost & North High Aerie — open):
+  putFloorProp('frostpeak-eyrie', 'falcon-perch', 39, 86, 1.5, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'falcon-perch', 46, 86, 1.5, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'falcon-perch', 38, 44, 1.5, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 44, 44, 1.5, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 37.5, 90.5, 1, 1, 5);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 46.5, 90.5, 1, 1, 5);
+
+  // Floor +6 (High Council Chamber & Elder's Open Solarium Terrace — Scene 1 Floor 6+ Ground View):
+  putFloorProp('frostpeak-eyrie', 'wind-throne', 43, 86.5, 2, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'falcon-frieze', 39.5, 86.5, 2, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 46.5, 86.5, 1, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 40.5, 54, 2, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 45.5, 54, 1, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 39.5, 56.5, 1, 1, 6);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 46.5, 56.5, 1, 1, 6);
+
+  // Floor +7 (Belfry of Zephyrs & North Lookout Bastion — open):
+  putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 41, 86.5, 2, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'silver-brazier', 45.5, 86.5, 1, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 43, 64, 1.5, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 40.5, 66.5, 1, 1, 7);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 66.5, 1, 1, 7);
+
+  // Floor +8 (The Crown of the Wind — open summit peak):
+  putFloorProp('frostpeak-eyrie', 'beacon-brazier', 40.5, 86.5, 1.5, 1, 8);
+  putFloorProp('frostpeak-eyrie', 'falcon-perch', 45.5, 86.5, 1.5, 1, 8);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 40.5, 89.5, 1, 1, 8);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 89.5, 1, 1, 8);
 
   // Floor -1 (Upper Silver Veins, North Lode, South Ore Depot):
   putFloorProp('frostpeak-sunken-drafts', 'mining-rig', 34, 81, 2, 1, -1);

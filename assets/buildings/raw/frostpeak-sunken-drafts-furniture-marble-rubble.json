@@ -1,0 +1,11 @@
+{
+  "id": "frostpeak-sunken-drafts-furniture-marble-rubble",
+  "kind": "furniture",
+  "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the carved marble rubble inside The Sunken Drafts: a scatter of half-carved white marble blocks, rough grey slate flagstones, and mason chisels transitioning between refined masonry and raw mountain rock.",
+  "references": [
+    "frostpeak-sunken-drafts-exterior"
+  ],
+  "provider": "subagent-free",
+  "model": "ide-image-generator",
+  "createdAt": "2026-11-09T13:54:45.912Z"
+}

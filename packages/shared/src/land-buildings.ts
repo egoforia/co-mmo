@@ -294,6 +294,9 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       'stalagmite-cluster': { name: 'ice stalagmites', look: 'a cluster of sharp glacial ice stalagmites rising from the frozen rock floor', width: 1.5 },
       'mining-rig': { name: 'spelunker rig', look: 'a wooden hoist rig with coiled hemp rope, iron pickaxes, and hanging miner lanterns', width: 2 },
       'relic-sarcophagus': { name: 'ancient watcher sarcophagus', look: 'a massive carved stone sarcophagus bearing the falcon crest of the First Watch', width: 2.5 },
+      'mine-rail-crossing': { name: 'mine rail crossing', look: 'a section of rusted iron mine cart rail tracks with heavy cedar timber sleepers crossing a glowing pale blue permafrost fissure', width: 2 },
+      'stalactite-watchpost': { name: 'stalactite watch-post', look: 'a massive hollowed natural stone stalactite column carved into an underground watch-post with an arched window and hanging bronze miner lantern', width: 2 },
+      'marble-rubble': { name: 'carved marble rubble', look: 'a scatter of half-carved white marble blocks, rough grey slate flagstones, and mason chisels transitioning between refined masonry and raw mountain rock', width: 1.5 },
     },
   },
 };

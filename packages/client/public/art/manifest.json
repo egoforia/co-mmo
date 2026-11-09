@@ -552,6 +552,20 @@
     "width": 128,
     "height": 128
   },
+  "frostpeak-sunken-drafts-furniture-marble-rubble": {
+    "file": "art/frostpeak-sunken-drafts-furniture-marble-rubble.png",
+    "kind": "furniture",
+    "width": 200,
+    "height": 156,
+    "view": "isometric"
+  },
+  "frostpeak-sunken-drafts-furniture-mine-rail-crossing": {
+    "file": "art/frostpeak-sunken-drafts-furniture-mine-rail-crossing.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 196,
+    "view": "isometric"
+  },
   "frostpeak-sunken-drafts-furniture-mining-rig": {
     "file": "art/frostpeak-sunken-drafts-furniture-mining-rig.png",
     "kind": "furniture",
@@ -571,6 +585,13 @@
     "kind": "furniture",
     "width": 280,
     "height": 244,
+    "view": "isometric"
+  },
+  "frostpeak-sunken-drafts-furniture-stalactite-watchpost": {
+    "file": "art/frostpeak-sunken-drafts-furniture-stalactite-watchpost.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 348,
     "view": "isometric"
   },
   "frostpeak-sunken-drafts-furniture-stalagmite-cluster": {

@@ -193,5 +193,25 @@ describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
 
     const houseFurniture = map.landmarks.filter((l) => l.asset.startsWith('frostpeak-whiteledge-house-furniture-'));
     expect(houseFurniture.length).toBeGreaterThanOrEqual(4);
+
+    // Verify Step 3 subterranean cavern props and mixed marble/stone transition props:
+    const sunkenStyle = BUILDING_STYLES['frostpeak-sunken-drafts'];
+    expect(sunkenStyle?.furniture['mine-rail-crossing']).toBeDefined();
+    expect(sunkenStyle?.furniture['stalactite-watchpost']).toBeDefined();
+    expect(sunkenStyle?.furniture['marble-rubble']).toBeDefined();
+
+    const sunkenFurniture = map.landmarks.filter((l) => l.asset.startsWith('frostpeak-sunken-drafts-furniture-'));
+    expect(sunkenFurniture.length).toBeGreaterThanOrEqual(15);
+
+    const railCrossings = map.landmarks.filter((l) => l.asset === 'frostpeak-sunken-drafts-furniture-mine-rail-crossing');
+    expect(railCrossings.length, 'Expected mine rail crossings in subterranean chambers').toBeGreaterThanOrEqual(4);
+
+    const stalactiteWatchposts = map.landmarks.filter((l) => l.asset === 'frostpeak-sunken-drafts-furniture-stalactite-watchpost');
+    expect(stalactiteWatchposts.length, 'Expected stalactite watch-posts in subterranean chambers').toBeGreaterThanOrEqual(3);
+
+    const marbleRubble = map.landmarks.filter((l) => l.asset === 'frostpeak-sunken-drafts-furniture-marble-rubble');
+    expect(marbleRubble.length, 'Expected marble rubble in Floor +1 transition halls and subterranean caverns').toBeGreaterThanOrEqual(4);
+    expect(marbleRubble.some((l) => l.floor === 1)).toBe(true);
+    expect(marbleRubble.some((l) => (l.floor ?? 0) < 0)).toBe(true);
   });
 });

@@ -374,6 +374,64 @@ function layout(map: RegionMap, c: number): void {
   connectVertical(map, -4, sub4TunnelS, sub4South, 41);
 
   // -------------------------------------------------------------
+  // Subterranean Cavern & Mixed Chamber Details (Floors -1 to -4 & +1)
+  // -------------------------------------------------------------
+  const putFloorProp = (style: string, key: string, x: number, y: number, width: number, height: number, floor: number) =>
+    map.landmarks.push({ asset: furnitureArt(style, key), x, y, footprint: { width, height }, floor });
+
+  // Mixed Marble & Living Stone Chamber Details on Floor +1 (Grand Portico & South Bastion)
+  putFloorProp('frostpeak-whiteledge-house', 'mason-bench', 37, 84, 2, 1, 1);
+  putFloorProp('frostpeak-whiteledge-house', 'mountain-hearth', 49, 84, 2, 1, 1);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 37, 91, 1.5, 1, 1);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 36, 128, 1.5, 1, 1);
+
+  // Floor -1 (Upper Silver Veins, North Lode, South Ore Depot):
+  putFloorProp('frostpeak-sunken-drafts', 'mining-rig', 34, 81, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 42, 81, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 42, 93, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'ore-cart', 34, 93, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 54, 81, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 54, 93, 1.5, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'ore-cart', 34, 34, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 42, 41, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 49, 34, 1.5, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'mining-rig', 34, 130, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'ore-cart', 49, 130, 2, 1, -1);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 42, 138, 1.5, 1, -1);
+
+  // Floor -2 (Whispering Tunnels, North Den, South Stalker Lair):
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 32, 80, 2, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 55, 80, 2, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 42, 80, 2, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 42, 94, 2, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 32, 94, 1.5, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 55, 94, 1.5, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 33, 33, 1.5, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 50, 33, 2, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 42, 132, 2, 1, -2);
+  putFloorProp('frostpeak-sunken-drafts', 'ore-cart', 50, 138, 2, 1, -2);
+
+  // Floor -3 (Crypt of the First Watchers, North Tomb Vault, South Sarcophagus Hall):
+  putFloorProp('frostpeak-sunken-drafts', 'relic-sarcophagus', 34, 81, 2.5, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'relic-sarcophagus', 53, 81, 2.5, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 34, 93, 2, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 53, 93, 1.5, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'relic-sarcophagus', 42, 34, 2.5, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'marble-rubble', 34, 41, 1.5, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'relic-sarcophagus', 42, 136, 2.5, 1, -3);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 49, 130, 1.5, 1, -3);
+
+  // Floor -4 (The Hoarfrost Well, North Deep Cavern, South Frost Sump):
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 34, 82, 1.5, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 53, 82, 1.5, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 34, 92, 2, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'mine-rail-crossing', 43, 92, 2, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'relic-sarcophagus', 53, 92, 2.5, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 34, 35, 1.5, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'stalagmite-cluster', 49, 35, 1.5, 1, -4);
+  putFloorProp('frostpeak-sunken-drafts', 'stalactite-watchpost', 42, 132, 2, 1, -4);
+
+  // -------------------------------------------------------------
   // Stairways and Ladders (Connecting all 13 Levels)
   // -------------------------------------------------------------
 

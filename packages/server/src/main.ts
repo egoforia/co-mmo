@@ -77,7 +77,7 @@ const app = createApp({
     weather: process.env.WEATHER?.trim().toLowerCase() !== 'off',
   }),
   apiLog,
-  // NET_COMPRESS=off sends to players uncompressed (socket-net.ts).
+  // NET_COMPRESS=off sends to players uncompressed, NET_SKIP_STALE=off never skips a snapshot (socket-net.ts).
   net: netFromEnv(process.env),
   publicUrl,
   clientDir,

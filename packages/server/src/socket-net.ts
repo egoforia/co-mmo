@@ -8,12 +8,14 @@ import type { PerMessageDeflateOptions } from 'ws';
 export interface NetOptions {
   /** Compress what goes to players (NET_COMPRESS=off turns it off). */
   compress: boolean;
+  /** Skip snapshots for a connection that has fallen behind (snapshot-gate.ts; NET_SKIP_STALE=off turns it off). */
+  skipStale: boolean;
 }
 
 /** The choices from the environment: everything on unless set to `off`. */
 export function netFromEnv(env: Record<string, string | undefined>): NetOptions {
   const on = (name: string) => env[name]?.trim().toLowerCase() !== 'off';
-  return { compress: on('NET_COMPRESS') };
+  return { compress: on('NET_COMPRESS'), skipStale: on('NET_SKIP_STALE') };
 }
 
 /**

@@ -4,7 +4,8 @@ import { netFromEnv } from '../src/socket-net.ts';
 
 describe('the game socket on the network', () => {
   it('compresses what it sends to players, and NET_COMPRESS=off turns that off', async () => {
-    expect(netFromEnv({})).toEqual({ compress: true });
+    expect(netFromEnv({})).toEqual({ compress: true, skipStale: true });
+    expect(netFromEnv({ NET_SKIP_STALE: 'Off' }).skipStale).toBe(false);
     expect(netFromEnv({ NET_COMPRESS: 'off' }).compress).toBe(false);
     const { store, ws } = await start();
     const c = connect(ws, account(store, 'Mara').token);
@@ -16,7 +17,7 @@ describe('the game socket on the network', () => {
   });
 
   it('sends plainly when compression is off', async () => {
-    const { store, ws } = await start({ net: { compress: false } });
+    const { store, ws } = await start({ net: { compress: false, skipStale: true } });
     const c = connect(ws, account(store, 'Mara').token);
     await c.waitFor((m) => m.t === 'welcome');
     expect(c.socket.extensions).toBe('');

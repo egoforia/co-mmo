@@ -44,7 +44,7 @@ export interface PerfSources {
   /** The world scene's counts, once it has started. */
   counts: () => SceneCounts | undefined;
   /** Everything the game connection has received so far. */
-  received: { messages: number; bytes: number; snapshots: number };
+  received: { messages: number; bytes: number; snapshots: number; skipped: number };
   /** The latest times between snapshots arriving, ms. */
   snapshotGaps: number[];
   /** Sends a ping; the overlay hears the pong through `pong`. */
@@ -70,7 +70,7 @@ export class PerfOverlay {
   private readonly messagesIn = new Rate();
   private readonly bytesIn = new Rate();
   private readonly snapshotsIn = new Rate();
-  private lastReceived = { messages: 0, bytes: 0, snapshots: 0 };
+  private lastReceived = { messages: 0, bytes: 0, snapshots: 0, skipped: 0 };
   private stepAt = 0;
   private lastStep = 0;
   private drawCalls = 0;
@@ -280,6 +280,7 @@ export class PerfOverlay {
       // Snapshots leave the server evenly; arriving unevenly means the network wobbles.
       row('', `snapshots arrive ${typical.toFixed(0)} ms apart, 1 in 20 over ${late.toFixed(0)} ms`, late > typical * 3 ? 'warn' : '');
     }
+    if (this.sources.received.skipped) row('', `${this.sources.received.skipped} snapshots skipped so far because this connection fell behind`, 'warn');
     if (counts) row('', `others drawn ${counts.drawnBehindMs.toFixed(0)} ms behind the server · network wobble ${counts.wobbleMs.toFixed(0)} ms`, counts.wobbleMs > 150 ? 'warn' : '');
     if (counts) {
       row('World', `${this.sources.region()}${counts.tile ? ` at ${counts.tile.x}, ${counts.tile.y}` : ''} · ${counts.players} player${counts.players === 1 ? '' : 's'}, ${counts.creatures} creatures, ${counts.npcs} people, ${counts.bodies} fallen`);

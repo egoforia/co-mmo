@@ -194,6 +194,13 @@ laptop. `npm run netbench` measures it (docs/playtest.md).
   gets about 7 KB a second instead of 98, and the host sends about 0.3 MB a
   second instead of 3.8. It costs some processor time on the game server.
   `NET_COMPRESS=off` turns it off.
+- **No queue on a slow line.** The browser says a few times a second which
+  snapshot it has (`seen`). When snapshots start taking much longer than
+  usual to get there, they are waiting in a queue, so the game server skips
+  them (`snapshot-gate.ts`) and sends one every half second until the line
+  catches up, rather than let the player fall seconds behind. Each snapshot
+  carries everything in view, so nothing is lost but in-between steps; F3
+  shows how many were skipped. `NET_SKIP_STALE=off` turns it off.
 
 ## Crowds
 

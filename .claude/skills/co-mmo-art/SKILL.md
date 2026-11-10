@@ -45,7 +45,10 @@ Where things are:
 - Buildings: `BUILDING_STYLES` in `packages/shared/src/buildings.ts`. In
   diamond isometric projection (`ISOMETRIC`), buildings never use flat 2D
   exterior billboard pictures (`docs/buildings-and-walls.md`); they stand as
-  3D kit houses (`KitHouse`) or tall vertical cutaway walls (`rockWalls`).
+  3D kit houses (`KitHouse`) or tall vertical cutaway walls (`rockWalls`),
+  while open outdoor terraces (`storey.open`) use low `WALL_RISE` parapets on
+  exposed rims and downward cliff skirts (`skirt`) in the style's above-ground
+  masonry texture (`world-scene/walls.ts`, `world-scene/below.ts`).
   `building-art.ts` paints interior/surface textures (`floor`, `wall`, `door`
   — 100% full-bleed seamless tiles with zero magenta) and `furniture`.
 - Kit buildings: `packages/shared/src/building-kit/` builds a house from a

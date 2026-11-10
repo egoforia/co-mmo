@@ -248,4 +248,32 @@ describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
     expect(glowOf('frostpeak-sunken-drafts-furniture-stalactite-watchpost')).toBeDefined();
     expect(glowOf('frostpeak-sunken-drafts-furniture-mining-rig')).toBeDefined();
   });
+
+  it('aligns southern terrace cliffs and maintains a ground buffer from Whiteledge village houses', () => {
+    const masonShop = map.buildings.find((b) => b.style === 'frostpeak-whiteledge-house' && b.x === 48 && b.y === 128);
+    expect(masonShop).toBeDefined();
+
+    // Above-ground southern terraces (y >= 120, floor > 0) must keep a clean buffer from masonShop (x: 48..57, y: 128..133)
+    const southTerraces = map.storeys.filter((s) => s.floor > 0 && s.y >= 120);
+    expect(southTerraces.length).toBeGreaterThanOrEqual(4);
+    for (const s of southTerraces) {
+      const overlapsX = s.x < masonShop!.x + masonShop!.width && masonShop!.x < s.x + s.width;
+      const overlapsY = s.y < masonShop!.y + masonShop!.height && masonShop!.y < s.y + s.height;
+      expect(overlapsX && overlapsY, `Storey on floor ${s.floor} at (${s.x}, ${s.y}) must not overlap masonShop`).toBe(false);
+      if (overlapsX) {
+        expect(masonShop!.y - (s.y + s.height), `Storey on floor ${s.floor} should leave at least a 2-tile snow buffer north of masonShop`).toBeGreaterThanOrEqual(2);
+      }
+      if (overlapsY) {
+        expect(masonShop!.x - (s.x + s.width), `Storey on floor ${s.floor} should leave at least a 2-tile buffer west of masonShop`).toBeGreaterThanOrEqual(2);
+      }
+    }
+
+    // f1South and f2South share a flush southern cliff edge at y + height === 126 (row y = 125)
+    const f1South = map.storeys.find((s) => s.floor === 1 && s.x === 32 && s.y === 121)!;
+    const f2South = map.storeys.find((s) => s.floor === 2 && s.x === 32 && s.y === 121)!;
+    expect(f1South).toBeDefined();
+    expect(f2South).toBeDefined();
+    expect(f1South.y + f1South.height).toBe(126);
+    expect(f2South.y + f2South.height).toBe(126);
+  });
 });

@@ -3,7 +3,7 @@
 // below through their cut-down near walls.
 
 import Phaser from 'phaser';
-import { Tile, type RegionMap, type TileRect } from '@co-mmo/shared';
+import { Tile, storeyAt, type RegionMap, type TileRect } from '@co-mmo/shared';
 import { type BuildingView, type DrawnRegion, type FloorView, overlaps, setDepthShade, setShown } from './types.ts';
 import { standHouseBottom } from '../kit-house-view.ts';
 import { floorLift } from './depth.ts';
@@ -56,7 +56,27 @@ function closedWalls(scene: Phaser.Scene, region: DrawnRegion, key: BuildingView
     walls = rockWalls(scene, rowsOf(map.tiles, map.width, b, b), ox + b.x, oy + b.y, b.style, b.art, region.tilemaps, true, false, false, 0);
   } else {
     const s = key.storey;
-    walls = rockWalls(scene, rowsOf(s.tiles, s.width, s, { x: 0, y: 0 }), ox + s.x, oy + s.y, s.style, s.art, region.tilemaps, true, false, false, s.floor);
+    const neighbourTile = (wx: number, wy: number): Tile | undefined => {
+      const adj = storeyAt(map, wx - ox, wy - oy, s.floor);
+      if (!adj) return undefined;
+      return adj.tiles[(wy - oy - adj.y) * adj.width + (wx - ox - adj.x)] as Tile;
+    };
+    walls = rockWalls(
+      scene,
+      rowsOf(s.tiles, s.width, s, { x: 0, y: 0 }),
+      ox + s.x,
+      oy + s.y,
+      s.style,
+      s.art,
+      region.tilemaps,
+      true,
+      false,
+      false,
+      s.floor,
+      Boolean(s.open),
+      neighbourTile,
+      () => 0,
+    );
   }
   for (const w of walls) w.setData('shell', false).setVisible(false);
   region.objects.push(...walls);
@@ -96,7 +116,7 @@ export function showFloorsBelow(
   for (const v of region.buildings) {
     // The same buildings whose inside shows from upstairs (applyFloorView's showUnder).
     const covered = upstairs && Boolean(here && overlaps(here, v.building));
-    const under = covered || (upstairs && v.open);
+    const under = covered;
     const walls = under ? closedWalls(scene, region, v, mine) : (closed.get(v) ?? []);
     show(walls, under, mine);
     if (under && v.kitOutside) kitUnder.push({ v, storeys: kitStoreysUnder(v, mine) });
@@ -105,9 +125,10 @@ export function showFloorsBelow(
   }
   for (const f of region.floors) {
     const s = f.storey;
-    // A storey inside a kit house standing under us is already pictured by the house's own walls.
+    // A storey inside a kit house standing under us is already pictured by the house's own walls;
+    // open outdoor terraces are supported by their downward cliff skirts rather than closed room walls above their floor.
     const pictured = kitUnder.some((k) => s.floor < k.storeys && overlaps(s, k.v.building));
-    const under = upstairs && s.floor > 0 && s.floor < mine && !pictured;
+    const under = upstairs && s.floor > 0 && s.floor < mine && !s.open && !pictured;
     if (under) show(closedWalls(scene, region, f, mine), true, mine - s.floor);
     else show(closed.get(f) ?? [], false, 0);
     // Its floor and furniture are inside the house: drawn over the house's walls they would cover them.

@@ -57,14 +57,14 @@ When the Hush came, parts of the lower tunnels collapsed, and the deepest chambe
 Whiteledge is built on stepped marble terraces cut into the western cliffs. It is shielded from the cruelest polar winds by the crest of the mountain.
 
 - **The Grand Hearth:** A sunken circular courtyard with a great bronze brazier burning sweet, resinous frost-pine logs day and night.
-- **The Sculpted Houses:** Dwellings hollowed out of the marble face, featuring leaded frosted-glass dormers and smooth fluted columns.
+- **The Sculpted Houses:** Dwellings (`frostpeak-whiteledge-house`, surfaced in `frostpeak-whiteledge-house-wall`) hollowed out of the marble face, featuring leaded frosted-glass dormers and smooth fluted columns, set back from the southern Eyrie cliff wall (`y = 125`) across an open snowy terrace buffer (`y = 126..127`).
 - **Winding Stairs:** Broad marble steps linking the lower trail from Ysolde's clearing to the citadel gates.
 
 ---
 
 ## 4. Vertical Architecture: The Eyrie of the First Watch
 
-The central monument of Mount Zephyr rises 8 floors into the clouds and descends 4 floors into the earth.
+The central monument of Mount Zephyr rises 8 floors into the clouds (carved in pale Zephyr marble `frostpeak-eyrie-wall` with vertical cliff skirts and low `20px` stone terrace parapets) and descends 4 floors into the earth (hewn from dark frost-riven cavern stone `frostpeak-sunken-drafts-wall`).
 
 ### Above Ground (Floors +1 to +8)
 

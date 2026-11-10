@@ -100,7 +100,7 @@ describe('smooth connecting walls autotiling and storey awareness', () => {
     expect(exposedWall(3, 4, true)).toBe(false);
   });
 
-  it('skips full-height closed walls on open lower terraces and keeps uncovered ground-floor houses closed when upstairs', () => {
+  it('skips full-height closed walls on open lower terraces and only shows cutaways on the player floor', () => {
     const shouldStandClosedStoreyWalls = (upstairs: boolean, floor: number, mine: number, open: boolean, pictured: boolean) =>
       upstairs && floor > 0 && floor < mine && !open && !pictured;
 
@@ -109,9 +109,22 @@ describe('smooth connecting walls autotiling and storey awareness', () => {
     // Open lower mountain terrace does NOT get full-height closed walls erected above its floor:
     expect(shouldStandClosedStoreyWalls(true, 1, 2, true, false)).toBe(false);
 
-    // Uncovered ground-floor village house stays closed (showUnder = false) when player is on an upper cliff floor:
-    const shouldShowBuildingUnder = (covered: boolean, mine: number, under: boolean) => covered && mine > 0 && !under;
-    expect(shouldShowBuildingUnder(false, 2, false)).toBe(false);
-    expect(shouldShowBuildingUnder(true, 2, false)).toBe(true);
+    // Ground-floor buildings only cut away when the player is on Floor 0 (mine === 0):
+    const shouldOpenGroundBuilding = (floor: number, near: boolean) => floor === 0 && near;
+    expect(shouldOpenGroundBuilding(0, true)).toBe(true);
+    expect(shouldOpenGroundBuilding(1, true)).toBe(false);
+    expect(shouldOpenGroundBuilding(2, true)).toBe(false);
+
+    // Ground-floor interior cutaway (v.inside) only shows when on Floor 0 and open:
+    const shouldShowGroundInterior = (mine: number, open: boolean, under: boolean) => !under && mine === 0 && open;
+    expect(shouldShowGroundInterior(0, true, false)).toBe(true);
+    expect(shouldShowGroundInterior(0, false, false)).toBe(false);
+    expect(shouldShowGroundInterior(1, true, false)).toBe(false);
+    expect(shouldShowGroundInterior(2, true, false)).toBe(false);
+
+    // When upstairs, uncovered ground-floor houses remain closed exteriors (v.outside visible):
+    const shouldShowGroundExterior = (under: boolean, covered: boolean) => !under && !covered;
+    expect(shouldShowGroundExterior(false, false)).toBe(true);
+    expect(shouldShowGroundExterior(false, true)).toBe(false);
   });
 });

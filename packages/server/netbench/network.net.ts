@@ -59,15 +59,22 @@ interface Row {
   /** Median of the last steps answered: whether lag grew over the run. */
   answeredAtEnd: number;
   wobblePct: number;
+  /** The same for the server's own positions, tick to tick: uneven steps that start before the network (a robot's late steps, two in one tick). */
+  serverWobblePct: number;
   stallPct: number;
   leapPct: number;
   tickMs: number;
+  /** CPU the whole bench process used (game server, robots and proxies together), % of one core. */
+  cpuPct: number;
 }
 
 const rows: Row[] = [];
 
+/** `NETBENCH_ONLY=wi-fi` runs the scenarios whose names hold those words. */
+const ONLY = process.env.NETBENCH_ONLY?.toLowerCase();
+
 describe('network bench', () => {
-  for (const scenario of SCENARIOS) {
+  for (const scenario of SCENARIOS.filter((s) => !ONLY || s.name.toLowerCase().includes(ONLY))) {
     it(scenario.name, async () => {
       const result = await run(scenario);
       rows.push(...result);
@@ -114,15 +121,18 @@ async function run(scenario: Scenario): Promise<Row[]> {
     for (const bot of bots) bot.start(startedAt, (id, at) => turns.set(id, at));
     await pause(WARM_UP_MS);
     // Measure from here: the warm-up's numbers are thrown away.
-    for (const bot of bots) Object.assign(bot.numbers, { snapshots: 0, gaps: [], answered: [], speeds: [], chars: 0 });
+    for (const bot of bots) Object.assign(bot.numbers, { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0 });
     const before = proxies.map((p) => ({ ...p.counts }));
+    const cpuBefore = process.cpuUsage();
     await pause(SECONDS * 1000);
+    const cpu = process.cpuUsage(cpuBefore);
+    const cpuPct = ((cpu.user + cpu.system) / 1000 / (SECONDS * 1000)) * 100;
     for (const bot of bots) bot.stop();
     const tickMs = (regionServer ? (regionServer as unknown as { meter: { load(): { tickMs: number } } }).meter : app!.meter).load().tickMs;
     const sent = proxies.map((p, i) => p.counts.down - before[i]!.down);
     const main = bots.slice(0, scenario.players);
-    const result = [row(scenario.name, scenario.link.name, scenario.players, main, sent[0]!, tickMs)];
-    if (scenario.extra) result.push(row(`${scenario.name}: the weak one`, scenario.extra.name, 1, bots.slice(-1), sent[1]!, tickMs));
+    const result = [row(scenario.name, scenario.link.name, scenario.players, main, sent[0]!, tickMs, cpuPct)];
+    if (scenario.extra) result.push(row(`${scenario.name}: the weak one`, scenario.extra.name, 1, bots.slice(-1), sent[1]!, tickMs, cpuPct));
     return result;
   } finally {
     for (const bot of bots) bot.close();
@@ -132,7 +142,7 @@ async function run(scenario: Scenario): Promise<Row[]> {
 }
 
 /** A report line from the robots that share one link. */
-function row(scenario: string, link: string, players: number, bots: BenchBot[], bytes: number, tickMs: number): Row {
+function row(scenario: string, link: string, players: number, bots: BenchBot[], bytes: number, tickMs: number, cpuPct: number): Row {
   const n = bots.map((b) => b.numbers);
   const gaps = n.flatMap((x) => x.gaps);
   const answered = n.flatMap((x) => x.answered);
@@ -146,15 +156,17 @@ function row(scenario: string, link: string, players: number, bots: BenchBot[], 
     hostMbPerSecond: round(bytes / SECONDS / 1024 / 1024, 2),
     gapP50: round(pct(gaps, 0.5)), gapP95: round(pct(gaps, 0.95)),
     answeredP50: round(pct(answered, 0.5)), answeredP95: round(pct(answered, 0.95)), answeredAtEnd: round(pct(atEnd, 0.5)),
-    wobblePct: round(smooth.wobble * 100), stallPct: round(smooth.stalls * 100), leapPct: round(smooth.leaps * 100),
+    wobblePct: round(smooth.wobble * 100),
+    serverWobblePct: round(smoothness(n.flatMap((x) => x.sourceSpeeds)).wobble * 100), stallPct: round(smooth.stalls * 100), leapPct: round(smooth.leaps * 100),
     tickMs: round(tickMs, 2),
+    cpuPct: round(cpuPct),
   };
 }
 
 /** The report as a plain text table. */
 function table(list: Row[]): string {
-  const head = ['scenario', 'snaps/s', 'KB/s each', 'host MB/s', 'gap p50/p95 ms', 'step answered p50/p95/end ms', 'others wobble %', 'stalls %', 'leaps %', 'tick ms'];
-  const lines = list.map((r) => [r.scenario, r.snapshotsPerSecond, r.kbPerPlayer, r.hostMbPerSecond, `${r.gapP50}/${r.gapP95}`, `${r.answeredP50}/${r.answeredP95}/${r.answeredAtEnd}`, r.wobblePct, r.stallPct, r.leapPct, r.tickMs].map(String));
+  const head = ['scenario', 'snaps/s', 'KB/s each', 'host MB/s', 'gap p50/p95 ms', 'step answered p50/p95/end ms', 'others wobble % (server)', 'stalls %', 'leaps %', 'tick ms', 'cpu %'];
+  const lines = list.map((r) => [r.scenario, r.snapshotsPerSecond, r.kbPerPlayer, r.hostMbPerSecond, `${r.gapP50}/${r.gapP95}`, `${r.answeredP50}/${r.answeredP95}/${r.answeredAtEnd}`, `${r.wobblePct} (${r.serverWobblePct})`, r.stallPct, r.leapPct, r.tickMs, r.cpuPct].map(String));
   const widths = head.map((h, i) => Math.max(h.length, ...lines.map((l) => l[i]!.length)));
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join('  ');
   return [fmt(head), fmt(widths.map((w) => '-'.repeat(w))), ...lines.map(fmt)].join('\n');

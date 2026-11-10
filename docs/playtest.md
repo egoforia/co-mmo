@@ -95,14 +95,17 @@ change with `main`. Each run is also saved to `netbench-results/`.
 | gap p50/p95 | Time between snapshots arriving: half are under the first, 1 in 20 over the second. |
 | step answered p50/p95/end | From sending a step until a snapshot says the server took it; `end` is the last steps only, so it shows lag that grows. |
 | others wobble % | How unevenly other players move on a robot's screen, drawn by the same smoothing as the browser (`netbench/remote-motion.ts`): the spread of their speed as a share of walking speed. Turning is left out. Around 2% is the bench's own noise. |
+| (server) | The same wobble in the server's own positions, tick to tick, before any network or drawing: when it is as high as the first number, the stutter started on the server (a robot's steps arriving bunched, two taken in one tick), not on the way. |
 | stalls %, leaps % | Frames where a walking player stood still, or moved over twice their speed. |
 | tick ms | How long a tick of their region took. |
+| cpu % | Processor time the whole bench used (game server, robots and proxies together), as a share of one core. |
 
 Scenarios: 10 players on the same machine, on home Wi-Fi (20 ms, up to 40 ms
 of wobble) and on mobile (50 ms, up to 120 ms); 40 players on Wi-Fi; one
 player on a weak 40 KB/s link among 20; and 10 players with their region on a
 region server 20 ms from the game server. `NETBENCH_SECONDS` sets how long
-each one runs (10 by default).
+each one runs (10 by default) and `NETBENCH_ONLY=wi-fi` runs only the scenarios
+whose names hold those words.
 
 The performance overlay (F3) shows the same from a real browser: under
 Network, how far apart snapshots arrive.

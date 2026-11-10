@@ -4,7 +4,7 @@
 // exactly as the browser draws them (the shared smoothing in prediction.ts).
 
 import { WebSocket } from 'ws';
-import { PLAYER_SPEED, type ServerMessage, type SnapshotMessage } from '@co-mmo/shared';
+import { PLAYER_SPEED, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
 import { RemoteMotion } from './remote-motion.ts';
 
 /** The ways a bench robot walks: back and forth along one line. */
@@ -25,13 +25,15 @@ export interface BotNumbers {
   answered: number[];
   /** Others' speed on screen, tiles a second, one per frame while they walk straight. */
   speeds: number[];
+  /** Others' speed between two snapshots a tick apart, tiles a second, as the server moved them (before any drawing). */
+  sourceSpeeds: number[];
   /** Characters of JSON received (before any compression). */
   chars: number;
 }
 
 /** A bench robot: a socket, its walk and its measurements. */
 export class BenchBot {
-  readonly numbers: BotNumbers = { snapshots: 0, gaps: [], answered: [], speeds: [], chars: 0 };
+  readonly numbers: BotNumbers = { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0 };
   id = '';
   private seq = 0;
   private sent = new Map<number, number>();
@@ -41,6 +43,8 @@ export class BenchBot {
   private measuring = false;
   private readonly motion = new RemoteMotion();
   private readonly seenAt = new Map<string, { x: number; y: number; at: number }>();
+  /** Each other player's place in the last snapshot, and its tick. */
+  private readonly lastSeen = new Map<string, { x: number; y: number; tick: number }>();
 
   private constructor(private readonly socket: WebSocket, private readonly index: number, private readonly watching: boolean, private readonly turns: (id: string) => number) {}
 
@@ -119,7 +123,14 @@ export class BenchBot {
       this.numbers.answered.push(now - at);
       this.sent.delete(seq);
     }
-    if (this.watching) this.motion.snapshot(message as SnapshotMessage, now);
+    if (!this.watching) return;
+    this.motion.snapshot(message, now);
+    for (const p of message.players) {
+      const was = this.lastSeen.get(p.id);
+      this.lastSeen.set(p.id, { x: p.x, y: p.y, tick: message.tick });
+      if (!was || message.tick - was.tick !== 1 || now - this.turns(p.id) < SETTLE_MS) continue;
+      this.numbers.sourceSpeeds.push(Math.hypot(p.x - was.x, p.y - was.y) / TICK_SECONDS);
+    }
   }
 
   /** One frame on the robot's screen: where each other player is drawn, and how fast they moved since the last frame. */

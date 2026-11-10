@@ -419,6 +419,7 @@ function play(token: string): void {
         game,
         counts: () => world.counts(),
         received: connection.received,
+        snapshotGaps: connection.snapshotGaps,
         ping: (n) => connection.send({ t: 'ping', n }),
         server: () => perfStats(token),
         camera: 'isometric',

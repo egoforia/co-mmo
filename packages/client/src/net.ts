@@ -7,6 +7,9 @@ export class GameConnection {
   private socket: WebSocket;
   /** Everything received so far, for the performance overlay: messages, their size in characters, and snapshots among them. */
   readonly received = { messages: 0, bytes: 0, snapshots: 0 };
+  /** The last hundred times between snapshots arriving, ms: how evenly the network brings them. */
+  readonly snapshotGaps: number[] = [];
+  private lastSnapshotAt = 0;
 
   constructor(token: string, onMessage: MessageHandler, onClose: (reason: string, code: number) => void) {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -18,13 +21,21 @@ export class GameConnection {
       this.received.bytes += data.length;
       try {
         const message = JSON.parse(data) as ServerMessage;
-        if (message.t === 'snapshot') this.received.snapshots++;
+        if (message.t === 'snapshot') this.snapshotArrived();
         onMessage(message);
       } catch (err) {
         console.error('Bad server message', err);
       }
     });
     this.socket.addEventListener('close', (event) => onClose(event.reason, event.code));
+  }
+
+  private snapshotArrived(): void {
+    this.received.snapshots++;
+    const now = performance.now();
+    if (this.lastSnapshotAt) this.snapshotGaps.push(now - this.lastSnapshotAt);
+    if (this.snapshotGaps.length > 100) this.snapshotGaps.shift();
+    this.lastSnapshotAt = now;
   }
 
   send(message: ClientMessage): void {

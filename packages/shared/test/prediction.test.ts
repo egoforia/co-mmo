@@ -96,7 +96,7 @@ describe('SnapshotClock', () => {
 
   it('draws further behind when a crowd makes snapshots come less often', () => {
     const clock = new SnapshotClock();
-    for (let n = 0; n < 20; n++) clock.arrived(100 + n * 4, n * 200 + 40);
+    for (let n = 0; n < 30; n++) clock.arrived(100 + n * 4, n * 200 + 40);
     expect(clock.gap).toBe(200);
     expect(clock.delay).toBe(210);
   });

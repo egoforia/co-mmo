@@ -2,12 +2,20 @@ import { TICK_SECONDS } from './constants.ts';
 
 /** How long arrivals are remembered to judge the network, ms. */
 const WINDOW_MS = 3000;
+/** Until this many snapshots have come, the network's wobble is not known yet: assume some. */
+const LEARNING = 20;
+/** The wobble assumed while learning, ms. */
+const ASSUMED_JITTER_MS = 50;
 /** Never drawn closer than this behind the server, ms, so a slightly late snapshot is already waiting. */
 const MIN_DELAY_MS = 60;
 /** Never drawn further behind than this, ms: past it, waiting costs more than it smooths. */
 const MAX_DELAY_MS = 600;
 /** How quickly the drawn time catches up with where it should be: the time it takes to close a gap, ms. */
 const EASE_MS = 500;
+/** The fastest the drawn time may run while catching up: 10% fast is hard to see, a leap is not. */
+const MOST_AHEAD = 0.1;
+/** The slowest it may run while falling back to wait for a late network: half speed. */
+const MOST_BEHIND = 0.5;
 /** A gap this big between the drawn and the wanted time is jumped rather than eased, ms. */
 const SNAP_MS = 1000;
 /**
@@ -33,6 +41,8 @@ export class SnapshotClock {
   private readonly arrivals: { at: number; late: number; tick: number }[] = [];
   /** Local time minus server time for a snapshot that met the least delay (see DRIFT). */
   private base?: number;
+  /** Snapshots since the timeline started: the wobble is learnt from the first LEARNING. */
+  private count = 0;
   private lastTick?: number;
   private lastAt = 0;
   /** The server time others are drawn at, and the local time that was worked out. */
@@ -56,12 +66,14 @@ export class SnapshotClock {
         shift = server - before;
         this.arrivals.length = 0;
         this.base = undefined;
+        this.count = 0;
         if (this.drawn) this.drawn.server += shift;
       }
     }
     this.lastTick = tick;
     this.lastAt = now;
     const offset = now - server;
+    this.count++;
     if (this.base === undefined || offset < this.base) this.base = offset;
     else this.base += (offset - this.base) * DRIFT;
     this.arrivals.push({ at: now, late: offset - this.base, tick });
@@ -78,10 +90,11 @@ export class SnapshotClock {
       this.drawn = { server: wanted, local: now };
       return wanted;
     }
-    // Run a little fast or slow until caught up, rather than jumping: others never skip or reverse.
+    // Run a little fast or slow until caught up, rather than jumping: others never skip, rush or reverse.
     const dt = Math.max(0, now - d.local);
     const ahead = d.server + dt;
-    const server = ahead + (wanted - ahead) * Math.min(1, dt / EASE_MS);
+    const nudge = (wanted - ahead) * Math.min(1, dt / EASE_MS);
+    const server = ahead + Math.max(-MOST_BEHIND * dt, Math.min(MOST_AHEAD * dt, nudge));
     this.drawn = { server: Math.max(d.server, server), local: now };
     return this.drawn.server;
   }
@@ -93,9 +106,9 @@ export class SnapshotClock {
 
   /** How much later than the quickest snapshot lately one in twenty arrived, ms: the network's wobble. */
   get jitter(): number {
-    if (this.arrivals.length < 2) return 0;
     const late = this.arrivals.map((a) => a.late).sort((a, b) => a - b);
-    return late[Math.floor(late.length * 0.95)]!;
+    const seen = late.length ? late[Math.floor(late.length * 0.95)]! : 0;
+    return this.count < LEARNING ? Math.max(seen, ASSUMED_JITTER_MS) : seen;
   }
 
   /** The usual time between snapshots on the server, ms: one tick, or more in a crowd. */

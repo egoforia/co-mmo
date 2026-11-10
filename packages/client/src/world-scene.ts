@@ -10,6 +10,7 @@
 import Phaser from 'phaser';
 import {
   Predictor,
+  SnapshotClock,
   bodiesSeen,
   TICK_SECONDS,
   floorDrawnFrom,
@@ -98,6 +99,8 @@ export class WorldScene extends Phaser.Scene {
   private welcome: WelcomeMessage;
   private map!: RegionMap;
   private predictor?: Predictor;
+  /** The server's clock, from snapshot ticks: others are drawn on it, not on when snapshots arrive. */
+  private readonly clock = new SnapshotClock();
   private lastSeq = 0;
   private me!: Avatar;
   private remotes = new Map<string, Remote>();
@@ -381,6 +384,8 @@ export class WorldScene extends Phaser.Scene {
       regions: regions.length,
       chunks: regions.reduce((n, r) => n + r.chunks.size, 0),
       lamps: regions.reduce((n, r) => n + r.lamps.length, 0),
+      drawnBehindMs: this.clock.delay,
+      wobbleMs: this.clock.jitter,
       tile: this.predictor ? { x: Math.floor(this.predictor.position.x), y: Math.floor(this.predictor.position.y) } : undefined,
     };
   }
@@ -419,11 +424,14 @@ export class WorldScene extends Phaser.Scene {
     // Creatures stand in our way as they stand in the server's (hit-boxes.ts).
     this.predictor.bodies = bodiesSeen(snapshot.creatures);
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
-    const now = performance.now();
+    // On the server's time: when it was sent, not when it happened to arrive.
+    const shift = this.clock.arrived(snapshot.tick, performance.now());
+    if (shift) for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) for (const r of group.values()) r.interp.rebase(shift);
+    const at = snapshot.tick * TICK_SECONDS * 1000;
     const load = (k: string, u: string) => this.loadArt(k, u);
     const painted = (key: string) => this.textures.exists(key);
     for (const p of snapshot.players) if (p.race) this.races.set(p.id, p.race);
-    syncAvatars(this, this.remotes, snapshot.players, now, (e) => makeAvatar(this, this.metrics, playerTexture(e.id, e.race), e.name, false));
+    syncAvatars(this, this.remotes, snapshot.players, at, (e) => makeAvatar(this, this.metrics, playerTexture(e.id, e.race), e.name, false));
     for (const p of snapshot.players) {
       const remote = this.remotes.get(p.id);
       if (!remote) continue;
@@ -433,7 +441,7 @@ export class WorldScene extends Phaser.Scene {
       setStatusIcons(this, remote, p.statuses);
       remote.body.setAlpha(p.fallen ? FALLEN_ALPHA : 1);
     }
-    syncAvatars(this, this.creatures, snapshot.creatures ?? [], now, (c) => makeCreature(this, this.metrics, c));
+    syncAvatars(this, this.creatures, snapshot.creatures ?? [], at, (c) => makeCreature(this, this.metrics, c));
     for (const c of snapshot.creatures ?? []) {
       const creature = this.creatures.get(c.id);
       creature?.label.setText(creatureLabel(c, painted));
@@ -445,10 +453,10 @@ export class WorldScene extends Phaser.Scene {
       const at = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
       return { x: at.x, y: at.y - floorLift(floor), depth: floorDepthOffset(floor) + PROJECTION.depth(this.origin.x + x, this.origin.y + y) };
     });
-    syncAvatars(this, this.npcs, snapshot.npcs ?? [], now, (n) => makeNpc(this, this.metrics, n));
+    syncAvatars(this, this.npcs, snapshot.npcs ?? [], at, (n) => makeNpc(this, this.metrics, n));
     for (const n of snapshot.npcs ?? []) this.npcs.get(n.id)?.label.setText(n.asleep ? `${n.name} (asleep)` : n.name);
     const bodies = snapshot.bodies ?? [];
-    syncAvatars(this, this.bodies, bodies, now, (b) => makeBody(this, this.metrics, b));
+    syncAvatars(this, this.bodies, bodies, at, (b) => makeBody(this, this.metrics, b));
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
     this.targeting.refresh((id) => this.creatures.get(id) ?? this.remotes.get(id));
   }
@@ -501,18 +509,20 @@ export class WorldScene extends Phaser.Scene {
     if (target.floor !== this.floor) this.changeFloor(target);
     else if (gap > 2) this.shown = { x: target.x, y: target.y };
     else {
-      this.shown.x += (target.x - this.shown.x) * 0.5;
-      this.shown.y += (target.y - this.shown.y) * 0.5;
+      // Half the way each 60th of a second, however fast the screen draws.
+      const ease = 1 - 0.5 ** (Math.min(deltaMs, 250) / (1000 / 60));
+      this.shown.x += (target.x - this.shown.x) * ease;
+      this.shown.y += (target.y - this.shown.y) * ease;
     }
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     setCoords({ x: this.shown.x, y: this.shown.y, floor: this.floor });
     this.revealBuildings(false);
     this.drawNear();
 
-    const now = performance.now();
+    const drawAt = this.clock.renderAt(performance.now());
     for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
       for (const remote of group.values()) {
-        const pos = remote.interp.sample(now);
+        const pos = remote.interp.sample(drawAt);
         if (!pos) continue;
         // Measured without the lunge nudge, so a strike is not a step.
         const before = { x: remote.body.x - remote.nudge.x, y: remote.body.y - remote.nudge.y };

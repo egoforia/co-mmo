@@ -292,7 +292,8 @@ export function syncAvatars<E extends { id: string; x: number; y: number; health
   scene: Phaser.Scene,
   group: Map<string, Remote>,
   entities: E[],
-  now: number,
+  /** The snapshot's server time (SnapshotClock), ms. */
+  at: number,
   make: (e: E) => Avatar,
 ): void {
   const seen = new Set<string>();
@@ -304,7 +305,7 @@ export function syncAvatars<E extends { id: string; x: number; y: number; health
       group.set(entity.id, remote);
     }
     remote.floor = entity.floor ?? 0;
-    remote.interp.push(now, entity.x, entity.y);
+    remote.interp.push(at, entity.x, entity.y);
     if (entity.health !== undefined) setHealth(scene, remote, entity.health);
   }
   for (const [id, remote] of group) {

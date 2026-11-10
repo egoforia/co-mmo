@@ -83,6 +83,8 @@ export async function start(opts: {
   clientDir?: string;
   /** The kit buildings' shipped texture sheets, for tests that draw kit houses. */
   kitSheets?: string;
+  /** How the game socket uses the network (socket-net.ts); the game's own choices when missing. */
+  net?: AppOptions['net'];
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
@@ -102,6 +104,7 @@ export async function start(opts: {
     ...(opts.regionBus ? { regionBus: opts.regionBus } : {}),
     ...(opts.clientDir ? { clientDir: opts.clientDir } : {}),
     ...(opts.kitSheets ? { kitSheets: opts.kitSheets } : {}),
+    ...(opts.net ? { net: opts.net } : {}),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',

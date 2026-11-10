@@ -10,6 +10,7 @@ import type { Account, Store } from './store.ts';
 import type { Wishes } from './wishes.ts';
 import type { Workshop } from './workshop.ts';
 import { settle, type World } from './world.ts';
+import { deflateOptions, type NetOptions } from './socket-net.ts';
 
 export interface GameSocketOptions {
   server: Server;
@@ -22,6 +23,8 @@ export interface GameSocketOptions {
   builds: Builds;
   /** How often idle connections are pinged, in ms. */
   heartbeatMs?: number;
+  /** How the socket uses the network (socket-net.ts); everything on when missing. */
+  net?: NetOptions;
 }
 
 /** The game's WebSocket, as the rest of the server sees it. */
@@ -44,7 +47,8 @@ export interface GameSocket {
  */
 export function openGameSocket(options: GameSocketOptions): GameSocket {
   const { store, world, wishes, workshop, reports, rules, builds } = options;
-  const wss = new WebSocketServer({ server: options.server, path: '/ws', maxPayload: 4096 });
+  const net = options.net ?? { compress: true };
+  const wss = new WebSocketServer({ server: options.server, path: '/ws', maxPayload: 4096, perMessageDeflate: net.compress ? deflateOptions() : false });
   const sockets = new Map<string, WebSocket>();
   // Heartbeat: ping every client so idle connections stay open through proxies,
   // and drop any that stopped answering (a sleeping laptop, a dead network).

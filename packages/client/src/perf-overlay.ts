@@ -45,6 +45,8 @@ export interface PerfSources {
   counts: () => SceneCounts | undefined;
   /** Everything the game connection has received so far. */
   received: { messages: number; bytes: number; snapshots: number };
+  /** The latest times between snapshots arriving, ms. */
+  snapshotGaps: number[];
   /** Sends a ping; the overlay hears the pong through `pong`. */
   ping: (n: number) => void;
   /** The server's side, or undefined when it does not answer. */
@@ -271,6 +273,13 @@ export class PerfOverlay {
     memory && memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.7 ? 'warn' : '');
     row('Network', `${ping === undefined ? 'no answer yet' : `${ping.toFixed(0)} ms round trip`} · ${this.snapshotsIn.perSecond(now).toFixed(0)} snapshots/s · ${this.messagesIn.perSecond(now).toFixed(0)} messages/s · ${(this.bytesIn.perSecond(now) / 1024).toFixed(1)} kB/s in`,
       ping !== undefined && ping > 200 ? 'warn' : '');
+    const gaps = [...this.sources.snapshotGaps].sort((a, b) => a - b);
+    if (gaps.length >= 10) {
+      const typical = gaps[Math.floor(gaps.length / 2)]!;
+      const late = gaps[Math.floor(gaps.length * 0.95)]!;
+      // Snapshots leave the server evenly; arriving unevenly means the network wobbles.
+      row('', `snapshots arrive ${typical.toFixed(0)} ms apart, 1 in 20 over ${late.toFixed(0)} ms`, late > typical * 3 ? 'warn' : '');
+    }
     if (counts) {
       row('World', `${this.sources.region()}${counts.tile ? ` at ${counts.tile.x}, ${counts.tile.y}` : ''} · ${counts.players} player${counts.players === 1 ? '' : 's'}, ${counts.creatures} creatures, ${counts.npcs} people, ${counts.bodies} fallen`);
       row('Drawn', `${counts.regions} region${counts.regions === 1 ? '' : 's'}, ${counts.chunks} chunks of ground near you, ${counts.lamps} lamps`);

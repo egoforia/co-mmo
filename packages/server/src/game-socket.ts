@@ -11,6 +11,7 @@ import type { Wishes } from './wishes.ts';
 import type { Workshop } from './workshop.ts';
 import { settle, type World } from './world.ts';
 import { deflateOptions, type NetOptions } from './socket-net.ts';
+import { SnapshotGate } from './snapshot-gate.ts';
 
 export interface GameSocketOptions {
   server: Server;
@@ -47,7 +48,7 @@ export interface GameSocket {
  */
 export function openGameSocket(options: GameSocketOptions): GameSocket {
   const { store, world, wishes, workshop, reports, rules, builds } = options;
-  const net = options.net ?? { compress: true };
+  const net = options.net ?? { compress: true, skipStale: true };
   const wss = new WebSocketServer({ server: options.server, path: '/ws', maxPayload: 4096, perMessageDeflate: net.compress ? deflateOptions() : false });
   const sockets = new Map<string, WebSocket>();
   // Heartbeat: ping every client so idle connections stay open through proxies,
@@ -69,6 +70,8 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
     // Signed in but still choosing a people and Calling: not in the world yet.
     let choosing = false;
     let entered = false;
+    // Holds back snapshots while this connection has fallen behind (snapshot-gate.ts).
+    const gate = net.skipStale ? new SnapshotGate() : undefined;
     alive.add(socket);
     socket.on('pong', () => alive.add(socket));
     const authTimer = setTimeout(() => socket.close(4001, 'Sign-in timed out.'), 5000);
@@ -79,7 +82,9 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
       const away = awayFeed(store, account);
       world.join(publicInfo(account), {
         send: (m) => {
-          if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(m));
+          if (socket.readyState !== socket.OPEN) return;
+          const out = gate ? gate.pass(m, performance.now(), socket.bufferedAmount) : m;
+          if (out) socket.send(JSON.stringify(out));
         },
         close: (reason) => socket.close(4000, reason),
       }, { regionId: account.regionId, x: account.x, y: account.y, floor: account.floor }, upgradeCharacter(account.character));
@@ -133,7 +138,9 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
         return;
       }
       if (!isClientMessage(parsed)) return;
-      if (parsed.t === 'ping') {
+      if (parsed.t === 'seen') {
+        gate?.seen(parsed.tick, performance.now());
+      } else if (parsed.t === 'ping') {
         // Answered here, before any region: the overlay times the network and this server, not the queue behind it.
         socket.send(JSON.stringify({ t: 'pong', n: parsed.n }));
       } else if (parsed.t === 'pray') {

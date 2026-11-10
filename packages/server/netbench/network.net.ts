@@ -22,7 +22,8 @@ const WATCHERS = 3;
 const LAN: Link = { name: 'same machine', delayMs: 0, jitterMs: 0 };
 const WIFI: Link = { name: 'home Wi-Fi', delayMs: 20, jitterMs: 40 };
 const MOBILE: Link = { name: 'mobile', delayMs: 50, jitterMs: 120 };
-const WEAK: Link = { name: 'weak link, 40 KB/s', delayMs: 30, jitterMs: 40, bytesPerSecond: 40_000 };
+/** Slower than 20 players' snapshots need even compressed (about 4 KB/s), so the server has to skip some. */
+const WEAK: Link = { name: 'weak link, 3 KB/s', delayMs: 30, jitterMs: 40, bytesPerSecond: 3_000 };
 
 interface Scenario {
   name: string;
@@ -65,6 +66,8 @@ interface Row {
   stallPct: number;
   leapPct: number;
   tickMs: number;
+  /** Snapshots the server skipped a second for each robot, because it had fallen behind. */
+  skippedPerSecond: number;
   /** CPU the whole bench process used (game server, robots and proxies together), % of one core. */
   cpuPct: number;
 }
@@ -123,7 +126,7 @@ async function run(scenario: Scenario): Promise<Row[]> {
     for (const bot of bots) bot.start(startedAt, (id, at) => turns.set(id, at));
     await pause(WARM_UP_MS);
     // Measure from here: the warm-up's numbers are thrown away.
-    for (const bot of bots) Object.assign(bot.numbers, { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0 });
+    for (const bot of bots) Object.assign(bot.numbers, { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0, skipped: 0 });
     const before = proxies.map((p) => ({ ...p.counts }));
     const cpuBefore = process.cpuUsage();
     await pause(SECONDS * 1000);
@@ -162,13 +165,14 @@ function row(scenario: string, link: string, players: number, bots: BenchBot[], 
     serverWobblePct: round(smoothness(n.flatMap((x) => x.sourceSpeeds)).wobble * 100), stallPct: round(smooth.stalls * 100), leapPct: round(smooth.leaps * 100),
     tickMs: round(tickMs, 2),
     cpuPct: round(cpuPct),
+    skippedPerSecond: round(n.reduce((a, x) => a + x.skipped, 0) / bots.length / SECONDS),
   };
 }
 
 /** The report as a plain text table. */
 function table(list: Row[]): string {
-  const head = ['scenario', 'snaps/s', 'KB/s each', 'host MB/s', 'gap p50/p95 ms', 'step answered p50/p95/end ms', 'others wobble % (server)', 'stalls %', 'leaps %', 'tick ms', 'cpu %'];
-  const lines = list.map((r) => [r.scenario, r.snapshotsPerSecond, r.kbPerPlayer, r.hostMbPerSecond, `${r.gapP50}/${r.gapP95}`, `${r.answeredP50}/${r.answeredP95}/${r.answeredAtEnd}`, `${r.wobblePct} (${r.serverWobblePct})`, r.stallPct, r.leapPct, r.tickMs, r.cpuPct].map(String));
+  const head = ['scenario', 'snaps/s', 'KB/s each', 'host MB/s', 'gap p50/p95 ms', 'step answered p50/p95/end ms', 'others wobble % (server)', 'stalls %', 'leaps %', 'tick ms', 'cpu %', 'skipped/s'];
+  const lines = list.map((r) => [r.scenario, r.snapshotsPerSecond, r.kbPerPlayer, r.hostMbPerSecond, `${r.gapP50}/${r.gapP95}`, `${r.answeredP50}/${r.answeredP95}/${r.answeredAtEnd}`, `${r.wobblePct} (${r.serverWobblePct})`, r.stallPct, r.leapPct, r.tickMs, r.cpuPct, r.skippedPerSecond].map(String));
   const widths = head.map((h, i) => Math.max(h.length, ...lines.map((l) => l[i]!.length)));
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join('  ');
   return [fmt(head), fmt(widths.map((w) => '-'.repeat(w))), ...lines.map(fmt)].join('\n');

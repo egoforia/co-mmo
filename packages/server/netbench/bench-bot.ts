@@ -7,6 +7,8 @@ import { WebSocket } from 'ws';
 import { PLAYER_SPEED, TICK_SECONDS, type ServerMessage } from '@co-mmo/shared';
 import { RemoteMotion } from './remote-motion.ts';
 
+/** How often the browser says which snapshot it has, ms (client net.ts SEEN_EVERY_MS). */
+const SEEN_EVERY_MS = 250;
 /** The ways a bench robot walks: back and forth along one line. */
 const LINES: [number, number][] = [[1, 0], [0, 1]];
 /** How long a robot walks one way before turning back, ms. */
@@ -29,15 +31,18 @@ export interface BotNumbers {
   sourceSpeeds: number[];
   /** Characters of JSON received (before any compression). */
   chars: number;
+  /** Snapshots the server skipped because this robot had fallen behind. */
+  skipped: number;
 }
 
 /** A bench robot: a socket, its walk and its measurements. */
 export class BenchBot {
-  readonly numbers: BotNumbers = { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0 };
+  readonly numbers: BotNumbers = { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0, skipped: 0 };
   id = '';
   private seq = 0;
   private sent = new Map<number, number>();
   private lastArrival = 0;
+  private lastSeenSent = 0;
   private walkTimer?: ReturnType<typeof setInterval>;
   private frameTimer?: ReturnType<typeof setInterval>;
   private measuring = false;
@@ -116,6 +121,12 @@ export class BenchBot {
     if (message.t !== 'snapshot') return;
     const now = performance.now();
     this.numbers.snapshots++;
+    this.numbers.skipped += message.skipped ?? 0;
+    // Says what it has, as the browser does (net.ts), so the server can skip snapshots when it falls behind.
+    if (now - this.lastSeenSent >= SEEN_EVERY_MS) {
+      this.lastSeenSent = now;
+      this.send({ t: 'seen', tick: message.tick });
+    }
     if (this.lastArrival) this.numbers.gaps.push(now - this.lastArrival);
     this.lastArrival = now;
     for (const [seq, at] of this.sent) {

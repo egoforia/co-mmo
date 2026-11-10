@@ -32,6 +32,17 @@ export interface InputMessage {
   dy: number;
 }
 
+/**
+ * The newest snapshot the browser has received, sent a few times a second.
+ * The server times how long snapshots take to arrive, and when a connection
+ * falls behind it skips snapshots until it catches up, rather than queueing
+ * ever older ones (socket-net.ts, SnapshotGate).
+ */
+export interface SeenMessage {
+  t: 'seen';
+  tick: number;
+}
+
 export interface ChatSendMessage {
   t: 'chat';
   channel: ChatChannel;
@@ -244,7 +255,8 @@ export type ClientMessage =
   | WishAnswerMessage
   | ReportMessage
   | TeleportMessage
-  | PingMessage;
+  | PingMessage
+  | SeenMessage;
 
 export interface PlayerInfo {
   id: string;
@@ -394,6 +406,8 @@ export interface SnapshotMessage {
   /** What skills left inside the view radius (traps, Echoes, a hawk, a sand double), when there is any. */
   marks?: WorldMark[];
   online: number;
+  /** Snapshots skipped just before this one because the connection had fallen behind (SeenMessage). */
+  skipped?: number;
 }
 
 /**
@@ -690,6 +704,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'attack') return m.target === undefined || isId(m.target);
   if (m.t === 'interact' || m.t === 'wake') return true;
   if (m.t === 'ping') return Number.isSafeInteger(m.n);
+  if (m.t === 'seen') return Number.isSafeInteger(m.tick) && (m.tick as number) >= 0;
   if (m.t === 'loot') {
     return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&
       (m.index === undefined || (Number.isInteger(m.index) && (m.index as number) >= 0 && (m.index as number) < 100)) &&

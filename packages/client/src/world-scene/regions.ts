@@ -475,10 +475,7 @@ export function revealBuildings(
     if (!v.outside.length) continue;
     const rx = worldX - v.ox;
     const ry = worldY - v.oy;
-    const open =
-      floor === 0
-        ? nearBuilding(v.building, rx, ry, v.kit ? undefined : 1.2)
-        : floor > 0 && within(v.building, Math.floor(rx), Math.floor(ry));
+    const open = floor === 0 && nearBuilding(v.building, rx, ry, v.kit ? undefined : 1.2);
     if (open === v.open && !instant) continue;
     if (open !== v.open) changed = true;
     v.open = open;
@@ -499,8 +496,8 @@ function compromisesPlayerView(
   shown: { x: number; y: number },
   mine: number,
 ): boolean {
-  // Kit houses stand their own multi-storey sprite when closed and cut to floor 0 when open.
-  if (region.buildings.some((v) => v.kit && overlaps(s, v.building))) {
+  // From the ground, kit houses stand their own multi-storey sprite when closed and cut to floor 0 when open.
+  if (mine === 0 && region.buildings.some((v) => v.kit && overlaps(s, v.building))) {
     return !seenFromGround(region.map, s);
   }
   // Directly inside or entering the footprint of this upper storey on our floor.
@@ -573,16 +570,16 @@ export function applyFloorView(
     }
     for (const v of region.buildings) {
       const covered = Boolean(current && here && overlaps(here, v.building));
-      const showUnder = covered && mine > 0 && !under;
       for (const o of v.outside) {
-        o.setVisible(!under && !covered && !showUnder);
+        o.setVisible(!under && !covered);
         setDepthShade(o, groundDelta, true);
-        if (!scene.tweens.isTweening(o)) o.setAlpha(v.open ? 0 : 1);
+        if (!scene.tweens.isTweening(o)) o.setAlpha(mine === 0 && v.open ? 0 : 1);
       }
       for (const o of v.inside) {
-        o.setVisible(!under && (!covered || showUnder));
-        setDepthShade(o, groundDelta, !showUnder);
-        if (!showUnder && !scene.tweens.isTweening(o)) o.setAlpha(v.open ? 1 : 0);
+        const showInside = mine === 0 && v.open;
+        o.setVisible(!under && showInside);
+        setDepthShade(o, groundDelta, false);
+        if (!scene.tweens.isTweening(o)) o.setAlpha(showInside ? 1 : 0);
       }
     }
     for (const o of region.stairs) {

@@ -238,7 +238,7 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
     name: 'The Eyrie of the First Watch',
     biome: 'frostpeak',
     kit: 'zephyr-marble',
-    kitShape: { roof: 'flat', battlements: true, towers: [{ corner: 'front-left' }, { corner: 'front-right' }], numStoreys: 3 },
+    kitShape: { roof: 'flat', numStoreys: 1 },
     references: ['zephyr-falcon'],
     exterior:
       'a soaring mountain redoubt carved into the highest crest of Mount Zephyr: pure white marble colonnades, silver-rimed battlements, ' +

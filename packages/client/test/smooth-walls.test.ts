@@ -84,4 +84,34 @@ describe('smooth connecting walls autotiling and storey awareness', () => {
     // At x=9, touching x=10 in storey B:
     expect(isOpenEastFromA(9, 5)).toBe(false); // Both are walls: NO divider face!
   });
+
+  it('renders low parapet rims on exposed open-terrace edges while suppressing mid-cliff seams under upper storeys', () => {
+    const wall = (x: number, y: number) => x === 5 || y === 4;
+    const hasUpperTile = (wx: number, wy: number) => wx <= 3 && wy === 4;
+    const exposedWall = (x: number, y: number, openTerrace: boolean) =>
+      wall(x, y) && !(openTerrace && hasUpperTile(x, y));
+
+    // Exposed terrace edge (not covered by an upper storey tile) keeps its low parapet wall & coping cap:
+    expect(exposedWall(5, 4, true)).toBe(true);
+    expect(exposedWall(4, 4, true)).toBe(true);
+
+    // Lower terrace edge directly underneath an aligned upper cliff face suppresses its mid-cliff parapet seam:
+    expect(exposedWall(2, 4, true)).toBe(false);
+    expect(exposedWall(3, 4, true)).toBe(false);
+  });
+
+  it('skips full-height closed walls on open lower terraces and keeps uncovered ground-floor houses closed when upstairs', () => {
+    const shouldStandClosedStoreyWalls = (upstairs: boolean, floor: number, mine: number, open: boolean, pictured: boolean) =>
+      upstairs && floor > 0 && floor < mine && !open && !pictured;
+
+    // Indoor lower storey gets closed walls when viewed from upstairs:
+    expect(shouldStandClosedStoreyWalls(true, 1, 2, false, false)).toBe(true);
+    // Open lower mountain terrace does NOT get full-height closed walls erected above its floor:
+    expect(shouldStandClosedStoreyWalls(true, 1, 2, true, false)).toBe(false);
+
+    // Uncovered ground-floor village house stays closed (showUnder = false) when player is on an upper cliff floor:
+    const shouldShowBuildingUnder = (covered: boolean, mine: number, under: boolean) => covered && mine > 0 && !under;
+    expect(shouldShowBuildingUnder(false, 2, false)).toBe(false);
+    expect(shouldShowBuildingUnder(true, 2, false)).toBe(true);
+  });
 });

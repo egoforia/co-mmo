@@ -234,6 +234,7 @@ const floors: FloorView[] = map.storeys.map((storey) => {
     Boolean(storey.open),
     (wx, wy) => neighbourTile(wx - ox, wy - oy),
     cliffDrops,
+    (wx, wy) => Boolean(storeyAt(map, wx - ox, wy - oy, storey.floor + 1)),
   );
   const upperShellWalls =
     storey.floor > 0 && !storey.open
@@ -467,11 +468,17 @@ export function revealBuildings(
   worldX: number,
   worldY: number,
   instant: boolean,
+  floor = 0,
 ): boolean {
   let changed = false;
   for (const v of buildings) {
     if (!v.outside.length) continue;
-    const open = nearBuilding(v.building, worldX - v.ox, worldY - v.oy, v.kit ? undefined : 1.2);
+    const rx = worldX - v.ox;
+    const ry = worldY - v.oy;
+    const open =
+      floor === 0
+        ? nearBuilding(v.building, rx, ry, v.kit ? undefined : 1.2)
+        : floor > 0 && within(v.building, Math.floor(rx), Math.floor(ry));
     if (open === v.open && !instant) continue;
     if (open !== v.open) changed = true;
     v.open = open;
@@ -566,7 +573,7 @@ export function applyFloorView(
     }
     for (const v of region.buildings) {
       const covered = Boolean(current && here && overlaps(here, v.building));
-      const showUnder = mine > 0 && !under;
+      const showUnder = covered && mine > 0 && !under;
       for (const o of v.outside) {
         o.setVisible(!under && !covered && !showUnder);
         setDepthShade(o, groundDelta, true);

@@ -262,8 +262,8 @@ function layout(map: RegionMap, c: number): void {
   const f1Central = addStorey(map, { x: 34, y: 82, width: 18, height: 11 }, 1, eyrie.style, undefined, true);
   const f1North = addStorey(map, { x: 34, y: 34, width: 18, height: 28 }, 1, eyrie.style, undefined, true);
   const f1TunnelN = addStorey(map, { x: 34, y: 62, width: 18, height: 20 }, 1, eyrie.style, undefined, true);
-  const f1South = addStorey(map, { x: 32, y: 121, width: 26, height: 7 }, 1, eyrie.style, undefined, true);
-  const f1SouthWest = addStorey(map, { x: 32, y: 128, width: 16, height: 10 }, 1, eyrie.style, undefined, true);
+  const f1South = addStorey(map, { x: 32, y: 121, width: 24, height: 5 }, 1, eyrie.style, undefined, true);
+  const f1SouthWest = addStorey(map, { x: 32, y: 126, width: 14, height: 10 }, 1, eyrie.style, undefined, true);
   const f1TunnelS = addStorey(map, { x: 34, y: 115, width: 12, height: 6 }, 1, eyrie.style, undefined, true);
   const f1West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 1, eyrie.style, undefined, true);
   const f1TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 1, eyrie.style, undefined, true);
@@ -279,8 +279,8 @@ function layout(map: RegionMap, c: number): void {
   const f2Central = addStorey(map, { x: 34, y: 82, width: 17, height: 10 }, 2, eyrie.style, undefined, true);
   const f2North = addStorey(map, { x: 34, y: 34, width: 17, height: 27 }, 2, eyrie.style, undefined, true);
   const f2TunnelN = addStorey(map, { x: 34, y: 61, width: 17, height: 21 }, 2, eyrie.style, undefined, true);
-  const f2South = addStorey(map, { x: 32, y: 121, width: 24, height: 6 }, 2, eyrie.style, undefined, true);
-  const f2SouthWest = addStorey(map, { x: 32, y: 127, width: 15, height: 10 }, 2, eyrie.style, undefined, true);
+  const f2South = addStorey(map, { x: 32, y: 121, width: 24, height: 5 }, 2, eyrie.style, undefined, true);
+  const f2SouthWest = addStorey(map, { x: 32, y: 126, width: 14, height: 10 }, 2, eyrie.style, undefined, true);
   const f2TunnelS = addStorey(map, { x: 40, y: 92, width: 6, height: 29 }, 2, eyrie.style, undefined, true);
   const f2West = addStorey(map, { x: 18, y: 83, width: 10, height: 10 }, 2, eyrie.style, undefined, true);
   const f2TunnelW = addStorey(map, { x: 28, y: 85, width: 6, height: 6 }, 2, eyrie.style, undefined, true);
@@ -307,7 +307,7 @@ function layout(map: RegionMap, c: number): void {
   const f3Central = addStorey(map, { x: 35, y: 83, width: 16, height: 9 }, 3, eyrie.style, undefined, true);
   const f3North = addStorey(map, { x: 35, y: 35, width: 16, height: 25 }, 3, eyrie.style, undefined, true);
   const f3TunnelN = addStorey(map, { x: 35, y: 60, width: 16, height: 23 }, 3, eyrie.style, undefined, true);
-  const f3South = addStorey(map, { x: 33, y: 121, width: 21, height: 5 }, 3, eyrie.style, undefined, true);
+  const f3South = addStorey(map, { x: 33, y: 121, width: 19, height: 5 }, 3, eyrie.style, undefined, true);
   const f3SouthWest = addStorey(map, { x: 33, y: 126, width: 13, height: 10 }, 3, eyrie.style, undefined, true);
 
   connectVertical(map, 3, f3North, f3TunnelN, 42);
@@ -318,7 +318,7 @@ function layout(map: RegionMap, c: number): void {
   const f4Central = addStorey(map, { x: 36, y: 84, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
   const f4North = addStorey(map, { x: 36, y: 36, width: 14, height: 23 }, 4, eyrie.style, undefined, true);
   const f4TunnelN = addStorey(map, { x: 36, y: 59, width: 14, height: 25 }, 4, eyrie.style, undefined, true);
-  const f4South = addStorey(map, { x: 34, y: 122, width: 14, height: 8 }, 4, eyrie.style, undefined, true);
+  const f4South = addStorey(map, { x: 34, y: 122, width: 12, height: 8 }, 4, eyrie.style, undefined, true);
 
   connectVertical(map, 4, f4North, f4TunnelN, 42);
   connectVertical(map, 4, f4TunnelN, f4Central, 42);
@@ -415,9 +415,9 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-eyrie', 'astrolabe-pedestal', 47, 37, 2, 1, 1);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 35, 60, 1.5, 1, 1);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 49, 60, 1.5, 1, 1);
-  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 51, 126, 2, 1, 1);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 49.5, 126.5, 1, 1, 1);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 55.5, 126.5, 1, 1, 1);
+  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 51, 124.5, 2, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 48.5, 124.5, 1, 1, 1);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 53.5, 124.5, 1, 1, 1);
   putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 21, 86, 2, 1, 1);
   putFloorProp('frostpeak-eyrie', 'ice-cascade', 21, 91, 2, 1, 1);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 19.5, 91.5, 1, 1, 1);
@@ -432,8 +432,8 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-eyrie', 'silver-brazier', 48, 59, 1, 1, 2);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 40.5, 96, 1.5, 1, 2);
   putFloorProp('frostpeak-eyrie', 'beacon-brazier', 45.5, 119, 1.5, 1, 2);
-  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 50, 125, 2, 1, 2);
-  putFloorProp('frostpeak-eyrie', 'falcon-frieze', 46, 125, 2, 1, 2);
+  putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 50, 124.5, 2, 1, 2);
+  putFloorProp('frostpeak-eyrie', 'falcon-frieze', 46, 124.5, 2, 1, 2);
   putFloorProp('frostpeak-whiteledge-house', 'cantilever-deck', 21, 86, 2, 1, 2);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 19.5, 91.5, 1, 1, 2);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 25.5, 91.5, 1, 1, 2);
@@ -457,7 +457,7 @@ function layout(map: RegionMap, c: number): void {
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 36.5, 57.5, 1, 1, 4);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 47.5, 57.5, 1, 1, 4);
   putFloorProp('frostpeak-eyrie', 'stone-balustrade', 36.5, 128.5, 1, 1, 4);
-  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 45.5, 128.5, 1, 1, 4);
+  putFloorProp('frostpeak-eyrie', 'stone-balustrade', 43.5, 128.5, 1, 1, 4);
 
   // Floor +5 (Master Falconer's Roost & North High Aerie — open):
   putFloorProp('frostpeak-eyrie', 'falcon-perch', 39, 86, 1.5, 1, 5);

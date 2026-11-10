@@ -49,7 +49,9 @@ Read the matching skill or guide before making changes:
   scenery in the biome kit (`packages/server/src/assets/kit.ts`). Everyone plays
   in diamond isometric projection (`ISOMETRIC` in `packages/client/src/projection.ts`),
   where buildings never use flat 2D exterior pictures; they stand as 3D kit houses or
-  open cutaways with tall vertical walls (`docs/buildings-and-walls.md`). The wish guard refuses drawing code.
+  open cutaways with tall vertical walls, while open outdoor terraces (`storey.open`)
+  frame exposed rims with low `WALL_RISE` parapets and vertical cliff skirts in the
+  biome's above-ground masonry texture (`docs/buildings-and-walls.md`). The wish guard refuses drawing code.
 - One exception, the building kit (`packages/shared/src/building-kit/`, the
   Owner's choice on 2026-10-18): code builds house shapes from plain data,
   the image model paints every surface they show as flat textures, and a

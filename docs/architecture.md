@@ -233,9 +233,12 @@ Walkers take stairs only on purpose (`goTo`, `stairsToward`): a creature
 follows its prey up stairs within its leash, never up a ladder; people who
 live upstairs come down to the square. `buildFloors` gives a building floors
 and finds room for each flight; the world editor's Floors tool uses it. The
-browser draws only the floor you are on: upstairs over its building, with
-the land below around it; underground, the land above hidden. Your floor is
-saved with your place. Stairs show their painted pictures (`Stairway.art`)
+browser draws your active floor along with non-occluding upper storeys above
+(`compromisesPlayerView` in `world-scene/regions.ts`) and depth-shaded lower
+storeys and vertical cliff skirts (`skirt` in `world-scene/walls.ts`) below
+when above ground (`mine >= 0`), while enclosed lower storeys (`!s.open`)
+stand on closed full-height walls (`world-scene/below.ts`); underground
+(`mine < 0`), only your floor shows. Your floor is saved with your place. Stairs show their painted pictures (`Stairway.art`)
 once there are any, and always a label saying where they go.
 
 **The Smugglers' Sea Cave.** Shared `sea-cave.ts`: the shore's sea cave built

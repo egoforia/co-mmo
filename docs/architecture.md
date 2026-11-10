@@ -304,6 +304,10 @@ its look is painted again. The game's collision is still its wall tiles.
 ## Client modules
 
 `main.ts` (sign-in and boot), `net.ts` + `api.ts` (server talk),
+shared `prediction.ts` (our own steps predicted, others smoothed) and
+`snapshot-clock.ts` (others drawn on the server's time from each snapshot's
+tick, just far enough behind for the network's wobble; measured with
+`npm run netbench`, docs/playtest.md),
 `world-scene.ts` (the Phaser scene facade; positions go through `PROJECTION`, and
 walkers face its `ways`: the four isometric ways show standing pictures
 until walks are made for them, and a walker with no isometric pictures yet

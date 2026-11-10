@@ -89,45 +89,56 @@ interface Sample {
   y: number;
 }
 
+/** How far past the newest snapshot a walker is carried on, ms, when the next one is late. */
+const CARRY_ON_MS = 75;
+
 /**
- * Smooths other players' movement by rendering them slightly in the past,
- * between the two snapshots around that moment. When snapshots come further
- * apart (a crowded region sends them less often), it looks further back, so
- * movement stays smooth instead of stopping and jumping.
+ * Smooths another player's (or a creature's) movement: positions are kept
+ * on the server's time (SnapshotClock, from each snapshot's tick) and drawn
+ * between the two around the moment the clock says to draw, so an unevenly
+ * arriving network does not make them speed up and slow down. When the next
+ * snapshot is late they walk on for a moment in the same direction, rather
+ * than stopping dead and then jumping.
  */
 export class Interpolator {
   private samples: Sample[] = [];
 
-  constructor(private readonly delayMs = 100) {}
-
+  /** A position at server time `at`, ms. */
   push(at: number, x: number, y: number): void {
+    const last = this.samples[this.samples.length - 1];
+    if (last && at <= last.at) {
+      // The same tick again (or an older one): the newest word wins.
+      if (at === last.at) Object.assign(last, { x, y });
+      return;
+    }
     this.samples.push({ at, x, y });
     if (this.samples.length > 20) this.samples.shift();
   }
 
-  /** How far in the past it renders: the usual delay, or a little more than the time between snapshots. */
-  get delay(): number {
-    const gaps: number[] = [];
-    for (let i = Math.max(1, this.samples.length - 5); i < this.samples.length; i++) gaps.push(this.samples[i]!.at - this.samples[i - 1]!.at);
-    if (!gaps.length) return this.delayMs;
-    gaps.sort((a, b) => a - b);
-    return Math.max(this.delayMs, gaps[Math.floor(gaps.length / 2)]! * 1.25);
+  /** The server's ticks started over (SnapshotClock.arrived): keep what we have on the new timeline. */
+  rebase(shift: number): void {
+    for (const s of this.samples) s.at += shift;
   }
 
-  sample(now: number): Vec2 | null {
+  /** Where to draw it at server time `t`, ms. */
+  sample(t: number): Vec2 | null {
     if (this.samples.length === 0) return null;
-    const t = now - this.delay;
     const first = this.samples[0]!;
     if (t <= first.at) return { x: first.x, y: first.y };
     for (let i = this.samples.length - 1; i > 0; i--) {
       const a = this.samples[i - 1]!;
       const b = this.samples[i]!;
       if (t >= a.at && t <= b.at) {
-        const f = b.at === a.at ? 1 : (t - a.at) / (b.at - a.at);
+        const f = (t - a.at) / (b.at - a.at);
         return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
       }
     }
     const last = this.samples[this.samples.length - 1]!;
-    return { x: last.x, y: last.y };
+    const before = this.samples[this.samples.length - 2];
+    if (!before) return { x: last.x, y: last.y };
+    // Late: carry on as they were going, a little way only.
+    const over = Math.min(t - last.at, CARRY_ON_MS);
+    const f = over / (last.at - before.at);
+    return { x: last.x + (last.x - before.x) * f, y: last.y + (last.y - before.y) * f };
   }
 }

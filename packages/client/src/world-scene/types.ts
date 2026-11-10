@@ -204,6 +204,10 @@ export interface SceneCounts {
   lamps: number;
   /** The tile we stand on. */
   tile?: { x: number; y: number };
+  /** How far behind the server others are drawn, ms (SnapshotClock.delay). */
+  drawnBehindMs: number;
+  /** How much the network delays snapshots unevenly, ms (SnapshotClock.jitter). */
+  wobbleMs: number;
 }
 
 /** An isometric way as a step on screen, one long. */

@@ -188,7 +188,8 @@ cap). Two things happen as it fills:
   than 40 people and creatures are in view, then every 2, 3 and at most 4
   ticks. A process whose ticks take more than half their time slows them
   down the same way. Players' own steps are predicted on their screen and
-  others are drawn a little further in the past, so movement stays smooth,
+  others are drawn a little further in the past (one gap between snapshots
+  plus the network's wobble, `snapshot-clock.ts`), so movement stays smooth,
   just slightly less precise.
 - **Cells.** Past 50 players a region splits into strips side by side
   (up to four, at least 16 tiles wide), each run on its own, spread over

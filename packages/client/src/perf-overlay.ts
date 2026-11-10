@@ -280,6 +280,7 @@ export class PerfOverlay {
       // Snapshots leave the server evenly; arriving unevenly means the network wobbles.
       row('', `snapshots arrive ${typical.toFixed(0)} ms apart, 1 in 20 over ${late.toFixed(0)} ms`, late > typical * 3 ? 'warn' : '');
     }
+    if (counts) row('', `others drawn ${counts.drawnBehindMs.toFixed(0)} ms behind the server · network wobble ${counts.wobbleMs.toFixed(0)} ms`, counts.wobbleMs > 150 ? 'warn' : '');
     if (counts) {
       row('World', `${this.sources.region()}${counts.tile ? ` at ${counts.tile.x}, ${counts.tile.y}` : ''} · ${counts.players} player${counts.players === 1 ? '' : 's'}, ${counts.creatures} creatures, ${counts.npcs} people, ${counts.bodies} fallen`);
       row('Drawn', `${counts.regions} region${counts.regions === 1 ? '' : 's'}, ${counts.chunks} chunks of ground near you, ${counts.lamps} lamps`);

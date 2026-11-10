@@ -268,12 +268,18 @@ describe('Mount Zephyr, Whiteledge, and The Eyrie of the First Watch', () => {
       }
     }
 
-    // f1South and f2South share a flush southern cliff edge at y + height === 126 (row y = 125)
+    // f1South, f2South, and f3South share a flush southern cliff edge at y + height === 126 and eastern edge at x + width === 56
     const f1South = map.storeys.find((s) => s.floor === 1 && s.x === 32 && s.y === 121)!;
     const f2South = map.storeys.find((s) => s.floor === 2 && s.x === 32 && s.y === 121)!;
+    const f3South = map.storeys.find((s) => s.floor === 3 && s.x === 32 && s.y === 121)!;
     expect(f1South).toBeDefined();
     expect(f2South).toBeDefined();
+    expect(f3South).toBeDefined();
     expect(f1South.y + f1South.height).toBe(126);
     expect(f2South.y + f2South.height).toBe(126);
+    expect(f3South.y + f3South.height).toBe(126);
+    expect(f1South.x + f1South.width).toBe(56);
+    expect(f2South.x + f2South.width).toBe(56);
+    expect(f3South.x + f3South.width).toBe(56);
   });
 });

@@ -307,7 +307,7 @@ function layout(map: RegionMap, c: number): void {
   const f3Central = addStorey(map, { x: 35, y: 83, width: 16, height: 9 }, 3, eyrie.style, undefined, true);
   const f3North = addStorey(map, { x: 35, y: 35, width: 16, height: 25 }, 3, eyrie.style, undefined, true);
   const f3TunnelN = addStorey(map, { x: 35, y: 60, width: 16, height: 23 }, 3, eyrie.style, undefined, true);
-  const f3South = addStorey(map, { x: 33, y: 121, width: 19, height: 5 }, 3, eyrie.style, undefined, true);
+  const f3South = addStorey(map, { x: 32, y: 121, width: 24, height: 5 }, 3, eyrie.style, undefined, true);
   const f3SouthWest = addStorey(map, { x: 33, y: 126, width: 13, height: 10 }, 3, eyrie.style, undefined, true);
 
   connectVertical(map, 3, f3North, f3TunnelN, 42);

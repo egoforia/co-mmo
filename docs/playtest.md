@@ -104,8 +104,9 @@ Scenarios: 10 players on the same machine, on home Wi-Fi (20 ms, up to 40 ms
 of wobble) and on mobile (50 ms, up to 120 ms); 40 players on Wi-Fi; one
 player on a weak 40 KB/s link among 20; and 10 players with their region on a
 region server 20 ms from the game server. `NETBENCH_SECONDS` sets how long
-each one runs (10 by default) and `NETBENCH_ONLY=wi-fi` runs only the scenarios
-whose names hold those words.
+each one runs (10 by default), `NETBENCH_ONLY=wi-fi` runs only the scenarios
+whose names hold those words, and the game's network switches in `.env`
+(`NET_COMPRESS=off`) apply, to compare.
 
 The performance overlay (F3) shows the same from a real browser: under
 Network, how far apart snapshots arrive.

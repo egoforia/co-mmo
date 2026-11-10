@@ -246,6 +246,7 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DAY_MINUTES` | `60` | Real minutes in one game day, dawn to dawn |
 | `WEATHER_MINUTES` | `20` | Real minutes each spell of weather lasts before it may turn |
 | `WEATHER` | on | `off` keeps every land's sky clear |
+| `NET_COMPRESS` | on | `off` sends to players uncompressed ([docs/scale.md](docs/scale.md), Smooth play on any connection) |
 | `DATA_FILE` | `data/world.json` | An older game's world file, brought into Postgres on its first run; its folder holds `db/` and `art/` |
 | `CLIENT_DIR` | `packages/client/dist` if built | Built client to serve |
 | `ART_DIR` | `art/` next to `DATA_FILE` | Where painted wish art is saved |

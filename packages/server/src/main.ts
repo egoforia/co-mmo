@@ -9,6 +9,7 @@ import { connectPostgres, openBuiltInPostgres } from './db.ts';
 import { connectRedis } from './redis.ts';
 import { RedisTurnLedger, SharedPaintQueue } from './shared-paint-queue.ts';
 import { RedisBus } from './bus.ts';
+import { netFromEnv } from './socket-net.ts';
 import { Updater, currentCommit } from './updates.ts';
 import { ApiLog, KEEP_DAYS, MAX_BYTES } from './api-log.ts';
 
@@ -76,6 +77,8 @@ const app = createApp({
     weather: process.env.WEATHER?.trim().toLowerCase() !== 'off',
   }),
   apiLog,
+  // NET_COMPRESS=off sends to players uncompressed (socket-net.ts).
+  net: netFromEnv(process.env),
   publicUrl,
   clientDir,
   updater,

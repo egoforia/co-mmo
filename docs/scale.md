@@ -179,6 +179,22 @@ Each one says `Region server <name> joined.` in the game server's console.
 For a few friends on one laptop, region servers are not needed; they are
 how the world grows past what one process can run.
 
+## Smooth play on any connection
+
+What the game server sends players is made to stay smooth on home Wi-Fi
+and phones, and to fit a home connection's upload when the game runs on a
+laptop. `npm run netbench` measures it (docs/playtest.md).
+
+- **Others on the server's clock.** The browser draws other players and
+  creatures on the server's time, worked out from each snapshot's tick
+  (shared `snapshot-clock.ts`), just far enough behind it for the network's
+  wobble, so an uneven connection does not make them stutter.
+- **Compression.** Snapshots are compressed on the way out (WebSocket
+  permessage-deflate, `socket-net.ts`): with 40 players in view each player
+  gets about 7 KB a second instead of 98, and the host sends about 0.3 MB a
+  second instead of 3.8. It costs some processor time on the game server.
+  `NET_COMPRESS=off` turns it off.
+
 ## Crowds
 
 Nobody is turned away from a crowded region (design doc, Scaling without a

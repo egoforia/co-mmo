@@ -9,6 +9,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { MemoryBus, type Bus, type BusHandler } from '../src/bus.ts';
 import { RegionServer } from '../src/region-server.ts';
+import { netFromEnv } from '../src/socket-net.ts';
 import { account, app, start } from '../test/helpers.ts';
 import { BenchBot, smoothness } from './bench-bot.ts';
 import { LateLine, lagProxy, type LagProxy, type Link } from './lag-proxy.ts';
@@ -95,7 +96,8 @@ describe('network bench', () => {
 /** Plays one scenario and measures it. */
 async function run(scenario: Scenario): Promise<Row[]> {
   const bus = scenario.regionServerMs !== undefined ? new SlowBus(scenario.regionServerMs) : undefined;
-  const { store, ws } = await start(bus ? { regionBus: bus } : {});
+  // The game's network choices, as .env would set them (NET_COMPRESS=off to compare).
+  const { store, ws } = await start({ net: netFromEnv(process.env), ...(bus ? { regionBus: bus } : {}) });
   const port = Number(new URL(ws).port);
   let regionServer: RegionServer | undefined;
   if (bus) {

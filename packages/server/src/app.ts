@@ -47,6 +47,7 @@ import { bearer, json, readJson, serveStatic } from './http.ts';
 import { handleAccount } from './account-routes.ts';
 import { serveArtFile } from './art-files.ts';
 import { openGameSocket } from './game-socket.ts';
+import type { NetOptions } from './socket-net.ts';
 import { artFileReader, pointSources } from './hand-sources.ts';
 
 export interface AppOptions {
@@ -59,6 +60,8 @@ export interface AppOptions {
   autosaveMs?: number;
   /** How often idle connections are pinged, in ms. */
   heartbeatMs?: number;
+  /** How the game socket uses the network (socket-net.ts, from .env); everything on when missing. */
+  net?: NetOptions;
   /** Prayers and wishes: where art lives, and test overrides. */
   wishes: WishOptions;
   /** Checks GitHub for new commits and pulls them (Owner, God's View). */
@@ -410,7 +413,7 @@ export function createApp(options: AppOptions): App {
     await store.flush();
   }
 
-  const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, heartbeatMs: options.heartbeatMs });
+  const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, heartbeatMs: options.heartbeatMs, ...(options.net ? { net: options.net } : {}) });
 
   const tickTimer = setInterval(() => meter.tick(() => {
     rulesProfiler.startTick();

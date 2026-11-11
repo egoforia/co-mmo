@@ -12,12 +12,14 @@ export interface NetOptions {
   skipStale: boolean;
   /** Show what stands just over a region edge (region/beyond.ts; NET_SEE_ACROSS=off turns it off). On when missing. */
   seeAcross?: boolean;
+  /** The quicker path through region servers: snapshots passed on as written, steps sent together, one-step crossings (NET_FAST_PATH=off turns it off). On when missing. */
+  fastPath?: boolean;
 }
 
 /** The choices from the environment: everything on unless set to `off`. */
 export function netFromEnv(env: Record<string, string | undefined>): NetOptions {
   const on = (name: string) => env[name]?.trim().toLowerCase() !== 'off';
-  return { compress: on('NET_COMPRESS'), skipStale: on('NET_SKIP_STALE'), seeAcross: on('NET_SEE_ACROSS') };
+  return { compress: on('NET_COMPRESS'), skipStale: on('NET_SKIP_STALE'), seeAcross: on('NET_SEE_ACROSS'), fastPath: on('NET_FAST_PATH') };
 }
 
 /**

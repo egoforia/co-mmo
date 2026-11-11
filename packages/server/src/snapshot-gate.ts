@@ -42,19 +42,36 @@ export class SnapshotGate {
       return message;
     }
     if (message.t !== 'snapshot') return message;
+    const skipped = this.allow(message.tick, now, buffered);
+    if (skipped === undefined) return undefined;
+    return skipped ? { ...message, skipped } : message;
+  }
+
+  /**
+   * A snapshot already written as text (from a region server): the text to
+   * send, with how many were skipped before it added, or undefined to hold it back.
+   */
+  passText(text: string, tick: number, now: number, buffered: number): string | undefined {
+    const skipped = this.allow(tick, now, buffered);
+    if (skipped === undefined) return undefined;
+    // The text is a JSON object: one more field goes before its closing brace.
+    return skipped ? `${text.slice(0, text.lastIndexOf('}'))},"skipped":${skipped}}` : text;
+  }
+
+  /** Whether the snapshot of `tick` goes now: how many were skipped before it, or undefined to skip it too. */
+  private allow(tick: number, now: number, buffered: number): number | undefined {
     const late = this.behind > BEHIND_MS || buffered > MAX_BUFFERED;
     if (late && now - this.lastSent < KEEP_EVERY_MS) {
       this.skipped++;
       this.skippedSince++;
       return undefined;
     }
-    this.sentAt.set(message.tick, now);
+    this.sentAt.set(tick, now);
     if (this.sentAt.size > KEPT) this.sentAt.delete(this.sentAt.keys().next().value!);
     this.lastSent = now;
-    if (!this.skippedSince) return message;
-    const out = { ...message, skipped: this.skippedSince };
+    const skipped = this.skippedSince;
     this.skippedSince = 0;
-    return out;
+    return skipped;
   }
 
   /** The browser has seen the snapshot of `tick` (SeenMessage) by `now`. */

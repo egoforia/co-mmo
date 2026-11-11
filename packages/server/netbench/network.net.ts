@@ -7,12 +7,11 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { MemoryBus, type Bus, type BusHandler } from '../src/bus.ts';
 import { RegionServer } from '../src/region-server.ts';
 import { netFromEnv } from '../src/socket-net.ts';
 import { account, app, start } from '../test/helpers.ts';
 import { BenchBot, smoothness } from './bench-bot.ts';
-import { LateLine, lagProxy, type LagProxy, type Link } from './lag-proxy.ts';
+import { SlowBus, lagProxy, type LagProxy, type Link } from './lag-proxy.ts';
 
 const SECONDS = Number(process.env.NETBENCH_SECONDS ?? 10);
 const WARM_UP_MS = 2000;
@@ -42,6 +41,7 @@ const SCENARIOS: Scenario[] = [
   { name: '40 players, home Wi-Fi', players: 40, link: WIFI },
   { name: '20 players + one on a weak link', players: 20, link: WIFI, extra: WEAK },
   { name: '10 players, region server 20 ms away', players: 10, link: WIFI, regionServerMs: 20 },
+  { name: '40 players, region server 20 ms away', players: 40, link: WIFI, regionServerMs: 20 },
 ];
 
 /** One line of the report. */
@@ -176,23 +176,6 @@ function table(list: Row[]): string {
   const widths = head.map((h, i) => Math.max(h.length, ...lines.map((l) => l[i]!.length)));
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join('  ');
   return [fmt(head), fmt(widths.map((w) => '-'.repeat(w))), ...lines.map(fmt)].join('\n');
-}
-
-/** A bus whose messages take `ms` to reach the other server, in order, as Redis between two machines would. */
-class SlowBus implements Bus {
-  private readonly inner = new MemoryBus();
-  private readonly line = new LateLine();
-  constructor(private readonly ms: number) {}
-  publish(channel: string, message: unknown): void {
-    const text = JSON.stringify(message);
-    this.line.add(performance.now() + this.ms, () => this.inner.publish(channel, JSON.parse(text)));
-  }
-  subscribe(channel: string, handler: BusHandler): Promise<() => Promise<void>> {
-    return this.inner.subscribe(channel, handler);
-  }
-  close(): Promise<void> {
-    return this.inner.close();
-  }
 }
 
 function pct(list: number[], p: number): number {

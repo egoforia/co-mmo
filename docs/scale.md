@@ -208,6 +208,17 @@ laptop. `npm run netbench` measures it (docs/playtest.md).
   their edges. When a player walks over, the people they saw stay on screen
   and keep moving instead of vanishing and popping back. Fights, trades and
   searching bodies stay within a region. `NET_SEE_ACROSS=off` turns it off.
+- **A quicker path through region servers.** A region server writes each
+  player's snapshot as text once, and the game server passes it to the
+  socket without reading and writing it again (about a fifth of the work at
+  40 players). Players' inputs that come in together go to a region server
+  as one bus message. A player who walks off an edge or falls is let go by
+  their region server at once and sent along with the news, so the game
+  server moves them without asking back; steps still on their way to the
+  old server are sent on after them. Crossing to a region on another server
+  20 ms away now goes about 100 ms without a snapshot instead of 150 (two
+  ticks instead of three). `NET_FAST_PATH=off` turns it off, on the game
+  server and on region servers.
 
 ## Crowds
 

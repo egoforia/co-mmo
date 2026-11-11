@@ -189,7 +189,7 @@ export function createApp(options: AppOptions): App {
   const slowTicks = new SlowTickBuffer();
   const rulesProfiler = new TickProfiler();
   // Regions run on region servers when there are any (design doc, Scaling without a cap).
-  const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries(), slowTicks }) : undefined;
+  const regionServers = options.regionBus ? new RegionServers(options.regionBus, world, { content: () => wishes.entries(), slowTicks, fastPath: options.net?.fastPath ?? true }) : undefined;
   if (regionServers) world.hosting = regionServers;
   const ready = regionServers ? regionServers.start() : Promise.resolve();
   // How hard this process works, for God's View's Server health tab.

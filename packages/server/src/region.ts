@@ -109,6 +109,8 @@ export function snapshotEvery(crowd: number, strain = 0): number {
 export interface Connection {
   send(message: ServerMessage): void;
   close(reason: string): void;
+  /** A snapshot already written as text by a region server, passed on as it is (region-link.ts, Outgoing). */
+  sendSnapshot?(text: string, tick: number): void;
 }
 
 /** What a region needs from the world around it. */

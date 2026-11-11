@@ -87,6 +87,12 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
           if (out) socket.send(JSON.stringify(out));
         },
         close: (reason) => socket.close(4000, reason),
+        // A region server's snapshot, already written: passed on without reading it.
+        sendSnapshot: (text, tick) => {
+          if (socket.readyState !== socket.OPEN) return;
+          const out = gate ? gate.passText(text, tick, performance.now(), socket.bufferedAmount) : text;
+          if (out) socket.send(out);
+        },
       }, { regionId: account.regionId, x: account.x, y: account.y, floor: account.floor }, upgradeCharacter(account.character));
       world.sendTo(account.id, { t: 'content', entries: wishes.entries(), replace: true });
       if (away) world.sendTo(account.id, away);

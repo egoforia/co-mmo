@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
 import path from 'node:path';
-import { applyContent, DEFAULT_SKY, TICK_SECONDS, type ServerMessage, type SlowTickRecord } from '@co-mmo/shared';
+import { applyContent, DEFAULT_SKY, TICK_SECONDS, type ClientMessage, type ServerMessage, type SlowTickRecord } from '@co-mmo/shared';
 import { answer, type Bus } from './bus.ts';
-import { Region, type Cell, type Connection, type Leaving } from './region.ts';
-import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
+import { Region, type Cell, type Connection, type Departure, type Leaving } from './region.ts';
+import { GATEWAY, carryData, carryFrom, serverChannel, type DepartureData, type LeavingData, type Outgoing, type Placement, type RegionBeat, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
 import { LoadMeter } from './load-meter.ts';
 import { getProfilerConfig, recordProfileLocally } from './debug/profiler-session.ts';
 import { aggregatePhaseTimings } from './region/profiler.ts';
@@ -12,6 +12,8 @@ import { empty } from './region/beyond.ts';
 
 /** How often a region server tells the gateway it is alive and how busy it is. */
 export const BEAT_MS = 2000;
+/** How long a player let go of is remembered, ms, so inputs still on their way are sent on after them. */
+const RELEASED_MS = 5000;
 
 export interface RegionServerOptions {
   bus: Bus;
@@ -49,12 +51,21 @@ export class RegionServer {
   private readonly meter: LoadMeter;
   /** Regions here whose last border had something in it. */
   private readonly bordered = new Set<string>();
+  /**
+   * The quicker path (NET_FAST_PATH, on unless `off`): snapshots go to the
+   * gateway already written as text, and players walking off an edge or
+   * falling are let go at once, passed on with the departure.
+   */
+  private readonly fast: boolean;
+  /** Players let go of lately, by region and id: when. */
+  private readonly released = new Map<string, number>();
 
   constructor(private readonly options: RegionServerOptions) {
     this.bus = options.bus;
     this.id = options.id ?? `${hostname()}-${process.pid}-${randomBytes(3).toString('hex')}`;
     this.now = options.now ?? Date.now;
     this.random = options.random ?? Math.random;
+    this.fast = (options.env ?? process.env).NET_FAST_PATH?.trim().toLowerCase() !== 'off';
     this.meter = new LoadMeter(this.now, {
       slowTickThresholdMs: options.slowTickThresholdMs,
       phaseBreakdown: () => {
@@ -140,6 +151,8 @@ export class RegionServer {
   tick(): void {
     this.meter.tick(() => this.tickRegions());
     this.flush();
+    const old = this.now() - RELEASED_MS;
+    for (const [key, at] of this.released) if (at < old) this.released.delete(key);
   }
 
   private tickRegions(): void {
@@ -148,18 +161,35 @@ export class RegionServer {
       region.strain = strain;
       try {
         const departures = region.tick();
-        if (departures.length) {
-          this.toGateway({
-            t: 'departures', server: this.id, region: region.key,
-            list: departures.map((d) => ({ ...d, ...(region.position(d.id) ?? { x: 0, y: 0 }) })),
-          });
-        }
+        if (departures.length) this.toGateway({ t: 'departures', server: this.id, region: region.key, list: departures.map((d) => this.depart(region, d)) });
         if (region.cell) this.toGateway({ t: 'edge', server: this.id, region: region.key, ghosts: region.edge() });
         this.border(region);
       } catch (err) {
         this.failed(err);
       }
     }
+  }
+
+  /**
+   * A player leaving a region here. On the quicker path one walking off an
+   * edge or falling is let go at once and passed on with the departure, so
+   * the gateway moves them without asking back: one message, not three.
+   * Crossing into the next cell stays the split region's business.
+   */
+  private depart(region: Region, d: Departure): DepartureData {
+    const at = region.position(d.id) ?? { x: 0, y: 0 };
+    if (!this.fast || d.cell !== undefined) return { ...d, x: at.x, y: at.y };
+    const left = region.remove(d.id, '');
+    if (!left) return { ...d, x: at.x, y: at.y };
+    this.released.set(`${region.key} ${d.id}`, this.now());
+    return { ...d, x: at.x, y: at.y, left: leavingData(left) };
+  }
+
+  /** Steps for a player here, or, for one just let go of, sent on after them through the gateway. */
+  private input(region: string, id: string, m: ClientMessage): void {
+    const r = this.regions.get(region);
+    if (r?.has(id)) return r.handle(id, m);
+    if (this.released.has(`${region} ${id}`)) this.toGateway({ t: 'bounce', server: this.id, region, id, m });
   }
 
   /** Shows the regions around this one what stands near its edges, while anyone is there to see (region/beyond.ts). */
@@ -205,6 +235,10 @@ export class RegionServer {
       return;
     }
     if (m.t === 'answer') return;
+    if (m.t === 'inputs') {
+      for (const [region, id, input] of m.list) this.input(region, id, input);
+      return;
+    }
     if (m.t === 'host') {
       const region = this.makeRegion(m.region, m.cell);
       for (const p of m.placements) place(region, p);
@@ -232,7 +266,7 @@ export class RegionServer {
         return;
       }
       case 'input':
-        region.handle(m.id, m.m);
+        this.input(m.region, m.id, m.m);
         return;
       case 'change':
         answer(this.bus, m, region.change(m.id, m.op));
@@ -315,7 +349,10 @@ export class RegionServer {
       items.push(item);
     };
     return {
-      send: (m: ServerMessage) => out({ to: player, m }),
+      // A snapshot is written here, once, and passed on by the gateway as it is.
+      send: (m: ServerMessage) => out(this.fast && m.t === 'snapshot'
+        ? { to: player, text: JSON.stringify(m), tick: m.tick, s: { x: m.x, y: m.y, ack: m.ack, hp: m.hp, energy: m.energy } }
+        : { to: player, m }),
       close: (reason: string) => out({ close: player, reason }),
     };
   }

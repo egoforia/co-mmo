@@ -158,6 +158,8 @@ export type ToServer =
   | { t: 'join'; region: string; info: PlayerInfo; at: { x: number | null; y: number | null; floor?: number }; character: Character; announce?: string; carry?: CarryData; handoff?: boolean }
   | { t: 'remove'; region: string; id: string; announce?: string; ask?: number; replyTo?: string }
   | { t: 'input'; region: string; id: string; m: ClientMessage }
+  /** Players' steps and other inputs for this server, gathered for a few ms and sent together (InputBatch). */
+  | { t: 'inputs'; list: [region: string, id: string, m: ClientMessage][] }
   | { t: 'change'; region: string; id: string; op: CharacterOp; ask?: number; replyTo?: string }
   | { t: 'nearby'; region: string; id: string; ask?: number; replyTo?: string }
   | { t: 'tell'; region: string; id: string; text: string }
@@ -179,15 +181,39 @@ export type ToServer =
   | { t: 'start-profile'; profileId: string; durationSeconds: number; kind: 'cpu' | 'heap' }
   | { t: 'answer'; ask: number; value?: unknown; error?: string };
 
-/** One thing for the gateway to pass on to a player. */
-export type Outgoing = { to: string; m: ServerMessage } | { close: string; reason: string };
+/** What the gateway keeps of a player from each snapshot, so it can answer about them without asking. */
+export interface SnapshotSummary {
+  x: number;
+  y: number;
+  ack: number;
+  hp: number;
+  energy: number;
+}
+
+/**
+ * One thing for the gateway to pass on to a player. A snapshot comes already
+ * written as text, with what the gateway keeps of it beside it, so it goes
+ * on to the socket without being read and written again.
+ */
+export type Outgoing =
+  | { to: string; m: ServerMessage }
+  | { to: string; text: string; tick: number; s: SnapshotSummary }
+  | { close: string; reason: string };
+
+/**
+ * A player a region server let go of at once (walked off an edge or fell),
+ * passed to the gateway with the departure instead of waiting to be asked.
+ */
+export type DepartureData = Departure & { x: number; y: number; left?: LeavingData };
 
 /** Messages to the gateway. */
 export type ToGateway =
   | { t: 'hello'; server: string; load: ServerLoad }
   | { t: 'beat'; server: string; load: ServerLoad; regions: RegionBeat[] }
   | { t: 'out'; server: string; region: string; items: Outgoing[] }
-  | { t: 'departures'; server: string; region: string; list: (Departure & { x: number; y: number })[] }
+  | { t: 'departures'; server: string; region: string; list: DepartureData[] }
+  /** Inputs for a player this server just let go of: the gateway sends them on to wherever the player went. */
+  | { t: 'bounce'; server: string; region: string; id: string; m: ClientMessage }
   | { t: 'hook'; server: string; region: string; hook: 'worldChat'; m: ServerMessage }
   | { t: 'hook'; server: string; region: string; hook: 'creator'; thing: string; player: string; credit: import('@co-mmo/shared').CreatorCredit }
   | { t: 'hook'; server: string; region: string; hook: 'event'; type: 'use' | 'interact' | 'defeat'; player: string; data: Record<string, string | number> }

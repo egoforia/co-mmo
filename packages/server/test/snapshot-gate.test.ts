@@ -38,4 +38,14 @@ describe('SnapshotGate', () => {
     expect(gate.pass(snap(2), 50, 100_000)).toBeUndefined();
     expect(gate.pass({ t: 'notice', text: 'Hello' }, 60, 100_000)).toBeDefined();
   });
+
+  it('holds back and marks a snapshot a region server already wrote as text, the same way', () => {
+    const gate = new SnapshotGate();
+    gate.passText(JSON.stringify(snap(1)), 1, 0, 0);
+    expect(gate.passText(JSON.stringify(snap(2)), 2, 50, 100_000)).toBeUndefined();
+    expect(gate.passText(JSON.stringify(snap(3)), 3, 100, 100_000)).toBeUndefined();
+    const text = gate.passText(JSON.stringify(snap(4)), 4, 600, 0)!;
+    expect(JSON.parse(text)).toMatchObject({ t: 'snapshot', tick: 4, skipped: 2 });
+    expect(gate.passText(JSON.stringify(snap(5)), 5, 650, 0)).toBe(JSON.stringify(snap(5)));
+  });
 });

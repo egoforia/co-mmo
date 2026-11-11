@@ -41,7 +41,7 @@ import { Region, type Cell, type Connection, type Departure, type Ghosts, type L
 import { SplitRegion, cellsFor, placementsFor } from './split-region.ts';
 import { across } from './region/beyond.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
-import type { Placement, RegionHandle, WorldState } from './region-link.ts';
+import type { DepartureData, LeavingData, Placement, RegionHandle, WorldState } from './region-link.ts';
 
 /**
  * Where regions run. Without one every region runs in this process; the
@@ -851,12 +851,23 @@ export class World {
   }
 
   /** Players a region server let go of: they walked off an edge or fell there, or crossed into the next cell. */
-  departed(key: string, list: (Departure & { x: number; y: number })[]): void {
+  departed(key: string, list: DepartureData[]): void {
     const regionId = key.split('~')[0]!;
     const region = this.regions.get(regionId);
-    if (region instanceof SplitRegion) return region.departed(key, list, (d) => this.depart(region, d));
-    if (!region || key !== regionId) return;
+    if (!region) return;
+    // Players the server already let go of (the quicker path) move on at once, with nothing to ask.
+    const unit = this.unit(key) as { release?: (id: string, left: LeavingData) => Leaving | undefined } | undefined;
+    const rest: DepartureData[] = [];
     for (const d of list) {
+      if (!d.left || !unit?.release) rest.push(d);
+      else {
+        const taken = unit.release(d.id, d.left);
+        if (taken) this.depart(region, d, taken);
+      }
+    }
+    if (region instanceof SplitRegion) return region.departed(key, rest, (d) => this.depart(region, d));
+    if (key !== regionId) return;
+    for (const d of rest) {
       if (!region.has(d.id)) continue;
       (region as { moved?: (id: string, x: number, y: number) => void }).moved?.(d.id, d.x, d.y);
       this.depart(region, d);
@@ -866,16 +877,27 @@ export class World {
   /**
    * Moves a player who fell to the shrine, or who walked off an edge into
    * the region beyond. Between regions in this process it happens at once;
-   * a region server is asked to let the player go first.
+   * a region server is asked to let the player go first, unless it already
+   * did and sent them along (`taken`, the quicker path).
    */
-  private depart(region: RegionHandle, departure: Departure): void {
+  private depart(region: RegionHandle, departure: Departure, taken?: Leaving): void {
     const id = departure.id;
-    if (this.moving.has(id) || this.where.get(id) !== region.def.id) return;
-    const name = region.nameOf(id) ?? 'Someone';
+    if (this.moving.has(id) || this.where.get(id) !== region.def.id) {
+      // Already on their way somewhere else: one the server let go of goes back where they stood.
+      if (taken) region.join(taken.info, taken.conn, { x: taken.x, y: taken.y, floor: taken.carry.floor }, taken.character, '', taken.carry, true);
+      return;
+    }
+    const name = taken?.info.name ?? region.nameOf(id) ?? 'Someone';
+    // Out of the region, saying why: at once when the server already let them go.
+    const take = (announce: string): Leaving | undefined | Promise<Leaving | undefined> => {
+      if (!taken) return region.remove(id, announce);
+      region.announce(announce);
+      return taken;
+    };
     if (departure.died) {
       // The Fallen wake at the shrine, Weakened for a while; nothing is lost.
       this.moving.add(id);
-      this.track(settle(region.remove(id, `${name} fell in ${region.def.name}.`), (fallen) => {
+      this.track(settle(take(`${name} fell in ${region.def.name}.`), (fallen) => {
         this.moving.delete(id);
         if (!fallen || this.where.get(id) !== region.def.id) return;
         const home = this.home;
@@ -892,11 +914,14 @@ export class World {
     if (!departure.side) return;
     const target = this.regions.get(region.def.exits[departure.side] ?? '');
     // Keep the player's place along the edge, so crossing feels like one more step.
-    const at = region.position(id);
+    const at = taken ?? region.position(id);
     const arrival = target && at && arrivalPoint(target.map, departure.side, at);
-    if (!target || !arrival) return;
+    if (!target || !arrival) {
+      if (taken) region.join(taken.info, taken.conn, { x: taken.x, y: taken.y, floor: taken.carry.floor }, taken.character, '', taken.carry, true);
+      return;
+    }
     this.moving.add(id);
-    this.track(settle(region.remove(id, `${name} set off for ${target.def.name}.`), (moving) => {
+    this.track(settle(take(`${name} set off for ${target.def.name}.`), (moving) => {
       this.moving.delete(id);
       if (!moving || this.where.get(id) !== region.def.id) return;
       // The region beyond may itself have moved host meanwhile.

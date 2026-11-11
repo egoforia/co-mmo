@@ -3,7 +3,7 @@ import { Requests, type Bus } from './bus.ts';
 import { GATEWAY, serverChannel, type Placement, type RegionHandle, type ServerLoad, type ToGateway, type ToServer, type WorldState } from './region-link.ts';
 import type { SlowTickBuffer } from './debug/slow-tick-buffer.ts';
 import type { Cell, Ghosts } from './region.ts';
-import { RemoteRegion } from './remote-region.ts';
+import { InputBatch, RemoteRegion } from './remote-region.ts';
 import type { Hosting, World } from './world.ts';
 
 /** A region server that has not been heard from for this long is taken to be gone. */
@@ -57,6 +57,8 @@ export interface RegionServersOptions {
   deadMs?: number;
   /** Buffer to record slow-tick events received from region servers. */
   slowTicks?: SlowTickBuffer;
+  /** The quicker path (NET_FAST_PATH): players' inputs gathered and sent together. On when missing. */
+  fastPath?: boolean;
 }
 
 /**
@@ -68,6 +70,7 @@ export interface RegionServersOptions {
 export class RegionServers implements Hosting {
   private readonly servers = new Map<string, ServerInfo>();
   private readonly requests: Requests;
+  private readonly batch?: InputBatch;
   private readonly now: () => number;
   private unsubscribe?: () => Promise<void>;
   private watchTimer?: ReturnType<typeof setInterval>;
@@ -82,6 +85,7 @@ export class RegionServers implements Hosting {
   constructor(private readonly bus: Bus, private readonly world: World, private readonly options: RegionServersOptions) {
     this.requests = new Requests(bus, GATEWAY);
     this.now = options.now ?? Date.now;
+    this.batch = options.fastPath === false ? undefined : new InputBatch(bus);
   }
 
   async start(): Promise<void> {
@@ -92,6 +96,7 @@ export class RegionServers implements Hosting {
 
   async close(): Promise<void> {
     clearInterval(this.watchTimer);
+    this.batch?.flushAll();
     await this.unsubscribe?.();
     this.requests.failAll('The game server is shutting down.');
   }
@@ -135,7 +140,7 @@ export class RegionServers implements Hosting {
     if (!this.given.size) setImmediate(() => this.given.clear());
     this.given.set(server, (this.given.get(server) ?? 0) + 1);
     this.command(server, { t: 'host', region: def, placements, ...(cell ? { cell } : {}) });
-    return new RemoteRegion(def, server, this.bus, this.requests, cell);
+    return new RemoteRegion(def, server, this.bus, this.requests, cell, this.batch);
   }
 
   changed(): void {
@@ -198,6 +203,11 @@ export class RegionServers implements Hosting {
     if (m.t === 'edge') return this.world.edge(m.region, m.ghosts as Ghosts);
     if (m.t === 'border') return this.world.border(m.region, m.ghosts as Ghosts);
     if (m.t === 'departures') return this.world.departed(m.region, m.list);
+    if (m.t === 'bounce') {
+      // Steps sent after a player the server let go of: on to wherever they went (never back to the same place).
+      if (!region.has(m.id)) this.world.handle(m.id, m.m);
+      return;
+    }
     if (m.t !== 'hook') return;
     // Things a region asks of the whole world.
     switch (m.hook) {

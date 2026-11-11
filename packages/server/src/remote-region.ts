@@ -28,7 +28,15 @@ export class RemoteRegion implements RegionHandle {
   /** Neighbours whose last word across the edge had something in it. */
   private readonly beyond = new Set<string>();
 
-  constructor(readonly def: RegionDef, readonly host: string, private readonly bus: Bus, private readonly requests: Requests, readonly cell?: Cell) {
+  constructor(
+    readonly def: RegionDef,
+    readonly host: string,
+    private readonly bus: Bus,
+    private readonly requests: Requests,
+    readonly cell?: Cell,
+    /** Gathers players' inputs for the server and sends them together (the quicker path); each input goes alone when missing. */
+    private readonly batch?: InputBatch,
+  ) {
     // The land is made from the region's seed, the same here as there.
     this.map = generateRegion(def);
   }
@@ -169,7 +177,21 @@ export class RemoteRegion implements RegionHandle {
   }
 
   handle(id: string, message: ClientMessage): void {
-    if (this.players.has(id)) this.command({ t: 'input', region: this.key, id, m: message });
+    if (!this.players.has(id)) return;
+    if (this.batch) this.batch.add(this.channel, this.key, id, message);
+    else this.command({ t: 'input', region: this.key, id, m: message });
+  }
+
+  /**
+   * A player the region server let go of by itself (walked off an edge or
+   * fell), with what it sent: they are taken out here too, at once, with no
+   * question asked back. Undefined when they were already on their way out.
+   */
+  release(id: string, left: LeavingData): Leaving | undefined {
+    const mirror = this.players.get(id);
+    if (!mirror) return undefined;
+    this.players.delete(id);
+    return { info: left.info, conn: mirror.conn, character: left.character, x: left.x, y: left.y, carry: carryFrom(left.carry) };
   }
 
   tick(): Departure[] {
@@ -197,6 +219,15 @@ export class RemoteRegion implements RegionHandle {
       }
       const p = this.players.get(item.to);
       if (!p) continue;
+      if ('text' in item) {
+        // A snapshot written on the region server: passed on as it is.
+        Object.assign(p, { x: item.s.x, y: item.s.y, ack: item.s.ack });
+        p.character.hp = item.s.hp;
+        p.character.energy = item.s.energy;
+        if (p.conn.sendSnapshot) p.conn.sendSnapshot(item.text, item.tick);
+        else p.conn.send(JSON.parse(item.text) as ServerMessage);
+        continue;
+      }
       const m = item.m;
       if (m.t === 'snapshot') {
         p.x = m.x;
@@ -239,7 +270,51 @@ export class RemoteRegion implements RegionHandle {
   }
 
   private command(message: ToServer): void {
+    // Inputs gathered so far go first, so everything reaches the server in the order it was sent.
+    this.batch?.flush(this.channel);
     this.bus.publish(this.channel, message);
+  }
+}
+
+/**
+ * Players' inputs on their way to region servers (docs/scale.md, the quicker
+ * path): instead of a bus message per step, the inputs for each server that
+ * came in together (everything the game server read from its sockets in one
+ * go) are sent as one, just after. Nothing waits on a timer, so no step is
+ * held back. Anything else sent to that server sends them first, so nothing
+ * overtakes them.
+ */
+export class InputBatch {
+  private readonly waiting = new Map<string, [string, string, ClientMessage][]>();
+  private queued = false;
+  /** Bus messages sent and inputs in them, for the network bench. */
+  readonly counts = { messages: 0, inputs: 0 };
+
+  constructor(private readonly bus: Bus) {}
+
+  add(channel: string, region: string, id: string, m: ClientMessage): void {
+    let list = this.waiting.get(channel);
+    if (!list) this.waiting.set(channel, (list = []));
+    list.push([region, id, m]);
+    if (this.queued) return;
+    this.queued = true;
+    setImmediate(() => this.flushAll());
+  }
+
+  /** Sends what waits for one server now. */
+  flush(channel: string): void {
+    const list = this.waiting.get(channel);
+    if (!list) return;
+    this.waiting.delete(channel);
+    this.counts.messages++;
+    this.counts.inputs += list.length;
+    this.bus.publish(channel, { t: 'inputs', list } satisfies ToServer);
+  }
+
+  /** Sends everything waiting. */
+  flushAll(): void {
+    this.queued = false;
+    for (const channel of [...this.waiting.keys()]) this.flush(channel);
   }
 }
 

@@ -6,6 +6,7 @@
 
 import { createServer, connect, type Server, type Socket } from 'node:net';
 import type { AddressInfo } from 'node:net';
+import { MemoryBus, type Bus, type BusHandler } from '../src/bus.ts';
 
 /** What a link between a player and the game server is like. */
 export interface Link {
@@ -104,5 +105,25 @@ export class LateLine {
       while (this.queue.length && this.queue[0]!.at <= now + 1) this.queue.shift()!.run();
       this.wait();
     }, Math.max(0, next.at - performance.now()));
+  }
+}
+
+/** A bus whose messages take `ms` to reach the other server, in order, as Redis between two machines would. */
+export class SlowBus implements Bus {
+  private readonly inner = new MemoryBus();
+  private readonly line = new LateLine();
+  /** Messages sent, for the bench. */
+  sent = 0;
+  constructor(private readonly ms: number) {}
+  publish(channel: string, message: unknown): void {
+    this.sent++;
+    const text = JSON.stringify(message);
+    this.line.add(performance.now() + this.ms, () => this.inner.publish(channel, JSON.parse(text)));
+  }
+  subscribe(channel: string, handler: BusHandler): Promise<() => Promise<void>> {
+    return this.inner.subscribe(channel, handler);
+  }
+  close(): Promise<void> {
+    return this.inner.close();
   }
 }

@@ -1,7 +1,7 @@
 import type { Character, ClientMessage, NpcPlacement, PlayerInfo, RegionDef, RegionInfo, RegionMap, ServerMessage, Tile } from '@co-mmo/shared';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import { findSpots, type Carry, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
-import type { Placement, RegionHandle } from './region-link.ts';
+import type { DepartureData, Placement, RegionHandle } from './region-link.ts';
 
 /** A cell is never narrower than this many tiles, so a region splits into at most four. */
 export const MIN_CELL_WIDTH = 16;
@@ -214,7 +214,7 @@ export class SplitRegion implements RegionHandle {
    * Players a cell on a region server let go of: over a border into the next
    * cell, or out of the region (an edge, or a fall), which `onward` handles.
    */
-  departed(key: string, list: (Departure & { x: number; y: number })[], onward: (d: Departure) => void): void {
+  departed(key: string, list: DepartureData[], onward: (d: Departure) => void): void {
     const index = this.cells.findIndex((c) => c.key === key);
     const cell = this.cells[index];
     if (!cell) return;

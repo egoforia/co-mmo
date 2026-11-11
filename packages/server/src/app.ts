@@ -103,6 +103,8 @@ export interface AppOptions {
   apiLog?: ApiLog;
   /** How the sky turns: the length of a day and of each spell of weather (from .env). */
   sky?: SkyConfig;
+  /** Server clock function, for tests that freeze or advance time. */
+  now?: () => number;
 }
 
 export interface App {
@@ -138,7 +140,8 @@ export interface App {
 export function createApp(options: AppOptions): App {
   const { store } = options;
   // Each land is laid out with the world editor's saved changes over it.
-  const world = new World(Date.now, Math.random, options.sky, (regionId) => store.worldEdits(regionId).edits);
+  const now = options.now ?? options.wishes?.now ?? Date.now;
+  const world = new World(now, Math.random, options.sky, (regionId) => store.worldEdits(regionId).edits);
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.seeAcross = options.net?.seeAcross ?? true;
   world.tuning = tuningFor(options.net ?? { compress: true });

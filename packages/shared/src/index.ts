@@ -48,6 +48,7 @@ export * from './sea-cave-kit.ts';
 export * from './sea-cave.ts';
 // The building kit uses short geometry names (box, rect, add), so it gets its own namespace.
 export * as buildingKit from './building-kit/index.ts';
+export * from './testbed/arch-testbed.ts';
 export * from './footprints.ts';
 export * from './wished-abilities.ts';
 export * from './replay.ts';

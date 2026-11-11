@@ -85,6 +85,8 @@ export async function start(opts: {
   kitSheets?: string;
   /** How the game socket uses the network (socket-net.ts); the game's own choices when missing. */
   net?: AppOptions['net'];
+  /** How the sky turns: the length of a day and of each spell of weather. */
+  sky?: AppOptions['sky'];
 } = {}) {
   const store = opts.store ?? Store.memory();
   const artDir = opts.artDir ?? (await mkdtemp(join(tmpdir(), 'co-mmo-art-')));
@@ -105,6 +107,8 @@ export async function start(opts: {
     ...(opts.clientDir ? { clientDir: opts.clientDir } : {}),
     ...(opts.kitSheets ? { kitSheets: opts.kitSheets } : {}),
     ...(opts.net ? { net: opts.net } : {}),
+    ...(opts.sky ? { sky: opts.sky } : {}),
+    ...(opts.now ? { now: opts.now } : {}),
     wishes: {
       env: opts.env ?? {},
       anchorDir: opts.anchorDir ?? '/nonexistent',

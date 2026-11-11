@@ -79,8 +79,8 @@ describe('world layout', () => {
     }
     for (const c of map.creatures) expect(collides(map, c.x, c.y)).toBe(false);
     // The launch lands each have a centrepiece; the home lands beyond them have none yet.
-    if (!homeLandLayout(map.def.biome)) expect(map.landmarks.length).toBeGreaterThanOrEqual(1);
-    expect(map.npcs.length).toBeGreaterThanOrEqual(1);
+    if (!homeLandLayout(map.def.biome) && map.def.id !== 'arch-testbed') expect(map.landmarks.length).toBeGreaterThanOrEqual(1);
+    if (map.def.id !== 'arch-testbed') expect(map.npcs.length).toBeGreaterThanOrEqual(1);
   });
 
   it.each(maps.map((m) => [m.def.id, m] as const))('%s: every road is clear from its edge to the middle', (_id, map) => {

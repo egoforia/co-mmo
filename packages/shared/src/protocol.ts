@@ -408,6 +408,12 @@ export interface SnapshotMessage {
   online: number;
   /** Snapshots skipped just before this one because the connection had fallen behind (SeenMessage). */
   skipped?: number;
+  /**
+   * Things still in view but far off, left out of this snapshot to keep it
+   * small (they come every other one): keep drawing them, walking on as they
+   * were, until their next word.
+   */
+  kept?: string[];
 }
 
 /**

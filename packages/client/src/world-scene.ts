@@ -448,8 +448,10 @@ export class WorldScene extends Phaser.Scene {
     const at = snapshot.tick * TICK_SECONDS * 1000;
     const load = (k: string, u: string) => this.loadArt(k, u);
     const painted = (key: string) => this.textures.exists(key);
+    // Far things come every other snapshot; in between they are only named, and drawn on.
+    const kept = snapshot.kept?.length ? new Set(snapshot.kept) : undefined;
     for (const p of snapshot.players) if (p.race) this.races.set(p.id, p.race);
-    syncAvatars(this, this.remotes, snapshot.players, at, (e) => makeAvatar(this, this.metrics, playerTexture(e.id, e.race), e.name, false));
+    syncAvatars(this, this.remotes, snapshot.players, at, (e) => makeAvatar(this, this.metrics, playerTexture(e.id, e.race), e.name, false), kept);
     for (const p of snapshot.players) {
       const remote = this.remotes.get(p.id);
       if (!remote) continue;
@@ -459,7 +461,7 @@ export class WorldScene extends Phaser.Scene {
       setStatusIcons(this, remote, p.statuses);
       remote.body.setAlpha(p.fallen ? FALLEN_ALPHA : 1);
     }
-    syncAvatars(this, this.creatures, snapshot.creatures ?? [], at, (c) => makeCreature(this, this.metrics, c));
+    syncAvatars(this, this.creatures, snapshot.creatures ?? [], at, (c) => makeCreature(this, this.metrics, c), kept);
     for (const c of snapshot.creatures ?? []) {
       const creature = this.creatures.get(c.id);
       creature?.label.setText(creatureLabel(c, painted));
@@ -471,10 +473,10 @@ export class WorldScene extends Phaser.Scene {
       const at = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
       return { x: at.x, y: at.y - floorLift(floor), depth: floorDepthOffset(floor) + PROJECTION.depth(this.origin.x + x, this.origin.y + y) };
     });
-    syncAvatars(this, this.npcs, snapshot.npcs ?? [], at, (n) => makeNpc(this, this.metrics, n));
+    syncAvatars(this, this.npcs, snapshot.npcs ?? [], at, (n) => makeNpc(this, this.metrics, n), kept);
     for (const n of snapshot.npcs ?? []) this.npcs.get(n.id)?.label.setText(n.asleep ? `${n.name} (asleep)` : n.name);
     const bodies = snapshot.bodies ?? [];
-    syncAvatars(this, this.bodies, bodies, at, (b) => makeBody(this, this.metrics, b));
+    syncAvatars(this, this.bodies, bodies, at, (b) => makeBody(this, this.metrics, b), kept);
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
     this.targeting.refresh((id) => this.creatures.get(id) ?? this.remotes.get(id));
   }

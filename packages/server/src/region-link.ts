@@ -112,6 +112,8 @@ export interface WorldState {
   sky?: SkyConfig;
   /** Regions with someone in a region beside them: each tick they show what stands near their edges (region/beyond.ts). */
   borders?: string[];
+  /** How regions thin their snapshots out (region/far.ts). */
+  tuning?: import('./region/far.ts').SnapshotTuning;
 }
 
 /** How busy a region server is, sent every couple of seconds. */

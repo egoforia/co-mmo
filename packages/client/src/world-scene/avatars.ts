@@ -295,6 +295,8 @@ export function syncAvatars<E extends { id: string; x: number; y: number; health
   /** The snapshot's server time (SnapshotClock), ms. */
   at: number,
   make: (e: E) => Avatar,
+  /** Far things the snapshot left out but are still in view (SnapshotMessage.kept): drawn on, not removed. */
+  kept?: ReadonlySet<string>,
 ): void {
   const seen = new Set<string>();
   for (const entity of entities) {
@@ -309,7 +311,7 @@ export function syncAvatars<E extends { id: string; x: number; y: number; health
     if (entity.health !== undefined) setHealth(scene, remote, entity.health);
   }
   for (const [id, remote] of group) {
-    if (seen.has(id)) continue;
+    if (seen.has(id) || kept?.has(id)) continue;
     destroyAvatar(scene, remote);
     group.delete(id);
   }

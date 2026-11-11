@@ -39,6 +39,7 @@ const SCENARIOS: Scenario[] = [
   { name: '10 players, home Wi-Fi', players: 10, link: WIFI },
   { name: '10 players, mobile', players: 10, link: MOBILE },
   { name: '40 players, home Wi-Fi', players: 40, link: WIFI },
+  { name: '60 players, home Wi-Fi', players: 60, link: WIFI },
   { name: '20 players + one on a weak link', players: 20, link: WIFI, extra: WEAK },
   { name: '10 players, region server 20 ms away', players: 10, link: WIFI, regionServerMs: 20 },
   { name: '40 players, region server 20 ms away', players: 40, link: WIFI, regionServerMs: 20 },

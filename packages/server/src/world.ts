@@ -40,6 +40,7 @@ import { Parties } from './parties.ts';
 import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
 import { SplitRegion, cellsFor, placementsFor } from './split-region.ts';
 import { across } from './region/beyond.ts';
+import { STEADY, type SnapshotTuning } from './region/far.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { DepartureData, LeavingData, Placement, RegionHandle, WorldState } from './region-link.ts';
 
@@ -105,6 +106,8 @@ export class World {
   private readonly credited = new Map<string, number>();
   /** Players see what stands just over a region edge (region/beyond.ts; NET_SEE_ACROSS=off turns it off). */
   seeAcross = true;
+  /** How regions thin their snapshots out (region/far.ts), from the game's network choices; as before when unset. */
+  tuning: SnapshotTuning = STEADY;
   /** Players per cell before a region splits; a tuning value. */
   cellPlayers = CELL_PLAYERS;
   /** Regions being split or joined up right now. */
@@ -195,7 +198,7 @@ export class World {
       const members = this.parties.members(id);
       if (members.length > 1) parties[id] = members;
     }
-    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky, borders: this.bordering() };
+    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky, borders: this.bordering(), tuning: this.tuning };
   }
 
   /** Regions with someone in a region beside them, corners too: those whose edges are worth showing. */
@@ -743,7 +746,11 @@ export class World {
     if (this.paused && !this.stepping) return;
     for (const region of this.regions.values()) {
       if (this.pausedRegions.has(region.def.id) && !this.stepping) continue;
-      for (const unit of region.cells ?? [region]) if (unit instanceof Region) unit.strain = strain;
+      for (const unit of region.cells ?? [region]) {
+        if (!(unit instanceof Region)) continue;
+        unit.strain = strain;
+        unit.tuning = this.tuning;
+      }
       for (const departure of region.tick()) this.depart(region, departure);
     }
     this.showBorders();

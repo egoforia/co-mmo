@@ -102,7 +102,7 @@ change with `main`. Each run is also saved to `netbench-results/`.
 | cpu % | Processor time the whole bench used (game server, robots and proxies together), as a share of one core. |
 
 Scenarios: 10 players on the same machine, on home Wi-Fi (20 ms, up to 40 ms
-of wobble) and on mobile (50 ms, up to 120 ms); 40 players on Wi-Fi; one
+of wobble) and on mobile (50 ms, up to 120 ms); 40 and 60 players on Wi-Fi; one
 player on a weak 3 KB/s link among 20; and 10 players with their region on a
 region server 20 ms from the game server (and 40 the same way). A second
 bench, `crossing.net.ts`, walks one player back and forth over the road
@@ -112,7 +112,7 @@ each crossing went without a snapshot and whether a step was lost
 each one runs (10 by default), `NETBENCH_ONLY=wi-fi` runs only the scenarios
 whose names hold those words, and the game's network switches in `.env`
 (`NET_COMPRESS=off`, `NET_SKIP_STALE=off`, `NET_SEE_ACROSS=off`,
-`NET_FAST_PATH=off`) apply, to compare.
+`NET_FAST_PATH=off`, `NET_FAR_LESS=off`) apply, to compare.
 
 The performance overlay (F3) shows the same from a real browser: under
 Network, how far apart snapshots arrive.

@@ -84,6 +84,7 @@ export const WORLD_REGIONS: RegionDef[] = [
   { id: 'desert', name: 'Mirage Desert', biome: 'mirage-desert', seed: 4001, at: { x: 0, y: 1 }, exits: { north: 'sanctum' } },
   { id: 'frostpeak', name: 'Frostpeak', biome: 'frostpeak', seed: 5001, at: { x: 0, y: -1 }, exits: { south: 'sanctum' } },
   { id: 'mushroom-hollow', name: 'Mushroom Hollow', biome: 'mushroom-hollow', seed: 6001, at: { x: -2, y: 0 }, exits: { east: 'woods' } },
+  { id: 'arch-testbed', name: 'Architectural Testbed', biome: 'sanctum', seed: 7777, at: { x: 99, y: 99 }, exits: {} },
 ];
 
 /** Regions players wished into being, by id (filled in by applyContent). */
@@ -276,6 +277,8 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
   return { ...structuredClone(rest), def };
 }
 
+import { archTestbedLayout } from './testbed/arch-testbed.ts';
+
 function layOut(def: RegionDef, size: number): RegionMap {
   const map: RegionMap = {
     def,
@@ -294,6 +297,10 @@ function layOut(def: RegionDef, size: number): RegionMap {
     spots: [],
   };
   const c = Math.floor(size / 2);
+  if (def.id === 'arch-testbed') {
+    archTestbedLayout(map, c);
+    return map;
+  }
   const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? homeLandLayout(def.biome) ?? sanctumLayout;
   layout(map, c);
   // The launch lands' caves, palaces, castles and the rest, each joined to the middle by a road.

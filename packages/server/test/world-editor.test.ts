@@ -100,8 +100,9 @@ describe('the world editor', () => {
     expect(made.body.edits[0]).toMatchObject({ name: 'Thorn Wolf', asset: 'woods-thorn-wolf', by: 'Ego' });
     const woods = app!.world.local('woods')!;
     expect(woods.creatureIds().length).toBe(before + 3);
-    const wolves = woods.creatureIds().map((id) => woods.creature(id)!).filter((c) => Math.hypot(c.x - spot[0] - 0.5, c.y - spot[1] - 0.5) <= 3.6);
-    expect(wolves.filter((c) => c.kind === 'thorn-wolf').length).toBeGreaterThanOrEqual(3);
+    // Where they live, laid by the edit (live wolves wander off as soon as the land ticks, so their places are read from the land).
+    const homes = app!.world.region('woods')!.map.creatures.filter((c) => c.kind === 'thorn-wolf' && Math.hypot(c.x - spot[0] - 0.5, c.y - spot[1] - 0.5) <= 3.6);
+    expect(homes.length).toBeGreaterThanOrEqual(3);
   });
 
   it('keeps edits across a restart', async () => {

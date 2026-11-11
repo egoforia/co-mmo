@@ -75,6 +75,7 @@ import { Kit } from './region/kit.ts';
 import { Gathering } from './region/gathering.ts';
 import { Minds } from './region/minds.ts';
 import { Crowd, spreadHomes } from './region/crowd.ts';
+import { Beyond, nearEdge } from './region/beyond.ts';
 import { Quests } from './region/quests.ts';
 import { RegionState, type Body, type PlayerState } from './region/state.ts';
 import { afflictCreature, afflictPlayer, type StatusFrom } from './region/statuses.ts';
@@ -235,6 +236,8 @@ export class Region {
   private weather: Weather | undefined;
   /** What the cells beside this one show near the border, by their index. */
   private readonly ghosts = new Map<number, Ghosts>();
+  /** What the regions around this one show near their edges (region/beyond.ts). */
+  private readonly beyond = new Beyond();
   /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
   strain = 0;
   readonly logger: CombatLogger = combatLogger;
@@ -733,7 +736,8 @@ export class Region {
     this.s.tickCount++;
     const now = this.now();
 
-    phase('crowd', () => this.crowd.gather(this.ghosts.values()));
+    const across = [...this.ghosts.values(), ...this.beyond.all(this.s.tickCount)];
+    phase('crowd', () => this.crowd.gather(across));
 
     const departures = phase('inputs', () => {
       const list: Departure[] = [];
@@ -840,9 +844,10 @@ export class Region {
         for (const n of this.s.townsfolk) {
           if (npcNear(n)) npcs.push(npcView(n));
         }
-        // What the cells beside this one show across the border.
-        for (const g of this.ghosts.values()) {
-          for (const e of g.players) if (e.id !== p.info.id && near(e)) players.push(e);
+        // What the cells beside this one show across the border, and the regions around this one across theirs.
+        for (const g of across) {
+          // Someone halfway over an edge is shown where they now are, once.
+          for (const e of g.players) if (!this.s.players.has(e.id) && near(e)) players.push(e);
           for (const e of g.creatures) if (near(e)) creatures.push(e);
           for (const e of g.bodies) if (near(e)) bodies.push(e);
           for (const e of g.npcs) if (npcNear(e)) npcs.push(e);
@@ -878,26 +883,41 @@ export class Region {
   /** What players in the cells beside this one may see of it: everything within view of a border. */
   edge(): Ghosts {
     const cell = this.cell;
+    if (!cell) return { players: [], creatures: [], bodies: [], npcs: [] };
+    return this.shown((x) => (cell.index > 0 && x < cell.x0 + VIEW_RADIUS) || (cell.index < cell.count - 1 && x >= cell.x1 - VIEW_RADIUS));
+  }
+
+  /** What players in the regions around this one may see of it: everything within view of its edges (region/beyond.ts). */
+  border(): Ghosts {
+    const size = this.map.width;
+    return this.shown((x, y) => nearEdge(x, y, size));
+  }
+
+  /** Everything standing where `seen` says, as players elsewhere see it. */
+  private shown(seen: (x: number, y: number) => boolean): Ghosts {
     const g: Ghosts = { players: [], creatures: [], bodies: [], npcs: [] };
-    if (!cell) return g;
-    const seen = (x: number) => (cell.index > 0 && x < cell.x0 + VIEW_RADIUS) || (cell.index < cell.count - 1 && x >= cell.x1 - VIEW_RADIUS);
     const now = this.now();
     for (const p of this.s.players.values()) {
-      if (!seen(p.x)) continue;
+      if (!seen(p.x, p.y)) continue;
       g.players.push(playerView(p, statusIds(p, now, p.character.weakenedUntil)));
     }
     for (const c of this.s.creatures) {
-      if (c.respawnAt === null && seen(c.x)) g.creatures.push(creatureView(c, mood(c), statusIds(c, now)));
+      if (c.respawnAt === null && seen(c.x, c.y)) g.creatures.push(creatureView(c, mood(c), statusIds(c, now)));
     }
-    // Bodies are searched in their own cell; across the border they are only seen.
-    for (const b of this.s.bodies) if (seen(b.x)) g.bodies.push(bodyView(b, false));
-    for (const n of this.s.townsfolk) if (seen(n.x)) g.npcs.push(npcView(n));
+    // Bodies are searched where they lie; from elsewhere they are only seen.
+    for (const b of this.s.bodies) if (seen(b.x, b.y)) g.bodies.push(bodyView(b, false));
+    for (const n of this.s.townsfolk) if (seen(n.x, n.y)) g.npcs.push(npcView(n));
     return g;
   }
 
   /** What the cell at `from` shows near the border, until it next says. */
   seeAcross(from: number, ghosts: Ghosts): void {
     this.ghosts.set(from, ghosts);
+  }
+
+  /** What the region (or cell) `from` beside this one shows near its edge, counted from this region's corner (region/beyond.ts). */
+  seeBeyond(from: string, ghosts: Ghosts): void {
+    this.beyond.set(from, ghosts, this.s.tickCount);
   }
 
   /** Tells everyone here when the weather turns (not when it is first worked out). */

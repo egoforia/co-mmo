@@ -232,12 +232,30 @@ export class WorldScene extends Phaser.Scene {
     if (far) this.shown = { ...this.predictor.position };
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     if (before !== welcome.region.id) {
-      // Who and what we saw were counted from the old corner, and belong to the
-      // region we left; the next snapshot shows the ones here.
-      for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
-        for (const a of group.values()) destroyAvatar(this, a);
-        group.clear();
-      }
+      // Who and what we saw were counted from the old corner. The region we
+      // walked into showed us those near the edge already (players and the
+      // lands' own creatures by the same names), so they are kept, counted
+      // from the new corner, and go on smoothly; the next snapshot drops the
+      // ones out of sight. Bodies, people and wished creatures are named per
+      // region, so they are shown afresh.
+      const dx = was.x - this.origin.x;
+      const dy = was.y - this.origin.y;
+      // The new region counts its own ticks: what we keep moves onto them with its first snapshot.
+      this.clock.restart();
+      const lands = [`${before}-`, `${welcome.region.id}-`];
+      const keep = (group: Map<string, Remote>, kept: (id: string) => boolean) => {
+        for (const [id, r] of group) {
+          if (kept(id)) r.interp.shift(dx, dy);
+          else {
+            destroyAvatar(this, r);
+            group.delete(id);
+          }
+        }
+      };
+      keep(this.remotes, () => true);
+      keep(this.creatures, (id) => lands.some((l) => id.startsWith(l)));
+      keep(this.bodies, () => false);
+      keep(this.npcs, () => false);
     }
     this.sky.set(welcome.sky, lightTint(welcome.region.def.biome));
     if (far) {

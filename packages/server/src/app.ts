@@ -139,6 +139,7 @@ export function createApp(options: AppOptions): App {
   // Each land is laid out with the world editor's saved changes over it.
   const world = new World(Date.now, Math.random, options.sky, (regionId) => store.worldEdits(regionId).edits);
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
+  world.seeAcross = options.net?.seeAcross ?? true;
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   const env = options.wishes.env ?? process.env;
   // Before anything that sends requests is made, so every one of them is logged.

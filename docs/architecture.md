@@ -85,7 +85,9 @@ hooks combat and the minds ask for passives, timed hits and Hidden),
 `minds.ts` (runs the creatures and NPCs below each tick), `kit.ts` (gear, items, crafting, shops),
 `quests.ts` (talking and quests), `bodies.ts` (loot) and `chat.ts`,
 `region-views.ts` (what players see of each thing: the one shape both
-snapshots and split-region borders send), `split-region.ts`, the
+snapshots and split-region borders send), `region/beyond.ts` (what stands
+near a region's edges, moved onto each neighbour's corner, so players see
+across region edges), `split-region.ts`, the
 `region-*`/`remote-region.ts` files for region servers, `parties.ts`,
 `trades.ts`, `character-ops.ts`. What lives in a region keeps its own module:
 `creature-brain.ts` (each creature's behaviour: wander, guard, chase,

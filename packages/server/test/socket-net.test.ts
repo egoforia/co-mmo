@@ -4,7 +4,8 @@ import { netFromEnv } from '../src/socket-net.ts';
 
 describe('the game socket on the network', () => {
   it('compresses what it sends to players, and NET_COMPRESS=off turns that off', async () => {
-    expect(netFromEnv({})).toEqual({ compress: true, skipStale: true });
+    expect(netFromEnv({})).toEqual({ compress: true, skipStale: true, seeAcross: true });
+    expect(netFromEnv({ NET_SEE_ACROSS: 'off' }).seeAcross).toBe(false);
     expect(netFromEnv({ NET_SKIP_STALE: 'Off' }).skipStale).toBe(false);
     expect(netFromEnv({ NET_COMPRESS: 'off' }).compress).toBe(false);
     const { store, ws } = await start();

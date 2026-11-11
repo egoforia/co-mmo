@@ -201,6 +201,13 @@ laptop. `npm run netbench` measures it (docs/playtest.md).
   catches up, rather than let the player fall seconds behind. Each snapshot
   carries everything in view, so nothing is lost but in-between steps; F3
   shows how many were skipped. `NET_SKIP_STALE=off` turns it off.
+- **No empty roads at region edges.** Each region shows the regions around
+  it, corners too, what stands within sight of its edges (`region/beyond.ts`),
+  so someone two tiles over a road edge is drawn where they stand, whichever
+  servers run the two regions. Only regions with someone beside them send
+  their edges. When a player walks over, the people they saw stay on screen
+  and keep moving instead of vanishing and popping back. Fights, trades and
+  searching bodies stay within a region. `NET_SEE_ACROSS=off` turns it off.
 
 ## Crowds
 

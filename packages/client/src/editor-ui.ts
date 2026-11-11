@@ -10,7 +10,9 @@ import {
   buildingAt,
   MAX_SPAWN,
   MAX_STROKE,
+  PAINT_NAMES,
   PAINT_TILES,
+  editWords,
   Tile,
   isBlocking,
   tileAt,
@@ -21,7 +23,6 @@ import {
   type PaintTile,
   type RegionMap,
   type TilePoint,
-  type WorldEdit,
 } from '@co-mmo/shared';
 import { worldEdits, type EditLog } from './api.ts';
 import { escapeHtml } from './ui.ts';
@@ -49,7 +50,6 @@ const TOOLS: { id: Tool; name: string; hint: string }[] = [
   { id: 'spot', name: 'Gathering', hint: 'Click open ground to stand a gathering spot there, or choose Take away and click a spot.' },
 ];
 
-const PAINT_NAMES: Record<PaintTile, string> = { ground: 'Ground', path: 'Path', water: 'Water', tree: 'Tree', rock: 'Rock', wall: 'Wall' };
 const TILE_NAMES: Partial<Record<Tile, string>> = {
   [Tile.Ground]: 'open ground', [Tile.Path]: 'a path', [Tile.Water]: 'water', [Tile.Tree]: 'a tree', [Tile.Rock]: 'a rock',
   [Tile.Wall]: 'a wall', [Tile.Floor]: 'a floor', [Tile.Door]: 'a doorway', [Tile.Bridge]: 'a bridge', [Tile.Blocked]: 'under a set piece',
@@ -475,22 +475,6 @@ function describe(map: RegionMap, at: TilePoint): string {
   const words = TILE_NAMES[map.tiles[at[1] * map.width + at[0]] as Tile] ?? 'Something';
   const name = building && BUILDING_STYLES[building.style]?.name;
   return `${words[0]!.toUpperCase()}${words.slice(1)}${name ? ` of ${name}` : ''}`;
-}
-
-/** One line for an edit in the list. */
-export function editWords(e: WorldEdit): string {
-  switch (e.kind) {
-    case 'paint': return `${PAINT_NAMES[e.tile]} on ${e.tiles.length} tile${e.tiles.length === 1 ? '' : 's'}`;
-    case 'move': return e.to ? `Moved from ${e.from.join(', ')} to ${e.to.join(', ')}` : `Took away what stood at ${e.from.join(', ')}`;
-    case 'road': return `Road from ${e.from.join(', ')} to ${e.to.join(', ')}`;
-    case 'house': return `${BUILDING_STYLES[e.style]?.name ?? 'A house'}, ${e.floor[0]} × ${e.floor[1]}`;
-    case 'spawn': return `${e.count} ${e.name ?? e.creature} at ${e.at.join(', ')}`;
-    case 'clear': return `Cleared monsters within ${e.radius} of ${e.at.join(', ')}`;
-    case 'piece': return `${setPiece(e.piece)?.name ?? 'A set piece'} at ${e.at.join(', ')}`;
-    case 'spot': return e.spot ? `${SPOTS[e.spot]?.name ?? 'A gathering spot'} at ${e.at.join(', ')}` : `Took away the gathering spot at ${e.at.join(', ')}`;
-    case 'footprint': return `Footprint of what stands at ${e.at.join(', ')} set to ${e.footprint[0]} × ${e.footprint[1]}`;
-    case 'floors': return e.up || e.down ? `${e.up} floor${e.up === 1 ? '' : 's'} up and ${e.down} down by ${e.ladders ? 'ladders' : 'stairs'}, at ${e.at.join(', ')}` : `Took the floors off the building at ${e.at.join(', ')}`;
-  }
 }
 
 /** 0 to n. */

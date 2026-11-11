@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, generateRegion, isBlocking, tileAt, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
+import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, editWords, generateRegion, isBlocking, stampEdit, tileAt, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
 import type { Store, WorldEditLog } from './store.ts';
 import type { World } from './world.ts';
 
@@ -172,23 +172,8 @@ export class WorldEditor {
   }
 
   private stamp(draft: WorldEditDraft, by: string): WorldEdit {
-    const stamp = { id: randomUUID().slice(0, 8), by, made: this.now() };
     // Only the fields each kind has are kept, whatever else was sent.
-    switch (draft.kind) {
-      case 'paint': return { kind: 'paint', tile: draft.tile, tiles: draft.tiles.map(([x, y]) => [x, y]), ...stamp };
-      case 'move': return { kind: 'move', from: draft.from, to: draft.to, ...stamp };
-      case 'road': return { kind: 'road', from: draft.from, to: draft.to, ...stamp };
-      case 'house': return { kind: 'house', at: draft.at, floor: draft.floor, style: draft.style, ...stamp };
-      case 'clear': return { kind: 'clear', at: draft.at, radius: draft.radius, ...stamp };
-      case 'piece': return { kind: 'piece', piece: draft.piece, at: draft.at, ...stamp };
-      case 'floors': return { kind: 'floors', at: draft.at, up: draft.up, down: draft.down, ...(draft.ladders ? { ladders: true } : {}), ...stamp };
-      case 'footprint': return { kind: 'footprint', at: draft.at, footprint: [draft.footprint[0], draft.footprint[1]], ...stamp };
-      case 'spot': return { kind: 'spot', spot: draft.spot, at: draft.at, ...stamp };
-      case 'spawn': {
-        const def = CREATURES[draft.creature]!;
-        return { kind: 'spawn', creature: draft.creature, at: draft.at, count: draft.count, name: def.name, asset: def.art, ...stamp };
-      }
-    }
+    return stampEdit(draft, { id: randomUUID().slice(0, 8), by, made: this.now() }, CREATURES);
   }
 
   /** Why these edits would shut travellers out of the land (where they arrive is blocked), if they would. */
@@ -207,32 +192,7 @@ export class WorldEditor {
   }
 }
 
-/** Human-readable one-line summary of a `WorldEditDraft`. */
+/** One line for a `WorldEditDraft`, as the list of edits words it. */
 export function summarizeDraft(draft: WorldEditDraft): string {
-  switch (draft.kind) {
-    case 'paint':
-      return `Paint ${draft.tiles.length} ${draft.tile} tile${draft.tiles.length === 1 ? '' : 's'}`;
-    case 'move':
-      return draft.to
-        ? `Move (${draft.from[0]}, ${draft.from[1]}) → (${draft.to[0]}, ${draft.to[1]})`
-        : `Remove object at (${draft.from[0]}, ${draft.from[1]})`;
-    case 'road':
-      return `Lay road (${draft.from[0]}, ${draft.from[1]}) → (${draft.to[0]}, ${draft.to[1]})`;
-    case 'house':
-      return `Build ${BUILDING_STYLES[draft.style]?.name ?? draft.style} (${draft.floor[0]}×${draft.floor[1]}) at (${draft.at[0]}, ${draft.at[1]})`;
-    case 'floors':
-      return `Set floors (+${draft.up} up, -${draft.down} down) at (${draft.at[0]}, ${draft.at[1]})`;
-    case 'piece':
-      return `Place set piece ${draft.piece} at (${draft.at[0]}, ${draft.at[1]})`;
-    case 'spot':
-      return draft.spot
-        ? `Place gathering spot ${SPOTS[draft.spot]?.name ?? draft.spot} at (${draft.at[0]}, ${draft.at[1]})`
-        : `Clear gathering spot at (${draft.at[0]}, ${draft.at[1]})`;
-    case 'footprint':
-      return `Resize footprint at (${draft.at[0]}, ${draft.at[1]}) to ${draft.footprint[0]}×${draft.footprint[1]}`;
-    case 'spawn':
-      return `Spawn ${draft.count}× ${CREATURES[draft.creature]?.name ?? draft.creature} at (${draft.at[0]}, ${draft.at[1]})`;
-    case 'clear':
-      return `Clear monsters within ${draft.radius} tiles of (${draft.at[0]}, ${draft.at[1]})`;
-  }
+  return editWords(draft, CREATURES);
 }

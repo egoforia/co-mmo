@@ -109,7 +109,16 @@ describe('clean-room architectural testbed captures', () => {
 
     console.log('Waiting for arch-testbed scene to initialize...');
     console.log('app.world regions:', app ? [...app.world.regions.keys()] : 'app is null');
-    await page.waitForTimeout(8000);
+    await page.waitForTimeout(6000);
+
+    // Hide all HUD overlays, minimap, chat, bars, dialogue, forms so screenshots capture pristine architecture
+    await page.addStyleTag({
+      content: `
+        #chat, #hud, #stats, #keys, #mini-map, #quests, #abilities, #sound-panel, #target-hud, .window, .bar-group, #toast, #perf, #party, #party-invite, form {
+          display: none !important;
+        }
+      `,
+    });
 
     const testbed = app!.world.local('arch-testbed');
     console.log('testbed instance:', testbed ? 'found' : 'NOT FOUND');
@@ -124,8 +133,40 @@ describe('clean-room architectural testbed captures', () => {
       console.log(`[${shotIndex}/${totalShots}] Placing at ${s.id} (${s.x}, ${s.y}, floor ${s.floor})...`);
       testbed.placePlayer(id, s.x, s.y, s.floor);
 
-      // Allow camera to pan, cutaways to evaluate, and tiles to draw
-      await page.waitForTimeout(2500);
+      // Wait until the client receives the snapshot and updates its avatar position & floor
+      await page.waitForFunction(
+        (target) => {
+          const scene = (window as any).scene;
+          if (!scene?.shown) return false;
+          const dx = Math.abs(scene.shown.x - target.x);
+          const dy = Math.abs(scene.shown.y - target.y);
+          return dx < 0.2 && dy < 0.2 && scene.floor === target.floor;
+        },
+        { x: s.x, y: s.y, floor: s.floor },
+        { timeout: 15_000 }
+      );
+
+      // Center camera directly onto avatar body now that it is placed at the target coordinates
+      const camInfo = await page.evaluate(() => {
+        const scene = (window as any).scene;
+        if (!scene) return 'No scene';
+        const cam = scene.cameras?.main;
+        const me = scene.me;
+        if (me?.body && cam) {
+          cam.startFollow(me.body, true, 0.2, 0.2);
+          cam.centerOn(me.body.x, me.body.y);
+        }
+        return {
+          cam: cam ? { scrollX: Math.round(cam.scrollX), scrollY: Math.round(cam.scrollY), midX: Math.round(cam.midPoint?.x), midY: Math.round(cam.midPoint?.y) } : null,
+          shown: scene.shown,
+          floor: scene.floor,
+          meBody: me?.body ? { x: Math.round(me.body.x), y: Math.round(me.body.y) } : null,
+        };
+      });
+      console.log(`[${shotIndex}/${totalShots}] Cam info:`, JSON.stringify(camInfo));
+
+      // Allow rendering to settle, textures to draw, and cutaways to apply
+      await page.waitForTimeout(600);
 
       await page.screenshot({ path: shotPath, timeout: 60_000 });
       const sizeKb = (statSync(shotPath).size / 1024).toFixed(0);

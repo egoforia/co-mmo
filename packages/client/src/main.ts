@@ -410,6 +410,8 @@ function play(token: string): void {
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
       scene,
     });
+    (window as any).game = game;
+    (window as any).scene = scene;
     // The mini map of your floor.
     new MiniMap({ view: () => scene?.miniMapView() });
     // The performance overlay, for Stewards and the Owner checking where the game is slow.

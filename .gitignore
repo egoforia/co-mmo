@@ -9,4 +9,5 @@ data/
 coverage/
 .wish/
 playtest-results/
+shot-results/
 netbench-results/

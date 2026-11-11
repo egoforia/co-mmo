@@ -15,6 +15,7 @@ Read the matching skill or guide before making changes:
 | Art, sound, isometric camera, building kit & walks | `.claude/skills/co-mmo-art/SKILL.md`, `docs/art-pipeline.md`, `docs/buildings-and-walls.md` |
 | Player-, Steward- & Owner-facing text and God dialogue | `.claude/skills/co-mmo-player-words/SKILL.md` |
 | Running the game, Scale mode & robot playtests | `.claude/skills/co-mmo-run/SKILL.md`, `docs/playtest.md`, `docs/scale.md` |
+| Screenshots: taking, comparing and reviewing them (`/shots`) | `.claude/skills/co-mmo-shots/SKILL.md`, `docs/screenshots.md` |
 | Pull requests, conflicts & merge rules | `.claude/skills/steward/SKILL.md` |
 | Product decisions, Wish Workshop, mods & milestones | `docs/design.md`, `docs/building-wishes.md`, `docs/sign-in.md` |
 | Gathering, crafts, recipes & crafted copies | `docs/crafting.md` |
@@ -24,6 +25,9 @@ Read the matching skill or guide before making changes:
 - `npm run typecheck` and `npm test` (Vitest) must pass. Tests live in
   `packages/*/test/*.test.ts`; server tests start a real app on a random
   port with `test/helpers.ts`.
+- A change to what is drawn or shown must also be checked in pictures:
+  `npm run shots -- --compare` (or `/shots`), reviewed as
+  `.claude/skills/co-mmo-shots/SKILL.md` says.
 - A wish branch (`wish/<issue>`) must also pass
   `node scripts/wish-guard.mjs --base origin/main`: a size limit, and files a
   wish may not change unless the Owner's approval allows core changes.

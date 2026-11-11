@@ -16,6 +16,7 @@
     "start": "npm run start -w @co-mmo/server",
     "test": "vitest run",
     "playtest": "vitest run -c vitest.playtest.config.ts",
+    "shots": "node scripts/shots.mjs",
     "netbench": "vitest run -c vitest.netbench.config.ts --silent=false",
     "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client",
     "anchors": "npm run anchors -w @co-mmo/server --",

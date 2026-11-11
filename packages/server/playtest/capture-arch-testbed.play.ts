@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import { chromium, type Browser } from 'playwright';
-import { newCharacter, WORLD_REGIONS } from '@co-mmo/shared';
+import { newCharacter, ARCH_TESTBED_REGION } from '@co-mmo/shared';
 import { ARCH_TESTBED_WAYPOINTS } from '../../../packages/shared/src/testbed/arch-testbed.ts';
 import { account, app } from '../test/helpers.ts';
 import { playWorld } from './harness.ts';

@@ -84,14 +84,24 @@ export const WORLD_REGIONS: RegionDef[] = [
   { id: 'desert', name: 'Mirage Desert', biome: 'mirage-desert', seed: 4001, at: { x: 0, y: 1 }, exits: { north: 'sanctum' } },
   { id: 'frostpeak', name: 'Frostpeak', biome: 'frostpeak', seed: 5001, at: { x: 0, y: -1 }, exits: { south: 'sanctum' } },
   { id: 'mushroom-hollow', name: 'Mushroom Hollow', biome: 'mushroom-hollow', seed: 6001, at: { x: -2, y: 0 }, exits: { east: 'woods' } },
-  { id: 'arch-testbed', name: 'Architectural Testbed', biome: 'sanctum', seed: 7777, at: { x: 99, y: 99 }, exits: {} },
 ];
+
+/** Architectural clean-room testbed region definition. */
+export const ARCH_TESTBED_REGION: RegionDef = {
+  id: 'arch-testbed',
+  name: 'Architectural Testbed',
+  biome: 'sanctum',
+  seed: 7777,
+  at: { x: 10, y: 10 },
+  exits: {},
+};
 
 /** Regions players wished into being, by id (filled in by applyContent). */
 export const WISHED_REGIONS = new Map<string, RegionDef>();
 
-/** A launch region or a wished one, by id. */
+/** A launch region, testbed region, or a wished one, by id. */
 export function regionDef(id: string): RegionDef | undefined {
+  if (id === ARCH_TESTBED_REGION.id) return ARCH_TESTBED_REGION;
   return WORLD_REGIONS.find((r) => r.id === id) ?? WISHED_REGIONS.get(id);
 }
 

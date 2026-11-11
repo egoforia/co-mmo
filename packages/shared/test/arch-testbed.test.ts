@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ARCH_TESTBED_WAYPOINTS, WORLD_REGIONS, generateRegion, storeyAt } from '../src/index.ts';
+import { ARCH_TESTBED_REGION, ARCH_TESTBED_WAYPOINTS, generateRegion, regionDef, storeyAt } from '../src/index.ts';
 
 describe('arch-testbed: architectural clean-room proving ground', () => {
-  const def = WORLD_REGIONS.find((r) => r.id === 'arch-testbed')!;
+  const def = ARCH_TESTBED_REGION;
   const map = generateRegion(def);
 
   it('is a registered region with clean-room guarantees', () => {
     expect(def).toBeDefined();
+    expect(regionDef('arch-testbed')).toBeDefined();
     expect(def.id).toBe('arch-testbed');
     expect(def.biome).toBe('sanctum');
     // Clean-room guarantees: zero entities or clutter to distract automated testing

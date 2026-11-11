@@ -7,6 +7,7 @@ import {
   generateRegion,
   wisherOf,
   WORLD_REGIONS,
+  ARCH_TESTBED_REGION,
   arrivalPoint,
   cellBeyond,
   openSides,
@@ -416,6 +417,9 @@ export class World {
   }
 
   region(id: string): RegionHandle | undefined {
+    if (!this.regions.has(id) && id === ARCH_TESTBED_REGION.id) {
+      this.addRegion(structuredClone(ARCH_TESTBED_REGION));
+    }
     return this.regions.get(id);
   }
 
@@ -447,6 +451,9 @@ export class World {
 
   /** A region running in this process, for tests and tools that reach into the simulation. */
   local(id: string): Region | undefined {
+    if (!this.regions.has(id) && id === ARCH_TESTBED_REGION.id) {
+      this.addRegion(structuredClone(ARCH_TESTBED_REGION));
+    }
     const region = this.regions.get(id);
     return region instanceof Region ? region : undefined;
   }
@@ -466,6 +473,9 @@ export class World {
     character = previous?.character(info.id) ?? character;
     if (previous && previous.def.id !== saved.regionId) {
       void settle(previous.remove(info.id, `${info.name} left.`), (left) => left?.conn.close('Signed in from another window.'));
+    }
+    if (!this.regions.has(saved.regionId) && saved.regionId === ARCH_TESTBED_REGION.id) {
+      this.addRegion(structuredClone(ARCH_TESTBED_REGION));
     }
     const region = this.regions.get(saved.regionId) ?? this.home;
     this.where.set(info.id, region.def.id);

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, editWords, isBlocking, stampEdit, tileAt, withEdit, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
 import type { Store, WorldEditLog } from './store.ts';
 import type { World } from './world.ts';
+import { WORKSHOP_BIOMES, exportDrafts, newWorkshopLand, workshopDef } from './workshop-lands.ts';
 
 /** What an edit, undo or redo came to: the land's edits now, or why it could not be done, in words. */
 export type EditResult = { ok: true; log: WorldEditLog } | { ok: false; message: string };
@@ -39,8 +40,10 @@ export class WorldEditor {
 
   /** Lists all regions and returns the selected region's full map, edits, and tool palettes for the studio. */
   inspectRegion(regionId?: string): {
-    regions: { id: string; name: string; biome: string; width: number; height: number }[];
+    regions: { id: string; name: string; biome: string; width: number; height: number; workshop?: boolean }[];
     region: string;
+    /** The looks a new workshop land may take. */
+    workshopBiomes: string[];
     map: RegionMap | null;
     edits: WorldEdit[];
     undone: number;
@@ -59,6 +62,7 @@ export class WorldEditor {
       biome: r.def.biome,
       width: r.map.width,
       height: r.map.height,
+      ...(r.def.workshop ? { workshop: true } : {}),
     }));
     const chosenId = regionId && this.world.region(regionId) ? regionId : (regions[0]?.id ?? 'sanctum');
     const reg = this.world.region(chosenId);
@@ -66,6 +70,7 @@ export class WorldEditor {
     return {
       regions,
       region: chosenId,
+      workshopBiomes: WORKSHOP_BIOMES,
       map: reg?.map ?? null,
       edits: log.edits,
       undone: log.undone.length,
@@ -171,6 +176,22 @@ export class WorldEditor {
     const edit = log.edits.find((e) => e.id === editId);
     if (!edit) return { ok: false, message: 'That edit is not in this land any more.' };
     return this.save(regionId, { edits: log.edits.filter((e) => e !== edit), undone: [...log.undone, edit] });
+  }
+
+  /** Makes a blank workshop land to build on (the Owner and Stewards); its id, or why not, in words. */
+  createLand(name: unknown, biome: unknown, by: string): { ok: true; region: string } | { ok: false; message: string } {
+    const land = newWorkshopLand(name, biome, by, this.world.defs(), this.now());
+    if (typeof land === 'string') return { ok: false, message: land };
+    if (!this.world.addRegion(workshopDef(land))) return { ok: false, message: 'There is no room for another land just now. Try again.' };
+    this.store.setWorldEdits(land.id, { edits: [], undone: [], land });
+    return { ok: true, region: land.id };
+  }
+
+  /** A land's edits as a file: what it ships with, then the editor's, as drafts any land can take. */
+  exportLand(regionId: string): { name: string; biome: string; edits: WorldEditDraft[] } | undefined {
+    const region = this.world.region(regionId);
+    if (!region) return undefined;
+    return { name: region.def.name, biome: region.def.biome, edits: exportDrafts([...(region.def.base ?? []), ...this.log(regionId).edits]) };
   }
 
   private stamp(draft: WorldEditDraft, by: string): WorldEdit {

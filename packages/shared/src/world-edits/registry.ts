@@ -4,6 +4,7 @@ import type { EditContext, EditKind } from './kind.ts';
 import { CLEAR } from './kinds/clear.ts';
 import { FLOORS } from './kinds/floors.ts';
 import { FOOTPRINT } from './kinds/footprint.ts';
+import { FURNITURE } from './kinds/furniture.ts';
 import { HOUSE } from './kinds/house.ts';
 import { MOVE } from './kinds/move.ts';
 import { PAINT } from './kinds/paint.ts';
@@ -11,6 +12,8 @@ import { PIECE } from './kinds/piece.ts';
 import { ROAD } from './kinds/road.ts';
 import { SPAWN } from './kinds/spawn.ts';
 import { SPOT } from './kinds/spot.ts';
+import { STAIRS } from './kinds/stairs.ts';
+import { STOREY } from './kinds/storey.ts';
 import { nameThings } from './names.ts';
 import type { EditKindId, EditStamp, WorldEdit, WorldEditDraft } from './types.ts';
 
@@ -30,6 +33,9 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   clear: CLEAR,
   spot: SPOT,
   footprint: FOOTPRINT,
+  storey: STOREY,
+  stairs: STAIRS,
+  furniture: FURNITURE,
 };
 
 /** A kind by its name, when there is one. */

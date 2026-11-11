@@ -137,6 +137,9 @@ export class World {
       def.exits = links.get(def.id) ?? {};
       this.regions.set(def.id, this.makeRegion(def));
     }
+    // The workshop lands the game ships with, off the grid.
+    const testbed = structuredClone(ARCH_TESTBED_REGION);
+    this.regions.set(testbed.id, this.makeRegion(testbed));
   }
 
   /** Sets a region up wherever the hosting says, with what was wished into it; split into cells when asked. */
@@ -189,7 +192,8 @@ export class World {
 
   /** The regions around one, corners too. */
   neighbours(def: RegionDef): RegionDef[] {
-    return this.defs().filter((d) => d.id !== def.id && Math.max(Math.abs(d.at.x - def.at.x), Math.abs(d.at.y - def.at.y)) === 1);
+    if (def.workshop) return [];
+    return this.defs().filter((d) => d.id !== def.id && !d.workshop && Math.max(Math.abs(d.at.x - def.at.x), Math.abs(d.at.y - def.at.y)) === 1);
   }
 
   /** What every region server must know about the world: its regions, who is online, and parties. */
@@ -323,7 +327,8 @@ export class World {
     if (this.regions.has(def.id) || this.defs().some((d) => d.at.x === def.at.x && d.at.y === def.at.y)) return false;
     def.exits = linkRegions([...this.defs(), def]).get(def.id) ?? {};
     this.regions.set(def.id, this.makeRegion(def));
-    this.relink(def.at);
+    // A workshop land stands off the grid: no roads change.
+    if (!def.workshop) this.relink(def.at);
     this.stateChanged();
     return true;
   }
@@ -373,7 +378,7 @@ export class World {
   openEdge(playerId: string): { region: RegionHandle; side: Side; cell: { x: number; y: number } } | undefined {
     const region = this.regionOf(playerId);
     const at = region?.position(playerId);
-    if (!region || !at) return undefined;
+    if (!region || !at || region.def.workshop) return undefined;
     const side = nearestOpenSide(this.defs(), region.def, at.x, at.y, region.map.width);
     return side && { region, side, cell: cellBeyond(region.def, side) };
   }
@@ -388,7 +393,7 @@ export class World {
    * region goes when a land the game ships with now stands on its own square.
    */
   freeCellNear(cell: { x: number; y: number }): { x: number; y: number } {
-    const defs = this.defs();
+    const defs = this.defs().filter((d) => !d.workshop);
     const free = defs.flatMap((d) => openSides(defs, d).map((side) => cellBeyond(d, side)));
     return free.sort((a, b) => Math.abs(a.x - cell.x) + Math.abs(a.y - cell.y) - (Math.abs(b.x - cell.x) + Math.abs(b.y - cell.y)) || a.y - b.y || a.x - b.x)[0] ?? cell;
   }
@@ -444,9 +449,6 @@ export class World {
   }
 
   region(id: string): RegionHandle | undefined {
-    if (!this.regions.has(id) && id === ARCH_TESTBED_REGION.id) {
-      this.addRegion(structuredClone(ARCH_TESTBED_REGION));
-    }
     return this.regions.get(id);
   }
 
@@ -478,9 +480,6 @@ export class World {
 
   /** A region running in this process, for tests and tools that reach into the simulation. */
   local(id: string): Region | undefined {
-    if (!this.regions.has(id) && id === ARCH_TESTBED_REGION.id) {
-      this.addRegion(structuredClone(ARCH_TESTBED_REGION));
-    }
     const region = this.regions.get(id);
     return region instanceof Region ? region : undefined;
   }
@@ -500,9 +499,6 @@ export class World {
     character = previous?.character(info.id) ?? character;
     if (previous && previous.def.id !== saved.regionId) {
       void settle(previous.remove(info.id, `${info.name} left.`), (left) => left?.conn.close('Signed in from another window.'));
-    }
-    if (!this.regions.has(saved.regionId) && saved.regionId === ARCH_TESTBED_REGION.id) {
-      this.addRegion(structuredClone(ARCH_TESTBED_REGION));
     }
     const region = this.regions.get(saved.regionId) ?? this.home;
     this.where.set(info.id, region.def.id);
@@ -536,12 +532,6 @@ export class World {
   findRegion(query: string): RegionHandle | undefined {
     const q = query.trim().toLowerCase();
     if (!q) return undefined;
-    if (
-      ARCH_TESTBED_REGION.id.toLowerCase().includes(q) ||
-      ARCH_TESTBED_REGION.name.toLowerCase().includes(q)
-    ) {
-      this.region(ARCH_TESTBED_REGION.id);
-    }
     const direct = this.regions.get(q);
     if (direct) return direct;
 

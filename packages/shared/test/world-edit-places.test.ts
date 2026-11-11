@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ARCH_TESTBED_REGION, CREATURES, Tile, checkEdit, generateRegion, stampEdit, thingById, tileAt, withEdit, type WorldEdit, type WorldEditDraft } from '../src/index.ts';
+import { ARCH_TESTBED_REGION, CREATURES, Tile, checkEdit, generateRegion, regionDef, stampEdit, thingById, tileAt, withEdit, type WorldEdit, type WorldEditDraft } from '../src/index.ts';
 
 // Edits that name their floor and point at things by name (world-edits/names.ts).
 
@@ -8,13 +8,18 @@ const testbed = (edits: WorldEdit[] = []) => generateRegion({ ...ARCH_TESTBED_RE
 
 describe('names for what stands on a land', () => {
   it('names generated things in the order they are laid, the same every time', () => {
-    const a = testbed();
-    const b = testbed();
+    const a = generateRegion(regionDef('sanctum')!);
+    const b = generateRegion(regionDef('sanctum')!);
     expect(a.buildings.map((x) => x.id)).toEqual(b.buildings.map((x) => x.id));
     expect(a.buildings[0]!.id).toBe('gen:building:0');
-    expect(a.storeys.every((s) => s.id?.startsWith('gen:storey:'))).toBe(true);
     expect(a.stairways.every((s) => s.id?.startsWith('gen:stairway:'))).toBe(true);
-    expect(thingById(a, 'gen:landmark:0')).toMatchObject({ kind: 'landmark', thing: { asset: 'sanctum-inn-furniture-dining-table' } });
+  });
+
+  it('names what a land ships with after the edit that lays it', () => {
+    const a = testbed();
+    expect(a.buildings[0]!.id).toBe('testbed-01:building:0');
+    expect(a.storeys.every((s) => /^testbed-\d+:storey:0$/.test(s.id ?? ''))).toBe(true);
+    expect(thingById(a, 'testbed-03:landmark:0')).toMatchObject({ kind: 'landmark', thing: { asset: 'sanctum-inn-furniture-dining-table' } });
   });
 
   it('names what an edit lays after the edit', () => {

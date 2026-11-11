@@ -8,6 +8,7 @@ import { Region } from './region.ts';
 import { TickProfiler, aggregatePhaseTimings } from './region/profiler.ts';
 import { SlowTickBuffer } from './debug/slow-tick-buffer.ts';
 import { WorldEditor } from './world-editor.ts';
+import { workshopDef } from './workshop-lands.ts';
 import { handleWorldEdits } from './world-edit-routes.ts';
 import type { Account, Store } from './store.ts';
 import { dailyClips } from './settings.ts';
@@ -146,6 +147,8 @@ export function createApp(options: AppOptions): App {
   world.seeAcross = options.net?.seeAcross ?? true;
   world.tuning = tuningFor(options.net ?? { compress: true });
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
+  // The workshop lands the Owner and Stewards made in the editor.
+  for (const land of store.workshopLands()) world.addRegion(workshopDef(land));
   const env = options.wishes.env ?? process.env;
   // Before anything that sends requests is made, so every one of them is logged.
   const apiLog = options.apiLog ?? ApiLog.memory({ env });

@@ -1322,3 +1322,16 @@ button.queue-add-btn.staged {
   font-size: 13px;
 }
 
+
+/* The Studio map's "Lay edits from a file": a button-like label over a hidden file input. */
+.file-pick {
+  display: inline-block;
+  cursor: pointer;
+  border: 1px solid var(--edge);
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.file-pick input {
+  display: none;
+}

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
+import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type BiomeId, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
 import { defaultSettings, type Settings } from './settings.ts';
 import type { RuleTestReport } from './rule-test.ts';
@@ -150,6 +150,19 @@ interface Data {
 export interface WorldEditLog {
   edits: WorldEdit[];
   undone: WorldEdit[];
+  /** Set on a workshop land the Owner or a Steward made in the editor: what it is and who made it. */
+  land?: WorkshopLand;
+}
+
+/** A workshop land made in the editor (workshop-lands.ts): a blank land off the world grid. */
+export interface WorkshopLand {
+  id: string;
+  name: string;
+  biome: BiomeId;
+  seed: number;
+  at: { x: number; y: number };
+  by: string;
+  made: number;
 }
 
 /**
@@ -503,9 +516,16 @@ export class Store {
     return this.data.worldEdits?.[regionId] ?? { edits: [], undone: [] };
   }
 
+  /** Saves a land's edits; a workshop land stays one. */
   setWorldEdits(regionId: string, log: WorldEditLog): void {
-    this.data.worldEdits = { ...this.data.worldEdits, [regionId]: log };
+    const land = log.land ?? this.data.worldEdits?.[regionId]?.land;
+    this.data.worldEdits = { ...this.data.worldEdits, [regionId]: { ...log, ...(land ? { land } : {}) } };
     this.persist();
+  }
+
+  /** Every workshop land made in the editor, oldest first. */
+  workshopLands(): WorkshopLand[] {
+    return Object.values(this.data.worldEdits ?? {}).flatMap((l) => (l.land ? [l.land] : [])).sort((a, b) => a.made - b.made);
   }
 
   // --- Settings and spending -----------------------------------------------

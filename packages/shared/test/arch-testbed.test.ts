@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ARCH_TESTBED_REGION, ARCH_TESTBED_WAYPOINTS, generateRegion, regionDef, storeyAt } from '../src/index.ts';
+import { ARCH_TESTBED_REGION, ARCH_TESTBED_WAYPOINTS, Tile, generateRegion, regionDef, storeyAt } from '../src/index.ts';
 
 describe('arch-testbed: architectural clean-room proving ground', () => {
   const def = ARCH_TESTBED_REGION;
@@ -120,4 +120,17 @@ describe('arch-testbed: architectural clean-room proving ground', () => {
       expect(Number.isInteger(wp.floor), `${key} floor integer`).toBe(true);
     }
   });
+
+  it('lays the world editor\'s edits over its layout, like every other land', () => {
+    const tree = { kind: 'paint' as const, tile: 'tree' as const, tiles: [[30, 34]] as [number, number][], id: 't1', by: 'Owner', made: 0 };
+    const spawn = { kind: 'spawn' as const, creature: 'walking-mushroom', at: [34, 30] as [number, number], count: 2, id: 's1', by: 'Owner', made: 0 };
+    const edited = generateRegion({ ...def, edits: [tree, spawn] });
+    expect(map.tiles[34 * map.width + 30]).toBe(Tile.Ground);
+    expect(edited.tiles[34 * edited.width + 30]).toBe(Tile.Tree);
+    expect(edited.creatures.length).toBe(2);
+    // The rest of the testbed is untouched.
+    expect(edited.buildings.length).toBe(map.buildings.length);
+    expect(edited.storeys.length).toBe(map.storeys.length);
+  });
 });
+

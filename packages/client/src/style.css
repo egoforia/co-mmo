@@ -549,6 +549,11 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #mini-map.max { width: min(70vh, calc(100vw - 24px)); z-index: 4; }
 body.has-mini-map #quests { top: 372px; }
 body.has-mini-map-min #quests { top: 92px; }
+/* The world editor stands beside the mini map, not over it (a folded map leaves its title bar room). */
+@media (min-width: 721px) {
+  body.has-mini-map #editor { right: 244px; }
+  body.has-mini-map-min #editor { top: 96px; }
+}
 @media (max-width: 720px) {
   #mini-map { width: 150px; }
   body.has-mini-map #quests { top: 292px; }

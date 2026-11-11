@@ -115,6 +115,21 @@ describe('the world editor', () => {
     expect(app!.world.home.def.edits).toHaveLength(1);
     expect(tile(app!.world.home.map, spot)).toBe(Tile.Water);
   });
+  it('shows edits made in the Architectural Testbed, and keeps them across a restart', async () => {
+    const store = Store.memory();
+    const first = await start({ store });
+    const owner = account(store, 'Ego', 'owner');
+    const spot: TilePoint = [30, 36];
+    expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Ground);
+    const made = await api(first.base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'paint', tile: 'tree', tiles: [spot] } });
+    expect(made.status).toBe(200);
+    expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
+    // Its pavilions are still there under the edit.
+    expect(app!.world.region('arch-testbed')!.map.buildings.length).toBeGreaterThan(0);
+    await stop();
+    await start({ store });
+    expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
+  });
 });
 
 describe('the world editor with region servers', () => {

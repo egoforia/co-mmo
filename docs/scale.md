@@ -208,6 +208,12 @@ laptop. `npm run netbench` measures it (docs/playtest.md).
   their edges. When a player walks over, the people they saw stay on screen
   and keep moving instead of vanishing and popping back. Fights, trades and
   searching bodies stay within a region. `NET_SEE_ACROSS=off` turns it off.
+- **Far things less often, without compression.** With `NET_COMPRESS=off`,
+  people and creatures more than 12 tiles off come in every other snapshot
+  and are only named (`kept`) in between, so the browser keeps drawing them
+  (`region/far.ts`). With compression this is not done: snapshots that
+  differ from one tick to the next compress worse, and the bench measured
+  more bytes, not fewer. `NET_FAR_LESS=off` turns it off.
 - **A quicker path through region servers.** A region server writes each
   player's snapshot as text once, and the game server passes it to the
   socket without reading and writing it again (about a fifth of the work at
@@ -226,8 +232,10 @@ Nobody is turned away from a crowded region (design doc, Scaling without a
 cap). Two things happen as it fills:
 
 - **Fewer snapshots.** A player's snapshots go out every tick until more
-  than 40 people and creatures are in view, then every 2, 3 and at most 4
-  ticks. A process whose ticks take more than half their time slows them
+  than 80 people and creatures are in view (40 with `NET_COMPRESS=off`),
+  then every 2, 3 and at most 4 ticks (past 160 and 300, or 80 and 150).
+  Compressed, 60 players in view cost each about 8 KB a second at the full
+  20 snapshots. A process whose ticks take more than half their time slows them
   down the same way. Players' own steps are predicted on their screen and
   others are drawn a little further in the past (one gap between snapshots
   plus the network's wobble, `snapshot-clock.ts`), so movement stays smooth,

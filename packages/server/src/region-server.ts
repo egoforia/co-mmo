@@ -159,6 +159,7 @@ export class RegionServer {
     const strain = this.meter.strain;
     for (const region of this.regions.values()) {
       region.strain = strain;
+      if (this.world.tuning) region.tuning = this.world.tuning;
       try {
         const departures = region.tick();
         if (departures.length) this.toGateway({ t: 'departures', server: this.id, region: region.key, list: departures.map((d) => this.depart(region, d)) });

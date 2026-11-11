@@ -79,7 +79,7 @@ const app = createApp({
   apiLog,
   // NET_COMPRESS=off sends to players uncompressed, NET_SKIP_STALE=off never skips a snapshot,
   // NET_SEE_ACROSS=off hides what stands over a region edge, NET_FAST_PATH=off takes the
-  // slower path through region servers (socket-net.ts).
+  // slower path through region servers, NET_FAR_LESS=off sends far things every time (socket-net.ts).
   net: netFromEnv(process.env),
   publicUrl,
   clientDir,

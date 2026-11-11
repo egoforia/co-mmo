@@ -48,6 +48,7 @@ import { handleAccount } from './account-routes.ts';
 import { serveArtFile } from './art-files.ts';
 import { openGameSocket } from './game-socket.ts';
 import type { NetOptions } from './socket-net.ts';
+import { tuningFor } from './region/far.ts';
 import { artFileReader, pointSources } from './hand-sources.ts';
 
 export interface AppOptions {
@@ -140,6 +141,7 @@ export function createApp(options: AppOptions): App {
   const world = new World(Date.now, Math.random, options.sky, (regionId) => store.worldEdits(regionId).edits);
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.seeAcross = options.net?.seeAcross ?? true;
+  world.tuning = tuningFor(options.net ?? { compress: true });
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   const env = options.wishes.env ?? process.env;
   // Before anything that sends requests is made, so every one of them is logged.

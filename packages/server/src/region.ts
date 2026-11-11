@@ -76,6 +76,7 @@ import { Gathering } from './region/gathering.ts';
 import { Minds } from './region/minds.ts';
 import { Crowd, spreadHomes } from './region/crowd.ts';
 import { Beyond, nearEdge } from './region/beyond.ts';
+import { STEADY, crowdOf, thinOut, type SnapshotTuning } from './region/far.ts';
 import { Quests } from './region/quests.ts';
 import { RegionState, type Body, type PlayerState } from './region/state.ts';
 import { afflictCreature, afflictPlayer, type StatusFrom } from './region/statuses.ts';
@@ -88,8 +89,8 @@ const MAX_QUEUED_INPUTS = 10;
 const MAX_INPUTS_PER_TICK = 2;
 /** Health starts coming back this long after the last hit taken. */
 const REGEN_DELAY_MS = 5000;
-/** Snapshots come every tick until this many people and creatures are in view, then less often (see snapshotEvery). */
-const CROWD_STEPS = [40, 80, 150];
+/** Snapshots come every tick until `crowdFrom` people and creatures are in view (SnapshotTuning), then less often at these multiples of it (see snapshotEvery). */
+const CROWD_STEPS = [1, 2, 3.75];
 /** The slowest snapshots: every this many ticks. */
 const MAX_SNAPSHOT_EVERY = 4;
 
@@ -101,8 +102,8 @@ const MAX_SNAPSHOT_EVERY = 4;
  * screen and others are smoothed, so fewer snapshots look smoother, just a
  * little less precise.
  */
-export function snapshotEvery(crowd: number, strain = 0): number {
-  const forCrowd = 1 + CROWD_STEPS.filter((n) => crowd > n).length;
+export function snapshotEvery(crowd: number, strain = 0, crowdFrom = STEADY.crowdFrom): number {
+  const forCrowd = 1 + CROWD_STEPS.filter((n) => crowd > n * crowdFrom).length;
   return Math.min(MAX_SNAPSHOT_EVERY, forCrowd + strain);
 }
 
@@ -242,6 +243,8 @@ export class Region {
   private readonly beyond = new Beyond();
   /** How pressed the process running this region is (0 to 2, see LoadMeter.strain); snapshots slow down to match. */
   strain = 0;
+  /** How snapshots are thinned out (region/far.ts): set by the world from the game's network choices. */
+  tuning: SnapshotTuning = STEADY;
   readonly logger: CombatLogger = combatLogger;
   /** Measures the simulation phases of each tick. */
   readonly profiler = new TickProfiler();
@@ -818,7 +821,7 @@ export class Region {
       const online = this.hooks.online();
       const allMarks = worldMarks(this.s, now);
       for (const p of all) {
-        const every = snapshotEvery(p.crowd, this.strain);
+        const every = snapshotEvery(p.crowd, this.strain, this.tuning.crowdFrom);
         if (every > 1 && (this.s.tickCount + p.phase) % every !== 0) {
           this.s.flush(p);
           continue;
@@ -854,10 +857,14 @@ export class Region {
           for (const e of g.bodies) if (near(e)) bodies.push(e);
           for (const e of g.npcs) if (npcNear(e)) npcs.push(e);
         }
-        p.crowd = players.length + creatures.length;
+        // Far things every other snapshot (region/far.ts), unless crowds already make every snapshot rarer.
+        const farEvery = every > 1 ? 1 : this.tuning.farEvery;
+        const view = thinOut({ players, creatures, bodies, npcs }, p, this.s.tickCount + p.phase, farEvery);
+        p.crowd = crowdOf(view, farEvery);
         const marks = allMarks.filter(near);
         p.conn.send({
-          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now), players, creatures, bodies, npcs, ...(marks.length ? { marks } : {}), online,
+          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now),
+          players: view.players, creatures: view.creatures, bodies: view.bodies, npcs: view.npcs, ...(view.kept.length ? { kept: view.kept } : {}), ...(marks.length ? { marks } : {}), online,
         });
         this.s.flush(p);
       }

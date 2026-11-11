@@ -21,7 +21,9 @@ export class RemoteMotion {
       if (!interp) this.others.set(p.id, (interp = new Interpolator()));
       interp.push(at, p.x, p.y);
     }
-    for (const id of this.others.keys()) if (!seen.has(id)) this.others.delete(id);
+    // Far ones the snapshot only named (kept) are drawn on, as the browser does.
+    const kept = new Set(snapshot.kept ?? []);
+    for (const id of this.others.keys()) if (!seen.has(id) && !kept.has(id)) this.others.delete(id);
   }
 
   /** Where each other player is drawn at `now`. */

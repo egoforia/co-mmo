@@ -14,12 +14,14 @@ export interface NetOptions {
   seeAcross?: boolean;
   /** The quicker path through region servers: snapshots passed on as written, steps sent together, one-step crossings (NET_FAST_PATH=off turns it off). On when missing. */
   fastPath?: boolean;
+  /** Far things in every other snapshot only (region/far.ts; NET_FAR_LESS=off sends them every time). On when missing. */
+  farLess?: boolean;
 }
 
 /** The choices from the environment: everything on unless set to `off`. */
 export function netFromEnv(env: Record<string, string | undefined>): NetOptions {
   const on = (name: string) => env[name]?.trim().toLowerCase() !== 'off';
-  return { compress: on('NET_COMPRESS'), skipStale: on('NET_SKIP_STALE'), seeAcross: on('NET_SEE_ACROSS'), fastPath: on('NET_FAST_PATH') };
+  return { compress: on('NET_COMPRESS'), skipStale: on('NET_SKIP_STALE'), seeAcross: on('NET_SEE_ACROSS'), fastPath: on('NET_FAST_PATH'), farLess: on('NET_FAR_LESS') };
 }
 
 /**

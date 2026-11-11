@@ -29,8 +29,9 @@ Check the Server health tab shows the region servers. Details in
 `docs/scale.md`.
 
 **In a browser:** Chromium and Playwright are installed in cloud sessions
-(do not run `playwright install`). Open the invite link, take a screenshot of
-the game and of God's View, and look at them before saying a change works.
+(do not run `playwright install`). For anything visual, `npm run shots --
+--compare` takes fixed screenshots and compares them with main; review them
+as the `co-mmo-shots` skill says before saying a change works.
 
 The server needs ffmpeg for walks and sounds. Use a scratch `DATA_FILE` (its
 folder also holds `db/`) and `ART_DIR` so a test run does not touch the real

@@ -8,6 +8,11 @@ description: Use when driving a co-MMO pull request to mergeable: before each pu
 - Before every push: `npm run typecheck` and `npm test` pass locally. Wish
   branches (`wish/<issue>`) also pass
   `node scripts/wish-guard.mjs --base origin/main`.
+- Before every push of a change to what is drawn or shown (art, camera,
+  light, buildings, floors, HUD, God's View): `npm run shots -- --compare`
+  and review the pictures as the `co-mmo-shots` skill says (or run `/shots`).
+  The PR description gets a **Screenshots** section naming each changed shot
+  and why it changed.
 - Never change `.github/`, never push to `main`, never merge. The Owner
   (egoforia) cannot approve their own PRs on GitHub; a PR is merged only after
   they say "PR #N approved" in the project chat.

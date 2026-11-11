@@ -120,6 +120,14 @@ export class Interpolator {
     for (const s of this.samples) s.at += shift;
   }
 
+  /** Counts what we have from another corner (we walked into the next region): the same spots, `dx`, `dy` tiles over. */
+  shift(dx: number, dy: number): void {
+    for (const s of this.samples) {
+      s.x += dx;
+      s.y += dy;
+    }
+  }
+
   /** Where to draw it at server time `t`, ms. */
   sample(t: number): Vec2 | null {
     if (this.samples.length === 0) return null;

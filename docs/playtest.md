@@ -107,7 +107,7 @@ player on a weak 3 KB/s link among 20; and 10 players with their region on a
 region server 20 ms from the game server. `NETBENCH_SECONDS` sets how long
 each one runs (10 by default), `NETBENCH_ONLY=wi-fi` runs only the scenarios
 whose names hold those words, and the game's network switches in `.env`
-(`NET_COMPRESS=off`, `NET_SKIP_STALE=off`) apply, to compare.
+(`NET_COMPRESS=off`, `NET_SKIP_STALE=off`, `NET_SEE_ACROSS=off`) apply, to compare.
 
 The performance overlay (F3) shows the same from a real browser: under
 Network, how far apart snapshots arrive.

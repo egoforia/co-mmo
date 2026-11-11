@@ -2,6 +2,7 @@ import { generateRegion, type Character, type ClientMessage, type EntityInspecti
 import type { Bus, Requests } from './bus.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import { findSpots, nearestTile, type Carry, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
+import { empty } from './region/beyond.ts';
 import { carryData, carryFrom, serverChannel, type LeavingData, type Outgoing, type RegionBeat, type RegionHandle, type ToServer } from './region-link.ts';
 
 interface Mirror {
@@ -24,6 +25,8 @@ export class RemoteRegion implements RegionHandle {
   readonly map: RegionMap;
   private readonly players = new Map<string, Mirror>();
   private creatures: RegionBeat['creatures'] = [];
+  /** Neighbours whose last word across the edge had something in it. */
+  private readonly beyond = new Set<string>();
 
   constructor(readonly def: RegionDef, readonly host: string, private readonly bus: Bus, private readonly requests: Requests, readonly cell?: Cell) {
     // The land is made from the region's seed, the same here as there.
@@ -175,6 +178,14 @@ export class RemoteRegion implements RegionHandle {
 
   seeAcross(from: number, ghosts: Ghosts): void {
     this.command({ t: 'ghosts', region: this.key, from, ghosts });
+  }
+
+  seeBeyond(from: string, ghosts: Ghosts): void {
+    // Nothing to show is said once, so the region server forgets what was.
+    if (empty(ghosts)) {
+      if (!this.beyond.delete(from)) return;
+    } else this.beyond.add(from);
+    this.command({ t: 'beyond', region: this.key, from, ghosts });
   }
 
   /** Messages from the region server for players here: passed on, and remembered. */

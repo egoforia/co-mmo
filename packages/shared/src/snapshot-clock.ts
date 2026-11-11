@@ -45,6 +45,8 @@ export class SnapshotClock {
   private count = 0;
   private lastTick?: number;
   private lastAt = 0;
+  /** Set by restart: the next snapshot begins a new timeline. */
+  private fresh = false;
   /** The server time others are drawn at, and the local time that was worked out. */
   private drawn?: { server: number; local: number };
 
@@ -61,7 +63,7 @@ export class SnapshotClock {
     if (this.lastTick !== undefined) {
       // More ticks than time passed (plus a second's slack), or fewer than none: a new timeline.
       const elapsed = (now - this.lastAt) / this.tickMs;
-      if (tick < this.lastTick || tick - this.lastTick > elapsed + 1000 / this.tickMs) {
+      if (this.fresh || tick < this.lastTick || tick - this.lastTick > elapsed + 1000 / this.tickMs) {
         const before = now - (this.base ?? 0);
         shift = server - before;
         this.arrivals.length = 0;
@@ -70,6 +72,7 @@ export class SnapshotClock {
         if (this.drawn) this.drawn.server += shift;
       }
     }
+    this.fresh = false;
     this.lastTick = tick;
     this.lastAt = now;
     const offset = now - server;
@@ -79,6 +82,14 @@ export class SnapshotClock {
     this.arrivals.push({ at: now, late: offset - this.base, tick });
     while (this.arrivals.length > 2 && now - this.arrivals[0]!.at > WINDOW_MS) this.arrivals.shift();
     return shift;
+  }
+
+  /**
+   * The next snapshot starts a new timeline, whatever its tick (we entered
+   * another region, whose ticks need not follow on from the last one's).
+   */
+  restart(): void {
+    this.fresh = true;
   }
 
   /** The server time to draw others at, for local time `now`. */

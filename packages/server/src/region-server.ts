@@ -8,6 +8,7 @@ import { GATEWAY, carryData, carryFrom, serverChannel, type LeavingData, type Ou
 import { LoadMeter } from './load-meter.ts';
 import { getProfilerConfig, recordProfileLocally } from './debug/profiler-session.ts';
 import { aggregatePhaseTimings } from './region/profiler.ts';
+import { empty } from './region/beyond.ts';
 
 /** How often a region server tells the gateway it is alive and how busy it is. */
 export const BEAT_MS = 2000;
@@ -46,6 +47,8 @@ export class RegionServer {
   private beatTimer?: ReturnType<typeof setInterval>;
   private unsubscribe?: () => Promise<void>;
   private readonly meter: LoadMeter;
+  /** Regions here whose last border had something in it. */
+  private readonly bordered = new Set<string>();
 
   constructor(private readonly options: RegionServerOptions) {
     this.bus = options.bus;
@@ -152,10 +155,25 @@ export class RegionServer {
           });
         }
         if (region.cell) this.toGateway({ t: 'edge', server: this.id, region: region.key, ghosts: region.edge() });
+        this.border(region);
       } catch (err) {
         this.failed(err);
       }
     }
+  }
+
+  /** Shows the regions around this one what stands near its edges, while anyone is there to see (region/beyond.ts). */
+  private border(region: Region): void {
+    if (!this.world.borders?.includes(region.def.id)) {
+      this.bordered.delete(region.key);
+      return;
+    }
+    const ghosts = region.border();
+    // Nothing near the edges is said once, so the neighbours forget what was.
+    if (empty(ghosts) && !this.bordered.has(region.key)) return;
+    if (empty(ghosts)) this.bordered.delete(region.key);
+    else this.bordered.add(region.key);
+    this.toGateway({ t: 'border', server: this.id, region: region.key, ghosts });
   }
 
   private receive(m: ToServer): void {
@@ -250,6 +268,9 @@ export class RegionServer {
         return;
       case 'ghosts':
         region.seeAcross(m.from, m.ghosts);
+        return;
+      case 'beyond':
+        region.seeBeyond(m.from, m.ghosts);
         return;
       case 'inspect': {
         const inspection = region.inspect(m.kind, m.id);

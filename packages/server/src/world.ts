@@ -39,6 +39,7 @@ import {
 import { Parties } from './parties.ts';
 import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
 import { SplitRegion, cellsFor, placementsFor } from './split-region.ts';
+import { across } from './region/beyond.ts';
 import type { CharacterOp, OpResult } from './character-ops.ts';
 import type { Placement, RegionHandle, WorldState } from './region-link.ts';
 
@@ -102,6 +103,8 @@ export class World {
   private readonly lastWhisper = new Map<string, string>();
   /** When a player last earned someone Creator XP for a thing, per kind of enjoyment. */
   private readonly credited = new Map<string, number>();
+  /** Players see what stands just over a region edge (region/beyond.ts; NET_SEE_ACROSS=off turns it off). */
+  seeAcross = true;
   /** Players per cell before a region splits; a tuning value. */
   cellPlayers = CELL_PLAYERS;
   /** Regions being split or joined up right now. */
@@ -109,6 +112,8 @@ export class World {
   /** Since when each split region has been quiet enough to join up again. */
   private readonly quietSince = new Map<string, number>();
   private ticks = 0;
+  /** Regions (or cells) running here that showed their edges last tick. */
+  private readonly bordered = new Set<string>();
   /** Lands being laid out again after an edit, one after another per land. */
   private readonly reshaping = new Map<string, Promise<void>>();
 
@@ -190,7 +195,26 @@ export class World {
       const members = this.parties.members(id);
       if (members.length > 1) parties[id] = members;
     }
-    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky };
+    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky, borders: this.bordering() };
+  }
+
+  /** Regions with someone in a region beside them, corners too: those whose edges are worth showing. */
+  private bordering(): string[] {
+    if (!this.seeAcross) return [];
+    const occupied = new Set(this.where.values());
+    return this.defs().filter((d) => this.neighbours(d).some((n) => occupied.has(n.id))).map((d) => d.id);
+  }
+
+  /**
+   * A region (or one cell of it) showed what stands near its edges: each
+   * region around it sees what lies within its sight, from its own corner.
+   */
+  border(key: string, ghosts: Ghosts): void {
+    const region = this.regions.get(key.split('~')[0]!);
+    if (!region || !this.seeAcross) return;
+    for (const n of this.neighbours(region.def)) {
+      this.regions.get(n.id)?.seeBeyond?.(key, across(ghosts, region.def, n, region.map.width));
+    }
   }
 
   /** Wished things came into being or went away (wishes granted, restored or rolled back). */
@@ -722,7 +746,22 @@ export class World {
       for (const unit of region.cells ?? [region]) if (unit instanceof Region) unit.strain = strain;
       for (const departure of region.tick()) this.depart(region, departure);
     }
+    this.showBorders();
     if (++this.ticks % TICK_RATE === 0) this.checkCrowds();
+  }
+
+  /** Regions running here show the regions around them what stands near their edges, while anyone is there to see. */
+  private showBorders(): void {
+    const wanted = new Set(this.bordering());
+    for (const region of this.regions.values()) {
+      for (const unit of region.cells ?? [region]) {
+        // Regions on region servers send theirs themselves.
+        if (!(unit instanceof Region)) continue;
+        if (wanted.has(region.def.id)) this.border(unit.key, unit.border());
+        else if (this.bordered.delete(unit.key)) this.border(unit.key, { players: [], creatures: [], bodies: [], npcs: [] });
+        if (wanted.has(region.def.id)) this.bordered.add(unit.key);
+      }
+    }
   }
 
   // --- Dev pause and step controls --------------------------------------------

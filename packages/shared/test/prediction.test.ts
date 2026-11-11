@@ -55,6 +55,15 @@ describe('Interpolator', () => {
     i.rebase(-1000);
     expect(i.sample(25)).toEqual({ x: 5, y: 0 });
   });
+
+  it('counts what it has from the next region\'s corner after we cross an edge', () => {
+    const i = new Interpolator();
+    i.push(1000, 2, 7);
+    i.push(1050, 4, 7);
+    // We walked west: the region we left lies 256 tiles east of the new corner.
+    i.shift(256, 0);
+    expect(i.sample(1025)).toEqual({ x: 259, y: 7 });
+  });
 });
 
 describe('SnapshotClock', () => {
@@ -112,6 +121,21 @@ describe('SnapshotClock', () => {
     // Drawn time carries on smoothly on the new timeline.
     expect(after - (before + shift)).toBeGreaterThanOrEqual(0);
     expect(after - (before + shift)).toBeLessThan(100);
+  });
+
+  it('starts a new timeline when told we entered another region, even when its ticks look like they follow on', () => {
+    const clock = new SnapshotClock();
+    feed(clock, 20, () => 0);
+    const before = clock.renderAt(1000);
+    // The next region's ticks happen to run a few ticks ahead of the last one's.
+    clock.restart();
+    const shift = clock.arrived(100 + 20 + 7, 1040);
+    expect(shift).not.toBe(0);
+    const after = clock.renderAt(1040);
+    expect(after - (before + shift)).toBeGreaterThanOrEqual(0);
+    expect(after - (before + shift)).toBeLessThan(100);
+    // Only once: the next tick follows on.
+    expect(clock.arrived(100 + 20 + 8, 1090)).toBe(0);
   });
 });
 

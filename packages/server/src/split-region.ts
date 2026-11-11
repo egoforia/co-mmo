@@ -200,6 +200,11 @@ export class SplitRegion implements RegionHandle {
     return out;
   }
 
+  /** What a region beside this one shows near its edge: every cell sees it. */
+  seeBeyond(from: string, ghosts: Ghosts): void {
+    for (const c of this.cells) c.seeBeyond?.(from, ghosts);
+  }
+
   /** A cell's border, for the cells either side of it. */
   edgeFrom(index: number, ghosts: Ghosts): void {
     for (const n of [index - 1, index + 1]) this.cells[n]?.seeAcross?.(index, ghosts);

@@ -63,6 +63,8 @@ export interface RegionHandle {
   readonly cells?: RegionHandle[];
   /** A cell: what the cell at `from` shows near the border. */
   seeAcross?(from: number, ghosts: Ghosts): void;
+  /** What a region (or cell) beside this one shows near its edge, counted from this region's corner (region/beyond.ts). */
+  seeBeyond?(from: string, ghosts: Ghosts): void;
   /** Live entity inspection for debug tools. */
   inspect?(kind: 'player' | 'creature', id: string): EntityInspection | undefined | Promise<EntityInspection | undefined>;
 }
@@ -108,6 +110,8 @@ export interface WorldState {
   parties: Record<string, string[]>;
   /** How the sky turns, so every server's regions keep the same hours and weather. */
   sky?: SkyConfig;
+  /** Regions with someone in a region beside them: each tick they show what stands near their edges (region/beyond.ts). */
+  borders?: string[];
 }
 
 /** How busy a region server is, sent every couple of seconds. */
@@ -165,6 +169,7 @@ export type ToServer =
   | { t: 'exits'; region: string; exits: RegionDef['exits'] }
   | { t: 'welcome-all'; region: string }
   | { t: 'ghosts'; region: string; from: number; ghosts: Ghosts }
+  | { t: 'beyond'; region: string; from: string; ghosts: Ghosts }
   | { t: 'world'; state: WorldState }
   | { t: 'content'; entries: import('@co-mmo/shared').ContentEntry[] }
   | { t: 'inspect'; region: string; kind: 'player' | 'creature'; id: string; ask?: number; replyTo?: string }
@@ -191,6 +196,8 @@ export type ToGateway =
   | { t: 'hook'; server: string; region: string; hook: 'regionChat'; m: ServerMessage }
   /** A cell's border, each tick, for the cells beside it. */
   | { t: 'edge'; server: string; region: string; ghosts: Ghosts }
+  /** What a region (or cell) shows near its edges, each tick, for the regions around it. */
+  | { t: 'border'; server: string; region: string; ghosts: Ghosts }
   | { t: 'entity-inspection'; server: string; region: string; data: EntityInspection }
   /** A tick that exceeded the time budget, captured for investigation. */
   | { t: 'slow-tick'; server: string; record: SlowTickRecord }

@@ -83,7 +83,16 @@ const testbedShots: ShotSpec[] = [
 
 describe('clean-room architectural testbed captures', () => {
   it('captures all 25 clean-room combinations in arch-testbed', async () => {
-    const world = await playWorld({ clientDir, kitSheets, shippedArt });
+    // High noon daylight at 12:00:00 (phase 0.5), 24-hour cycle, zero darkness, clear skies
+    const NOON_MS = 12 * 60 * 60_000;
+    const sky = { dayMinutes: 24 * 60, weatherMinutes: 60, weather: false };
+    const world = await playWorld({
+      clientDir,
+      kitSheets,
+      shippedArt,
+      now: () => NOON_MS,
+      sky,
+    });
     const totalShots = testbedShots.length;
 
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -99,9 +108,14 @@ describe('clean-room architectural testbed captures', () => {
     await page.waitForSelector('#game canvas', { timeout: 30_000 });
 
     console.log('Waiting for arch-testbed scene to initialize...');
+    console.log('app.world regions:', app ? [...app.world.regions.keys()] : 'app is null');
     await page.waitForTimeout(8000);
 
-    const testbed = app!.world.local('arch-testbed')!;
+    const testbed = app!.world.local('arch-testbed');
+    console.log('testbed instance:', testbed ? 'found' : 'NOT FOUND');
+    if (!testbed) {
+      throw new Error(`arch-testbed region not found in app.world! Available regions: ${[...app!.world.regions.keys()].join(', ')}`);
+    }
 
     let shotIndex = 1;
     for (const s of testbedShots) {

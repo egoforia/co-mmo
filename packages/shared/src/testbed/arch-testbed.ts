@@ -95,9 +95,37 @@ export function archTestbedLayout(map: RegionMap, _c: number): void {
   // =========================================================================
   // Vault 1 (Floor -1): 10x10 cavern room at (40, 160)
   addStorey(map, { x: 40, y: 160, width: 10, height: 10 }, -1, 'frostpeak-sunken-drafts', undefined, false);
+  map.landmarks.push({
+    asset: 'sanctum-cathedral-furniture-brazier',
+    x: 42,
+    y: 162,
+    footprint: { width: 1, height: 1 },
+    floor: -1,
+  });
+  map.landmarks.push({
+    asset: 'sanctum-cathedral-furniture-brazier',
+    x: 47,
+    y: 167,
+    footprint: { width: 1, height: 1 },
+    floor: -1,
+  });
 
   // Vault 2 (Floor -2): 10x10 cavern pit directly below at (40, 160)
   addStorey(map, { x: 40, y: 160, width: 10, height: 10 }, -2, 'frostpeak-sunken-drafts', undefined, false);
+  map.landmarks.push({
+    asset: 'sanctum-cathedral-furniture-brazier',
+    x: 42,
+    y: 162,
+    footprint: { width: 1, height: 1 },
+    floor: -2,
+  });
+  map.landmarks.push({
+    asset: 'sanctum-cathedral-furniture-brazier',
+    x: 47,
+    y: 167,
+    footprint: { width: 1, height: 1 },
+    floor: -2,
+  });
 
   // Cavern stairs from Floor -2 up to Floor -1
   addStairs(map, {

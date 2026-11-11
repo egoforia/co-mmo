@@ -40,6 +40,11 @@ describe('shots', () => {
     expect((await pictureProblems(join(dir, 'magenta.png'))).join()).toMatch(/400 magenta pixels between \(40,40\) and \(59,59\)/);
     expect((await pictureProblems(join(dir, 'blank.png'))).join()).toMatch(/one flat colour/);
     expect(await pictureProblems(join(dir, 'fine.png'))).toEqual([]);
+    // A hole the browser left: see-through pixels over a drawn scene.
+    await sharp(await square({ r: 40, g: 120, b: 60 })).ensureAlpha().composite([{ input: { create: { width: 30, height: 30, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }, left: 0, top: 0, blend: 'dest-in' }]).toFile(join(dir, 'hole.png'));
+    expect((await pictureProblems(join(dir, 'hole.png'))).join()).toMatch(/see-through/);
+    await sharp(await square({ r: 10, g: 12, b: 14 }, { r: 80, g: 80, b: 80 })).toFile(join(dir, 'dark.png'));
+    expect((await pictureProblems(join(dir, 'dark.png'))).join()).toMatch(/almost black/);
   });
 
   it('measures what changed between two pictures, and where', async () => {

@@ -28,13 +28,21 @@ shot takes 15 to 30 seconds.
 3. For each shot in `packages/server/shots/list.ts`: starts a fresh server
    whose sky shows the shot's hour and weather (`shots/sky.ts` picks a day
    and weather length that land the real clock on them, so the game's clock
-   is untouched), signs in an Owner at the shot's spot and floor, opens the
-   page, waits until a second passes with under 1% of the screen changing
-   (at most 20 s), runs the shot's `open` step, and takes the picture.
+   is untouched), signs in an Owner at the shot's spot and floor (moved to
+   the nearest free tile middle if the spot is inside a wall or furniture,
+   which the server would otherwise nudge them out of), opens the page, waits
+   until the HUD's place line shows that spot and floor, hides the HUD for
+   `hideUi` shots, waits until a second passes with under 1% of the screen
+   changing (at most 20 s), runs the shot's `open` step, and takes the
+   picture. Chromium draws with SwiftShader: its default software drawing
+   leaves a see-through square in the game canvas where the mini map's
+   canvas composites.
 4. Runs machine checks on each picture (`shots/pictures.ts`): errors the page
    threw or logged, requests that failed, magenta left from a painting's
-   background, a screen that is one flat colour, and a screen that never held
-   still.
+   background, see-through pixels, a screen that is one flat colour or almost
+   black, a player the page never showed at the spot, and a screen that never
+   held still. A run that exits 0 only means the pictures were taken; the
+   review is what says they are right.
 5. Writes the close-up (middle of the screen, 2x, no smoothing), the contact
    sheet and `shots.json`.
 6. With `--compare`: checks the other commit out beside the repo
@@ -52,10 +60,14 @@ touches a real world.
 
 | Verdict | Meaning |
 | --- | --- |
-| same | Under 0.3% of pixels changed: moving creatures and townsfolk make some. |
-| small change | 0.3% to 2%: look, it may be movement or a real small change. |
-| changed | 2% or more: must be explained in the PR. |
+| same | Under 0.5% of pixels changed. |
+| look | 0.5% to 4%: open the picture. Townsfolk and creatures walk on their own (a busy Sanctum changes up to about 3% between two runs of the same code); if the red is only them, it is the same. |
+| changed | 4% or more: must be explained in the PR. |
 | changed size | The page's size changed (full-page God's View pictures). |
+
+The player is the same every run (same name, same look) and the game's
+randomness is seeded per shot, so what is left is people moving with the
+clock.
 
 ## Adding a shot
 

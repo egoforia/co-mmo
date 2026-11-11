@@ -12,10 +12,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, devices, type Browser, type BrowserContext, type Page } from 'playwright';
-import { generateRegion, maxHp, newCharacter, regionDef } from '@co-mmo/shared';
+import { collides, generateRegion, hashString, maxHp, newCharacter, regionDef, type RegionMap } from '@co-mmo/shared';
 import { SHOTS, type Shot, type Spot } from './list.ts';
 import { pinnedSky } from './sky.ts';
-import { drawKitHouses, newArtDir, owner, shotWorld } from './world.ts';
+import { drawKitHouses, newArtDir, owner, seedRandom, shotWorld } from './world.ts';
 import { changedShare, closeUp, contactSheet, pictureProblems } from './pictures.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -72,13 +72,58 @@ beforeAll(async () => {
 
 /** Chromium as Playwright installs it, or the copy cloud sessions have when Playwright's own is missing. */
 async function launch(): Promise<Browser> {
+  // Without a graphics card, Chromium's default software drawing leaves a see-through hole in the
+  // game's canvas wherever the mini map's canvas composites; SwiftShader draws it whole.
+  const args = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
   try {
-    return await chromium.launch();
+    return await chromium.launch({ args });
   } catch (err) {
     const cloud = '/opt/pw-browsers/chromium';
     if (!existsSync(cloud)) throw err;
-    return chromium.launch({ executablePath: cloud, args: ['--headless=new', '--no-sandbox'] });
+    return chromium.launch({ executablePath: cloud, args: [...args, '--headless=new', '--no-sandbox'] });
   }
+}
+
+/** Hides the game's windows and HUD, for shots of the world itself. */
+const NO_UI = '#hud, #stats, #chat, #mini-map, #keys, #abilities, #quests, #party, #party-invite, #sound-panel, #toast, .window { display: none !important; }';
+
+/**
+ * The spot itself when a player can stand there, or the nearest tile middle that is
+ * free: the server nudges a player out of a wall, and the picture would be off.
+ */
+function freeSpot(map: RegionMap, spot: Spot): Spot | undefined {
+  const floor = spot.floor ?? 0;
+  if (!collides(map, spot.x, spot.y, floor)) return spot;
+  for (let r = 1; r <= 4; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = Math.floor(spot.x) + dx + 0.5, y = Math.floor(spot.y) + dy + 0.5;
+        if (!collides(map, x, y, floor)) return { x, y, floor };
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Waits until the page shows the player at the spot and floor (the HUD's place line,
+ * which the client writes from what it has drawn), so no shot catches the land before.
+ */
+async function arrived(page: Page, spot: Spot): Promise<boolean> {
+  return page
+    .waitForFunction(
+      ({ x, y, floor }) => {
+        const text = document.getElementById('hud-coords')?.textContent ?? '';
+        const m = /(-?\d+),\s*(-?\d+)/.exec(text);
+        if (!m) return false;
+        const onFloor = floor ? text.includes(floor > 0 ? `Floor ${floor}` : `B${Math.abs(floor)}`) : !/Floor|B\d/.test(text);
+        return Math.abs(Number(m[1]) - x) <= 1 && Math.abs(Number(m[2]) - y) <= 1 && onFloor;
+      },
+      { x: spot.x, y: spot.y, floor: spot.floor ?? 0 },
+      { timeout: 30_000 },
+    )
+    .then(() => true, () => false);
 }
 
 afterAll(async () => {
@@ -122,11 +167,14 @@ async function take(shot: Shot): Promise<Taken> {
   const sky = pinnedSky(regionId, def.biome, hour, weather);
   if (typeof sky === 'string') throw new Error(`The shot ${shot.name} can't be taken: ${sky}`);
 
+  seedRandom(hashString(shot.name));
   const world = await shotWorld(root, clientDir, artDir, sky);
   try {
     const { id, token } = owner(world.store);
     const map = generateRegion(def);
-    const spot: Spot = shot.at ? shot.at(map) : map.spawn;
+    const wanted: Spot = shot.at ? shot.at(map) : map.spawn;
+    const spot = freeSpot(map, wanted);
+    if (!spot) throw new Error(`The shot ${shot.name} puts the player inside a wall at ${wanted.x}, ${wanted.y}, with no free tile near.`);
     // Tough, so the land's creatures can't knock the player back to a shrine before the picture.
     const hardy = { ...newCharacter(), level: 30 };
     world.store.savePosition(id, spot.x, spot.y, regionId, { ...hardy, hp: maxHp(hardy) }, spot.floor ?? 0);
@@ -147,6 +195,8 @@ async function take(shot: Shot): Promise<Taken> {
     } else {
       await page.goto(`${world.base}/`);
       await page.waitForSelector('#game canvas', { timeout: 30_000 });
+      if (!(await arrived(page, spot))) problems.push(`The page never showed the player at ${spot.x}, ${spot.y} on floor ${spot.floor ?? 0}; the server may have moved them.`);
+      if (shot.hideUi) await page.addStyleTag({ content: NO_UI });
     }
     // Pictures load and the light eases in after the page opens; wait until the screen holds still.
     const settled = await settle(page);

@@ -8,7 +8,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import type { SkyConfig } from '@co-mmo/shared';
+import { hashString, type SkyConfig } from '@co-mmo/shared';
 import { createApp, type App } from '../src/app.ts';
 import { OfflineGod } from '../src/god.ts';
 import { Store } from '../src/store.ts';
@@ -55,11 +55,38 @@ export async function shotWorld(repoRoot: string, clientDir: string, artDir: str
   return { app, store, base: `http://127.0.0.1:${port}`, close: () => app.close() };
 }
 
-/** Makes an account (the Owner, so God's View opens) and returns its sign-in token. */
+/**
+ * Makes an account (the Owner, so God's View opens) and returns its sign-in
+ * token. A player without a look of their own is drawn as one of two people
+ * picked from their account id, so ids are drawn until the pick is the same
+ * every run; otherwise every comparison would show the player changing.
+ */
 export function owner(store: Store, name = 'Shots'): { id: string; token: string } {
-  const invite = store.createInvite(null, 'owner');
-  const { account, token } = store.acceptInvite(invite.code, name, 'sanctum');
-  return { id: account.id, token };
+  for (let i = 0; ; i++) {
+    const invite = store.createInvite(null, 'owner');
+    const { account, token } = store.acceptInvite(invite.code, `${name}${i}`, 'sanctum');
+    if (hashString(account.id) % 2 === 0 || i > 50) {
+      // The same name every run too, so the name over the player and in the HUD doesn't change.
+      account.name = name;
+      return { id: account.id, token };
+    }
+  }
+}
+
+/**
+ * Makes Math.random repeat the same numbers from `seed` on, so creatures and
+ * townsfolk start from the same places and choices in every run. Their
+ * moves still follow the clock, so busy shots differ a little.
+ */
+export function seedRandom(seed: number): void {
+  let a = seed >>> 0;
+  Math.random = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /**

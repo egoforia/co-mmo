@@ -33,13 +33,15 @@ export interface Shot {
   weather?: Weather;
   /** Screen size: desktop 1280x800 (default) or a phone. */
   screen?: 'desktop' | 'phone';
+  /** Hide the HUD and windows, for shots of the world itself (buildings, floors). */
+  hideUi?: boolean;
   /** Done after the page has settled and before the picture: open a window, click a tab. */
   open?: (page: Page) => Promise<void>;
   /** What someone looking at the picture must find in it; each is checked by eye and named in the report. */
   mustSee: string[];
 }
 
-/** The middle of a building's floor, for shots inside it. */
+/** The middle of a building's floor, for shots inside it (moved to the nearest free tile if furniture stands there). */
 const inside = (style: string, floor = 0) => (map: RegionMap): Spot => {
   const b = map.buildings.find((x) => x.style === style);
   if (!b) throw new Error(`There is no ${style} here.`);
@@ -78,6 +80,7 @@ export const SHOTS: Shot[] = [
   },
   {
     name: 'sanctum-arcanum-inside',
+    hideUi: true,
     about: 'Inside the Arcanum: the cutaway of a kit house.',
     region: 'sanctum',
     at: inside('sanctum-arcanum'),
@@ -105,6 +108,7 @@ export const SHOTS: Shot[] = [
   },
   {
     name: 'shore-sea-cave-loft',
+    hideUi: true,
     about: "One floor up in the sea cave: only this floor's walls and people show.",
     region: 'shore',
     at: upstairs(0),
@@ -133,6 +137,7 @@ export const SHOTS: Shot[] = [
   },
   {
     name: 'frostpeak-upstairs',
+    hideUi: true,
     about: 'A Frostpeak terrace one floor up: open rims, parapets and cliff skirts.',
     region: 'frostpeak',
     at: upstairs(0),

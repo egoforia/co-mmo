@@ -10,10 +10,14 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { compare, type Difference } from './pictures.ts';
 
-/** Below this share of changed pixels a shot reads as the same: moving creatures, water and rain make some. */
-const NOISE = 0.003;
-/** Above this a shot has clearly changed. */
-const CLEAR = 0.02;
+/** Below this share of changed pixels a shot reads as the same. */
+const NOISE = 0.005;
+/**
+ * At or above this a shot has clearly changed. Between the two, look: townsfolk
+ * and creatures walk on their own, and in a busy place (the Sanctum) that alone
+ * changes up to about 3% between two runs of the same code.
+ */
+const CLEAR = 0.04;
 
 interface Run {
   shots: { name: string; about: string; file: string; mustSee: string[]; problems: string[] }[];
@@ -29,7 +33,7 @@ const read = (dir: string): Run => {
 function verdict(d: Difference): string {
   if (d.resized) return 'changed size';
   if (d.changed >= CLEAR) return 'changed';
-  if (d.changed >= NOISE) return 'small change';
+  if (d.changed >= NOISE) return 'look';
   return 'same';
 }
 
@@ -60,7 +64,7 @@ async function main(): Promise<void> {
     `Before: \`${values.before}\`  `,
     `After: \`${values.after}\``,
     '',
-    `Below ${pct(NOISE)} changed counts as the same (moving creatures, water and weather make some change); ${pct(CLEAR)} or more is a clear change. Every "changed" shot must be explained in the pull request.`,
+    `Below ${pct(NOISE)} changed counts as the same; ${pct(CLEAR)} or more is a clear change. In between, look: if the red is only walking townsfolk and creatures, it is the same. Every "changed" shot, and every "look" shot whose red is not just people moving, must be explained in the pull request.`,
     '',
     '| Shot | Verdict | Changed | Where | Machine findings |',
     '| --- | --- | --- | --- | --- |',

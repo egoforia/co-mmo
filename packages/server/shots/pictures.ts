@@ -23,10 +23,18 @@ const MAGENTA_SHARE = 0.0005;
 /** Below this spread of brightness the picture is one flat colour. */
 const FLAT_SPREAD = 4;
 
+/** Below this average brightness (0-255) the picture is too dark to judge anything in it. */
+const DARK = 20;
+
 /** What a machine can tell is wrong with a screenshot, in plain words; empty when nothing is. */
 export async function pictureProblems(file: string): Promise<string[]> {
   const { data, width, height } = await raw(file);
   const problems: string[] = [];
+  // See-through pixels: a hole the browser left (layered canvases), which a viewer shows as black or white.
+  const alpha = await sharp(file).ensureAlpha().extractChannel(3).raw().toBuffer();
+  let clear = 0;
+  for (const a of alpha) if (a < 250) clear++;
+  if (clear / alpha.length > MAGENTA_SHARE) problems.push(`${clear} see-through pixels: part of the screen was not drawn (often a layered canvas).`);
   let magenta = 0;
   let minX = width, minY = height, maxX = -1, maxY = -1;
   let sum = 0, sumSq = 0;
@@ -45,6 +53,7 @@ export async function pictureProblems(file: string): Promise<string[]> {
   const n = width * height;
   const spread = Math.sqrt(Math.max(0, sumSq / n - (sum / n) ** 2));
   if (spread < FLAT_SPREAD) problems.push('The picture is almost one flat colour: the game may not have drawn.');
+  else if (sum / n < DARK) problems.push('The picture is almost black: too dark to judge (night with no lights, or an unlit floor).');
   if (magenta / n > MAGENTA_SHARE) {
     problems.push(`${magenta} magenta pixels between (${minX},${minY}) and (${maxX},${maxY}): a painting's background was not cut away.`);
   }

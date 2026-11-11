@@ -42,19 +42,34 @@ What you get, in `shot-results/`:
 - `compare/<name>.png` (before | after | changed pixels in red) and
   `compare/report.md` (shots ranked by how much changed).
 
+**Steady pictures.** The runner waits for the page to show the player at
+the spot and floor (the HUD's place line), then for the screen to hold
+still; it moves a spot that is inside a wall or furniture to the nearest
+free tile middle, since the server would nudge the player out. Never replace
+these waits with fixed sleeps. Shots of buildings and floors set `hideUi` so
+the HUD doesn't cover them; the others keep it, because the HUD is part of
+what players see. A place that is too dark to judge (an unlit cellar) is a
+finding about the game's lights, not a reason to change the shot's hour.
+
 **New feature, new shot.** When your change draws something no shot shows,
 add one to `packages/server/shots/list.ts` with a `mustSee` list. Keep
 existing names stable; comparisons pair shots by name.
 
 ## How to look
 
+A run that exits 0 only means every picture was taken. It says nothing about
+whether the pictures are right: dark voids, holes and clutter all pass. The
+review below is the check.
+
 1. **Read the machine findings first** (`shots.json` problems,
    `report.md` last column): page errors, failed requests, magenta left
-   from a painting, a blank screen, a screen that never held still. Fix those
+   from a painting, see-through holes, a blank or almost black screen, a
+   player the page never showed at the spot, a screen that never held still. Fix those
    before judging anything by eye.
 2. **Compare, don't judge alone.** Open the `compare/` picture for every
-   shot marked `changed` or `changed size`. Say what changed and why your
-   change explains it. A change you can't explain is a bug until shown
+   shot marked `changed`, `changed size` or `look`. Red that is only
+   townsfolk and creatures in new places is movement, not a change. Say what
+   changed and why your change explains it. A change you can't explain is a bug until shown
    otherwise. `same` shots need no look unless your change should have
    touched them; then "same" is the bug.
 3. **Look at the close-up**, not only the whole screen. Small things (a seam,
@@ -98,6 +113,6 @@ existing names stable; comparisons pair shots by name.
 
 - Weather only grades the light today (no falling rain or snow).
 - Creatures and townsfolk move, so busy shots change a little between runs;
-  the report counts under 0.3% as the same.
+  the report counts under 0.5% as the same and marks up to 4% "look".
 - God's View and Art Studio pictures are full-page and change height with
   their content.

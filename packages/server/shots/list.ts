@@ -190,4 +190,16 @@ export const SHOTS: Shot[] = [
     },
     mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons and the edit list are readable'],
   },
+  {
+    name: 'studio-map',
+    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Floors tool chosen.",
+    page: '/art-studio.html#art/map-editor',
+    ready: '#studio-map-canvas',
+    open: async (page) => {
+      await page.click('.studio-map [data-map-zoom="in"]');
+      await page.click('.studio-map [data-map-zoom="in"]');
+      await page.click('.studio-map [data-tool="floors"]');
+    },
+    mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Floors tool settings (up, down, ladders)', 'the edit list beside the map'],
+  },
 ];

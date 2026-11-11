@@ -7,7 +7,7 @@
 // - art-ui/hand-editor.ts: Interactive Frame-by-Frame Hand & Grip Workbench
 // - art-ui/skill-stage.ts: Interactive Attack, Skill & Status Effect Stage
 // - art-ui/hud-fx.ts: HUD Elements, Status Icons, Skill FX, Hotbar & 7-Slot Equipment Paperdoll
-// - art-ui/map-editor.ts: In-Studio Region Map Preview & Manual 10-tool + AI Map Architect Editor
+// - editor/studio-map.ts: the world editor's Studio view (Map Preview & Editor) with the AI Map Architect
 // - art-ui/models.ts: Decoupled Art, Video, Sound, Music & AI Art Director models
 // - art-ui/pages.ts: Items, Biomes (with Gathering Spots), Building looks, and Sounds & music
 // - art-ui/buildings.ts: Buildings sub-tab (how each building stands, its kit views, furniture footprints)
@@ -49,7 +49,7 @@ import {
   loadMapEditorData,
   mapEditorPage,
   mountMapEditorCanvas,
-} from './art-ui/map-editor.ts';
+} from './editor/studio-map.ts';
 import { collectMissingGaps, handleMissingClick, missingPage } from './art-ui/missing.ts';
 import {
   handleModelsChange,

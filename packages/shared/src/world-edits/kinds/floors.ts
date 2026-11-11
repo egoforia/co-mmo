@@ -1,6 +1,6 @@
 import { MAX_FLOORS, buildFloors } from '../../floors.ts';
 import type { EditKind } from '../kind.ts';
-import { OFF_EDGE, buildingFor, inside } from '../tiles.ts';
+import { OFF_EDGE, buildingAt, buildingFor, inside } from '../tiles.ts';
 
 /** Floors above and below a building, joined by stairs or ladders. */
 export const FLOORS: EditKind<'floors'> = {
@@ -8,13 +8,18 @@ export const FLOORS: EditKind<'floors'> = {
   name: 'Floors',
   hint: 'Click a building to give it floors above and below the ground, joined by stairs or ladders. 0 and 0 takes them off.',
   pointer: 'click',
-  targets: true,
+  targets: 'building',
   fields: [
     { key: 'up', label: 'Floors up', type: 'number', min: 0, max: MAX_FLOORS.up, default: 1 },
     { key: 'down', label: 'Floors down', type: 'number', min: 0, max: MAX_FLOORS.down, default: 0 },
-    { key: 'ladders', label: 'Ladders', type: 'flag', default: false },
+    { key: 'ladders', label: 'Ladders (monsters cannot climb them)', type: 'flag', default: false },
   ],
   shape: '{"kind":"floors","at":[x,y],"up":1,"down":0,"ladders":false}',
+  outline(map, { at }) {
+    const b = buildingAt(map, at);
+    return [b ? { x: b.x, y: b.y, w: b.width, h: b.height } : { x: at[0], y: at[1], w: 1, h: 1, tone: 'warn' }];
+  },
+  make: (use, v) => ({ kind: 'floors', at: use.at, up: Number(v.up), down: Number(v.down), ...(v.ladders ? { ladders: true } : {}), ...(use.target ? { target: use.target } : {}) }),
   check(map, edit) {
     if (!inside(map, edit.at)) return OFF_EDGE;
     const b = buildingFor(map, edit);

@@ -284,8 +284,13 @@ each land's edits in the store (`world_edits` table) with undo and redo,
 refuses edits that do not fit or would block where players arrive, and has
 `World.reshape` set the land up again wherever it runs, players put back
 where they stood or the nearest open spot. Routes in `world-edit-routes.ts`;
-the window is `client/src/editor-ui.ts`, whose tile outlines are the
-editor's own marks, seen only while it is open, never game art.
+the browser side is `client/src/editor/`: `core.ts` holds the tools (Look
+and one per kind in the registry), their settings drawn from each kind's
+fields, what a press, drag or release makes (`make`) and what to outline
+(`outline`), and two views use it: `in-game.ts`, the window beside the game,
+and `studio-map.ts`, the Art Studio's Map Preview & Editor (any floor, zoom
+in and out, the AI Map Architect). Their outlines and the Studio's tile plan
+are the editor's own marks, seen only while it is open, never game art.
 
 **The building kit.** `shared/src/building-kit/` (exported as `buildingKit`)
 turns a building as data (`BuildingSpec`: footprint in bays, doors and

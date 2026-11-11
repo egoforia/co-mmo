@@ -1,5 +1,5 @@
 import type { RegionMap } from '../world.ts';
-import type { DraftOf, EditKindId, EditOf } from './types.ts';
+import type { DraftOf, EditKindId, EditOf, TilePoint } from './types.ts';
 
 // The contract every kind of world edit keeps. One file per kind in kinds/
 // implements it; the registry hands it to the server (checks, stamping),
@@ -8,7 +8,28 @@ import type { DraftOf, EditKindId, EditOf } from './types.ts';
 
 /** What the editor knows besides the land: the monster kinds there are, with their names and pictures. */
 export interface EditContext {
-  creatures: Record<string, { name: string; art: string }>;
+  creatures: Record<string, { name: string; art: string; level?: number }>;
+}
+
+/** A setting's value as an editor holds it. */
+export type FieldValue = string | number | boolean;
+
+/** Where a tool was used: the tile clicked (or picked up from), the tile it goes to for a move, the start for a road, the tiles a stroke covered, and the thing it was used on. */
+export interface ToolUse {
+  at: TilePoint;
+  to?: TilePoint | null;
+  from?: TilePoint;
+  tiles?: TilePoint[];
+  target?: string;
+}
+
+/** A box of tiles an editor outlines: where the tool aims, what is held (picked up, a road's start), or a warning (what goes away). */
+export interface Outline {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tone?: 'aim' | 'held' | 'warn';
 }
 
 /** How a tool is used on the world. */
@@ -24,7 +45,7 @@ export type EditPointer =
 
 /** One setting a tool offers beside the world, described so any editor can draw it. */
 export type EditField =
-  | { key: string; label: string; type: 'choice'; choices: (ctx: EditContext) => { id: string; name: string }[] }
+  | { key: string; label: string; type: 'choice'; choices: (ctx: EditContext) => { id: string; name: string }[]; default?: (ctx: EditContext) => string }
   | { key: string; label: string; type: 'number'; min: number; max: number; default: number }
   | { key: string; label: string; type: 'flag'; default: boolean };
 
@@ -38,10 +59,16 @@ export interface EditKind<K extends EditKindId> {
   pointer: EditPointer;
   /** True when it works on floors above and below the ground too; the rest work on the ground only, for now. */
   onFloors?: boolean;
-  /** True when it changes one thing, which the editor may name (`target`) instead of a tile. */
-  targets?: boolean;
-  /** Its settings; filled by the editors in step 4 of the editor plan. */
+  /** When it changes one thing, which the editor may name (`target`) instead of a tile: a building, or a set piece or piece of furniture. */
+  targets?: 'building' | 'piece';
+  /** Its settings, drawn the same by every editor. */
   fields: EditField[];
+  /** False while it has nothing to offer (set pieces while their kit's wish is off). */
+  available?(): boolean;
+  /** The tiles to outline under the pointer before it is used (one tile when left out); `use.from` is what was picked up or where a road starts. */
+  outline?(map: RegionMap, use: ToolUse & { level: number }, values: Record<string, FieldValue>): Outline[];
+  /** The draft a tool makes from where it was used and its settings. */
+  make(use: ToolUse, values: Record<string, FieldValue>): DraftOf<K>;
   /** The draft as one JSON line, for the AI Map Architect's prompt. */
   shape: string;
   /** Why it cannot be made on this land, in words for the editor, or undefined when it can. */

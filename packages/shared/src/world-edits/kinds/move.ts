@@ -1,7 +1,7 @@
 import { blockOn } from '../../floors.ts';
 import { Tile, set } from '../../world.ts';
 import type { EditKind } from '../kind.ts';
-import { OFF_EDGE, built, clearUnder, floorOf, footprint, inside, landmarkFor, movable, tileOf, tileOn } from '../tiles.ts';
+import { OFF_EDGE, built, clearUnder, floorOf, footprint, inside, landmarkAt, landmarkFor, movable, tileOf, tileOn } from '../tiles.ts';
 
 /** Picks up a tree, rock, water or set piece and puts it down elsewhere, or takes it away. Set pieces and furniture move on any floor. */
 export const MOVE: EditKind<'move'> = {
@@ -10,9 +10,17 @@ export const MOVE: EditKind<'move'> = {
   hint: 'Click a tree, rock, water or set piece to pick it up, then click where it goes.',
   pointer: 'pick-then-click',
   onFloors: true,
-  targets: true,
+  targets: 'piece',
   fields: [],
   shape: '{"kind":"move","from":[x1,y1],"to":[x2,y2]|null}',
+  outline(map, { at, from, level }) {
+    if (from) return [{ x: from[0], y: from[1], w: 1, h: 1, tone: 'held' }, { x: at[0], y: at[1], w: 1, h: 1 }];
+    const piece = landmarkAt(map, at, level);
+    if (!piece) return [{ x: at[0], y: at[1], w: 1, h: 1 }];
+    const f = footprint(piece);
+    return [{ x: f.left, y: f.top, w: f.width, h: f.height }];
+  },
+  make: (use) => ({ kind: 'move', from: use.at, to: use.to ?? null, ...(use.target ? { target: use.target } : {}) }),
   check(map, edit) {
     if (!inside(map, edit.from) || (edit.to !== null && !inside(map, edit.to))) return OFF_EDGE;
     const floor = floorOf(edit);

@@ -1,4 +1,5 @@
 import { SPOTS } from '../../gathering.ts';
+import { ITEMS } from '../../rpg.ts';
 import { Tile, set } from '../../world.ts';
 import type { EditKind } from '../kind.ts';
 import { OFF_EDGE, inside, tileOf } from '../tiles.ts';
@@ -9,8 +10,9 @@ export const SPOT: EditKind<'spot'> = {
   name: 'Gathering',
   hint: 'Click open ground to stand a gathering spot there, or choose Take away and click a spot.',
   pointer: 'click',
-  fields: [{ key: 'spot', label: 'Spot', type: 'choice', choices: () => [...Object.entries(SPOTS).map(([id, s]) => ({ id, name: s.name })), { id: '', name: 'Take away' }] }],
+  fields: [{ key: 'spot', label: 'Spot', type: 'choice', choices: () => [{ id: '', name: 'Take away' }, ...Object.entries(SPOTS).map(([id, s]) => ({ id, name: `${s.name} (${ITEMS[s.material]?.name ?? s.material})` }))], default: () => Object.keys(SPOTS)[0] ?? '' }],
   shape: '{"kind":"spot","spot":"<spotId>"|null,"at":[x,y]}',
+  make: (use, v) => ({ kind: 'spot', spot: v.spot ? String(v.spot) : null, at: use.at }),
   check(map, edit) {
     if (!inside(map, edit.at)) return OFF_EDGE;
     const there = map.spots.some((p) => p.x === edit.at[0] && p.y === edit.at[1]);

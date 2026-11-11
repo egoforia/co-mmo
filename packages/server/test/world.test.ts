@@ -168,6 +168,19 @@ describe('World', () => {
       // Teleport by name to desert
       world.handle('a', { t: 'teleport', region: 'Mirage Desert' });
       expect(world.regionOf('a')!.def.id).toBe('desert');
+
+      // Teleport to architectural testbed on demand
+      world.handle('a', { t: 'teleport', region: 'arch-testbed' });
+      expect(world.regionOf('a')!.def.id).toBe('arch-testbed');
+      expect(world.regionOf('a')!.position('a')!.x).toBe(30);
+      expect(world.regionOf('a')!.position('a')!.y).toBe(30);
+
+      // Teleport to floor 1 in architectural testbed
+      world.handle('a', { t: 'teleport', region: 'testbed', x: 106, y: 46, floor: 1 });
+      expect(world.regionOf('a')!.def.id).toBe('arch-testbed');
+      expect(world.regionOf('a')!.position('a')!.x).toBe(106);
+      expect(world.regionOf('a')!.position('a')!.y).toBe(46);
+      expect(world.regionOf('a')!.position('a')!.floor).toBe(1);
     });
 
     it('rejects teleporting to blocked or solid coordinates and sends an error', () => {

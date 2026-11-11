@@ -536,6 +536,12 @@ export class World {
   findRegion(query: string): RegionHandle | undefined {
     const q = query.trim().toLowerCase();
     if (!q) return undefined;
+    if (
+      ARCH_TESTBED_REGION.id.toLowerCase().includes(q) ||
+      ARCH_TESTBED_REGION.name.toLowerCase().includes(q)
+    ) {
+      this.region(ARCH_TESTBED_REGION.id);
+    }
     const direct = this.regions.get(q);
     if (direct) return direct;
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, editWords, generateRegion, isBlocking, stampEdit, tileAt, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
+import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, editWords, isBlocking, stampEdit, tileAt, withEdit, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
 import type { Store, WorldEditLog } from './store.ts';
 import type { World } from './world.ts';
 
@@ -30,6 +30,11 @@ export class WorldEditor {
   /** A land's edits and those taken back. */
   log(regionId: string): WorldEditLog {
     return this.store.worldEdits(regionId);
+  }
+
+  /** The land's edits that no longer fit it and were passed over, by id. */
+  unlaid(regionId: string): string[] {
+    return this.world.region(regionId)?.map.unlaid ?? [];
   }
 
   /** Lists all regions and returns the selected region's full map, edits, and tool palettes for the studio. */
@@ -84,9 +89,7 @@ export class WorldEditor {
     if (!region) {
       return { ok: false, steps: drafts.map((d) => ({ draft: d, summary: summarizeDraft(d), valid: false, why: 'There is no land by that name.' })) };
     }
-    const log = this.log(regionId);
-    const workingEdits: WorldEdit[] = [...log.edits];
-    let currentMap = generateRegion({ ...region.def, edits: workingEdits });
+    let currentMap = region.map;
     const steps: PreviewStep[] = [];
     for (const draft of drafts) {
       const why = checkEdit(currentMap, draft, CREATURES);
@@ -94,14 +97,13 @@ export class WorldEditor {
         steps.push({ draft, summary: summarizeDraft(draft), valid: false, why });
         continue;
       }
-      const edit = this.stamp(draft, by);
-      const blocked = this.blocks(region.def, [...workingEdits, edit]);
+      const next = withEdit(currentMap, this.stamp(draft, by));
+      const blocked = blocks(next);
       if (blocked) {
         steps.push({ draft, summary: summarizeDraft(draft), valid: false, why: blocked });
         continue;
       }
-      workingEdits.push(edit);
-      currentMap = generateRegion({ ...region.def, edits: workingEdits });
+      currentMap = next;
       steps.push({ draft, summary: summarizeDraft(draft), valid: true });
     }
     return { ok: steps.some((s) => s.valid), steps };
@@ -114,16 +116,16 @@ export class WorldEditor {
     if (!Array.isArray(drafts) || !drafts.length) return { ok: false, message: 'Pick at least one edit to apply.' };
     const log = this.log(regionId);
     const workingEdits: WorldEdit[] = [...log.edits];
-    let currentMap = generateRegion({ ...region.def, edits: workingEdits });
+    let currentMap = region.map;
     let applied = 0;
     for (const draft of drafts) {
       const why = checkEdit(currentMap, draft, CREATURES);
       if (why) continue;
       const edit = this.stamp(draft, by);
-      const blocked = this.blocks(region.def, [...workingEdits, edit]);
-      if (blocked) continue;
+      const next = withEdit(currentMap, edit);
+      if (blocks(next)) continue;
       workingEdits.push(edit);
-      currentMap = generateRegion({ ...region.def, edits: workingEdits });
+      currentMap = next;
       applied++;
     }
     if (!applied) return { ok: false, message: 'None of those edits could be laid on this land.' };
@@ -139,7 +141,7 @@ export class WorldEditor {
     if (why) return { ok: false, message: why };
     const edit = this.stamp(draft, by);
     const log = this.log(regionId);
-    const blocked = this.blocks(region.def, [...log.edits, edit]);
+    const blocked = blocks(withEdit(region.map, edit));
     if (blocked) return { ok: false, message: blocked };
     return this.save(regionId, { edits: [...log.edits, edit], undone: [] });
   }
@@ -158,7 +160,7 @@ export class WorldEditor {
     const next = log.undone.at(-1);
     if (!next) return { ok: false, message: 'There is nothing to redo in this land.' };
     const region = this.world.region(regionId);
-    const blocked = region && this.blocks(region.def, [...log.edits, next]);
+    const blocked = region && blocks(withEdit(region.map, next));
     if (blocked) return { ok: false, message: blocked };
     return this.save(regionId, { edits: [...log.edits, next], undone: log.undone.slice(0, -1) });
   }
@@ -176,20 +178,19 @@ export class WorldEditor {
     return stampEdit(draft, { id: randomUUID().slice(0, 8), by, made: this.now() }, CREATURES);
   }
 
-  /** Why these edits would shut travellers out of the land (where they arrive is blocked), if they would. */
-  private blocks(def: RegionMap['def'], edits: WorldEdit[]): string | undefined {
-    const map = generateRegion({ ...def, edits });
-    const arrivals = [map.spawn, ...Object.values(map.entries)];
-    return arrivals.some((p) => p && isBlocking(tileAt(map, p.x, p.y)))
-      ? 'That would block a spot where players arrive in this land. Leave it open.'
-      : undefined;
-  }
-
   private async save(regionId: string, log: WorldEditLog): Promise<EditResult> {
     this.store.setWorldEdits(regionId, log);
     await this.world.reshape(regionId);
     return { ok: true, log };
   }
+}
+
+/** Why a land laid out with an edit would shut travellers out (where they arrive is blocked), if it would. */
+function blocks(map: RegionMap): string | undefined {
+  const arrivals = [map.spawn, ...Object.values(map.entries)];
+  return arrivals.some((p) => p && isBlocking(tileAt(map, p.x, p.y)))
+    ? 'That would block a spot where players arrive in this land. Leave it open.'
+    : undefined;
 }
 
 /** One line for a `WorldEditDraft`, as the list of edits words it. */

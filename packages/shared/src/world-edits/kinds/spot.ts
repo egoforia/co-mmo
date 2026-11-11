@@ -23,15 +23,16 @@ export const SPOT: EditKind<'spot'> = {
     const [x, y] = edit.at;
     const here = (p: { x: number; y: number }) => p.x === x && p.y === y;
     if (edit.spot === null) {
-      if (!map.spots.some(here)) return;
+      if (!map.spots.some(here)) return false;
       map.spots = map.spots.filter((p) => !here(p));
       set(map, x, y, Tile.Ground);
-      return;
+      return true;
     }
     const t = tileOf(map, edit.at);
-    if (!SPOTS[edit.spot] || map.spots.some(here) || (t !== Tile.Ground && t !== Tile.Path)) return;
+    if (!SPOTS[edit.spot] || map.spots.some(here) || (t !== Tile.Ground && t !== Tile.Path)) return false;
     map.spots.push({ id: edit.id, kind: edit.spot, x, y });
     set(map, x, y, Tile.Blocked);
+    return true;
   },
   keep: (d) => ({ kind: 'spot', spot: d.spot, at: d.at }),
   words: (e) => (e.spot ? `${SPOTS[e.spot]?.name ?? 'A gathering spot'} at ${e.at.join(', ')}` : `Took away the gathering spot at ${e.at.join(', ')}`),

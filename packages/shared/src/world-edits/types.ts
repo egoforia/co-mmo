@@ -14,8 +14,20 @@ export const PAINT_TILES: PaintTile[] = ['ground', 'path', 'water', 'tree', 'roc
 /** What each brush kind is called in the editor. */
 export const PAINT_NAMES: Record<PaintTile, string> = { ground: 'Ground', path: 'Path', water: 'Water', tree: 'Tree', rock: 'Rock', wall: 'Wall' };
 
+/**
+ * Where on the land an edit works: its floor, `level` (the ground when missing, as
+ * every edit saved before floors were named) and, for edits that change one
+ * thing, that thing's name (names.ts). A tile still finds the thing when no
+ * name is given.
+ */
+export interface EditPlace {
+  /** The floor it works on (floors.ts numbering); named `level` because a house's `floor` is its size. */
+  level?: number;
+  target?: string;
+}
+
 /** An edit as the editor sends it, before the server stamps who made it and when. */
-export type WorldEditDraft =
+export type WorldEditDraft = EditPlace & (
   /** Lays one kind of tile on these tiles; a path over water becomes a bridge. */
   | { kind: 'paint'; tile: PaintTile; tiles: TilePoint[] }
   /** Picks up the set piece, tree or rock at `from` and puts it down at `to`, or takes it away when `to` is null. */
@@ -35,7 +47,8 @@ export type WorldEditDraft =
   /** Gives the set piece or piece of furniture over `at` the tiles it blocks and stands on, still centred under its picture (the Art tab's hit boxes). */
   | { kind: 'footprint'; at: TilePoint; footprint: [width: number, height: number] }
   /** Stands a gathering spot of a kind (gathering.ts) on a tile, or takes away the one there when `spot` is null. */
-  | { kind: 'spot'; spot: string | null; at: TilePoint };
+  | { kind: 'spot'; spot: string | null; at: TilePoint }
+);
 
 /** The name of each kind of edit. */
 export type EditKindId = WorldEditDraft['kind'];

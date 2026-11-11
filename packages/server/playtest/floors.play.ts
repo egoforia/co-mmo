@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
-import { buildFloors, collides, generateRegion, newCharacter, regionDef } from '@co-mmo/shared';
+import { buildFloors, collides, generateRegion, newCharacter, regionDef, type Stairway } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
 import { playWorld } from './harness.ts';
 
@@ -79,7 +79,9 @@ describe('floors', () => {
     await page.selectOption('#editor select[name="down"]', '1');
     await page.mouse.click(centre.x, centre.y);
     await expect.poll(() => world.store.worldEdits('sanctum').edits.length, { timeout: 10_000 }).toBe(1);
-    expect(app!.world.home.map.stairways).toEqual(map.stairways);
+    // The same stairs, besides the names the land gives them (world-edits/names.ts).
+    const unnamed = (list: Stairway[]) => list.map(({ id: _, ...s }) => s);
+    expect(unnamed(app!.world.home.map.stairways)).toEqual(unnamed(map.stairways));
     await page.click('#editor .close');
     await page.waitForTimeout(1500);
     await page.screenshot({ path: resolve(shots, 'floors-ground.png') });

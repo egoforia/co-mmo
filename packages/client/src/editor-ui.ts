@@ -12,6 +12,7 @@ import {
   MAX_STROKE,
   PAINT_NAMES,
   PAINT_TILES,
+  EDIT_KINDS,
   editWords,
   Tile,
   isBlocking,
@@ -90,7 +91,7 @@ export class EditorUi {
   private log: EditLog = { edits: [], undone: 0 };
   /** Mid-tool: the brush stroke, the thing picked up, or the road's start. */
   private stroke: { region: string; tiles: Map<string, TilePoint> } | undefined;
-  private picked: { region: string; at: TilePoint; what: string } | undefined;
+  private picked: { region: string; at: TilePoint; what: string; target?: string } | undefined;
   private roadFrom: { region: string; at: TilePoint } | undefined;
   private busy = false;
   private status = '';
@@ -195,16 +196,16 @@ export class EditorUi {
         return this.addToStroke(region, at);
       case 'move': {
         if (!this.picked) {
-          const piece = landmarkAt(map, at);
+          const piece = landmarkAt(map, at, this.levelIn(region));
           const tile = map.tiles[at[1] * map.width + at[0]] as Tile;
-          if (!piece && ![Tile.Tree, Tile.Rock, Tile.Water].includes(tile)) return this.say('There is nothing there to move: pick a tree, a rock, water or a set piece.');
-          this.picked = { region, at, what: piece ? 'the set piece' : TILE_NAMES[tile]! };
+          if (!piece && (this.levelIn(region) || ![Tile.Tree, Tile.Rock, Tile.Water].includes(tile))) return this.say('There is nothing there to move: pick a tree, a rock, water or a set piece.');
+          this.picked = { region, at, what: piece ? 'the set piece' : TILE_NAMES[tile]!, ...(piece?.id ? { target: piece.id } : {}) };
           return this.render(`Picked up ${this.picked.what}. Click where it goes, or take it away.`);
         }
         if (this.picked.region !== region) return this.say('Put it down in the same land it came from.');
-        const from = this.picked.at;
+        const { at: from, target } = this.picked;
         this.picked = undefined;
-        return void this.act({ edit: { kind: 'move', from, to: at } }, region);
+        return void this.act({ edit: { kind: 'move', from, to: at, ...(target ? { target } : {}) } }, region);
       }
       case 'road': {
         if (!this.roadFrom) {
@@ -220,9 +221,11 @@ export class EditorUi {
         const floor = KIT_HOUSE_FLOORS[this.houseSize]!.floor;
         return void this.act({ edit: { kind: 'house', at: houseCorner(at, floor), floor, style: this.houseStyle } }, region);
       }
-      case 'floors':
-        if (!buildingAt(map, at)) return this.say('Click a building to give it floors.');
-        return void this.act({ edit: { kind: 'floors', at, up: this.floorsUp, down: this.floorsDown, ...(this.ladders ? { ladders: true } : {}) } }, region);
+      case 'floors': {
+        const building = buildingAt(map, at);
+        if (!building) return this.say('Click a building to give it floors.');
+        return void this.act({ edit: { kind: 'floors', at, up: this.floorsUp, down: this.floorsDown, ...(this.ladders ? { ladders: true } : {}), ...(building.id ? { target: building.id } : {}) } }, region);
+      }
       case 'piece':
         if (!setPiece(this.piece)) return this.say('Choose a set piece first.');
         return void this.act({ edit: { kind: 'piece', piece: this.piece, at } }, region);
@@ -259,6 +262,8 @@ export class EditorUi {
   /** Sends a change (or undo, redo, remove) and shows the land's edits as they now are. */
   private async act(action: Parameters<typeof worldEdits>[2] & object, region = this.listRegion, name = region === this.listRegion ? this.listName : this.nameOf(region)): Promise<void> {
     if (this.busy) return;
+    // Tools that work on every floor work on the one we stand on; the rest work on the ground, as before.
+    if ('edit' in action && EDIT_KINDS[action.edit.kind].onFloors) action = { edit: { ...action.edit, level: this.levelIn(region) } };
     this.busy = true;
     this.render('Saving…');
     try {
@@ -271,6 +276,11 @@ export class EditorUi {
     }
     this.busy = false;
     this.render();
+  }
+
+  /** The floor we stand on, in our own land; the ground in the lands drawn around it. */
+  private levelIn(region: string): number {
+    return region === this.options.region().id ? (this.attached?.currentFloor ?? 0) : 0;
   }
 
   /** A land's name, from the ones drawn around us. */
@@ -394,9 +404,9 @@ export class EditorUi {
     if (d.redo !== undefined) return this.act({ redo: true });
     if (d.remove) return this.act({ remove: d.remove });
     if (d.away !== undefined && this.picked) {
-      const { region, at } = this.picked;
+      const { region, at, target } = this.picked;
       this.picked = undefined;
-      return this.act({ edit: { kind: 'move', from: at, to: null } }, region);
+      return this.act({ edit: { kind: 'move', from: at, to: null, ...(target ? { target } : {}) } }, region);
     }
   }
 
@@ -451,7 +461,8 @@ export class EditorUi {
       clear: `<label>Tiles around <input name="radius" type="number" min="1" max="${MAX_CLEAR_RADIUS}" value="${this.radius}" /></label>`,
       spot: `<label>Spot <select name="spot">${option('', 'Take away', !this.spot)}${Object.entries(SPOTS).map(([id, d]) => option(id, `${d.name} (${ITEMS[d.material]?.name ?? d.material})`, id === this.spot)).join('')}</select></label>`,
     };
-    const edits = [...this.log.edits].reverse().map((e) => `<li><span>${escapeHtml(editWords(e))}</span><span class="by">${escapeHtml(e.by)}</span>
+    const unlaid = new Set(this.log.unlaid ?? []);
+    const edits = [...this.log.edits].reverse().map((e) => `<li><span>${escapeHtml(editWords(e))}${unlaid.has(e.id) ? ' <em class="note">(no longer fits)</em>' : ''}</span><span class="by">${escapeHtml(e.by)}</span>
       <button type="button" class="quiet" data-remove="${escapeHtml(e.id)}" aria-label="Take this edit out" title="Take this edit out">×</button></li>`).join('');
     this.box.innerHTML = `
       <h2>World editor <label class="hitbox-toggle"><input type="checkbox" name="hitboxes" ${this.showHitboxes ? 'checked' : ''} /> Hitboxes</label><button type="button" class="close" aria-label="Close">×</button></h2>

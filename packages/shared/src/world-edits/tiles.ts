@@ -1,5 +1,7 @@
-import { Tile, isBlocking, set, type Building, type Landmark, type RegionMap } from '../world.ts';
-import type { TilePoint } from './types.ts';
+import { setOn } from '../floors.ts';
+import { Tile, isBlocking, set, tileAt, type Building, type Landmark, type RegionMap } from '../world.ts';
+import { thingById } from './names.ts';
+import type { EditPlace, TilePoint } from './types.ts';
 
 // Reading a land for the edit kinds: what stands on a tile, which tiles a
 // set piece covers, and which tiles an edit may lay things on.
@@ -15,6 +17,16 @@ export function inside(map: RegionMap, p: unknown): p is TilePoint {
 
 export function tileOf(map: RegionMap, [x, y]: TilePoint): Tile {
   return map.tiles[y * map.width + x] as Tile;
+}
+
+/** The tile on a floor; off every storey a floor above or below is solid. */
+export function tileOn(map: RegionMap, [x, y]: TilePoint, floor = 0): Tile {
+  return floor ? tileAt(map, x, y, floor) : tileOf(map, [x, y]);
+}
+
+/** The floor an edit works on: the ground when it names none. */
+export function floorOf(place: EditPlace): number {
+  return place.level ?? 0;
 }
 
 /** Tiles a move can pick up. */
@@ -46,15 +58,33 @@ export function footprint(l: Landmark): { left: number; top: number; width: numb
   return { left, top: bottom - l.footprint.height + 1, width: l.footprint.width, height: l.footprint.height };
 }
 
-/** The set piece (or piece of furniture) standing on a tile, the one drawn in front first. */
-export function landmarkAt(map: RegionMap, [x, y]: TilePoint): Landmark | undefined {
+/** The set piece (or piece of furniture) standing on a tile of a floor, the one drawn in front first. */
+export function landmarkAt(map: RegionMap, [x, y]: TilePoint, floor = 0): Landmark | undefined {
   for (let i = map.landmarks.length - 1; i >= 0; i--) {
-    // The editor works on the ground; furniture on other floors stays put.
-    if (map.landmarks[i]!.floor) continue;
+    if ((map.landmarks[i]!.floor ?? 0) !== floor) continue;
     const f = footprint(map.landmarks[i]!);
     if (x >= f.left && x < f.left + f.width && y >= f.top && y < f.top + f.height) return map.landmarks[i];
   }
   return undefined;
+}
+
+/** The set piece an edit points at: by name when it gives one, else the one on its tile and floor. */
+export function landmarkFor(map: RegionMap, edit: EditPlace & { at?: TilePoint; from?: TilePoint }): Landmark | undefined {
+  if (edit.target) {
+    const named = thingById(map, edit.target);
+    return named?.kind === 'landmark' ? named.thing : undefined;
+  }
+  const at = edit.at ?? edit.from;
+  return at ? landmarkAt(map, at, floorOf(edit)) : undefined;
+}
+
+/** The building an edit points at: by name when it gives one, else the one over its tile. */
+export function buildingFor(map: RegionMap, edit: EditPlace & { at: TilePoint }): Building | undefined {
+  if (edit.target) {
+    const named = thingById(map, edit.target);
+    return named?.kind === 'building' ? named.thing : undefined;
+  }
+  return buildingAt(map, edit.at);
 }
 
 /** The building whose walls stand over a tile. */
@@ -72,9 +102,12 @@ export function overlaps(a: { x: number; y: number; width: number; height: numbe
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
-/** Puts back what lies under a set piece: open ground, or floor indoors. */
-export function clearUnder(map: RegionMap, f: { left: number; top: number; width: number; height: number }): void {
+/** Puts back what lies under a set piece: open ground, or floor indoors and on every floor off the ground. */
+export function clearUnder(map: RegionMap, f: { left: number; top: number; width: number; height: number }, floor = 0): void {
   for (let y = f.top; y < f.top + f.height; y++) {
-    for (let x = f.left; x < f.left + f.width; x++) set(map, x, y, onFloor(map, x, y) ? Tile.Floor : Tile.Ground);
+    for (let x = f.left; x < f.left + f.width; x++) {
+      if (floor) setOn(map, floor, x, y, Tile.Floor);
+      else set(map, x, y, onFloor(map, x, y) ? Tile.Floor : Tile.Ground);
+    }
   }
 }

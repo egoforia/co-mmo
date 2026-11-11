@@ -102,6 +102,8 @@ export async function kitHouses(token: string, region: string): Promise<building
 export interface EditLog {
   edits: WorldEdit[];
   undone: number;
+  /** Edits that no longer fit the land and were passed over, by id. */
+  unlaid?: string[];
 }
 
 /**

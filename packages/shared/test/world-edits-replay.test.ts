@@ -41,10 +41,13 @@ function everyKind([x, y]: TilePoint): WorldEditDraft[] {
   ];
 }
 
-/** A map's whole shape as one number. */
+/** A map's whole shape as one number; the names things were given later, and the list of edits passed over, are left out. */
 function fingerprint(map: RegionMap): number {
-  const { def: _, tiles, storeys, ...rest } = map;
-  return hashString(JSON.stringify({ tiles: [...tiles], storeys: storeys.map((s) => ({ ...s, tiles: [...s.tiles] })), ...rest }));
+  const unnamed = (list: { id?: string }[]) => list.map(({ id: _, ...t }) => t);
+  const { def: _, tiles, storeys, unlaid: __, ...rest } = map;
+  const named = rest as Record<string, unknown>;
+  for (const key of ['landmarks', 'buildings', 'stairways']) named[key] = unnamed(named[key] as { id?: string }[]);
+  return hashString(JSON.stringify({ tiles: [...tiles], storeys: unnamed(storeys).map((s) => ({ ...s, tiles: [...(s as { tiles: Uint8Array }).tiles] })), ...named }));
 }
 
 const LANDS: RegionDef[] = [...WORLD_REGIONS, ARCH_TESTBED_REGION];
@@ -56,7 +59,8 @@ const EXPECTED: Record<string, number> = {
   desert: 2102079442,
   frostpeak: 712081707,
   'mushroom-hollow': 1416057618,
-  'arch-testbed': 3516164357,
+  // Changed on purpose: the Floors tool now works in the testbed, whose own stairs fail the floor checks (floors.ts, buildFloors).
+  'arch-testbed': 1502972504,
 };
 
 describe('world edits replay', () => {

@@ -14,6 +14,7 @@ export type KeyAction =
   | { home: true }
   | { zoom: 1 | -1 }
   | { escape: true }
+  | { bookmark: true }
   | { undo: true }
   | { redo: true };
 
@@ -23,6 +24,7 @@ export function keyAction(event: KeyboardEvent, core: EditorCore, lastTool: Part
   const ctrl = event.ctrlKey || event.metaKey;
   const plain = !(ctrl || event.altKey);
   if ((key === 'k' && ctrl) || (key === '/' && plain)) return { find: true };
+  if (key === 'd' && ctrl) return { bookmark: true };
   // What is picked: M moves it, Ctrl C copies it, Delete takes it away.
   if (core.hasPick()) {
     if (key === 'delete' || key === 'backspace') return { pick: 'remove' };

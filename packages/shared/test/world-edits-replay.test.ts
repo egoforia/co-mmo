@@ -61,8 +61,8 @@ const EXPECTED: Record<string, number> = {
   desert: 2102079442,
   frostpeak: 712081707,
   'mushroom-hollow': 1416057618,
-  // Changed on purpose: the Floors tool now works in the testbed, whose own stairs fail the floor checks (floors.ts, buildFloors).
-  'arch-testbed': 1502972504,
+  // Changed on purpose: the testbed's own stairs (bay 6) now stand on open floor at both ends, so it passes the floor checks.
+  'arch-testbed': 2199300130,
 };
 
 describe('world edits replay', () => {

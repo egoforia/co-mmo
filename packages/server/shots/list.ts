@@ -195,6 +195,22 @@ export const SHOTS: Shot[] = [
     mustSee: ['an open terrace a floor up, its low parapet along the rim', 'the cliff skirt below the rim down to the ground'],
   },
   {
+    name: 'testbed-outdoor-stairs',
+    about: "The testbed's bookmark G6-A: outdoor stairs from the ground up onto a small terrace, the terrace reaching over the stairs' top.",
+    region: 'arch-testbed',
+    at: bookmark('G6-A'),
+    hideUi: true,
+    mustSee: ['stairs climbing north from the ground onto the terrace', 'the terrace floor meeting the top of the stairs with no gap'],
+  },
+  {
+    name: 'testbed-terrace-stairs',
+    about: "The testbed's bookmark G6-E: stairs from the first-floor terrace up to the second-floor terrace above it.",
+    region: 'arch-testbed',
+    at: bookmark('G6-E'),
+    hideUi: true,
+    mustSee: ['the stairs between the two terraces', 'both terraces drawn whole, nothing floating'],
+  },
+  {
     name: 'editor-testbed',
     about: 'The world editor open in the Architectural Testbed, beside the mini map.',
     region: 'arch-testbed',

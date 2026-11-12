@@ -6,6 +6,8 @@ import { ARCH_TESTBED_REGION, Tile, WORLD_REGIONS, generateRegion, landChecks, t
 describe('land checks', () => {
   it('finds nothing wrong in the lands players start in', () => {
     for (const def of WORLD_REGIONS) expect(landChecks(generateRegion(def)), def.id).toEqual({ shapes: [], walks: [] });
+    // The testbed too: every stair stands on open floor at both ends, and everyone can be walked to.
+    expect(landChecks(generateRegion(ARCH_TESTBED_REGION))).toEqual({ shapes: [], walks: [] });
   });
 
   it('finds a person shut away by walls, and nothing wrong once they are let out', () => {

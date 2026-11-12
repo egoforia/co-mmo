@@ -96,8 +96,8 @@ describe('arch-testbed: architectural clean-room proving ground', () => {
     expect(bridgeSpan).toBeDefined();
     expect(bridgeSpan!.open).toBe(true);
 
-    // Fixture E: Terrace stairs (Floor 1 to Floor 2)
-    expect(map.stairways.some((s) => s.x === 144 && s.y === 156 && s.lower === 1 && s.upper === 2)).toBe(true);
+    // Fixture E: Terrace stairs (Floor 1 to Floor 2), up through the upper terrace so both floors are open under them.
+    expect(map.stairways.some((s) => s.x === 144 && s.y === 158 && s.lower === 1 && s.upper === 2)).toBe(true);
   });
 
   it('defines valid test waypoints for all 25 architectural combinations', () => {

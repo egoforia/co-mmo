@@ -3,7 +3,7 @@ import { MAX_FLOORS, Tile, floorName, isBlocking, tileAt, type Bookmark, type Ou
 import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
-import { EditorCore, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
+import { EditorCore, draftsHtml, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
 
 // The world editor's window beside the game, for the Owner and Stewards,
 // used by pointing at the world. The tools, their settings and what they
@@ -46,6 +46,8 @@ export class EditorUi {
   private floor?: number;
   /** Whether the bookmarks list is unfolded, kept as the window is drawn again. */
   private marksOpen = false;
+  /** New edits go live at once instead of waiting as drafts. */
+  private live = false;
 
   constructor(private readonly options: EditorOptions) {
     this.box.addEventListener('click', (event) => void this.clicked(event));
@@ -79,6 +81,7 @@ export class EditorUi {
       this.outline?.clear();
       this.hitboxGraphics?.clear();
       this.attached?.viewFloor(undefined);
+      this.attached?.previewEdits(this.listRegion);
       return;
     }
     this.attach();
@@ -89,6 +92,7 @@ export class EditorUi {
 
   /** Shows the edits of the land we are in. */
   private follow(): void {
+    if (this.listRegion) this.attached?.previewEdits(this.listRegion);
     ({ id: this.listRegion, name: this.listName } = this.options.region());
   }
 
@@ -102,10 +106,16 @@ export class EditorUi {
   private async reload(): Promise<void> {
     try {
       this.log = await worldEdits(this.options.token, this.listRegion);
+      this.showDrafts();
     } catch (err) {
       this.status = (err as Error).message;
     }
     this.render();
+  }
+
+  /** The scene shows the listed land's drafts while the editor is open. */
+  private showDrafts(): void {
+    this.attached?.previewEdits(this.listRegion, this.open ? this.log.edits : undefined);
   }
 
   /** Listens to the pointer over the world, once the scene is running. */
@@ -143,8 +153,8 @@ export class EditorUi {
 
   /** Does what a tool asks: says something, or sends the edit it made. */
   private async step(step: ToolStep): Promise<void> {
-    if (step.drafts) await this.act({ edits: step.drafts }, step.region);
-    else if (step.draft) await this.act({ edit: step.draft }, step.region);
+    if (step.drafts) await this.act({ edits: step.drafts, live: this.live }, step.region);
+    else if (step.draft) await this.act({ edit: step.draft, live: this.live }, step.region);
     else if (step.say !== undefined) this.render(step.say);
     else if (this.core.holding()) this.render();
   }
@@ -155,10 +165,14 @@ export class EditorUi {
     this.busy = true;
     this.render('Saving…');
     try {
+      if (region !== this.listRegion) this.attached?.previewEdits(this.listRegion);
       this.log = await worldEdits(this.options.token, region, action);
       this.listRegion = region;
       this.listName = name;
-      this.status = 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.' : 'Done. Everyone here sees it now.';
+      this.showDrafts();
+      this.status = 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.'
+        : 'publish' in action ? 'Published. Everyone here sees it now.' : 'discard' in action ? 'Drafts thrown away. Redo brings them back.'
+        : this.live ? 'Done. Everyone here sees it now.' : 'Drafted. Only editors see it until you publish.';
     } catch (err) {
       this.status = (err as Error).message;
     }
@@ -244,6 +258,8 @@ export class EditorUi {
     if (d.undo !== undefined) return this.act({ undo: true });
     if (d.redo !== undefined) return this.act({ redo: true });
     if (d.remove) return this.act({ remove: d.remove });
+    if (d.publish !== undefined) return this.act({ publish: true });
+    if (d.discard !== undefined) return this.act({ discard: true });
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.listRegion)));
     if (d.pick) return this.step(this.core.pickAction(d.pick));
     if (d.go !== undefined) {
@@ -261,6 +277,7 @@ export class EditorUi {
       this.showHitboxes = input.checked;
       this.drawHitboxes();
     } else if (input.name === 'view-floor') this.chooseFloor(input.value);
+    else if (input.name === 'live') this.live = input.checked;
     else this.core.set(input.name, input.value, input.checked);
     // Hand the keys back to walking.
     input.blur();
@@ -279,6 +296,7 @@ export class EditorUi {
       <p class="status" aria-live="polite">${escapeHtml(this.status)}</p>
       <h3>Edits in ${escapeHtml(this.listName)}
         ${historyHtml(this.log, this.busy)}</h3>
+      ${draftsHtml(this.log, this.live, this.busy)}
       ${editListHtml(this.log)}
       ${this.bookmarksHtml()}`;
     this.drawHitboxes();

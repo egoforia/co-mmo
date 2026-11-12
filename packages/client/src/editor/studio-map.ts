@@ -2,7 +2,7 @@ import { MAX_FLOORS, Tile, isBlocking, tileAt, type Outline, type RegionMap, typ
 import { loadToken } from '../api.ts';
 import { artState, esc, usd } from '../art-ui/state.ts';
 import { landsCard, layFile, makeLand, saveEdits } from './studio-lands.ts';
-import { EditorCore, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
+import { EditorCore, draftsHtml, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
 
 // The world editor's second view: the Art Studio's map of a whole land
 // (Map Preview & Editor), seen from above, any floor, zoomed in or out, with
@@ -54,6 +54,8 @@ const state = {
   /** Which part of the map the scroll box shows, as the fraction across and down of its middle. */
   view: { x: 0.5, y: 0.5 },
   layers: { showHitboxes: false, showSpots: true, showSpawns: true },
+  /** New edits go live at once instead of waiting as drafts. */
+  live: false,
   hover: null as TilePoint | null,
   status: 'Click any tile on the map to look at it or edit it.',
   data: null as RegionInspectPayload | null,
@@ -157,6 +159,7 @@ export function mapEditorPage(): string {
         </section>
         <section class="studio-card map-history-card">
           <div class="studio-split-header"><h3>Edits in ${esc(d.map.def.name)} (${d.edits.length})</h3>${historyHtml(d)}</div>
+          ${draftsHtml(d, state.live)}
           <div class="map-edits-list">${editListHtml({ ...d, unlaid: d.map.unlaid })}</div>
         </section>
         ${landsCard(d.workshopBiomes ?? [])}
@@ -272,8 +275,8 @@ function wire(canvas: HTMLCanvasElement): void {
 
 /** Does what a tool asks: says something, or sends the edit it made. */
 async function step(s: ToolStep): Promise<void> {
-  if (s.drafts) return send({ edits: s.drafts });
-  if (s.draft) return send({ edit: s.draft });
+  if (s.drafts) return send({ edits: s.drafts, live: state.live });
+  if (s.draft) return send({ edit: s.draft, live: state.live });
   if (s.say !== undefined) {
     state.status = s.say;
     artState.ctx.rerender();
@@ -282,12 +285,13 @@ async function step(s: ToolStep): Promise<void> {
 
 async function send(action: Record<string, unknown>): Promise<void> {
   try {
-    await mapApi('/api/world-edits' + ('undo' in action ? '/undo' : 'redo' in action ? '/redo' : 'remove' in action ? '/remove' : ''), 'POST', {
-      region: state.regionId,
-      ...('edit' in action ? { edit: action.edit } : 'edits' in action ? { edits: action.edits } : 'remove' in action ? { id: action.remove } : {}),
-    });
+    const path = 'edit' in action || 'edits' in action ? '' : `/${Object.keys(action)[0]}`;
+    const body = 'remove' in action ? { id: action.remove } : 'edit' in action || 'edits' in action ? action : {};
+    await mapApi('/api/world-edits' + path, 'POST', { region: state.regionId, ...body });
     await loadMapEditorData(state.regionId);
-    state.status = 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.' : 'Done. Everyone in this land sees it now.';
+    state.status = 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.'
+      : 'publish' in action ? 'Published. Everyone in this land sees it now.' : 'discard' in action ? 'Drafts thrown away. Redo brings them back.'
+      : state.live ? 'Done. Everyone in this land sees it now.' : 'Drafted. Only editors see it until you publish.';
   } catch (err) {
     state.status = (err as Error).message;
   }
@@ -312,6 +316,8 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
   else if (d.undo !== undefined) return void send({ undo: true }), true;
   else if (d.redo !== undefined) return void send({ redo: true }), true;
   else if (d.remove) return void send({ remove: d.remove }), true;
+  else if (d.publish !== undefined) return void send({ publish: true }), true;
+  else if (d.discard !== undefined) return void send({ discard: true }), true;
   else if (d.mapAiDiscard !== undefined) state.ai = { ...state.ai, summary: '', steps: [] };
   else if (d.mapAiApply !== undefined) return applyAi(t), true;
   else if (d.mapExport !== undefined) return void saveEdits(state.regionId).catch((err: Error) => artState.ctx.toast(err.message)), true;
@@ -324,7 +330,7 @@ function applyAi(t: HTMLButtonElement): void {
   const drafts = state.ai.steps.filter((s) => s.checked && s.valid).map((s) => s.draft);
   if (!drafts.length) return;
   t.disabled = true;
-  void mapApi<{ applied: number }>('/api/world-edits/ai-apply', 'POST', { region: state.regionId, drafts })
+  void mapApi<{ applied: number }>('/api/world-edits/ai-apply', 'POST', { region: state.regionId, drafts, live: state.live })
     .then(async (res) => {
       state.ai = { ...state.ai, summary: '', steps: [] };
       await loadMapEditorData(state.regionId);
@@ -343,6 +349,10 @@ export function handleMapEditorChange(target: HTMLElement): boolean {
   const input = target as HTMLInputElement;
   if (input.dataset.mapRegion !== undefined) {
     void loadMapEditorData(input.value).then(() => artState.ctx.rerender());
+    return true;
+  }
+  if (input.name === 'live') {
+    state.live = input.checked;
     return true;
   }
   if (input.dataset.mapLayer) {

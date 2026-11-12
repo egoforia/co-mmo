@@ -1,7 +1,8 @@
 // The world editor's new tools, in a real browser: the Owner makes a blank
 // workshop land and builds the testbed's terrace bay (Bay 2) on it from
 // nothing with the in-game editor (three open terraces stepping up, and a
-// bookmark to look from), looks at each floor with the floor picker, picks a
+// bookmark to look from), as drafts only it sees until it publishes them,
+// looks at each floor with the floor picker, picks a
 // terrace with Select and takes it away and back, and goes to the bookmark.
 // The terraces must come out the same as the testbed's. Screenshots land in
 // playtest-results/.
@@ -84,6 +85,8 @@ describe('the world editor in a workshop land', () => {
     await page.waitForTimeout(1500);
     await page.click('#edit-world-button');
     await page.waitForSelector('#editor:not([hidden]) .tools');
+    // Let the land settle (the editor reads its edits) before pointing at it.
+    await page.waitForTimeout(1500);
 
     /** Turns the camera so these tiles' middle (on the floor shown) sits left of the editor's window, clear of the chat and the bars. */
     const aim = async (a: [number, number], b: [number, number]) => {
@@ -116,11 +119,21 @@ describe('the world editor in a workshop land', () => {
     await terrace(2, [102, 40], [109, 45]);
     await terrace(4, [118, 40], [123, 45]);
 
+    // Drafts: the editor shows them, players do not see them yet.
+    const seen = () => page.evaluate(() => (window as unknown as { scene: { currentMap: { storeys: unknown[] } } }).scene.currentMap.storeys.length);
+    await expect.poll(seen, { timeout: 10_000 }).toBe(3);
+    expect(land().storeys).toHaveLength(0);
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: resolve(shots, 'workshop-drafts.png') });
+    await page.click('#editor [data-publish]');
+    await expect.poll(() => land().storeys.length, { timeout: 10_000 }).toBe(3);
+
     // The bay matches the testbed's, terrace for terrace.
     const testbed = generateRegion(ARCH_TESTBED_REGION).storeys.filter((s) => s.y === 40 && s.x >= 100 && s.x < 130);
     expect(land().storeys.map(shape)).toEqual(testbed.map(shape));
 
-    // Select the summit, take it away, and take that back.
+    // Select the summit, take it away, and take that back: made live at once this time.
+    await page.check('#editor input[name="live"]');
     await page.click('#editor [data-tool="select"]');
     await aim([120, 42], [120, 42]);
     await clickTile(page, 120, 42);

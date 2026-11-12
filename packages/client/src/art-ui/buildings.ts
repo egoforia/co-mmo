@@ -83,7 +83,7 @@ export function footprintSubmit(form: HTMLFormElement): boolean {
   const at = form.dataset.at!.split(',').map(Number) as [number, number];
   const token = loadToken();
   if (!token) return artState.ctx.toast('Sign in again to change the world.'), true;
-  void worldEdits(token, form.dataset.region!, { edit: { kind: 'footprint', at, footprint } }).then(
+  void worldEdits(token, form.dataset.region!, { edit: { kind: 'footprint', at, footprint }, live: true }).then(
     () => { artState.ctx.toast('Saved. Players see it at once.'); artState.ctx.rerender(); },
     (err: Error) => artState.ctx.toast(err.message),
   );

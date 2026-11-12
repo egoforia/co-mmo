@@ -144,7 +144,8 @@ export class World {
 
   /** Sets a region up wherever the hosting says, with what was wished into it; split into cells when asked. */
   private makeRegion(def: RegionDef, count = 1): RegionHandle {
-    const edits = this.edits(def.id);
+    // Drafts stay in the editor (world-editor.ts) until published.
+    const edits = this.edits(def.id).filter((e) => !e.draft);
     if (edits.length) def.edits = edits;
     else delete def.edits;
     const placements = this.placements.get(def.id) ?? [];

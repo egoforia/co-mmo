@@ -74,6 +74,8 @@ describe('floors', () => {
     // The Floors tool, clicked on the shop we stand in.
     await page.click('#edit-world-button');
     await page.waitForSelector('#editor:not([hidden]) .tools');
+    // These changes are for everyone at once, not drafts.
+    await page.check('#editor input[name="live"]');
     await page.click('#editor [data-tool="floors"]');
     await page.selectOption('#editor select[name="up"]', '1');
     await page.selectOption('#editor select[name="down"]', '1');

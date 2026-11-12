@@ -75,6 +75,8 @@ export interface EditStamp {
   made: number;
   /** Edits made together (a move, a paste) share a group, and undo, redo and take out treat them as one. */
   group?: string;
+  /** Not published yet: seen and changed only in the editor, laid for players once published. */
+  draft?: boolean;
 }
 
 /** One saved change to a land; a spawn also keeps its monster's name and picture. */

@@ -81,6 +81,8 @@ describe('the world editor', () => {
 
     await page.click('#edit-world-button');
     await page.waitForSelector('#editor:not([hidden]) .tools');
+    // These changes are for everyone at once, not drafts.
+    await page.check('#editor input[name="live"]');
 
     // Plant a tree three tiles south (east of us is under the editor's window).
     await page.click('#editor [data-tool="paint"]');
@@ -97,24 +99,24 @@ describe('the world editor', () => {
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(0);
     expect.soft(tile(spot.x, spot.y + 3), 'the tree is gone again').toBe(Tile.Ground);
 
-    // A road east, and a small house at its end.
+    // A road west (east of us is under the editor's window), and a small house at its end.
     await page.click('#editor [data-tool="road"]');
-    await clickTile(1, 1);
-    await clickTile(7, 1);
+    await clickTile(-1, 1);
+    await clickTile(-7, 1);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
     await page.click('#editor [data-tool="house"]');
     await page.selectOption('#editor select[name="size"]', '0');
-    await clickTile(8, 1);
+    await clickTile(-8, 1);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(2);
     const house = app!.world.home.map.buildings.at(-1)!;
-    expect.soft(house.door, 'the doorway is on the road\'s end').toEqual({ x: spot.x + 8, y: spot.y });
-    expect.soft(tile(spot.x + 2, spot.y + 1), 'the road').toBe(Tile.Path);
+    expect.soft(house.door, 'the doorway is on the road\'s end').toEqual({ x: spot.x - 8, y: spot.y });
+    expect.soft(tile(spot.x - 2, spot.y + 1), 'the road').toBe(Tile.Path);
 
-    // Monsters to the west.
+    // Monsters to the south.
     await page.click('#editor [data-tool="spawn"]');
     await page.selectOption('#editor select[name="creature"]', 'lantern-moth');
     const before = app!.world.home.creatureIds().length;
-    await clickTile(-5, 2);
+    await clickTile(2, 5);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(3);
     expect.soft(app!.world.home.creatureIds().length, 'four more monsters').toBe(before + 4);
     await page.waitForTimeout(1500);

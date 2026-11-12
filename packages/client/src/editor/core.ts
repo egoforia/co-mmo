@@ -323,10 +323,10 @@ export function describe(map: RegionMap, at: TilePoint, level = 0): string {
   return `${words[0]!.toUpperCase()}${words.slice(1)}${name ? ` of ${name}` : ''}`;
 }
 
-/** A land's edits, newest first, each with a button to take it out (`data-remove`). */
+/** A land's edits, newest first, drafts marked, each with a button to take it out (`data-remove`). */
 export function editListHtml(list: EditList): string {
   const unlaid = new Set(list.unlaid ?? []);
-  const items = [...list.edits].reverse().map((e) => `<li><span>${escapeHtml(editWords(e))}${unlaid.has(e.id) ? ' <em class="note">(no longer fits)</em>' : ''}</span><span class="by">${escapeHtml(e.by)}</span>
+  const items = [...list.edits].reverse().map((e) => `<li${e.draft ? ' class="draft"' : ''}><span>${escapeHtml(editWords(e))}${e.draft ? ' <em class="note">(draft)</em>' : ''}${unlaid.has(e.id) ? ' <em class="note">(no longer fits)</em>' : ''}</span><span class="by">${escapeHtml(e.by)}</span>
       <button type="button" class="quiet" data-remove="${escapeHtml(e.id)}" aria-label="Take this edit out" title="Take this edit out">×</button></li>`);
   return `<ol class="edits">${items.join('') || '<li class="note">No edits here yet.</li>'}</ol>`;
 }
@@ -335,6 +335,21 @@ export function editListHtml(list: EditList): string {
 export function historyHtml(list: EditList, busy = false): string {
   return `<span><button type="button" class="quiet" data-undo ${list.edits.length && !busy ? '' : 'disabled'}>Undo</button>
       <button type="button" class="quiet" data-redo ${list.undone && !busy ? '' : 'disabled'}>Redo</button></span>`;
+}
+
+/**
+ * Drafts and publishing: whether new edits go live at once (`name="live"`),
+ * and, while there are drafts, Publish (`data-publish`) and Throw away (`data-discard`).
+ */
+export function draftsHtml(list: EditList, live: boolean, busy = false): string {
+  const drafts = list.edits.filter((e) => e.draft).length;
+  const off = busy ? ' disabled' : '';
+  const buttons = drafts
+    ? `<span class="note">${drafts} draft${drafts === 1 ? '' : 's'}: only editors see ${drafts === 1 ? 'it' : 'them'}.</span>
+      <button type="button" data-publish${off}>Publish for everyone</button>
+      <button type="button" class="quiet" data-discard${off}>Throw drafts away</button>`
+    : '';
+  return `<div class="drafts"><label class="check"><input type="checkbox" name="live"${live ? ' checked' : ''} /> Make changes live at once</label>${buttons}</div>`;
 }
 
 /** The tool buttons (`data-tool`), the chosen one standing out. */

@@ -44,7 +44,11 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number): Picked | u
   const person = map.npcs.find((n) => (n.floor ?? 0) === level && Math.floor(n.x) === x && Math.floor(n.y) === y);
   if (person) return { kind: 'person', id: person.id, name: person.name, level, box: tile(x, y), details: ['Where they start the day.'] };
   const monster = map.creatures.find((c) => (c.floor ?? 0) === level && Math.floor(c.x) === x && Math.floor(c.y) === y);
-  if (monster) return { kind: 'monster', name: `${monster.name}’s home`, level, box: tile(x, y), details: ['It comes back here after it falls.'] };
+  if (monster) {
+    const spawn = monster.spawn ? map.creatures.filter((c) => c.spawn === monster.spawn).length : 1;
+    const ways = [monster.level ? `Level ${monster.level}` : '', monster.behavior ? `ways: ${monster.behavior}` : '', monster.active ? `about: ${monster.active}` : '', monster.route ? `a patrol path of ${monster.route.length} corners` : ''].filter(Boolean);
+    return { kind: 'monster', name: `${monster.name}’s home`, level, box: tile(x, y), details: ['It comes back here after it falls.', ...(spawn > 1 ? [`One of a spawn of ${spawn}: taking it away takes them all.`] : []), ...(ways.length ? [ways.join(', ')] : [])] };
+  }
   const piece = landmarkAt(map, at, level);
   if (piece) {
     const f = footprint(piece);
@@ -125,7 +129,8 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
     }
     case 'monster': {
       const c = map.creatures.find((m) => (m.floor ?? 0) === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
-      return c && { kind: 'spawn', creature: c.kind, at: to, count: 1, ...(p.level ? { level: p.level } : {}) };
+      // Its level, ways and hours come too; a patrol path stays where it was drawn.
+      return c && { kind: 'spawn', creature: c.kind, at: to, count: 1, ...(p.level ? { level: p.level } : {}), ...(c.level ? { monsterLevel: c.level } : {}), ...(c.behavior && c.behavior !== 'patrol' ? { behavior: c.behavior } : {}), ...(c.active ? { active: c.active } : {}) };
     }
     case 'person': {
       // Someone new, the same in every way but their name on the land.

@@ -136,6 +136,25 @@ describe('the world editor', () => {
     expect(homes.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('makes a spawn\'s live monsters at the level, ways and patrol path the editor gave them', async () => {
+    const { base, store } = await start();
+    const owner = account(store, 'Ego', 'owner');
+    const spot = openGround(app!.world.region('woods')!.map);
+    await api(base, '/api/world-edits', owner.token, 'POST', { region: 'woods', live: true, edit: { kind: 'spawn', creature: 'thorn-wolf', at: spot, count: 1, monsterLevel: 9, behavior: 'guard', active: 'always' } });
+    const [made] = app!.world.region('woods')!.map.creatures.filter((c) => c.level === 9);
+    expect(made).toBeTruthy();
+    const live = () => app!.world.local('woods')!.allCreatures().find((c) => c.kind === 'thorn-wolf' && c.def.level === 9);
+    expect(live()!.def).toMatchObject({ level: 9, behavior: 'guard', active: 'always' });
+    // A patrol path from its home (the first of a spawn stands on its spot, in open ground), walked as drawn.
+    const home: [number, number] = [Math.floor(made!.x), Math.floor(made!.y)];
+    expect(home).toEqual(spot);
+    const route = [[home[0] + 2, home[1]], [home[0] + 2, home[1] + 2], [home[0], home[1] + 2]];
+    const drawn = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'woods', live: true, edit: { kind: 'patrol', at: home, route } });
+    expect(drawn.body.message).toBeUndefined();
+    expect(live()!.def.behavior).toBe('patrol');
+    expect(live()!.route).toEqual(route.map(([x, y]) => ({ x: x! + 0.5, y: y! + 0.5 })));
+  });
+
   it('keeps edits across a restart', async () => {
     const store = Store.memory();
     const first = await start({ store });

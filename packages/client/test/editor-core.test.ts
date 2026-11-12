@@ -137,4 +137,18 @@ describe('the editor core', () => {
     expect(change).toMatchObject({ kind: 'person', target: 'sister-amala', name: 'Sister Amala', look: amala.asset, shop: { teaches: [{ ability: 'mend' }] } });
     expect(checkEdit(map, change, CREATURES)).toBeUndefined();
   });
+
+  it('draws a patrol path from a monster\'s home with a drag, and lays a spawn at another level', () => {
+    const core = new EditorCore();
+    const home = map.creatures[0]!;
+    const at: TilePoint = [Math.floor(home.x), Math.floor(home.y)];
+    core.choose('patrol');
+    core.press('sanctum', map, at, 0);
+    for (let x = 1; x <= 6; x++) core.drag('sanctum', map, [at[0] + x, at[1]]);
+    expect(core.release().draft).toEqual({ kind: 'patrol', at, route: [[at[0] + 1, at[1]], [at[0] + 4, at[1]], [at[0] + 6, at[1]]], level: 0 });
+    core.choose('spawn');
+    core.set('monsterLevel', '7');
+    core.set('behavior', 'chase');
+    expect(core.press('sanctum', map, [30, 30], 0).draft).toMatchObject({ kind: 'spawn', monsterLevel: 7, behavior: 'chase', level: 0 });
+  });
 });

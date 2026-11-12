@@ -9,6 +9,7 @@ import ARCH_TESTBED_EDITS from './testbed/arch-testbed.edits.json';
 import type { BuildingSpec } from './building-kit/spec.ts';
 import type { Stairway, Storey } from './floors.ts';
 import type { ShopDef } from './kit.ts';
+import type { CreatureTune } from './creature-tune.ts';
 import type { Routine } from './routines.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -199,7 +200,8 @@ export interface NpcPlacement {
   routine?: Partial<Routine>;
 }
 
-export interface CreatureSpawn {
+/** A monster's home; the world editor may change its level, ways and hours, and give it a patrol path (creature-tune.ts). */
+export interface CreatureSpawn extends CreatureTune {
   kind: string;
   name: string;
   asset: string;
@@ -207,6 +209,8 @@ export interface CreatureSpawn {
   y: number;
   /** The floor it lives on (floors.ts), when not the ground. */
   floor?: number;
+  /** The edit whose spawn it belongs to, so the editor changes and takes away the spawn as one. */
+  spawn?: string;
 }
 
 /**

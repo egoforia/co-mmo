@@ -1,5 +1,7 @@
 import {
   CREATURES,
+  tunedCreature,
+  type CreatureTune,
   energyPerSecond,
   maxEnergy,
   TICK_RATE,
@@ -278,7 +280,7 @@ export class Region {
     this.minds.logger = this.logger;
     this.kit = new Kit(this.s);
     this.talk = new Chat(this.s);
-    this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor) : []));
+    this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor, c) : []));
     spreadHomes(this.map, this.s.creatures);
     this.s.townsfolk = this.map.npcs.filter((n) => this.inCell(n.x)).map((n) => makeTownsperson(n, this.map, this.random));
     this.trades = new TradeDesk({
@@ -309,9 +311,13 @@ export class Region {
     return !this.cell || (x >= this.cell.x0 && x < this.cell.x1);
   }
 
-  private makeCreature(id: string, kind: string, x: number, y: number, floor = 0): Creature[] {
+  /** A live monster of a kind at its home, as the world editor tuned its spawn (level, ways, hours, patrol path) when it did. */
+  private makeCreature(id: string, kind: string, x: number, y: number, floor = 0, tune?: CreatureTune): Creature[] {
     const cdef = CREATURES[kind];
-    return cdef ? [makeCreature(id, kind, cdef, x, y, this.random, floor)] : [];
+    if (!cdef) return [];
+    const c = makeCreature(id, kind, tunedCreature(cdef, tune), x, y, this.random, floor);
+    if (tune?.route?.length) c.route = tune.route.map((s) => ({ ...s }));
+    return [c];
   }
 
   /** How the sky turns over this land. */

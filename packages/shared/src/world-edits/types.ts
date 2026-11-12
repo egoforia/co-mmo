@@ -5,6 +5,7 @@
 import type { BuildingSpec } from '../building-kit/spec.ts';
 import type { ShopDef } from '../kit.ts';
 import type { Routine } from '../routines.ts';
+import type { MonsterWays } from './kinds/monster-ways.ts';
 
 /** A tile position, x east and y south, from the land's top-left corner. */
 export type TilePoint = [x: number, y: number];
@@ -41,7 +42,11 @@ export type WorldEditDraft = EditPlace & (
   /** A walled house: its walls' top-left corner, its floor inside them, and its look (a key of BUILDING_STYLES). */
   | { kind: 'house'; at: TilePoint; floor: [width: number, height: number]; style: string }
   /** Monsters of a kind that live around a spot, and come back there after they fall. */
-  | { kind: 'spawn'; creature: string; at: TilePoint; count: number }
+  | ({ kind: 'spawn'; creature: string; at: TilePoint; count: number } & Partial<MonsterWays>)
+  /** Changes the level, ways and hours of every monster of the spawn whose home is on `at` (0 and 'own' put back the kind's). */
+  | ({ kind: 'monsters'; at: TilePoint } & Partial<MonsterWays>)
+  /** A patrol path (tiles, in order) for every monster of the spawn whose home is on `at`; they walk it round and round. */
+  | { kind: 'patrol'; at: TilePoint; route: TilePoint[] }
   /** Sends away every monster living within `radius` tiles of a spot. */
   | { kind: 'clear'; at: TilePoint; radius: number }
   /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */

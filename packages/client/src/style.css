@@ -521,6 +521,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .tools { display: flex; flex-wrap: wrap; gap: 4px; }
 #editor .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 #editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }
+#editor .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
 #editor .edits { list-style: none; margin: 0; padding: 0; }
 #editor .edits li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--edge); }
 #editor .edits .by { color: var(--muted); font-size: 11px; }

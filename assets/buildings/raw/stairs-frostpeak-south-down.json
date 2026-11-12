@@ -1,0 +1,11 @@
+{
+  "id": "stairs-frostpeak-south-down",
+  "kind": "prop",
+  "heading": "south",
+  "direction": "down",
+  "biome": "frostpeak",
+  "name": "SOUTH Descending stairs (frostpeak)",
+  "file": "art/stairs-frostpeak-south-down.png",
+  "width": 256,
+  "height": 256
+}

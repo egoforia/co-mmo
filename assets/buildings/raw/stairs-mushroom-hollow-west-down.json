@@ -1,0 +1,11 @@
+{
+  "id": "stairs-mushroom-hollow-west-down",
+  "kind": "prop",
+  "heading": "west",
+  "direction": "down",
+  "biome": "mushroom-hollow",
+  "name": "WEST Descending stairs (mushroom-hollow)",
+  "file": "art/stairs-mushroom-hollow-west-down.png",
+  "width": 256,
+  "height": 256
+}

@@ -57,6 +57,8 @@ export interface Stairway extends TileRect {
   /** Where you step off on the lower floor and on the upper one: beside it, never on it. */
   bottom: { x: number; y: number };
   top: { x: number; y: number };
+  /** The cardinal direction a player walks to climb up from lower to upper floor. */
+  climbs?: Heading;
   /** Its pictures' ids: going up, drawn on the lower floor, and going down, on the upper; a label says where it goes until they are painted. */
   art?: { up?: string; down?: string };
   /** What the floors it joins are called there (the sea cave's "Smugglers' Loft"), for its label and what players are told. */
@@ -206,6 +208,20 @@ export function addStairs(map: RegionMap, plan: StairPlan): Stairway {
   const way: Stairway = { kind, x, y, width, height, lower, upper, bottom, top, ...(art ? { art } : {}), ...(names ? { names } : {}) };
   map.stairways.push(way);
   return way;
+}
+
+/**
+ * Resolves the heading a stairway climbs (direction walked going from lower to upper floor).
+ * Uses explicit `s.climbs` if set, or falls back to vector from `bottom` to `top` landing.
+ */
+export function stairHeading(s: Stairway): Heading {
+  if (s.climbs) return s.climbs;
+  const dx = s.top.x - s.bottom.x;
+  const dy = s.top.y - s.bottom.y;
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    return dy < 0 ? 'north' : 'south';
+  }
+  return dx > 0 ? 'east' : 'west';
 }
 
 /** The first open tile beside a rectangle on a floor, not on other stairs: on the side wanted, else any other. */

@@ -486,11 +486,44 @@
     "height": 284,
     "view": "isometric"
   },
+  "frostpeak-eyrie-furniture-beacon-brazier": {
+    "file": "art/frostpeak-eyrie-furniture-beacon-brazier.png",
+    "kind": "furniture",
+    "width": 200,
+    "height": 424,
+    "provider": "subagent-free",
+    "model": "ide-image-generator",
+    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the mountain beacon brazier inside The Eyrie of the First Watch: a monumental carved white marble and silver pillar beacon burning with a tall wind-defying golden-amber and pale blue mountain fire.",
+    "createdAt": "2026-11-09T16:11:44.999Z",
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-falcon-frieze": {
+    "file": "art/frostpeak-eyrie-furniture-falcon-frieze.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 352,
+    "provider": "subagent-free",
+    "model": "ide-image-generator",
+    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the carved falcon relief frieze inside The Eyrie of the First Watch: a cyclopean white marble and dark slate cliff wall relief panel carved with geometric outspread falcon wings and silver First Watch runes.",
+    "createdAt": "2026-11-09T16:11:44.999Z",
+    "view": "isometric"
+  },
   "frostpeak-eyrie-furniture-falcon-perch": {
     "file": "art/frostpeak-eyrie-furniture-falcon-perch.png",
     "kind": "furniture",
     "width": 200,
     "height": 280,
+    "view": "isometric"
+  },
+  "frostpeak-eyrie-furniture-ice-cascade": {
+    "file": "art/frostpeak-eyrie-furniture-ice-cascade.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 268,
+    "provider": "subagent-free",
+    "model": "ide-image-generator",
+    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the frozen waterfall cascade inside The Eyrie of the First Watch: a frozen alpine waterfall of faceted pale-blue glacier ice and white rime cascading down rough grey mountain slate rock.",
+    "createdAt": "2026-11-09T16:11:44.999Z",
     "view": "isometric"
   },
   "frostpeak-eyrie-furniture-silver-brazier": {
@@ -624,6 +657,17 @@
     "kind": "tile",
     "width": 128,
     "height": 128
+  },
+  "frostpeak-whiteledge-house-furniture-cantilever-deck": {
+    "file": "art/frostpeak-whiteledge-house-furniture-cantilever-deck.png",
+    "kind": "furniture",
+    "width": 240,
+    "height": 244,
+    "provider": "subagent-free",
+    "model": "ide-image-generator",
+    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the cantilevered timber deck inside Whiteledge Terrace House: a cantilevered mountain cedar plank lookout platform with heavy diagonal pine support struts and cold-forged silver-iron brackets.",
+    "createdAt": "2026-11-09T16:11:44.999Z",
+    "view": "isometric"
   },
   "frostpeak-whiteledge-house-furniture-fur-bed": {
     "file": "art/frostpeak-whiteledge-house-furniture-fur-bed.png",
@@ -1469,8 +1513,656 @@
     "width": 256,
     "height": 256
   },
+  "stairs-east-down": {
+    "file": "art/stairs-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-east-up": {
+    "file": "art/stairs-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-down": {
+    "file": "art/stairs-ember-wastes-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-east-down": {
+    "file": "art/stairs-ember-wastes-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-east-up": {
+    "file": "art/stairs-ember-wastes-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-north-down": {
+    "file": "art/stairs-ember-wastes-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-north-up": {
+    "file": "art/stairs-ember-wastes-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-south-down": {
+    "file": "art/stairs-ember-wastes-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-south-up": {
+    "file": "art/stairs-ember-wastes-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-up": {
+    "file": "art/stairs-ember-wastes-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-west-down": {
+    "file": "art/stairs-ember-wastes-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-west-up": {
+    "file": "art/stairs-ember-wastes-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-down": {
+    "file": "art/stairs-frostpeak-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-east-down": {
+    "file": "art/stairs-frostpeak-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-east-up": {
+    "file": "art/stairs-frostpeak-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-north-down": {
+    "file": "art/stairs-frostpeak-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-north-up": {
+    "file": "art/stairs-frostpeak-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-south-down": {
+    "file": "art/stairs-frostpeak-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-south-up": {
+    "file": "art/stairs-frostpeak-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-up": {
+    "file": "art/stairs-frostpeak-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-west-down": {
+    "file": "art/stairs-frostpeak-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-west-up": {
+    "file": "art/stairs-frostpeak-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-down": {
+    "file": "art/stairs-mirage-desert-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-east-down": {
+    "file": "art/stairs-mirage-desert-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-east-up": {
+    "file": "art/stairs-mirage-desert-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-north-down": {
+    "file": "art/stairs-mirage-desert-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-north-up": {
+    "file": "art/stairs-mirage-desert-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-south-down": {
+    "file": "art/stairs-mirage-desert-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-south-up": {
+    "file": "art/stairs-mirage-desert-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-up": {
+    "file": "art/stairs-mirage-desert-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-west-down": {
+    "file": "art/stairs-mirage-desert-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-west-up": {
+    "file": "art/stairs-mirage-desert-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-down": {
+    "file": "art/stairs-murkmire-swamp-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-east-down": {
+    "file": "art/stairs-murkmire-swamp-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-east-up": {
+    "file": "art/stairs-murkmire-swamp-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-north-down": {
+    "file": "art/stairs-murkmire-swamp-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-north-up": {
+    "file": "art/stairs-murkmire-swamp-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-south-down": {
+    "file": "art/stairs-murkmire-swamp-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-south-up": {
+    "file": "art/stairs-murkmire-swamp-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-up": {
+    "file": "art/stairs-murkmire-swamp-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-west-down": {
+    "file": "art/stairs-murkmire-swamp-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-west-up": {
+    "file": "art/stairs-murkmire-swamp-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-down": {
+    "file": "art/stairs-mushroom-hollow-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-east-down": {
+    "file": "art/stairs-mushroom-hollow-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-east-up": {
+    "file": "art/stairs-mushroom-hollow-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-north-down": {
+    "file": "art/stairs-mushroom-hollow-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-north-up": {
+    "file": "art/stairs-mushroom-hollow-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-south-down": {
+    "file": "art/stairs-mushroom-hollow-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-south-up": {
+    "file": "art/stairs-mushroom-hollow-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-up": {
+    "file": "art/stairs-mushroom-hollow-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-west-down": {
+    "file": "art/stairs-mushroom-hollow-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-west-up": {
+    "file": "art/stairs-mushroom-hollow-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-north-down": {
+    "file": "art/stairs-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-north-up": {
+    "file": "art/stairs-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-down": {
+    "file": "art/stairs-sanctum-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-east-down": {
+    "file": "art/stairs-sanctum-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-east-up": {
+    "file": "art/stairs-sanctum-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-north-down": {
+    "file": "art/stairs-sanctum-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-north-up": {
+    "file": "art/stairs-sanctum-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-south-down": {
+    "file": "art/stairs-sanctum-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-south-up": {
+    "file": "art/stairs-sanctum-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-up": {
+    "file": "art/stairs-sanctum-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-west-down": {
+    "file": "art/stairs-sanctum-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-west-up": {
+    "file": "art/stairs-sanctum-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-down": {
+    "file": "art/stairs-sky-ruins-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-east-down": {
+    "file": "art/stairs-sky-ruins-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-east-up": {
+    "file": "art/stairs-sky-ruins-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-north-down": {
+    "file": "art/stairs-sky-ruins-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-north-up": {
+    "file": "art/stairs-sky-ruins-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-south-down": {
+    "file": "art/stairs-sky-ruins-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-south-up": {
+    "file": "art/stairs-sky-ruins-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-up": {
+    "file": "art/stairs-sky-ruins-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-west-down": {
+    "file": "art/stairs-sky-ruins-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-west-up": {
+    "file": "art/stairs-sky-ruins-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-south-down": {
+    "file": "art/stairs-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-south-up": {
+    "file": "art/stairs-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-down": {
+    "file": "art/stairs-sunlit-shore-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-east-down": {
+    "file": "art/stairs-sunlit-shore-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-east-up": {
+    "file": "art/stairs-sunlit-shore-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-north-down": {
+    "file": "art/stairs-sunlit-shore-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-north-up": {
+    "file": "art/stairs-sunlit-shore-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-south-down": {
+    "file": "art/stairs-sunlit-shore-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-south-up": {
+    "file": "art/stairs-sunlit-shore-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-up": {
+    "file": "art/stairs-sunlit-shore-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-west-down": {
+    "file": "art/stairs-sunlit-shore-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-west-up": {
+    "file": "art/stairs-sunlit-shore-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
   "stairs-up": {
     "file": "art/stairs-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-down": {
+    "file": "art/stairs-verdant-meadows-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-east-down": {
+    "file": "art/stairs-verdant-meadows-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-east-up": {
+    "file": "art/stairs-verdant-meadows-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-north-down": {
+    "file": "art/stairs-verdant-meadows-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-north-up": {
+    "file": "art/stairs-verdant-meadows-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-south-down": {
+    "file": "art/stairs-verdant-meadows-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-south-up": {
+    "file": "art/stairs-verdant-meadows-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-up": {
+    "file": "art/stairs-verdant-meadows-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-west-down": {
+    "file": "art/stairs-verdant-meadows-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-west-up": {
+    "file": "art/stairs-verdant-meadows-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-west-down": {
+    "file": "art/stairs-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-west-up": {
+    "file": "art/stairs-west-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-down": {
+    "file": "art/stairs-whispering-woods-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-east-down": {
+    "file": "art/stairs-whispering-woods-east-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-east-up": {
+    "file": "art/stairs-whispering-woods-east-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-north-down": {
+    "file": "art/stairs-whispering-woods-north-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-north-up": {
+    "file": "art/stairs-whispering-woods-north-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-south-down": {
+    "file": "art/stairs-whispering-woods-south-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-south-up": {
+    "file": "art/stairs-whispering-woods-south-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-up": {
+    "file": "art/stairs-whispering-woods-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-west-down": {
+    "file": "art/stairs-whispering-woods-west-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-west-up": {
+    "file": "art/stairs-whispering-woods-west-up.png",
     "kind": "prop",
     "width": 256,
     "height": 256
@@ -2074,169 +2766,5 @@
     "height": 187,
     "frames": 12,
     "cycleSeconds": 0.9
-  },
-  "frostpeak-eyrie-furniture-falcon-frieze": {
-    "file": "art/frostpeak-eyrie-furniture-falcon-frieze.png",
-    "kind": "furniture",
-    "width": 240,
-    "height": 352,
-    "provider": "subagent-free",
-    "model": "ide-image-generator",
-    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the carved falcon relief frieze inside The Eyrie of the First Watch: a cyclopean white marble and dark slate cliff wall relief panel carved with geometric outspread falcon wings and silver First Watch runes.",
-    "createdAt": "2026-11-09T16:11:44.999Z",
-    "view": "isometric"
-  },
-  "frostpeak-eyrie-furniture-ice-cascade": {
-    "file": "art/frostpeak-eyrie-furniture-ice-cascade.png",
-    "kind": "furniture",
-    "width": 240,
-    "height": 268,
-    "provider": "subagent-free",
-    "model": "ide-image-generator",
-    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the frozen waterfall cascade inside The Eyrie of the First Watch: a frozen alpine waterfall of faceted pale-blue glacier ice and white rime cascading down rough grey mountain slate rock.",
-    "createdAt": "2026-11-09T16:11:44.999Z",
-    "view": "isometric"
-  },
-  "frostpeak-eyrie-furniture-beacon-brazier": {
-    "file": "art/frostpeak-eyrie-furniture-beacon-brazier.png",
-    "kind": "furniture",
-    "width": 200,
-    "height": 424,
-    "provider": "subagent-free",
-    "model": "ide-image-generator",
-    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the mountain beacon brazier inside The Eyrie of the First Watch: a monumental carved white marble and silver pillar beacon burning with a tall wind-defying golden-amber and pale blue mountain fire.",
-    "createdAt": "2026-11-09T16:11:44.999Z",
-    "view": "isometric"
-  },
-  "frostpeak-whiteledge-house-furniture-cantilever-deck": {
-    "file": "art/frostpeak-whiteledge-house-furniture-cantilever-deck.png",
-    "kind": "furniture",
-    "width": 240,
-    "height": 244,
-    "provider": "subagent-free",
-    "model": "ide-image-generator",
-    "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the cantilevered timber deck inside Whiteledge Terrace House: a cantilevered mountain cedar plank lookout platform with heavy diagonal pine support struts and cold-forged silver-iron brackets.",
-    "createdAt": "2026-11-09T16:11:44.999Z",
-    "view": "isometric"
-  },
-  "stairs-sanctum-up": {
-    "file": "art/stairs-sanctum-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-sanctum-down": {
-    "file": "art/stairs-sanctum-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-whispering-woods-up": {
-    "file": "art/stairs-whispering-woods-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-whispering-woods-down": {
-    "file": "art/stairs-whispering-woods-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-sunlit-shore-up": {
-    "file": "art/stairs-sunlit-shore-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-sunlit-shore-down": {
-    "file": "art/stairs-sunlit-shore-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-frostpeak-up": {
-    "file": "art/stairs-frostpeak-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-frostpeak-down": {
-    "file": "art/stairs-frostpeak-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-mirage-desert-up": {
-    "file": "art/stairs-mirage-desert-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-mirage-desert-down": {
-    "file": "art/stairs-mirage-desert-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-verdant-meadows-up": {
-    "file": "art/stairs-verdant-meadows-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-verdant-meadows-down": {
-    "file": "art/stairs-verdant-meadows-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-mushroom-hollow-up": {
-    "file": "art/stairs-mushroom-hollow-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-mushroom-hollow-down": {
-    "file": "art/stairs-mushroom-hollow-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-ember-wastes-up": {
-    "file": "art/stairs-ember-wastes-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-ember-wastes-down": {
-    "file": "art/stairs-ember-wastes-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-murkmire-swamp-up": {
-    "file": "art/stairs-murkmire-swamp-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-murkmire-swamp-down": {
-    "file": "art/stairs-murkmire-swamp-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-sky-ruins-up": {
-    "file": "art/stairs-sky-ruins-up.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
-  },
-  "stairs-sky-ruins-down": {
-    "file": "art/stairs-sky-ruins-down.png",
-    "kind": "prop",
-    "width": 256,
-    "height": 256
   }
 }

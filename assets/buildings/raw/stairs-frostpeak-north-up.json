@@ -1,0 +1,11 @@
+{
+  "id": "stairs-frostpeak-north-up",
+  "kind": "prop",
+  "heading": "north",
+  "direction": "up",
+  "biome": "frostpeak",
+  "name": "NORTH Ascending stairs (frostpeak)",
+  "file": "art/stairs-frostpeak-north-up.png",
+  "width": 256,
+  "height": 256
+}

@@ -1,0 +1,11 @@
+{
+  "id": "stairs-murkmire-swamp-east-down",
+  "kind": "prop",
+  "heading": "east",
+  "direction": "down",
+  "biome": "murkmire-swamp",
+  "name": "EAST Descending stairs (murkmire-swamp)",
+  "file": "art/stairs-murkmire-swamp-east-down.png",
+  "width": 256,
+  "height": 256
+}

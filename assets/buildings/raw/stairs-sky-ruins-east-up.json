@@ -1,0 +1,11 @@
+{
+  "id": "stairs-sky-ruins-east-up",
+  "kind": "prop",
+  "heading": "east",
+  "direction": "up",
+  "biome": "sky-ruins",
+  "name": "EAST Ascending stairs (sky-ruins)",
+  "file": "art/stairs-sky-ruins-east-up.png",
+  "width": 256,
+  "height": 256
+}

@@ -1,0 +1,10 @@
+{
+  "id": "stairs-west-down",
+  "kind": "prop",
+  "heading": "west",
+  "direction": "down",
+  "name": "WEST Descending stairs (Generic)",
+  "file": "art/stairs-west-down.png",
+  "width": 256,
+  "height": 256
+}

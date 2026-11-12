@@ -1,0 +1,11 @@
+{
+  "id": "stairs-sunlit-shore-west-up",
+  "kind": "prop",
+  "heading": "west",
+  "direction": "up",
+  "biome": "sunlit-shore",
+  "name": "WEST Ascending stairs (sunlit-shore)",
+  "file": "art/stairs-sunlit-shore-west-up.png",
+  "width": 256,
+  "height": 256
+}

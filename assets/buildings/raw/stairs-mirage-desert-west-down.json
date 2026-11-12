@@ -1,0 +1,11 @@
+{
+  "id": "stairs-mirage-desert-west-down",
+  "kind": "prop",
+  "heading": "west",
+  "direction": "down",
+  "biome": "mirage-desert",
+  "name": "WEST Descending stairs (mirage-desert)",
+  "file": "art/stairs-mirage-desert-west-down.png",
+  "width": 256,
+  "height": 256
+}

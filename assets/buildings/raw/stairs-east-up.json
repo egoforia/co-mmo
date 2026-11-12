@@ -1,0 +1,10 @@
+{
+  "id": "stairs-east-up",
+  "kind": "prop",
+  "heading": "east",
+  "direction": "up",
+  "name": "EAST Ascending stairs (Generic)",
+  "file": "art/stairs-east-up.png",
+  "width": 256,
+  "height": 256
+}

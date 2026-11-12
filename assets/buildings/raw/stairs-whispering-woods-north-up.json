@@ -1,0 +1,11 @@
+{
+  "id": "stairs-whispering-woods-north-up",
+  "kind": "prop",
+  "heading": "north",
+  "direction": "up",
+  "biome": "whispering-woods",
+  "name": "NORTH Ascending stairs (whispering-woods)",
+  "file": "art/stairs-whispering-woods-north-up.png",
+  "width": 256,
+  "height": 256
+}

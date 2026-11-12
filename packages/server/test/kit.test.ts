@@ -341,4 +341,24 @@ describe('people from the world editor', () => {
     region.handle('a', { t: 'shop', action: 'master', npc: 'e1:person', id: 'smithing' });
     expect(notices(conn).at(-1)).toMatch(/Hesper names you a master of Smithing/);
   });
+
+  it('offer the quest the editor gave them, and the land keeps the weather it was given', () => {
+    const def = regionDef('shore')!;
+    const marina = new Region(def, undefined, () => 0, () => 0.5).map.npcs.find((n) => n.id === 'marina')!;
+    const at = [Math.floor(marina.x) + 2, Math.floor(marina.y)] as [number, number];
+    const person = EDIT_KINDS.person.make({ at }, { name: 'Hesper', look: 'shore-trader', greeting: 'Hello.', wares: 'none', buys: false, teaches: 'none', masters: 'none', day: 'keep' });
+    const quest = EDIT_KINDS.quest.make({ at, target: 'e1:person' }, { title: 'Crabs Again', offer: 'The crabs are back.', thanks: 'Thank you.', goal: 'defeat', creature: 'thorn-wolf', item: 'tonic', count: 2, xp: 30, gold: 10 });
+    const snow = EDIT_KINDS.land.make({ at }, { weather: 'snow', arrive: false });
+    const edits = [person, quest, snow].map((d, i) => stampEdit(d, { id: `e${i + 1}`, by: 'Ego', made: 0 }, {}));
+    const region = new Region({ ...def, edits }, undefined, () => 1_000_000, () => 0.5);
+    expect(region.sky().weather).toBe('snow');
+    const conn = fakeConn();
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, newCharacter());
+    besideNpc(region, 'a', 'e1:person');
+    region.handle('a', { t: 'interact' });
+    expect(of(conn, 'dialogue').at(-1)).toMatchObject({ offer: { quest: 'e2:quest', title: 'Crabs Again' } });
+    expect(of(conn, 'dialogue').at(-1)!.text).toContain('The crabs are back.');
+    region.handle('a', { t: 'accept', quest: 'e2:quest' });
+    expect(region.character('a')!.quests.map((q) => q.id)).toContain('e2:quest');
+  });
 });

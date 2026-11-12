@@ -351,6 +351,18 @@ or lays it again at another floor size from the same corner, keeping its name
 (`takeBuilding` in `kinds/remove.ts` clears what was inside). **Gathering**
 can scatter up to `MAX_SPOTS` spots round the one clicked (`count`).
 
+**Quests** on people are the `quest` kind (`kinds/quest.ts`): defeat so many
+of a monster or bring so many of a thing, for experience and gold, given by
+the person clicked. Laid, a quest joins `QUESTS` as `<edit id>:quest` (as
+wished content joins the shared tables) with `edit: true`, and the land lists
+it in `RegionMap.quests`; `questOffered(c, npc, land)` offers an editor's
+quest only where its land lists it, so drafts and quests taken back are
+never offered. **Land settings** (`land`) set weather that stays
+(`RegionMap.weather`, read by the server's `sky()` and `skyOver`) and where
+players arrive (`map.spawn`). **Scenery** (`scenery`) grows trees and rocks
+over a round patch the way the layouts scatter them, drawn in the land's
+biome kit, or clears them back to open ground.
+
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with
 (`RegionDef.base`) first, then the editor's. A `workshop` land stands off the

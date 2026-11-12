@@ -11,6 +11,7 @@ import type { Stairway, Storey } from './floors.ts';
 import type { ShopDef } from './kit.ts';
 import type { CreatureTune } from './creature-tune.ts';
 import type { Light } from './light.ts';
+import type { Weather } from './sky.ts';
 import type { Routine } from './routines.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -299,6 +300,10 @@ export interface RegionMap {
   unlaid?: string[];
   /** Named places to look from, laid by bookmark edits: the editor goes there, the screenshot list reads them. */
   bookmarks?: Bookmark[];
+  /** Weather the world editor set for the land, whatever the sky does elsewhere; it turns with the sky when missing. */
+  weather?: Weather;
+  /** Quests the world editor gave its people, by id (QUESTS): only these of the editor's are offered here. */
+  quests?: string[];
   /** Lights standing on their own (no piece to glow), laid by light edits. */
   lights?: PlacedLight[];
 }

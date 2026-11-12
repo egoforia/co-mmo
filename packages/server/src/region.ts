@@ -328,7 +328,8 @@ export class Region {
   /** Where the day is and the weather here now. */
   sky(now = this.now()): { phase: number; weather: Weather } {
     const config = this.skyConfig;
-    return { phase: dayPhase(now, config), weather: weatherAt(this.def.id, this.def.biome, now, config) };
+    // A land the world editor gave weather of its own keeps it.
+    return { phase: dayPhase(now, config), weather: this.map.weather ?? weatherAt(this.def.id, this.def.biome, now, config) };
   }
 
   // --- Wished content ----------------------------------------------------------

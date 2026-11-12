@@ -94,7 +94,7 @@ export class Quests {
     const paths = pathChoices(ch, npc.id);
     if (paths) text = [text, mentorWords(ch)].filter(Boolean).join('\n\n');
 
-    const offer = questOffered(ch, npc.id);
+    const offer = questOffered(ch, npc.id, this.s.map);
     // What they are up to at this hour comes first: woken from sleep, or out gathering herbs.
     const now = greetingNow(npc, this.phase());
     const said = [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || npc.greeting || NPC_GREETINGS[npc.id] || '...';
@@ -133,7 +133,7 @@ export class Quests {
   /** Takes a quest the NPC beside the player offers. */
   accept(p: PlayerState, questId: string): void {
     const def = QUESTS[questId];
-    if (!def || questOffered(p.character, def.giver) !== questId) return;
+    if (!def || questOffered(p.character, def.giver, this.s.map) !== questId) return;
     const giver = this.s.map.npcs.find((n) => n.id === def.giver);
     if (!giver || (giver.floor ?? 0) !== p.floor || Math.hypot(giver.x - p.x, giver.y - p.y) > TALK_RANGE + 1) return;
     p.character.quests.push({ id: questId, count: 0, done: false });

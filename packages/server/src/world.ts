@@ -184,11 +184,12 @@ export class World {
 
   /**
    * Where the day is and the weather over a region now. Both follow from the
-   * time and the land alone, so this reads the same wherever the region runs.
+   * time and the land alone (its own weather when the world editor set one),
+   * so this reads the same wherever the region runs.
    */
   skyOver(def: RegionDef): { phase: number; weather: Weather } {
     const now = this.now();
-    return { phase: dayPhase(now, this.sky), weather: weatherAt(def.id, def.biome, now, this.sky) };
+    return { phase: dayPhase(now, this.sky), weather: this.region(def.id)?.map.weather ?? weatherAt(def.id, def.biome, now, this.sky) };
   }
 
   /** The regions around one, corners too. */

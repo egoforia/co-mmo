@@ -5,6 +5,8 @@
 import type { BuildingSpec } from '../building-kit/spec.ts';
 import type { ShopDef } from '../kit.ts';
 import type { Routine } from '../routines.ts';
+import type { QuestGoal } from '../rpg.ts';
+import type { Weather } from '../sky.ts';
 import type { MonsterWays } from './kinds/monster-ways.ts';
 
 /** A tile position, x east and y south, from the land's top-left corner. */
@@ -51,6 +53,12 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'light'; at: TilePoint; color: string; radius: number; flicker?: boolean }
   /** Gives the building over `at` (or named by `target`) another look, and another floor size from the same corner when `floor` is given. */
   | { kind: 'restyle'; at: TilePoint; style: string; floor?: [width: number, height: number] }
+  /** Trees and rocks over a round patch, each as thick as 0 (cleared away) to 3, drawn in the land's own look. */
+  | { kind: 'scenery'; at: TilePoint; radius: number; trees: number; rocks: number }
+  /** The land's weather ('sky' turns with the sky), and where players arrive (`at`) when `arrive`. */
+  | { kind: 'land'; at: TilePoint; weather: Weather | 'sky'; arrive?: boolean }
+  /** A quest the person named by `target` gives: defeat so many of a monster, or bring so many of one thing, for experience and gold. */
+  | { kind: 'quest'; at: TilePoint; title: string; offer: string; thanks: string; goal: Extract<QuestGoal, { kind: 'defeat' | 'gather' }>; reward: { xp: number; gold: number } }
   /** Sends away every monster living within `radius` tiles of a spot. */
   | { kind: 'clear'; at: TilePoint; radius: number }
   /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */
@@ -110,6 +118,9 @@ export const PERSON_TEXT = { name: 40, greeting: 300, wares: 40, price: 100_000 
 
 /** Most tiles one brush stroke may paint. */
 export const MAX_STROKE = 400;
+/** Longest a quest's title and lines may be, most it may ask for, and its biggest reward. */
+export const QUEST_TEXT = { title: 60, words: 400, count: 30, reward: 5000 };
+
 /** Most gathering spots one click may scatter. */
 export const MAX_SPOTS = 12;
 /** Most monsters one spawn may hold. */

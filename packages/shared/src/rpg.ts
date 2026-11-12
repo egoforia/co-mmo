@@ -769,6 +769,8 @@ export interface QuestDef {
   /** Who it is handed in to, when not the one who gave it (a trial ends with the Path mentor). */
   turnIn?: string;
   reward: { xp: number; gold: number; items?: InventorySlot[]; ability?: string };
+  /** Made in the world editor: offered only while its land lays it (`RegionMap.quests`), not as a draft or once taken back. */
+  edit?: boolean;
 }
 
 export const QUESTS: Record<string, QuestDef> = {
@@ -826,10 +828,11 @@ export const NPC_GREETINGS: Record<string, string> = {
 };
 
 /** The quest an NPC can offer this character now, if any. */
-export function questOffered(c: Character, npc: string): string | undefined {
+export function questOffered(c: Character, npc: string, land?: { quests?: string[] }): string | undefined {
   return Object.entries(QUESTS).find(
     ([id, q]) =>
       q.giver === npc &&
+      (!q.edit || !!land?.quests?.includes(id)) &&
       !c.quests.some((s) => s.id === id) &&
       (!q.calling || q.calling === c.calling) &&
       c.level >= (q.minLevel ?? 0) &&

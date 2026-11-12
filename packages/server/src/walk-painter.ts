@@ -732,7 +732,7 @@ export class WalkPainter {
         console.error(`Walk ${id} failed:`, reason);
         // Invalid or unprocessable input (422) cannot succeed by asking again.
         if (isUnprocessable(err)) {
-          handle?.fail(reason);
+          handle?.fail(reason, 422);
           return undefined;
         }
       }

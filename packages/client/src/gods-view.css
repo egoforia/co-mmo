@@ -101,7 +101,8 @@ pre { background: var(--panel); border: 1px solid var(--edge); padding: 12px; wh
 .spend { list-style: none; padding: 0; margin: 0; min-width: 220px; }
 .spend li { display: flex; justify-content: space-between; gap: 20px; border-bottom: 1px solid #2c2540; padding: 3px 0; }
 
-#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); padding: 10px 16px; }
+#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); padding: 10px 16px; z-index: 1000; max-width: min(600px, calc(100vw - 32px)); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6); }
+#toast.bad { border-color: var(--bad); color: var(--bad); background: #23161c; }
 [hidden] { display: none !important; }
 
 @media (max-width: 700px) {

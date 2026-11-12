@@ -16,6 +16,7 @@ import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSH
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
+import { isUnprocessable } from './walk-painter.ts';
 import type { HandFinder } from './hand-finder.ts';
 import { HAND_VIEWS, type Facing, type HandView } from './assets/points.ts';
 import type { Updater } from './updates.ts';
@@ -769,6 +770,7 @@ export async function handleAdmin(
       }
     } catch (err) {
       if (err instanceof ArtRequestError) return json(res, 409, { error: 'art_refused', message: err.message }), true;
+      if (isUnprocessable(err)) return json(res, 422, { error: 'validation_failed', message: (err as Error).message }), true;
       throw err;
     }
   }

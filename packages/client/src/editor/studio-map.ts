@@ -2,7 +2,7 @@ import { MAX_FLOORS, Tile, isBlocking, tileAt, type Outline, type RegionMap, typ
 import { loadToken } from '../api.ts';
 import { artState, esc, usd } from '../art-ui/state.ts';
 import { landsCard, layFile, makeLand, saveEdits } from './studio-lands.ts';
-import { EditorCore, draftsHtml, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
+import { EditorCore, draftsHtml, editListHtml, hereWords, historyHtml, toolsHtml, type ToolStep } from './core.ts';
 
 // The world editor's second view: the Art Studio's map of a whole land
 // (Map Preview & Editor), seen from above, any floor, zoomed in or out, with
@@ -57,7 +57,7 @@ const state = {
   /** New edits go live at once instead of waiting as drafts. */
   live: false,
   hover: null as TilePoint | null,
-  status: 'Click any tile on the map to look at it or edit it.',
+  status: 'Click a thing on the map to pick it, or choose a tool to change the land.',
   data: null as RegionInspectPayload | null,
   ai: { prompt: '', summary: '', usd: 0, steps: [] as AiStep[] },
 };
@@ -125,7 +125,7 @@ export function mapEditorPage(): string {
       </div>
       <div class="map-status-bar">
         <span id="map-status-text">${esc(state.status)}</span>
-        <span id="map-hover-coords" class="coord-pill">${state.hover ? `Tile ${state.hover[0]}, ${state.hover[1]}` : 'Point at the map'}</span>
+        <span id="map-hover-coords" class="coord-pill">${state.hover ? esc(hereWords(d.map, state.hover, state.floor)) : 'Point at the map'}</span>
       </div>
     </div>
     <div class="map-editor-grid">
@@ -264,7 +264,7 @@ function wire(canvas: HTMLCanvasElement): void {
   canvas.onmousemove = (e) => {
     state.hover = tileOf(e);
     const coords = document.getElementById('map-hover-coords');
-    if (coords) coords.textContent = state.hover ? `Tile ${state.hover[0]}, ${state.hover[1]}` : 'Point at the map';
+    if (coords) coords.textContent = state.hover && state.data ? hereWords(state.data.map, state.hover, state.floor) : 'Point at the map';
     if (state.hover && e.buttons & 1) core.drag(state.regionId, state.data!.map, state.hover);
     draw(canvas);
   };

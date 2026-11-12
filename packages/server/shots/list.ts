@@ -219,7 +219,51 @@ export const SHOTS: Shot[] = [
       await page.click('#edit-world-button');
       await page.waitForSelector('#editor:not([hidden])');
     },
-    mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons (Select, Take away and Bookmark among them), the floor picker and the edit list are readable'],
+    mustSee: [
+      'edit mode: the game HUD, chat, stats and key bar are gone; a top bar (land, floor stepper, hour and weather, Tiles and Hitboxes, drafts, Done) runs across the top',
+      'the editor panel on the right and the mini map at the bottom left, neither covering the other',
+      'the tool buttons (Select, Take away and Bookmark among them) and the edit list are readable in the panel',
+      'a status strip along the bottom with Chat, Undo and Redo',
+      'no red hitbox fill: hitboxes start off',
+    ],
+  },
+  {
+    name: 'editor-kit-form',
+    about: 'The world editor in edit mode with the Kit building tool chosen, so its settings and shape checks show in the panel.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-tool="kit"]');
+    },
+    mustSee: ['the Kit building settings (Look, Bays across, Bays deep, Storeys) in the panel under the tools', 'the panel ends above the status strip and scrolls rather than running off the screen'],
+  },
+  {
+    name: 'editor-drafts-menu',
+    about: 'The world editor with the drafts menu open and hitboxes switched on.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor input[name="hitboxes"]');
+      await page.click('#editor .publish-menu summary');
+    },
+    mustSee: ['the drafts pill reads "No drafts" and its menu shows "Make my changes live at once"', 'red and orange hitbox fills on the walls near the player', 'the Hitboxes box ticked in the top bar'],
+  },
+  {
+    name: 'editor-phone',
+    about: 'The world editor opened on a phone-sized screen, which says it needs a bigger one.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    screen: 'phone',
+    open: async (page) => {
+      // The HUD may push the button off a narrow screen; the shot is about what the editor shows.
+      await page.evaluate(() => document.getElementById('edit-world-button')?.click());
+      await page.waitForSelector('#editor:not([hidden])');
+    },
+    mustSee: ['a short note saying the world editor needs a bigger screen', 'a Done button to leave', 'no squeezed tool panel'],
   },
   {
     name: 'editor-tile-grid',

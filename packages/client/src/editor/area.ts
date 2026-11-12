@@ -41,6 +41,11 @@ export class AreaTool {
     this.corner = undefined;
   }
 
+  /** True while the first corner of an area is clicked and the second is not. */
+  midway(): boolean {
+    return !!this.corner;
+  }
+
   /** A click: the first corner, the second (copies), or where a copy is pasted. */
   press(region: string, map: RegionMap, at: TilePoint): ToolStep {
     if (this.copied) return { drafts: pasteArea(this.copied, at), region, say: 'Pasted.' };

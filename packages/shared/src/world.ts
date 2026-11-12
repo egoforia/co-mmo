@@ -10,6 +10,7 @@ import type { BuildingSpec } from './building-kit/spec.ts';
 import type { Stairway, Storey } from './floors.ts';
 import type { ShopDef } from './kit.ts';
 import type { CreatureTune } from './creature-tune.ts';
+import type { Light } from './light.ts';
 import type { Routine } from './routines.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -298,6 +299,18 @@ export interface RegionMap {
   unlaid?: string[];
   /** Named places to look from, laid by bookmark edits: the editor goes there, the screenshot list reads them. */
   bookmarks?: Bookmark[];
+  /** Lights standing on their own (no piece to glow), laid by light edits. */
+  lights?: PlacedLight[];
+}
+
+/** A light standing on its own on a floor (light.ts): a glow with no picture of its own. */
+export interface PlacedLight {
+  /** The light edit that laid it. */
+  id: string;
+  x: number;
+  y: number;
+  floor: number;
+  light: Light;
 }
 
 /** A named place to look from on a floor of a land, and what it is for. */

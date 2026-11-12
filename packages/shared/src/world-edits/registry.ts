@@ -8,6 +8,7 @@ import { FOOTPRINT } from './kinds/footprint.ts';
 import { FURNITURE } from './kinds/furniture.ts';
 import { HOUSE } from './kinds/house.ts';
 import { KIT } from './kinds/kit.ts';
+import { LIGHT } from './kinds/light.ts';
 import { MOVE } from './kinds/move.ts';
 import { MONSTERS } from './kinds/monsters.ts';
 import { PAINT } from './kinds/paint.ts';
@@ -15,6 +16,7 @@ import { PATROL_PATH } from './kinds/patrol.ts';
 import { PERSON } from './kinds/person.ts';
 import { PIECE } from './kinds/piece.ts';
 import { REMOVE } from './kinds/remove.ts';
+import { RESTYLE } from './kinds/restyle.ts';
 import { ROAD } from './kinds/road.ts';
 import { SPAWN } from './kinds/spawn.ts';
 import { SPOT } from './kinds/spot.ts';
@@ -34,6 +36,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   road: ROAD,
   house: HOUSE,
   kit: KIT,
+  restyle: RESTYLE,
   floors: FLOORS,
   piece: PIECE,
   spawn: SPAWN,
@@ -42,6 +45,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   person: PERSON,
   clear: CLEAR,
   spot: SPOT,
+  light: LIGHT,
   footprint: FOOTPRINT,
   storey: STOREY,
   stairs: STAIRS,

@@ -59,7 +59,7 @@ export interface EditList {
 }
 
 const LOOK = { id: 'look' as const, name: 'Look', hint: 'Point at the world to see what is there.' };
-const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster or bookmark to see it, then take it away, copy it or move it.' };
+const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see it, then take it away, copy it or move it.' };
 const CONTEXT: EditContext = { creatures: CREATURES };
 
 /** Number settings with at most this many choices are drawn as a list to pick from. */

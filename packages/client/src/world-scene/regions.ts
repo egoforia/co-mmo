@@ -356,7 +356,7 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
   return open;
 }
 
-/** Lights for a region's fires, lanterns and shrines, and its buildings' windows. */
+/** Lights for a region's fires, lanterns and shrines, the lights the editor stood on their own, and its buildings' windows. */
 export function placeLamps(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[]): Lamp[] {
   const lamps: Lamp[] = [];
   const add = (light: Light, x: number, y: number, window: boolean, floor: number, tile: { x: number; y: number }) => {
@@ -370,6 +370,11 @@ export function placeLamps(scene: Phaser.Scene, map: RegionMap, ox: number, oy: 
     const at = PROJECTION.toScreen(feet.x, feet.y);
     const floor = l.floor ?? 0;
     if (light) add(light, at.x, at.y - floorLift(floor) - T * 0.6, false, floor, { x: Math.floor(l.x), y: Math.floor(l.y - 0.01) });
+  }
+  // Lights the world editor stood on their own.
+  for (const l of map.lights ?? []) {
+    const at = PROJECTION.toScreen(ox + l.x, oy + l.y);
+    add(l.light, at.x, at.y - floorLift(l.floor) - T * 0.6, false, l.floor, { x: Math.floor(l.x), y: Math.floor(l.y) });
   }
   for (const v of views) {
     if (!v.outside.length) continue;

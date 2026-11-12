@@ -4,6 +4,10 @@ import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
 import { EditorCore, draftsHtml, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
+import { GRID_RADIUS, drawTileGrid } from './tile-grid.ts';
+
+/** Where the tile wireframe switch is remembered, on this browser only. */
+const GRID_KEY = 'co-mmo.editor.tileGrid';
 
 /** The hours the editor can show a land at, as phases of the day (sky.ts: dawn from 5, day from 7, dusk from 18, night from 20). */
 const PREVIEW_HOURS: Record<string, { name: string; phase?: number }> = {
@@ -52,6 +56,10 @@ export class EditorUi {
   private outline?: Phaser.GameObjects.Graphics;
   private hitboxGraphics?: Phaser.GameObjects.Graphics;
   private showHitboxes = true;
+  private gridGraphics?: Phaser.GameObjects.Graphics;
+  private showGrid = readGrid();
+  /** Where the hitboxes and wireframe were last drawn around, so walking redraws them only on a new tile. */
+  private drawnAt = '';
   private attached?: WorldScene;
   /** The hour and weather the editor shows the land in ('' and none: as they are). */
   private readonly sky: { hour: string; weather?: Weather } = { hour: '' };
@@ -95,6 +103,8 @@ export class EditorUi {
     if (!open) {
       this.outline?.clear();
       this.hitboxGraphics?.clear();
+      this.gridGraphics?.clear();
+      this.drawnAt = '';
       this.attached?.viewFloor(undefined);
       this.attached?.previewEdits(this.listRegion);
       this.attached?.previewSky({});
@@ -141,6 +151,11 @@ export class EditorUi {
     this.attached = scene;
     this.outline = scene.add.graphics().setDepth(OUTLINE_DEPTH);
     this.hitboxGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 5);
+    this.gridGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 6);
+    // Walking (or the floor shown changing) moves what the marks are drawn around.
+    scene.events.on('update', () => {
+      if (this.open && this.marksKey() !== this.drawnAt) this.drawHitboxes();
+    });
     scene.input.on('pointermove', (p: Phaser.Input.Pointer) => this.pointer(p, p.isDown ? 'drag' : 'hover'));
     scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.pointer(p, 'down'));
     scene.input.on('pointerup', (p: Phaser.Input.Pointer) => this.pointer(p, 'up'));
@@ -292,19 +307,31 @@ export class EditorUi {
     return this.attached?.landName(region) ?? 'that land';
   }
 
-  /** Draws collision hitboxes for the current floor around the player. */
+  /** The tile and floors the editor's marks are drawn around now. */
+  private marksKey(): string {
+    const scene = this.attached;
+    if (!scene) return '';
+    const at = scene.playerPosition;
+    return `${scene.currentMap?.def.id}:${Math.floor(at.x)},${Math.floor(at.y)}:${scene.currentFloor}:${scene.shownFloor}`;
+  }
+
+  /** Draws collision hitboxes for the current floor, and the tile wireframe of the floor shown, around the player. */
   drawHitboxes(): void {
     const scene = this.attached;
     const g = this.hitboxGraphics;
     if (!scene || !g) return;
     g.clear();
-    if (!this.open || !this.showHitboxes) return;
+    this.gridGraphics?.clear();
+    this.drawnAt = this.marksKey();
+    if (!this.open) return;
     const map = scene.currentMap;
     if (!map) return;
-    const floor = scene.currentFloor;
     const cx = Math.floor(scene.playerPosition.x);
     const cy = Math.floor(scene.playerPosition.y);
-    const radius = 28;
+    if (this.showGrid && this.gridGraphics) drawTileGrid(this.gridGraphics, scene, map, scene.shownFloor, cx, cy);
+    if (!this.showHitboxes) return;
+    const floor = scene.currentFloor;
+    const radius = GRID_RADIUS;
     for (let ty = Math.max(0, cy - radius); ty <= Math.min(map.height - 1, cy + radius); ty++) {
       for (let tx = Math.max(0, cx - radius); tx <= Math.min(map.width - 1, cx + radius); tx++) {
         const t = tileAt(map, tx, ty, floor);
@@ -352,6 +379,14 @@ export class EditorUi {
     if (input.name === 'hitboxes') {
       this.showHitboxes = input.checked;
       this.drawHitboxes();
+    } else if (input.name === 'tile-grid') {
+      this.showGrid = input.checked;
+      try {
+        localStorage.setItem(GRID_KEY, input.checked ? '1' : '0');
+      } catch {
+        // No storage here: the switch still works until the page is reloaded.
+      }
+      this.drawHitboxes();
     } else if (input.name === 'view-floor') this.chooseFloor(input.value);
     else if (input.name === 'view-hour') this.chooseSky(input.value);
     else if (input.name === 'view-weather') this.chooseSky(undefined, input.value);
@@ -368,7 +403,7 @@ export class EditorUi {
     this.attach();
     const tool = this.core.current();
     this.box.innerHTML = `
-      <h2>World editor <label class="hitbox-toggle"><input type="checkbox" name="hitboxes" ${this.showHitboxes ? 'checked' : ''} /> Hitboxes</label><button type="button" class="close" aria-label="Close">×</button></h2>
+      <h2>World editor <span class="view-toggles"><label class="hitbox-toggle" title="Thin lines around every tile near you"><input type="checkbox" name="tile-grid" ${this.showGrid ? 'checked' : ''} /> Tiles</label><label class="hitbox-toggle"><input type="checkbox" name="hitboxes" ${this.showHitboxes ? 'checked' : ''} /> Hitboxes</label></span><button type="button" class="close" aria-label="Close">×</button></h2>
       <div class="tools">${toolsHtml(this.core)}</div>
       <div class="settings">${this.floorHtml()}</div>
       <p class="note">${escapeHtml(tool.hint)}</p>
@@ -381,5 +416,14 @@ export class EditorUi {
       ${this.bookmarksHtml()}
       ${this.checksHtml()}`;
     this.drawHitboxes();
+  }
+}
+
+/** Whether the tile wireframe was left on in this browser (off when nothing was saved). */
+function readGrid(): boolean {
+  try {
+    return localStorage.getItem(GRID_KEY) === '1';
+  } catch {
+    return false;
   }
 }

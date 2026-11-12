@@ -53,7 +53,7 @@ const state = {
   cell: 0,
   /** Which part of the map the scroll box shows, as the fraction across and down of its middle. */
   view: { x: 0.5, y: 0.5 },
-  layers: { showHitboxes: false, showSpots: true, showSpawns: true },
+  layers: { showGrid: false, showHitboxes: false, showSpots: true, showSpawns: true },
   /** New edits go live at once instead of waiting as drafts. */
   live: false,
   hover: null as TilePoint | null,
@@ -114,7 +114,7 @@ export function mapEditorPage(): string {
           <span class="coord-pill">${Math.round((state.cell / fitted(d.map)) * 100)}%</span>
           <button type="button" class="quiet" data-map-zoom="in" aria-label="Zoom in" title="Zoom in"${state.cell >= MOST ? ' disabled' : ''}>+</button>
         </div>
-        ${layer('showHitboxes', 'Hitboxes')}${layer('showSpots', `Gathering spots (${d.map.spots?.length ?? 0})`)}${layer('showSpawns', 'People &amp; monsters')}
+        ${layer('showGrid', 'Tiles')}${layer('showHitboxes', 'Hitboxes')}${layer('showSpots', `Gathering spots (${d.map.spots?.length ?? 0})`)}${layer('showSpawns', 'People &amp; monsters')}
       </div>
     </div>
     <div class="studio-card map-toolbar-card">
@@ -204,9 +204,16 @@ function draw(canvas: HTMLCanvasElement): void {
       }
     }
   }
+  // With Tiles on, a thin line around every tile.
+  if (state.layers.showGrid) {
+    g.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    g.lineWidth = 1;
+    for (let x = 0; x <= map.width; x++) g.strokeRect(x * c, 0, 0, canvas.height);
+    for (let y = 0; y <= map.height; y++) g.strokeRect(0, y * c, canvas.width, 0);
+  }
   // A faint line every five tiles.
-  g.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-  g.lineWidth = 0.5;
+  g.strokeStyle = state.layers.showGrid ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.06)';
+  g.lineWidth = state.layers.showGrid ? 1 : 0.5;
   for (let x = 0; x <= map.width; x += 5) g.strokeRect(x * c, 0, 0, canvas.height);
   for (let y = 0; y <= map.height; y += 5) g.strokeRect(0, y * c, canvas.width, 0);
   g.strokeStyle = '#f2dc6b';

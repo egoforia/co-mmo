@@ -222,6 +222,18 @@ export const SHOTS: Shot[] = [
     mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons (Select, Take away and Bookmark among them), the floor picker and the edit list are readable'],
   },
   {
+    name: 'editor-tile-grid',
+    about: 'The world editor open in the Architectural Testbed with its Tiles switch on: a thin wireframe around every tile near the player.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor input[name="tile-grid"]');
+    },
+    mustSee: ['thin light lines along the tile edges around the player, lying flat on the ground in the diamond grid', 'the Tiles switch ticked beside Hitboxes in the editor title', 'the lines stop at the land\'s edge and do not cover the editor window'],
+  },
+  {
     name: 'studio-map',
     about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Floors tool chosen.",
     page: '/art-studio.html#art/map-editor',
@@ -232,5 +244,17 @@ export const SHOTS: Shot[] = [
       await page.click('.studio-map [data-tool="floors"]');
     },
     mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Floors tool settings (up, down, ladders)', 'the edit list beside the map'],
+  },
+  {
+    name: 'studio-map-tiles',
+    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Tiles layer on.",
+    page: '/art-studio.html#art/map-editor',
+    ready: '#studio-map-canvas',
+    open: async (page) => {
+      await page.click('.studio-map [data-map-zoom="in"]');
+      await page.click('.studio-map [data-map-zoom="in"]');
+      await page.click('.studio-map [data-map-layer="showGrid"]');
+    },
+    mustSee: ['a thin line around every tile, brighter every fifth tile', 'the Tiles box ticked beside Hitboxes'],
   },
 ];

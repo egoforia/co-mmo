@@ -1,9 +1,12 @@
 import {
+  BEHAVIORS,
   BUILDING_STYLES,
   CREATURES,
+  PERSON_LOOKS,
   SEA_CAVE_PIECES,
   SPOTS,
   Tile,
+  designSpec,
   editShapes,
   tileAt,
   type RegionMap,
@@ -59,6 +62,9 @@ export async function planAiWorldEdits(options: {
           `Available gathering spots: ${spotIds.join(', ')}.`,
           `Available creatures: ${creatureIds.join(', ')}.`,
           `Available kit pieces: ${pieceIds.slice(0, 20).join(', ')}.`,
+          `Building styles the kit can build (for "kit"): ${styleIds.filter((id) => BUILDING_STYLES[id]!.kit).join(', ')}.`,
+          `Looks for people: ${PERSON_LOOKS.map((l) => l.id).join(', ')}. Monster ways: ${BEHAVIORS.join(', ')}.`,
+          ...landContext(map, center),
           'Produce 1 to 6 WorldEditDraft JSON objects matching the user instruction.',
           'Valid draft shapes:',
           ...editShapes(),
@@ -145,6 +151,18 @@ function findOpenGroundTile(map: RegionMap, near: TilePoint, offset = 0): TilePo
 }
 
 /** Deterministic rule-based planner so the AI Map Architect works even offline or in tests. */
+/** What the architect is told of the land near the focus: its people and buildings by name, so edits can point at them. */
+function landContext(map: RegionMap, [cx, cy]: TilePoint): string[] {
+  const near = (x: number, y: number) => Math.hypot(x - cx, y - cy) <= 40;
+  const people = map.npcs.filter((n) => near(n.x, n.y)).slice(0, 12).map((n) => `${n.name} (target "${n.id}", at [${Math.floor(n.x)}, ${Math.floor(n.y)}]${n.floor ? `, level ${n.floor}` : ''})`);
+  const buildings = map.buildings.filter((b) => b.id && near(b.x, b.y)).slice(0, 12).map((b) => `${BUILDING_STYLES[b.style]?.name ?? b.style} (target "${b.id}", at [${b.x}, ${b.y}], ${b.width}x${b.height})`);
+  return [
+    `People near the focus: ${people.join('; ') || 'none'}.`,
+    `Buildings near the focus: ${buildings.join('; ') || 'none'}.`,
+    'A "level" field on any edit is the floor it works on (0 the ground); a monster\'s own level is "monsterLevel".',
+  ];
+}
+
 function heuristicPlan(map: RegionMap, prompt: string, center: TilePoint): { rationale: string; drafts: WorldEditDraft[] } {
   const lower = prompt.toLowerCase();
   const drafts: WorldEditDraft[] = [];
@@ -230,6 +248,32 @@ function heuristicPlan(map: RegionMap, prompt: string, center: TilePoint): { rat
     const at = findOpenGroundTile(map, focus, 3);
     drafts.push({ kind: 'paint', tile: 'rock', tiles: [at] });
     notes.push(`place a boulder at (${at[0]}, ${at[1]})`);
+  }
+
+  // 7. A light, a person, a kit building, the land's weather
+  if (/\b(light|lamp|lantern|glow)\b/.test(lower)) {
+    const at = findOpenGroundTile(map, focus, 4);
+    drafts.push({ kind: 'light', at, color: /\b(blue|moon)\b/.test(lower) ? '#b8d0ff' : /\b(violet|purple|arcane|magic)\b/.test(lower) ? '#c49bff' : '#ffd27a', radius: 3, ...(/\b(fire|flame|torch)\b/.test(lower) ? { flicker: true } : {}) });
+    notes.push(`stand a light at (${at[0]}, ${at[1]})`);
+  }
+  if (/\b(person|npc|shopkeeper|merchant|villager|smith)\b/.test(lower)) {
+    const at = findOpenGroundTile(map, focus, 5);
+    const name = /\bnamed\s+([A-Z][a-z]+)/.exec(prompt)?.[1] ?? 'A newcomer';
+    drafts.push({ kind: 'person', at, name, look: PERSON_LOOKS[0]!.id, greeting: 'Well met, traveller.' });
+    notes.push(`stand ${name} at (${at[0]}, ${at[1]})`);
+  }
+  if (/\b(tower|castle|fort|keep|battlements?)\b/.test(lower)) {
+    const style = Object.values(BUILDING_STYLES).find((s) => s.kit && s.biome === map.def.biome)?.id ?? Object.values(BUILDING_STYLES).find((s) => s.kit)?.id;
+    if (style) {
+      const at = findFreeHouseCorner(map, focus, [8, 8]);
+      drafts.push({ kind: 'kit', at, style, spec: designSpec({ across: 4, deep: 4, storeys: 2, door: 1, windows: 'every-other', roof: 'flat', battlements: true, towers: 'front', dome: false, chimney: false }) });
+      notes.push(`raise a towered kit building at (${at[0]}, ${at[1]})`);
+    }
+  }
+  const weather = (['snow', 'rain', 'fog', 'storm', 'sandstorm'] as const).find((w) => lower.includes(w));
+  if (weather && /\b(always|weather|land|keep)\b/.test(lower)) {
+    drafts.push({ kind: 'land', at: focus, weather });
+    notes.push(`keep the land in ${weather}`);
   }
 
   // Fallback if prompt was generic: lay a short scenic path with a biome gathering spot

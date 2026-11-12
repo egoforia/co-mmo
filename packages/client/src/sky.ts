@@ -17,6 +17,8 @@ export class SkyClock {
   private shown?: [number, number, number];
   /** The sun's colour and the sky's all-round share shown now, eased the same way. */
   private shownSun?: { color: [number, number, number]; fill: number };
+  /** The world editor's look at another hour or weather, on this screen only. */
+  private preview: { phase?: number; weather?: Weather } = {};
 
   /** A welcome said how the sky turns, its clock and the weather here, and the land's own light. */
   set(view: SkyView | undefined, biomeTint: number): void {
@@ -31,9 +33,19 @@ export class SkyClock {
     this.view = { ...this.view, weather };
   }
 
+  /** Shows another hour (a phase of the day) or weather on this screen only, for the world editor; none puts back the sky's. */
+  showAs(preview: { phase?: number; weather?: Weather }): void {
+    this.preview = preview;
+  }
+
+  /** The weather shown: the editor's look, else the land's. */
+  private get weather(): Weather {
+    return this.preview.weather ?? this.view.weather;
+  }
+
   /** Where the day is now. */
   phase(): number {
-    return dayPhase(Date.now() + this.offset, this.view.config);
+    return this.preview.phase ?? dayPhase(Date.now() + this.offset, this.view.config);
   }
 
   /** How dark it is, 0 by day to 1 at night. */
@@ -43,12 +55,12 @@ export class SkyClock {
 
   /** The hour and the weather in a few words, for the corner of the screen. */
   words(): string {
-    return skyWords(this.phase(), this.view.weather);
+    return skyWords(this.phase(), this.weather);
   }
 
   /** The light grade to show this frame, eased from the last toward the sky's colour. */
   tint(deltaMs: number): number {
-    const target = skyTint(this.biomeTint, this.phase(), this.view.weather);
+    const target = skyTint(this.biomeTint, this.phase(), this.weather);
     const goal: [number, number, number] = [(target >> 16) & 0xff, (target >> 8) & 0xff, target & 0xff];
     const t = Math.min(1, (EASE_PER_SECOND * deltaMs) / 1000);
     this.shown = this.shown ? (this.shown.map((v, i) => v + (goal[i]! - v) * t) as [number, number, number]) : goal;
@@ -58,8 +70,8 @@ export class SkyClock {
 
   /** The sun or moon and the sky's all-round share this frame; a change of weather eases in like the grade. */
   sun(deltaMs: number): { sun: Sun; fill: number } {
-    const goal = sunAt(this.phase(), this.view.weather);
-    const fill = skyFill(this.view.weather);
+    const goal = sunAt(this.phase(), this.weather);
+    const fill = skyFill(this.weather);
     const t = Math.min(1, (EASE_PER_SECOND * deltaMs) / 1000);
     const was = this.shownSun;
     this.shownSun = was

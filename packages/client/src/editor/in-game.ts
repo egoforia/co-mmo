@@ -1,9 +1,20 @@
 import Phaser from 'phaser';
-import { MAX_FLOORS, Tile, floorName, isBlocking, tileAt, type Bookmark, type Outline, type TilePoint } from '@co-mmo/shared';
+import { MAX_FLOORS, Tile, floorName, isBlocking, landChecks, tileAt, type Bookmark, type LandChecks, type Outline, type TilePoint, type Weather } from '@co-mmo/shared';
 import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
 import { EditorCore, draftsHtml, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
+
+/** The hours the editor can show a land at, as phases of the day (sky.ts: dawn from 5, day from 7, dusk from 18, night from 20). */
+const PREVIEW_HOURS: Record<string, { name: string; phase?: number }> = {
+  '': { name: 'The hour it is' },
+  dawn: { name: 'Dawn', phase: 6 / 24 },
+  day: { name: 'Midday', phase: 12 / 24 },
+  dusk: { name: 'Dusk', phase: 19 / 24 },
+  night: { name: 'Midnight', phase: 0 },
+};
+/** The weather the editor can show a land in ('' is as it is). */
+const PREVIEW_WEATHER: (Weather | '')[] = ['', 'clear', 'cloudy', 'rain', 'storm', 'fog', 'snow', 'sandstorm'];
 
 // The world editor's window beside the game, for the Owner and Stewards,
 // used by pointing at the world. The tools, their settings and what they
@@ -42,8 +53,12 @@ export class EditorUi {
   private hitboxGraphics?: Phaser.GameObjects.Graphics;
   private showHitboxes = true;
   private attached?: WorldScene;
+  /** The hour and weather the editor shows the land in ('' and none: as they are). */
+  private readonly sky: { hour: string; weather?: Weather } = { hour: '' };
   /** The floor the editor works on and shows, or undefined for the one we stand on. */
   private floor?: number;
+  /** What the last check of a land found, shown while the list shows that land. */
+  private checks?: { region: string; found: LandChecks; unpainted: string[] };
   /** Whether the bookmarks list is unfolded, kept as the window is drawn again. */
   private marksOpen = false;
   /** New edits go live at once instead of waiting as drafts. */
@@ -82,6 +97,7 @@ export class EditorUi {
       this.hitboxGraphics?.clear();
       this.attached?.viewFloor(undefined);
       this.attached?.previewEdits(this.listRegion);
+      this.attached?.previewSky({});
       return;
     }
     this.attach();
@@ -197,7 +213,64 @@ export class EditorUi {
   private floorHtml(): string {
     const floors = Array.from({ length: MAX_FLOORS.up + MAX_FLOORS.down + 1 }, (_, i) => MAX_FLOORS.up - i);
     const option = (value: string, label: string, chosen: boolean) => `<option value="${value}"${chosen ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-    return `<label class="floor-pick">Floor <select name="view-floor">${option('', 'Where I stand', this.floor === undefined)}${floors.map((f) => option(String(f), floorName(f), this.floor === f)).join('')}</select></label>`;
+    const hours = Object.entries(PREVIEW_HOURS).map(([id, h]) => option(id, h.name, this.sky.hour === id)).join('');
+    const weathers = PREVIEW_WEATHER.map((w) => option(w, w === '' ? 'As it is' : w[0]!.toUpperCase() + w.slice(1), (this.sky.weather ?? '') === w)).join('');
+    return `<label class="floor-pick">Floor <select name="view-floor">${option('', 'Where I stand', this.floor === undefined)}${floors.map((f) => option(String(f), floorName(f), this.floor === f)).join('')}</select></label>
+      <label class="floor-pick">See it at <select name="view-hour">${hours}</select></label>
+      <label class="floor-pick">In <select name="view-weather">${weathers}</select></label>`;
+  }
+
+  /** Shows the land at another hour or in other weather, on this screen only (players see the sky as it is). */
+  private chooseSky(hour?: string, weather?: string): void {
+    if (hour !== undefined) this.sky.hour = Object.hasOwn(PREVIEW_HOURS, hour) ? hour : '';
+    if (weather !== undefined) this.sky.weather = (PREVIEW_WEATHER as string[]).includes(weather) && weather ? (weather as Weather) : undefined;
+    this.attached?.previewSky({ ...(PREVIEW_HOURS[this.sky.hour]?.phase !== undefined ? { phase: PREVIEW_HOURS[this.sky.hour]!.phase } : {}), ...(this.sky.weather ? { weather: this.sky.weather } : {}) });
+  }
+
+  /** Checks the land the list shows: shapes, walks, and pictures not painted yet. */
+  private check(): void {
+    const scene = this.attached;
+    const map = scene?.landMap(this.listRegion);
+    if (!scene || !map) return this.render('That land is not in sight to check.');
+    // Pictures the land shows that this screen has none of: people, monsters and pieces.
+    const assets = new Set([...map.npcs.map((n) => n.asset), ...map.creatures.map((c) => c.asset), ...map.landmarks.map((l) => l.asset)]);
+    const unpainted = [...assets].filter((a) => a && !scene.textures.exists(a)).sort();
+    this.checks = { region: this.listRegion, found: landChecks(map), unpainted };
+    const { shapes, walks } = this.checks.found;
+    this.render(shapes.length + walks.length + unpainted.length ? 'Checked. See what turned up below.' : 'Checked. All is well here.');
+  }
+
+  /** The check and shot buttons, and what the last check found in three short lists. */
+  private checksHtml(): string {
+    const c = this.checks;
+    const buttons = '<p class="checks-actions"><button type="button" class="quiet" data-check>Check this land</button> <button type="button" class="quiet" data-shot title="Saves a picture of what you see">Take a shot here</button></p>';
+    if (!c || c.region !== this.listRegion) return buttons;
+    const list = (title: string, items: string[], none: string) =>
+      `<h4>${escapeHtml(title)}</h4>${items.length ? `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : `<p class="note">${escapeHtml(none)}</p>`}`;
+    const n = c.unpainted.length;
+    // The Art tab's two image models: about 4 cents a picture, or 12 for the sharper one.
+    const cost = n ? `<p class="note">About $${(n * 0.039).toFixed(2)} to $${(n * 0.12).toFixed(2)} to paint them all in the Art tab.</p>` : '';
+    return `<details class="checks-box" open><summary>Checks</summary>
+      ${list('Shapes', c.found.shapes, 'Every floor, stair and kit building holds together.')}
+      ${list('Walks', c.found.walks, 'Everyone and everything here can be walked to from where players arrive.')}
+      ${list('Not painted yet', c.unpainted, 'Everything here has its picture.')}${cost}
+      </details>${buttons}`;
+  }
+
+  /** Saves a picture of the game as it is drawn now (the editor's window is not in it). */
+  private shot(): void {
+    const scene = this.attached;
+    if (!scene) return this.render('The game is not running yet.');
+    const at = scene.playerPosition;
+    const name = `co-mmo-${this.options.region().id}-${Math.floor(at.x)}-${Math.floor(at.y)}.png`;
+    scene.game.renderer.snapshot((image) => {
+      if (!(image instanceof HTMLImageElement)) return this.render('The picture could not be taken.');
+      const link = document.createElement('a');
+      link.href = image.src;
+      link.download = name;
+      link.click();
+      this.render(`Saved ${name}.`);
+    });
   }
 
   /** The bookmarks of the land the list shows, each with a button to go there (`data-go`). */
@@ -262,6 +335,9 @@ export class EditorUi {
     if (d.discard !== undefined) return this.act({ discard: true });
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.listRegion)));
     if (d.pick) return this.step(this.core.pickAction(d.pick));
+    if (d.area) return this.step(this.core.areaAction(d.area, d.value));
+    if (d.check !== undefined) return this.check();
+    if (d.shot !== undefined) return this.shot();
     if (d.go !== undefined) {
       const mark = this.bookmarks()[Number(d.go)];
       if (!mark) return;
@@ -277,6 +353,8 @@ export class EditorUi {
       this.showHitboxes = input.checked;
       this.drawHitboxes();
     } else if (input.name === 'view-floor') this.chooseFloor(input.value);
+    else if (input.name === 'view-hour') this.chooseSky(input.value);
+    else if (input.name === 'view-weather') this.chooseSky(undefined, input.value);
     else if (input.name === 'live') this.live = input.checked;
     else if (this.core.set(input.name, input.value, input.checked) && this.core.hasNotes()) this.render();
     // Hand the keys back to walking.
@@ -300,7 +378,8 @@ export class EditorUi {
         ${historyHtml(this.log, this.busy)}</h3>
       ${draftsHtml(this.log, this.live, this.busy)}
       ${editListHtml(this.log)}
-      ${this.bookmarksHtml()}`;
+      ${this.bookmarksHtml()}
+      ${this.checksHtml()}`;
     this.drawHitboxes();
   }
 }

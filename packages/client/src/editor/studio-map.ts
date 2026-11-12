@@ -313,6 +313,7 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
   else if (d.mapZoom) zoom(d.mapZoom === 'in' ? 'in' : 'out');
   else if (d.away !== undefined) return void step(core.takeAway(state.floor)), true;
   else if (d.pick) return void step(core.pickAction(d.pick)), true;
+  else if (d.area) return void step(core.areaAction(d.area, d.value)), true;
   else if (d.undo !== undefined) return void send({ undo: true }), true;
   else if (d.redo !== undefined) return void send({ redo: true }), true;
   else if (d.remove) return void send({ remove: d.remove }), true;

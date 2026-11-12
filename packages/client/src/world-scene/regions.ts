@@ -27,6 +27,7 @@ import {
   registerKitTileset,
   registerStoreyTileset,
   registerTileset,
+  stairTexture,
 } from '../textures.ts';
 import {
   type BuildingView,
@@ -322,8 +323,7 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
     for (const floor of [s.lower, s.upper]) {
       const parts: Phaser.GameObjects.GameObject[] = [];
       const isUp = floor === s.lower;
-      const defaultArt = isUp ? (s.kind === 'ladder' ? 'ladder-up' : 'stairs-up') : (s.kind === 'ladder' ? 'ladder-down' : 'stairs-down');
-      const art = (isUp ? s.art?.up : s.art?.down) ?? defaultArt;
+      const art = stairTexture(scene, map.def.biome, s, isUp);
       const feet = PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
       const at = PROJECTION.toScreen(feet.x, feet.y);
       const lift = floorLift(floor);

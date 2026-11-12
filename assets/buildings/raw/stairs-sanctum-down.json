@@ -1,0 +1,16 @@
+{
+  "id": "stairs-sanctum-down",
+  "biome": "sanctum",
+  "kind": "prop",
+  "direction": "down",
+  "name": "Descending stairs (the Sanctum)",
+  "materials": [
+    "pale temple limestone",
+    "white marble",
+    "aged verdigris copper",
+    "polished brass"
+  ],
+  "mood": "sacred, serene",
+  "view": "classic 2:1 isometric view, looking down at about 30 degrees from one corner",
+  "prompt": "Low-poly isometric fantasy game art, light-neutral, flat faceted shapes with crisp edges. An isometric floor stairwell opening leading downward crafted from pale temple limestone, white marble, aged verdigris copper, polished brass. Palette leans on the Sanctum signatures. Isolated on pure magenta (#FF00FF)."
+}

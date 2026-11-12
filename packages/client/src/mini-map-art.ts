@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { TILE_PIXELS, Tile, type RegionMap } from '@co-mmo/shared';
-import { TILE_MARGIN, propTexture, registerBuildingTileset, registerStoreyTileset, registerTileset } from './textures.ts';
+import { TILE_MARGIN, propTexture, registerBuildingTileset, registerStoreyTileset, registerTileset, stairTexture } from './textures.ts';
 
 // The mini map's pictures of each floor, put together from the same painted
 // tiles, trees, rocks and set pieces the world is drawn with, only smaller.
@@ -100,7 +100,8 @@ function landmarks(scene: Phaser.Scene, ctx: CanvasRenderingContext2D, map: Regi
 function stairs(scene: Phaser.Scene, ctx: CanvasRenderingContext2D, map: RegionMap, floor: number, ox: number, oy: number): void {
   for (const s of map.stairways) {
     if (s.lower !== floor && s.upper !== floor) continue;
-    const art = floor === s.lower ? s.art?.up : s.art?.down;
+    const isUp = floor === s.lower;
+    const art = stairTexture(scene, map.def.biome, s, isUp);
     if (art && scene.textures.exists(art)) stand(ctx, source(scene, art), s.x - ox + s.width / 2, s.y - oy + s.height, s.width);
   }
 }

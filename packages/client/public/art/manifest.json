@@ -2118,5 +2118,125 @@
     "prompt": "Stylised low-poly isometric fantasy game art, light-neutral.\nSubject: the cantilevered timber deck inside Whiteledge Terrace House: a cantilevered mountain cedar plank lookout platform with heavy diagonal pine support struts and cold-forged silver-iron brackets.",
     "createdAt": "2026-11-09T16:11:44.999Z",
     "view": "isometric"
+  },
+  "stairs-sanctum-up": {
+    "file": "art/stairs-sanctum-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sanctum-down": {
+    "file": "art/stairs-sanctum-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-up": {
+    "file": "art/stairs-whispering-woods-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-whispering-woods-down": {
+    "file": "art/stairs-whispering-woods-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-up": {
+    "file": "art/stairs-sunlit-shore-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sunlit-shore-down": {
+    "file": "art/stairs-sunlit-shore-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-up": {
+    "file": "art/stairs-frostpeak-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-frostpeak-down": {
+    "file": "art/stairs-frostpeak-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-up": {
+    "file": "art/stairs-mirage-desert-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mirage-desert-down": {
+    "file": "art/stairs-mirage-desert-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-up": {
+    "file": "art/stairs-verdant-meadows-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-verdant-meadows-down": {
+    "file": "art/stairs-verdant-meadows-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-up": {
+    "file": "art/stairs-mushroom-hollow-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-mushroom-hollow-down": {
+    "file": "art/stairs-mushroom-hollow-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-up": {
+    "file": "art/stairs-ember-wastes-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-ember-wastes-down": {
+    "file": "art/stairs-ember-wastes-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-up": {
+    "file": "art/stairs-murkmire-swamp-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-murkmire-swamp-down": {
+    "file": "art/stairs-murkmire-swamp-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-up": {
+    "file": "art/stairs-sky-ruins-up.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
+  },
+  "stairs-sky-ruins-down": {
+    "file": "art/stairs-sky-ruins-down.png",
+    "kind": "prop",
+    "width": 256,
+    "height": 256
   }
 }

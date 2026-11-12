@@ -1,0 +1,15 @@
+{
+  "id": "stairs-ember-wastes-up",
+  "biome": "ember-wastes",
+  "kind": "prop",
+  "direction": "up",
+  "name": "Ascending stairs (Ember Wastes)",
+  "materials": [
+    "hexagonal columnar basalt",
+    "blackened iron grate",
+    "molten ember glow"
+  ],
+  "mood": "volcanic, harsh",
+  "view": "classic 2:1 isometric view, looking down at about 30 degrees from one corner",
+  "prompt": "Low-poly isometric fantasy game art, light-neutral, flat faceted shapes with crisp edges. An isometric staircase ascending from bottom-left toward top-right crafted from hexagonal columnar basalt, blackened iron grate, molten ember glow. Palette leans on Ember Wastes signatures. Isolated on pure magenta (#FF00FF)."
+}

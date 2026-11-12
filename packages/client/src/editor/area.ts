@@ -53,8 +53,14 @@ export class AreaTool {
       this.corner = { region, at };
       return { say: 'Now click the opposite corner of the area to copy.' };
     }
-    const copy = copyArea(map, this.corner.at, at);
+    const from = this.corner.at;
     this.corner = undefined;
+    return this.copy(map, from, at);
+  }
+
+  /** Copies the area between two corners (an area dragged out with Select, or two clicks here). */
+  copy(map: RegionMap, from: TilePoint, to: TilePoint): ToolStep {
+    const copy = copyArea(map, from, to);
     if (!copy) return { say: 'There is nothing in that area to copy.' };
     this.copied = copy;
     return { say: `Copied ${copy.size[0]} × ${copy.size[1]} tiles: ${copy.drafts.length} changes. Click where its top-left corner goes to paste it.` };

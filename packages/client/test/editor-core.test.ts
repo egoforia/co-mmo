@@ -122,22 +122,79 @@ describe('the editor core', () => {
     expect(core.press('sanctum', map, [30, 30], 1).draft).toEqual({ kind: 'bookmark', at: [30.5, 30.5], name: 'Front door', level: 1 });
   });
 
-  it('picks a person, moves them to the floor shown, and loads them into the Person tool to change', () => {
+  it('picks a person, moves them to the floor shown, and changes them from the inspector', () => {
     const core = new EditorCore();
     const amala = map.npcs.find((n) => n.id === 'sister-amala')!;
     const at: TilePoint = [Math.floor(amala.x), Math.floor(amala.y)];
     core.choose('select');
     expect(core.press('sanctum', map, at, 0).say).toBe('Picked Sister Amala.');
-    expect(core.settingsHtml()).toContain('data-pick="change"');
+    expect(core.settingsHtml()).toContain('data-pick="apply:person"');
+    expect(core.settingsHtml()).toContain('name="insp.person.name" type="text" maxlength="40" value="Sister Amala"');
     core.pickAction('move');
     expect(core.press('sanctum', map, [30, 30], 1).draft).toEqual({ kind: 'person', at: [30, 30], target: 'sister-amala', level: 1 });
     core.press('sanctum', map, at, 0);
-    expect(core.pickAction('change').say).toMatch(/click Sister Amala/);
-    expect(core.tool).toBe('person');
-    expect(core.settingsHtml()).toContain('value="Sister Amala"');
-    const change = core.press('sanctum', map, at, 0).draft!;
-    expect(change).toMatchObject({ kind: 'person', target: 'sister-amala', name: 'Sister Amala', look: amala.asset, shop: { teaches: [{ ability: 'mend' }] } });
+    expect(core.set('insp.person.greeting', 'Walk in the light.')).toBe(true);
+    const change = core.pickAction('apply:person').draft!;
+    expect(change).toMatchObject({ kind: 'person', at, target: 'sister-amala', name: 'Sister Amala', look: amala.asset, greeting: 'Walk in the light.', shop: { teaches: [{ ability: 'mend' }] } });
     expect(checkEdit(map, change, CREATURES)).toBeUndefined();
+  });
+
+  it('gives a picked person a quest, showing only the settings that apply', () => {
+    const core = new EditorCore();
+    const amala = map.npcs.find((n) => n.id === 'sister-amala')!;
+    const at: TilePoint = [Math.floor(amala.x), Math.floor(amala.y)];
+    core.press('sanctum', map, at, 0);
+    expect(core.settingsHtml()).toContain('name="insp.quest.creature"');
+    expect(core.settingsHtml()).not.toContain('name="insp.quest.item"');
+    expect(core.redraws('insp.quest.goal')).toBe(true);
+    core.set('insp.quest.goal', 'gather');
+    expect(core.settingsHtml()).toContain('name="insp.quest.item"');
+    expect(core.settingsHtml()).not.toContain('name="insp.quest.creature"');
+    const quest = core.pickAction('apply:quest').draft!;
+    expect(quest).toMatchObject({ kind: 'quest', target: 'sister-amala', goal: { kind: 'gather' } });
+    expect(checkEdit(map, quest, CREATURES)).toBeUndefined();
+  });
+
+  it('changes a picked building\'s floors and look from the inspector, filled in as it is', () => {
+    const core = new EditorCore();
+    core.press('sanctum', map, inShop, 0);
+    const html = core.settingsHtml();
+    expect(html).toContain('data-section="restyle"');
+    expect(html).toContain('data-section="floors"');
+    expect(html).toContain(`<option value="${shop.style}" selected>`);
+    core.set('insp.floors.up', '2');
+    const floors = core.pickAction('apply:floors').draft!;
+    expect(floors).toEqual({ kind: 'floors', at: [shop.x, shop.y], up: 2, down: 0, target: shop.id });
+    expect(checkEdit(map, floors, CREATURES)).toBeUndefined();
+    expect(core.pickAction('remove').draft).toMatchObject({ kind: 'remove', target: shop.id });
+    expect(core.hasPick()).toBe(false);
+  });
+
+  it('changes a picked monster spawn, and draws its patrol path from its home', () => {
+    const core = new EditorCore();
+    const home = map.creatures.find((c) => !c.floor)!;
+    const at: TilePoint = [Math.floor(home.x), Math.floor(home.y)];
+    core.press('sanctum', map, at, 0);
+    core.set('insp.monsters.monsterLevel', '9');
+    expect(core.pickAction('apply:monsters').draft).toMatchObject({ kind: 'monsters', at, monsterLevel: 9, level: 0 });
+    expect(core.pickAction('apply:patrol').say).toMatch(/Drag along/);
+    // The drag may start anywhere: the path starts at the home.
+    core.press('sanctum', map, [at[0] + 1, at[1]], 0);
+    for (let x = 2; x <= 6; x++) core.drag('sanctum', map, [at[0] + x, at[1]]);
+    expect(core.release().draft).toEqual({ kind: 'patrol', at, route: [[at[0] + 1, at[1]], [at[0] + 4, at[1]], [at[0] + 6, at[1]]], level: 0 });
+  });
+
+  it('picks an area dragged over bare ground and holds it to paste', () => {
+    const core = new EditorCore();
+    const [x, y] = [shop.x - 1, shop.y - 1];
+    expect(core.press('sanctum', map, [x, y], 0)).toEqual({});
+    core.drag('sanctum', map, [shop.x + shop.width, shop.y + shop.height]);
+    expect(core.outlines('sanctum', map, [0, 0], 0)[0]).toMatchObject({ x, y, tone: 'held' });
+    expect(core.release().say).toMatch(/^Copied /);
+    expect(core.current().id).toBe('area');
+    core.choose('select');
+    core.press('sanctum', map, [x, y], 0);
+    expect(core.release().say).toMatch(/^Nothing to pick/);
   });
 
   it('draws a patrol path from a monster\'s home with a drag, and lays a spawn at another level', () => {

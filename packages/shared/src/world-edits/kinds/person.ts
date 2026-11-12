@@ -125,6 +125,15 @@ export const PERSON: EditKind<'person'> = {
   pointer: 'click',
   onFloors: true,
   targets: 'person',
+  inspects: {
+    picks: ['person'],
+    title: 'Who they are',
+    action: 'Change them',
+    current: (map, p) => {
+      const n = map.npcs.find((m) => m.id === p.id);
+      return n && personValues(n);
+    },
+  },
   fields: [
     { key: 'name', label: 'Name', type: 'text', max: PERSON_TEXT.name, default: 'A newcomer' },
     { key: 'look', label: 'Looks like', type: 'choice', choices: () => PERSON_LOOKS },

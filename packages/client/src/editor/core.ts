@@ -1,30 +1,22 @@
 import {
   BUILDING_STYLES,
-  CREATURES,
   EDIT_KINDS,
   MAX_STROKE,
   SPOTS,
   Tile,
   buildingAt,
-  copyDraft,
   editWords,
   floorName,
   landmarkAt,
-  moveDrafts,
   brushTiles,
-  personValues,
   pickAt,
-  removeDraft,
   setPiece,
   tileAt,
   type BrushShape,
-  type EditContext,
-  type EditField,
   type EditKind,
   type EditKindId,
   type FieldValue,
   type Outline,
-  type Picked,
   type RegionMap,
   type TilePoint,
   type ToolUse,
@@ -33,10 +25,13 @@ import {
 } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 import { AreaTool } from './area.ts';
+import { fieldsHtml, filled, hasRules, readField } from './fields.ts';
+import { Inspector } from './inspector.ts';
 
 // The world editor's core, shared by its two views: the window beside the
 // game (in-game.ts) and the Studio's map (studio-map.ts). It knows the tools
-// (one per kind of edit in the registry, plus Select and Copy and paste), their settings, what a
+// (one per kind of edit in the registry, plus Select and Copy and paste), their settings, the
+// Select tool's inspector (inspector.ts), what a
 // press, drag or release on a tile makes, what to outline under the pointer,
 // and how the edit list reads. The views only turn the pointer into tiles,
 // draw the outlines their own way and send what the core makes.
@@ -62,12 +57,8 @@ export interface EditList {
   unlaid?: string[];
 }
 
-const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see it, then take it away, copy it or move it.' };
+const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see and change it. Drag over bare ground to copy an area.' };
 const AREA = { id: 'area' as const, name: 'Copy and paste', hint: 'Click two corners to copy an area: its ground and everything standing in it. Then each click pastes it, all or none. Keep a copy as a prefab to paste in any land.' };
-const CONTEXT: EditContext = { creatures: CREATURES };
-
-/** Number settings with at most this many choices are drawn as a list to pick from. */
-const SHORT_RANGE = 8;
 
 const TILE_NAMES: Partial<Record<Tile, string>> = {
   [Tile.Ground]: 'open ground', [Tile.Path]: 'a path', [Tile.Water]: 'water', [Tile.Tree]: 'a tree', [Tile.Rock]: 'a rock',
@@ -79,11 +70,11 @@ export class EditorCore {
   tool: ToolId = 'select';
   private readonly values: Partial<Record<EditKindId, Record<string, FieldValue>>> = {};
   /** Mid-tool: the brush stroke, or what was picked up (or where a road starts). */
-  private stroke: { region: string; level: number; tiles: Map<string, TilePoint>; from: TilePoint } | undefined;
+  private stroke: { region: string; level: number; tiles: Map<string, TilePoint>; from: TilePoint; kind?: EditKind<EditKindId> } | undefined;
   private held: { region: string; at: TilePoint; what: string; target?: string } | undefined;
-  /** The Select tool's pick, and whether a copy or move of it waits for where it goes. */
   private readonly area = new AreaTool();
-  private picked: { region: string; thing: Picked; placing?: 'copy' | 'move'; values?: Record<string, FieldValue> } | undefined;
+  /** The Select tool: what is picked and how to change it. */
+  readonly inspector = new Inspector();
 
   /** The tools on offer now: set pieces only while their kit's wish is on. */
   tools(): { id: ToolId; name: string; hint: string }[] {
@@ -109,13 +100,13 @@ export class EditorCore {
   cancel(): void {
     this.stroke = undefined;
     this.held = undefined;
-    this.picked = undefined;
+    this.inspector.reset();
     this.area.reset();
   }
 
   /** True while a tool is part way through something Esc would drop: a stroke, a first click, a pick or an area corner. */
   midway(): boolean {
-    return !!(this.stroke || this.held || this.picked || this.area.midway());
+    return !!(this.stroke || this.held || this.inspector.midway() || this.area.midway());
   }
 
   /** True while a thing is picked up (the move tool's Take it away). */
@@ -130,31 +121,25 @@ export class EditorCore {
   /** The current tool's settings, chosen or as they start. */
   settings(kind = this.kind()): Record<string, FieldValue> {
     if (!kind) return {};
-    const chosen = (this.values[kind.kind] ??= {});
-    const out: Record<string, FieldValue> = {};
-    for (const f of kind.fields) out[f.key] = f.key in chosen ? chosen[f.key]! : start(f);
-    // A choice whose list changed (a wish switched off) starts again.
-    for (const f of kind.fields) if (f.type === 'choice' && !f.choices(CONTEXT).some((c) => c.id === out[f.key])) out[f.key] = start(f);
-    return out;
+    return filled(kind.fields, (this.values[kind.kind] ??= {}));
   }
 
   /** Sets one of the current tool's settings from its input; false when it is not one. */
   set(key: string, raw: string, checked?: boolean): boolean {
+    if (this.tool === 'select') return this.inspector.set(key, raw, checked);
     if (this.tool === 'area') return this.area.set(key, raw);
     const kind = this.kind();
     const field = kind?.fields.find((f) => f.key === key);
     if (!kind || !field) return false;
-    const chosen = (this.values[kind.kind] ??= {});
-    if (field.type === 'flag') chosen[key] = !!checked;
-    else if (field.type === 'number') chosen[key] = Math.max(field.min, Math.min(field.max, Math.round(Number(raw)) || field.min));
-    else if (field.type === 'text') chosen[key] = raw.slice(0, field.max);
-    else chosen[key] = raw;
+    (this.values[kind.kind] ??= {})[key] = readField(field, raw, checked);
     return true;
   }
 
-  /** True when the tool says something under its settings that changes with them (so the view draws them again on a change). */
-  hasNotes(): boolean {
-    return !!this.kind()?.notes;
+  /** True when a change to this input changes what the panel shows (notes under the settings, or settings that apply only sometimes), so the view draws it again. */
+  redraws(key: string): boolean {
+    if (this.tool === 'select') return this.inspector.redraws(key);
+    const kind = this.kind();
+    return !!kind && (!!kind.notes || hasRules(kind.fields));
   }
 
   /** The Copy and paste tool's buttons (`data-area`, with `data-value` naming a prefab). */
@@ -162,84 +147,41 @@ export class EditorCore {
     return this.tool === 'area' ? this.area.action(action, value) : {};
   }
 
-  /** The current tool's settings as HTML: each input named by its setting's key. */
+  /** The current tool's settings as HTML: each input named by its setting's key; Select's is the inspector. */
   settingsHtml(): string {
-    if (this.tool === 'select') return this.pickedHtml();
+    if (this.tool === 'select') return this.inspector.html();
     if (this.tool === 'area') return this.area.html();
     const kind = this.kind();
     if (!kind) return '';
     const values = this.settings(kind);
-    const option = (value: string, label: string, chosen: boolean) => `<option value="${escapeHtml(value)}"${chosen ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-    const fields = kind.fields.map((f) => {
-      const v = values[f.key];
-      if (f.type === 'flag') return `<label class="check"><input type="checkbox" name="${f.key}"${v ? ' checked' : ''} /> ${escapeHtml(f.label)}</label>`;
-      if (f.type === 'text') return `<label>${escapeHtml(f.label)} <input name="${f.key}" type="text" maxlength="${f.max}" value="${escapeHtml(String(v))}" /></label>`;
-      if (f.type === 'choice') return `<label>${escapeHtml(f.label)} <select name="${f.key}">${f.choices(CONTEXT).map((c) => option(c.id, c.name, c.id === v)).join('')}</select></label>`;
-      if (f.max - f.min <= SHORT_RANGE) {
-        const counts = Array.from({ length: f.max - f.min + 1 }, (_, i) => f.min + i);
-        return `<label>${escapeHtml(f.label)} <select name="${f.key}">${counts.map((n) => option(String(n), String(n), n === v)).join('')}</select></label>`;
-      }
-      return `<label>${escapeHtml(f.label)} <input name="${f.key}" type="number" min="${f.min}" max="${f.max}" value="${v}" /></label>`;
-    });
+    const fields = [fieldsHtml(kind.fields, values)];
     if (this.holding()) fields.push('<button type="button" class="quiet" data-away>Take it away</button>');
     const notes = kind.notes?.(values) ?? [];
     if (notes.length) fields.push(`<ul class="tool-notes">${notes.map((n) => `<li class="${n.ok ? 'ok' : 'bad'}">${escapeHtml(n.text)}</li>`).join('')}</ul>`);
     return fields.join('\n');
   }
 
-  /** The Select tool's card: what is picked, and what to do with it (`data-pick`). */
-  private pickedHtml(): string {
-    const p = this.picked;
-    if (!p) return '<p class="note">Nothing picked yet.</p>';
-    const { thing } = p;
-    const change = p.values ? '<button type="button" class="quiet" data-pick="change">Change</button>' : '';
-    const buttons = p.placing
-      ? `<p class="note">Click where its top-left corner goes${thing.kind === 'person' ? ', on any floor' : ''}. Esc to stop.</p>`
-      : `<button type="button" class="quiet" data-pick="remove">Take it away</button><button type="button" class="quiet" data-pick="copy">Copy</button><button type="button" class="quiet" data-pick="move">Move</button>${change}`;
-    return `<div class="picked"><strong>${escapeHtml(thing.name)}</strong>
-      ${[...thing.details, `At ${thing.box.x}, ${thing.box.y}${thing.level ? `, floor ${thing.level}` : ''}`].map((d) => `<span class="note">${escapeHtml(d)}</span>`).join('')}
-      ${thing.id ? `<span class="note">Name: <code>${escapeHtml(thing.id)}</code></span>` : ''}
-      <span class="pick-actions">${buttons}</span></div>`;
-  }
-
-  /** The Select tool's buttons: take the pick away now, or copy or move it with the next click. */
+  /** The inspector's buttons (`data-pick`): take the pick away, copy or move it with the next click, or change it. */
   pickAction(action: string): ToolStep {
-    const p = this.picked;
-    if (!p || this.tool !== 'select') return {};
-    if (action === 'remove') {
-      this.picked = undefined;
-      return { draft: removeDraft(p.thing), region: p.region };
-    }
-    // A person's settings go to the Person tool, to change and then click them.
-    if (action === 'change' && p.values) {
-      this.values.person = { ...p.values };
-      this.tool = 'person';
-      this.picked = undefined;
-      return { say: `Change their settings, then click ${p.thing.name} to make it so.` };
-    }
-    if (action === 'copy' || action === 'move') {
-      p.placing = action;
-      return { say: action === 'copy' ? 'Click where the copy goes.' : 'Click where it goes.' };
-    }
-    return {};
+    return this.tool === 'select' ? this.inspector.action(action) : {};
   }
 
-  /** The Select tool on a tile: a copy or move lands there, or the thing there is picked. */
+  /** True while something is picked (and not waiting for where it goes), for the keys that act on it. */
+  hasPick(): boolean {
+    return this.tool === 'select' && !!this.inspector.picked && !this.inspector.picked.placing;
+  }
+
+  /** The Select tool on a tile: the patrol path being drawn starts, or the inspector picks. */
   private select(region: string, map: RegionMap, at: TilePoint, level: number): ToolStep {
-    const p = this.picked;
-    if (p?.placing) {
-      if (p.region !== region) return { say: 'Keep it in the land it came from.' };
-      // People go to the floor shown; everything else stays on its own.
-      const onto = p.thing.kind === 'person' ? (level ? { level } : { level: undefined }) : {};
-      const drafts = p.placing === 'copy' ? [copyDraft(map, p.thing, at)].filter((d) => !!d).map((d) => ({ ...d, ...onto })) : moveDrafts(map, p.thing, at, p.thing.kind === 'person' ? level : p.thing.level);
-      if (!drafts?.length) return { say: 'That cannot be copied yet.' };
-      this.picked = p.placing === 'copy' ? { region, thing: p.thing, placing: 'copy' } : undefined;
-      return drafts.length === 1 ? { draft: drafts[0]!, region } : { drafts, region };
+    const p = this.inspector.picked;
+    if (this.inspector.path && p) {
+      if (p.region !== region) return { say: 'Draw the path in the land its monsters live in.' };
+      const home: TilePoint = [p.thing.box.x, p.thing.box.y];
+      this.stroke = { region, level: p.thing.level, tiles: new Map([[`${home[0]},${home[1]}`, home]]), from: home, kind: EDIT_KINDS.patrol as unknown as EditKind<EditKindId> };
+      this.drag(region, map, at);
+      return {};
     }
-    const thing = pickAt(map, at, level);
-    const person = thing?.kind === 'person' ? map.npcs.find((n) => n.id === thing.id) : undefined;
-    this.picked = thing && { region, thing, ...(person ? { values: personValues(person) } : {}) };
-    return { say: thing ? `Picked ${thing.name}.` : `Nothing to pick at ${at[0]}, ${at[1]}.` };
+    return this.inspector.press(region, map, at, level);
   }
 
   /** A press on a tile of a land, on a floor of it. */
@@ -282,6 +224,7 @@ export class EditorCore {
 
   /** The pointer dragged over a tile while pressed: a brush stroke grows. */
   drag(region: string, map: RegionMap, [x, y]: TilePoint): void {
+    if (this.tool === 'select' && !this.stroke) return this.inspector.drag(region, [x, y]);
     if (!this.stroke || this.stroke.region !== region) return;
     const n = Number(this.settings().brush) || 1;
     // A rectangle, line or fill is drawn again from where it was pressed, each time the pointer moves.
@@ -301,9 +244,11 @@ export class EditorCore {
 
   /** The pointer let go: a brush stroke is laid. */
   release(): ToolStep {
+    if (this.tool === 'select' && !this.stroke) return this.dropBox();
     const stroke = this.stroke;
     this.stroke = undefined;
-    const kind = this.kind();
+    const kind = stroke?.kind ?? this.kind();
+    if (stroke?.kind) this.inspector.path = false;
     if (!stroke?.tiles.size || !kind) return {};
     const tiles = [...stroke.tiles.values()];
     return this.make(kind, { at: tiles[0]!, tiles }, stroke.region, stroke.level);
@@ -315,6 +260,17 @@ export class EditorCore {
     if (!this.holding() || !kind) return {};
     const { at, target, region } = this.take();
     return this.make(kind, { at, to: null, ...(target ? { target } : {}) }, region, level);
+  }
+
+  /** An area dragged out with Select is copied, and Copy and paste takes over to paste it; one tile is just bare ground. */
+  private dropBox(): ToolStep {
+    const box = this.inspector.release();
+    if (!box) return {};
+    const [a, b] = [box.from, box.to];
+    if (a[0] === b[0] && a[1] === b[1]) return { say: `Nothing to pick at ${a[0]}, ${a[1]}.` };
+    const step = this.area.copy(box.map, a, b);
+    if (this.area.copied) this.tool = 'area';
+    return step;
   }
 
   private take(): NonNullable<EditorCore['held']> {
@@ -331,12 +287,8 @@ export class EditorCore {
 
   /** What to outline under the pointer on a land: the stroke so far, then what the tool would touch. */
   outlines(region: string, map: RegionMap, at: TilePoint, level: number): Outline[] {
-    if (this.tool === 'select') {
-      const p = this.picked?.region === region ? this.picked : undefined;
-      if (!p) return [pickAt(map, at, level)?.box ?? { x: at[0], y: at[1], w: 1, h: 1 }];
-      const held: Outline = { ...p.thing.box, tone: 'held' };
-      return p.placing ? [held, { x: at[0], y: at[1], w: p.thing.box.w, h: p.thing.box.h }] : [held, { x: at[0], y: at[1], w: 1, h: 1 }];
-    }
+    if (this.tool === 'select' && this.stroke?.region === region) return [...this.stroke.tiles.values()].map(([x, y]) => ({ x, y, w: 1, h: 1, tone: 'held' as const }));
+    if (this.tool === 'select') return this.inspector.outlines(region, map, at, level);
     if (this.tool === 'area') return this.area.outlines(region, at);
     const kind = this.kind();
     if (!kind) return [{ x: at[0], y: at[1], w: 1, h: 1 }];
@@ -345,12 +297,6 @@ export class EditorCore {
     const aim = kind.outline?.(map, { at, level, ...(from ? { from } : {}) }, this.settings(kind)) ?? [{ x: at[0], y: at[1], w: 1, h: 1 }];
     return [...stroke, ...aim];
   }
-}
-
-/** A setting's starting value. */
-function start(f: EditField): FieldValue {
-  if (f.type !== 'choice') return f.default;
-  return f.default?.(CONTEXT) ?? f.choices(CONTEXT)[0]?.id ?? '';
 }
 
 /** What stands on a tile of a floor, in a few words. */

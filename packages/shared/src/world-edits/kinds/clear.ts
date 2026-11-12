@@ -9,6 +9,7 @@ export const CLEAR: EditKind<'clear'> = {
   hint: 'Click to send away every monster living near that spot.',
   pointer: 'click',
   onFloors: true,
+  inspects: { picks: ['monster'], title: 'Clear monsters around it', action: 'Send them away' },
   fields: [{ key: 'radius', label: 'Tiles around', type: 'number', min: 1, max: MAX_CLEAR_RADIUS, default: 6 }],
   shape: '{"kind":"clear","at":[x,y],"radius":6}',
   outline(_map, { at }, v) {

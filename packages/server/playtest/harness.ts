@@ -74,3 +74,12 @@ export async function goLive(page: import('playwright').Page): Promise<void> {
   // Ticking it draws the bar again, which folds the menu away.
   await page.check('#editor input[name="live"]');
 }
+
+/** Selects the building at a point of the screen and gives it floors from the inspector's Floors section. */
+export async function giveFloors(page: import('playwright').Page, at: { x: number; y: number }, up: number, down: number): Promise<void> {
+  await page.mouse.click(at.x, at.y);
+  await page.click('#editor details[data-section="floors"] summary');
+  await page.selectOption('#editor select[name="insp.floors.up"]', String(up));
+  await page.selectOption('#editor select[name="insp.floors.down"]', String(down));
+  await page.click('#editor [data-pick="apply:floors"]');
+}

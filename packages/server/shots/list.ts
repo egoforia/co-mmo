@@ -222,7 +222,7 @@ export const SHOTS: Shot[] = [
     mustSee: [
       'edit mode: the game HUD, chat, stats and key bar are gone; a top bar (land, floor stepper, hour and weather, Tiles and Hitboxes, drafts, Done) runs across the top',
       'the editor panel on the right and the mini map at the bottom left, neither covering the other',
-      'the tool buttons (Select, Take away and Bookmark among them) and the edit list are readable in the panel',
+      'the panel says to click something to see and change it, or drag over bare ground to copy an area, and the edit list is readable',
       'a status strip along the bottom with Chat, Undo and Redo',
       'no red hitbox fill: hitboxes start off',
     ],
@@ -267,9 +267,27 @@ export const SHOTS: Shot[] = [
     },
     mustSee: [
       'a rail of six groups down the left (Select, Ground, Build, Furnish, Life, Places), each with its key letter, Life standing out',
-      'the options bar beside the rail with the Life tools (Person, Quest, Monsters, Change monsters, Patrol path, Clear, Gathering), Person chosen',
+      'the options bar beside the rail with the Life tools (Person, Monsters, Gathering), Person chosen',
       'the finder in the middle near the top: Stairs first, then bookmarks to go to (Go to …), with Tool, Place or Do beside each',
       'the panel on the right no longer has a wall of tool buttons',
+    ],
+  },
+  {
+    name: 'editor-inspector',
+    about: 'The world editor with the shop the player stands in selected: its inspector, with the Floors section unfolded.',
+    region: 'sanctum',
+    at: inside('sanctum-arcanum'),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.mouse.click(640, 400);
+      await page.click('#editor details[data-section="floors"] summary');
+      await page.waitForTimeout(300);
+    },
+    mustSee: [
+      'the shop outlined in green in the world',
+      'the inspector: the building\'s name with "Building" beside it, its size, and Move (M), Copy (Ctrl C) and Take away (Del)',
+      'sections "Look and size" (open, its look chosen) and "Floors above and below" (open, with Floors up, Floors down and Ladders, and a "Set the floors" button)',
     ],
   },
   {
@@ -325,16 +343,15 @@ export const SHOTS: Shot[] = [
   },
   {
     name: 'studio-map',
-    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Floors tool chosen.",
+    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Build group chosen.",
     page: '/art-studio.html#art/map-editor',
     ready: '#studio-map-canvas',
     open: async (page) => {
       await page.click('.studio-map [data-map-zoom="in"]');
       await page.click('.studio-map [data-map-zoom="in"]');
       await page.click('.studio-map [data-group="build"]');
-      await page.click('.studio-map [data-tool="floors"]');
     },
-    mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Floors tool settings (up, down, ladders)', 'the edit list beside the map'],
+    mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Build tools (Kit building, House, Storey, Stairs) with Kit building\'s settings', 'the edit list beside the map'],
   },
   {
     name: 'studio-map-tiles',

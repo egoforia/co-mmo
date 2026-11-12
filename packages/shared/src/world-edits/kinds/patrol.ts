@@ -26,6 +26,8 @@ export const PATROL_PATH: EditKind<'patrol'> = {
   hint: 'Press on a monster’s home and drag along the way it should walk, then let go. Its whole spawn walks the path round and round, and attacks anyone it meets.',
   pointer: 'drag',
   onFloors: true,
+  // From the inspector the drag starts at the picked home, wherever it is pressed.
+  inspects: { picks: ['monster'], title: 'Patrol path', action: 'Draw its path' },
   fields: [],
   shape: '{"kind":"patrol","at":[x,y],"route":[[x,y],[x,y]]}',
   // Where the drag started is the home; the rest of the line is the path.

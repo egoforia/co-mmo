@@ -307,7 +307,15 @@ smallest thing on a tile of a floor (bookmark, spot, person, monster's home,
 piece, stairs, storey, building) and shows what it is; Take it away is a
 `remove` edit naming it, Copy lays a new edit read from it (`copyDraft`), and
 Move is the piece's own `move`, or a take-away and a copy sent together
-(`moveDrafts`). Edits sent together (`POST /api/world-edits { edits }`) are
+(`moveDrafts`). Select is the editor's inspector (`client/src/editor/inspector.ts`):
+select first, then change. A kind that changes a thing already there
+declares `inspects` (the picked kinds it changes, its section's title and
+button, and the thing's settings as they are now), and its fields may carry a
+`when` rule so they show only when they apply (`editor/fields.ts`). Change
+building, Floors, Footprint, Change monsters, Patrol path, Clear and Quest
+are sections of the inspector, not tools on the rail (`rail.ts`, `FOLDED`;
+they stay in the finder), and dragging over bare ground with Select copies
+that area for Copy and paste. `edit-keys.ts` says what each key does. Edits sent together (`POST /api/world-edits { edits }`) are
 made all or none and share a `group`, so undo, redo and take out treat them
 as one step. A `bookmark` edit names a place to look from on a floor with a
 line on what it tests (`RegionMap.bookmarks`); the window lists a land's

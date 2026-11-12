@@ -42,6 +42,7 @@ export const PAINT: EditKind<'paint'> = {
     paint(map, edit.tile, edit.tiles);
     // A spot painted over is gone.
     map.spots = map.spots.filter((p) => tileOf(map, [p.x, p.y]) === Tile.Blocked);
+    return true;
   },
   keep: (d) => ({ kind: 'paint', tile: d.tile, tiles: d.tiles.map(([x, y]) => [x, y]) }),
   words: (e) => `${PAINT_NAMES[e.tile]} on ${e.tiles.length} tile${e.tiles.length === 1 ? '' : 's'}`,

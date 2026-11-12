@@ -14,6 +14,7 @@ import {
   MAX_SPAWN,
   MAX_STROKE,
   PAINT_TILES,
+  EDIT_KINDS,
   editWords,
   SPOTS,
   Tile,
@@ -106,7 +107,7 @@ interface MapStudioState {
   showSpawns: boolean;
   showGrid: boolean;
   hoverTile: TilePoint | null;
-  picked: { at: TilePoint; what: string } | null;
+  picked: { at: TilePoint; what: string; target?: string } | null;
   roadFrom: TilePoint | null;
   status: string;
   data: RegionInspectPayload | null;
@@ -327,7 +328,7 @@ export function mapEditorPage(): string {
                     .map(
                       (e) => `
                   <li>
-                    <span>${esc(editWords(e))}</span>
+                    <span>${esc(editWords(e))}${d.map?.unlaid?.includes(e.id) ? ' <em class="note">(no longer fits)</em>' : ''}</span>
                     <small class="by">by ${esc(e.by)}</small>
                     <button type="button" class="quiet" data-map-remove="${esc(e.id)}" title="Take this edit out">✕</button>
                   </li>`,
@@ -590,21 +591,21 @@ async function handleTilePress(at: TilePoint): Promise<void> {
     }
     case 'move': {
       if (!mapState.picked) {
-        const lm = landmarkAt(map, at);
+        const lm = landmarkAt(map, at, mapState.floor);
         const t = map.tiles[at[1] * map.width + at[0]] as Tile;
-        if (!lm && ![Tile.Tree, Tile.Rock, Tile.Water].includes(t)) {
+        if (!lm && (mapState.floor || ![Tile.Tree, Tile.Rock, Tile.Water].includes(t))) {
           mapState.status = 'Nothing movable at that tile: click a tree, rock, water, or set piece.';
           artState.ctx.rerender();
           return;
         }
-        mapState.picked = { at, what: lm ? (setPiece(lm.asset)?.name ?? lm.asset) : Tile[t] };
+        mapState.picked = { at, what: lm ? (setPiece(lm.asset)?.name ?? lm.asset) : Tile[t]!, ...(lm?.id ? { target: lm.id } : {}) };
         mapState.status = `Picked up ${mapState.picked.what} at [${at[0]}, ${at[1]}]. Click destination tile or "Take away".`;
         artState.ctx.rerender();
         return;
       }
-      const from = mapState.picked.at;
+      const { at: from, target } = mapState.picked;
       mapState.picked = null;
-      await sendMapAction({ edit: { kind: 'move', from, to: at } });
+      await sendMapAction({ edit: { kind: 'move', from, to: at, ...(target ? { target } : {}) } });
       return;
     }
     case 'road': {
@@ -625,7 +626,8 @@ async function handleTilePress(at: TilePoint): Promise<void> {
       return;
     }
     case 'floors': {
-      if (!buildingAt(map, at)) {
+      const building = buildingAt(map, at);
+      if (!building) {
         mapState.status = 'Click inside a building to set its upper storeys and basements.';
         artState.ctx.rerender();
         return;
@@ -637,6 +639,7 @@ async function handleTilePress(at: TilePoint): Promise<void> {
           up: mapState.floorsUp,
           down: mapState.floorsDown,
           ...(mapState.ladders ? { ladders: true } : {}),
+          ...(building.id ? { target: building.id } : {}),
         },
       });
       return;
@@ -646,7 +649,8 @@ async function handleTilePress(at: TilePoint): Promise<void> {
       return;
     }
     case 'footprint': {
-      await sendMapAction({ edit: { kind: 'footprint', at, footprint: [mapState.footprintW, mapState.footprintH] } });
+      const lm = landmarkAt(map, at, mapState.floor);
+      await sendMapAction({ edit: { kind: 'footprint', at, footprint: [mapState.footprintW, mapState.footprintH], ...(lm?.id ? { target: lm.id } : {}) } });
       return;
     }
     case 'piece': {
@@ -673,6 +677,9 @@ async function handleTilePress(at: TilePoint): Promise<void> {
 }
 
 async function sendMapAction(action: Record<string, unknown>): Promise<void> {
+  // Tools that work on every floor work on the floor shown; the rest work on the ground, as before.
+  const edit = action.edit as WorldEditDraft | undefined;
+  if (edit && EDIT_KINDS[edit.kind]?.onFloors) action = { ...action, edit: { ...edit, level: mapState.floor } };
   try {
     await mapApi('/api/world-edits', 'POST', { region: mapState.regionId, ...action });
     await loadMapEditorData(mapState.regionId);
@@ -699,9 +706,9 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
     return true;
   }
   if (t.dataset.mapTakeAway !== undefined && mapState.picked) {
-    const from = mapState.picked.at;
+    const { at: from, target } = mapState.picked;
     mapState.picked = null;
-    void sendMapAction({ edit: { kind: 'move', from, to: null } });
+    void sendMapAction({ edit: { kind: 'move', from, to: null, ...(target ? { target } : {}) } });
     return true;
   }
   if (t.dataset.mapUndo !== undefined) {

@@ -131,6 +131,19 @@ describe('the world editor', () => {
     await start({ store });
     expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
   });
+  it('points at things by name and works on floors above the ground', async () => {
+    const { base, store } = await start();
+    const owner = account(store, 'Ego', 'owner');
+    const gone = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'move', from: [30, 30], to: [31, 31], target: 'gen:landmark:99' } });
+    expect(gone).toMatchObject({ status: 400, body: { message: 'That is not there any more.' } });
+    const upstairs = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'spawn', creature: 'walking-mushroom', at: [104, 46], count: 1, level: 1 } });
+    expect(upstairs.status).toBe(200);
+    expect(upstairs.body.edits[0]).toMatchObject({ kind: 'spawn', level: 1 });
+    expect(upstairs.body.unlaid).toEqual([]);
+    expect(app!.world.region('arch-testbed')!.map.creatures.some((c) => c.floor === 1)).toBe(true);
+    const ground = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'road', from: [104, 46], to: [106, 46], level: 1 } });
+    expect(ground.body.message).toBe('The Road tool works on the ground floor for now.');
+  });
 });
 
 describe('the world editor with region servers', () => {

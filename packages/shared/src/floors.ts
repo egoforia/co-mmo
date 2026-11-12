@@ -29,6 +29,8 @@ export interface TileRect {
 
 /** One floor off the ground, over a rectangle of the land. */
 export interface Storey extends TileRect {
+  /** Its name on this land, the same every time it is laid out (world-edits/names.ts). */
+  id?: string;
   /** 1, 2... above the ground; -1, -2... below it. */
   floor: number;
   /** Its tiles, row by row (Tile values); outside them on this floor there is nothing to stand on. */
@@ -46,6 +48,8 @@ export type StairKind = 'stairs' | 'ladder';
 
 /** Stairs or a ladder between a floor and the one above it. */
 export interface Stairway extends TileRect {
+  /** Its name on this land, the same every time it is laid out (world-edits/names.ts). */
+  id?: string;
   kind: StairKind;
   /** The floor it goes up from, and the one above (always one more). */
   lower: number;
@@ -395,6 +399,8 @@ interface Walled extends TileRect {
  * no room for a flight.
  */
 export function buildFloors(map: RegionMap, b: Walled, up: number, down: number, kind: StairKind = 'stairs'): boolean {
+  // Problems the land already had elsewhere (a hand-laid test land's stairs) do not stop this building's flights.
+  const known = new Set(floorChecks(map));
   const mine = (r: TileRect) => overlap(r, b);
   const before = { storeys: map.storeys, stairways: map.stairways };
   map.storeys = map.storeys.filter((s) => !mine(s));
@@ -402,7 +408,7 @@ export function buildFloors(map: RegionMap, b: Walled, up: number, down: number,
   for (let f = 1; f <= up; f++) addStorey(map, b, f, b.style, b.art);
   for (let f = -1; f >= -down; f--) addStorey(map, b, f, b.style, b.art);
   for (let from = -down, n = 0; from < up; from++, n++) {
-    if (placeFlight(map, b, from, kind, n % 2 === 1)) continue;
+    if (placeFlight(map, b, from, kind, n % 2 === 1, known)) continue;
     map.storeys = before.storeys;
     map.stairways = before.stairways;
     return false;
@@ -411,7 +417,7 @@ export function buildFloors(map: RegionMap, b: Walled, up: number, down: number,
 }
 
 /** Sets one flight from a floor to the next in the first spot that fits, from the west end (or the east). */
-function placeFlight(map: RegionMap, b: Walled, from: number, kind: StairKind, east: boolean): boolean {
+function placeFlight(map: RegionMap, b: Walled, from: number, kind: StairKind, east: boolean, known: ReadonlySet<string>): boolean {
   const [w, h] = kind === 'ladder' ? [1, 1] : [2, 1];
   const xs: number[] = [];
   for (let x = b.x + 1; x + w <= b.x + b.width - 1; x++) xs.push(x);
@@ -426,7 +432,7 @@ function placeFlight(map: RegionMap, b: Walled, from: number, kind: StairKind, e
       const way = addStairs(map, { kind, ...rect, from });
       // Never where it would cover the landing of the flight next to it.
       const clash = map.stairways.some((o) => o !== way && ((o.lower === from + 1 && on(rect, o.top.x, o.top.y)) || (o.upper === from && on(rect, o.bottom.x, o.bottom.y)) || (o.lower === from + 1 && on(o, way.top.x, way.top.y)) || (o.upper === from && on(o, way.bottom.x, way.bottom.y))));
-      if (!clash && !floorChecks(map).length) return true;
+      if (!clash && floorChecks(map).every((p) => known.has(p))) return true;
       map.stairways.splice(map.stairways.indexOf(way), 1);
     }
   }

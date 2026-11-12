@@ -26,15 +26,16 @@ export const HOUSE: EditKind<'house'> = {
     return undefined;
   },
   apply(map, { at, floor, style }) {
-    if (!BUILDING_STYLES[style]) return;
+    if (!BUILDING_STYLES[style]) return false;
     const rect = { x: at[0] - 1, y: at[1] - 1, width: floor[0] + 4, height: floor[1] + 4 };
-    if (map.buildings.some((b) => overlaps(rect, b))) return;
+    if (map.buildings.some((b) => overlaps(rect, b))) return false;
     // Set pieces under the new walls and the clearing around them make way.
     map.landmarks = map.landmarks.filter((l) => {
       const f = footprint(l);
       return !overlaps(rect, { x: f.left, y: f.top, width: f.width, height: f.height });
     });
     map.buildings.push(building(map, at[0], at[1], floor[0], floor[1], style));
+    return true;
   },
   keep: (d) => ({ kind: 'house', at: d.at, floor: d.floor, style: d.style }),
   words: (e) => `${BUILDING_STYLES[e.style]?.name ?? 'A house'}, ${e.floor[0]} × ${e.floor[1]}`,

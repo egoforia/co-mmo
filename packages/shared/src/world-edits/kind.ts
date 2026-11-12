@@ -36,16 +36,21 @@ export interface EditKind<K extends EditKindId> {
   /** One or two plain sentences on how to use it. */
   hint: string;
   pointer: EditPointer;
+  /** True when it works on floors above and below the ground too; the rest work on the ground only, for now. */
+  onFloors?: boolean;
+  /** True when it changes one thing, which the editor may name (`target`) instead of a tile. */
+  targets?: boolean;
   /** Its settings; filled by the editors in step 4 of the editor plan. */
   fields: EditField[];
   /** The draft as one JSON line, for the AI Map Architect's prompt. */
   shape: string;
   /** Why it cannot be made on this land, in words for the editor, or undefined when it can. */
   check(map: RegionMap, edit: DraftOf<K>, ctx: EditContext): string | undefined;
-  /** Lays it over the land; passes over quietly when it no longer fits. */
-  apply(map: RegionMap, edit: EditOf<K>): void;
+  /** Lays it over the land; false when it no longer fits and was passed over. */
+  apply(map: RegionMap, edit: EditOf<K>): boolean;
   /** Only the fields this kind has, whatever else was sent, plus what it keeps from the context. */
   keep(draft: DraftOf<K>, ctx: EditContext): DraftOf<K> & { name?: string; asset?: string };
+  // The registry keeps `level` and `target` for kinds that take them.
   /** One line for the list of edits. */
   words(edit: DraftOf<K> & { name?: string }, ctx?: EditContext): string;
 }

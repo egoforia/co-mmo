@@ -4,7 +4,7 @@ import { furnitureArt } from './buildings.ts';
 import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
 import { homeLandLayout } from './home-lands.ts';
-import { applyEdits, type WorldEdit } from './world-edits.ts';
+import { applyEdits, nameThings, type WorldEdit } from './world-edits.ts';
 import type { Stairway, Storey } from './floors.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -151,6 +151,8 @@ export function nearestOpenSide(defs: RegionDef[], def: RegionDef, x: number, y:
 
 /** A large painted set piece; its footprint tiles are blocked. */
 export interface Landmark {
+  /** Its name on this land, the same every time it is laid out (world-edits/names.ts). */
+  id?: string;
   asset: string;
   /** Bottom centre of the art, in tiles. */
   x: number;
@@ -186,6 +188,8 @@ export interface CreatureSpawn {
  * art fades to show the floor and furniture inside.
  */
 export interface Building {
+  /** Its name on this land, the same every time it is laid out (world-edits/names.ts). */
+  id?: string;
   /** Top-left corner of the walls, in tiles; the size includes the walls. */
   x: number;
   y: number;
@@ -258,6 +262,8 @@ export interface RegionMap {
    * land beyond sets the same, so the road runs on across the border.
    */
   gates?: Partial<Record<Side, number>>;
+  /** The world editor's edits that no longer fit this land and were passed over, by id. */
+  unlaid?: string[];
 }
 
 /**
@@ -309,6 +315,7 @@ function layOut(def: RegionDef, size: number): RegionMap {
   const c = Math.floor(size / 2);
   if (def.id === 'arch-testbed') {
     archTestbedLayout(map, c);
+    nameThings(map, 'gen');
     // The testbed's own layout stays as written; the world editor's changes go on top, as on every land.
     if (def.edits?.length) applyEdits(map, def.edits);
     settle(map);
@@ -336,6 +343,7 @@ function layOut(def: RegionDef, size: number): RegionMap {
   // The biome's gathering spots, on open ground the trails leave alone.
   map.spots = layOutSpots({ width: size, height: size, seed: map.seed, biome: def.biome, open: (x, y) => map.tiles[y * size + x] === Tile.Ground });
   for (const s of map.spots) set(map, s.x, s.y, Tile.Blocked);
+  nameThings(map, 'gen');
   // After the trails are cut, so a tree an editor planted stays where it was put.
   if (def.edits?.length) applyEdits(map, def.edits);
   settle(map);

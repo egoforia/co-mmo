@@ -9,7 +9,7 @@ import type { EditResult, WorldEditor } from './world-editor.ts';
 
 // The world editor's API. Only the Owner and Stewards edit the world; every
 // change is saved and can be taken back.
-//   GET  /api/world-edits?region=<id>[&includeMap=1]   the land's edits (and map/palettes for Studio)
+//   GET  /api/world-edits?region=<id>[&includeMap=1]   the land's edits, those that no longer fit (and map/palettes for Studio)
 //   POST /api/world-edits            { region, edit }
 //   POST /api/world-edits/undo       { region }
 //   POST /api/world-edits/redo       { region }
@@ -37,7 +37,7 @@ export async function handleWorldEdits(
       return json(res, 200, editor.inspectRegion(region || undefined)), true;
     }
     const log = editor.log(region);
-    return json(res, 200, { edits: log.edits, undone: log.undone.length }), true;
+    return json(res, 200, { edits: log.edits, undone: log.undone.length, unlaid: editor.unlaid(region) }), true;
   }
   if (req.method !== 'POST') return json(res, 404, { error: 'not_found' }), true;
   const body = await readJson(req);
@@ -66,5 +66,5 @@ export async function handleWorldEdits(
   else if (action === 'remove' && typeof body?.id === 'string') result = await editor.remove(region, body.id);
   else return json(res, 400, { error: 'bad_request', message: 'The editor did not understand that change.' }), true;
   if (!result.ok) return json(res, 400, { error: 'not_done', message: result.message }), true;
-  return json(res, 200, { edits: result.log.edits, undone: result.log.undone.length, map: editor.inspectRegion(region).map }), true;
+  return json(res, 200, { edits: result.log.edits, undone: result.log.undone.length, unlaid: editor.unlaid(region), map: editor.inspectRegion(region).map }), true;
 }

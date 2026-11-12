@@ -332,6 +332,16 @@ their shop as `wares`, since browsers have no table for it. Select moves a
 person to the floor shown, copies them, or loads them into the Person tool
 (`personValues`) to change.
 
+**Monsters** in full: a spawn (`kinds/spawn.ts`) may set its monsters' level,
+ways (behaviour) and hours; `monsters` changes them later for a whole spawn,
+picked by one home; `patrol` gives a spawn a patrol path dragged from a home
+(`kinds/patrol.ts`). The changes ride on each home (`CreatureSpawn` extends
+`CreatureTune`, with `spawn` naming the edit it came from, so Take away takes
+the spawn as one), and the server makes its live monsters from
+`tunedCreature(def, home)`, which scales health, harm, experience, gold and
+defence with the level as levelled creatures do (`creature-tune.ts`). The
+edit's monster level is `monsterLevel`, apart from `level`, its floor.
+
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with
 (`RegionDef.base`) first, then the editor's. A `workshop` land stands off the

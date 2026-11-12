@@ -3,6 +3,7 @@ import { isBlocking } from '../../world.ts';
 import type { EditKind } from '../kind.ts';
 import { OFF_EDGE, floorOf, inside, tileOn } from '../tiles.ts';
 import { MAX_SPAWN, type TilePoint } from '../types.ts';
+import { WAYS_FIELDS, keptWays, setWays, waysFrom, waysProblem } from './monster-ways.ts';
 
 /** Monsters of a kind that live around a spot and come back there after they fall. */
 export const SPAWN: EditKind<'spawn'> = {
@@ -21,14 +22,17 @@ export const SPAWN: EditKind<'spawn'> = {
         .map(([id, c]) => ({ id, name: c.level ? `${c.name} (level ${c.level})` : c.name })),
     },
     { key: 'count', label: 'How many', type: 'number', min: 1, max: MAX_SPAWN, default: 4 },
+    ...WAYS_FIELDS,
   ],
-  shape: '{"kind":"spawn","creature":"<creatureId>","at":[x,y],"count":2}',
+  shape: '{"kind":"spawn","creature":"<creatureId>","at":[x,y],"count":2,"monsterLevel":4,"behavior":"guard","active":"night"}',
   outline: (_map, { at }) => [{ x: at[0] - 3, y: at[1] - 3, w: 7, h: 7, tone: 'warn' }, { x: at[0], y: at[1], w: 1, h: 1 }],
-  make: (use, v) => ({ kind: 'spawn', creature: String(v.creature), at: use.at, count: Number(v.count) }),
+  make: (use, v) => ({ kind: 'spawn', creature: String(v.creature), at: use.at, count: Number(v.count), ...keptWays(waysFrom(v), false) }),
   check(map, edit, ctx) {
     if (typeof edit.creature !== 'string' || !ctx.creatures[edit.creature]) return 'There is no monster of that kind.';
     if (!Number.isInteger(edit.count) || edit.count < 1 || edit.count > MAX_SPAWN) return `A spawn holds 1 to ${MAX_SPAWN} monsters.`;
     if (!inside(map, edit.at)) return OFF_EDGE;
+    const ways = waysProblem(edit);
+    if (ways) return ways;
     return isBlocking(tileOn(map, edit.at, floorOf(edit))) ? 'Monsters cannot live there: pick open ground.' : undefined;
   },
   // Spots for its monsters, around its middle on open ground, the same wherever it is laid out.
@@ -46,12 +50,16 @@ export const SPAWN: EditKind<'spawn'> = {
       if (taken.some(([tx, ty]) => tx === x && ty === y)) continue;
       taken.push([x, y]);
     }
-    for (const [x, y] of taken) map.creatures.push({ kind: edit.creature, name: edit.name ?? edit.creature, asset: edit.asset ?? edit.creature, x: x + 0.5, y: y + 0.5, ...(floor ? { floor } : {}) });
+    for (const [x, y] of taken) {
+      const c = { kind: edit.creature, name: edit.name ?? edit.creature, asset: edit.asset ?? edit.creature, x: x + 0.5, y: y + 0.5, ...(floor ? { floor } : {}), spawn: edit.id };
+      setWays(c, edit);
+      map.creatures.push(c);
+    }
     return taken.length > 0;
   },
   keep(d, ctx) {
     const def = ctx.creatures[d.creature]!;
-    return { kind: 'spawn', creature: d.creature, at: d.at, count: d.count, name: def.name, asset: def.art };
+    return { kind: 'spawn', creature: d.creature, at: d.at, count: d.count, ...keptWays(d, false), name: def.name, asset: def.art };
   },
   words: (e, ctx) => `${e.count} ${e.name ?? ctx?.creatures[e.creature]?.name ?? e.creature} at ${e.at.join(', ')}`,
 };

@@ -22,8 +22,9 @@ function unnamedAt(map: RegionMap, [x, y]: TilePoint, floor: number): (() => voi
   if (spot >= 0) return () => (map.spots.splice(spot, 1), set(map, x, y, Tile.Ground));
   const person = map.npcs.findIndex(here);
   if (person >= 0) return () => void map.npcs.splice(person, 1);
-  const monster = map.creatures.findIndex(here);
-  if (monster >= 0) return () => void map.creatures.splice(monster, 1);
+  // A monster's home goes with its whole spawn, when an edit laid it.
+  const monster = map.creatures.find(here);
+  if (monster) return () => void (map.creatures = map.creatures.filter((c) => c === monster || (monster.spawn && c.spawn === monster.spawn) ? false : true));
   return undefined;
 }
 

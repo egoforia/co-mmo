@@ -13,6 +13,7 @@ export * from './biomes.ts';
 export * from './art.ts';
 export * from './buildings.ts';
 export * from './rpg.ts';
+export * from './creature-tune.ts';
 export * from './races.ts';
 export * from './classes.ts';
 export * from './skills/index.ts';

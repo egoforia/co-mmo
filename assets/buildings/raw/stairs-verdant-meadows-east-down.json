@@ -1,0 +1,11 @@
+{
+  "id": "stairs-verdant-meadows-east-down",
+  "kind": "prop",
+  "heading": "east",
+  "direction": "down",
+  "biome": "verdant-meadows",
+  "name": "EAST Descending stairs (verdant-meadows)",
+  "file": "art/stairs-verdant-meadows-east-down.png",
+  "width": 256,
+  "height": 256
+}

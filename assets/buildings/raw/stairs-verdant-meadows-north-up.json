@@ -1,0 +1,11 @@
+{
+  "id": "stairs-verdant-meadows-north-up",
+  "kind": "prop",
+  "heading": "north",
+  "direction": "up",
+  "biome": "verdant-meadows",
+  "name": "NORTH Ascending stairs (verdant-meadows)",
+  "file": "art/stairs-verdant-meadows-north-up.png",
+  "width": 256,
+  "height": 256
+}

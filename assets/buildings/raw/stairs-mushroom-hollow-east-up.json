@@ -1,0 +1,11 @@
+{
+  "id": "stairs-mushroom-hollow-east-up",
+  "kind": "prop",
+  "heading": "east",
+  "direction": "up",
+  "biome": "mushroom-hollow",
+  "name": "EAST Ascending stairs (mushroom-hollow)",
+  "file": "art/stairs-mushroom-hollow-east-up.png",
+  "width": 256,
+  "height": 256
+}

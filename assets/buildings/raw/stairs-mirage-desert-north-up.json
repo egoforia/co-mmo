@@ -1,0 +1,11 @@
+{
+  "id": "stairs-mirage-desert-north-up",
+  "kind": "prop",
+  "heading": "north",
+  "direction": "up",
+  "biome": "mirage-desert",
+  "name": "NORTH Ascending stairs (mirage-desert)",
+  "file": "art/stairs-mirage-desert-north-up.png",
+  "width": 256,
+  "height": 256
+}

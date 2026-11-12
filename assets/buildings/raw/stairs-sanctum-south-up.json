@@ -1,0 +1,11 @@
+{
+  "id": "stairs-sanctum-south-up",
+  "kind": "prop",
+  "heading": "south",
+  "direction": "up",
+  "biome": "sanctum",
+  "name": "SOUTH Ascending stairs (sanctum)",
+  "file": "art/stairs-sanctum-south-up.png",
+  "width": 256,
+  "height": 256
+}

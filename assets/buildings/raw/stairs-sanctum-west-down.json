@@ -1,0 +1,11 @@
+{
+  "id": "stairs-sanctum-west-down",
+  "kind": "prop",
+  "heading": "west",
+  "direction": "down",
+  "biome": "sanctum",
+  "name": "WEST Descending stairs (sanctum)",
+  "file": "art/stairs-sanctum-west-down.png",
+  "width": 256,
+  "height": 256
+}

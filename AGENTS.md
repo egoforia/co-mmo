@@ -30,3 +30,7 @@
   - Open outdoor terraces (`storey.open === true`) use low `WALL_RISE` (`~20px`) stone parapets on exposed rims (`!hasUpperTile`) and downward vertical cliff skirts (`skirt`), never full-height `closedWalls` in `world-scene/below.ts`.
   - Standalone ground-floor buildings not overlapped by the player's current upper storey must remain closed (`v.outside`) when `mine > 0`, cutaway interiors (`v.inside`) only display when the player is on Floor 0 (`mine === 0`), and elevated southern/eastern cliff faces must leave at least a 2-tile ground buffer north/west of ground-floor buildings.
   - Keep above-ground wall and cliff textures (`frostpeak-eyrie-wall`, `frostpeak-whiteledge-house-wall`) distinct from subterranean cavern textures (`frostpeak-sunken-drafts-wall`).
+- **Stairs & Vertical Traversal Standardization (`docs/buildings-and-walls.md`)**:
+  - All stair assets adhere to standard $256 \times 256\text{px}$ frames, rigid 2:1 isometric diamond rims ($170\text{--}195\text{px}$ height) for descending wells, and minimum solid luminance $L \ge 110$ to prevent dark biome camouflage.
+  - Multi-tier directional hierarchy: always support 4 cardinal headings (`north`, `south`, `east`, `west`) via `stairHeading()`.
+  - In-game affordances: interactive hover cursor/tint, color-coded floating labels (Golden Amber for Up, Cool Cyan for Down), and high-contrast mini-map navigation badges.

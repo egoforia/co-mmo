@@ -17,6 +17,11 @@ const whileDown: ProxyOptions['configure'] = (proxy) => {
 };
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@co-mmo/shared': resolve(here, '../shared/src/index.ts'),
+    },
+  },
   server: {
     port: 5173,
     proxy: {

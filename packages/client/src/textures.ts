@@ -10,6 +10,7 @@ import {
   type BiomeLook,
   type BuildingPart,
   type RegionDef,
+  type Stairway,
   type Storey,
   type TileArt,
 } from '@co-mmo/shared';
@@ -230,4 +231,7 @@ export function propTexture(scene: Phaser.Scene, biome: string, kind: 'tree' | '
   }
   return undefined;
 }
+
+export { stairTexture, type TextureRegistry } from './stair-art.ts';
+
 

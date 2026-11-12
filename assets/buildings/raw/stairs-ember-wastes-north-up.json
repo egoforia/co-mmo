@@ -1,0 +1,11 @@
+{
+  "id": "stairs-ember-wastes-north-up",
+  "kind": "prop",
+  "heading": "north",
+  "direction": "up",
+  "biome": "ember-wastes",
+  "name": "NORTH Ascending stairs (ember-wastes)",
+  "file": "art/stairs-ember-wastes-north-up.png",
+  "width": 256,
+  "height": 256
+}

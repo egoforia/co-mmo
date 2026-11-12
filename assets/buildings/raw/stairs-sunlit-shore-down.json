@@ -1,0 +1,16 @@
+{
+  "id": "stairs-sunlit-shore-down",
+  "biome": "sunlit-shore",
+  "kind": "prop",
+  "direction": "down",
+  "name": "Descending stairs (Sunlit Shore)",
+  "materials": [
+    "weathered driftwood",
+    "sea-cotton rope",
+    "brass fittings",
+    "pearl shells"
+  ],
+  "mood": "breezy, maritime",
+  "view": "classic 2:1 isometric view, looking down at about 30 degrees from one corner",
+  "prompt": "Low-poly isometric fantasy game art, light-neutral, flat faceted shapes with crisp edges. An isometric floor stairwell opening leading downward crafted from weathered driftwood, sea-cotton rope, brass fittings, pearl shells. Palette leans on Sunlit Shore signatures. Isolated on pure magenta (#FF00FF)."
+}

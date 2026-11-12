@@ -1,0 +1,11 @@
+{
+  "id": "stairs-ember-wastes-south-down",
+  "kind": "prop",
+  "heading": "south",
+  "direction": "down",
+  "biome": "ember-wastes",
+  "name": "SOUTH Descending stairs (ember-wastes)",
+  "file": "art/stairs-ember-wastes-south-down.png",
+  "width": 256,
+  "height": 256
+}

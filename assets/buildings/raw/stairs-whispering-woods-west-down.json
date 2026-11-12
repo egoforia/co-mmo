@@ -1,0 +1,11 @@
+{
+  "id": "stairs-whispering-woods-west-down",
+  "kind": "prop",
+  "heading": "west",
+  "direction": "down",
+  "biome": "whispering-woods",
+  "name": "WEST Descending stairs (whispering-woods)",
+  "file": "art/stairs-whispering-woods-west-down.png",
+  "width": 256,
+  "height": 256
+}

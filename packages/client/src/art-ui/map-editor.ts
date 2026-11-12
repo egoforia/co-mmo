@@ -14,6 +14,7 @@ import {
   MAX_SPAWN,
   MAX_STROKE,
   PAINT_TILES,
+  editWords,
   SPOTS,
   Tile,
   buildingAt,
@@ -30,7 +31,6 @@ import {
   type WorldEditDraft,
 } from '@co-mmo/shared';
 import { loadToken } from '../api.ts';
-import { editWords } from '../editor-ui.ts';
 import { artState, esc, usd } from './state.ts';
 
 type StudioMapTool = 'look' | 'paint' | 'move' | 'road' | 'house' | 'floors' | 'piece' | 'spot' | 'footprint' | 'spawn' | 'clear';

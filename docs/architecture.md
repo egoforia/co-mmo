@@ -264,7 +264,13 @@ a house of any building style (kit-friendly floor sizes, so it stands as a
 kit house in the isometric camera); floors above and below a building, by
 stairs or ladders; a set piece's or furniture's footprint (the tiles it
 blocks, from the Art tab's Buildings page); a monster spawn; clearing monsters
-away. `generateRegion` lays the edits over the land in order, so the server,
+away. Each kind of edit is one file in shared `world-edits/kinds/` keeping the
+`EditKind` contract (`world-edits/kind.ts`): its checks, how it lays itself
+on the map, the fields it keeps when stamped, its tool name, hint and
+settings, its words in the list of edits and its shape for the AI Map
+Architect. `world-edits/registry.ts` (`EDIT_KINDS`) is the only place that
+looks a kind up, so a new kind is one file there and one line in the
+registry; `world-edits.ts` is the face over them. `generateRegion` lays the edits over the land in order, so the server,
 every region server and every browser lay out the same map, and a browser
 draws a land again when its definition changes. `world-editor.ts` keeps
 each land's edits in the store (`world_edits` table) with undo and redo,

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MAX_FLOORS, Tile, floorName, isBlocking, tileAt, type Bookmark, type Outline, type TilePoint, type Weather } from '@co-mmo/shared';
+import { MAX_FLOORS, Tile, floorName, isBlocking, landChecks, tileAt, type Bookmark, type LandChecks, type Outline, type TilePoint, type Weather } from '@co-mmo/shared';
 import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
@@ -57,6 +57,8 @@ export class EditorUi {
   private readonly sky: { hour: string; weather?: Weather } = { hour: '' };
   /** The floor the editor works on and shows, or undefined for the one we stand on. */
   private floor?: number;
+  /** What the last check of a land found, shown while the list shows that land. */
+  private checks?: { region: string; found: LandChecks; unpainted: string[] };
   /** Whether the bookmarks list is unfolded, kept as the window is drawn again. */
   private marksOpen = false;
   /** New edits go live at once instead of waiting as drafts. */
@@ -225,6 +227,52 @@ export class EditorUi {
     this.attached?.previewSky({ ...(PREVIEW_HOURS[this.sky.hour]?.phase !== undefined ? { phase: PREVIEW_HOURS[this.sky.hour]!.phase } : {}), ...(this.sky.weather ? { weather: this.sky.weather } : {}) });
   }
 
+  /** Checks the land the list shows: shapes, walks, and pictures not painted yet. */
+  private check(): void {
+    const scene = this.attached;
+    const map = scene?.landMap(this.listRegion);
+    if (!scene || !map) return this.render('That land is not in sight to check.');
+    // Pictures the land shows that this screen has none of: people, monsters and pieces.
+    const assets = new Set([...map.npcs.map((n) => n.asset), ...map.creatures.map((c) => c.asset), ...map.landmarks.map((l) => l.asset)]);
+    const unpainted = [...assets].filter((a) => a && !scene.textures.exists(a)).sort();
+    this.checks = { region: this.listRegion, found: landChecks(map), unpainted };
+    const { shapes, walks } = this.checks.found;
+    this.render(shapes.length + walks.length + unpainted.length ? 'Checked. See what turned up below.' : 'Checked. All is well here.');
+  }
+
+  /** The check and shot buttons, and what the last check found in three short lists. */
+  private checksHtml(): string {
+    const c = this.checks;
+    const buttons = '<p class="checks-actions"><button type="button" class="quiet" data-check>Check this land</button> <button type="button" class="quiet" data-shot title="Saves a picture of what you see">Take a shot here</button></p>';
+    if (!c || c.region !== this.listRegion) return buttons;
+    const list = (title: string, items: string[], none: string) =>
+      `<h4>${escapeHtml(title)}</h4>${items.length ? `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : `<p class="note">${escapeHtml(none)}</p>`}`;
+    const n = c.unpainted.length;
+    // The Art tab's two image models: about 4 cents a picture, or 12 for the sharper one.
+    const cost = n ? `<p class="note">About $${(n * 0.039).toFixed(2)} to $${(n * 0.12).toFixed(2)} to paint them all in the Art tab.</p>` : '';
+    return `<details class="checks-box" open><summary>Checks</summary>
+      ${list('Shapes', c.found.shapes, 'Every floor, stair and kit building holds together.')}
+      ${list('Walks', c.found.walks, 'Everyone and everything here can be walked to from where players arrive.')}
+      ${list('Not painted yet', c.unpainted, 'Everything here has its picture.')}${cost}
+      </details>${buttons}`;
+  }
+
+  /** Saves a picture of the game as it is drawn now (the editor's window is not in it). */
+  private shot(): void {
+    const scene = this.attached;
+    if (!scene) return this.render('The game is not running yet.');
+    const at = scene.playerPosition;
+    const name = `co-mmo-${this.options.region().id}-${Math.floor(at.x)}-${Math.floor(at.y)}.png`;
+    scene.game.renderer.snapshot((image) => {
+      if (!(image instanceof HTMLImageElement)) return this.render('The picture could not be taken.');
+      const link = document.createElement('a');
+      link.href = image.src;
+      link.download = name;
+      link.click();
+      this.render(`Saved ${name}.`);
+    });
+  }
+
   /** The bookmarks of the land the list shows, each with a button to go there (`data-go`). */
   private bookmarksHtml(): string {
     const marks = this.bookmarks();
@@ -288,6 +336,8 @@ export class EditorUi {
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.listRegion)));
     if (d.pick) return this.step(this.core.pickAction(d.pick));
     if (d.area) return this.step(this.core.areaAction(d.area, d.value));
+    if (d.check !== undefined) return this.check();
+    if (d.shot !== undefined) return this.shot();
     if (d.go !== undefined) {
       const mark = this.bookmarks()[Number(d.go)];
       if (!mark) return;
@@ -328,7 +378,8 @@ export class EditorUi {
         ${historyHtml(this.log, this.busy)}</h3>
       ${draftsHtml(this.log, this.live, this.busy)}
       ${editListHtml(this.log)}
-      ${this.bookmarksHtml()}`;
+      ${this.bookmarksHtml()}
+      ${this.checksHtml()}`;
     this.drawHitboxes();
   }
 }

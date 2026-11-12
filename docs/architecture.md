@@ -363,6 +363,21 @@ players arrive (`map.spawn`). **Scenery** (`scenery`) grows trees and rocks
 over a round patch the way the layouts scatter them, drawn in the land's
 biome kit, or clears them back to open ground.
 
+**Group C tools.** Paint has brush shapes (`brushTiles`: free, a
+rectangle or a line dragged out, or a 4-connected fill capped at
+`MAX_STROKE`). **Copy and paste** (`world-edits/area.ts`) turns an area
+into edits counted from its corner (`copyArea`: paint by tile kind, then
+everything standing wholly inside, copied the way Select copies it;
+bookmarks are left out, as they name places) and `pasteArea` shifts them to
+each click, laid together, all or none; the client keeps prefabs in the
+browser (`client/src/editor/area.ts`). The in-game editor previews the
+land at another hour or in other weather on that screen only
+(`SkyClock.showAs`), and its **checks panel** (`landChecks` in
+`world-edits/checks.ts`) lists shape problems (`floorChecks`, `kitProblems`
+on kit buildings), people, doorways and gathering spots a player cannot walk
+to from `map.spawn` across the stairs, and pictures this screen has none of,
+with a cost range. **Take a shot here** saves the game canvas as a PNG.
+
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with
 (`RegionDef.base`) first, then the editor's. A `workshop` land stands off the

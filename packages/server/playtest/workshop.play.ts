@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
-import { ARCH_TESTBED_REGION, generateRegion, newCharacter, type Storey } from '@co-mmo/shared';
+import { ARCH_TESTBED_REGION, Tile, generateRegion, newCharacter, type Storey } from '@co-mmo/shared';
 import { account, api, app } from '../test/helpers.ts';
 import { playWorld } from './harness.ts';
 
@@ -228,6 +228,43 @@ describe('the world editor in a workshop land', () => {
     });
     await page.waitForTimeout(5000);
     await page.screenshot({ path: resolve(shots, 'workshop-kit-building.png') });
+
+    // Group C: a rectangle of path dragged out, copied and pasted south of it.
+    await page.click('#edit-world-button');
+    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.selectOption('#editor select[name="view-floor"]', '0');
+    await page.click('#editor [data-tool="paint"]');
+    await page.selectOption('#editor select[name="tile"]', 'path');
+    await page.selectOption('#editor select[name="shape"]', 'rect');
+    await aim([94, 78], [104, 92]);
+    const drag = [await screenOf(page, 97, 80), await screenOf(page, 100, 82)];
+    await page.mouse.move(drag[0]!.x, drag[0]!.y);
+    await page.mouse.down();
+    await page.mouse.move((drag[0]!.x + drag[1]!.x) / 2, (drag[0]!.y + drag[1]!.y) / 2, { steps: 4 });
+    await page.mouse.move(drag[1]!.x, drag[1]!.y, { steps: 4 });
+    await page.mouse.up();
+    const paths = (x0: number, y0: number) => {
+      const map = land();
+      let n = 0;
+      for (let y = y0; y < y0 + 3; y++) for (let x = x0; x < x0 + 4; x++) if (map.tiles[y * map.width + x] === Tile.Path) n++;
+      return n;
+    };
+    await expect.poll(() => paths(97, 80), { timeout: 10_000 }).toBe(12);
+    await page.click('#editor [data-tool="area"]');
+    await clickTile(page, 96, 79);
+    await clickTile(page, 101, 83);
+    await expect.poll(() => page.locator('#editor .status').textContent()).toMatch(/^Copied /);
+    await clickTile(page, 96, 86);
+    await expect.poll(() => paths(97, 87), { timeout: 10_000 }).toBe(12);
+    // The checks find Hesper up on the terrace with no stairs to it.
+    await page.click('#editor [data-check]');
+    await expect.poll(() => page.locator('#editor .checks-box').textContent()).toContain('Hesper at (108, 46) on floor 1 cannot be walked to.');
+    // Dusk, on this screen only, and a shot of it saved.
+    await page.selectOption('#editor select[name="view-hour"]', 'dusk');
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: resolve(shots, 'workshop-dusk-checks.png') });
+    const [saved] = await Promise.all([page.waitForEvent('download'), page.click('#editor [data-shot]')]);
+    expect(saved.suggestedFilename()).toMatch(/^co-mmo-.+\.png$/);
 
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

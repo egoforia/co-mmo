@@ -272,6 +272,7 @@ function wire(canvas: HTMLCanvasElement): void {
 
 /** Does what a tool asks: says something, or sends the edit it made. */
 async function step(s: ToolStep): Promise<void> {
+  if (s.drafts) return send({ edits: s.drafts });
   if (s.draft) return send({ edit: s.draft });
   if (s.say !== undefined) {
     state.status = s.say;
@@ -283,7 +284,7 @@ async function send(action: Record<string, unknown>): Promise<void> {
   try {
     await mapApi('/api/world-edits' + ('undo' in action ? '/undo' : 'redo' in action ? '/redo' : 'remove' in action ? '/remove' : ''), 'POST', {
       region: state.regionId,
-      ...('edit' in action ? { edit: action.edit } : 'remove' in action ? { id: action.remove } : {}),
+      ...('edit' in action ? { edit: action.edit } : 'edits' in action ? { edits: action.edits } : 'remove' in action ? { id: action.remove } : {}),
     });
     await loadMapEditorData(state.regionId);
     state.status = 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.' : 'Done. Everyone in this land sees it now.';
@@ -307,6 +308,7 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
   else if (d.mapFloor !== undefined) state.floor = Number(d.mapFloor);
   else if (d.mapZoom) zoom(d.mapZoom === 'in' ? 'in' : 'out');
   else if (d.away !== undefined) return void step(core.takeAway(state.floor)), true;
+  else if (d.pick) return void step(core.pickAction(d.pick)), true;
   else if (d.undo !== undefined) return void send({ undo: true }), true;
   else if (d.redo !== undefined) return void send({ redo: true }), true;
   else if (d.remove) return void send({ remove: d.remove }), true;

@@ -41,10 +41,10 @@ function everyKind([x, y]: TilePoint): WorldEditDraft[] {
   ];
 }
 
-/** A map's whole shape as one number; the names things were given later, and the list of edits passed over, are left out. */
+/** A map's whole shape as one number; the names things were given later, the list of edits passed over and the bookmarks (new since) are left out. */
 function fingerprint(map: RegionMap): number {
   const unnamed = (list: { id?: string }[]) => list.map(({ id: _, ...t }) => t);
-  const { def: _, tiles, storeys, unlaid: __, ...rest } = map;
+  const { def: _, tiles, storeys, unlaid: __, bookmarks: ___, ...rest } = map;
   const named = rest as Record<string, unknown>;
   for (const key of ['landmarks', 'buildings', 'stairways']) named[key] = unnamed(named[key] as { id?: string }[]);
   return hashString(JSON.stringify({ tiles: [...tiles], storeys: unnamed(storeys).map((s) => ({ ...s, tiles: [...(s as { tiles: Uint8Array }).tiles] })), ...named }));

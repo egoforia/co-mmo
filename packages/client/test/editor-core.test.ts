@@ -19,7 +19,7 @@ function openGround(): TilePoint {
 describe('the editor core', () => {
   it('offers Look and every kind of edit there is', () => {
     const ids = new EditorCore().tools().map((t) => t.id);
-    expect(ids[0]).toBe('look');
+    expect(ids.slice(0, 2)).toEqual(['look', 'select']);
     for (const kind of Object.values(EDIT_KINDS)) if (kind.available?.() ?? true) expect(ids).toContain(kind.kind);
   });
 
@@ -94,5 +94,29 @@ describe('the editor core', () => {
     expect(core.outlines('sanctum', map, [30, 30], 0)).toEqual([{ x: 28, y: 28, w: 5, h: 5, tone: 'warn' }]);
     core.choose('floors');
     expect(core.outlines('sanctum', map, inShop, 0)).toEqual([{ x: shop.x, y: shop.y, w: shop.width, h: shop.height }]);
+  });
+
+  it('picks a building, then copies or moves it with the next click', () => {
+    const core = new EditorCore();
+    core.choose('select');
+    expect(core.press('sanctum', map, inShop, 0).say).toMatch(/^Picked /);
+    expect(core.settingsHtml()).toContain('data-pick="move"');
+    expect(core.outlines('sanctum', map, [10, 10], 0)[0]).toMatchObject({ x: shop.x, y: shop.y, tone: 'held' });
+    core.pickAction('copy');
+    expect(core.press('sanctum', map, [20, 20], 0).draft).toEqual({ kind: 'house', at: [20, 20], floor: [shop.width - 2, shop.height - 2], style: shop.style });
+    core.choose('select');
+    core.press('sanctum', map, inShop, 0);
+    core.pickAction('move');
+    const moved = core.press('sanctum', map, [20, 20], 0);
+    expect(moved.drafts?.map((d) => d.kind)).toEqual(['remove', 'house']);
+    expect(moved.drafts?.[0]).toMatchObject({ target: shop.id });
+  });
+
+  it('draws a bookmark\'s name as a line of text', () => {
+    const core = new EditorCore();
+    core.choose('bookmark');
+    core.set('name', 'Front door');
+    expect(core.settingsHtml()).toContain('name="name" type="text" maxlength="40" value="Front door"');
+    expect(core.press('sanctum', map, [30, 30], 1).draft).toEqual({ kind: 'bookmark', at: [30.5, 30.5], name: 'Front door', level: 1 });
   });
 });

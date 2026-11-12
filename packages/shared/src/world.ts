@@ -283,6 +283,19 @@ export interface RegionMap {
   gates?: Partial<Record<Side, number>>;
   /** The world editor's edits that no longer fit this land and were passed over, by id. */
   unlaid?: string[];
+  /** Named places to look from, laid by bookmark edits: the editor goes there, the screenshot list reads them. */
+  bookmarks?: Bookmark[];
+}
+
+/** A named place to look from on a floor of a land, and what it is for. */
+export interface Bookmark {
+  /** The bookmark edit that laid it. */
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  floor: number;
+  note?: string;
 }
 
 /**

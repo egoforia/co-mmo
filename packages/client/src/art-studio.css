@@ -1335,3 +1335,7 @@ button.queue-add-btn.staged {
 .file-pick input {
   display: none;
 }
+
+/* The Select tool's card in the Studio map. */
+.studio-map .picked { display: flex; flex-direction: column; gap: 2px; }
+.studio-map .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }

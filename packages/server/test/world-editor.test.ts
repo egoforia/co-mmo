@@ -177,6 +177,31 @@ describe('the world editor', () => {
     const ground = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'road', from: [104, 46], to: [106, 46], level: 1 } });
     expect(ground.body.message).toBe('The Road tool works on the ground floor for now.');
   });
+
+  it('moves a house as one step: undo, redo and take out treat its two edits as one', async () => {
+    const { base, store } = await start();
+    const owner = account(store, 'Ego', 'owner');
+    const land = () => app!.world.region('arch-testbed')!.map;
+    const at = (x: number, y: number) => land().buildings.some((b) => b.x === x && b.y === y);
+    const move = { region: 'arch-testbed', edits: [{ kind: 'remove', at: [56, 40], target: 'testbed-02:building:0' }, { kind: 'house', at: [160, 100], floor: [8, 8], style: 'sanctum-inn' }] };
+    const moved = await api(base, '/api/world-edits', owner.token, 'POST', move);
+    expect(moved.status).toBe(200);
+    expect(moved.body.edits).toHaveLength(2);
+    expect(moved.body.edits[0].group).toBeTruthy();
+    expect(moved.body.edits[1].group).toBe(moved.body.edits[0].group);
+    expect([at(56, 40), at(160, 100)]).toEqual([false, true]);
+
+    expect((await api(base, '/api/world-edits/undo', owner.token, 'POST', { region: 'arch-testbed' })).body).toMatchObject({ edits: [], undone: 2 });
+    expect([at(56, 40), at(160, 100)]).toEqual([true, false]);
+    expect((await api(base, '/api/world-edits/redo', owner.token, 'POST', { region: 'arch-testbed' })).body).toMatchObject({ undone: 0 });
+    expect([at(56, 40), at(160, 100)]).toEqual([false, true]);
+    expect((await api(base, '/api/world-edits/remove', owner.token, 'POST', { region: 'arch-testbed', id: moved.body.edits[1].id })).body).toMatchObject({ edits: [], undone: 2 });
+
+    // All or none: the second does not fit, so the first is not made either.
+    const half = { region: 'arch-testbed', edits: [{ kind: 'remove', at: [56, 40], target: 'testbed-02:building:0' }, { kind: 'house', at: [40, 40], floor: [8, 8], style: 'sanctum-inn' }] };
+    expect((await api(base, '/api/world-edits', owner.token, 'POST', half)).status).toBe(400);
+    expect(at(56, 40)).toBe(true);
+  });
 });
 
 describe('the world editor with region servers', () => {

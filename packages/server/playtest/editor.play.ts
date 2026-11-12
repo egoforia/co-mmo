@@ -82,12 +82,12 @@ describe('the world editor', () => {
     await page.click('#edit-world-button');
     await page.waitForSelector('#editor:not([hidden]) .tools');
 
-    // Plant a tree three tiles east.
+    // Plant a tree three tiles south (east of us is under the editor's window).
     await page.click('#editor [data-tool="paint"]');
     await page.selectOption('#editor select[name="tile"]', 'tree');
-    await clickTile(3, 0);
+    await clickTile(0, 3);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
-    expect.soft(tile(spot.x + 3, spot.y), 'a tree three tiles east').toBe(Tile.Tree);
+    expect.soft(tile(spot.x, spot.y + 3), 'a tree three tiles south').toBe(Tile.Tree);
     await expect.poll(welcomes, { timeout: 5_000 }).toBeGreaterThan(seen);
     await page.waitForTimeout(800);
     await page.screenshot({ path: resolve(shots, 'editor-tree.png') });
@@ -95,7 +95,7 @@ describe('the world editor', () => {
     // Take it back.
     await page.click('#editor [data-undo]');
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(0);
-    expect.soft(tile(spot.x + 3, spot.y), 'the tree is gone again').toBe(Tile.Ground);
+    expect.soft(tile(spot.x, spot.y + 3), 'the tree is gone again').toBe(Tile.Ground);
 
     // A road east, and a small house at its end.
     await page.click('#editor [data-tool="road"]');

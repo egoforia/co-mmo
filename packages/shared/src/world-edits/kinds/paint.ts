@@ -28,10 +28,16 @@ export const PAINT: EditKind<'paint'> = {
   hint: 'Click or drag to lay ground, paths, water, trees, rocks or walls. A path over water becomes a bridge.',
   pointer: 'drag',
   fields: [
-    { key: 'tile', label: 'Lay', type: 'choice', choices: () => PAINT_TILES.map((id) => ({ id, name: PAINT_NAMES[id] })) },
-    { key: 'brush', label: 'Brush', type: 'number', min: 1, max: 5, default: 1 },
+    { key: 'tile', label: 'Lay', type: 'choice', choices: () => PAINT_TILES.map((id) => ({ id, name: PAINT_NAMES[id] })), default: () => 'tree' },
+    { key: 'brush', label: 'Brush', type: 'choice', choices: () => [1, 3, 5].map((n) => ({ id: String(n), name: `${n} × ${n}` })) },
   ],
   shape: '{"kind":"paint","tile":"ground"|"path"|"water"|"tree"|"rock"|"wall","tiles":[[x,y],...]}',
+  outline: (_map, { at }, v) => {
+    const n = Number(v.brush) || 1;
+    const half = Math.floor(n / 2);
+    return [{ x: at[0] - half, y: at[1] - half, w: n, h: n }];
+  },
+  make: (use, v) => ({ kind: 'paint', tile: String(v.tile) as PaintTile, tiles: use.tiles ?? [use.at] }),
   check(map, edit) {
     if (!PAINT_TILES.includes(edit.tile)) return 'The brush cannot lay that.';
     if (!Array.isArray(edit.tiles) || !edit.tiles.length) return 'Paint at least one tile.';

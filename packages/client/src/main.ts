@@ -14,7 +14,7 @@ import { PrayerUi } from './prayer-ui.ts';
 import { knowArt, onContent, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
-import { EditorUi } from './editor-ui.ts';
+import { EditorUi } from './editor/in-game.ts';
 import { MiniMap } from './mini-map.ts';
 import { chooseCamera } from './camera.ts';
 import { PerfOverlay } from './perf-overlay.ts';

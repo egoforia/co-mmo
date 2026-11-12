@@ -84,7 +84,7 @@ describe('the world editor', () => {
 
     // Plant a tree three tiles east.
     await page.click('#editor [data-tool="paint"]');
-    await page.selectOption('#editor select[name="paint"]', 'tree');
+    await page.selectOption('#editor select[name="tile"]', 'tree');
     await clickTile(3, 0);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
     expect.soft(tile(spot.x + 3, spot.y), 'a tree three tiles east').toBe(Tile.Tree);

@@ -1,6 +1,6 @@
 import { blockOn } from '../../floors.ts';
 import type { EditKind } from '../kind.ts';
-import { OFF_EDGE, clearUnder, floorOf, footprint, inside, landmarkFor, open, tileOn } from '../tiles.ts';
+import { OFF_EDGE, clearUnder, floorOf, footprint, inside, landmarkAt, landmarkFor, open, tileOn } from '../tiles.ts';
 import { MAX_FOOTPRINT } from '../types.ts';
 
 /** The tiles a set piece or piece of furniture blocks, still centred under its picture. */
@@ -10,12 +10,19 @@ export const FOOTPRINT: EditKind<'footprint'> = {
   hint: 'Click a piece of furniture or a set piece to change how many tiles across and deep it blocks.',
   pointer: 'click',
   onFloors: true,
-  targets: true,
+  targets: 'piece',
   fields: [
-    { key: 'width', label: 'Across', type: 'number', min: 1, max: MAX_FOOTPRINT, default: 1 },
-    { key: 'height', label: 'Deep', type: 'number', min: 1, max: MAX_FOOTPRINT, default: 1 },
+    { key: 'width', label: 'Across', type: 'number', min: 1, max: MAX_FOOTPRINT, default: 2 },
+    { key: 'height', label: 'Deep', type: 'number', min: 1, max: MAX_FOOTPRINT, default: 2 },
   ],
   shape: '{"kind":"footprint","at":[x,y],"footprint":[2,1]}',
+  outline(map, { at, level }) {
+    const piece = landmarkAt(map, at, level);
+    if (!piece) return [{ x: at[0], y: at[1], w: 1, h: 1, tone: 'warn' }];
+    const f = footprint(piece);
+    return [{ x: f.left, y: f.top, w: f.width, h: f.height }];
+  },
+  make: (use, v) => ({ kind: 'footprint', at: use.at, footprint: [Number(v.width), Number(v.height)], ...(use.target ? { target: use.target } : {}) }),
   check(map, edit) {
     if (!inside(map, edit.at)) return OFF_EDGE;
     const piece = landmarkFor(map, edit);

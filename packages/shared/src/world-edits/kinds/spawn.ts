@@ -12,10 +12,19 @@ export const SPAWN: EditKind<'spawn'> = {
   pointer: 'click',
   onFloors: true,
   fields: [
-    { key: 'creature', label: 'Monster', type: 'choice', choices: (ctx) => Object.entries(ctx.creatures).map(([id, c]) => ({ id, name: c.name })) },
+    {
+      key: 'creature',
+      label: 'Monster',
+      type: 'choice',
+      choices: (ctx) => Object.entries(ctx.creatures)
+        .sort(([, a], [, b]) => a.name.localeCompare(b.name))
+        .map(([id, c]) => ({ id, name: c.level ? `${c.name} (level ${c.level})` : c.name })),
+    },
     { key: 'count', label: 'How many', type: 'number', min: 1, max: MAX_SPAWN, default: 4 },
   ],
   shape: '{"kind":"spawn","creature":"<creatureId>","at":[x,y],"count":2}',
+  outline: (_map, { at }) => [{ x: at[0] - 3, y: at[1] - 3, w: 7, h: 7, tone: 'warn' }, { x: at[0], y: at[1], w: 1, h: 1 }],
+  make: (use, v) => ({ kind: 'spawn', creature: String(v.creature), at: use.at, count: Number(v.count) }),
   check(map, edit, ctx) {
     if (typeof edit.creature !== 'string' || !ctx.creatures[edit.creature]) return 'There is no monster of that kind.';
     if (!Number.isInteger(edit.count) || edit.count < 1 || edit.count > MAX_SPAWN) return `A spawn holds 1 to ${MAX_SPAWN} monsters.`;

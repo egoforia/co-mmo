@@ -11,6 +11,11 @@ export const CLEAR: EditKind<'clear'> = {
   onFloors: true,
   fields: [{ key: 'radius', label: 'Tiles around', type: 'number', min: 1, max: MAX_CLEAR_RADIUS, default: 6 }],
   shape: '{"kind":"clear","at":[x,y],"radius":6}',
+  outline(_map, { at }, v) {
+    const r = Number(v.radius) || 1;
+    return [{ x: at[0] - r, y: at[1] - r, w: r * 2 + 1, h: r * 2 + 1, tone: 'warn' }];
+  },
+  make: (use, v) => ({ kind: 'clear', at: use.at, radius: Number(v.radius) }),
   check(map, edit) {
     if (!inside(map, edit.at)) return OFF_EDGE;
     return typeof edit.radius === 'number' && edit.radius > 0 && edit.radius <= MAX_CLEAR_RADIUS ? undefined : `Clear 1 to ${MAX_CLEAR_RADIUS} tiles around.`;

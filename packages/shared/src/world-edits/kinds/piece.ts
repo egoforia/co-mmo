@@ -11,8 +11,14 @@ export const PIECE: EditKind<'piece'> = {
   hint: 'Click open ground or a floor to stand a sea cave piece there. It shows once its picture is painted in the Art tab.',
   pointer: 'click',
   onFloors: true,
+  available: () => setPieces().length > 0,
   fields: [{ key: 'piece', label: 'Piece', type: 'choice', choices: () => setPieces().map((p) => ({ id: p.id, name: p.name })) }],
   shape: '{"kind":"piece","piece":"<pieceId>","at":[x,y]}',
+  outline(_map, { at }, v) {
+    const f = setPiece(String(v.piece))?.footprint ?? { width: 1, height: 1 };
+    return [{ x: at[0], y: at[1] - f.height + 1, w: f.width, h: f.height }];
+  },
+  make: (use, v) => ({ kind: 'piece', piece: String(v.piece), at: use.at }),
   check(map, edit) {
     const piece = typeof edit.piece === 'string' ? setPiece(edit.piece) : undefined;
     if (!piece) return 'There is no set piece of that kind.';

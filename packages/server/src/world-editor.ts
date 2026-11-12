@@ -140,42 +140,61 @@ export class WorldEditor {
 
   /** Makes a change to a land, when it fits; redo forgets what was taken back. */
   async add(regionId: string, draft: WorldEditDraft, by: string): Promise<EditResult> {
+    return this.addTogether(regionId, [draft], by);
+  }
+
+  /**
+   * Makes changes that belong together (a move is a take-away and a lay-again),
+   * all or none: each is checked on the land as the ones before it left it.
+   * They share a group, so undo, redo and take out treat them as one step.
+   */
+  async addTogether(regionId: string, drafts: WorldEditDraft[], by: string): Promise<EditResult> {
     const region = this.world.region(regionId);
     if (!region) return { ok: false, message: 'There is no land by that name.' };
-    const why = checkEdit(region.map, draft, CREATURES);
-    if (why) return { ok: false, message: why };
-    const edit = this.stamp(draft, by);
-    const log = this.log(regionId);
-    const blocked = blocks(withEdit(region.map, edit));
+    if (!drafts.length || drafts.length > MAX_TOGETHER) return { ok: false, message: 'The editor did not understand that change.' };
+    const group = drafts.length > 1 ? randomUUID().slice(0, 8) : undefined;
+    let map = region.map;
+    const made: WorldEdit[] = [];
+    for (const draft of drafts) {
+      const why = checkEdit(map, draft, CREATURES);
+      if (why) return { ok: false, message: why };
+      const edit = { ...this.stamp(draft, by), ...(group ? { group } : {}) };
+      map = withEdit(map, edit);
+      made.push(edit);
+    }
+    const blocked = blocks(map);
     if (blocked) return { ok: false, message: blocked };
-    return this.save(regionId, { edits: [...log.edits, edit], undone: [] });
+    return this.save(regionId, { edits: [...this.log(regionId).edits, ...made], undone: [] });
   }
 
-  /** Takes back the newest edit. */
+  /** Takes back the newest edit, or the newest edits made together. */
   async undo(regionId: string): Promise<EditResult> {
     const log = this.log(regionId);
-    const last = log.edits.at(-1);
-    if (!last) return { ok: false, message: 'There is nothing to undo in this land.' };
-    return this.save(regionId, { edits: log.edits.slice(0, -1), undone: [...log.undone, last] });
+    const step = lastStep(log.edits);
+    if (!step.length) return { ok: false, message: 'There is nothing to undo in this land.' };
+    return this.save(regionId, { edits: log.edits.slice(0, -step.length), undone: [...log.undone, ...step] });
   }
 
-  /** Makes the newest edit taken back again. */
+  /** Makes the newest edit (or edits made together) taken back again. */
   async redo(regionId: string): Promise<EditResult> {
     const log = this.log(regionId);
-    const next = log.undone.at(-1);
-    if (!next) return { ok: false, message: 'There is nothing to redo in this land.' };
+    const step = lastStep(log.undone);
+    if (!step.length) return { ok: false, message: 'There is nothing to redo in this land.' };
     const region = this.world.region(regionId);
-    const blocked = region && blocks(withEdit(region.map, next));
+    let map = region?.map;
+    for (const edit of step) map = map && withEdit(map, edit);
+    const blocked = map && blocks(map);
     if (blocked) return { ok: false, message: blocked };
-    return this.save(regionId, { edits: [...log.edits, next], undone: log.undone.slice(0, -1) });
+    return this.save(regionId, { edits: [...log.edits, ...step], undone: log.undone.slice(0, -step.length) });
   }
 
-  /** Takes back one edit, wherever it is in the list; redo brings it back as the newest. */
+  /** Takes back one edit (with those made together with it), wherever it is in the list; redo brings it back as the newest. */
   async remove(regionId: string, editId: string): Promise<EditResult> {
     const log = this.log(regionId);
     const edit = log.edits.find((e) => e.id === editId);
     if (!edit) return { ok: false, message: 'That edit is not in this land any more.' };
-    return this.save(regionId, { edits: log.edits.filter((e) => e !== edit), undone: [...log.undone, edit] });
+    const gone = log.edits.filter((e) => e === edit || (edit.group && e.group === edit.group));
+    return this.save(regionId, { edits: log.edits.filter((e) => !gone.includes(e)), undone: [...log.undone, ...gone] });
   }
 
   /** Makes a blank workshop land to build on (the Owner and Stewards); its id, or why not, in words. */
@@ -204,6 +223,18 @@ export class WorldEditor {
     await this.world.reshape(regionId);
     return { ok: true, log };
   }
+}
+
+/** Most edits one step may make together. */
+const MAX_TOGETHER = 50;
+
+/** The newest step in a list: its last edit, with those made together with it. */
+function lastStep(edits: WorldEdit[]): WorldEdit[] {
+  const last = edits.at(-1);
+  if (!last?.group) return last ? [last] : [];
+  let from = edits.length - 1;
+  while (from > 0 && edits[from - 1]!.group === last.group) from--;
+  return edits.slice(from);
 }
 
 /** Why a land laid out with an edit would shut travellers out (where they arrive is blocked), if it would. */

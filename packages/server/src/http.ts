@@ -30,13 +30,13 @@ export function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-/** A request's JSON object body, or null when it is too big, not JSON, or not an object. */
-export async function readJson(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+/** A request's JSON object body, or null when it is too big (over `max` bytes), not JSON, or not an object. */
+export async function readJson(req: IncomingMessage, max = MAX_BODY_BYTES): Promise<Record<string, unknown> | null> {
   let size = 0;
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) return null;
+    if (size > max) return null;
     chunks.push(chunk as Buffer);
   }
   try {

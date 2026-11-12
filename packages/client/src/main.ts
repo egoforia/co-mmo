@@ -347,7 +347,7 @@ function play(token: string): void {
       if (artStudioLink) artStudioLink.hidden = welcome.you.role !== 'owner';
       // The Owner and Stewards can change the world where they stand.
       const edit = document.getElementById('edit-world-button')!;
-      const opened = new EditorUi({ token, scene: () => scene ?? undefined, region: () => ({ id: regionId, name: region }) });
+      const opened = new EditorUi({ token, scene: () => scene ?? undefined, region: () => ({ id: regionId, name: region }), teleport: (to) => connection.send({ t: 'teleport', ...to }) });
       editor = opened;
       edit.hidden = false;
       edit.addEventListener('click', () => opened.toggle());

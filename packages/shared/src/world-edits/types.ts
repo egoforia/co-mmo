@@ -54,6 +54,10 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'stairs'; at: TilePoint; size: [width: number, height: number]; from: number; climbs?: 'north' | 'south' | 'east' | 'west'; ladder?: boolean }
   /** A building style's piece of furniture standing on the edit's floor, its picture's bottom centre at `at` (tiles, may be halves); it blocks its footprint unless `walkable`. */
   | { kind: 'furniture'; asset: string; at: TilePoint; footprint: [width: number, height: number]; walkable?: boolean }
+  /** Takes away the thing named by `target` (a building, storey, stairs or piece), or else the bookmark, gathering spot, person or monster's home on `at`. */
+  | { kind: 'remove'; at: TilePoint }
+  /** A named place to look from on the edit's floor (tiles, may be halves), with a line on what it is for: the editor goes there, the screenshot list reads it. */
+  | { kind: 'bookmark'; at: TilePoint; name: string; note?: string }
 );
 
 /** The name of each kind of edit. */
@@ -69,6 +73,8 @@ export interface EditStamp {
   by: string;
   /** When it was made. */
   made: number;
+  /** Edits made together (a move, a paste) share a group, and undo, redo and take out treat them as one. */
+  group?: string;
 }
 
 /** One saved change to a land; a spawn also keeps its monster's name and picture. */
@@ -76,6 +82,9 @@ export type WorldEdit = WorldEditDraft & EditStamp & { name?: string; asset?: st
 
 /** The saved edit of one kind. */
 export type EditOf<K extends EditKindId> = DraftOf<K> & EditStamp & { name?: string; asset?: string };
+
+/** Longest a bookmark's name and its note may be. */
+export const BOOKMARK_TEXT = { name: 40, note: 120 };
 
 /** Most tiles one brush stroke may paint. */
 export const MAX_STROKE = 400;

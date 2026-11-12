@@ -291,6 +291,19 @@ fields, what a press, drag or release makes (`make`) and what to outline
 and `studio-map.ts`, the Art Studio's Map Preview & Editor (any floor, zoom
 in and out, the AI Map Architect). Their outlines and the Studio's tile plan
 are the editor's own marks, seen only while it is open, never game art.
+The in-game window has a floor picker (any floor from 3 down to 4 up; the
+scene shows that floor, `WorldScene.viewFloor`, while the player stays where
+they are). The Select tool (`world-edits/select.ts`, `pickAt`) picks the
+smallest thing on a tile of a floor (bookmark, spot, person, monster's home,
+piece, stairs, storey, building) and shows what it is; Take it away is a
+`remove` edit naming it, Copy lays a new edit read from it (`copyDraft`), and
+Move is the piece's own `move`, or a take-away and a copy sent together
+(`moveDrafts`). Edits sent together (`POST /api/world-edits { edits }`) are
+made all or none and share a `group`, so undo, redo and take out treat them
+as one step. A `bookmark` edit names a place to look from on a floor with a
+line on what it tests (`RegionMap.bookmarks`); the window lists a land's
+bookmarks with a Go button (a teleport), and the testbed's 25 camera check
+places are its bookmarks (`ARCH_TESTBED_WAYPOINTS` reads them).
 
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with

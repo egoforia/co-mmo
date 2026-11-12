@@ -121,6 +121,8 @@ export class WorldScene extends Phaser.Scene {
   private shown = { x: 0, y: 0 };
   /** The floor we are on and are shown (floors.ts): 0 the ground. */
   private floor = 0;
+  /** The floor the world editor looks at instead of ours, while it is open on another floor. */
+  private viewed?: number;
   private tint?: Phaser.GameObjects.Rectangle;
   /** True when pictures are lit by the sky and lamps (WebGL); false when a shade is laid over them. */
   private lit = false;
@@ -378,7 +380,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private applyFloor(): void {
-    applyFloorView(this, this.drawn, this.welcome.region.def.id, this.map, this.shown, this.floor);
+    applyFloorView(this, this.drawn, this.welcome.region.def.id, this.map, this.shown, this.shownFloor);
   }
 
   /** The weather over our land turned. */
@@ -561,7 +563,7 @@ export class WorldScene extends Phaser.Scene {
         if (group === this.remotes || group === this.npcs) {
           const floor = remote.floor ?? 0;
           const [wx, wy] = [this.origin.x + pos.x, this.origin.y + pos.y];
-          const onDrawnFloor = group === this.npcs ? floor === this.floor : floorDrawnFrom(this.map, this.floor, floor, wx, wy);
+          const onDrawnFloor = group === this.npcs ? floor === this.shownFloor : floorDrawnFrom(this.map, this.floor, floor, wx, wy);
           const sameIndoor = floor !== 0 && floor === this.floor;
           const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && !this.map.buildings.some((b) => overlaps(s, b)) && within(s, Math.floor(wx), Math.floor(wy)));
           const seen = onDrawnFloor && (sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(wx - v.ox), Math.floor(wy - v.oy))));
@@ -667,12 +669,12 @@ export class WorldScene extends Phaser.Scene {
     const at = `${Math.floor(x / 8)},${Math.floor(y / 8)}`;
     if (at === this.nearAt && !force) return;
     this.nearAt = at;
-    drawNearChunks(this, this.drawn, x, y, this.floor);
+    drawNearChunks(this, this.drawn, x, y, this.shownFloor);
   }
 
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
-    revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant, this.floor);
+    revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant, this.shownFloor);
     this.applyFloor();
   }
 
@@ -701,7 +703,7 @@ export class WorldScene extends Phaser.Scene {
     const ey = PROJECTION.toScreen(0, 1);
     const [ax, ay, bx, by] = [ex.x - o.x, ex.y - o.y, ey.x - o.x, ey.y - o.y];
     const det = ax * by - bx * ay;
-    const [sx, sy] = [at.x - o.x, at.y + floorLift(this.floor) - o.y];
+    const [sx, sy] = [at.x - o.x, at.y + floorLift(this.shownFloor) - o.y];
     const wx = Math.floor((sx * by - bx * sy) / det);
     const wy = Math.floor((ax * sy - sx * ay) / det);
     for (const [region, drawn] of this.drawn) {
@@ -711,6 +713,11 @@ export class WorldScene extends Phaser.Scene {
       if (x >= 0 && y >= 0 && x < drawn.map.width && y < drawn.map.height) return { region, map: drawn.map, x, y };
     }
     return undefined;
+  }
+
+  /** A land drawn around us, as it is laid out here. */
+  landMap(region: string): RegionMap | undefined {
+    return this.drawn.get(region)?.map;
   }
 
   /** The name of a land drawn around us. */
@@ -726,6 +733,19 @@ export class WorldScene extends Phaser.Scene {
     return this.floor;
   }
 
+  /** The floor drawn: ours, or the one the world editor looks at. */
+  get shownFloor(): number {
+    return this.viewed ?? this.floor;
+  }
+
+  /** The world editor looks at another floor where we stand (undefined: ours again). */
+  viewFloor(floor: number | undefined): void {
+    if (floor === this.viewed || (floor === this.floor && this.viewed === undefined)) return;
+    this.viewed = floor === this.floor ? undefined : floor;
+    this.revealBuildings(true);
+    this.applyFloor();
+  }
+
   get playerPosition(): { x: number; y: number } {
     return { ...this.shown };
   }
@@ -734,7 +754,7 @@ export class WorldScene extends Phaser.Scene {
   tileCorners(map: RegionMap, x: number, y: number, width = 1, height = 1): Phaser.Math.Vector2[] {
     const ox = map.def.at.x * map.width;
     const oy = map.def.at.y * map.height;
-    const lift = floorLift(this.floor);
+    const lift = floorLift(this.shownFloor);
     return [[x, y], [x + width, y], [x + width, y + height], [x, y + height]].map(([cx, cy]) => {
       const p = PROJECTION.toScreen(ox + cx!, oy + cy!);
       return new Phaser.Math.Vector2(p.x, p.y - lift);

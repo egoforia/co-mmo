@@ -12,6 +12,7 @@ import type { EditResult, WorldEditor } from './world-editor.ts';
 //   GET  /api/world-edits?region=<id>[&includeMap=1]   the land's edits, those that no longer fit (and map/palettes for Studio)
 //   GET  /api/world-edits?region=<id>&export=1         the land's edits as a file any land can take
 //   POST /api/world-edits            { region, edit }
+//   POST /api/world-edits            { region, edits }    changes made together, all or none, undone as one
 //   POST /api/world-edits/undo       { region }
 //   POST /api/world-edits/redo       { region }
 //   POST /api/world-edits/remove     { region, id }
@@ -19,6 +20,9 @@ import type { EditResult, WorldEditor } from './world-editor.ts';
 //   POST /api/world-edits/ai-apply   { region, drafts }
 //   POST /api/world-edits/import     { region, drafts }   a file's edits, those that fit
 //   POST /api/world-edits/lands      { name, biome }      a new blank workshop land
+
+/** Most bytes a world editor request may send: a whole land's edits, read from a file. */
+const EDITS_BODY_BYTES = 1_000_000;
 
 /** Answers the world editor's routes; false when the request is not for them. */
 export async function handleWorldEdits(
@@ -47,7 +51,8 @@ export async function handleWorldEdits(
     return json(res, 200, { edits: log.edits, undone: log.undone.length, unlaid: editor.unlaid(region) }), true;
   }
   if (req.method !== 'POST') return json(res, 404, { error: 'not_found' }), true;
-  const body = await readJson(req);
+  // A land's edits as a file run longer than other requests; only the Owner and Stewards get this far.
+  const body = await readJson(req, EDITS_BODY_BYTES);
   const region = typeof body?.region === 'string' ? body.region : '';
 
   if (action === 'ai-preview') {
@@ -73,6 +78,7 @@ export async function handleWorldEdits(
 
   let result: EditResult;
   if (action === '' && body?.edit && typeof body.edit === 'object') result = await editor.add(region, body.edit as WorldEditDraft, account.name);
+  else if (action === '' && Array.isArray(body?.edits) && body.edits.every((e: unknown) => e && typeof e === 'object')) result = await editor.addTogether(region, body.edits as WorldEditDraft[], account.name);
   else if (action === 'undo') result = await editor.undo(region);
   else if (action === 'redo') result = await editor.redo(region);
   else if (action === 'remove' && typeof body?.id === 'string') result = await editor.remove(region, body.id);

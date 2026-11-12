@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Tile, isBlocking, tileAt, type Outline, type TilePoint } from '@co-mmo/shared';
+import { MAX_FLOORS, Tile, floorName, isBlocking, tileAt, type Bookmark, type Outline, type TilePoint } from '@co-mmo/shared';
 import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
@@ -23,6 +23,8 @@ export interface EditorOptions {
   scene: () => WorldScene | undefined;
   /** The land we are in. */
   region: () => { id: string; name: string };
+  /** Takes us to a place (a bookmark), in this land or another. */
+  teleport?: (to: { region: string; x: number; y: number; floor: number }) => void;
 }
 
 /** The world editor's window and its pointer tools. */
@@ -40,10 +42,19 @@ export class EditorUi {
   private hitboxGraphics?: Phaser.GameObjects.Graphics;
   private showHitboxes = true;
   private attached?: WorldScene;
+  /** The floor the editor works on and shows, or undefined for the one we stand on. */
+  private floor?: number;
+  /** Whether the bookmarks list is unfolded, kept as the window is drawn again. */
+  private marksOpen = false;
 
   constructor(private readonly options: EditorOptions) {
     this.box.addEventListener('click', (event) => void this.clicked(event));
     this.box.addEventListener('change', (event) => this.changed(event));
+    // A fold's toggle does not bubble: listen on the way down.
+    this.box.addEventListener('toggle', (event) => {
+      const fold = event.target as HTMLDetailsElement;
+      if (fold.classList?.contains('bookmarks-box')) this.marksOpen = fold.open;
+    }, true);
     document.addEventListener('keydown', (event) => {
       if (!this.open || (event.target as HTMLElement).closest?.('input, textarea')) return;
       const key = event.key.toLowerCase();
@@ -67,6 +78,7 @@ export class EditorUi {
     if (!open) {
       this.outline?.clear();
       this.hitboxGraphics?.clear();
+      this.attached?.viewFloor(undefined);
       return;
     }
     this.attach();
@@ -131,7 +143,8 @@ export class EditorUi {
 
   /** Does what a tool asks: says something, or sends the edit it made. */
   private async step(step: ToolStep): Promise<void> {
-    if (step.draft) await this.act({ edit: step.draft }, step.region);
+    if (step.drafts) await this.act({ edits: step.drafts }, step.region);
+    else if (step.draft) await this.act({ edit: step.draft }, step.region);
     else if (step.say !== undefined) this.render(step.say);
     else if (this.core.holding()) this.render();
   }
@@ -153,9 +166,38 @@ export class EditorUi {
     this.render();
   }
 
-  /** The floor we stand on, in our own land; the ground in the lands drawn around it. */
+  /** The floor chosen (or the one we stand on), in our own land; the ground in the lands drawn around it. */
   private levelIn(region: string): number {
-    return region === this.options.region().id ? (this.attached?.currentFloor ?? 0) : 0;
+    return region === this.options.region().id ? (this.floor ?? this.attached?.currentFloor ?? 0) : 0;
+  }
+
+  /** The editor works on and shows another floor, or the one we stand on again. */
+  private chooseFloor(raw: string): void {
+    this.floor = raw === '' ? undefined : Number(raw);
+    this.core.cancel();
+    this.attached?.viewFloor(this.floor);
+    this.render('');
+  }
+
+  /** The floor picker: where we stand, or any floor from the highest down. */
+  private floorHtml(): string {
+    const floors = Array.from({ length: MAX_FLOORS.up + MAX_FLOORS.down + 1 }, (_, i) => MAX_FLOORS.up - i);
+    const option = (value: string, label: string, chosen: boolean) => `<option value="${value}"${chosen ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    return `<label class="floor-pick">Floor <select name="view-floor">${option('', 'Where I stand', this.floor === undefined)}${floors.map((f) => option(String(f), floorName(f), this.floor === f)).join('')}</select></label>`;
+  }
+
+  /** The bookmarks of the land the list shows, each with a button to go there (`data-go`). */
+  private bookmarksHtml(): string {
+    const marks = this.bookmarks();
+    if (!marks.length) return '';
+    const items = marks.map((b, i) => `<li><span><strong>${escapeHtml(b.name)}</strong>${b.note ? ` <span class="note">${escapeHtml(b.note)}</span>` : ''}</span>
+      <button type="button" class="quiet" data-go="${i}" title="Go there">Go</button></li>`);
+    // Folded, so a land with many (the testbed has 25) leaves the edit list in sight.
+    return `<details class="bookmarks-box"${this.marksOpen ? ' open' : ''}><summary>Bookmarks (${marks.length})</summary><ol class="bookmarks">${items.join('')}</ol></details>`;
+  }
+
+  private bookmarks(): Bookmark[] {
+    return this.attached?.landMap(this.listRegion)?.bookmarks ?? [];
   }
 
   /** A land's name, from the ones drawn around us. */
@@ -203,6 +245,14 @@ export class EditorUi {
     if (d.redo !== undefined) return this.act({ redo: true });
     if (d.remove) return this.act({ remove: d.remove });
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.listRegion)));
+    if (d.pick) return this.step(this.core.pickAction(d.pick));
+    if (d.go !== undefined) {
+      const mark = this.bookmarks()[Number(d.go)];
+      if (!mark) return;
+      this.chooseFloor('');
+      this.options.teleport?.({ region: this.listRegion, x: mark.x, y: mark.y, floor: mark.floor });
+      this.render(`Going to ${mark.name}.`);
+    }
   }
 
   private changed(event: Event): void {
@@ -210,7 +260,8 @@ export class EditorUi {
     if (input.name === 'hitboxes') {
       this.showHitboxes = input.checked;
       this.drawHitboxes();
-    } else this.core.set(input.name, input.value, input.checked);
+    } else if (input.name === 'view-floor') this.chooseFloor(input.value);
+    else this.core.set(input.name, input.value, input.checked);
     // Hand the keys back to walking.
     input.blur();
   }
@@ -222,12 +273,14 @@ export class EditorUi {
     this.box.innerHTML = `
       <h2>World editor <label class="hitbox-toggle"><input type="checkbox" name="hitboxes" ${this.showHitboxes ? 'checked' : ''} /> Hitboxes</label><button type="button" class="close" aria-label="Close">×</button></h2>
       <div class="tools">${toolsHtml(this.core)}</div>
+      <div class="settings">${this.floorHtml()}</div>
       <p class="note">${escapeHtml(tool.hint)}</p>
       <div class="settings">${this.core.settingsHtml()}</div>
       <p class="status" aria-live="polite">${escapeHtml(this.status)}</p>
       <h3>Edits in ${escapeHtml(this.listName)}
         ${historyHtml(this.log, this.busy)}</h3>
-      ${editListHtml(this.log)}`;
+      ${editListHtml(this.log)}
+      ${this.bookmarksHtml()}`;
     this.drawHitboxes();
   }
 }

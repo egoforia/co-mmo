@@ -108,21 +108,19 @@ export interface EditLog {
 
 /**
  * The world editor (Owner and Stewards): reads a land's edits, or makes a
- * change (`edit`), `undo`, `redo` or `remove` one. Throws with the server's
+ * change (`edit`, or `edits` made together), `undo`, `redo` or `remove` one. Throws with the server's
  * words when it cannot be done.
  */
-export async function worldEdits(token: string, region: string, action?: { edit: WorldEditDraft } | { undo: true } | { redo: true } | { remove: string }): Promise<EditLog> {
+export async function worldEdits(token: string, region: string, action?: { edit: WorldEditDraft } | { edits: WorldEditDraft[] } | { undo: true } | { redo: true } | { remove: string }): Promise<EditLog> {
   const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  const path = !action || 'edit' in action || 'edits' in action ? '' : 'undo' in action ? '/undo' : 'redo' in action ? '/redo' : '/remove';
+  const body = !action ? undefined : 'remove' in action ? { region, id: action.remove } : 'undo' in action || 'redo' in action ? { region } : { region, ...action };
   const res = !action
     ? await fetch(`/api/world-edits?region=${encodeURIComponent(region)}`, { headers })
-    : await fetch(`/api/world-edits${'edit' in action ? '' : 'undo' in action ? '/undo' : 'redo' in action ? '/redo' : '/remove'}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ region, ...('edit' in action ? { edit: action.edit } : 'remove' in action ? { id: action.remove } : {}) }),
-    });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.message ?? 'The editor could not reach the server. Try again.');
-  return body as EditLog;
+    : await fetch(`/api/world-edits${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(answer.message ?? 'The editor could not reach the server. Try again.');
+  return answer as EditLog;
 }
 
 /** How the server running your part of the world keeps up, for the performance overlay (Stewards and the Owner). */

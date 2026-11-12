@@ -47,7 +47,8 @@ export type EditPointer =
 export type EditField =
   | { key: string; label: string; type: 'choice'; choices: (ctx: EditContext) => { id: string; name: string }[]; default?: (ctx: EditContext) => string }
   | { key: string; label: string; type: 'number'; min: number; max: number; default: number }
-  | { key: string; label: string; type: 'flag'; default: boolean };
+  | { key: string; label: string; type: 'flag'; default: boolean }
+  | { key: string; label: string; type: 'text'; max: number; default: string };
 
 /** Everything about one kind of edit. */
 export interface EditKind<K extends EditKindId> {
@@ -59,8 +60,8 @@ export interface EditKind<K extends EditKindId> {
   pointer: EditPointer;
   /** True when it works on floors above and below the ground too; the rest work on the ground only, for now. */
   onFloors?: boolean;
-  /** When it changes one thing, which the editor may name (`target`) instead of a tile: a building, or a set piece or piece of furniture. */
-  targets?: 'building' | 'piece';
+  /** When it changes one thing, which the editor may name (`target`) instead of a tile: a building, a set piece or piece of furniture, or any named thing. */
+  targets?: 'building' | 'piece' | 'thing';
   /** Its settings, drawn the same by every editor. */
   fields: EditField[];
   /** False while it has nothing to offer (set pieces while their kit's wish is off). */

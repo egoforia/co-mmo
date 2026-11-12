@@ -55,6 +55,13 @@ const upstairs = (lower: number, nth = 0) => (map: RegionMap): Spot => {
   return { ...way.top, floor: way.upper };
 };
 
+/** Standing on a land's bookmark (a world editor edit), by its name. */
+const bookmark = (name: string) => (map: RegionMap): Spot => {
+  const b = map.bookmarks?.find((m) => m.name === name);
+  if (!b) throw new Error(`There is no bookmark ${name} here.`);
+  return { x: b.x, y: b.y, floor: b.floor };
+};
+
 /** Every shot, in the order the contact sheet shows them. */
 export const SHOTS: Shot[] = [
   {
@@ -180,6 +187,14 @@ export const SHOTS: Shot[] = [
     mustSee: ['pictures load (no broken image icons)', 'buttons and labels are readable'],
   },
   {
+    name: 'testbed-terrace-rim',
+    about: "The testbed's bookmark G2-B: the first terrace's rim, with its low parapet and cliff skirt.",
+    region: 'arch-testbed',
+    at: bookmark('G2-B'),
+    hideUi: true,
+    mustSee: ['an open terrace a floor up, its low parapet along the rim', 'the cliff skirt below the rim down to the ground'],
+  },
+  {
     name: 'editor-testbed',
     about: 'The world editor open in the Architectural Testbed, beside the mini map.',
     region: 'arch-testbed',
@@ -188,7 +203,7 @@ export const SHOTS: Shot[] = [
       await page.click('#edit-world-button');
       await page.waitForSelector('#editor:not([hidden])');
     },
-    mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons and the edit list are readable'],
+    mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons (Select, Take away and Bookmark among them), the floor picker and the edit list are readable'],
   },
   {
     name: 'studio-map',

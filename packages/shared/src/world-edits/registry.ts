@@ -1,6 +1,7 @@
 import { MAX_FLOORS } from '../floors.ts';
 import type { RegionMap } from '../world.ts';
 import type { EditContext, EditKind } from './kind.ts';
+import { BOOKMARK } from './kinds/bookmark.ts';
 import { CLEAR } from './kinds/clear.ts';
 import { FLOORS } from './kinds/floors.ts';
 import { FOOTPRINT } from './kinds/footprint.ts';
@@ -9,6 +10,7 @@ import { HOUSE } from './kinds/house.ts';
 import { MOVE } from './kinds/move.ts';
 import { PAINT } from './kinds/paint.ts';
 import { PIECE } from './kinds/piece.ts';
+import { REMOVE } from './kinds/remove.ts';
 import { ROAD } from './kinds/road.ts';
 import { SPAWN } from './kinds/spawn.ts';
 import { SPOT } from './kinds/spot.ts';
@@ -36,6 +38,8 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   storey: STOREY,
   stairs: STAIRS,
   furniture: FURNITURE,
+  remove: REMOVE,
+  bookmark: BOOKMARK,
 };
 
 /** A kind by its name, when there is one. */

@@ -8,6 +8,8 @@ import { applyEdits, nameThings, type WorldEdit } from './world-edits.ts';
 import ARCH_TESTBED_EDITS from './testbed/arch-testbed.edits.json';
 import type { BuildingSpec } from './building-kit/spec.ts';
 import type { Stairway, Storey } from './floors.ts';
+import type { ShopDef } from './kit.ts';
+import type { Routine } from './routines.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
 
@@ -191,6 +193,10 @@ export interface NpcPlacement {
   y: number;
   /** The floor they live on (floors.ts), when not the ground. */
   floor?: number;
+  /** Their own words, shop and hours, given in the world editor; else the game's tables by their id (NPC_GREETINGS, SHOPS, NPC_ROUTINES). */
+  greeting?: string;
+  shop?: ShopDef;
+  routine?: Partial<Routine>;
 }
 
 export interface CreatureSpawn {

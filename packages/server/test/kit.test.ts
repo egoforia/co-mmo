@@ -5,12 +5,14 @@ import {
   CREATOR_LEVEL_FAVOR,
   CREATOR_XP,
   ITEMS,
+  EDIT_KINDS,
   addItem,
   copyBase,
   copyId,
   itemCount,
   newCharacter,
   regionDef,
+  stampEdit,
   type PlayerInfo,
   type ServerMessage,
 } from '@co-mmo/shared';
@@ -311,5 +313,32 @@ describe('Creator XP', () => {
     expect(store.addCreatorXp(ilya.id, 12)).toBe(1);
     const c = store.accountById(ilya.id)!.character!;
     expect([c.creatorLevel, c.creatorXp, c.favor]).toEqual([2, 2, favor + CREATOR_LEVEL_FAVOR]);
+  });
+});
+
+describe('people from the world editor', () => {
+  it('talk, trade and teach a mastery from their own shop', () => {
+    const def = regionDef('shore')!;
+    const at = (() => {
+      const map = new Region(def, undefined, () => 0, () => 0.5).map;
+      const m = map.npcs.find((n) => n.id === 'marina')!;
+      return [Math.floor(m.x) + 2, Math.floor(m.y)] as [number, number];
+    })();
+    const draft = EDIT_KINDS.person.make({ at }, { name: 'Hesper', look: 'shore-trader', greeting: 'Mind the forge.', wares: 'tools:smithing', buys: true, teaches: 'none', masters: 'smithing', day: 'tireless' });
+    const region = new Region({ ...def, edits: [stampEdit(draft, { id: 'e1', by: 'Ego', made: 0 }, {})] }, undefined, () => 1_000_000, () => 0.5);
+    const conn = fakeConn();
+    const c = newCharacter();
+    c.gold = 500;
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, c);
+    besideNpc(region, 'a', 'e1:person');
+    region.handle('a', { t: 'interact' });
+    const said = of(conn, 'dialogue').at(-1)!;
+    expect(said).toMatchObject({ npc: { name: 'Hesper' }, shop: true, wares: { buys: true, masters: ['smithing'] } });
+    expect(said.text).toContain('Mind the forge.');
+    const tool = said.wares!.sells[0]!.item;
+    region.handle('a', { t: 'shop', action: 'buy', npc: 'e1:person', id: tool });
+    expect(notices(conn).at(-1)).toMatch(/You bought/);
+    region.handle('a', { t: 'shop', action: 'master', npc: 'e1:person', id: 'smithing' });
+    expect(notices(conn).at(-1)).toMatch(/Hesper names you a master of Smithing/);
   });
 });

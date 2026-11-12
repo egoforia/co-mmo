@@ -1,7 +1,7 @@
 import {
   ABILITIES,
   SANCTUM_MENTORS,
-  SHOPS,
+  shopOf,
   choosePath,
   mentorOf,
   pathChoices,
@@ -97,14 +97,17 @@ export class Quests {
     const offer = questOffered(ch, npc.id);
     // What they are up to at this hour comes first: woken from sleep, or out gathering herbs.
     const now = greetingNow(npc, this.phase());
-    const said = [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || NPC_GREETINGS[npc.id] || '...';
+    const said = [text, offer && QUESTS[offer]!.offer].filter(Boolean).join('\n\n') || npc.greeting || NPC_GREETINGS[npc.id] || '...';
     const message: ServerMessage = {
       t: 'dialogue',
       npc: { id: npc.id, name: npc.name, asset: npc.asset },
       text: now ? `${now}\n\n${said}` : said,
     };
     if (offer) message.offer = { quest: offer, title: QUESTS[offer]!.title, reward: rewardText(offer) };
-    if (SHOPS[npc.id]) message.shop = true;
+    const shop = shopOf(npc);
+    if (shop) message.shop = true;
+    // Someone the world editor gave a shop: the browser has no table of their wares, so they come along.
+    if (shop && npc.shop) message.wares = shop;
     if (paths?.length) message.paths = paths;
     p.conn.send(message);
   }

@@ -1,4 +1,7 @@
 import { BUILDING_STYLES, furnitureArt } from '../buildings.ts';
+import { shopOf } from '../kit.ts';
+import { NPC_GREETINGS } from '../rpg.ts';
+import { routineOf } from '../routines.ts';
 import { SPOTS } from '../gathering.ts';
 import { floorName, stairwayAt, type Heading, type Stairway } from '../floors.ts';
 import { setPiece } from '../sea-cave-kit.ts';
@@ -88,7 +91,7 @@ export function removeDraft(p: Picked): WorldEditDraft {
 
 /**
  * The edit that lays a copy of a picked thing with its box's corner at `to`,
- * or undefined when it cannot be copied (people, for now). Read from the land
+ * or undefined when it cannot be copied. Read from the land
  * as it stands, so a copy of a generated house is a house of its size and look.
  */
 export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDraft | undefined {
@@ -124,6 +127,11 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
       const c = map.creatures.find((m) => (m.floor ?? 0) === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
       return c && { kind: 'spawn', creature: c.kind, at: to, count: 1, ...(p.level ? { level: p.level } : {}) };
     }
+    case 'person': {
+      // Someone new, the same in every way but their name on the land.
+      const n = map.npcs.find((m) => m.id === p.id);
+      return n && { kind: 'person', at: to, name: n.name, look: n.asset, ...(n.greeting ?? NPC_GREETINGS[n.id] ? { greeting: n.greeting ?? NPC_GREETINGS[n.id] } : {}), ...(shopOf(n) ? { shop: structuredClone(shopOf(n)!) } : {}), routine: routineOf(n.id, n.routine), ...(p.level ? { level: p.level } : {}) };
+    }
     case 'bookmark': {
       const b = map.bookmarks?.find((m) => m.floor === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
       // Names are one to a land: a copy takes the next free number.
@@ -139,11 +147,13 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
 
 /**
  * The edits that move a picked thing so its box's corner lands on `to`: a set
- * piece or piece of furniture moves itself; anything else is taken away and
- * laid again there, both in one step.
+ * piece or piece of furniture moves itself, and so does a person (keeping who
+ * they are, on the floor shown); anything else is taken away and laid again
+ * there, both in one step.
  */
-export function moveDrafts(map: RegionMap, p: Picked, to: TilePoint): WorldEditDraft[] | undefined {
+export function moveDrafts(map: RegionMap, p: Picked, to: TilePoint, level = p.level): WorldEditDraft[] | undefined {
   if (p.kind === 'landmark') return [{ kind: 'move', from: [p.box.x, p.box.y], to, level: p.level, ...(p.id ? { target: p.id } : {}) }];
+  if (p.kind === 'person') return p.id ? [{ kind: 'person', at: to, target: p.id, ...(level ? { level } : {}) }] : undefined;
   const copy = copyDraft(map, p, to);
   return copy && [removeDraft(p), copy];
 }

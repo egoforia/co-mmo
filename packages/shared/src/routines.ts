@@ -65,9 +65,9 @@ export const NPC_ROUTINES: Record<string, Partial<Routine>> = {
   },
 };
 
-/** What someone does in each part of the day. */
-export function routineOf(npc: string): Routine {
-  return { ...DEFAULT_ROUTINE, ...NPC_ROUTINES[npc] };
+/** What someone does in each part of the day: their own hours when the editor gave them some, else the land's. */
+export function routineOf(npc: string, own?: Partial<Routine>): Routine {
+  return { ...DEFAULT_ROUTINE, ...NPC_ROUTINES[npc], ...own };
 }
 
 /** The first thing said when someone talks to this person now, if anything. */

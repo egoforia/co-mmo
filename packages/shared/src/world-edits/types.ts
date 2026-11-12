@@ -3,6 +3,8 @@
 // kinds so every kind, the server and the browser share one vocabulary.
 
 import type { BuildingSpec } from '../building-kit/spec.ts';
+import type { ShopDef } from '../kit.ts';
+import type { Routine } from '../routines.ts';
 
 /** A tile position, x east and y south, from the land's top-left corner. */
 export type TilePoint = [x: number, y: number];
@@ -62,6 +64,8 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'bookmark'; at: TilePoint; name: string; note?: string }
   /** A building of a kit look (`style`) with its walls' top-left corner at `at`, built to `spec` (D bays across, W deep; its one doorway in the ground storey's south, `left`, wall). */
   | { kind: 'kit'; at: TilePoint; style: string; spec: BuildingSpec }
+  /** A person standing on the edit's floor at `at`: someone new (name and look needed), or the person named by `target` moved there; what is given replaces what they had. */
+  | { kind: 'person'; at: TilePoint; name?: string; look?: string; greeting?: string; shop?: ShopDef; routine?: Partial<Routine> }
 );
 
 /** The name of each kind of edit. */
@@ -91,6 +95,9 @@ export type EditOf<K extends EditKindId> = DraftOf<K> & EditStamp & { name?: str
 
 /** Longest a bookmark's name and its note may be. */
 export const BOOKMARK_TEXT = { name: 40, note: 120 };
+
+/** Longest a person's name and what they say may be, most wares or lessons a shop may offer, and its highest price in gold. */
+export const PERSON_TEXT = { name: 40, greeting: 300, wares: 40, price: 100_000 };
 
 /** Most tiles one brush stroke may paint. */
 export const MAX_STROKE = 400;

@@ -119,4 +119,22 @@ describe('the editor core', () => {
     expect(core.settingsHtml()).toContain('name="name" type="text" maxlength="40" value="Front door"');
     expect(core.press('sanctum', map, [30, 30], 1).draft).toEqual({ kind: 'bookmark', at: [30.5, 30.5], name: 'Front door', level: 1 });
   });
+
+  it('picks a person, moves them to the floor shown, and loads them into the Person tool to change', () => {
+    const core = new EditorCore();
+    const amala = map.npcs.find((n) => n.id === 'sister-amala')!;
+    const at: TilePoint = [Math.floor(amala.x), Math.floor(amala.y)];
+    core.choose('select');
+    expect(core.press('sanctum', map, at, 0).say).toBe('Picked Sister Amala.');
+    expect(core.settingsHtml()).toContain('data-pick="change"');
+    core.pickAction('move');
+    expect(core.press('sanctum', map, [30, 30], 1).draft).toEqual({ kind: 'person', at: [30, 30], target: 'sister-amala', level: 1 });
+    core.press('sanctum', map, at, 0);
+    expect(core.pickAction('change').say).toMatch(/click Sister Amala/);
+    expect(core.tool).toBe('person');
+    expect(core.settingsHtml()).toContain('value="Sister Amala"');
+    const change = core.press('sanctum', map, at, 0).draft!;
+    expect(change).toMatchObject({ kind: 'person', target: 'sister-amala', name: 'Sister Amala', look: amala.asset, shop: { teaches: [{ ability: 'mend' }] } });
+    expect(checkEdit(map, change, CREATURES)).toBeUndefined();
+  });
 });

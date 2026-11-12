@@ -151,4 +151,20 @@ describe('the editor core', () => {
     core.set('behavior', 'chase');
     expect(core.press('sanctum', map, [30, 30], 0).draft).toMatchObject({ kind: 'spawn', monsterLevel: 7, behavior: 'chase', level: 0 });
   });
+
+  it('drags out a rectangle of paint, and copies an area to paste it with each click', () => {
+    const core = new EditorCore();
+    core.choose('paint');
+    core.set('shape', 'rect');
+    core.press('sanctum', map, [40, 40], 0);
+    core.drag('sanctum', map, [41, 40]);
+    core.drag('sanctum', map, [42, 41]);
+    expect((core.release().draft as { tiles: TilePoint[] }).tiles).toHaveLength(6);
+    core.choose('area');
+    expect(core.press('sanctum', map, [shop.x - 1, shop.y - 1], 0).say).toMatch(/opposite corner/);
+    expect(core.press('sanctum', map, [shop.x + shop.width, shop.y + shop.height], 0).say).toMatch(/^Copied /);
+    const pasted = core.press('sanctum', map, [20, 20], 0).drafts!;
+    expect(pasted.find((d) => d.kind === 'house')).toMatchObject({ at: [21, 21], style: shop.style });
+    expect(core.settingsHtml()).toContain('data-area="save"');
+  });
 });

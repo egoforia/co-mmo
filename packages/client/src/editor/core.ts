@@ -10,11 +10,13 @@ import {
   editWords,
   landmarkAt,
   moveDrafts,
+  brushTiles,
   personValues,
   pickAt,
   removeDraft,
   setPiece,
   tileAt,
+  type BrushShape,
   type EditContext,
   type EditField,
   type EditKind,
@@ -29,6 +31,7 @@ import {
   type WorldEditDraft,
 } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
+import { AreaTool } from './area.ts';
 
 // The world editor's core, shared by its two views: the window beside the
 // game (in-game.ts) and the Studio's map (studio-map.ts). It knows the tools
@@ -38,7 +41,7 @@ import { escapeHtml } from '../ui.ts';
 // draw the outlines their own way and send what the core makes.
 
 /** A tool: Look, Select, or one kind of edit. */
-export type ToolId = EditKindId | 'look' | 'select';
+export type ToolId = EditKindId | 'look' | 'select' | 'area';
 
 /** What a press or release asks the view to do: say something, send an edit (or edits made together), or nothing yet. */
 export interface ToolStep {
@@ -60,6 +63,7 @@ export interface EditList {
 
 const LOOK = { id: 'look' as const, name: 'Look', hint: 'Point at the world to see what is there.' };
 const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see it, then take it away, copy it or move it.' };
+const AREA = { id: 'area' as const, name: 'Copy and paste', hint: 'Click two corners to copy an area: its ground and everything standing in it. Then each click pastes it, all or none. Keep a copy as a prefab to paste in any land.' };
 const CONTEXT: EditContext = { creatures: CREATURES };
 
 /** Number settings with at most this many choices are drawn as a list to pick from. */
@@ -75,15 +79,16 @@ export class EditorCore {
   tool: ToolId = 'look';
   private readonly values: Partial<Record<EditKindId, Record<string, FieldValue>>> = {};
   /** Mid-tool: the brush stroke, or what was picked up (or where a road starts). */
-  private stroke: { region: string; level: number; tiles: Map<string, TilePoint> } | undefined;
+  private stroke: { region: string; level: number; tiles: Map<string, TilePoint>; from: TilePoint } | undefined;
   private held: { region: string; at: TilePoint; what: string; target?: string } | undefined;
   /** The Select tool's pick, and whether a copy or move of it waits for where it goes. */
+  private readonly area = new AreaTool();
   private picked: { region: string; thing: Picked; placing?: 'copy' | 'move'; values?: Record<string, FieldValue> } | undefined;
 
   /** The tools on offer now: set pieces only while their kit's wish is on. */
   tools(): { id: ToolId; name: string; hint: string }[] {
     const kinds = Object.values(EDIT_KINDS) as EditKind<EditKindId>[];
-    return [LOOK, SELECT, ...kinds.filter((k) => k.available?.() ?? true).map((k) => ({ id: k.kind, name: k.name, hint: k.hint }))];
+    return [LOOK, SELECT, AREA, ...kinds.filter((k) => k.available?.() ?? true).map((k) => ({ id: k.kind, name: k.name, hint: k.hint }))];
   }
 
   /** The chosen tool, falling back to Look when it is no longer on offer. */
@@ -96,7 +101,7 @@ export class EditorCore {
 
   /** Picks a tool, dropping whatever the last one was in the middle of. */
   choose(tool: string): void {
-    if (tool === 'look' || tool === 'select' || Object.hasOwn(EDIT_KINDS, tool)) this.tool = tool as ToolId;
+    if (tool === 'look' || tool === 'select' || tool === 'area' || Object.hasOwn(EDIT_KINDS, tool)) this.tool = tool as ToolId;
     this.cancel();
   }
 
@@ -105,6 +110,7 @@ export class EditorCore {
     this.stroke = undefined;
     this.held = undefined;
     this.picked = undefined;
+    this.area.reset();
   }
 
   /** True while a thing is picked up (the move tool's Take it away). */
@@ -113,7 +119,7 @@ export class EditorCore {
   }
 
   private kind(): EditKind<EditKindId> | undefined {
-    return this.tool === 'look' || this.tool === 'select' ? undefined : (EDIT_KINDS[this.tool] as unknown as EditKind<EditKindId>);
+    return this.tool === 'look' || this.tool === 'select' || this.tool === 'area' ? undefined : (EDIT_KINDS[this.tool] as unknown as EditKind<EditKindId>);
   }
 
   /** The current tool's settings, chosen or as they start. */
@@ -129,6 +135,7 @@ export class EditorCore {
 
   /** Sets one of the current tool's settings from its input; false when it is not one. */
   set(key: string, raw: string, checked?: boolean): boolean {
+    if (this.tool === 'area') return this.area.set(key, raw);
     const kind = this.kind();
     const field = kind?.fields.find((f) => f.key === key);
     if (!kind || !field) return false;
@@ -145,9 +152,15 @@ export class EditorCore {
     return !!this.kind()?.notes;
   }
 
+  /** The Copy and paste tool's buttons (`data-area`, with `data-value` naming a prefab). */
+  areaAction(action: string, value?: string): ToolStep {
+    return this.tool === 'area' ? this.area.action(action, value) : {};
+  }
+
   /** The current tool's settings as HTML: each input named by its setting's key. */
   settingsHtml(): string {
     if (this.tool === 'select') return this.pickedHtml();
+    if (this.tool === 'area') return this.area.html();
     const kind = this.kind();
     if (!kind) return '';
     const values = this.settings(kind);
@@ -227,11 +240,12 @@ export class EditorCore {
   /** A press on a tile of a land, on a floor of it. */
   press(region: string, map: RegionMap, at: TilePoint, level: number): ToolStep {
     if (this.tool === 'select') return this.select(region, map, at, level);
+    if (this.tool === 'area') return this.area.press(region, map, at);
     const kind = this.kind();
     if (!kind) return { say: `${describe(map, at, level)} at ${at[0]}, ${at[1]} in ${map.def.name}.` };
     switch (kind.pointer) {
       case 'drag':
-        this.stroke = { region, level, tiles: new Map() };
+        this.stroke = { region, level, tiles: new Map(), from: at };
         this.drag(region, map, at);
         return {};
       case 'two-clicks':
@@ -265,6 +279,12 @@ export class EditorCore {
   drag(region: string, map: RegionMap, [x, y]: TilePoint): void {
     if (!this.stroke || this.stroke.region !== region) return;
     const n = Number(this.settings().brush) || 1;
+    // A rectangle, line or fill is drawn again from where it was pressed, each time the pointer moves.
+    const shape = String(this.settings().shape ?? 'free') as BrushShape;
+    if (shape !== 'free') {
+      this.stroke.tiles = new Map(brushTiles(map, shape, this.stroke.from, [x, y], n).map((t) => [`${t[0]},${t[1]}`, t]));
+      return;
+    }
     const half = Math.floor(n / 2);
     for (let dy = -half; dy <= half; dy++) {
       for (let dx = -half; dx <= half; dx++) {
@@ -312,6 +332,7 @@ export class EditorCore {
       const held: Outline = { ...p.thing.box, tone: 'held' };
       return p.placing ? [held, { x: at[0], y: at[1], w: p.thing.box.w, h: p.thing.box.h }] : [held, { x: at[0], y: at[1], w: 1, h: 1 }];
     }
+    if (this.tool === 'area') return this.area.outlines(region, at);
     const kind = this.kind();
     if (!kind) return [{ x: at[0], y: at[1], w: 1, h: 1 }];
     const stroke = this.stroke?.region === region ? [...this.stroke.tiles.values()].map(([x, y]) => ({ x, y, w: 1, h: 1 })) : [];

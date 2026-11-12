@@ -392,6 +392,11 @@ export class WorldScene extends Phaser.Scene {
     this.sky.setWeather(weather);
   }
 
+  /** The world editor shows another hour or weather here, on this screen only; none puts back the sky's. */
+  previewSky(preview: { phase?: number; weather?: Weather }): void {
+    this.sky.showAs(preview);
+  }
+
   /** The hour and the weather in a few words. */
   skyText(): string {
     return this.sky.words();

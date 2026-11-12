@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { BODY_TYPES, FACINGS, ISO_WAYS, isRetiredArt, walkArt, walkStandArt, type ArtEntry, type ArtManifest, type Facing, type IsoWay } from '@co-mmo/shared';
 import { ANCHORS } from './assets/anchors.ts';
-import type { ImageProvider, ImageRequest } from './assets/provider.ts';
+import { ProviderError, type ImageProvider, type ImageRequest } from './assets/provider.ts';
 import { KEY_COLOR } from './assets/style.ts';
 import { DEFAULT_VIDEO_MODEL, videoUsd, type VideoProvider } from './assets/video.ts';
 import { checkWalk } from './assets/walk-checks.ts';
@@ -82,6 +82,13 @@ export interface StandingView {
   recipe?: Recipe;
   /** Earlier standing pictures. */
   versions: ArtVersion[];
+}
+
+/** Whether an error is an unprocessable request (HTTP 422), which should not be retried. */
+export function isUnprocessable(err: unknown): boolean {
+  if (err instanceof ProviderError && err.status === 422) return true;
+  if (typeof err === 'object' && err !== null && 'status' in err && (err as { status: unknown }).status === 422) return true;
+  return false;
 }
 
 /** Seconds of video a walk clip takes. */
@@ -723,6 +730,11 @@ export class WalkPainter {
         if (err instanceof PaintStopped) return { stop: err.message };
         reason = plain(err);
         console.error(`Walk ${id} failed:`, reason);
+        // Invalid or unprocessable input (422) cannot succeed by asking again.
+        if (isUnprocessable(err)) {
+          handle?.fail(reason);
+          return undefined;
+        }
       }
     }
     handle?.fail(`Tried twice. ${reason}`);

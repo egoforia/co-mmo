@@ -60,7 +60,7 @@ export function makeTownsperson(npc: NpcPlacement, map: RegionMap, random: () =>
 /** One tick of a person's day: set off when the part of the day changes, walk there, then stroll or sleep. */
 export function live(n: Townsperson, town: Town): void {
   const part = dayPart(town.phase);
-  const step = routineOf(n.id)[part];
+  const step = routineOf(n.id, n.routine)[part];
   const spot = n.spots[step.place];
   if (n.part !== part) {
     n.part = part;
@@ -114,5 +114,5 @@ function plan(map: RegionMap, n: Townsperson, spot: Placed): Spot[] {
 
 /** What a person says first when spoken to now (woken up, or busy with their evening), if anything. */
 export function greetingNow(n: Townsperson, phase: number): string | undefined {
-  return routineWords(n.name, routineOf(n.id)[dayPart(phase)], n.asleep);
+  return routineWords(n.name, routineOf(n.id, n.routine)[dayPart(phase)], n.asleep);
 }

@@ -28,6 +28,7 @@ import {
   type CraftId,
   type Stats,
   type RecipeDef,
+  type ShopDef,
   type ShopMessage,
   type Character,
   type TradeActionMessage,
@@ -70,7 +71,7 @@ export class KitUi {
   private energy: number;
   /** When each ability is ready again, by performance.now(). */
   private readonly readyAt = new Map<string, number>();
-  private shopNpc: { id: string; name: string } | null = null;
+  private shopNpc: { id: string; name: string; shop?: ShopDef } | null = null;
   private trade: TradeView | null = null;
   private timer: number | undefined;
   private readonly spellbook: SpellbookUi;
@@ -151,7 +152,7 @@ export class KitUi {
     }, 200);
   }
 
-  openShop(npc: { id: string; name: string }): void {
+  openShop(npc: { id: string; name: string; shop?: ShopDef }): void {
     this.shopNpc = npc;
     $('shop').hidden = false;
     this.renderShop();
@@ -301,7 +302,7 @@ export class KitUi {
 
   private renderShop(): void {
     const npc = this.shopNpc;
-    const shop = npc && SHOPS[npc.id];
+    const shop = npc && (npc.shop ?? SHOPS[npc.id]);
     if (!npc || !shop) return;
     const c = this.character;
     const sells = shop.sells.filter((s) => ITEMS[s.item]).map((s) => {

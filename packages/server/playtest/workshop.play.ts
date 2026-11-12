@@ -3,8 +3,9 @@
 // nothing with the in-game editor (three open terraces stepping up, and a
 // bookmark to look from), as drafts only it sees until it publishes them,
 // looks at each floor with the floor picker, picks a
-// terrace with Select and takes it away and back, goes to the bookmark, and
-// designs a kit building with battlements and towers.
+// terrace with Select and takes it away and back, goes to the bookmark,
+// stands a shopkeeper on the terrace and trades with them, and designs a kit
+// building with battlements and towers.
 // The terraces must come out the same as the testbed's. Screenshots land in
 // playtest-results/.
 
@@ -161,6 +162,37 @@ describe('the world editor in a workshop land', () => {
     await page.waitForFunction(() => (window as unknown as { scene: { floor: number } }).scene.floor === 1, undefined, { timeout: 10_000 });
     await page.waitForTimeout(800);
     await page.screenshot({ path: resolve(shots, 'workshop-bookmark.png') });
+
+    // Someone new on the terrace: a smith who sells tools, buys, and makes masters of smithing.
+    await page.click('#editor [data-tool="person"]');
+    await page.fill('#editor input[name="name"]', 'Hesper');
+    await page.fill('#editor input[name="greeting"]', 'Mind the forge, traveller.');
+    await page.locator('#editor input[name="greeting"]').blur();
+    await page.selectOption('#editor select[name="look"]', 'frostpeak-kaen');
+    await page.selectOption('#editor select[name="wares"]', 'tools:smithing');
+    await page.check('#editor input[name="buys"]');
+    await page.selectOption('#editor select[name="masters"]', 'smithing');
+    await page.selectOption('#editor select[name="view-floor"]', '1');
+    await aim([100, 40], [111, 51]);
+    await clickTile(page, 108, 46);
+    await expect.poll(() => land().npcs.find((n) => n.name === 'Hesper')?.floor, { timeout: 10_000 }).toBe(1);
+    // Spoken to and traded with in the game, the editor closed.
+    await page.click('#editor .close');
+    app!.world.local(region)!.placePlayer(id, 107.5, 46.5, 1);
+    await page.evaluate(() => {
+      const scene = (window as unknown as { scene: { me: { body: unknown }; cameras: { main: { startFollow(b: unknown): void } } } }).scene;
+      scene.cameras.main.startFollow(scene.me.body);
+    });
+    await page.waitForTimeout(1500);
+    await page.keyboard.press('e');
+    await expect.poll(() => page.locator('#dialogue').textContent(), { timeout: 10_000 }).toContain('Mind the forge, traveller.');
+    await page.click('#dialogue [data-shop]');
+    await expect.poll(() => page.locator('#shop').textContent(), { timeout: 10_000 }).toContain('Become a master');
+    await page.screenshot({ path: resolve(shots, 'workshop-person.png') });
+    await page.click('#shop [data-close]');
+    await page.click('#edit-world-button');
+    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.check('#editor input[name="live"]');
 
     // A kit building from the designer: a flat roof behind battlements with towers at the front, its shape checked as it is chosen.
     await page.click('#editor [data-tool="kit"]');

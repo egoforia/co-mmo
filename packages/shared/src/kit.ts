@@ -241,6 +241,19 @@ export const SHOPS: Record<string, ShopDef> = {
   },
 };
 
+/** Who a shop is asked about: a shopkeeper's id, or the person standing on the land with their own shop (given in the world editor). */
+export type Shopkeeper = string | { id: string; shop?: ShopDef };
+
+/**
+ * A person's shop: their own when the world editor gave them one (none when
+ * it offers nothing), else the game's by their id.
+ */
+export function shopOf(keeper: Shopkeeper): ShopDef | undefined {
+  if (typeof keeper === 'string') return SHOPS[keeper];
+  if (keeper.shop) return keeper.shop.sells.length || keeper.shop.teaches.length || keeper.shop.buys || keeper.shop.masters?.length ? keeper.shop : undefined;
+  return SHOPS[keeper.id];
+}
+
 /** Gold a shop pays for one of an item; 0 when it cannot be sold. */
 export function sellPrice(item: string): number {
   const def = ITEMS[item];
@@ -249,8 +262,8 @@ export function sellPrice(item: string): number {
 }
 
 /** Buys one item from a shop; gear comes as a copy made by the shopkeeper when `mint` is given. Returns why not. */
-export function buy(c: Character, npc: string, item: string, mint?: Mint): string | undefined {
-  const offer = SHOPS[npc]?.sells.find((s) => s.item === item);
+export function buy(c: Character, npc: Shopkeeper, item: string, mint?: Mint): string | undefined {
+  const offer = shopOf(npc)?.sells.find((s) => s.item === item);
   if (!offer || !ITEMS[item]) return 'That is not for sale here.';
   if (c.gold < offer.price) return `That costs ${offer.price} gold; you have ${c.gold}.`;
   if (itemCount(c, item) >= MAX_STACK) return 'Your bag cannot hold any more of those.';
@@ -260,8 +273,8 @@ export function buy(c: Character, npc: string, item: string, mint?: Mint): strin
 }
 
 /** Sells items to a shop that buys. Returns why not. */
-export function sell(c: Character, npc: string, item: string, qty = 1): string | undefined {
-  if (!SHOPS[npc]?.buys) return 'They do not buy things.';
+export function sell(c: Character, npc: Shopkeeper, item: string, qty = 1): string | undefined {
+  if (!shopOf(npc)?.buys) return 'They do not buy things.';
   const price = sellPrice(item);
   if (!price) return 'That cannot be sold.';
   if (!Number.isInteger(qty) || qty < 1 || itemCount(c, item) < qty) return 'You do not have that many.';
@@ -271,8 +284,8 @@ export function sell(c: Character, npc: string, item: string, qty = 1): string |
 }
 
 /** Pays a trainer to learn an ability. Returns why not. */
-export function train(c: Character, npc: string, ability: string): string | undefined {
-  const offer = SHOPS[npc]?.teaches.find((t) => t.ability === ability);
+export function train(c: Character, npc: Shopkeeper, ability: string): string | undefined {
+  const offer = shopOf(npc)?.teaches.find((t) => t.ability === ability);
   if (!offer || !ABILITIES[ability]) return 'They cannot teach you that.';
   if (c.abilities.includes(ability)) return 'You know that already.';
   const replaced = replacedWords(c, ability);
@@ -284,8 +297,8 @@ export function train(c: Character, npc: string, ability: string): string | unde
 }
 
 /** Takes up a mastery with its master, or trades `replace` for it. Returns why not. */
-export function master(c: Character, npc: string, craft: CraftId, replace?: CraftId): string | undefined {
-  if (!SHOPS[npc]?.masters?.includes(craft)) return 'They cannot make you a master of that.';
+export function master(c: Character, npc: Shopkeeper, craft: CraftId, replace?: CraftId): string | undefined {
+  if (!shopOf(npc)?.masters?.includes(craft)) return 'They cannot make you a master of that.';
   return chooseMastery(c, craft, replace);
 }
 

@@ -2,7 +2,7 @@ import {
   ABILITIES,
   ITEMS,
   RECIPES,
-  SHOPS,
+  shopOf,
   buy,
   craft,
   crafted,
@@ -28,6 +28,7 @@ import {
   keyWords,
   maxHp,
   setHotbar,
+  NPC_NAMES,
   npcName,
   takeItem,
   type EquipSlot,
@@ -35,6 +36,10 @@ import {
   type Stats,
 } from '@co-mmo/shared';
 import type { PlayerState, RegionState } from './state.ts';
+import type { Townsperson } from '../townsfolk.ts';
+
+/** What a shopkeeper is called in lines about trading: the game's way for its own people ("the Cactus Elder"), else the name they were given. */
+const called = (n: Townsperson) => (Object.hasOwn(NPC_NAMES, n.id) ? npcName(n.id) : n.name);
 
 /**
  * The Adventurer's kit: wearing gear, using items and scrolls, crafting,
@@ -93,33 +98,33 @@ export class Kit {
   }
 
   /** Taking up a mastery, or changing one, with the craft's master. */
-  private master(p: PlayerState, m: ShopMessage): void {
+  private master(p: PlayerState, m: ShopMessage, keeper: Townsperson): void {
     const ch = p.character;
     if (!isCraft(m.id) || (m.replace !== undefined && !isCraft(m.replace))) return;
     const replace = m.replace as CraftId | undefined;
-    const why = master(ch, m.npc, m.id, replace);
+    const why = master(ch, keeper, m.id, replace);
     if (why) return this.s.notice(p, why);
-    this.s.notice(p, `${npcName(m.npc)} names you a master of ${CRAFTS[m.id].name}. You can now rise to level ${MAX_CRAFT_LEVEL} and work the rarest materials.${replace ? ` Your ${CRAFTS[replace].name} drops back to level ${craftLevel(ch, replace)}.` : ''}`);
+    this.s.notice(p, `${called(keeper)} names you a master of ${CRAFTS[m.id].name}. You can now rise to level ${MAX_CRAFT_LEVEL} and work the rarest materials.${replace ? ` Your ${CRAFTS[replace].name} drops back to level ${craftLevel(ch, replace)}.` : ''}`);
     p.dirty = true;
   }
 
   /** Buying, selling and lessons, only while standing by the shopkeeper. */
   shop(p: PlayerState, m: ShopMessage): void {
     const keeper = this.s.townsfolk.find((n) => n.id === m.npc);
-    if (!keeper || !SHOPS[m.npc] || keeper.floor !== p.floor || Math.hypot(keeper.x - p.x, keeper.y - p.y) > TALK_RANGE + 1) {
-      return this.s.notice(p, `Walk up to ${npcName(m.npc)} to trade.`);
+    if (!keeper || !shopOf(keeper) || keeper.floor !== p.floor || Math.hypot(keeper.x - p.x, keeper.y - p.y) > TALK_RANGE + 1) {
+      return this.s.notice(p, `Walk up to ${keeper?.name ?? npcName(m.npc)} to trade.`);
     }
-    if (m.action === 'master') return this.master(p, m);
+    if (m.action === 'master') return this.master(p, m, keeper);
     const ch = p.character;
     const before = ch.gold;
-    const why = m.action === 'buy' ? buy(ch, m.npc, m.id, shopMade(npcName(m.npc), this.s.random, m.npc)) : m.action === 'sell' ? sell(ch, m.npc, m.id, m.qty ?? 1) : train(ch, m.npc, m.id);
+    const why = m.action === 'buy' ? buy(ch, keeper, m.id, shopMade(called(keeper), this.s.random, m.npc)) : m.action === 'sell' ? sell(ch, keeper, m.id, m.qty ?? 1) : train(ch, keeper, m.id);
     if (why) return this.s.notice(p, why);
     const name = m.action === 'learn' ? ABILITIES[m.id]!.name : ITEMS[m.id]?.name ?? m.id;
     this.s.notice(p, m.action === 'buy'
       ? `You bought a ${name} for ${before - ch.gold} gold.`
       : m.action === 'sell'
         ? `You sold ${m.qty && m.qty > 1 ? `${m.qty} × ` : 'a '}${name} for ${ch.gold - before} gold.`
-        : `${npcName(m.npc)} teaches you ${name}. ${keyWords(ch, m.id)}`);
+        : `${called(keeper)} teaches you ${name}. ${keyWords(ch, m.id)}`);
     p.dirty = true;
   }
 

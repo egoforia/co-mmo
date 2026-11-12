@@ -60,8 +60,8 @@ export interface EditKind<K extends EditKindId> {
   pointer: EditPointer;
   /** True when it works on floors above and below the ground too; the rest work on the ground only, for now. */
   onFloors?: boolean;
-  /** When it changes one thing, which the editor may name (`target`) instead of a tile: a building, a set piece or piece of furniture, or any named thing. */
-  targets?: 'building' | 'piece' | 'thing';
+  /** When it changes one thing, which the editor may name (`target`) instead of a tile: a building, a set piece or piece of furniture, a person, or any named thing. */
+  targets?: 'building' | 'piece' | 'thing' | 'person';
   /** Its settings, drawn the same by every editor. */
   fields: EditField[];
   /** False while it has nothing to offer (set pieces while their kit's wish is off). */

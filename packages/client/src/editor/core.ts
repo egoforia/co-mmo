@@ -10,6 +10,7 @@ import {
   editWords,
   landmarkAt,
   moveDrafts,
+  personValues,
   pickAt,
   removeDraft,
   setPiece,
@@ -77,7 +78,7 @@ export class EditorCore {
   private stroke: { region: string; level: number; tiles: Map<string, TilePoint> } | undefined;
   private held: { region: string; at: TilePoint; what: string; target?: string } | undefined;
   /** The Select tool's pick, and whether a copy or move of it waits for where it goes. */
-  private picked: { region: string; thing: Picked; placing?: 'copy' | 'move' } | undefined;
+  private picked: { region: string; thing: Picked; placing?: 'copy' | 'move'; values?: Record<string, FieldValue> } | undefined;
 
   /** The tools on offer now: set pieces only while their kit's wish is on. */
   tools(): { id: ToolId; name: string; hint: string }[] {
@@ -173,10 +174,10 @@ export class EditorCore {
     const p = this.picked;
     if (!p) return '<p class="note">Nothing picked yet.</p>';
     const { thing } = p;
-    const can = thing.kind !== 'person';
+    const change = p.values ? '<button type="button" class="quiet" data-pick="change">Change</button>' : '';
     const buttons = p.placing
-      ? `<p class="note">Click where its top-left corner goes. Esc to stop.</p>`
-      : `<button type="button" class="quiet" data-pick="remove">Take it away</button>${can ? '<button type="button" class="quiet" data-pick="copy">Copy</button><button type="button" class="quiet" data-pick="move">Move</button>' : ''}`;
+      ? `<p class="note">Click where its top-left corner goes${thing.kind === 'person' ? ', on any floor' : ''}. Esc to stop.</p>`
+      : `<button type="button" class="quiet" data-pick="remove">Take it away</button><button type="button" class="quiet" data-pick="copy">Copy</button><button type="button" class="quiet" data-pick="move">Move</button>${change}`;
     return `<div class="picked"><strong>${escapeHtml(thing.name)}</strong>
       ${[...thing.details, `At ${thing.box.x}, ${thing.box.y}${thing.level ? `, floor ${thing.level}` : ''}`].map((d) => `<span class="note">${escapeHtml(d)}</span>`).join('')}
       ${thing.id ? `<span class="note">Name: <code>${escapeHtml(thing.id)}</code></span>` : ''}
@@ -191,6 +192,13 @@ export class EditorCore {
       this.picked = undefined;
       return { draft: removeDraft(p.thing), region: p.region };
     }
+    // A person's settings go to the Person tool, to change and then click them.
+    if (action === 'change' && p.values) {
+      this.values.person = { ...p.values };
+      this.tool = 'person';
+      this.picked = undefined;
+      return { say: `Change their settings, then click ${p.thing.name} to make it so.` };
+    }
     if (action === 'copy' || action === 'move') {
       p.placing = action;
       return { say: action === 'copy' ? 'Click where the copy goes.' : 'Click where it goes.' };
@@ -203,13 +211,16 @@ export class EditorCore {
     const p = this.picked;
     if (p?.placing) {
       if (p.region !== region) return { say: 'Keep it in the land it came from.' };
-      const drafts = p.placing === 'copy' ? [copyDraft(map, p.thing, at)].filter((d) => !!d) : moveDrafts(map, p.thing, at);
+      // People go to the floor shown; everything else stays on its own.
+      const onto = p.thing.kind === 'person' ? (level ? { level } : { level: undefined }) : {};
+      const drafts = p.placing === 'copy' ? [copyDraft(map, p.thing, at)].filter((d) => !!d).map((d) => ({ ...d, ...onto })) : moveDrafts(map, p.thing, at, p.thing.kind === 'person' ? level : p.thing.level);
       if (!drafts?.length) return { say: 'That cannot be copied yet.' };
       this.picked = p.placing === 'copy' ? { region, thing: p.thing, placing: 'copy' } : undefined;
       return drafts.length === 1 ? { draft: drafts[0]!, region } : { drafts, region };
     }
     const thing = pickAt(map, at, level);
-    this.picked = thing && { region, thing };
+    const person = thing?.kind === 'person' ? map.npcs.find((n) => n.id === thing.id) : undefined;
+    this.picked = thing && { region, thing, ...(person ? { values: personValues(person) } : {}) };
     return { say: thing ? `Picked ${thing.name}.` : `Nothing to pick at ${at[0]}, ${at[1]}.` };
   }
 
@@ -243,7 +254,8 @@ export class EditorCore {
         return this.make(kind, { at: from, to: at, ...(target ? { target } : {}) }, region, level);
       }
       default: {
-        const target = kind.targets === 'building' ? buildingAt(map, at)?.id : kind.targets === 'piece' ? landmarkAt(map, at, level)?.id : kind.targets === 'thing' ? pickAt(map, at, level)?.id : undefined;
+        const picked = kind.targets === 'thing' || kind.targets === 'person' ? pickAt(map, at, level) : undefined;
+        const target = kind.targets === 'building' ? buildingAt(map, at)?.id : kind.targets === 'piece' ? landmarkAt(map, at, level)?.id : kind.targets === 'person' ? (picked?.kind === 'person' ? picked.id : undefined) : picked?.id;
         return this.make(kind, { at, ...(target ? { target } : {}) }, region, level);
       }
     }

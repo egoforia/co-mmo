@@ -33,6 +33,7 @@ import {
   xpToNext,
   type Character,
   type DialogueMessage,
+  type ShopDef,
   type EquipSlot,
   type Stats,
   type StatusView,
@@ -57,7 +58,7 @@ export interface RpgActions {
   /** Takes off what is worn in a slot. */
   unequip(slot: EquipSlot): void;
   /** Opens a shopkeeper's or trainer's window. */
-  openShop(npc: { id: string; name: string }): void;
+  openShop(npc: { id: string; name: string; shop?: ShopDef }): void;
   accept(quest: string): void;
   /** Chooses a Path at the mentor beside you. */
   choosePath(npc: string, path: string): void;
@@ -77,6 +78,8 @@ export class RpgUi {
   private hp: number;
   private energy: number;
   private chapter = CHAPTERS[0]!.id;
+  /** The shop of the person last spoken to, when the world editor gave them one. */
+  private wares: ShopDef | undefined;
   private lastAttack = 0;
   /** Our statuses as the stats line shows them (HTML), as the last snapshot told them. */
   private statusText = '';
@@ -121,7 +124,7 @@ export class RpgUi {
       const path = target.closest<HTMLElement>('[data-path]');
       if (path) actions.choosePath(path.dataset.npc!, path.dataset.path!);
       const shop = target.closest<HTMLElement>('[data-shop]');
-      if (shop) actions.openShop({ id: shop.dataset.shop!, name: shop.dataset.name ?? '' });
+      if (shop) actions.openShop({ id: shop.dataset.shop!, name: shop.dataset.name ?? '', ...(this.wares ? { shop: this.wares } : {}) });
       if (quest || shop || path || target.closest('[data-close]')) $('dialogue').hidden = true;
     });
     $('keys').addEventListener('click', (e) => {
@@ -167,6 +170,7 @@ export class RpgUi {
 
   showDialogue(d: DialogueMessage): void {
     const box = $('dialogue');
+    this.wares = d.wares;
     const paragraphs = d.text.split('\n\n').map((p) => `<p>${escapeHtml(p)}</p>`).join('');
     const shop = d.shop ? `<button type="button" data-shop="${escapeHtml(d.npc.id)}" data-name="${escapeHtml(d.npc.name)}">Trade</button>` : '';
     const offer = d.offer

@@ -322,6 +322,16 @@ house (`buildingKit.kitHouse`) is built from that spec instead of its
 style's. Its one doorway is in the ground storey's south wall, where the
 game's doorway is; upper storeys get floors to walk on (`buildFloors`).
 
+**People** are the `person` edit kind (`world-edits/kinds/person.ts`): someone
+new with a name, a look (`PERSON_LOOKS`, the pictures of the shipped people),
+what they say, a shop and the hours they keep, or (`target`) someone already
+on the land moved and changed. Their words, shop and day ride on the land's
+`NpcPlacement` (`greeting`, `shop`, `routine`); the server reads those before
+the game's tables (`shopOf`, `routineOf(id, own)`), and a dialogue carries
+their shop as `wares`, since browsers have no table for it. Select moves a
+person to the floor shown, copies them, or loads them into the Person tool
+(`personValues`) to change.
+
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with
 (`RegionDef.base`) first, then the editor's. A `workshop` land stands off the

@@ -4,7 +4,7 @@
 import { isCalling, type CallingId } from './classes.ts';
 import type { ContentEntry, WishCard } from './content.ts';
 import { isRace, type RaceId } from './races.ts';
-import type { TradeOffer } from './kit.ts';
+import type { ShopDef, TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
 import type { SkyConfig, Weather } from './sky.ts';
@@ -575,6 +575,8 @@ export interface DialogueMessage {
   offer?: { quest: string; title: string; reward: string };
   /** The NPC keeps a shop or teaches: the prices come from SHOPS. */
   shop?: boolean;
+  /** The shop of someone given one in the world editor, which SHOPS does not know. */
+  wares?: ShopDef;
   /** A Path mentor after the trial: the Paths the player may choose (trials.ts). */
   paths?: PathChoice[];
 }

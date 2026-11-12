@@ -342,6 +342,15 @@ the spawn as one), and the server makes its live monsters from
 defence with the level as levelled creatures do (`creature-tune.ts`). The
 edit's monster level is `monsterLevel`, apart from `level`, its floor.
 
+A spawn (or Change monsters) may also add **loot** of its own (`loot`,
+`lootChance`; on the home as `CreatureTune.loot`, added to the kind's drops).
+**Lights** on their own are the `light` kind: a colour, reach and flicker on a
+tile of any floor (`RegionMap.lights`), lit by the game like a lamp's
+(`placeLamps`). **Change building** (`restyle`) gives a building another look,
+or lays it again at another floor size from the same corner, keeping its name
+(`takeBuilding` in `kinds/remove.ts` clears what was inside). **Gathering**
+can scatter up to `MAX_SPOTS` spots round the one clicked (`count`).
+
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with
 (`RegionDef.base`) first, then the editor's. A `workshop` land stands off the

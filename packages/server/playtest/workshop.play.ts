@@ -4,7 +4,7 @@
 // bookmark to look from), as drafts only it sees until it publishes them,
 // looks at each floor with the floor picker, picks a
 // terrace with Select and takes it away and back, goes to the bookmark,
-// stands a shopkeeper on the terrace and trades with them, and designs a kit
+// stands a shopkeeper and a light on the terrace and trades with them, and designs a kit
 // building with battlements and towers.
 // The terraces must come out the same as the testbed's. Screenshots land in
 // playtest-results/.
@@ -176,6 +176,11 @@ describe('the world editor in a workshop land', () => {
     await aim([100, 40], [111, 51]);
     await clickTile(page, 108, 46);
     await expect.poll(() => land().npcs.find((n) => n.name === 'Hesper')?.floor, { timeout: 10_000 }).toBe(1);
+    // A violet light of its own beside them.
+    await page.click('#editor [data-tool="light"]');
+    await page.selectOption('#editor select[name="color"]', 'arcane');
+    await clickTile(page, 105, 47);
+    await expect.poll(() => land().lights?.[0]?.light.color, { timeout: 10_000 }).toBe('#c49bff');
     // Spoken to and traded with in the game, the editor closed.
     await page.click('#editor .close');
     app!.world.local(region)!.placePlayer(id, 107.5, 46.5, 1);

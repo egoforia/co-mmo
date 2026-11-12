@@ -1,4 +1,4 @@
-import { BEHAVIOR_NOTICE, type Behavior, type CreatureDef } from './rpg.ts';
+import { BEHAVIOR_NOTICE, type Behavior, type CreatureDef, type Drop } from './rpg.ts';
 import type { Active } from './sky.ts';
 import { creatureDefence } from './weapons.ts';
 
@@ -12,6 +12,8 @@ export interface CreatureTune {
   level?: number;
   behavior?: Behavior;
   active?: Active;
+  /** What it may leave besides its kind's drops. */
+  loot?: Drop[];
   /** Where a patrol walks, tile middles in order, round and round. */
   route?: { x: number; y: number }[];
 }
@@ -26,7 +28,7 @@ const xpAt = (l: number) => 5 + l * 5;
 
 /** A monster kind as a spawn's changes make it; the kind itself when nothing changed. */
 export function tunedCreature(def: CreatureDef, tune: CreatureTune | undefined): CreatureDef {
-  if (!tune || (tune.level === undefined && tune.behavior === undefined && tune.active === undefined)) return def;
+  if (!tune || (tune.level === undefined && tune.behavior === undefined && tune.active === undefined && !tune.loot?.length)) return def;
   const out: CreatureDef = { ...def };
   const level = tune.level;
   if (level !== undefined && level !== def.level) {
@@ -48,5 +50,6 @@ export function tunedCreature(def: CreatureDef, tune: CreatureTune | undefined):
     if (out.notice <= 0) out.notice = BEHAVIOR_NOTICE[tune.behavior];
   }
   if (tune.active) out.active = tune.active;
+  if (tune.loot?.length) out.drops = [...def.drops, ...tune.loot.map((d) => ({ ...d }))];
   return out;
 }

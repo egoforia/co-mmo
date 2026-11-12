@@ -1,4 +1,4 @@
-import { Tile, set, type RegionMap } from '../../world.ts';
+import { Tile, set, type Building, type RegionMap } from '../../world.ts';
 import type { TileRect } from '../../floors.ts';
 import type { EditKind } from '../kind.ts';
 import { thingById } from '../names.ts';
@@ -13,11 +13,13 @@ function within(inner: TileRect, outer: TileRect): boolean {
   return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
 }
 
-/** What stands on a tile with no name: a bookmark, a gathering spot, a person or a monster's home. */
+/** What stands on a tile with no name: a bookmark, a light, a gathering spot, a person or a monster's home. */
 function unnamedAt(map: RegionMap, [x, y]: TilePoint, floor: number): (() => void) | undefined {
   const here = (p: { x: number; y: number; floor?: number }) => (p.floor ?? 0) === floor && Math.floor(p.x) === x && Math.floor(p.y) === y;
   const mark = map.bookmarks?.findIndex(here) ?? -1;
   if (mark >= 0) return () => void map.bookmarks!.splice(mark, 1);
+  const light = map.lights?.findIndex(here) ?? -1;
+  if (light >= 0) return () => void map.lights!.splice(light, 1);
   const spot = floor ? -1 : map.spots.findIndex(here);
   if (spot >= 0) return () => (map.spots.splice(spot, 1), set(map, x, y, Tile.Ground));
   const person = map.npcs.findIndex(here);
@@ -59,24 +61,30 @@ function takeAway(map: RegionMap, edit: EditOf<'remove'> | (Omit<EditOf<'remove'
       map.landmarks = drop(map.landmarks, (l) => (l.floor ?? 0) === s.floor && within(pieceRect(l), s));
       return true;
     }
-    case 'building': {
-      // Its walls become open ground; its floors, stairs and furniture go with it.
-      const b = named.thing;
-      map.buildings = drop(map.buildings, (t) => t === b);
-      map.storeys = drop(map.storeys, (s) => within(s, b));
-      map.stairways = drop(map.stairways, (w) => within(w, b));
-      map.landmarks = drop(map.landmarks, (l) => within(pieceRect(l), b));
-      for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) set(map, x, y, Tile.Ground);
+    case 'building':
+      takeBuilding(map, named.thing);
       return true;
-    }
   }
+}
+
+/** Takes a building away: its walls become open ground; its floors, stairs and furniture go with it. */
+export function takeBuilding(map: RegionMap, b: Building): void {
+  const pieceRect = (l: (typeof map.landmarks)[number]) => {
+    const f = footprint(l);
+    return { x: f.left, y: f.top, width: f.width, height: f.height };
+  };
+  map.buildings = map.buildings.filter((t) => t !== b);
+  map.storeys = map.storeys.filter((s) => !within(s, b));
+  map.stairways = map.stairways.filter((w) => !within(w, b));
+  map.landmarks = map.landmarks.filter((l) => !within(pieceRect(l), b));
+  for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) set(map, x, y, Tile.Ground);
 }
 
 /** Takes away one thing on a land: a building, storey, stairs, piece, spot, person, monster's home or bookmark. */
 export const REMOVE: EditKind<'remove'> = {
   kind: 'remove',
   name: 'Take away',
-  hint: 'Click a thing to take it away: a building, a storey, stairs, a piece, a gathering spot, a person, a monster’s home or a bookmark.',
+  hint: 'Click a thing to take it away: a building, a storey, stairs, a piece, a gathering spot, a person, a monster’s home, a light or a bookmark.',
   pointer: 'click',
   onFloors: true,
   targets: 'thing',

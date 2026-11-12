@@ -17,7 +17,7 @@ import type { TilePoint, WorldEditDraft } from './types.ts';
 // name, so they find it again whatever the tile.
 
 /** What can be picked. */
-export type PickKind = 'building' | 'storey' | 'stairway' | 'landmark' | 'spot' | 'monster' | 'person' | 'bookmark';
+export type PickKind = 'building' | 'storey' | 'stairway' | 'landmark' | 'spot' | 'monster' | 'person' | 'bookmark' | 'light';
 
 /** A thing picked on a land: what it is, its name there, and its box on the floor. */
 export interface Picked {
@@ -39,6 +39,8 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number): Picked | u
   const tile = (bx: number, by: number, w = 1, h = 1): Outline => ({ x: bx, y: by, w, h });
   const mark = map.bookmarks?.find((b) => b.floor === level && Math.floor(b.x) === x && Math.floor(b.y) === y);
   if (mark) return { kind: 'bookmark', name: `Bookmark “${mark.name}”`, level, box: tile(x, y), details: mark.note ? [mark.note] : [] };
+  const light = map.lights?.find((l) => l.floor === level && Math.floor(l.x) === x && Math.floor(l.y) === y);
+  if (light) return { kind: 'light', name: 'A light', level, box: tile(x, y), details: [`Reaches ${light.light.radius} tiles`, light.light.flicker ? 'Flickers like a flame' : 'Shines steadily'] };
   const spot = !level ? map.spots.find((s) => s.x === x && s.y === y) : undefined;
   if (spot) return { kind: 'spot', name: SPOTS[spot.kind]?.name ?? 'A gathering spot', level, box: tile(x, y), details: [] };
   const person = map.npcs.find((n) => (n.floor ?? 0) === level && Math.floor(n.x) === x && Math.floor(n.y) === y);
@@ -130,12 +132,16 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
     case 'monster': {
       const c = map.creatures.find((m) => (m.floor ?? 0) === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
       // Its level, ways and hours come too; a patrol path stays where it was drawn.
-      return c && { kind: 'spawn', creature: c.kind, at: to, count: 1, ...(p.level ? { level: p.level } : {}), ...(c.level ? { monsterLevel: c.level } : {}), ...(c.behavior && c.behavior !== 'patrol' ? { behavior: c.behavior } : {}), ...(c.active ? { active: c.active } : {}) };
+      return c && { kind: 'spawn', creature: c.kind, at: to, count: 1, ...(p.level ? { level: p.level } : {}), ...(c.level ? { monsterLevel: c.level } : {}), ...(c.behavior && c.behavior !== 'patrol' ? { behavior: c.behavior } : {}), ...(c.active ? { active: c.active } : {}), ...(c.loot?.[0] ? { loot: c.loot[0].item, lootChance: Math.round(c.loot[0].chance * 100) } : {}) };
     }
     case 'person': {
       // Someone new, the same in every way but their name on the land.
       const n = map.npcs.find((m) => m.id === p.id);
       return n && { kind: 'person', at: to, name: n.name, look: n.asset, ...(n.greeting ?? NPC_GREETINGS[n.id] ? { greeting: n.greeting ?? NPC_GREETINGS[n.id] } : {}), ...(shopOf(n) ? { shop: structuredClone(shopOf(n)!) } : {}), routine: routineOf(n.id, n.routine), ...(p.level ? { level: p.level } : {}) };
+    }
+    case 'light': {
+      const l = map.lights?.find((m) => m.floor === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
+      return l && { kind: 'light', at: to, color: l.light.color, radius: l.light.radius, ...(l.light.flicker ? { flicker: true } : {}), ...(p.level ? { level: p.level } : {}) };
     }
     case 'bookmark': {
       const b = map.bookmarks?.find((m) => m.floor === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);

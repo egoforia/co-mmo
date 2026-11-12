@@ -47,6 +47,10 @@ export type WorldEditDraft = EditPlace & (
   | ({ kind: 'monsters'; at: TilePoint } & Partial<MonsterWays>)
   /** A patrol path (tiles, in order) for every monster of the spawn whose home is on `at`; they walk it round and round. */
   | { kind: 'patrol'; at: TilePoint; route: TilePoint[] }
+  /** A light of a colour (#rrggbb) and reach (tiles) shining from a tile of the edit's floor, flickering like a flame or steady. */
+  | { kind: 'light'; at: TilePoint; color: string; radius: number; flicker?: boolean }
+  /** Gives the building over `at` (or named by `target`) another look, and another floor size from the same corner when `floor` is given. */
+  | { kind: 'restyle'; at: TilePoint; style: string; floor?: [width: number, height: number] }
   /** Sends away every monster living within `radius` tiles of a spot. */
   | { kind: 'clear'; at: TilePoint; radius: number }
   /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */
@@ -55,8 +59,8 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'floors'; at: TilePoint; up: number; down: number; ladders?: boolean }
   /** Gives the set piece or piece of furniture over `at` the tiles it blocks and stands on, still centred under its picture (the Art tab's hit boxes). */
   | { kind: 'footprint'; at: TilePoint; footprint: [width: number, height: number] }
-  /** Stands a gathering spot of a kind (gathering.ts) on a tile, or takes away the one there when `spot` is null. */
-  | { kind: 'spot'; spot: string | null; at: TilePoint }
+  /** Stands a gathering spot of a kind (gathering.ts) on a tile, and `count` - 1 more scattered around it, or takes away the one there when `spot` is null. */
+  | { kind: 'spot'; spot: string | null; at: TilePoint; count?: number }
   /** A floor above or below the ground over a rectangle, walled round, or an open terrace with low parapets (floors.ts addStorey). */
   | { kind: 'storey'; at: TilePoint; size: [width: number, height: number]; storey: number; style: string; open?: boolean }
   /** A flight of stairs (or a ladder) with its top-left tile at `at`, from floor `from` up to the one above, climbed walking `climbs`. */
@@ -106,6 +110,8 @@ export const PERSON_TEXT = { name: 40, greeting: 300, wares: 40, price: 100_000 
 
 /** Most tiles one brush stroke may paint. */
 export const MAX_STROKE = 400;
+/** Most gathering spots one click may scatter. */
+export const MAX_SPOTS = 12;
 /** Most monsters one spawn may hold. */
 export const MAX_SPAWN = 12;
 /** Widest area the clear tool may empty, in tiles. */

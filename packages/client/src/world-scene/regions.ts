@@ -330,17 +330,21 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
       const depthOff = floorDepthOffset(floor);
       if (art && scene.textures.exists(art)) {
         const img = scene.add.image(at.x, at.y - lift, art).setOrigin(0.5, 0.92);
-        parts.push(img.setDepth(depthOff + PROJECTION.depth(feet.x, feet.y) - 1));
+        img.setDepth(depthOff + PROJECTION.depth(feet.x, feet.y) - 1);
+        img.setInteractive({ useHandCursor: true });
+        img.on('pointerover', () => img.setTint(0xfff8d0));
+        img.on('pointerout', () => img.clearTint());
+        parts.push(img);
       }
       const arrow = isUp ? '▲' : '▼';
       const label = scene.add.text(at.x, at.y - lift - T * 0.75, `${arrow} ${stairsLabel(s, floor)}`, {
         fontFamily: 'sans-serif',
         fontSize: '18px',
         fontStyle: 'bold',
-        color: '#fff6dc',
-        stroke: '#1c1830',
+        color: isUp ? '#ffd359' : '#8ee8f5',
+        stroke: isUp ? '#2e1e04' : '#062533',
         strokeThickness: 4,
-        backgroundColor: '#1c1830ee',
+        backgroundColor: isUp ? '#1e1505ee' : '#041620ee',
         padding: { x: 8, y: 4 },
       });
       parts.push(label.setOrigin(0.5, 1).setDepth(LABEL_DEPTH - 2));

@@ -185,3 +185,49 @@ describe('all 10 biomes have 4-sided published stairs in manifest and on disk', 
     }
   }
 });
+
+describe('stairs standardization rules', () => {
+  const biomes = Object.keys(BIOMES) as BiomeId[];
+
+  it('guarantees every biome stair base asset meets the minimum luminance readability threshold (L >= 110)', async () => {
+    const sharp = (await import('sharp')).default;
+    for (const biome of biomes) {
+      for (const dir of ['up', 'down'] as const) {
+        const filePath = resolve(ART_DIR, `stairs-${biome}-${dir}.png`);
+        const { data } = await sharp(filePath).raw().toBuffer({ resolveWithObject: true });
+        let solidPixels = 0;
+        let totalR = 0;
+        let totalG = 0;
+        let totalB = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3]! > 20) {
+            solidPixels++;
+            totalR += data[i]!;
+            totalG += data[i + 1]!;
+            totalB += data[i + 2]!;
+          }
+        }
+        expect(solidPixels).toBeGreaterThan(10_000);
+        const avgR = totalR / solidPixels;
+        const avgG = totalG / solidPixels;
+        const avgB = totalB / solidPixels;
+        const lum = Math.round(0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
+        expect(lum, `${biome} ${dir} stairs luminance (${lum}) must be >= 110 for in-game readability`).toBeGreaterThanOrEqual(110);
+      }
+    }
+  });
+
+  it('guarantees all stair manifests adhere to standard 256x256 dimensions and prop kind', () => {
+    for (const biome of biomes) {
+      for (const heading of ['north', 'south', 'east', 'west'] as const) {
+        for (const dir of ['up', 'down'] as const) {
+          const id = `stairs-${biome}-${heading}-${dir}`;
+          const entry = MANIFEST[id];
+          expect(entry.width).toBe(256);
+          expect(entry.height).toBe(256);
+          expect(entry.kind).toBe('prop');
+        }
+      }
+    }
+  });
+});

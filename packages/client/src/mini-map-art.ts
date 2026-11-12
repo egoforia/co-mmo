@@ -103,7 +103,30 @@ function stairs(scene: Phaser.Scene, ctx: CanvasRenderingContext2D, map: RegionM
     const isUp = floor === s.lower;
     const art = stairTexture(scene, map.def.biome, s, isUp);
     if (art && scene.textures.exists(art)) stand(ctx, source(scene, art), s.x - ox + s.width / 2, s.y - oy + s.height, s.width);
+    drawStairBadge(ctx, s.x - ox + s.width / 2, s.y - oy + s.height / 2, isUp);
   }
+}
+
+/** Draws a high-contrast navigation badge for stairs on the mini map (gold for up, cyan for down). */
+function drawStairBadge(ctx: CanvasRenderingContext2D, x: number, y: number, isUp: boolean): void {
+  const px = x * PLAN_PIXELS;
+  const py = y * PLAN_PIXELS;
+  const r = 4;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.fillStyle = isUp ? '#1e1505' : '#041620';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = isUp ? '#ffd359' : '#8ee8f5';
+  ctx.stroke();
+
+  ctx.fillStyle = isUp ? '#ffd359' : '#8ee8f5';
+  ctx.font = 'bold 6px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(isUp ? '▲' : '▼', px, py + (isUp ? -0.5 : 0.5));
+  ctx.restore();
 }
 
 /** Draws a picture `width` tiles across, its bottom middle at tile point (x, y). */

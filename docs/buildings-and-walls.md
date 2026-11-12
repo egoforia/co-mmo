@@ -143,6 +143,45 @@ Before merging or committing new buildings or biomes, verify:
 - [ ] **Tests Pass:** `npm test` and `npm run typecheck` pass with 0 errors.
 - [ ] **Visual Playtest:** An in-game screenshot confirms that characters and furniture are visually enclosed by tall, opaque isometric walls.
 
+---
+
+## 6. Isometric Stairs & Vertical Traversal Architecture
+
+Stairs connect floors across multi-storey kit houses, open terraces, cliff skirts, and subterranean dungeons. All future stair assets and generation pipelines **must strictly follow these standardization rules** so players immediately identify vertical traversal routes anywhere in the world:
+
+### 1. Geometric Footprint & Bounding Box Standards
+- **Ascending Flights (`up`)**:
+  - Canvas: Standardized $256 \times 256\text{px}$ RGBA PNG.
+  - Active bounding box: Width $220\text{--}256\text{px}$, height $240\text{--}256\text{px}$ to clear a full vertical storey rise (`floorLift = 96px` / `WALL_RISE = 96px`).
+  - Screen Anchor: Fixed at $(0.5, 0.92)$ origin (`PROJECTION.stand`).
+- **Descending Stairwells (`down`)**:
+  - Canvas: Standardized $256 \times 256\text{px}$ RGBA PNG.
+  - Active bounding box: Full width $256\text{px}$, height strictly between $170\text{px}$ and $195\text{px}$. This maintains the exact $2:1$ isometric diamond floor rim ($256 \times 128\text{px}$) plus a $45\text{--}65\text{px}$ parapet curbing.
+  - Central Well Gradient: The interior descending pit must step into an abyss gradient ($>80\%$ dark shadow, $\text{RGB} < 25, 25, 25$) so it reads immediately as a descent rather than a flat floor rug.
+
+### 2. The Four Cardinal Headings
+Every stairway supports 4 cardinal headings resolved via `stairHeading(s)` in `packages/shared/src/floors.ts`:
+1. **`north`**: Climbs backward into the distance; riser faces face the player directly.
+2. **`south`**: Climbs forward toward the camera; horizontal tread lips require sharp specular highlights to separate steps from flat platforms.
+3. **`east`**: Climbs diagonally rightward along the isometric axis; lateral balustrade visible along the lower rim.
+4. **`west`**: Climbs diagonally leftward along the isometric axis; lateral balustrade visible along the lower rim.
+
+### 3. Readability & Minimum Luminance Threshold ($L \ge 110$)
+- In dark biomes (Murkmire Swamp, Whispering Woods, Ember Wastes), stairs must never drop below the perceptual contrast threshold against floor tiles.
+- **Rule:** Average solid pixel luminance must be **$L \ge 110$** ($L = 0.299R + 0.587G + 0.114B$).
+- **Threshold Signifier:** Every stair entrance must incorporate a distinct, high-contrast entry landing threshold (e.g. inlaid brass border, carved runic curb, or pale timber runner).
+- **Step Lip Highlights:** Tread leading edges require a 1px specular highlight ($L_{edge} \ge L_{step} + 40$).
+
+### 4. Engine & UI Affordances
+- **Interactive Mouse Affordance**: Stair sprites in `packages/client/src/world-scene/regions.ts` must be interactive (`setInteractive({ useHandCursor: true })`) with hover tint feedback (`setTint(0xfff8d0)`).
+- **Directional Floating Labels**:
+  - Ascending (`up`): Golden Amber badge (`#ffd359`, stroke `#2e1e04`, background `#1e1505ee`).
+  - Descending (`down`): Cool Cyan badge (`#8ee8f5`, stroke `#062533`, background `#041620ee`).
+- **Mini-Map Navigation Glyphs**: In `packages/client/src/mini-map-art.ts`, stairways render high-contrast directional badges (`▲`/`▼`) at their center coordinates so traversal points pop out clearly on the radar.
+
+### 5. Automated Verification
+- `packages/client/test/biome-stairs.test.ts` programmatically validates all 80 directional biome stairs and 8 generic stairs for file existence, manifest registration, $256 \times 256$ dimensions, and the $L \ge 110$ luminance standard.
+
 ## Wished buildings
 
 An Engine wish for a building adds a style to `BUILDING_STYLES` and places

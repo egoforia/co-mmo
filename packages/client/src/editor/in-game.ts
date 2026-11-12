@@ -22,6 +22,13 @@ const GRID_KEY = 'co-mmo.editor.tileGrid';
 // takes it back. The outlines and marks it draws over the world are the
 // editor's own, seen only while it is open, never game art.
 
+/** How fast the keys pan the free camera, in screen pixels a second (twice that with Shift). */
+const PAN_SPEED = 700;
+/** The keys that pan the free camera, and which way. */
+const PAN_KEYS: Record<string, [number, number]> = {
+  w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0],
+};
+
 /** Above everything in the world, labels included. */
 const OUTLINE_DEPTH = 1_000_010;
 const TONES: Record<NonNullable<Outline['tone']>, number> = { aim: 0xf2dc6b, held: 0x6fd08c, warn: 0xf6757a };
@@ -71,6 +78,9 @@ export class EditorUi {
   private marksOpen = false;
   /** New edits go live at once instead of waiting as drafts. */
   private live = false;
+  /** The pan keys held down, and whether Shift is. */
+  private readonly held = new Set<string>();
+  private fast = false;
 
   constructor(private readonly options: EditorOptions) {
     this.box.classList.add('edit-mode');
@@ -83,11 +93,24 @@ export class EditorUi {
       if (fold.classList?.contains('bookmarks-box')) this.marksOpen = fold.open;
     }, true);
     document.addEventListener('keydown', (event) => this.key(event));
+    document.addEventListener('keyup', (event) => {
+      this.held.delete(event.key.toLowerCase());
+      this.fast = event.shiftKey;
+    });
+    window.addEventListener('blur', () => this.held.clear());
   }
 
   private key(event: KeyboardEvent): void {
-    if (!this.open || (event.target as HTMLElement).closest?.('input, textarea')) return;
+    if (!this.open || (event.target as HTMLElement).closest?.('input, textarea, select')) return;
     const key = event.key.toLowerCase();
+    this.fast = event.shiftKey;
+    if (PAN_KEYS[key] && !(event.ctrlKey || event.metaKey || event.altKey)) {
+      this.held.add(key);
+      event.preventDefault();
+      return;
+    }
+    if (key === 'home') return this.backToMe();
+    if ((key === '+' || key === '=' || key === '-') && !(event.ctrlKey || event.metaKey)) return this.zoom(key === '-' ? -1 : 1);
     if (key === 'escape') {
       // Esc drops what a tool is part way through first, then closes the editor.
       if (this.core.midway()) {
@@ -110,6 +133,8 @@ export class EditorUi {
     document.body.classList.toggle('editing', open);
     if (!open) document.body.classList.remove('editing-chat');
     this.core.cancel();
+    this.held.clear();
+    this.attached?.freeCamera(open);
     if (!open) {
       this.outline?.clear();
       this.hitboxGraphics?.clear();
@@ -121,9 +146,39 @@ export class EditorUi {
       return;
     }
     this.attach();
+    this.attached?.freeCamera(true);
     this.follow();
     this.render();
     void this.reload();
+  }
+
+  /** The mini map was clicked at a tile of the land we are in: the camera goes there. False when the editor is closed. */
+  jumpTo(x: number, y: number): boolean {
+    const scene = this.attached;
+    if (!this.open || !scene?.currentMap) return false;
+    scene.lookAt(scene.currentMap, x - 0.5, y - 0.5);
+    return true;
+  }
+
+  /** The camera goes back to the player and follows them until it is moved again. */
+  private backToMe(): void {
+    this.attached?.followMe();
+    this.render('Back to you.');
+  }
+
+  /** Zooms the camera a step in or out. */
+  private zoom(direction: 1 | -1): void {
+    const share = this.attached?.zoomCamera(direction);
+    if (share !== undefined) this.render(`Zoom ${Math.round(share * 100)}%.`);
+  }
+
+  /** Brings the player to the middle of the screen, on the floor shown (the server moves them to open ground nearby if need be). */
+  private bringMe(): void {
+    const at = this.attached?.cameraTile();
+    if (!at) return this.render('There is no land in the middle of the screen.');
+    this.options.teleport?.({ region: at.region, x: at.x + 0.5, y: at.y + 0.5, floor: this.levelIn(at.region) });
+    this.attached?.followMe();
+    this.render('Bringing you here.');
   }
 
   /** Shows the edits of the land we are in. */
@@ -162,12 +217,29 @@ export class EditorUi {
     this.outline = scene.add.graphics().setDepth(OUTLINE_DEPTH);
     this.hitboxGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 5);
     this.gridGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 6);
-    // Walking (or the floor shown changing) moves what the marks are drawn around.
-    scene.events.on('update', () => {
-      if (this.open && marksKey(scene) !== this.drawnAt) this.drawMarks();
+    // The pan keys move the camera; moving it (or the floor shown changing) moves what the marks are drawn around.
+    scene.events.on('update', (_time: number, delta: number) => {
+      if (!this.open) return;
+      if (this.held.size) {
+        let [dx, dy] = [0, 0];
+        for (const k of this.held) [dx, dy] = [dx + PAN_KEYS[k]![0], dy + PAN_KEYS[k]![1]];
+        const step = (PAN_SPEED * (this.fast ? 2 : 1) * Math.min(delta, 250)) / 1000;
+        scene.panCamera(dx * step, dy * step);
+      }
+      if (marksKey(scene) !== this.drawnAt) this.drawMarks();
     });
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => this.pointer(p, p.isDown ? 'drag' : 'hover'));
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.pointer(p, 'down'));
+    // The wheel zooms; dragging with the right or middle button pans.
+    scene.input.mouse?.disableContextMenu();
+    scene.input.on('wheel', (_p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) => {
+      if (this.open && dy) this.zoom(dy > 0 ? -1 : 1);
+    });
+    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (this.open && (p.rightButtonDown() || p.middleButtonDown())) return scene.panCamera(p.prevPosition.x - p.x, p.prevPosition.y - p.y);
+      this.pointer(p, p.isDown ? 'drag' : 'hover');
+    });
+    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.leftButtonDown()) this.pointer(p, 'down');
+    });
     scene.input.on('pointerup', (p: Phaser.Input.Pointer) => this.pointer(p, 'up'));
   }
 
@@ -291,6 +363,8 @@ export class EditorUi {
     }
     if (d.floorStep) return this.chooseFloor(this.shownFloor() + Number(d.floorStep));
     if (d.floorMine !== undefined) return this.chooseFloor(undefined);
+    if (d.me !== undefined) return this.backToMe();
+    if (d.bring !== undefined) return this.bringMe();
     if (d.tool) {
       this.core.choose(d.tool);
       return this.render('');
@@ -310,6 +384,7 @@ export class EditorUi {
       if (!mark) return;
       this.chooseFloor(undefined);
       this.options.teleport?.({ region: this.listRegion, x: mark.x, y: mark.y, floor: mark.floor });
+      this.attached?.followMe();
       this.render(`Going to ${mark.name}.`);
     }
   }

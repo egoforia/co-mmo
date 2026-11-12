@@ -92,12 +92,15 @@ import {
   within,
 } from './world-scene/types.ts';
 
+import { FreeCamera } from './world-scene/free-camera.ts';
+
 export type { MapFigure, MiniMapView, SceneCounts, WorldSceneOptions } from './world-scene/types.ts';
 
 /** How faint a Fallen player shows, lying where they fell. */
 const FALLEN_ALPHA = 0.45;
 
 export class WorldScene extends Phaser.Scene {
+  private readonly freeCam = new FreeCamera(this, () => this.me?.body, () => this.fitTint());
   private welcome: WelcomeMessage;
   private map!: RegionMap;
   private predictor?: Predictor;
@@ -438,7 +441,9 @@ export class WorldScene extends Phaser.Scene {
       }
       figures.splice(1, 0, ...spots);
     }
-    return { scene: this, map: this.map, artLoaded: this.artLoaded, floor: this.floor, figures };
+    // While the world editor's camera is free, the map follows the camera instead of us.
+    const centre = this.freeCam.active ? this.cameraLocal() : undefined;
+    return { scene: this, map: this.map, artLoaded: this.artLoaded, floor: this.floor, figures, ...(centre ? { centre } : {}) };
   }
 
   /** Whether gathering spots show on the mini map (sensesSpots). */
@@ -500,6 +505,8 @@ export class WorldScene extends Phaser.Scene {
   /** Clicking a creature or player chooses them (clicking the ground lets go); Tab goes through the creatures near us. */
   private listenForTargets(): void {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      // The world editor's clicks are its tools', never a choice of whom to fight.
+      if (this.options.editing?.()) return;
       const hit = Targeting.under(p.worldX, p.worldY, [this.creatures, this.remotes]);
       this.targeting.choose(hit?.[0] ?? null, hit?.[1]);
     });
@@ -706,15 +713,8 @@ export class WorldScene extends Phaser.Scene {
    * to tiles by its own three points.
    */
   tileAt(screenX: number, screenY: number): { region: string; map: RegionMap; x: number; y: number } | undefined {
-    const at = this.cameras.main.getWorldPoint(screenX, screenY);
-    const o = PROJECTION.toScreen(0, 0);
-    const ex = PROJECTION.toScreen(1, 0);
-    const ey = PROJECTION.toScreen(0, 1);
-    const [ax, ay, bx, by] = [ex.x - o.x, ex.y - o.y, ey.x - o.x, ey.y - o.y];
-    const det = ax * by - bx * ay;
-    const [sx, sy] = [at.x - o.x, at.y + floorLift(this.shownFloor) - o.y];
-    const wx = Math.floor((sx * by - bx * sy) / det);
-    const wy = Math.floor((ax * sy - sx * ay) / det);
+    const w = this.worldTile(screenX, screenY);
+    const [wx, wy] = [Math.floor(w.x), Math.floor(w.y)];
     for (const [region, drawn] of this.drawn) {
       const { at: cell } = drawn.map.def;
       const x = wx - cell.x * drawn.map.width;
@@ -773,6 +773,57 @@ export class WorldScene extends Phaser.Scene {
 
   get playerPosition(): { x: number; y: number } {
     return { ...this.shown };
+  }
+
+  /** The world editor's camera: free of the player while the editor is open (free-camera.ts). */
+  freeCamera(on: boolean): void {
+    this.freeCam.set(on);
+  }
+
+  /** Moves the free camera by screen pixels. */
+  panCamera(dx: number, dy: number): void {
+    this.freeCam.pan(dx, dy);
+  }
+
+  /** Zooms the free camera a step in (1) or out (-1); returns its share of the usual zoom. */
+  zoomCamera(direction: 1 | -1): number {
+    return this.freeCam.zoom(direction);
+  }
+
+  /** The camera follows the player again. */
+  followMe(): void {
+    this.freeCam.follow();
+  }
+
+  /** Centres the free camera on a tile of a land drawn around us, on the floor shown. */
+  lookAt(map: RegionMap, x: number, y: number): void {
+    const p = PROJECTION.toScreen(map.def.at.x * map.width + x + 0.5, map.def.at.y * map.height + y + 0.5);
+    this.freeCam.centreOn(p.x, p.y - floorLift(this.shownFloor));
+  }
+
+  /** The middle of the screen in the tiles of the land we are in (it may lie beyond its edge). */
+  private cameraLocal(): { x: number; y: number } {
+    const cam = this.cameras.main;
+    const w = this.worldTile(cam.width / 2, cam.height / 2);
+    return { x: w.x - this.origin.x, y: w.y - this.origin.y };
+  }
+
+  /** The world tile (not rounded) under a point on the screen, on the floor shown: the projection turned back by its own three points. */
+  private worldTile(screenX: number, screenY: number): { x: number; y: number } {
+    const at = this.cameras.main.getWorldPoint(screenX, screenY);
+    const o = PROJECTION.toScreen(0, 0);
+    const ex = PROJECTION.toScreen(1, 0);
+    const ey = PROJECTION.toScreen(0, 1);
+    const [ax, ay, bx, by] = [ex.x - o.x, ex.y - o.y, ey.x - o.x, ey.y - o.y];
+    const det = ax * by - bx * ay;
+    const [sx, sy] = [at.x - o.x, at.y + floorLift(this.shownFloor) - o.y];
+    return { x: (sx * by - bx * sy) / det, y: (ax * sy - sx * ay) / det };
+  }
+
+  /** The land and tile in the middle of the screen. */
+  cameraTile(): ReturnType<WorldScene['tileAt']> {
+    const cam = this.cameras.main;
+    return this.tileAt(cam.width / 2, cam.height / 2);
   }
 
   /** The screen corners of a rectangle of tiles in a land, for the world editor's outlines. */

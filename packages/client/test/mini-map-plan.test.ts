@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addStorey, building, type RegionMap } from '@co-mmo/shared';
-import { MAP_ZOOMS, MAP_ZOOM_START, floorsAt, mapCaption, mapTransform, nextZoom, onMap, peekStep } from '../src/mini-map-plan.ts';
+import { MAP_ZOOMS, MAP_ZOOM_START, floorsAt, fromMap, mapCaption, mapTransform, nextZoom, onMap, peekStep } from '../src/mini-map-plan.ts';
 import { ISOMETRIC } from '../src/projection.ts';
 
 /** A small land with a house of two floors up and a cellar, and a wider cave under the east. */
@@ -61,6 +61,17 @@ describe('the mini map', () => {
       const b = ISOMETRIC.toScreen(10 + dx, 20 + dy);
       // The same direction, and the same squash, as the camera's.
       expect(Math.atan2(map.y - mid.y, map.x - mid.x)).toBeCloseTo(Math.atan2(b.y - a.y, b.x - a.x));
+    }
+  });
+});
+
+describe('a click on the mini map', () => {
+  it('turns back into the tile it was drawn from', () => {
+    const t = mapTransform('diamond', 6, 40.5, 52.25, 220);
+    for (const [x, y] of [[40.5, 52.25], [0, 0], [63.2, 17.9]] as const) {
+      const at = fromMap(t, onMap(t, x, y).x, onMap(t, x, y).y);
+      expect(at.x).toBeCloseTo(x, 6);
+      expect(at.y).toBeCloseTo(y, 6);
     }
   });
 });

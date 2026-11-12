@@ -66,6 +66,14 @@ export function mapTransform(_camera: 'diamond', step: number, cx: number, cy: n
   return [a, b, c, d, half - (a * cx + c * cy), half - (b * cx + d * cy)];
 }
 
+/** The tile position under a point on the map: onMap turned back. */
+export function fromMap(t: readonly number[], px: number, py: number): { x: number; y: number } {
+  const [a, b, c, d, e, f] = t as [number, number, number, number, number, number];
+  const det = a * d - b * c;
+  const [sx, sy] = [px - e, py - f];
+  return { x: (d * sx - c * sy) / det, y: (a * sy - b * sx) / det };
+}
+
 /** Where tile position (x, y) falls on the map, by a transform from mapTransform. */
 export function onMap(t: readonly number[], x: number, y: number): { x: number; y: number } {
   return { x: t[0]! * x + t[2]! * y + t[4]!, y: t[1]! * x + t[3]! * y + t[5]! };

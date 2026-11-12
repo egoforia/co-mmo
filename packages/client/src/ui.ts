@@ -23,6 +23,11 @@ export function isTyping(): boolean {
   return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement;
 }
 
+/** True while the world editor's edit mode is open: the game's keys and clicks step back for its own. */
+export function isEditing(): boolean {
+  return document.body.classList.contains('editing');
+}
+
 let toastTimer: number | undefined;
 export function toast(text: string, ms = 6000): void {
   const el = $('toast');

@@ -518,6 +518,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .editor-strip .here { color: var(--ink); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; }
 #editor .editor-strip .status { color: #f2dc6b; flex: 2 1 0; text-align: center; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #editor .editor-strip > span:last-child { display: flex; gap: 4px; }
+#editor .editor-strip .camera-keys { color: var(--muted); font-size: 11px; white-space: nowrap; }
 #editor .tools { display: flex; flex-wrap: wrap; gap: 4px; }
 #editor .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 #editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }

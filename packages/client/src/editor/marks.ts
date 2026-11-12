@@ -3,9 +3,10 @@ import { Tile, isBlocking, tileAt } from '@co-mmo/shared';
 import type { WorldScene } from '../world-scene.ts';
 import { GRID_RADIUS, drawTileGrid } from './tile-grid.ts';
 
-// The editor's marks over the world near the player: the hitboxes of the
-// floor we stand on (tiles nobody can walk on) and the tile wireframe of the
-// floor shown. They are the editor's own lines, never game art.
+// The editor's marks over the world around the middle of the screen (the
+// free camera's centre, or the player when it is over another land): the
+// hitboxes of the floor we stand on (tiles nobody can walk on) and the tile
+// wireframe of the floor shown. They are the editor's own lines, never game art.
 
 /** Which marks to draw. */
 export interface MarkOptions {
@@ -13,20 +14,27 @@ export interface MarkOptions {
   grid: boolean;
 }
 
-/** The tile and floors the marks are drawn around now, so walking redraws them only on a new tile. */
-export function marksKey(scene: WorldScene): string {
+/** The tile of the land we are in that the marks are drawn around: the middle of the screen, or where we stand. */
+function centre(scene: WorldScene): { x: number; y: number } {
+  const mid = scene.cameraTile();
+  if (mid && mid.region === scene.currentMap?.def.id) return { x: mid.x, y: mid.y };
   const at = scene.playerPosition;
-  return `${scene.currentMap?.def.id}:${Math.floor(at.x)},${Math.floor(at.y)}:${scene.currentFloor}:${scene.shownFloor}`;
+  return { x: Math.floor(at.x), y: Math.floor(at.y) };
 }
 
-/** Draws the chosen marks around the player, clearing the last ones first. */
+/** The tile and floors the marks are drawn around now, so they are drawn again only when it changes. */
+export function marksKey(scene: WorldScene): string {
+  const at = centre(scene);
+  return `${scene.currentMap?.def.id}:${at.x},${at.y}:${scene.currentFloor}:${scene.shownFloor}`;
+}
+
+/** Draws the chosen marks around the middle of the screen, clearing the last ones first. */
 export function drawMarks(scene: WorldScene, hitboxes: Phaser.GameObjects.Graphics, grid: Phaser.GameObjects.Graphics, show: MarkOptions): void {
   hitboxes.clear();
   grid.clear();
   const map = scene.currentMap;
   if (!map) return;
-  const cx = Math.floor(scene.playerPosition.x);
-  const cy = Math.floor(scene.playerPosition.y);
+  const { x: cx, y: cy } = centre(scene);
   if (show.grid) drawTileGrid(grid, scene, map, scene.shownFloor, cx, cy);
   if (!show.hitboxes) return;
   const floor = scene.currentFloor;

@@ -8,14 +8,17 @@ import { FOOTPRINT } from './kinds/footprint.ts';
 import { FURNITURE } from './kinds/furniture.ts';
 import { HOUSE } from './kinds/house.ts';
 import { KIT } from './kinds/kit.ts';
+import { LAND } from './kinds/land.ts';
 import { LIGHT } from './kinds/light.ts';
 import { MOVE } from './kinds/move.ts';
 import { MONSTERS } from './kinds/monsters.ts';
 import { PAINT } from './kinds/paint.ts';
 import { PATROL_PATH } from './kinds/patrol.ts';
 import { PERSON } from './kinds/person.ts';
+import { QUEST } from './kinds/quest.ts';
 import { PIECE } from './kinds/piece.ts';
 import { REMOVE } from './kinds/remove.ts';
+import { SCENERY } from './kinds/scenery.ts';
 import { RESTYLE } from './kinds/restyle.ts';
 import { ROAD } from './kinds/road.ts';
 import { SPAWN } from './kinds/spawn.ts';
@@ -32,6 +35,7 @@ import type { EditKindId, EditStamp, WorldEdit, WorldEditDraft } from './types.t
 /** Every kind of edit, in the order the editors offer their tools. */
 export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   paint: PAINT,
+  scenery: SCENERY,
   move: MOVE,
   road: ROAD,
   house: HOUSE,
@@ -43,6 +47,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   monsters: MONSTERS,
   patrol: PATROL_PATH,
   person: PERSON,
+  quest: QUEST,
   clear: CLEAR,
   spot: SPOT,
   light: LIGHT,
@@ -52,6 +57,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   furniture: FURNITURE,
   remove: REMOVE,
   bookmark: BOOKMARK,
+  land: LAND,
 };
 
 /** A kind by its name, when there is one. */

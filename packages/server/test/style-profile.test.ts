@@ -34,4 +34,15 @@ describe('the art style profile', () => {
     expect(FLAT_ISOMETRIC.kitTextures).not.toMatch(/terracotta|honey|cream/);
     expect(FLAT_ISOMETRIC.kitTextures).toContain('in the colours each texture below names');
   });
+
+  it('generates a quadruped gait in walkVideoPrompt for four-legged bodies', () => {
+    const prompt = walkVideoPrompt([], 'front-left', 'four-legged');
+    expect(prompt).toContain('steady four-legged quadruped walk');
+    expect(prompt).toContain('muzzle, chest and four hooves');
+    expect(prompt).toContain('LEFT flank');
+    expect(prompt).toContain('never turning square to the camera or rotating into a side profile/flank view');
+    expect(prompt).not.toContain('like on a treadmill');
+    expect(prompt).not.toContain('arms swinging');
+    expect(prompt).not.toContain('toes');
+  });
 });

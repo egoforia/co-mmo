@@ -3,7 +3,8 @@
 // nothing with the in-game editor (three open terraces stepping up, and a
 // bookmark to look from), as drafts only it sees until it publishes them,
 // looks at each floor with the floor picker, picks a
-// terrace with Select and takes it away and back, and goes to the bookmark.
+// terrace with Select and takes it away and back, goes to the bookmark, and
+// designs a kit building with battlements and towers.
 // The terraces must come out the same as the testbed's. Screenshots land in
 // playtest-results/.
 
@@ -63,7 +64,7 @@ const shape = (s: Storey) => ({ x: s.x, y: s.y, width: s.width, height: s.height
 
 describe('the world editor in a workshop land', () => {
   it('builds the testbed\'s terrace bay from nothing', async () => {
-    const world = await playWorld({ clientDir });
+    const world = await playWorld({ clientDir, kitSheets: resolve(root, 'assets/kit-sheets') });
     const problems: string[] = [];
     const { id, token } = account(world.store, 'Ego', 'owner');
     const made = await api(world.base, '/api/world-edits/lands', token, 'POST', { name: 'Terrace Lab', biome: 'frostpeak' });
@@ -161,8 +162,38 @@ describe('the world editor in a workshop land', () => {
     await page.waitForTimeout(800);
     await page.screenshot({ path: resolve(shots, 'workshop-bookmark.png') });
 
+    // A kit building from the designer: a flat roof behind battlements with towers at the front, its shape checked as it is chosen.
+    await page.click('#editor [data-tool="kit"]');
+    await page.selectOption('#editor select[name="style"]', 'sanctum-arcanum');
+    for (const name of ['across', 'deep']) {
+      await page.fill(`#editor input[name="${name}"]`, '4');
+      await page.dispatchEvent(`#editor input[name="${name}"]`, 'change');
+    }
+    await page.selectOption('#editor select[name="roof"]', 'flat');
+    await page.check('#editor input[name="battlements"]');
+    await page.selectOption('#editor select[name="towers"]', 'front');
+    await expect.poll(() => page.locator('#editor .tool-notes li').first().textContent()).toBe('Shape checks: every part meets, nothing floats.');
+    await page.selectOption('#editor select[name="view-floor"]', '0');
+    await aim([96, 60], [106, 70]);
+    await clickTile(page, 96, 60);
+    await expect.poll(() => land().buildings.length, { timeout: 10_000 }).toBe(1);
+    expect(land().buildings[0]).toMatchObject({ x: 96, y: 60, width: 10, height: 10, kit: { W: 4, D: 4, roof: 'flat', battlements: true } });
+    // The server builds its kit house from the spec (a few seconds in a worker), then every browser draws it.
+    const status = async () => (await api(world.base, `/api/kit-houses?region=${region}`, token)).body.houses[0]?.status;
+    await expect.poll(status, { timeout: 90_000, interval: 2000 }).toBe('ready');
+    // Seen from the ground outside it, the editor closed.
+    await page.click('#editor .close');
+    app!.world.local(region)!.placePlayer(id, 101, 76, 0);
+    await page.waitForFunction(() => (window as unknown as { scene: { floor: number } }).scene.floor === 0, undefined, { timeout: 10_000 });
+    await page.evaluate(() => {
+      const scene = (window as unknown as { scene: { me: { body: unknown }; cameras: { main: { startFollow(b: unknown): void } } } }).scene;
+      scene.cameras.main.startFollow(scene.me.body);
+    });
+    await page.waitForTimeout(5000);
+    await page.screenshot({ path: resolve(shots, 'workshop-kit-building.png') });
+
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);
     await context.close();
-  }, 120_000);
+  }, 300_000);
 });

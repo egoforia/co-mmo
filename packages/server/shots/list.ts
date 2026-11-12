@@ -179,4 +179,15 @@ export const SHOTS: Shot[] = [
     page: '/art-studio.html',
     mustSee: ['pictures load (no broken image icons)', 'buttons and labels are readable'],
   },
+  {
+    name: 'editor-testbed',
+    about: 'The world editor open in the Architectural Testbed, beside the mini map.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+    },
+    mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons and the edit list are readable'],
+  },
 ];

@@ -309,6 +309,9 @@ function layOut(def: RegionDef, size: number): RegionMap {
   const c = Math.floor(size / 2);
   if (def.id === 'arch-testbed') {
     archTestbedLayout(map, c);
+    // The testbed's own layout stays as written; the world editor's changes go on top, as on every land.
+    if (def.edits?.length) applyEdits(map, def.edits);
+    settle(map);
     return map;
   }
   const layout = def.wild ? wildLayout(def.wild) : BIOME_LAYOUTS[def.biome] ?? homeLandLayout(def.biome) ?? sanctumLayout;

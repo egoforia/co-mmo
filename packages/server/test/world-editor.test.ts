@@ -100,8 +100,9 @@ describe('the world editor', () => {
     expect(made.body.edits[0]).toMatchObject({ name: 'Thorn Wolf', asset: 'woods-thorn-wolf', by: 'Ego' });
     const woods = app!.world.local('woods')!;
     expect(woods.creatureIds().length).toBe(before + 3);
-    const wolves = woods.creatureIds().map((id) => woods.creature(id)!).filter((c) => Math.hypot(c.x - spot[0] - 0.5, c.y - spot[1] - 0.5) <= 3.6);
-    expect(wolves.filter((c) => c.kind === 'thorn-wolf').length).toBeGreaterThanOrEqual(3);
+    // Where they live, laid by the edit (live wolves wander off as soon as the land ticks, so their places are read from the land).
+    const homes = app!.world.region('woods')!.map.creatures.filter((c) => c.kind === 'thorn-wolf' && Math.hypot(c.x - spot[0] - 0.5, c.y - spot[1] - 0.5) <= 3.6);
+    expect(homes.length).toBeGreaterThanOrEqual(3);
   });
 
   it('keeps edits across a restart', async () => {
@@ -114,6 +115,21 @@ describe('the world editor', () => {
     await start({ store });
     expect(app!.world.home.def.edits).toHaveLength(1);
     expect(tile(app!.world.home.map, spot)).toBe(Tile.Water);
+  });
+  it('shows edits made in the Architectural Testbed, and keeps them across a restart', async () => {
+    const store = Store.memory();
+    const first = await start({ store });
+    const owner = account(store, 'Ego', 'owner');
+    const spot: TilePoint = [30, 36];
+    expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Ground);
+    const made = await api(first.base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'paint', tile: 'tree', tiles: [spot] } });
+    expect(made.status).toBe(200);
+    expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
+    // Its pavilions are still there under the edit.
+    expect(app!.world.region('arch-testbed')!.map.buildings.length).toBeGreaterThan(0);
+    await stop();
+    await start({ store });
+    expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
   });
 });
 

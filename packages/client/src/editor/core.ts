@@ -139,6 +139,11 @@ export class EditorCore {
     return true;
   }
 
+  /** True when the tool says something under its settings that changes with them (so the view draws them again on a change). */
+  hasNotes(): boolean {
+    return !!this.kind()?.notes;
+  }
+
   /** The current tool's settings as HTML: each input named by its setting's key. */
   settingsHtml(): string {
     if (this.tool === 'select') return this.pickedHtml();
@@ -158,6 +163,8 @@ export class EditorCore {
       return `<label>${escapeHtml(f.label)} <input name="${f.key}" type="number" min="${f.min}" max="${f.max}" value="${v}" /></label>`;
     });
     if (this.holding()) fields.push('<button type="button" class="quiet" data-away>Take it away</button>');
+    const notes = kind.notes?.(values) ?? [];
+    if (notes.length) fields.push(`<ul class="tool-notes">${notes.map((n) => `<li class="${n.ok ? 'ok' : 'bad'}">${escapeHtml(n.text)}</li>`).join('')}</ul>`);
     return fields.join('\n');
   }
 

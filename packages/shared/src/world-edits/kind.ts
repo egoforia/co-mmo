@@ -66,6 +66,8 @@ export interface EditKind<K extends EditKindId> {
   fields: EditField[];
   /** False while it has nothing to offer (set pieces while their kit's wish is off). */
   available?(): boolean;
+  /** Lines to show under the settings as they are now: the kit building's shape checks. */
+  notes?(values: Record<string, FieldValue>): { ok: boolean; text: string }[];
   /** The tiles to outline under the pointer before it is used (one tile when left out); `use.from` is what was picked up or where a road starts. */
   outline?(map: RegionMap, use: ToolUse & { level: number }, values: Record<string, FieldValue>): Outline[];
   /** The draft a tool makes from where it was used and its settings. */

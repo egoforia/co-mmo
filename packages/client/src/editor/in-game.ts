@@ -278,7 +278,7 @@ export class EditorUi {
       this.drawHitboxes();
     } else if (input.name === 'view-floor') this.chooseFloor(input.value);
     else if (input.name === 'live') this.live = input.checked;
-    else this.core.set(input.name, input.value, input.checked);
+    else if (this.core.set(input.name, input.value, input.checked) && this.core.hasNotes()) this.render();
     // Hand the keys back to walking.
     input.blur();
   }
@@ -286,6 +286,8 @@ export class EditorUi {
   private render(status?: string): void {
     if (status !== undefined) this.status = status;
     if (!this.open) return;
+    // The game may not have been running yet when the editor opened.
+    this.attach();
     const tool = this.core.current();
     this.box.innerHTML = `
       <h2>World editor <label class="hitbox-toggle"><input type="checkbox" name="hitboxes" ${this.showHitboxes ? 'checked' : ''} /> Hitboxes</label><button type="button" class="close" aria-label="Close">×</button></h2>

@@ -6,6 +6,7 @@ import { layPlaces } from './places.ts';
 import { homeLandLayout } from './home-lands.ts';
 import { applyEdits, nameThings, type WorldEdit } from './world-edits.ts';
 import ARCH_TESTBED_EDITS from './testbed/arch-testbed.edits.json';
+import type { BuildingSpec } from './building-kit/spec.ts';
 import type { Stairway, Storey } from './floors.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -229,6 +230,8 @@ export interface Building {
    * cave), which shows no outside picture, its rock seen from above.
    */
   art?: TileArt;
+  /** Built to this kit spec (the world editor's kit building designer) instead of the one its style gives. */
+  kit?: BuildingSpec;
 }
 
 /** Kit pictures drawn for a building's or a storey's tiles: its floor, its walls, and planks or paths across it. */

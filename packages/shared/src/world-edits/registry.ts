@@ -7,6 +7,7 @@ import { FLOORS } from './kinds/floors.ts';
 import { FOOTPRINT } from './kinds/footprint.ts';
 import { FURNITURE } from './kinds/furniture.ts';
 import { HOUSE } from './kinds/house.ts';
+import { KIT } from './kinds/kit.ts';
 import { MOVE } from './kinds/move.ts';
 import { PAINT } from './kinds/paint.ts';
 import { PIECE } from './kinds/piece.ts';
@@ -29,6 +30,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   move: MOVE,
   road: ROAD,
   house: HOUSE,
+  kit: KIT,
   floors: FLOORS,
   piece: PIECE,
   spawn: SPAWN,

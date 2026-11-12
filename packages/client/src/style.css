@@ -500,6 +500,9 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .edits li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--edge); }
 #editor .edits .by { color: var(--muted); font-size: 11px; }
 #editor .edits button { padding: 0 6px; }
+#editor .tool-notes, .studio-map .tool-notes { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 12px; }
+#editor .tool-notes .ok, .studio-map .tool-notes .ok { color: #6fd08c; }
+#editor .tool-notes .bad, .studio-map .tool-notes .bad { color: #f6757a; }
 #editor .drafts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
 #editor .drafts .check { width: 100%; display: flex; gap: 6px; align-items: center; }
 #editor .edits li.draft > span:first-child { font-style: italic; }

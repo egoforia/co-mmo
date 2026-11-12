@@ -2,6 +2,8 @@
 // saved (the draft stamped with who made it and when). Kept apart from the
 // kinds so every kind, the server and the browser share one vocabulary.
 
+import type { BuildingSpec } from '../building-kit/spec.ts';
+
 /** A tile position, x east and y south, from the land's top-left corner. */
 export type TilePoint = [x: number, y: number];
 
@@ -58,6 +60,8 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'remove'; at: TilePoint }
   /** A named place to look from on the edit's floor (tiles, may be halves), with a line on what it is for: the editor goes there, the screenshot list reads it. */
   | { kind: 'bookmark'; at: TilePoint; name: string; note?: string }
+  /** A building of a kit look (`style`) with its walls' top-left corner at `at`, built to `spec` (D bays across, W deep; its one doorway in the ground storey's south, `left`, wall). */
+  | { kind: 'kit'; at: TilePoint; style: string; spec: BuildingSpec }
 );
 
 /** The name of each kind of edit. */

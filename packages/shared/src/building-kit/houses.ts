@@ -60,6 +60,11 @@ export function kitHouse(b: Building): KitHouse | undefined {
   const W = deep / BAY_TILES;
   if (!Number.isInteger(D) || !Number.isInteger(W) || D < 1 || W < 1) return undefined;
   if (!Number.isInteger(door) || door < 0 || door >= D || b.door.y !== floor.bottom) return undefined;
+  // Designed in the world editor: built as it was drawn, when it still fits its walls.
+  if (b.kit) {
+    if (b.kit.D !== D || b.kit.W !== W) return undefined;
+    return { spec: b.kit, look, floor, key: `${look}-${W}x${D}-${hashString(JSON.stringify({ spec: b.kit, look, LAYOUT_VERSION })).toString(36)}` };
+  }
   // The door, with windows two bays along on either side of it.
   const south: Record<number, Opening> = { [door]: 'door' };
   for (let j = door % 2; j < D; j += 2) if (j !== door) south[j] = 'window';

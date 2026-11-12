@@ -312,6 +312,15 @@ with them for the editor alone, the server still walking them on the
 published land). `POST /publish` makes a land's drafts live, `POST /discard`
 throws them away (redo brings them back); a workshop land may stay drafts
 for good. Players are shown the land again only when its published edits change.
+The **kit building designer** is the `kit` edit kind (`world-edits/kinds/kit.ts`):
+its settings (look, bays across and deep, storeys, doorway bay, windows, gable
+or flat roof, battlements, towers, dome, chimney) make a `BuildingSpec`
+(`designSpec`), the kit's own shape checks run on it as the settings change
+(`kitProblems`, shown under the settings through the kind's `notes`), and
+laid it is a walled building carrying the spec (`Building.kit`), whose kit
+house (`buildingKit.kitHouse`) is built from that spec instead of its
+style's. Its one doorway is in the ground storey's south wall, where the
+game's doorway is; upper storeys get floors to walk on (`buildFloors`).
 
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with

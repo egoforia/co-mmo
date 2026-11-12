@@ -373,7 +373,10 @@ export function handleMapEditorChange(target: HTMLElement): boolean {
     artState.ctx.rerender();
     return true;
   }
-  return core.set(input.name, input.value, input.checked);
+  if (!core.set(input.name, input.value, input.checked)) return false;
+  // Settings can change what the tool says below them (the kit building's shape checks).
+  if (core.hasNotes()) artState.ctx.rerender();
+  return true;
 }
 
 /** The AI Map Architect's form; false when the form is not it. */

@@ -117,7 +117,11 @@ export function walkVideoPrompt(gear: Carried[], direction: IsoWay, body = 'two-
   // Clips drifted out of the three-quarter turn and slid their feet, so both are spelled out.
   const facing = `${SEEN[direction]}: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`;
   // A crawler has no arms to swing; its legs move in turns instead.
-  const gait = body === 'two-legged' ? 'a brisk, cheerful walk with clear alternating steps and arms swinging' : 'a steady scuttle with its legs stepping in clear alternating sets';
+  const gait = body === 'two-legged'
+    ? 'a brisk, cheerful walk with clear alternating steps and arms swinging'
+    : body === 'four-legged'
+      ? 'a steady four-legged quadruped walk with legs stepping in alternating pairs'
+      : 'a steady scuttle with its legs stepping in clear alternating sets';
   return [
     `${STYLE.animation} The character from the image walks in place ${facing}, like on a treadmill: ${gait}.`,
     gear.length ? `Everything they carry stays in the same hand and on the same side of the body as in the image, held steady at the same angle. ${gearPlacement(gear, direction)}` : '',

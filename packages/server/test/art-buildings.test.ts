@@ -15,7 +15,7 @@ describe("the Art tab's Buildings page", () => {
     const counter = arcanum.furniture.find((f: any) => f.name === 'counter');
     expect(counter).toMatchObject({ footprint: [3, 1], floor: 0, editable: true });
 
-    const edited = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', edit: { kind: 'footprint', at: counter.at, footprint: [2, 1] } });
+    const edited = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', live: true, edit: { kind: 'footprint', at: counter.at, footprint: [2, 1] } });
     expect(edited.status).toBe(200);
     const after = (await list()).find((b) => b.style === 'sanctum-arcanum').furniture.find((f: any) => f.name === 'counter');
     expect(after.footprint).toEqual([2, 1]);

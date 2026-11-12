@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, editWords, isBlocking, stampEdit, tileAt, withEdit, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
+import { BUILDING_STYLES, CREATURES, KIT_HOUSE_FLOORS, PAINT_TILES, SEA_CAVE_PIECES, SPOTS, checkEdit, editWords, generateRegion, isBlocking, stampEdit, tileAt, withEdit, type RegionMap, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
 import type { Store, WorldEditLog } from './store.ts';
 import type { World } from './world.ts';
 import { WORKSHOP_BIOMES, exportDrafts, newWorkshopLand, workshopDef } from './workshop-lands.ts';
@@ -20,6 +20,8 @@ export interface PreviewStep {
  * store with an undo and redo list, and has the world lay the land out
  * again wherever it runs whenever they change. Edits are data on the land
  * (shared world-edits.ts), so the server and every browser lay them the same.
+ * New edits are drafts unless made live: the editor sees and checks them on
+ * the land as it would be (`editorMap`), players see them once published.
  */
 export class WorldEditor {
   constructor(
@@ -33,9 +35,18 @@ export class WorldEditor {
     return this.store.worldEdits(regionId);
   }
 
-  /** The land's edits that no longer fit it and were passed over, by id. */
+  /** The land's edits that no longer fit it and were passed over, by id, drafts included. */
   unlaid(regionId: string): string[] {
-    return this.world.region(regionId)?.map.unlaid ?? [];
+    return this.editorMap(regionId)?.unlaid ?? [];
+  }
+
+  /** The land as the editor sees it: laid out with its drafts too (the land players see when there are none). */
+  editorMap(regionId: string): RegionMap | undefined {
+    const region = this.world.region(regionId);
+    if (!region) return undefined;
+    const { edits } = this.log(regionId);
+    if (!edits.some((e) => e.draft)) return region.map;
+    return generateRegion({ ...region.def, edits });
   }
 
   /** Lists all regions and returns the selected region's full map, edits, and tool palettes for the studio. */
@@ -71,7 +82,7 @@ export class WorldEditor {
       regions,
       region: chosenId,
       workshopBiomes: WORKSHOP_BIOMES,
-      map: reg?.map ?? null,
+      map: this.editorMap(chosenId) ?? null,
       edits: log.edits,
       undone: log.undone.length,
       palettes: {
@@ -94,7 +105,7 @@ export class WorldEditor {
     if (!region) {
       return { ok: false, steps: drafts.map((d) => ({ draft: d, summary: summarizeDraft(d), valid: false, why: 'There is no land by that name.' })) };
     }
-    let currentMap = region.map;
+    let currentMap = this.editorMap(regionId)!;
     const steps: PreviewStep[] = [];
     for (const draft of drafts) {
       const why = checkEdit(currentMap, draft, CREATURES);
@@ -115,18 +126,18 @@ export class WorldEditor {
   }
 
   /** Applies a batch of validated `WorldEditDraft[]` in one reshape operation. */
-  async applyBatch(regionId: string, drafts: WorldEditDraft[], by: string): Promise<EditResult & { applied?: number }> {
+  async applyBatch(regionId: string, drafts: WorldEditDraft[], by: string, live = false): Promise<EditResult & { applied?: number }> {
     const region = this.world.region(regionId);
     if (!region) return { ok: false, message: 'There is no land by that name.' };
     if (!Array.isArray(drafts) || !drafts.length) return { ok: false, message: 'Pick at least one edit to apply.' };
     const log = this.log(regionId);
     const workingEdits: WorldEdit[] = [...log.edits];
-    let currentMap = region.map;
+    let currentMap = this.editorMap(regionId)!;
     let applied = 0;
     for (const draft of drafts) {
       const why = checkEdit(currentMap, draft, CREATURES);
       if (why) continue;
-      const edit = this.stamp(draft, by);
+      const edit = this.stamp(draft, by, live);
       const next = withEdit(currentMap, edit);
       if (blocks(next)) continue;
       workingEdits.push(edit);
@@ -139,8 +150,8 @@ export class WorldEditor {
   }
 
   /** Makes a change to a land, when it fits; redo forgets what was taken back. */
-  async add(regionId: string, draft: WorldEditDraft, by: string): Promise<EditResult> {
-    return this.addTogether(regionId, [draft], by);
+  async add(regionId: string, draft: WorldEditDraft, by: string, live = false): Promise<EditResult> {
+    return this.addTogether(regionId, [draft], by, live);
   }
 
   /**
@@ -148,17 +159,17 @@ export class WorldEditor {
    * all or none: each is checked on the land as the ones before it left it.
    * They share a group, so undo, redo and take out treat them as one step.
    */
-  async addTogether(regionId: string, drafts: WorldEditDraft[], by: string): Promise<EditResult> {
+  async addTogether(regionId: string, drafts: WorldEditDraft[], by: string, live = false): Promise<EditResult> {
     const region = this.world.region(regionId);
     if (!region) return { ok: false, message: 'There is no land by that name.' };
     if (!drafts.length || drafts.length > MAX_TOGETHER) return { ok: false, message: 'The editor did not understand that change.' };
     const group = drafts.length > 1 ? randomUUID().slice(0, 8) : undefined;
-    let map = region.map;
+    let map = this.editorMap(regionId)!;
     const made: WorldEdit[] = [];
     for (const draft of drafts) {
       const why = checkEdit(map, draft, CREATURES);
       if (why) return { ok: false, message: why };
-      const edit = { ...this.stamp(draft, by), ...(group ? { group } : {}) };
+      const edit = { ...this.stamp(draft, by, live), ...(group ? { group } : {}) };
       map = withEdit(map, edit);
       made.push(edit);
     }
@@ -180,8 +191,7 @@ export class WorldEditor {
     const log = this.log(regionId);
     const step = lastStep(log.undone);
     if (!step.length) return { ok: false, message: 'There is nothing to redo in this land.' };
-    const region = this.world.region(regionId);
-    let map = region?.map;
+    let map = this.editorMap(regionId);
     for (const edit of step) map = map && withEdit(map, edit);
     const blocked = map && blocks(map);
     if (blocked) return { ok: false, message: blocked };
@@ -195,6 +205,24 @@ export class WorldEditor {
     if (!edit) return { ok: false, message: 'That edit is not in this land any more.' };
     const gone = log.edits.filter((e) => e === edit || (edit.group && e.group === edit.group));
     return this.save(regionId, { edits: log.edits.filter((e) => !gone.includes(e)), undone: [...log.undone, ...gone] });
+  }
+
+  /** Publishes the land's drafts: players see them from now on. */
+  async publish(regionId: string): Promise<EditResult> {
+    const log = this.log(regionId);
+    if (!log.edits.some((e) => e.draft)) return { ok: false, message: 'There are no drafts to publish in this land.' };
+    const map = this.editorMap(regionId);
+    const blocked = map && blocks(map);
+    if (blocked) return { ok: false, message: blocked };
+    return this.save(regionId, { edits: log.edits.map(({ draft: _, ...e }) => e as WorldEdit), undone: log.undone });
+  }
+
+  /** Throws the land's drafts away; redo brings them back. */
+  async discard(regionId: string): Promise<EditResult> {
+    const log = this.log(regionId);
+    const drafts = log.edits.filter((e) => e.draft);
+    if (!drafts.length) return { ok: false, message: 'There are no drafts to throw away in this land.' };
+    return this.save(regionId, { edits: log.edits.filter((e) => !e.draft), undone: [...log.undone, ...drafts] });
   }
 
   /** Makes a blank workshop land to build on (the Owner and Stewards); its id, or why not, in words. */
@@ -213,14 +241,17 @@ export class WorldEditor {
     return { name: region.def.name, biome: region.def.biome, edits: exportDrafts([...(region.def.base ?? []), ...this.log(regionId).edits]) };
   }
 
-  private stamp(draft: WorldEditDraft, by: string): WorldEdit {
-    // Only the fields each kind has are kept, whatever else was sent.
-    return stampEdit(draft, { id: randomUUID().slice(0, 8), by, made: this.now() }, CREATURES);
+  private stamp(draft: WorldEditDraft, by: string, live = false): WorldEdit {
+    // Only the fields each kind has are kept, whatever else was sent; a new edit is a draft unless made live.
+    return stampEdit(draft, { id: randomUUID().slice(0, 8), by, made: this.now(), ...(live ? {} : { draft: true }) }, CREATURES);
   }
 
   private async save(regionId: string, log: WorldEditLog): Promise<EditResult> {
+    const published = (l: WorldEditLog) => l.edits.filter((e) => !e.draft).map((e) => e.id).join();
+    const changed = published(this.log(regionId)) !== published(log);
     this.store.setWorldEdits(regionId, log);
-    await this.world.reshape(regionId);
+    // Players' land is laid again only when what they see changed.
+    if (changed) await this.world.reshape(regionId);
     return { ok: true, log };
   }
 }

@@ -304,6 +304,14 @@ as one step. A `bookmark` edit names a place to look from on a floor with a
 line on what it tests (`RegionMap.bookmarks`); the window lists a land's
 bookmarks with a Go button (a teleport), and the testbed's 25 camera check
 places are its bookmarks (`ARCH_TESTBED_WAYPOINTS` reads them).
+New edits are **drafts** (`draft: true` on the saved edit) unless sent with
+`live: true` ("Make changes live at once"): `World` lays only published edits
+for players, while the editor checks and shows a land with its drafts
+(`WorldEditor.editorMap`; in the game `WorldScene.previewEdits` draws the land
+with them for the editor alone, the server still walking them on the
+published land). `POST /publish` makes a land's drafts live, `POST /discard`
+throws them away (redo brings them back); a workshop land may stay drafts
+for good. Players are shown the land again only when its published edits change.
 
 **Workshop lands.** A land with `layout: 'blank'` is flat open ground and
 nothing else; everything on it is laid by edits, those it ships with

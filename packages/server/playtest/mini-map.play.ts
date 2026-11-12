@@ -79,6 +79,8 @@ describe('the mini map', () => {
     expect(await painted(page), 'the land is drawn').toBeGreaterThan(0.9);
 
     await page.click('#edit-world-button');
+    // Live at once, not a draft, so the land players walk has the floors.
+    await page.check('#editor input[name="live"]');
     await page.click('#editor [data-tool="floors"]');
     await page.selectOption('#editor select[name="up"]', '1');
     await page.selectOption('#editor select[name="down"]', '1');

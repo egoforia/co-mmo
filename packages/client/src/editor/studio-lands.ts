@@ -69,5 +69,5 @@ export async function layFile(region: string, input: HTMLInputElement): Promise<
   if (!Array.isArray(drafts) || !drafts.length) throw new Error('That file has no edits in it.');
   const laid = await call<{ applied: number }>('/api/world-edits/import', { region, drafts });
   const left = drafts.length - laid.applied;
-  artState.ctx.toast(`Laid ${laid.applied} edit${laid.applied === 1 ? '' : 's'}${left ? `; ${left} did not fit this land` : ''}.`);
+  artState.ctx.toast(`Laid ${laid.applied} edit${laid.applied === 1 ? '' : 's'} as drafts${left ? `; ${left} did not fit this land` : ''}.`);
 }

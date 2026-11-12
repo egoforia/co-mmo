@@ -108,13 +108,13 @@ export interface EditLog {
 
 /**
  * The world editor (Owner and Stewards): reads a land's edits, or makes a
- * change (`edit`, or `edits` made together), `undo`, `redo` or `remove` one. Throws with the server's
+ * change (`edit`, or `edits` made together; drafts unless `live`), `undo`, `redo` or `remove` one, or `publish` or `discard` the drafts. Throws with the server's
  * words when it cannot be done.
  */
-export async function worldEdits(token: string, region: string, action?: { edit: WorldEditDraft } | { edits: WorldEditDraft[] } | { undo: true } | { redo: true } | { remove: string }): Promise<EditLog> {
+export async function worldEdits(token: string, region: string, action?: { edit: WorldEditDraft; live?: boolean } | { edits: WorldEditDraft[]; live?: boolean } | { undo: true } | { redo: true } | { remove: string } | { publish: true } | { discard: true }): Promise<EditLog> {
   const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
-  const path = !action || 'edit' in action || 'edits' in action ? '' : 'undo' in action ? '/undo' : 'redo' in action ? '/redo' : '/remove';
-  const body = !action ? undefined : 'remove' in action ? { region, id: action.remove } : 'undo' in action || 'redo' in action ? { region } : { region, ...action };
+  const path = !action || 'edit' in action || 'edits' in action ? '' : `/${Object.keys(action)[0]}`;
+  const body = !action ? undefined : 'remove' in action ? { region, id: action.remove } : 'edit' in action || 'edits' in action ? { region, ...action } : { region };
   const res = !action
     ? await fetch(`/api/world-edits?region=${encodeURIComponent(region)}`, { headers })
     : await fetch(`/api/world-edits${path}`, { method: 'POST', headers, body: JSON.stringify(body) });

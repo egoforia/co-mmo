@@ -1339,3 +1339,8 @@ button.queue-add-btn.staged {
 /* The Select tool's card in the Studio map. */
 .studio-map .picked { display: flex; flex-direction: column; gap: 2px; }
 .studio-map .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* Drafts and publishing beside the Studio map's edit list. */
+.studio-map .drafts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 10px; }
+.studio-map .drafts .check { width: 100%; }
+.studio-map .edits li.draft > span:first-child { font-style: italic; }

@@ -25,11 +25,13 @@ import {
   type ArtPointsManifest,
   type HitMessage,
   type RaceId,
+  type RegionDef,
   type RegionMap,
   type Side,
   type SnapshotMessage,
   type Weather,
   type WelcomeMessage,
+  type WorldEdit,
 } from '@co-mmo/shared';
 import { HouseArt } from './kit-house-view.ts';
 import { lightScene, setSkyLight } from './lights.ts';
@@ -123,6 +125,8 @@ export class WorldScene extends Phaser.Scene {
   private floor = 0;
   /** The floor the world editor looks at instead of ours, while it is open on another floor. */
   private viewed?: number;
+  /** A land's edits drafts and all, laid here instead of the published ones while the world editor shows drafts. */
+  private preview?: { region: string; edits: WorldEdit[] };
   private tint?: Phaser.GameObjects.Rectangle;
   /** True when pictures are lit by the sky and lamps (WebGL); false when a shade is laid over them. */
   private lit = false;
@@ -335,12 +339,12 @@ export class WorldScene extends Phaser.Scene {
    * and those we can walk into.
    */
   private showRegion(welcome: WelcomeMessage): void {
-    const def = welcome.region.def;
+    const def = this.withPreview(welcome.region.def);
     this.map = generateRegion(def);
     const size = this.map.width;
     this.origin = { x: def.at.x * size, y: def.at.y * size };
     this.marks?.clear();
-    const around = [def, ...welcome.neighbours.filter((n) => Math.max(Math.abs(n.at.x - def.at.x), Math.abs(n.at.y - def.at.y)) === 1)];
+    const around = [def, ...welcome.neighbours.map((n) => this.withPreview(n)).filter((n) => Math.max(Math.abs(n.at.x - def.at.x), Math.abs(n.at.y - def.at.y)) === 1)];
     const wanted = new Set(around.map((d) => d.id));
     for (const [id, region] of this.drawn) {
       if (!wanted.has(id)) undrawRegion(this, id, region, this.drawn);
@@ -713,6 +717,22 @@ export class WorldScene extends Phaser.Scene {
       if (x >= 0 && y >= 0 && x < drawn.map.width && y < drawn.map.height) return { region, map: drawn.map, x, y };
     }
     return undefined;
+  }
+
+  /**
+   * The world editor shows a land with its drafts (only to its editor; the
+   * server still walks us on the published land), or as published again
+   * when `edits` has no drafts.
+   */
+  previewEdits(region: string, edits?: WorldEdit[]): void {
+    const next = edits?.some((e) => e.draft) ? { region, edits } : undefined;
+    if (JSON.stringify(next) === JSON.stringify(this.preview)) return;
+    this.preview = next;
+    if (this.predictor) this.enterRegion(this.welcome);
+  }
+
+  private withPreview(def: RegionDef): RegionDef {
+    return this.preview?.region === def.id ? { ...def, edits: this.preview.edits } : def;
   }
 
   /** A land drawn around us, as it is laid out here. */

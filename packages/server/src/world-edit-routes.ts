@@ -16,6 +16,9 @@ import type { EditResult, WorldEditor } from './world-editor.ts';
 //   POST /api/world-edits/undo       { region }
 //   POST /api/world-edits/redo       { region }
 //   POST /api/world-edits/remove     { region, id }
+//   POST /api/world-edits/publish    { region }           the land's drafts, for players to see
+//   POST /api/world-edits/discard    { region }           throw the land's drafts away (redo brings them back)
+// New edits are drafts, seen only in the editor, unless the request says `live: true`.
 //   POST /api/world-edits/ai-preview { region, prompt, focus? }
 //   POST /api/world-edits/ai-apply   { region, drafts }
 //   POST /api/world-edits/import     { region, drafts }   a file's edits, those that fit
@@ -70,15 +73,18 @@ export async function handleWorldEdits(
 
   if (action === 'ai-apply' || action === 'import') {
     const drafts = Array.isArray(body?.drafts) ? (body.drafts as WorldEditDraft[]) : [];
-    const applied = await editor.applyBatch(region, drafts, account.name);
+    const applied = await editor.applyBatch(region, drafts, account.name, body?.live === true);
     if (!applied.ok) return json(res, 400, { error: 'not_done', message: applied.message }), true;
     const inspected = editor.inspectRegion(region);
-    return json(res, 200, { ok: true, applied: applied.applied, edits: applied.log.edits, undone: applied.log.undone.length, map: inspected.map }), true;
+    return json(res, 200, { ok: true, applied: applied.applied, edits: applied.log.edits, undone: applied.log.undone.length, unlaid: editor.unlaid(region), map: inspected.map }), true;
   }
 
   let result: EditResult;
-  if (action === '' && body?.edit && typeof body.edit === 'object') result = await editor.add(region, body.edit as WorldEditDraft, account.name);
-  else if (action === '' && Array.isArray(body?.edits) && body.edits.every((e: unknown) => e && typeof e === 'object')) result = await editor.addTogether(region, body.edits as WorldEditDraft[], account.name);
+  const live = body?.live === true;
+  if (action === '' && body?.edit && typeof body.edit === 'object') result = await editor.add(region, body.edit as WorldEditDraft, account.name, live);
+  else if (action === '' && Array.isArray(body?.edits) && body.edits.every((e: unknown) => e && typeof e === 'object')) result = await editor.addTogether(region, body.edits as WorldEditDraft[], account.name, live);
+  else if (action === 'publish') result = await editor.publish(region);
+  else if (action === 'discard') result = await editor.discard(region);
   else if (action === 'undo') result = await editor.undo(region);
   else if (action === 'redo') result = await editor.redo(region);
   else if (action === 'remove' && typeof body?.id === 'string') result = await editor.remove(region, body.id);

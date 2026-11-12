@@ -32,7 +32,7 @@ describe('the world editor', () => {
     const steward = account(store, 'Sten', 'steward');
     const player = account(store, 'Pip');
     const spot = openGround(app!.world.home.map);
-    const plant = { region: 'sanctum', edit: { kind: 'paint', tile: 'tree', tiles: [spot] } };
+    const plant = { region: 'sanctum', live: true, edit: { kind: 'paint', tile: 'tree', tiles: [spot] } };
     expect((await api(base, '/api/world-edits', player.token, 'POST', plant)).status).toBe(403);
     expect((await api(base, '/api/world-edits?region=sanctum', player.token)).status).toBe(403);
 
@@ -77,16 +77,47 @@ describe('the world editor', () => {
     });
     expect(batchApply.status).toBe(200);
     expect(batchApply.body.applied).toBe(1);
+    // A draft: in the editor's map, not yet in the land players walk.
+    expect(batchApply.body.edits.at(-1)).toMatchObject({ draft: true });
+    expect(tile(batchApply.body.map, validSpot)).toBe(Tile.Path);
+    expect(tile(app!.world.home.map, validSpot)).not.toBe(Tile.Path);
+    const published = await api(base, '/api/world-edits/publish', steward.token, 'POST', { region: 'sanctum' });
+    expect(published.body.edits.some((e: WorldEdit) => e.draft)).toBe(false);
     expect(tile(app!.world.home.map, validSpot)).toBe(Tile.Path);
+    expect((await api(base, '/api/world-edits/publish', steward.token, 'POST', { region: 'sanctum' })).body.message).toBe('There are no drafts to publish in this land.');
+  });
+
+  it('keeps new edits as drafts until published, seen only in the editor, and throws them away', async () => {
+    const { base, store, ws } = await start();
+    const owner = account(store, 'Ego', 'owner');
+    const watcher = await joined(ws, account(store, 'Pip').token);
+    const spot = openGround(app!.world.home.map);
+    const drafted = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', edit: { kind: 'paint', tile: 'rock', tiles: [spot] } });
+    expect(drafted.body.edits[0]).toMatchObject({ kind: 'paint', draft: true });
+    expect(tile(drafted.body.map, spot)).toBe(Tile.Rock);
+    expect(tile(app!.world.home.map, spot)).toBe(Tile.Ground);
+    const listed = await api(base, '/api/world-edits?region=sanctum', owner.token);
+    expect(listed.body.edits).toHaveLength(1);
+
+    const thrown = await api(base, '/api/world-edits/discard', owner.token, 'POST', { region: 'sanctum' });
+    expect(thrown.body).toMatchObject({ edits: [], undone: 1 });
+    const back = await api(base, '/api/world-edits/redo', owner.token, 'POST', { region: 'sanctum' });
+    expect(back.body.edits[0]).toMatchObject({ draft: true });
+    await api(base, '/api/world-edits/publish', owner.token, 'POST', { region: 'sanctum' });
+    expect(tile(app!.world.home.map, spot)).toBe(Tile.Rock);
+    // Players were shown the land again only once, when it was published.
+    const welcome = await watcher.waitFor<WelcomeMessage>((m) => m.t === 'welcome' && !!m.region.def.edits?.length);
+    expect(welcome.region.def.edits).toHaveLength(1);
+    expect(welcome.region.def.edits![0]).not.toHaveProperty('draft');
   });
 
   it('refuses edits that do not fit, in plain words, and never blocks where players arrive', async () => {
     const { base, store } = await start();
     const owner = account(store, 'Ego', 'owner');
     const spawn = app!.world.home.map.spawn;
-    const block = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', edit: { kind: 'paint', tile: 'rock', tiles: [[Math.floor(spawn.x), Math.floor(spawn.y)]] } });
+    const block = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', live: true, edit: { kind: 'paint', tile: 'rock', tiles: [[Math.floor(spawn.x), Math.floor(spawn.y)]] } });
     expect(block).toMatchObject({ status: 400, body: { message: expect.stringMatching(/where players arrive/) } });
-    const monster = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', edit: { kind: 'spawn', creature: 'no-such-thing', at: [10, 10], count: 2 } });
+    const monster = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', live: true, edit: { kind: 'spawn', creature: 'no-such-thing', at: [10, 10], count: 2 } });
     expect(monster.body.message).toBe('There is no monster of that kind.');
     expect(store.worldEdits('sanctum').edits).toHaveLength(0);
   });
@@ -96,7 +127,7 @@ describe('the world editor', () => {
     const owner = account(store, 'Ego', 'owner');
     const spot = openGround(app!.world.region('woods')!.map);
     const before = app!.world.region('woods')!.creatureIds().length;
-    const made = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'woods', edit: { kind: 'spawn', creature: 'thorn-wolf', at: spot, count: 3, name: 'Fake', by: 'Someone else' } });
+    const made = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'woods', live: true, edit: { kind: 'spawn', creature: 'thorn-wolf', at: spot, count: 3, name: 'Fake', by: 'Someone else' } });
     expect(made.body.edits[0]).toMatchObject({ name: 'Thorn Wolf', asset: 'woods-thorn-wolf', by: 'Ego' });
     const woods = app!.world.local('woods')!;
     expect(woods.creatureIds().length).toBe(before + 3);
@@ -110,7 +141,7 @@ describe('the world editor', () => {
     const first = await start({ store });
     const owner = account(store, 'Ego', 'owner');
     const spot = openGround(app!.world.home.map);
-    await api(first.base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', edit: { kind: 'paint', tile: 'water', tiles: [spot] } });
+    await api(first.base, '/api/world-edits', owner.token, 'POST', { region: 'sanctum', live: true, edit: { kind: 'paint', tile: 'water', tiles: [spot] } });
     await stop();
     await start({ store });
     expect(app!.world.home.def.edits).toHaveLength(1);
@@ -122,7 +153,7 @@ describe('the world editor', () => {
     const owner = account(store, 'Ego', 'owner');
     const spot: TilePoint = [30, 36];
     expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Ground);
-    const made = await api(first.base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'paint', tile: 'tree', tiles: [spot] } });
+    const made = await api(first.base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', live: true, edit: { kind: 'paint', tile: 'tree', tiles: [spot] } });
     expect(made.status).toBe(200);
     expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
     // Its pavilions are still there under the edit.
@@ -152,7 +183,7 @@ describe('the world editor', () => {
     const file = await api(first.base, '/api/world-edits?region=arch-testbed&export=1', steward.token);
     expect(file.body.edits.length).toBeGreaterThan(30);
     expect(file.body.edits[0]).not.toHaveProperty('id');
-    const loaded = await api(first.base, '/api/world-edits/import', steward.token, 'POST', { region: 'workshop-stair-lab', drafts: file.body.edits });
+    const loaded = await api(first.base, '/api/world-edits/import', steward.token, 'POST', { region: 'workshop-stair-lab', live: true, drafts: file.body.edits });
     expect(loaded.body.applied).toBe(file.body.edits.length);
     const testbed = app!.world.region('arch-testbed')!.map;
     const shape = (m: RegionMap) => ({ buildings: m.buildings.map(({ id: _, style, ...b }) => b), storeys: m.storeys.length, stairways: m.stairways.map(({ id: _, ...s }) => s) });
@@ -167,14 +198,14 @@ describe('the world editor', () => {
   it('points at things by name and works on floors above the ground', async () => {
     const { base, store } = await start();
     const owner = account(store, 'Ego', 'owner');
-    const gone = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'move', from: [30, 30], to: [31, 31], target: 'gen:landmark:99' } });
+    const gone = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', live: true, edit: { kind: 'move', from: [30, 30], to: [31, 31], target: 'gen:landmark:99' } });
     expect(gone).toMatchObject({ status: 400, body: { message: 'That is not there any more.' } });
-    const upstairs = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'spawn', creature: 'walking-mushroom', at: [104, 46], count: 1, level: 1 } });
+    const upstairs = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', live: true, edit: { kind: 'spawn', creature: 'walking-mushroom', at: [104, 46], count: 1, level: 1 } });
     expect(upstairs.status).toBe(200);
     expect(upstairs.body.edits[0]).toMatchObject({ kind: 'spawn', level: 1 });
     expect(upstairs.body.unlaid).toEqual([]);
     expect(app!.world.region('arch-testbed')!.map.creatures.some((c) => c.floor === 1)).toBe(true);
-    const ground = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', edit: { kind: 'road', from: [104, 46], to: [106, 46], level: 1 } });
+    const ground = await api(base, '/api/world-edits', owner.token, 'POST', { region: 'arch-testbed', live: true, edit: { kind: 'road', from: [104, 46], to: [106, 46], level: 1 } });
     expect(ground.body.message).toBe('The Road tool works on the ground floor for now.');
   });
 
@@ -183,7 +214,7 @@ describe('the world editor', () => {
     const owner = account(store, 'Ego', 'owner');
     const land = () => app!.world.region('arch-testbed')!.map;
     const at = (x: number, y: number) => land().buildings.some((b) => b.x === x && b.y === y);
-    const move = { region: 'arch-testbed', edits: [{ kind: 'remove', at: [56, 40], target: 'testbed-02:building:0' }, { kind: 'house', at: [160, 100], floor: [8, 8], style: 'sanctum-inn' }] };
+    const move = { region: 'arch-testbed', live: true, edits: [{ kind: 'remove', at: [56, 40], target: 'testbed-02:building:0' }, { kind: 'house', at: [160, 100], floor: [8, 8], style: 'sanctum-inn' }] };
     const moved = await api(base, '/api/world-edits', owner.token, 'POST', move);
     expect(moved.status).toBe(200);
     expect(moved.body.edits).toHaveLength(2);
@@ -198,7 +229,7 @@ describe('the world editor', () => {
     expect((await api(base, '/api/world-edits/remove', owner.token, 'POST', { region: 'arch-testbed', id: moved.body.edits[1].id })).body).toMatchObject({ edits: [], undone: 2 });
 
     // All or none: the second does not fit, so the first is not made either.
-    const half = { region: 'arch-testbed', edits: [{ kind: 'remove', at: [56, 40], target: 'testbed-02:building:0' }, { kind: 'house', at: [40, 40], floor: [8, 8], style: 'sanctum-inn' }] };
+    const half = { region: 'arch-testbed', live: true, edits: [{ kind: 'remove', at: [56, 40], target: 'testbed-02:building:0' }, { kind: 'house', at: [40, 40], floor: [8, 8], style: 'sanctum-inn' }] };
     expect((await api(base, '/api/world-edits', owner.token, 'POST', half)).status).toBe(400);
     expect(at(56, 40)).toBe(true);
   });
@@ -231,7 +262,7 @@ describe('the world editor with region servers', () => {
 
     const editor = new WorldEditor(store, world);
     const spot = openGround(world.home.map);
-    const result = await editor.add('sanctum', { kind: 'paint', tile: 'rock', tiles: [spot] }, 'Ego');
+    const result = await editor.add('sanctum', { kind: 'paint', tile: 'rock', tiles: [spot] }, 'Ego', true);
     expect(result.ok).toBe(true);
     await until(() => server.region('sanctum') !== undefined && tile(server.region('sanctum')!.map, spot) === Tile.Rock);
     expect(world.home.host).toBe('a');

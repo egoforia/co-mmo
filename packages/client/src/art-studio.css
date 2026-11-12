@@ -983,10 +983,18 @@ button.queue-add-btn.staged {
 
 .map-tools-row {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
 }
+
+.map-rail, .map-options { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.map-rail button kbd { margin-left: 6px; font-size: 11px; opacity: 0.7; }
+.map-rail button.on, .map-options button.on { background: var(--accent, #feae34); color: #181425; border-color: transparent; font-weight: 700; }
+.map-options { padding-top: 6px; }
+.map-options .seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 
 .map-tool-subbar {
   display: flex;

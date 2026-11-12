@@ -510,6 +510,19 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .publish-menu summary::-webkit-details-marker { display: none; }
 #editor .publish-menu .menu { position: absolute; right: 0; top: calc(100% + 6px); display: grid; gap: 8px; min-width: 240px; padding: 10px; background: var(--bg); border: 1px solid var(--edge); color: var(--ink); white-space: normal; }
 #editor .publish-menu .check { display: flex; gap: 6px; align-items: center; }
+#editor .editor-rail { position: absolute; top: 56px; left: 12px; width: 84px; display: grid; gap: 4px; padding: 6px; border-width: 1px; }
+#editor .editor-rail button { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; }
+#editor .editor-rail button kbd { margin: 0; }
+#editor .editor-rail button.on kbd { color: var(--bg); }
+#editor .editor-options { position: absolute; top: 56px; left: 108px; right: 364px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border-width: 1px; width: fit-content; max-width: calc(100vw - 480px); }
+#editor .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+#editor .editor-finder { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); z-index: 3; width: min(480px, calc(100vw - 32px)); padding: 10px; border-width: 1px; border-color: var(--accent); background: var(--bg); }
+#editor .editor-finder input { width: 100%; font-size: 15px; padding: 8px; }
+#editor .editor-finder .found { list-style: none; margin: 8px 0 4px; padding: 0; }
+#editor .editor-finder .found li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; cursor: pointer; }
+#editor .editor-finder .found li.chosen { background: rgba(254, 174, 52, 0.18); outline: 1px solid var(--accent); }
+#editor .editor-finder .found .kind { color: var(--muted); font-size: 11px; }
+#editor .editor-finder .note { color: var(--muted); font-size: 11px; margin: 0; }
 #editor .editor-panel { position: absolute; top: 56px; right: 12px; bottom: 48px; width: min(340px, calc(100vw - 24px)); overflow: auto; padding: 12px 14px; border-width: 1px; }
 #editor .editor-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 #editor .editor-panel .note { color: var(--muted); font-size: 12px; }
@@ -521,8 +534,9 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .editor-strip .camera-keys { color: var(--muted); font-size: 11px; white-space: nowrap; }
 #editor .tools { display: flex; flex-wrap: wrap; gap: 4px; }
 #editor .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-#editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }
+#editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; max-width: 100%; min-width: 0; }
 #editor .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
+#editor .settings select, #editor .settings input:not([type=checkbox]) { max-width: 100%; min-width: 0; box-sizing: border-box; }
 #editor .edits { list-style: none; margin: 0; padding: 0; }
 #editor .edits li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--edge); }
 #editor .edits .by { color: var(--muted); font-size: 11px; }
@@ -554,7 +568,7 @@ body.editing #mini-map { top: auto; right: auto; left: 12px; bottom: 48px; }
   #editor .editor-panel { top: 52px; bottom: auto; left: 12px; right: 12px; width: auto; }
   #editor .editor-panel > :not(.small-screen) { display: none; }
   #editor .editor-panel .small-screen { display: block; font-size: 14px; color: var(--ink); }
-  #editor .editor-strip { display: none; }
+  #editor .editor-strip, #editor .editor-rail, #editor .editor-options { display: none; }
 }
 
 /* --- Performance overlay (Stewards and the Owner, F3) ---------------------- */

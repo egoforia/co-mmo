@@ -61,3 +61,16 @@ export async function playWorld(options: Parameters<typeof start>[0] = {}) {
 }
 
 export type PlayWorld = Awaited<ReturnType<typeof playWorld>>;
+
+/** Chooses a world editor tool the way an editor does: its group on the rail, then the tool in the options bar. */
+export async function chooseTool(page: import('playwright').Page, tool: string, root = '#editor'): Promise<void> {
+  await page.click(`${root} [data-tools~="${tool}"]`);
+  await page.click(`${root} [data-tool="${tool}"]`);
+}
+
+/** Makes the world editor's changes go live at once (the drafts pill's menu). */
+export async function goLive(page: import('playwright').Page): Promise<void> {
+  await page.click('#editor .publish-menu summary');
+  // Ticking it draws the bar again, which folds the menu away.
+  await page.check('#editor input[name="live"]');
+}

@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { buildFloors, collides, generateRegion, newCharacter, regionDef, type Stairway } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
-import { playWorld } from './harness.ts';
+import { chooseTool, goLive, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -73,10 +73,10 @@ describe('floors', () => {
 
     // The Floors tool, clicked on the shop we stand in.
     await page.click('#edit-world-button');
-    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.waitForSelector('#editor:not([hidden]) .editor-rail');
     // These changes are for everyone at once, not drafts.
-    await page.check('#editor input[name="live"]');
-    await page.click('#editor [data-tool="floors"]');
+    await goLive(page);
+    await chooseTool(page, 'floors');
     await page.selectOption('#editor select[name="up"]', '1');
     await page.selectOption('#editor select[name="down"]', '1');
     await page.mouse.click(centre.x, centre.y);
@@ -84,7 +84,7 @@ describe('floors', () => {
     // The same stairs, besides the names the land gives them (world-edits/names.ts).
     const unnamed = (list: Stairway[]) => list.map(({ id: _, ...s }) => s);
     expect(unnamed(app!.world.home.map.stairways)).toEqual(unnamed(map.stairways));
-    await page.click('#editor .close');
+    await page.click('#editor [data-done]');
     await page.waitForTimeout(1500);
     await page.screenshot({ path: resolve(shots, 'floors-ground.png') });
 

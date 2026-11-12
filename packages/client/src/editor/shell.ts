@@ -49,11 +49,12 @@ const option = (value: string, label: string, chosen: boolean) => `<option value
 
 /** The top bar: land, floor stepper, hour and weather, the marks, drafts and Publish, Done. */
 export function barHtml(s: BarState): string {
+  const floors = Array.from({ length: MAX_FLOORS.up + MAX_FLOORS.down + 1 }, (_, i) => MAX_FLOORS.up - i);
   const up = s.floor < MAX_FLOORS.up ? '' : ' disabled';
   const down = s.floor > -MAX_FLOORS.down ? '' : ' disabled';
   const floor = `<span class="floor-step" role="group" aria-label="Floor">
       <button type="button" class="quiet" data-floor-step="1" title="The floor above" aria-label="The floor above"${up}>▲</button>
-      <span class="floor-name">${escapeHtml(capital(floorName(s.floor)))}</span>
+      <select name="view-floor" class="floor-name" aria-label="The floor shown">${floors.map((f) => option(String(f), capital(floorName(f)), f === s.floor)).join('')}</select>
       <button type="button" class="quiet" data-floor-step="-1" title="The floor below" aria-label="The floor below"${down}>▼</button>
       ${s.floorChosen ? '<button type="button" class="quiet" data-floor-mine title="Show the floor you stand on again">My floor</button>' : ''}
     </span>`;

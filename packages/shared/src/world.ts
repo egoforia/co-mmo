@@ -5,6 +5,7 @@ import { modsOff } from './mods.ts';
 import { layPlaces } from './places.ts';
 import { homeLandLayout } from './home-lands.ts';
 import { applyEdits, nameThings, type WorldEdit } from './world-edits.ts';
+import ARCH_TESTBED_EDITS from './testbed/arch-testbed.edits.json';
 import type { Stairway, Storey } from './floors.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
@@ -52,6 +53,14 @@ export interface RegionDef {
   wild?: WildLand;
   /** Changes the Owner and Stewards made in the world editor, laid over the land in order (world-edits.ts). */
   edits?: WorldEdit[];
+  /** 'blank': flat open ground and nothing else, for a land built in the editor (workshop lands); the biome's own layout when missing. */
+  layout?: 'blank';
+  /** Where players arrive on a blank land; its middle when missing. */
+  spawn?: { x: number; y: number };
+  /** The edits a land ships with, laid before the world editor's (the Architectural Testbed's are a JSON file). */
+  base?: WorldEdit[];
+  /** A workshop land: built in the editor, off the world grid (no roads join it), reached by teleport. */
+  workshop?: boolean;
 }
 
 /**
@@ -86,7 +95,12 @@ export const WORLD_REGIONS: RegionDef[] = [
   { id: 'mushroom-hollow', name: 'Mushroom Hollow', biome: 'mushroom-hollow', seed: 6001, at: { x: -2, y: 0 }, exits: { east: 'woods' } },
 ];
 
-/** Architectural clean-room testbed region definition. */
+/**
+ * The Architectural Testbed: a workshop land the game ships with, a blank
+ * land with every kind of building, terrace, cellar and stairs laid by world
+ * edits (testbed/arch-testbed.edits.json), for checking the camera and the
+ * building kit (testbed/arch-testbed.ts has its waypoints).
+ */
 export const ARCH_TESTBED_REGION: RegionDef = {
   id: 'arch-testbed',
   name: 'Architectural Testbed',
@@ -94,6 +108,10 @@ export const ARCH_TESTBED_REGION: RegionDef = {
   seed: 7777,
   at: { x: 10, y: 10 },
   exits: {},
+  layout: 'blank',
+  spawn: { x: 30, y: 30 },
+  workshop: true,
+  base: ARCH_TESTBED_EDITS as WorldEdit[],
 };
 
 /** Regions players wished into being, by id (filled in by applyContent). */
@@ -120,11 +138,12 @@ export function cellBeyond(def: RegionDef, side: Side): { x: number; y: number }
  * joined by a road, so a region wished beside two others reaches both.
  */
 export function linkRegions(defs: RegionDef[]): Map<string, Partial<Record<Side, string>>> {
-  const byCell = new Map(defs.map((d) => [`${d.at.x},${d.at.y}`, d.id]));
+  // Workshop lands stand off the grid: no road leads to or from one.
+  const byCell = new Map(defs.filter((d) => !d.workshop).map((d) => [`${d.at.x},${d.at.y}`, d.id]));
   const links = new Map<string, Partial<Record<Side, string>>>();
   for (const def of defs) {
     const exits: Partial<Record<Side, string>> = {};
-    for (const side of SIDES) {
+    for (const side of def.workshop ? [] : SIDES) {
       const cell = cellBeyond(def, side);
       const other = byCell.get(`${cell.x},${cell.y}`);
       if (other) exits[side] = other;
@@ -293,7 +312,6 @@ export function generateRegion(def: RegionDef, size = REGION_SIZE): RegionMap {
   return { ...structuredClone(rest), def };
 }
 
-import { archTestbedLayout } from './testbed/arch-testbed.ts';
 
 function layOut(def: RegionDef, size: number): RegionMap {
   const map: RegionMap = {
@@ -313,10 +331,11 @@ function layOut(def: RegionDef, size: number): RegionMap {
     spots: [],
   };
   const c = Math.floor(size / 2);
-  if (def.id === 'arch-testbed') {
-    archTestbedLayout(map, c);
-    nameThings(map, 'gen');
-    // The testbed's own layout stays as written; the world editor's changes go on top, as on every land.
+  if (def.layout === 'blank') {
+    // Flat open ground: everything on it is laid by edits, those it ships with first.
+    map.tiles.fill(Tile.Ground);
+    map.spawn = def.spawn ? { ...def.spawn } : { x: c, y: c };
+    if (def.base?.length) applyEdits(map, def.base);
     if (def.edits?.length) applyEdits(map, def.edits);
     settle(map);
     return map;

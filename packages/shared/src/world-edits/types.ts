@@ -48,6 +48,12 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'footprint'; at: TilePoint; footprint: [width: number, height: number] }
   /** Stands a gathering spot of a kind (gathering.ts) on a tile, or takes away the one there when `spot` is null. */
   | { kind: 'spot'; spot: string | null; at: TilePoint }
+  /** A floor above or below the ground over a rectangle, walled round, or an open terrace with low parapets (floors.ts addStorey). */
+  | { kind: 'storey'; at: TilePoint; size: [width: number, height: number]; storey: number; style: string; open?: boolean }
+  /** A flight of stairs (or a ladder) with its top-left tile at `at`, from floor `from` up to the one above, climbed walking `climbs`. */
+  | { kind: 'stairs'; at: TilePoint; size: [width: number, height: number]; from: number; climbs?: 'north' | 'south' | 'east' | 'west'; ladder?: boolean }
+  /** A building style's piece of furniture standing on the edit's floor, its picture's bottom centre at `at` (tiles, may be halves); it blocks its footprint unless `walkable`. */
+  | { kind: 'furniture'; asset: string; at: TilePoint; footprint: [width: number, height: number]; walkable?: boolean }
 );
 
 /** The name of each kind of edit. */

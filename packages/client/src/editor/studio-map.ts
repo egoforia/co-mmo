@@ -1,6 +1,7 @@
 import { MAX_FLOORS, Tile, isBlocking, tileAt, type Outline, type RegionMap, type TilePoint, type WorldEdit, type WorldEditDraft } from '@co-mmo/shared';
 import { loadToken } from '../api.ts';
 import { artState, esc, usd } from '../art-ui/state.ts';
+import { landsCard, layFile, makeLand, saveEdits } from './studio-lands.ts';
 import { EditorCore, editListHtml, historyHtml, toolsHtml, type ToolStep } from './core.ts';
 
 // The world editor's second view: the Art Studio's map of a whole land
@@ -27,7 +28,9 @@ const MOST = 32;
 
 export interface RegionInspectPayload {
   region: string;
-  regions: { id: string; name: string; biome: string }[];
+  regions: { id: string; name: string; biome: string; workshop?: boolean }[];
+  /** The looks a new workshop land may take. */
+  workshopBiomes: string[];
   map: RegionMap;
   edits: WorldEdit[];
   undone: number;
@@ -102,7 +105,7 @@ export function mapEditorPage(): string {
         <p class="note">Look at any land from above, on any floor, and change it with the same tools as the editor in the game, or ask the <b>AI Map Architect</b> and check its steps on the map before anything changes.</p>
       </div>
       <div class="map-top-controls">
-        <label>Land <select data-map-region>${d.regions.map((r) => option(r.id, `${r.name} (${r.biome})`, r.id === d.region)).join('')}</select></label>
+        <label>Land <select data-map-region>${d.regions.map((r) => option(r.id, `${r.name} (${r.workshop ? 'workshop' : r.biome})`, r.id === d.region)).join('')}</select></label>
         <div class="btn-group" role="group" aria-label="Floor">${floors.map((n) => `<button type="button" class="quiet${state.floor === n ? ' active-pill' : ''}" data-map-floor="${n}">${floorName(n)}</button>`).join('')}</div>
         <div class="btn-group" role="group" aria-label="Zoom">
           <button type="button" class="quiet" data-map-zoom="out" aria-label="Zoom out" title="Zoom out"${state.cell <= fitted(d.map) ? ' disabled' : ''}>−</button>
@@ -156,6 +159,7 @@ export function mapEditorPage(): string {
           <div class="studio-split-header"><h3>Edits in ${esc(d.map.def.name)} (${d.edits.length})</h3>${historyHtml(d)}</div>
           <div class="map-edits-list">${editListHtml({ ...d, unlaid: d.map.unlaid })}</div>
         </section>
+        ${landsCard(d.workshopBiomes ?? [])}
       </div>
     </div>
     </div>`;
@@ -308,6 +312,7 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
   else if (d.remove) return void send({ remove: d.remove }), true;
   else if (d.mapAiDiscard !== undefined) state.ai = { ...state.ai, summary: '', steps: [] };
   else if (d.mapAiApply !== undefined) return applyAi(t), true;
+  else if (d.mapExport !== undefined) return void saveEdits(state.regionId).catch((err: Error) => artState.ctx.toast(err.message)), true;
   else return false;
   artState.ctx.rerender();
   return true;
@@ -343,6 +348,13 @@ export function handleMapEditorChange(target: HTMLElement): boolean {
     mountMapEditorCanvas();
     return true;
   }
+  if (input.dataset.mapImport !== undefined) {
+    void layFile(state.regionId, input)
+      .then(() => loadMapEditorData(state.regionId))
+      .then(() => artState.ctx.rerender())
+      .catch((err: Error) => artState.ctx.toast(err.message));
+    return true;
+  }
   if (input.dataset.mapAiCheck !== undefined) {
     const s = state.ai.steps[Number(input.dataset.mapAiCheck)];
     if (s) s.checked = input.checked;
@@ -354,6 +366,13 @@ export function handleMapEditorChange(target: HTMLElement): boolean {
 
 /** The AI Map Architect's form; false when the form is not it. */
 export function handleMapEditorSubmit(form: HTMLFormElement): boolean {
+  if (form.id === 'map-land-form') {
+    void makeLand(form)
+      .then((region) => loadMapEditorData(region))
+      .then(() => artState.ctx.rerender())
+      .catch((err: Error) => artState.ctx.toast(err.message));
+    return true;
+  }
   if (form.id !== 'map-ai-form') return false;
   const prompt = String(new FormData(form).get('prompt') ?? '').trim();
   if (!prompt) return true;

@@ -10,12 +10,15 @@ import type { EditResult, WorldEditor } from './world-editor.ts';
 // The world editor's API. Only the Owner and Stewards edit the world; every
 // change is saved and can be taken back.
 //   GET  /api/world-edits?region=<id>[&includeMap=1]   the land's edits, those that no longer fit (and map/palettes for Studio)
+//   GET  /api/world-edits?region=<id>&export=1         the land's edits as a file any land can take
 //   POST /api/world-edits            { region, edit }
 //   POST /api/world-edits/undo       { region }
 //   POST /api/world-edits/redo       { region }
 //   POST /api/world-edits/remove     { region, id }
 //   POST /api/world-edits/ai-preview { region, prompt, focus? }
 //   POST /api/world-edits/ai-apply   { region, drafts }
+//   POST /api/world-edits/import     { region, drafts }   a file's edits, those that fit
+//   POST /api/world-edits/lands      { name, biome }      a new blank workshop land
 
 /** Answers the world editor's routes; false when the request is not for them. */
 export async function handleWorldEdits(
@@ -36,6 +39,10 @@ export async function handleWorldEdits(
     if (url.searchParams.get('includeMap') === '1') {
       return json(res, 200, editor.inspectRegion(region || undefined)), true;
     }
+    if (url.searchParams.get('export') === '1') {
+      const file = editor.exportLand(region);
+      return file ? json(res, 200, file) : json(res, 404, { error: 'not_found', message: 'There is no land by that name.' }), true;
+    }
     const log = editor.log(region);
     return json(res, 200, { edits: log.edits, undone: log.undone.length, unlaid: editor.unlaid(region) }), true;
   }
@@ -51,7 +58,12 @@ export async function handleWorldEdits(
     return json(res, 200, { ok: true, ...preview }), true;
   }
 
-  if (action === 'ai-apply') {
+  if (action === 'lands') {
+    const made = editor.createLand(body?.name, body?.biome, account.name);
+    return made.ok ? json(res, 200, made) : json(res, 400, { error: 'not_done', message: made.message }), true;
+  }
+
+  if (action === 'ai-apply' || action === 'import') {
     const drafts = Array.isArray(body?.drafts) ? (body.drafts as WorldEditDraft[]) : [];
     const applied = await editor.applyBatch(region, drafts, account.name);
     if (!applied.ok) return json(res, 400, { error: 'not_done', message: applied.message }), true;

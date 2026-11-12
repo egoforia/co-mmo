@@ -292,6 +292,19 @@ and `studio-map.ts`, the Art Studio's Map Preview & Editor (any floor, zoom
 in and out, the AI Map Architect). Their outlines and the Studio's tile plan
 are the editor's own marks, seen only while it is open, never game art.
 
+**Workshop lands.** A land with `layout: 'blank'` is flat open ground and
+nothing else; everything on it is laid by edits, those it ships with
+(`RegionDef.base`) first, then the editor's. A `workshop` land stands off the
+world grid: no roads join it, nothing grows beside it, and players reach it
+with `/teleport`. The Architectural Testbed is one, its bays shipped as
+`shared/src/testbed/arch-testbed.edits.json`; the Owner and Stewards make
+more from the Studio map (`POST /api/world-edits/lands`, server
+`workshop-lands.ts`, kept with the land's edits in `world_edits`). Any land's
+edits go out as a file (`?export=1`) and are laid on another land
+(`/import`), each checked as if made by hand. The kinds that build a land up
+from nothing are `storey` (a floor or an open terrace), `stairs` and
+`furniture`.
+
 **The building kit.** `shared/src/building-kit/` (exported as `buildingKit`)
 turns a building as data (`BuildingSpec`: footprint in bays, doors and
 windows per wall, stairs, and a crown: a pitched or flat roof,

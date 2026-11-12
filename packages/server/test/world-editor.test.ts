@@ -131,6 +131,39 @@ describe('the world editor', () => {
     await start({ store });
     expect(tile(app!.world.region('arch-testbed')!.map, spot)).toBe(Tile.Tree);
   });
+  it('lets a Steward make a workshop land, fill it from a file, and keeps it across a restart', async () => {
+    const store = Store.memory();
+    const first = await start({ store });
+    const steward = account(store, 'Sten', 'steward');
+    const player = account(store, 'Pip');
+    expect((await api(first.base, '/api/world-edits/lands', player.token, 'POST', { name: 'My Lab', biome: 'sanctum' })).status).toBe(403);
+    expect((await api(first.base, '/api/world-edits/lands', steward.token, 'POST', { name: 'x', biome: 'sanctum' })).body.message).toMatch(/name of 2 to 40/);
+    const made = await api(first.base, '/api/world-edits/lands', steward.token, 'POST', { name: 'Stair Lab', biome: 'frostpeak' });
+    expect(made.body).toEqual({ ok: true, region: 'workshop-stair-lab' });
+    expect((await api(first.base, '/api/world-edits/lands', steward.token, 'POST', { name: 'stair lab', biome: 'frostpeak' })).status).toBe(400);
+    const lab = () => app!.world.region('workshop-stair-lab')!;
+    // Blank, off the grid: no roads, and nothing beside it.
+    expect(lab().def).toMatchObject({ workshop: true, layout: 'blank', exits: {} });
+    expect(lab().map.buildings).toEqual([]);
+    expect(app!.world.neighbours(lab().def)).toEqual([]);
+    expect(app!.world.home.def.exits).toEqual({ north: 'frostpeak', west: 'woods', east: 'shore', south: 'desert' });
+
+    // The testbed as a file, laid on the new land: the same buildings, floors and stairs.
+    const file = await api(first.base, '/api/world-edits?region=arch-testbed&export=1', steward.token);
+    expect(file.body.edits.length).toBeGreaterThan(30);
+    expect(file.body.edits[0]).not.toHaveProperty('id');
+    const loaded = await api(first.base, '/api/world-edits/import', steward.token, 'POST', { region: 'workshop-stair-lab', drafts: file.body.edits });
+    expect(loaded.body.applied).toBe(file.body.edits.length);
+    const testbed = app!.world.region('arch-testbed')!.map;
+    const shape = (m: RegionMap) => ({ buildings: m.buildings.map(({ id: _, style, ...b }) => b), storeys: m.storeys.length, stairways: m.stairways.map(({ id: _, ...s }) => s) });
+    expect(shape(lab().map)).toEqual(shape(testbed));
+
+    await stop();
+    await start({ store });
+    expect(lab().def.name).toBe('Stair Lab');
+    expect(lab().map.stairways).toHaveLength(testbed.stairways.length);
+  });
+
   it('points at things by name and works on floors above the ground', async () => {
     const { base, store } = await start();
     const owner = account(store, 'Ego', 'owner');

@@ -91,6 +91,11 @@ describe('the Art tab', () => {
     expect(body.walkers.find((w: any) => w.id === 'player-mara')).toMatchObject({ kind: 'player look', place: { tab: 'characters', page: 'Mara' } });
     expect(body.walkers.find((w: any) => w.id === 'desert-scarab')).toMatchObject({ kind: 'creature', walks: {} });
     expect(body.walkers.find((w: any) => w.id === 'desert-scarab').estimateUsd).toBeGreaterThan(0);
+    expect(body.bodies).toEqual([
+      { id: 'two-legged', name: 'Two-legged, 3 heads tall' },
+      { id: 'four-legged', name: 'Four-legged, 2 heads tall' },
+      { id: 'six-legged', name: 'Six-legged crawler' },
+    ]);
   });
 
   it('paints a shipped building picture again with the Owner\'s words, logs it, and serves it over the shipped one', async () => {

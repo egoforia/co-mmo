@@ -3,7 +3,7 @@ import { describeCall } from '../src/api-log.ts';
 import { AiServices } from '../src/ai/services.ts';
 import type { ChatModel } from '../src/ai/chat.ts';
 import { ProviderError } from '../src/assets/provider.ts';
-import { MAX_DATA_URL_BYTES, ReplicateVideoProvider, replicateToken } from '../src/assets/replicate.ts';
+import { MAX_DATA_URL_BYTES, ReplicateVideoProvider, replicateError, replicateResolution, replicateToken } from '../src/assets/replicate.ts';
 import { videoUsd } from '../src/assets/video.ts';
 import { refusal } from '../src/paint-queue.ts';
 import { defaultSettings } from '../src/settings.ts';
@@ -112,6 +112,62 @@ describe('ReplicateVideoProvider', () => {
     expect(videoUsd('alibaba/wan-3', clip('480p'))).toBeCloseTo(0.4);
     expect(videoUsd('alibaba/wan-3', clip('720p'))).toBeCloseTo(0.8);
     expect(videoUsd('alibaba/wan-3', clip('1080p'))).toBeCloseTo(1.6);
+  });
+
+  it('configures resolution and image inputs for MiniMax H3-Lite models', async () => {
+    const { calls, fetchImpl } = fakeReplicate((call) =>
+      call.method === 'POST' ? Response.json({ id: 'p', status: 'succeeded', output: 'https://replicate.delivery/minimax.mp4' }) : new Response('mp4'));
+    const provider = new ReplicateVideoProvider('t', 'minimax/h3-lite', fetchImpl, noWait);
+    const clip = await provider.generate({ prompt: 'walk', first, last: first, seconds: 5 });
+
+    expect(clip).toMatchObject({ seconds: 5, resolution: '768P' });
+    const start = calls[0]!;
+    expect(start.body.input.resolution).toBe('768P');
+    expect(start.body.input.first_frame_image).toBe(`data:image/png;base64,${Buffer.from('png').toString('base64')}`);
+    expect(start.body.input.last_frame_image).toBe(`data:image/png;base64,${Buffer.from('png').toString('base64')}`);
+    expect(start.body.input.prompt_optimizer).toBe(false);
+
+    // 480p requested maps to uppercase 480P
+    await provider.generate({ prompt: 'walk', first, seconds: 5, resolution: '480p' });
+    expect(calls[2]!.body.input.resolution).toBe('480P');
+  });
+
+  it('omits resolution for models that do not take it, unless explicitly requested', async () => {
+    const { calls, fetchImpl } = fakeReplicate((call) =>
+      call.method === 'POST' ? Response.json({ id: 'p', status: 'succeeded', output: 'https://replicate.delivery/other.mp4' }) : new Response('mp4'));
+    const provider = new ReplicateVideoProvider('t', 'minimax/video-01', fetchImpl, noWait);
+    await provider.generate({ prompt: 'walk', first, seconds: 5 });
+    expect(calls[0]!.body.input.resolution).toBeUndefined();
+  });
+
+  it('formats validation errors including invalid_fields in replicateError', () => {
+    const err = replicateError(
+      'replicate',
+      new Response(null, { status: 422 }),
+      {
+        status: 'failed',
+        invalid_fields: [{ type: 'enum', field: 'input.resolution', description: 'resolution must be one of the following: "480P", "768P"' }],
+      },
+      'fallback',
+    );
+    expect(err.status).toBe(422);
+    expect(err.said).toBe('resolution must be one of the following: "480P", "768P"');
+  });
+});
+
+describe('replicateResolution', () => {
+  it('maps resolutions for Wan, MiniMax, and other models', () => {
+    expect(replicateResolution('alibaba/wan-3')).toBe('720p');
+    expect(replicateResolution('alibaba/wan-3', '480p')).toBe('480p');
+    expect(replicateResolution('alibaba/wan-3', '1080p')).toBe('1080p');
+
+    expect(replicateResolution('minimax/h3-lite')).toBe('768P');
+    expect(replicateResolution('minimax/h3-lite', '480p')).toBe('480P');
+    expect(replicateResolution('minimax/h3-lite', '768p')).toBe('768P');
+
+    expect(replicateResolution('minimax/video-01')).toBeUndefined();
+    expect(replicateResolution('unknown/model')).toBeUndefined();
+    expect(replicateResolution('unknown/model', '720p')).toBe('720p');
   });
 });
 

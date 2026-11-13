@@ -495,7 +495,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor kbd { font: inherit; font-size: 11px; color: var(--muted); margin-left: 4px; }
 #editor select, #editor input { background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; padding: 4px; max-width: 100%; }
 #editor input[type='number'] { width: 70px; }
-#editor .editor-bar { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 8px 12px; border-bottom-width: 1px; }
+#editor .editor-bar { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 8px 12px; border-bottom-width: 1px; }
 #editor .editor-bar .land-name { color: var(--accent); }
 #editor .editor-bar .spacer { flex: 1; }
 #editor .floor-step, #editor .sky-pick, #editor .view-toggles { display: inline-flex; gap: 6px; align-items: center; }
@@ -511,20 +511,20 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .publish-menu summary::-webkit-details-marker { display: none; }
 #editor .publish-menu .menu { position: absolute; right: 0; top: calc(100% + 6px); display: grid; gap: 8px; min-width: 240px; padding: 10px; background: var(--bg); border: 1px solid var(--edge); color: var(--ink); white-space: normal; }
 #editor .publish-menu .check { display: flex; gap: 6px; align-items: center; }
-#editor .editor-rail { position: absolute; top: 56px; left: 12px; width: 84px; display: grid; gap: 4px; padding: 6px; border-width: 1px; }
+#editor .editor-rail { position: absolute; top: calc(var(--editor-top, 44px) + 12px); left: 12px; width: 84px; display: grid; gap: 4px; padding: 6px; border-width: 1px; }
 #editor .editor-rail button { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; }
 #editor .editor-rail button kbd { margin: 0; }
 #editor .editor-rail button.on kbd { color: var(--bg); }
-#editor .editor-options { position: absolute; top: 56px; left: 108px; right: 364px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border-width: 1px; width: fit-content; max-width: calc(100vw - 480px); }
+#editor .editor-options { position: absolute; top: calc(var(--editor-top, 44px) + 12px); left: 108px; right: 364px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border-width: 1px; width: fit-content; max-width: calc(100vw - 480px); }
 #editor .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-#editor .editor-finder { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); z-index: 3; width: min(480px, calc(100vw - 32px)); padding: 10px; border-width: 1px; border-color: var(--accent); background: var(--bg); }
+#editor .editor-finder { position: absolute; top: calc(var(--editor-top, 44px) + 52px); left: 50%; transform: translateX(-50%); z-index: 3; width: min(480px, calc(100vw - 32px)); padding: 10px; border-width: 1px; border-color: var(--accent); background: var(--bg); }
 #editor .editor-finder input { width: 100%; font-size: 15px; padding: 8px; }
 #editor .editor-finder .found { list-style: none; margin: 8px 0 4px; padding: 0; }
 #editor .editor-finder .found li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; cursor: pointer; }
 #editor .editor-finder .found li.chosen { background: rgba(254, 174, 52, 0.18); outline: 1px solid var(--accent); }
 #editor .editor-finder .found .kind { color: var(--muted); font-size: 11px; }
 #editor .editor-finder .note { color: var(--muted); font-size: 11px; margin: 0; }
-#editor .editor-panel { position: absolute; top: 56px; right: 12px; bottom: 48px; width: min(340px, calc(100vw - 24px)); overflow: auto; padding: 12px 14px; border-width: 1px; }
+#editor .editor-panel { position: absolute; top: calc(var(--editor-top, 44px) + 12px); right: 12px; bottom: 48px; width: min(340px, calc(100vw - 24px)); overflow: auto; padding: 12px 14px; border-width: 1px; }
 #editor .editor-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 #editor .editor-panel .note { color: var(--muted); font-size: 12px; }
 #editor .editor-panel .small-screen { display: none; }
@@ -542,9 +542,9 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .edits li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--edge); }
 #editor .edits .by { color: var(--muted); font-size: 11px; }
 #editor .edits button { padding: 0 6px; }
-#editor .tool-notes, .studio-map .tool-notes { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 12px; }
-#editor .tool-notes .ok, .studio-map .tool-notes .ok { color: #6fd08c; }
-#editor .tool-notes .bad, .studio-map .tool-notes .bad { color: #f6757a; }
+#editor .tool-notes { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 12px; }
+#editor .tool-notes .ok { color: #6fd08c; }
+#editor .tool-notes .bad { color: #f6757a; }
 #editor .edits li.draft > span:first-child { font-style: italic; }
 #editor .bookmarks-box summary { margin: 14px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
 #editor .checks-box summary { margin: 14px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
@@ -568,6 +568,26 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .bookmark-view { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 #editor .bookmark-view input { flex: 1 1 100%; min-width: 0; box-sizing: border-box; }
 #editor .bookmark-view kbd, #editor .land-tab kbd { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+#editor .camera-pick { align-items: center; }
+#editor .camera-pick button { padding: 2px 8px; }
+#editor .file-pick { display: inline-block; cursor: pointer; border: 1px solid var(--edge); padding: 4px 10px; }
+#editor .file-pick input { display: none; }
+/* The Plan camera: a land from above, between the rail and the panel, over the world. */
+#editor .editor-plan { position: absolute; top: calc(var(--editor-top, 44px) + 56px); left: 108px; right: 364px; bottom: 48px; display: flex; flex-direction: column; border-width: 1px; background: var(--bg); }
+#editor .editor-plan[hidden] { display: none; }
+#editor .plan-bar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--edge); background: var(--panel); }
+#editor .plan-bar .check { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); cursor: pointer; }
+#editor .plan-bar .zoom { min-width: 4em; text-align: center; color: var(--muted); align-self: center; }
+#editor .plan-scroll { flex: 1; overflow: auto; min-height: 0; }
+#editor .plan-scroll canvas { display: block; cursor: crosshair; }
+/* The AI Map Architect, in the land panel. */
+#editor .architect textarea { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; padding: 6px; margin: 4px 0 6px; resize: vertical; }
+#editor .ai-steps { list-style: none; margin: 6px 0; padding: 0; }
+#editor .ai-steps li { display: grid; gap: 2px; padding: 4px 0; border-bottom: 1px solid var(--edge); }
+#editor .ai-steps li.bad { opacity: 0.7; }
+#editor .ai-steps .check { display: flex; gap: 6px; align-items: flex-start; }
+#editor .ai-steps small.bad { color: #f6757a; }
+body.editing-plan #mini-map { display: none !important; }
 
 /* Select's inspector: the picked thing, its actions, and a fold per kind of change. */
 .inspector { width: 100%; }
@@ -590,7 +610,7 @@ body.editing #mini-map { top: auto; right: auto; left: 12px; bottom: 48px; }
   #editor .editor-panel { top: 52px; bottom: auto; left: 12px; right: 12px; width: auto; }
   #editor .editor-panel > :not(.small-screen) { display: none; }
   #editor .editor-panel .small-screen { display: block; font-size: 14px; color: var(--ink); }
-  #editor .editor-strip, #editor .editor-rail, #editor .editor-options { display: none; }
+  #editor .editor-strip, #editor .editor-rail, #editor .editor-options, #editor .editor-plan { display: none; }
 }
 
 /* --- Performance overlay (Stewards and the Owner, F3) ---------------------- */

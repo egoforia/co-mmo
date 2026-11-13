@@ -8,6 +8,9 @@ import { GRID_RADIUS, drawTileGrid } from './tile-grid.ts';
 // hitboxes of the floor we stand on (tiles nobody can walk on) and the tile
 // wireframe of the floor shown. They are the editor's own lines, never game art.
 
+/** Where the tile wireframe switch is remembered, on this browser only. */
+const GRID_KEY = 'co-mmo.editor.tileGrid';
+
 /** Which marks to draw. */
 export interface MarkOptions {
   hitboxes: boolean;
@@ -49,5 +52,62 @@ export function drawMarks(scene: WorldScene, hitboxes: Phaser.GameObjects.Graphi
       hitboxes.lineStyle(1.5, colour, 0.9);
       hitboxes.strokePoints(pts, true);
     }
+  }
+}
+
+/** The two marks' layers in a running scene, their switches (`name="hitboxes"`, `name="tile-grid"`), and where they were last drawn. */
+export class WorldMarks {
+  /** Hitboxes start off: their fill hides the art being judged. The wireframe is as it was left in this browser. */
+  readonly show: MarkOptions = { hitboxes: false, grid: readGrid() };
+  private hitboxes?: Phaser.GameObjects.Graphics;
+  private grid?: Phaser.GameObjects.Graphics;
+  /** Where the marks were last drawn around, so walking redraws them only on a new tile. */
+  private drawnAt = '';
+
+  /** Draws in a newly running scene, under the outlines at `depth`. */
+  attach(scene: WorldScene, depth: number): void {
+    this.hitboxes = scene.add.graphics().setDepth(depth - 5);
+    this.grid = scene.add.graphics().setDepth(depth - 6);
+  }
+
+  clear(): void {
+    this.hitboxes?.clear();
+    this.grid?.clear();
+    this.drawnAt = '';
+  }
+
+  /** True when the camera or the floor shown has moved since the marks were drawn. */
+  stale(scene: WorldScene): boolean {
+    return marksKey(scene) !== this.drawnAt;
+  }
+
+  /** Draws the marks switched on (none while the editor is closed). */
+  draw(scene: WorldScene, open: boolean): void {
+    if (!this.hitboxes || !this.grid) return;
+    this.drawnAt = marksKey(scene);
+    if (open) drawMarks(scene, this.hitboxes, this.grid, this.show);
+  }
+
+  /** A switch was flipped; false when the input is not one of them. */
+  set(name: string, on: boolean): boolean {
+    if (name === 'hitboxes') this.show.hitboxes = on;
+    else if (name === 'tile-grid') {
+      this.show.grid = on;
+      try {
+        localStorage.setItem(GRID_KEY, on ? '1' : '0');
+      } catch {
+        // No storage here: the switch still works until the page is reloaded.
+      }
+    } else return false;
+    return true;
+  }
+}
+
+/** Whether the tile wireframe was left on in this browser (off when nothing was saved). */
+function readGrid(): boolean {
+  try {
+    return localStorage.getItem(GRID_KEY) === '1';
+  } catch {
+    return false;
   }
 }

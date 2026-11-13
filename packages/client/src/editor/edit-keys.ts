@@ -3,12 +3,13 @@ import { groupOf, groups, toolFor } from './rail.ts';
 
 // What a key does in edit mode, worked out apart from the page so it can be
 // read in one place (and tested): the finder, the picked thing's keys, a
-// group's letter, the camera's keys, Esc, and undo and redo. The pan keys
+// group's letter, the camera's keys (Tab switches World and Plan), Esc, and undo and redo. The pan keys
 // (camera-keys.ts) are heard before these.
 
 /** What a key asks the editor to do. */
 export type KeyAction =
   | { find: true }
+  | { camera: true }
   | { pick: 'remove' | 'move' | 'copy' }
   | { tool: ToolId }
   | { home: true }
@@ -25,6 +26,7 @@ export function keyAction(event: KeyboardEvent, core: EditorCore, lastTool: Part
   const plain = !(ctrl || event.altKey);
   if ((key === 'k' && ctrl) || (key === '/' && plain)) return { find: true };
   if (key === 'd' && ctrl) return { bookmark: true };
+  if (key === 'tab' && plain && !event.shiftKey) return { camera: true };
   // What is picked: M moves it, Ctrl C copies it, Delete takes it away.
   if (core.hasPick()) {
     if (key === 'delete' || key === 'backspace') return { pick: 'remove' };

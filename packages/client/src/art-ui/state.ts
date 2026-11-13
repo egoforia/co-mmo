@@ -210,7 +210,7 @@ export const SUBTABS = [
   ['buildings', 'Buildings'],
   ['hud-fx', 'HUD & FX'],
   ['sounds', 'Sounds'],
-  ['map-editor', 'Map Preview & Editor'],
+  ['map-editor', 'Map editor'],
   ['models', 'AI Models'],
 ] as const;
 export type Subtab = (typeof SUBTABS)[number][0] | 'now' | 'characters' | 'monsters';

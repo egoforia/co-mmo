@@ -351,6 +351,12 @@ function play(token: string): void {
       editor = opened;
       edit.hidden = false;
       edit.addEventListener('click', () => opened.toggle());
+      // The Art Studio's Map tab opens the game straight into the editor's Plan camera.
+      const editAt = new URLSearchParams(location.search).get('edit');
+      if (editAt) {
+        opened.toggle(true, editAt === 'plan' ? 'plan' : 'world');
+        history.replaceState(null, '', location.pathname);
+      }
     }
     // Painted status icons show in the stats line; a status without one is named instead.
     const statusIcon = (key: string) => manifest[key]?.file;

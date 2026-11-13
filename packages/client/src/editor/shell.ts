@@ -2,8 +2,8 @@ import { MAX_FLOORS, floorName, type Weather } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 import { historyHtml, type EditList } from './core.ts';
 
-// The edit mode's frame around the world: the top bar (land, floor, hour and
-// weather, what the editor marks, drafts and Publish, Done) and the status
+// The edit mode's frame around the world: the top bar (land, World or Plan
+// camera, floor, hour and weather, what the editor marks, drafts and Publish, Done) and the status
 // strip (what is under the pointer, the last thing that happened, Undo and
 // Redo). The game's own HUD steps back while the editor is open (the
 // `editing` class on the page), so the world gets the room. Plain HTML from
@@ -11,7 +11,7 @@ import { historyHtml, type EditList } from './core.ts';
 
 /** The hours the editor can show a land at, as phases of the day (sky.ts: dawn from 5, day from 7, dusk from 18, night from 20). */
 export const PREVIEW_HOURS: Record<string, { name: string; phase?: number }> = {
-  '': { name: 'The hour it is' },
+  '': { name: 'Hour: now' },
   dawn: { name: 'Dawn', phase: 6 / 24 },
   day: { name: 'Midday', phase: 12 / 24 },
   dusk: { name: 'Dusk', phase: 19 / 24 },
@@ -20,6 +20,27 @@ export const PREVIEW_HOURS: Record<string, { name: string; phase?: number }> = {
 /** The weather the editor can show a land in ('' is as it is). */
 export const PREVIEW_WEATHER: (Weather | '')[] = ['', 'clear', 'cloudy', 'rain', 'storm', 'fog', 'snow', 'sandstorm'];
 
+/** The hour and weather the editor shows a land in ('' and none: as they are). */
+export interface SkyChoice {
+  hour: string;
+  weather?: Weather;
+}
+
+/** Sets the hour or the weather chosen (left as they were when not given); what the scene's previewSky is asked to show. */
+export function chooseSky(sky: SkyChoice, hour?: string, weather?: string): { phase?: number; weather?: Weather } {
+  if (hour !== undefined) sky.hour = Object.hasOwn(PREVIEW_HOURS, hour) ? hour : '';
+  if (weather !== undefined) sky.weather = (PREVIEW_WEATHER as string[]).includes(weather) && weather ? (weather as Weather) : undefined;
+  const phase = PREVIEW_HOURS[sky.hour]?.phase;
+  return { ...(phase !== undefined ? { phase } : {}), ...(sky.weather ? { weather: sky.weather } : {}) };
+}
+
+/** What the status strip says after a change was sent. */
+export function doneWords(action: object, live: boolean): string {
+  return 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.'
+    : 'publish' in action ? 'Published. Everyone here sees it now.' : 'discard' in action ? 'Drafts thrown away. Redo brings them back.'
+    : live ? 'Done. Everyone here sees it now.' : 'Drafted. Only editors see it until you publish.';
+}
+
 /** What the top bar shows. */
 export interface BarState {
   /** The land whose edits the editor works on. */
@@ -27,7 +48,9 @@ export interface BarState {
   /** The floor shown, and whether it is chosen (false: it follows the one we stand on). */
   floor: number;
   floorChosen: boolean;
-  sky: { hour: string; weather?: Weather };
+  sky: SkyChoice;
+  /** The camera looking: the World or the Plan. */
+  camera: 'world' | 'plan';
   showGrid: boolean;
   showHitboxes: boolean;
   list: EditList;
@@ -59,14 +82,17 @@ export function barHtml(s: BarState): string {
       ${s.floorChosen ? '<button type="button" class="quiet" data-floor-mine title="Show the floor you stand on again">My floor</button>' : ''}
     </span>`;
   const hours = Object.entries(PREVIEW_HOURS).map(([id, h]) => option(id, h.name, s.sky.hour === id)).join('');
-  const weathers = PREVIEW_WEATHER.map((w) => option(w, w === '' ? 'Weather as it is' : w[0]!.toUpperCase() + w.slice(1), (s.sky.weather ?? '') === w)).join('');
+  const weathers = PREVIEW_WEATHER.map((w) => option(w, w === '' ? 'Weather: now' : w[0]!.toUpperCase() + w.slice(1), (s.sky.weather ?? '') === w)).join('');
   const sky = `<span class="sky-pick" title="See the land at another hour or in other weather. Only you see this.">
       <select name="view-hour" aria-label="See it at">${hours}</select><select name="view-weather" aria-label="In weather">${weathers}</select></span>`;
   const marks = `<span class="view-toggles">
       <label class="toggle" title="Thin lines around every tile near you"><input type="checkbox" name="tile-grid"${s.showGrid ? ' checked' : ''} /> Tiles</label>
       <label class="toggle" title="Tiles nobody can walk on"><input type="checkbox" name="hitboxes"${s.showHitboxes ? ' checked' : ''} /> Hitboxes</label></span>`;
+  const camera = `<span class="seg camera-pick" role="group" aria-label="Camera" title="Switch cameras (Tab)">${([['world', 'World'], ['plan', 'Plan']] as const).map(([id, name]) =>
+    `<button type="button" data-camera="${id}" class="${s.camera === id ? 'on' : 'quiet'}" aria-pressed="${s.camera === id}">${name}</button>`).join('')}</span>`;
+  // The plan has its own tiles and hitboxes switches, and no sky.
   return `<span class="land-name" title="The land you are editing">✎ <b>${escapeHtml(s.land)}</b></span>
-    ${floor}${sky}${marks}<span class="spacer"></span>${draftsPillHtml(s.list, s.live, s.busy)}
+    ${camera}${floor}${s.camera === 'world' ? `${sky}${marks}` : ''}<span class="spacer"></span>${draftsPillHtml(s.list, s.live, s.busy)}
     <button type="button" class="quiet done" data-done title="Close the editor (Esc)">Done <kbd>Esc</kbd></button>`;
 }
 

@@ -476,6 +476,38 @@ describe('the Art tab', () => {
     expect(refused.body.message).toMatch(/budget is spent/);
   });
 
+  it('generates an angle turnaround prompt over the admin API', async () => {
+    const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+    const res = await api(base, '/api/admin/art/angle-prompt', owner.token, 'POST', {
+      walker: 'desert-scarab',
+      sourceDirection: 'front-right',
+      targetDirection: 'front-left',
+      referenceType: 'standing',
+      targetType: 'standing',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.prompt).toContain('Sun Scarab');
+    expect(res.body.sourceLabel).toBe('towards us, right');
+    expect(res.body.targetLabel).toBe('towards us, left');
+    expect(res.body.rotationSummary).toContain('90° counter-clockwise');
+
+    const badDir = await api(base, '/api/admin/art/angle-prompt', owner.token, 'POST', {
+      walker: 'desert-scarab',
+      sourceDirection: 'invalid-way',
+      targetDirection: 'front-left',
+    });
+    expect(badDir.status).toBe(400);
+
+    const sameDir = await api(base, '/api/admin/art/angle-prompt', owner.token, 'POST', {
+      walker: 'desert-scarab',
+      sourceDirection: 'front-left',
+      targetDirection: 'front-left',
+    });
+    expect(sameDir.status).toBe(400);
+  });
+
   it('shows a request held back by the model\'s rate limit as waiting, and paints it after a restart', async () => {
     const shippedArt = await shippedManifest(await tmp());
     const once = () => new MemoryPaintQueue({ limit: () => ({ perMinute: 1, atOnce: 1 }) });

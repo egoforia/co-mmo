@@ -1,6 +1,20 @@
 import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ITEMS, TURNED, WishError, engineModId, isFacing, movingArt, skyWords, wishProgress, type Role } from '@co-mmo/shared';
+import {
+  ITEMS,
+  TURNED,
+  WishError,
+  engineModId,
+  isFacing,
+  movingArt,
+  skyWords,
+  wishProgress,
+  type Role,
+  ISO_WAYS,
+  type IsoWay,
+  type AngleReferenceType,
+  type AngleTargetType,
+} from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { buildingsOverview } from './art-buildings.ts';
 import type { KitHouses } from './assets/building-kit/kit-houses.ts';
@@ -584,6 +598,28 @@ export async function handleAdmin(
       if (route === 'art/adopt-denied-walk' && method === 'POST') {
         const done = await ctx.art.adoptDeniedClip(String(body?.walker ?? ''), String(body?.body ?? 'two-legged'), String(body?.direction ?? ''), Boolean(body?.retry));
         return json(res, 200, { ok: done }), true;
+      }
+      if (route === 'art/angle-prompt' && method === 'POST') {
+        const walker = String(body?.walker ?? '');
+        const sourceDirection = String(body?.sourceDirection ?? '') as IsoWay;
+        const targetDirection = String(body?.targetDirection ?? '') as IsoWay;
+        if (!ISO_WAYS.includes(sourceDirection) || !ISO_WAYS.includes(targetDirection)) {
+          return json(res, 400, { error: 'bad_request', message: 'Source and target direction must be one of the four isometric ways.' }), true;
+        }
+        if (sourceDirection === targetDirection) {
+          return json(res, 400, { error: 'bad_request', message: 'Target direction must be one of the other 3 isometric angles.' }), true;
+        }
+        const referenceType = (body?.referenceType === 'clip' ? 'clip' : 'standing') as AngleReferenceType;
+        const targetType = (body?.targetType === 'clip' ? 'clip' : 'standing') as AngleTargetType;
+        const resPrompt = ctx.art.anglePrompt({
+          walker,
+          sourceDirection,
+          targetDirection,
+          referenceType,
+          targetType,
+          body: typeof body?.body === 'string' ? body.body : undefined,
+        });
+        return json(res, 200, { ok: true, ...resPrompt }), true;
       }
       if (route === 'art/restore-view' && method === 'POST') {
         await ctx.art.restoreView(String(body?.walker ?? ''), String(body?.direction ?? ''), String(body?.version ?? ''));

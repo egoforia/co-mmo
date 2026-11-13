@@ -167,6 +167,7 @@ export function waysHtml(w: WalkerView): string {
     const versions = view.url || view.versions.length ? `<button type="button" class="quiet" data-view-versions="${esc(w.id)}" data-direction="${d}">${view.versions.length ? `Picture versions (${view.versions.length + 1})` : 'What made the picture'}</button>` : '';
     const older = (strip?.versions.length ?? 0) || (w.lost[d]?.length ?? 0);
     const walkVersions = strip || older ? `<button type="button" class="quiet" data-walk-versions="${esc(w.id)}" data-direction="${d}">${older ? `Walk versions (${older + (strip ? 1 : 0)})` : 'What made the walk'}</button>` : '';
+    const anglePrompt = view.url || strip ? `<button type="button" class="quiet" data-angle-prompt="${esc(JSON.stringify({ walker: w.id, direction: d }))}">Turn to other angles (prompt)</button>` : '';
     const clip = view.url ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'clip', walker: w.id, body: w.body ?? 'two-legged', direction: d }))}" data-walker-body>${strip ? 'Make clip again' : 'Make walk clip'} · about ${usd(w.clipUsd)}</button>` : '';
     const queueClip = view.url && !strip ? queueButtonHtml({ kind: 'clip', targetId: w.id, direction: d, body: w.body ?? 'two-legged', label: `Walk clip: ${w.name} (${label})`, category: 'Walk Clips', estimateUsd: w.clipUsd }) : '';
     const denied = w.denied?.[d];
@@ -182,7 +183,7 @@ export function waysHtml(w: WalkerView): string {
         <div class="standing">${view.url ? `<img src="${esc(view.url)}" alt="" loading="lazy">` : '<span class="ph">?</span>'}<small>${esc(label)}${found ? ` · ${found}` : ''}</small></div>
         ${stripHtml(strip, label, 110)}
         ${deniedNotice}
-        <div class="card-actions"><button type="button" data-art-review="${esc(JSON.stringify({ what: 'view', walker: w.id, direction: d }))}">${view.url ? 'Paint again' : 'Paint'} · about ${usd(w.viewUsd)}</button>${versions}${clip}${queueClip}${walkVersions}${view.url ? `<button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [id] }))}">Find hands again</button>` : ''}</div>
+        <div class="card-actions"><button type="button" data-art-review="${esc(JSON.stringify({ what: 'view', walker: w.id, direction: d }))}">${view.url ? 'Paint again' : 'Paint'} · about ${usd(w.viewUsd)}</button>${versions}${clip}${queueClip}${walkVersions}${anglePrompt}${view.url ? `<button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [id] }))}">Find hands again</button>` : ''}</div>
       </div>`;
   };
   const summary = [missing ? `${4 - missing} of 4 painted` : '', walking ? `walks ${walking} of 4` : ''].filter(Boolean).join(', ');
@@ -192,6 +193,7 @@ export function waysHtml(w: WalkerView): string {
       <div class="card-actions">
         <button type="button" data-art-review="${esc(JSON.stringify({ what: 'ways', walker: w.id }))}">${missing === 4 ? 'Paint the four ways together' : 'Paint all four again, together'} · about ${usd(w.viewUsd)}</button>
         ${queueButtonHtml({ kind: 'ways', targetId: w.id, label: `4-Way Turnaround: ${w.name}`, category: '4-Way Views', estimateUsd: w.viewUsd }, '+ Queue 4-Way Sheet')}
+        <button type="button" class="quiet" data-angle-prompt="${esc(JSON.stringify({ walker: w.id }))}">Turn to other angles (prompt)</button>
       </div>
       <div class="walks">${WAYS.map(way).join('')}</div>
     </section>`;

@@ -123,6 +123,10 @@ let lastHarmonized: {
   usd: number;
 } | null = null;
 
+export function hasDirectorState(): boolean {
+  return directorState !== null;
+}
+
 export async function loadArtDirector(): Promise<StyleDirectorOverview> {
   directorState = await artState.ctx.api<StyleDirectorOverview>('art/director');
   return directorState;

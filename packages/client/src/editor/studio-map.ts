@@ -74,6 +74,10 @@ async function mapApi<T>(path: string, method = 'GET', body?: unknown): Promise<
   return json as T;
 }
 
+export function hasMapEditorData(): boolean {
+  return state.data !== null;
+}
+
 /** Loads a land's map and edits for the Studio. */
 export async function loadMapEditorData(region = state.regionId): Promise<void> {
   if (region !== state.regionId) state.cell = 0;

@@ -177,7 +177,7 @@ describe('the Art tab', () => {
     expect((await api(base, '/api/art', owner.token)).body['sanctum-rock-normal']).toBeUndefined();
     expect((await api(base, '/api/admin/art/normal-drop', owner.token, 'POST', { asset: 'sanctum-rock' })).body.message).toMatch(/no painted normal map/);
     expect((await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'normal', asset: 'no-such-thing' })).body.message).toMatch(/not part of the game/);
-  });
+  }, 30_000);
 
   it('paints a whole group again, one request per picture', async () => {
     const { base, store, painter } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });

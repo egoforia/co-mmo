@@ -19,6 +19,7 @@ import {
   artDirectorPage,
   handleDirectorClick,
   handleDirectorSubmit,
+  hasDirectorState,
   loadArtDirector,
 } from './art-ui/art-director.ts';
 import { buildingsPage, footprintSubmit, loadBuildings } from './art-ui/buildings.ts';
@@ -46,6 +47,7 @@ import {
   handleMapEditorChange,
   handleMapEditorClick,
   handleMapEditorSubmit,
+  hasMapEditorData,
   loadMapEditorData,
   mapEditorPage,
   mountMapEditorCanvas,
@@ -54,6 +56,7 @@ import { collectMissingGaps, handleMissingClick, missingPage } from './art-ui/mi
 import {
   handleModelsChange,
   handleModelsSubmit,
+  hasModelsState,
   loadArtModels,
   modelsPage,
 } from './art-ui/models.ts';
@@ -123,24 +126,27 @@ export function afterArtRender(): void {
 }
 
 /** Renders the AI Art Studio page as HTML. */
-export async function artPage(context: ArtContext): Promise<string> {
+export async function artPage(context: ArtContext, force = false): Promise<string> {
   artState.ctx = context;
-  let asked: { questions: HandQuestion[]; mirrored?: Record<string, string> };
-  [artState.data, artState.points, asked] = await Promise.all([
-    context.api<ArtOverview>('art'),
-    fetch('/api/art-points').then((r) => (r.ok ? r.json() : {}), () => ({})),
-    context.api<{ questions: HandQuestion[]; mirrored?: Record<string, string> }>('art/hands').catch(() => ({ questions: [] })),
-    loadHandStatus(context),
-    loadUpNext(),
-  ]);
-  artState.questions = asked.questions;
-  artState.mirrored = asked.mirrored ?? {};
+  if (force || !artState.data) {
+    let asked: { questions: HandQuestion[]; mirrored?: Record<string, string> };
+    [artState.data, artState.points, asked] = await Promise.all([
+      context.api<ArtOverview>('art'),
+      fetch('/api/art-points').then((r) => (r.ok ? r.json() : {}), () => ({})),
+      context.api<{ questions: HandQuestion[]; mirrored?: Record<string, string> }>('art/hands').catch(() => ({ questions: [] })),
+      loadHandStatus(context),
+      loadUpNext(),
+    ]);
+    artState.questions = asked.questions;
+    artState.mirrored = asked.mirrored ?? {};
+  }
   const o = artState.data;
   const { sub, page } = where();
-  if (sub === 'buildings' || sub === 'looks') await loadBuildings();
-  if (sub === 'art-director') await loadArtDirector();
-  if (sub === 'map-editor') await loadMapEditorData();
-  if (sub === 'models') await loadArtModels();
+  if ((force || !artState.buildings) && (sub === 'buildings' || sub === 'looks')) await loadBuildings();
+  if ((force || !hasDirectorState()) && sub === 'art-director') await loadArtDirector();
+  if ((force || !hasMapEditorData()) && sub === 'map-editor') await loadMapEditorData();
+  if ((force || !hasModelsState()) && sub === 'models') await loadArtModels();
+  if ((force || !artState.upNext) && sub === 'queue') await loadUpNext();
 
   const stagedCount = (artState.upNext?.items.filter((i) => i.status === 'staged').length ?? 0);
   const missingCount = collectMissingGaps().length;

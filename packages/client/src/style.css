@@ -1,3 +1,4 @@
+@import './editor/asset-picker.css';
 :root {
   --ink: #ffffff;
   --muted: #c0cbdc;
@@ -642,3 +643,5 @@ body.has-mini-map-min #quests { top: 92px; }
   body.has-mini-map #quests { top: 292px; }
 }
 #stats-line .status-icon { width: 16px; height: 16px; vertical-align: -3px; }
+#editor .asset-choice { background: rgba(255, 255, 255, 0.06); color: var(--ink); border: 1px solid var(--edge); border-radius: 4px; }
+#editor .asset-choice:hover { border-color: #f2dc6b; }

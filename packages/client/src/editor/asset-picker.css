@@ -1,0 +1,31 @@
+/* The world editor's asset picker (editor/asset-picker.ts) and its picture buttons, in the game and the Art Studio. */
+.asset-picker { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(8, 6, 16, 0.55); font: 13px/1.35 ui-monospace, Menlo, Consolas, monospace; color: #fff; }
+.asset-picker[hidden] { display: none; }
+.asset-picker .asset-box { width: min(920px, calc(100vw - 32px)); height: min(620px, calc(100vh - 32px)); display: flex; flex-direction: column; background: #1c1830; border: 1px solid #5a6988; border-radius: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); overflow: hidden; }
+.asset-picker header { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid #5a6988; }
+.asset-picker header input { flex: 1; min-width: 0; padding: 6px 8px; background: #120f20; color: #fff; border: 1px solid #5a6988; border-radius: 4px; font: inherit; }
+.asset-picker button { font: inherit; color: #fff; background: #2a2440; border: 1px solid #5a6988; border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+.asset-picker button.on { background: #f2b33d; color: #1c1830; border-color: #f2b33d; }
+.asset-picker .asset-filters { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px; }
+.asset-picker .asset-body { flex: 1; display: grid; grid-template-columns: 1fr 260px; min-height: 0; }
+.asset-picker .asset-grid { list-style: none; margin: 0; padding: 8px 12px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; align-content: start; }
+.asset-picker .asset-grid li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border: 1px solid #3a3456; border-radius: 6px; background: #241f3a; cursor: pointer; }
+.asset-picker .asset-grid li:hover { border-color: #f2dc6b; }
+.asset-picker .asset-grid li.chosen { border-color: #6fd08c; box-shadow: 0 0 0 1px #6fd08c inset; }
+.asset-picker .asset-grid li.none { grid-column: 1 / -1; cursor: default; color: #c0cbdc; }
+.asset-picker .asset-grid img { width: 88px; height: 88px; object-fit: contain; }
+.asset-picker .asset-grid .name { font-size: 11px; text-align: center; color: #c0cbdc; overflow-wrap: anywhere; }
+.asset-picker .asset-grid .keep { position: absolute; top: 2px; right: 2px; padding: 0 4px; background: transparent; border: none; color: #c0cbdc; }
+.asset-picker .asset-grid .keep.on { color: #f2dc6b; }
+.asset-picker .unpainted { display: flex; align-items: center; justify-content: center; text-align: center; width: 88px; height: 88px; font-size: 11px; color: #c0cbdc; border: 1px dashed #5a6988; border-radius: 4px; }
+.asset-picker .asset-preview { border-left: 1px solid #5a6988; padding: 12px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.asset-picker .asset-preview img { width: 100%; max-height: 300px; object-fit: contain; background: #120f20; border-radius: 4px; }
+.asset-picker .asset-preview p.unpainted { width: auto; height: 120px; padding: 8px; }
+.asset-picker .note { color: #c0cbdc; font-size: 12px; }
+@media (max-width: 700px) { .asset-picker .asset-body { grid-template-columns: 1fr; } .asset-picker .asset-preview { display: none; } }
+
+/* A picture choice in a form: the picture and its name on one button. */
+.asset-field { width: 100%; }
+.asset-choice { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 4px 8px; cursor: pointer; }
+.asset-choice img, .asset-choice .unpainted { width: 40px; height: 40px; object-fit: contain; flex: none; }
+.asset-choice .unpainted { display: flex; align-items: center; justify-content: center; font-size: 8px; text-align: center; border: 1px dashed currentColor; border-radius: 3px; opacity: 0.7; }

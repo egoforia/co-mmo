@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { ARCH_TESTBED_REGION, Tile, generateRegion, newCharacter, type Storey } from '@co-mmo/shared';
 import { account, api, app } from '../test/helpers.ts';
-import { chooseTool, goLive, playWorld } from './harness.ts';
+import { chooseTool, goLive, pickAsset, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -169,7 +169,7 @@ describe('the world editor in a workshop land', () => {
     await page.fill('#editor input[name="name"]', 'Hesper');
     await page.fill('#editor input[name="greeting"]', 'Mind the forge, traveller.');
     await page.locator('#editor input[name="greeting"]').blur();
-    await page.selectOption('#editor select[name="look"]', 'frostpeak-kaen');
+    await pickAsset(page, 'look', 'frostpeak-kaen');
     await page.selectOption('#editor select[name="wares"]', 'tools:smithing');
     await page.check('#editor input[name="buys"]');
     await page.selectOption('#editor select[name="masters"]', 'smithing');

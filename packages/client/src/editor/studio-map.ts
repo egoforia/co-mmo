@@ -4,6 +4,8 @@ import { artState, esc, usd } from '../art-ui/state.ts';
 import { landsCard, layFile, makeLand, saveEdits } from './studio-lands.ts';
 import { EditorCore, draftsHtml, editListHtml, hereWords, historyHtml, type ToolStep } from './core.ts';
 import { groups, optionsHtml, railHtml, toolFor } from './rail.ts';
+import { pickFor } from './asset-picker.ts';
+import { loadArt } from './art-index.ts';
 
 // The world editor's second view: the Art Studio's map of a whole land
 // (Map Preview & Editor), seen from above, any floor, zoomed in or out, with
@@ -258,6 +260,8 @@ function wire(canvas: HTMLCanvasElement): void {
   // The inspector's sections stay folded or open as the tab is drawn again (a fold's toggle does not bubble).
   if (!foldsHeard) {
     foldsHeard = true;
+    // The pictures on the asset buttons show once the art is known.
+    void loadArt().then(() => artState.ctx.rerender());
     document.addEventListener('toggle', (event) => {
       const fold = event.target as HTMLElement;
       if (fold instanceof HTMLDetailsElement && fold.dataset.section && fold.closest('.studio-map')) core.inspector.toggled(fold.dataset.section, fold.open);
@@ -334,6 +338,7 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
   else if (d.mapZoom) zoom(d.mapZoom === 'in' ? 'in' : 'out');
   else if (d.away !== undefined) return void step(core.takeAway(state.floor)), true;
   else if (d.pick) return void step(core.pickAction(d.pick)), true;
+  else if (d.assetField) return pickFor(core, d.assetField, state.data.map, () => artState.ctx.rerender());
   else if (d.area) return void step(core.areaAction(d.area, d.value)), true;
   else if (d.undo !== undefined) return void send({ undo: true }), true;
   else if (d.redo !== undefined) return void send({ redo: true }), true;

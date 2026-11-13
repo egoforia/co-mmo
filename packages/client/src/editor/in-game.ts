@@ -9,7 +9,10 @@ import { findables, type FindSources } from './find-sources.ts';
 import { Finder } from './palette.ts';
 import { keyAction } from './edit-keys.ts';
 import { groupOf, groups, optionsHtml, railHtml, toolFor } from './rail.ts';
+import { Ghost } from './ghost.ts';
 import { LandControl } from './land-control.ts';
+import { loadArt } from './art-index.ts';
+import { pickFor } from './asset-picker.ts';
 import { takeShot } from './land-panel.ts';
 import { drawMarks, marksKey } from './marks.ts';
 import { PREVIEW_HOURS, PREVIEW_WEATHER, barHtml, stripHtml } from './shell.ts';
@@ -77,6 +80,7 @@ export class EditorUi {
   private readonly finder: Finder;
   /** The tool last used in each group, so a group's key brings it back. */
   private readonly lastTool: Partial<Record<string, ToolId>> = {};
+  private readonly ghost = new Ghost();
   private readonly land = new LandControl({
     core: this.core,
     scene: () => this.attached,
@@ -145,6 +149,7 @@ export class EditorUi {
       this.hitboxGraphics?.clear();
       this.gridGraphics?.clear();
       this.land.clear();
+      this.ghost.hide();
       this.drawnAt = '';
       this.attached?.viewFloor(undefined);
       this.attached?.previewEdits(this.listRegion);
@@ -156,6 +161,8 @@ export class EditorUi {
     this.follow();
     this.render();
     void this.reload();
+    // The pictures on the asset buttons show once the art is known.
+    void loadArt().then(() => this.render());
   }
 
   /** Chooses a tool, remembering it as its group's last. */
@@ -275,14 +282,21 @@ export class EditorUi {
     const at = scene.tileAt(p.x, p.y);
     if (!at) {
       this.outline?.clear();
+      this.ghost.hide();
       return this.readOut('');
     }
     const spot: TilePoint = [at.x, at.y];
     const level = this.levelIn(at.region);
-    this.readOut(hereWords(at.map, spot, level));
     if (kind === 'down' && !this.busy) void this.step(this.core.press(at.region, at.map, spot, level));
     else if (kind === 'drag') this.core.drag(at.region, at.map, spot);
-    strokeOutlines(this.outline, scene, at.map, this.core.outlines(at.region, at.map, spot, level));
+    // A making tool shows what it would make here, and whether it fits, before anything is sent.
+    const aim = kind === 'hover' ? this.core.aimAt(at.map, spot, level) : undefined;
+    const outlines = this.core.outlines(at.region, at.map, spot, level).map((o) => (aim?.problem && o.tone !== 'held' ? { ...o, tone: 'warn' as const } : o));
+    strokeOutlines(this.outline, scene, at.map, outlines);
+    const box = outlines.at(-1);
+    if (aim && box) this.ghost.show(scene, at.map, box, aim.art, aim.character);
+    else this.ghost.hide();
+    this.readOut(`${aim ? (aim.problem ? `✗ ${aim.problem} · ` : '✓ It fits here · ') : ''}${hereWords(at.map, spot, level)}`);
   }
 
   /** Says what is under the pointer in the status strip, without drawing the rest again. */
@@ -392,6 +406,7 @@ export class EditorUi {
     if (d.discard !== undefined) return this.act({ discard: true });
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.listRegion)));
     if (d.pick) return this.step(this.core.pickAction(d.pick));
+    if (d.assetField) return void pickFor(this.core, d.assetField, this.attached?.landMap(this.listRegion), () => this.render());
     if (d.area) return this.step(this.core.areaAction(d.area, d.value));
     if (d.shot !== undefined) return this.attached ? takeShot(this.attached, this.options.region().id, (w) => this.render(w)) : this.render('The game is not running yet.');
     if (d.go !== undefined) return this.goTo(Number(d.go));

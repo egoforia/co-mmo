@@ -19,7 +19,7 @@ export const SPAWN: EditKind<'spawn'> = {
       type: 'choice',
       choices: (ctx) => Object.entries(ctx.creatures)
         .sort(([, a], [, b]) => a.name.localeCompare(b.name))
-        .map(([id, c]) => ({ id, name: c.level ? `${c.name} (level ${c.level})` : c.name })),
+        .map(([id, c]) => ({ id, name: c.level ? `${c.name} (level ${c.level})` : c.name, art: c.art, size: [1, 1] as [number, number] })),
     },
     { key: 'count', label: 'How many', type: 'number', min: 1, max: MAX_SPAWN, default: 4 },
     ...WAYS_FIELDS,

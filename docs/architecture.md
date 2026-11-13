@@ -299,7 +299,14 @@ tool's settings, what Select picked, or, with nothing picked, the land panel
 (`land-panel.ts`, run by `land-control.ts`): Changes (drafts, published and
 built in, `changes.ts`, hover to outline, Go, a filter by group), Places
 (bookmarks, Bookmark this view with Ctrl D), Checks (run again after each
-change, the places they name marked red) and Land (its settings). `world-input.ts`
+change, the places they name marked red) and Land (its settings). A choice
+whose items carry `art` (and `size`) is a thing to place: the forms draw it as a
+picture button and `asset-picker.ts` offers it as pictures (search, Kept,
+Recent, In this land, Not painted yet, a large preview), its pictures read from
+the art manifests by `art-index.ts`. A one-click making tool shows a
+see-through ghost of what it would stand under the pointer (`ghost.ts`) and
+the server's own check of that spot in the status strip (`EditorCore.aimAt`).
+`world-input.ts`
 wires the pointer, wheel and frames, and `marks.ts` draws the hitboxes and tile wireframe. Their outlines and the
 Studio's tile plan are the editor's own marks, seen only while it is open,
 never game art. The redesign plan it follows step by step:

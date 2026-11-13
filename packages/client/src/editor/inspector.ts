@@ -144,6 +144,11 @@ export class Inspector {
     return true;
   }
 
+  /** One setting of a section as it is now. */
+  value(kind: EditKindId, key: string): FieldValue | undefined {
+    return this.values[kind]?.[key];
+  }
+
   /** True when changing this input can show or hide another of its section. */
   redraws(name: string): boolean {
     const [kindId] = this.input(name);

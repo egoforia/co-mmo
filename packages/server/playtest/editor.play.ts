@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser } from 'playwright';
 import { Tile, generateRegion, newCharacter, regionDef, type RegionMap } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
-import { chooseTool, goLive, playWorld } from './harness.ts';
+import { chooseTool, goLive, pickAsset, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -114,7 +114,7 @@ describe('the world editor', () => {
 
     // Monsters to the south.
     await chooseTool(page, 'spawn');
-    await page.selectOption('#editor select[name="creature"]', 'lantern-moth');
+    await pickAsset(page, 'creature', 'lantern-moth');
     const before = app!.world.home.creatureIds().length;
     await clickTile(2, 5);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(3);

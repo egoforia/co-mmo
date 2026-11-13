@@ -42,6 +42,14 @@ const SEEN: Record<IsoWay, string> = {
   'back-right': "in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us",
 };
 
+/** Direction descriptions tailored to four-legged animals and mounts, using quadruped anatomy. */
+const SEEN_QUADRUPED: Record<IsoWay, string> = {
+  'front-left': "in a three-quarter view from the front, facing diagonally toward the LOWER-LEFT corner of the picture: the muzzle, chest and four hooves point towards the viewer's left, exactly halfway between facing the viewer and a profile facing the left edge of the picture; their LEFT flank and front-left leg are nearer to us and their right flank further away",
+  'front-right': "in a three-quarter view from the front, facing diagonally toward the LOWER-RIGHT corner of the picture: the muzzle, chest and four hooves point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT flank and front-right leg are nearer to us and their left flank further away",
+  'back-left': "in a three-quarter view from behind, facing diagonally toward the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back, rump, and the back of the head, the muzzle hidden; their LEFT flank is nearer to us",
+  'back-right': "in a three-quarter view from behind, facing diagonally toward the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back, rump, and the back of the head, the muzzle hidden; their RIGHT flank is nearer to us",
+};
+
 /** The mirror of each isometric way, which the image model kept painting instead. */
 const WRONG_CORNER: Record<IsoWay, string> = {
   'front-left': 'facing the lower-right corner',
@@ -114,15 +122,29 @@ export { TURNTABLE_WAYS };
 
 /** The prompt that makes a standing picture walk in place and come back to the same pose. */
 export function walkVideoPrompt(gear: Carried[], direction: IsoWay, body = 'two-legged'): string {
+  const isQuadruped = body === 'four-legged';
   // Clips drifted out of the three-quarter turn and slid their feet, so both are spelled out.
-  const facing = `${SEEN[direction]}: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`;
-  // A crawler has no arms to swing; its legs move in turns instead.
-  const gait = body === 'two-legged' ? 'a brisk, cheerful walk with clear alternating steps and arms swinging' : 'a steady scuttle with its legs stepping in clear alternating sets';
+  const facing = isQuadruped
+    ? `${SEEN_QUADRUPED[direction]}: the creature's body strictly keeps exactly this three-quarter isometric diagonal turn the whole time, never turning square to the camera or rotating into a side profile/flank view, and every hoof that touches the ground stays planted where it lands until it lifts again, with no sliding`
+    : `${SEEN[direction]}: the body keeps exactly this three-quarter turn the whole time, never turning square to the camera or side-on, and a foot that touches the ground stays planted where it lands until it lifts again, with no sliding`;
+
+  // A crawler has no arms to swing; its legs move in turns instead. Quadrupeds step in alternating diagonal pairs.
+  const gait = body === 'two-legged'
+    ? 'a brisk, cheerful walk with clear alternating steps and arms swinging'
+    : isQuadruped
+      ? 'a steady four-legged quadruped walk with legs stepping in alternating pairs'
+      : 'a steady scuttle with its legs stepping in clear alternating sets';
+
+  const subject = isQuadruped ? 'creature' : 'character';
+  const walkLocomotion = isQuadruped
+    ? `walks in place along the isometric diagonal ${facing}: ${gait}.`
+    : `walks in place ${facing}, like on a treadmill: ${gait}.`;
+
   return [
-    `${STYLE.animation} The character from the image walks in place ${facing}, like on a treadmill: ${gait}.`,
+    `${STYLE.animation} The ${subject} from the image ${walkLocomotion}`,
     gear.length ? `Everything they carry stays in the same hand and on the same side of the body as in the image, held steady at the same angle. ${gearPlacement(gear, direction)}` : '',
-    'The camera is completely still: no zoom, no pan. The character stays in the centre of the picture at the same size and never turns.',
-    'The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one character, no one else. No text. Keep the painted look of the image.',
+    `The camera is completely still: no zoom, no pan. The ${subject} stays in the centre of the picture at the same size and never turns.`,
+    `The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one ${subject}, no one else. No text. Keep the painted look of the image.`,
   ].filter(Boolean).join(' ');
 }
 

@@ -58,12 +58,49 @@ export function jobsHtml(jobs: ArtJob[], b: Budget): string {
     ${done.length ? `<details${open.length ? '' : ' open'}><summary>Painted lately (${done.length})</summary><table class="log jobs">${done.map(row).join('')}</table></details>` : '<p class="note">Nothing painted since the server started.</p>'}`;
 }
 
-/** Keeps Painting now fresh without touching anything else on the page. */
+const notifiedFailedJobIds = new Set<string>();
+let initialJobsLoaded = false;
+
+/** Resets the failed jobs notification state (used by tests). */
+export function resetNotifiedFailedJobs(): void {
+  notifiedFailedJobIds.clear();
+  initialJobsLoaded = false;
+}
+
+/**
+ * Checks for failed art jobs with HTTP 422 / validation errors and displays a toast message.
+ * Historical failures present on first load are suppressed to prevent toast spamming.
+ */
+export function notifyFailedJobs(jobs: ArtJob[], toast: (msg: string, bad?: boolean) => void): void {
+  if (!initialJobsLoaded) {
+    initialJobsLoaded = true;
+    for (const j of jobs) {
+      if (j.status === 'failed') notifiedFailedJobIds.add(j.id);
+    }
+    return;
+  }
+  for (const job of jobs) {
+    if (job.status === 'failed' && !notifiedFailedJobIds.has(job.id)) {
+      notifiedFailedJobIds.add(job.id);
+      const is422 = job.statusCode === 422 || (typeof job.reason === 'string' && (/\b422\b/.test(job.reason) || /unprocessable/i.test(job.reason) || /input validation failed/i.test(job.reason)));
+      if (is422) {
+        const detail = job.reason || 'Input validation failed';
+        const msg = detail.includes('422') || detail.toLowerCase().startsWith('validation')
+          ? detail
+          : `Validation failed (422): ${detail}`;
+        toast(msg, true);
+      }
+    }
+  }
+}
+
+/** Keeps Painting now fresh without touching anything else on the page, toasting on 422 errors. */
 export async function refreshArtJobs(context: ArtContext): Promise<void> {
-  const box = document.getElementById('art-jobs');
-  if (!box) return;
   const r = await context.api<{ jobs: ArtJob[]; budget: Budget }>('art/jobs').catch(() => null);
-  if (!r || !document.body.contains(box)) return;
+  if (!r) return;
+  notifyFailedJobs(r.jobs, context.toast);
+  const box = document.getElementById('art-jobs');
+  if (!box || !document.body.contains(box)) return;
   const open = box.querySelector('details')?.open;
   box.innerHTML = jobsHtml(r.jobs, r.budget);
   const details = box.querySelector('details');

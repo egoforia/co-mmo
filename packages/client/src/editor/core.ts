@@ -1,5 +1,7 @@
 import {
   BUILDING_STYLES,
+  CREATURES,
+  checkEdit,
   EDIT_KINDS,
   MAX_STROKE,
   SPOTS,
@@ -15,6 +17,7 @@ import {
   type BrushShape,
   type EditKind,
   type EditKindId,
+  type FieldChoice,
   type FieldValue,
   type Outline,
   type RegionMap,
@@ -25,7 +28,7 @@ import {
 } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 import { AreaTool } from './area.ts';
-import { fieldsHtml, filled, hasRules, readField } from './fields.ts';
+import { CONTEXT, fieldsHtml, filled, hasRules, readField } from './fields.ts';
 import { Inspector } from './inspector.ts';
 
 // The world editor's core, shared by its two views: the window beside the
@@ -73,6 +76,8 @@ export class EditorCore {
   private stroke: { region: string; level: number; tiles: Map<string, TilePoint>; from: TilePoint; kind?: EditKind<EditKindId> } | undefined;
   private held: { region: string; at: TilePoint; what: string; target?: string } | undefined;
   private readonly area = new AreaTool();
+  /** The last aimAt, by land and a key of the tool, tile and settings. */
+  private aimed: { map: RegionMap; key: string; found: ReturnType<EditorCore['aim']> } | undefined;
   /** The Select tool: what is picked and how to change it. */
   readonly inspector = new Inspector();
 
@@ -138,6 +143,48 @@ export class EditorCore {
     if (!kind || !field) return false;
     (this.values[kind.kind] ??= {})[key] = readField(field, raw, checked);
     return true;
+  }
+
+  /** A picture choice's setting by its input's name (the tool's, the inspector's or a form's): its label, choices and value now. */
+  assetChoices(name: string): { label: string; choices: FieldChoice[]; value: string } | undefined {
+    const [head, kindId, key] = name.split('.');
+    const prefixed = (head === 'form' || head === 'insp') && kindId && Object.hasOwn(EDIT_KINDS, kindId);
+    const kind = prefixed ? (EDIT_KINDS[kindId as EditKindId] as unknown as EditKind<EditKindId>) : this.kind();
+    const fieldKey = prefixed ? key : name;
+    const field = kind?.fields.find((f) => f.key === fieldKey);
+    if (!kind || !field || field.type !== 'choice') return undefined;
+    const value = head === 'insp' ? this.inspector.value(kind.kind, field.key) : this.settings(kind)[field.key];
+    return { label: field.label, choices: field.choices(CONTEXT), value: String(value ?? '') };
+  }
+
+  /**
+   * What a one-click making tool would make on a tile, before it is sent:
+   * why it would not fit (the server's own check, in words), and the picture
+   * it would stand there, for the ghost. Undefined for the other tools.
+   */
+  aimAt(map: RegionMap, at: TilePoint, level: number): { problem?: string; art?: string; character: boolean } | undefined {
+    const kind = this.kind();
+    if (!kind || kind.pointer !== 'click' || this.holding()) return undefined;
+    const values = this.settings(kind);
+    // The pointer moves many times over one tile: the check runs once per tile, land and settings.
+    const key = `${kind.kind}|${at[0]},${at[1]},${level}|${JSON.stringify(values)}`;
+    if (this.aimed?.map === map && this.aimed.key === key) return this.aimed.found;
+    const found = this.aim(kind, map, at, level, values);
+    this.aimed = { map, key, found };
+    return found;
+  }
+
+  private aim(kind: EditKind<EditKindId>, map: RegionMap, at: TilePoint, level: number, values: Record<string, FieldValue>): { problem?: string; art?: string; character: boolean } {
+    const draft = kind.make({ at }, values) as WorldEditDraft;
+    let problem: string | undefined;
+    try {
+      problem = checkEdit(map, kind.onFloors ? { ...draft, level } : draft, CREATURES);
+    } catch {
+      // A check that cannot read the draft yet says nothing; the server checks again when it is sent.
+    }
+    const pictured = kind.fields.find((f) => f.type === 'choice' && f.choices(CONTEXT).some((c) => c.art));
+    const art = pictured?.type === 'choice' ? pictured.choices(CONTEXT).find((c) => c.id === values[pictured.key])?.art : undefined;
+    return { ...(problem ? { problem } : {}), ...(art ? { art } : {}), character: kind.kind === 'person' || kind.kind === 'spawn' };
   }
 
   /** A kind's own settings drawn outside its tool (the land panel's Land tab), inputs named `form.<kind>.<key>`. */

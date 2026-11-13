@@ -83,3 +83,9 @@ export async function giveFloors(page: import('playwright').Page, at: { x: numbe
   await page.selectOption('#editor select[name="insp.floors.down"]', String(down));
   await page.click('#editor [data-pick="apply:floors"]');
 }
+
+/** Chooses a thing to place from the asset picker's pictures, as an editor does. */
+export async function pickAsset(page: import('playwright').Page, field: string, id: string, root = '#editor'): Promise<void> {
+  await page.click(`${root} [data-asset-field="${field}"]`);
+  await page.click(`.asset-picker [data-asset="${id}"]`);
+}

@@ -298,6 +298,45 @@ export const SHOTS: Shot[] = [
     mustSee: ['the Checks tab chosen, with Shapes, Walks and Not painted yet, each saying all is well or listing what it found', 'when something is listed, the Checks tab shows a count and red squares mark those places in the world'],
   },
   {
+    name: 'editor-asset-picker',
+    about: "The world editor's asset picker, opened from the Person tool's \"Looks like\", with the pointer over a picture.",
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="life"]');
+      await page.click('#editor [data-asset-field="look"]');
+      await page.waitForSelector('.asset-picker:not([hidden]) [data-asset]');
+      await page.hover('.asset-picker [data-asset]:nth-child(3)');
+      await page.waitForTimeout(800);
+    },
+    mustSee: [
+      'a picker over the editor: "Choose: Looks like", a search box, and filters All, Kept, Recent, In this land, Not painted yet',
+      'a grid of character pictures, each with its name and a star to keep it; the chosen one outlined in green',
+      'the hovered picture large on the right with its name and "Stands on 1 × 1 tile"',
+    ],
+  },
+  {
+    name: 'editor-ghost',
+    about: 'The Person tool in the world editor with the pointer over open ground: a see-through ghost of who would stand there and the check result.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="life"]');
+      await page.mouse.move(700, 520);
+      await page.mouse.move(720, 540, { steps: 4 });
+      await page.waitForTimeout(500);
+    },
+    mustSee: [
+      'a see-through figure standing on the tile under the pointer, the size of the player, with a yellow outline on its tile',
+      'the status strip starts with "✓ It fits here"',
+      'the Person form shows "Looks like" as a picture button',
+    ],
+  },
+  {
     name: 'editor-inspector',
     about: 'The world editor with the shop the player stands in selected: its inspector, with the Floors section unfolded.',
     region: 'sanctum',

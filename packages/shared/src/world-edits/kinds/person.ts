@@ -136,7 +136,7 @@ export const PERSON: EditKind<'person'> = {
   },
   fields: [
     { key: 'name', label: 'Name', type: 'text', max: PERSON_TEXT.name, default: 'A newcomer' },
-    { key: 'look', label: 'Looks like', type: 'choice', choices: () => PERSON_LOOKS },
+    { key: 'look', label: 'Looks like', type: 'choice', choices: () => PERSON_LOOKS.map((l) => ({ ...l, art: l.id, size: [1, 1] as [number, number] })) },
     { key: 'greeting', label: 'What they say', type: 'text', max: PERSON_TEXT.greeting, default: 'Well met, traveller.' },
     {
       key: 'wares', label: 'Sells', type: 'choice',

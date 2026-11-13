@@ -1,5 +1,6 @@
-import { CREATURES, type EditContext, type EditField, type FieldValue } from '@co-mmo/shared';
+import { CREATURES, type EditContext, type EditField, type FieldChoice, type FieldValue } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
+import { pictureFile } from './art-index.ts';
 
 // A kind's settings as the editor draws and reads them: the making tools'
 // forms and the inspector's sections both come from here. A field with a
@@ -33,6 +34,19 @@ export function readField(field: EditField, raw: string, checked?: boolean): Fie
   return raw;
 }
 
+/** A choice of a thing to place, as its picture and name on a button that opens the asset picker (`data-asset-field` names the setting). */
+export function assetChoiceHtml(label: string, name: string, chosen: FieldChoice | undefined): string {
+  const file = pictureFile(chosen?.art);
+  const picture = file ? `<img src="${escapeHtml(file)}" alt="" />` : '<span class="unpainted">Not painted yet</span>';
+  return `<label class="asset-field">${escapeHtml(label)} <button type="button" class="asset-choice" data-asset-field="${escapeHtml(name)}" title="Choose from the pictures">${picture}<span>${escapeHtml(chosen?.name ?? 'Choose…')}</span></button></label>`;
+}
+
+/** The choices of a setting, by its input's name in a kind's fields (with any prefix before the key). */
+export function choicesOf(fields: EditField[], key: string): FieldChoice[] {
+  const f = fields.find((x) => x.key === key);
+  return f?.type === 'choice' ? f.choices(CONTEXT) : [];
+}
+
 /** True when changing one setting can show or hide another, so the form is drawn again. */
 export function hasRules(fields: EditField[]): boolean {
   return fields.some((f) => f.when);
@@ -46,7 +60,12 @@ export function fieldsHtml(fields: EditField[], values: Record<string, FieldValu
     const name = `${prefix}${f.key}`;
     if (f.type === 'flag') return `<label class="check"><input type="checkbox" name="${name}"${v ? ' checked' : ''} /> ${escapeHtml(f.label)}</label>`;
     if (f.type === 'text') return `<label>${escapeHtml(f.label)} <input name="${name}" type="text" maxlength="${f.max}" value="${escapeHtml(String(v))}" /></label>`;
-    if (f.type === 'choice') return `<label>${escapeHtml(f.label)} <select name="${name}">${f.choices(CONTEXT).map((c) => option(c.id, c.name, c.id === v)).join('')}</select></label>`;
+    if (f.type === 'choice') {
+      const choices = f.choices(CONTEXT);
+      // Things placed in the world are chosen from their pictures (asset-picker.ts).
+      if (choices.some((c) => c.art)) return assetChoiceHtml(f.label, name, choices.find((c) => c.id === v));
+      return `<label>${escapeHtml(f.label)} <select name="${name}">${choices.map((c) => option(c.id, c.name, c.id === v)).join('')}</select></label>`;
+    }
     if (f.max - f.min <= SHORT_RANGE) {
       const counts = Array.from({ length: f.max - f.min + 1 }, (_, i) => f.min + i);
       return `<label>${escapeHtml(f.label)} <select name="${name}">${counts.map((n) => option(String(n), String(n), n === v)).join('')}</select></label>`;

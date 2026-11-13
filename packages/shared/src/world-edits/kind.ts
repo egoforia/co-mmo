@@ -44,6 +44,14 @@ export type EditPointer =
   /** Click a thing to pick it up, then where it goes. */
   | 'pick-then-click';
 
+/** One choice of a choice setting: its id and name, and for things placed in the world the picture it is (an art id) and the tiles it stands on, so an editor can offer it as a picture. */
+export interface FieldChoice {
+  id: string;
+  name: string;
+  art?: string;
+  size?: [width: number, depth: number];
+}
+
 /** What every setting has: its key, its label, and when it applies. */
 interface FieldBase {
   key: string;
@@ -54,7 +62,7 @@ interface FieldBase {
 
 /** One setting a tool offers beside the world, described so any editor can draw it. */
 export type EditField = FieldBase & (
-  | { type: 'choice'; choices: (ctx: EditContext) => { id: string; name: string }[]; default?: (ctx: EditContext) => string }
+  | { type: 'choice'; choices: (ctx: EditContext) => FieldChoice[]; default?: (ctx: EditContext) => string }
   | { type: 'number'; min: number; max: number; default: number }
   | { type: 'flag'; default: boolean }
   | { type: 'text'; max: number; default: string });

@@ -22,7 +22,7 @@ export const FURNITURE: EditKind<'furniture'> = {
   pointer: 'click',
   onFloors: true,
   fields: [
-    { key: 'asset', label: 'Piece', type: 'choice', choices: () => [...furniture()].map(([id, f]) => ({ id, name: f.name })).sort((a, b) => a.name.localeCompare(b.name)) },
+    { key: 'asset', label: 'Piece', type: 'choice', choices: () => [...furniture()].map(([id, f]) => ({ id, name: f.name, art: id, size: [f.width, f.depth] as [number, number] })).sort((a, b) => a.name.localeCompare(b.name)) },
     { key: 'walkable', label: 'Can be walked through', type: 'flag', default: false },
   ],
   shape: '{"kind":"furniture","asset":"<style>-furniture-<key>","at":[x,y],"footprint":[2,1]}',

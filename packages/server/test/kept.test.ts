@@ -16,7 +16,7 @@ let db: TestSql;
 beforeAll(async () => {
   db = await testSql();
 }, 30_000);
-beforeEach(() => db.reset());
+beforeEach(() => db.reset(), 30_000);
 afterAll(() => db.end());
 
 const kinds: [string, () => Promise<Kept>][] = [
@@ -117,5 +117,31 @@ describe('the painting log kept across a restart', () => {
       ['sanctum-rock', 'done'],
     ]);
     expect(after.list()[2]!.usd).toBe(0.039);
+  });
+
+  it('records and keeps statusCode when an art job fails with an HTTP error like 422', async () => {
+    const kept = new MemoryKept();
+    let t = 2000;
+    const log = new ArtJobs(() => t++, kept);
+
+    const handle = log.add('deep-crag-matriarch-walk', 'Deep Crag Matriarch walking', 'clip', 'gods-view', 0.20);
+    handle.fail('Input validation failed: input.resolution must be 480P or 768P', 422);
+
+    expect(handle.job.status).toBe('failed');
+    expect(handle.job.statusCode).toBe(422);
+    expect(handle.job.reason).toContain('480P');
+
+    // Run also catches and records statusCode on error
+    const handleRun = log.add('deep-crag-matriarch-run', 'Running', 'clip', 'gods-view', 0.20);
+    const err = Object.assign(new Error('Unprocessable Entity'), { status: 422 });
+    await expect(log.run(handleRun, async () => { throw err; })).rejects.toThrow('Unprocessable Entity');
+    expect(handleRun.job.status).toBe('failed');
+    expect(handleRun.job.statusCode).toBe(422);
+
+    await log.flush();
+    const restored = new ArtJobs(() => t++, kept);
+    await restored.restore();
+    const failedWalk = restored.list().find((j) => j.asset === 'deep-crag-matriarch-walk');
+    expect(failedWalk?.statusCode).toBe(422);
   });
 });

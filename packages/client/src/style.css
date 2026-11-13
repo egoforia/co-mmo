@@ -138,7 +138,11 @@ html, body {
 #toast {
   position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--accent);
-  padding: 10px 14px; font-size: 13px; max-width: calc(100vw - 32px); word-break: break-all;
+  padding: 10px 14px; font-size: 13px; max-width: calc(100vw - 32px); word-break: break-word;
+  z-index: 1000; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+#toast.bad {
+  border-color: #f6757a; color: #f6757a; background: #23161c;
 }
 
 /* --- RPG --------------------------------------------------------------- */

@@ -1,3 +1,4 @@
+import { wallBetween } from '../edge-walls.ts';
 import { floorChecks, floorName, otherEnd, stairwayAt } from '../floors.ts';
 import { isBlocking, tileAt, type RegionMap } from '../world.ts';
 import { kitProblems } from './kinds/kit.ts';
@@ -56,7 +57,8 @@ function walkable(map: RegionMap): Set<number> {
   visit(0, Math.floor(map.spawn.x), Math.floor(map.spawn.y));
   for (let i = 0; i < queue.length; i++) {
     const [floor, x, y] = queue[i]!;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) visit(floor, x + dx, y + dy);
+    // A wall on a tile's side (edge-walls.ts) stops the step across it.
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) if (!wallBetween(map, x, y, dx, dy, floor)) visit(floor, x + dx, y + dy);
     // Stepping onto stairs or a ladder carries you to its landing on the other floor (floors.ts walkOn).
     const stairs = stairwayAt(map, x + 0.5, y + 0.5, floor);
     if (stairs) {

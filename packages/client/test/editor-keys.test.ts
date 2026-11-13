@@ -40,6 +40,29 @@ describe('the sheet of keys', () => {
   });
 });
 
+describe('R and the Wall tool', () => {
+  it('turns the wall\'s side round, and back with Shift, only while a tool has a side', () => {
+    const core = new EditorCore();
+    expect(keyAction(key('r'), core, {})).toBeUndefined();
+    core.choose('wall');
+    expect(keyAction(key('r'), core, {})).toEqual({ turn: 1 });
+    expect(keyAction(key('R', { shiftKey: true }), core, {})).toEqual({ turn: -1 });
+    expect(core.settings().side).toBe('north');
+    expect(core.turn(1)).toBe('East (lower right)');
+    expect(core.turn(1)).toBe('South (lower left)');
+    expect(core.turn(-1)).toBe('East (lower right)');
+    expect(core.settings().side).toBe('east');
+  });
+
+  it('outlines the side of each tile it would wall, not the whole tile', () => {
+    const core = new EditorCore();
+    core.choose('wall');
+    core.turn(1);
+    const map = { width: 20, height: 20 } as never;
+    expect(core.outlines('a', map, [4, 4], 0)).toEqual([{ x: 4.8, y: 4, w: 0.2, h: 1 }]);
+  });
+});
+
 describe('the panel\'s width', () => {
   it('follows the drag, between its least and most, leaving the world room', () => {
     expect(panelWidth(400, 1600)).toBe(400);

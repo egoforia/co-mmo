@@ -4,6 +4,7 @@ export * from './random.ts';
 export * from './palette.ts';
 export * from './world.ts';
 export * from './movement.ts';
+export * from './edge-walls.ts';
 export * from './floors.ts';
 export * from './hit-boxes.ts';
 export * from './names.ts';

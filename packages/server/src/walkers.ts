@@ -1,4 +1,4 @@
-import { TICK_RATE, TICK_SECONDS, collides, pushOut, roomFor, type Among, isBlocking, outsideSide, stairsMiddle, stairsToward, stairwayAt, takeStairs, tileAt, type Placed, type RegionMap, type Tile } from '@co-mmo/shared';
+import { TICK_RATE, TICK_SECONDS, collides, wallBetween, pushOut, roomFor, type Among, isBlocking, outsideSide, stairsMiddle, stairsToward, stairwayAt, takeStairs, tileAt, type Placed, type RegionMap, type Tile } from '@co-mmo/shared';
 
 // How creatures and people move about a region: stepping toward a point,
 // strolling near a spot, running from someone, and finding a way around
@@ -200,7 +200,7 @@ export function findPath(map: RegionMap, from: Spot, to: Spot, floor = from.floo
     const y = (at - x) / w;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
       const n = (y + dy) * w + (x + dx);
-      if (!open(x + dx, y + dy) || came[n] !== -1) continue;
+      if (!open(x + dx, y + dy) || came[n] !== -1 || wallBetween(map, x, y, dx, dy, floor)) continue;
       came[n] = at;
       queue.push(n);
     }

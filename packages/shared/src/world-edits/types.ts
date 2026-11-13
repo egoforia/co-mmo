@@ -3,6 +3,7 @@
 // kinds so every kind, the server and the browser share one vocabulary.
 
 import type { BuildingSpec } from '../building-kit/spec.ts';
+import type { WallHeight, WallSide } from '../edge-walls.ts';
 import type { ShopDef } from '../kit.ts';
 import type { Routine } from '../routines.ts';
 import type { QuestGoal } from '../rpg.ts';
@@ -37,6 +38,8 @@ export interface EditPlace {
 export type WorldEditDraft = EditPlace & (
   /** Lays one kind of tile on these tiles; a path over water becomes a bridge. */
   | { kind: 'paint'; tile: PaintTile; tiles: TilePoint[] }
+  /** Stands a wall on one side of each tile, in a building look and a height, on the edit's floor; `down` takes those walls away instead. */
+  | { kind: 'wall'; side: WallSide; tiles: TilePoint[]; style: string; height: WallHeight; down?: boolean }
   /** Picks up the set piece, tree or rock at `from` and puts it down at `to`, or takes it away when `to` is null. */
   | { kind: 'move'; from: TilePoint; to: TilePoint | null }
   /** A two-tile road from one tile to another, across then down, bridging water. */

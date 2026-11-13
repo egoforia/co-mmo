@@ -390,6 +390,16 @@ or lays it again at another floor size from the same corner, keeping its name
 (`takeBuilding` in `kinds/remove.ts` clears what was inside). **Gathering**
 can scatter up to `MAX_SPOTS` spots round the one clicked (`count`).
 
+**Walls on a tile's side** are the `wall` kind (`kinds/wall.ts`): a side
+(north, east, south, west; the editor's R key turns it, from a choice field
+marked `turns`), a building look and a height, on each tile dragged over, or
+`down` to take them away. They live in `RegionMap.edgeWalls` as the edge they
+stand on (shared `edge-walls.ts`), so both tiles stay open: `collides` stops a
+body within `WALL_HALF_THICKNESS` of the line, and `wallBetween` closes the
+step for `findPath` and the land checks. The client stands each as one wall
+face of its look (`world-scene/edge-walls.ts`, the faces `rockWalls` uses),
+see-through while it stands in front of the player.
+
 **Quests** on people are the `quest` kind (`kinds/quest.ts`): defeat so many
 of a monster or bring so many of a thing, for experience and gold, given by
 the person clicked. Laid, a quest joins `QUESTS` as `<edit id>:quest` (as

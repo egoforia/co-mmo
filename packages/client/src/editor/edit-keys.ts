@@ -3,7 +3,7 @@ import { groupOf, groups, toolFor } from './rail.ts';
 
 // What a key does in edit mode, worked out apart from the page so it can be
 // read in one place (and tested): the finder, the picked thing's keys, a
-// group's letter, the camera's keys (Tab switches World and Plan), Esc, and undo and redo. The pan keys
+// group's letter, R to turn a wall, the camera's keys (Tab switches World and Plan), Esc, and undo and redo. The pan keys
 // (camera-keys.ts) are heard before these.
 
 /** What a key asks the editor to do. */
@@ -13,6 +13,7 @@ export type KeyAction =
   | { keys: true }
   | { pick: 'remove' | 'move' | 'copy' }
   | { tool: ToolId }
+  | { turn: 1 | -1 }
   | { home: true }
   | { zoom: 1 | -1 }
   | { escape: true }
@@ -35,6 +36,8 @@ export function keyAction(event: KeyboardEvent, core: EditorCore, lastTool: Part
     if (key === 'm' && plain) return { pick: 'move' };
     if (key === 'c' && ctrl) return { pick: 'copy' };
   }
+  // R turns the tool's side (a wall's), Shift R turns it back.
+  if (key === 'r' && plain && core.turns()) return { turn: event.shiftKey ? -1 : 1 };
   const group = plain && groups(core).find((g) => g.key === key);
   if (group) return { tool: toolFor(core, group, lastTool, groupOf(core, core.current().id)?.id === group.id) };
   if (key === 'home') return { home: true };

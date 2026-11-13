@@ -337,6 +337,38 @@ export const SHOTS: Shot[] = [
     ],
   },
   {
+    name: 'editor-wall',
+    about: 'The Wall tool in the world editor: an L of walls dragged as two lines, the second after R turned the side, with the pointer showing the next side to wall.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-tools~="wall"]');
+      await page.click('#editor [data-tool="wall"]');
+      await page.selectOption('#editor select[name="shape"]', 'line');
+      // Tiles are 80 by 40 pixels on screen here: a line east along the north sides, then R and a line south along the east sides.
+      const line = async (from: [number, number], to: [number, number]) => {
+        await page.mouse.move(...from);
+        await page.mouse.down();
+        await page.mouse.move(...to, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(800);
+      };
+      await line([440, 300], [600, 380]);
+      await page.keyboard.press('r');
+      await line([600, 380], [440, 460]);
+      await page.mouse.move(380, 520);
+      await page.waitForTimeout(1200);
+    },
+    mustSee: [
+      'two upright walls meeting in an L, painted in grey castle stone, as tall as the player: one running to the lower right, one to the lower left from its end',
+      'they stand on the lines between tiles, not filling whole tiles',
+      'the Wall tool chosen in the options bar under Build; the panel shows Side (East), a Look picture button (Mossgate Castle), Height, Shape and "Take walls down instead"',
+      'a thin yellow outline along one side of the tile under the pointer',
+    ],
+  },
+  {
     name: 'editor-inspector',
     about: 'The world editor with the shop the player stands in selected: its inspector, with the Floors section unfolded.',
     region: 'sanctum',

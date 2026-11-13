@@ -64,6 +64,7 @@ import { setStatusIcons } from './world-scene/status-icons.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
 import { Targeting } from './world-scene/targeting.ts';
 import { cullOffscreen } from './world-scene/cull.ts';
+import { seeThroughWalls } from './world-scene/edge-walls.ts';
 import {
   applyFloorView,
   drawNearChunks,
@@ -691,6 +692,7 @@ export class WorldScene extends Phaser.Scene {
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
     revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant, this.shownFloor);
+    seeThroughWalls([...this.drawn.values()].flatMap((r) => r.edgeWalls), this.origin.x + this.shown.x, this.origin.y + this.shown.y, this.shownFloor);
     this.applyFloor();
   }
 

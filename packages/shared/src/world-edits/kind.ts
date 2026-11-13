@@ -62,7 +62,8 @@ interface FieldBase {
 
 /** One setting a tool offers beside the world, described so any editor can draw it. */
 export type EditField = FieldBase & (
-  | { type: 'choice'; choices: (ctx: EditContext) => FieldChoice[]; default?: (ctx: EditContext) => string }
+  /** `turns`: the editor's R key steps it to the next choice (a wall's side), Shift R back. */
+  | { type: 'choice'; choices: (ctx: EditContext) => FieldChoice[]; default?: (ctx: EditContext) => string; turns?: boolean }
   | { type: 'number'; min: number; max: number; default: number }
   | { type: 'flag'; default: boolean }
   | { type: 'text'; max: number; default: string });
@@ -102,6 +103,8 @@ export interface EditKind<K extends EditKindId> {
   notes?(values: Record<string, FieldValue>): { ok: boolean; text: string }[];
   /** The tiles to outline under the pointer before it is used (one tile when left out); `use.from` is what was picked up or where a road starts. */
   outline?(map: RegionMap, use: ToolUse & { level: number }, values: Record<string, FieldValue>): Outline[];
+  /** How one tile of a stroke being dragged is outlined (the whole tile when left out): a wall's side. */
+  mark?(at: TilePoint, values: Record<string, FieldValue>): Outline;
   /** The draft a tool makes from where it was used and its settings. */
   make(use: ToolUse, values: Record<string, FieldValue>): DraftOf<K>;
   /** The draft as one JSON line, for the AI Map Architect's prompt. */

@@ -171,6 +171,7 @@ export class EditorUi {
     else if ('camera' in action) this.chooseCamera(this.cameras.other());
     else if ('pick' in action) void this.step(this.core.pickAction(action.pick));
     else if ('tool' in action) this.chooseTool(action.tool);
+    else if ('turn' in action) this.render(`Side: ${this.core.turn(action.turn)}.`);
     else if ('home' in action) this.cameras.home();
     else if ('zoom' in action) this.cameras.zoom(action.zoom);
     else if ('bookmark' in action) void this.land.bookmarkView();

@@ -1,3 +1,4 @@
+import type { EdgeWall } from './edge-walls.ts';
 import type { BiomeId } from './biomes.ts';
 import { rand2, valueNoise } from './random.ts';
 import { furnitureArt } from './buildings.ts';
@@ -306,6 +307,8 @@ export interface RegionMap {
   quests?: string[];
   /** Lights standing on their own (no piece to glow), laid by light edits. */
   lights?: PlacedLight[];
+  /** Walls standing on one side of a tile (edge-walls.ts), laid by wall edits. */
+  edgeWalls?: EdgeWall[];
 }
 
 /** A light standing on its own on a floor (light.ts): a glow with no picture of its own. */

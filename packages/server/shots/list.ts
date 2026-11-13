@@ -228,6 +228,31 @@ export const SHOTS: Shot[] = [
     ],
   },
   {
+    name: 'editor-free-camera',
+    about: 'The world editor with its camera moved away from the player and zoomed out one step, with the tile wireframe on around the middle of the screen.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor input[name="tile-grid"]');
+      await page.mouse.move(400, 400);
+      await page.mouse.wheel(0, 200);
+      // A right-drag pans (the keys pan too, but software drawing runs too few frames to show it here).
+      await page.mouse.move(600, 450);
+      await page.mouse.down({ button: 'right' });
+      await page.mouse.move(400, 450, { steps: 8 });
+      await page.mouse.up({ button: 'right' });
+      await page.waitForTimeout(1200);
+    },
+    mustSee: [
+      'the world seen from further out than editor-testbed, panned east: the player stands well left of the middle',
+      'the tile wireframe around the middle of the screen, not around the player',
+      'the status strip says the zoom (75%) and offers Back to me and Bring me here',
+      'the mini map centred on the camera rather than on the player',
+    ],
+  },
+  {
     name: 'editor-kit-form',
     about: 'The world editor in edit mode with the Kit building tool chosen, so its settings and shape checks show in the panel.',
     region: 'arch-testbed',

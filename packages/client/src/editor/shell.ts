@@ -87,10 +87,13 @@ export function draftsPillHtml(list: EditList, live: boolean, busy = false): str
       </div></details></span>`;
 }
 
-/** The status strip: what is under the pointer, the last thing that happened, chat, Undo and Redo. */
+/** The status strip: what is under the pointer, the last thing that happened, the camera's keys and buttons, chat, Undo and Redo. */
 export function stripHtml(s: StripState): string {
   return `<span class="here" aria-label="Under the pointer">${escapeHtml(s.here || 'Point at the world')}</span>
     <span class="status" aria-live="polite">${escapeHtml(s.status)}</span>
+    <span class="camera-keys note" title="W A S D or the arrow keys pan (Shift: faster), the wheel or + and − zoom, a right-drag pans">Pan WASD · Zoom wheel</span>
+    <button type="button" class="quiet" data-me title="The camera goes back to you (Home)">Back to me</button>
+    <button type="button" class="quiet" data-bring title="Moves you to the middle of the screen">Bring me here</button>
     <button type="button" class="quiet" data-chat aria-pressed="${s.chatOpen}" title="Show or hide the chat">Chat</button>
     ${historyHtml(s.list, s.busy)}`;
 }

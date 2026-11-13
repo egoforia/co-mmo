@@ -1,4 +1,4 @@
-import { Tile, isBlocking, tileAt, type Outline, type RegionMap, type WorldEditDraft } from '@co-mmo/shared';
+import { Tile, isBlocking, tileAt, wallBox, type Outline, type RegionMap, type WorldEditDraft } from '@co-mmo/shared';
 
 // The Plan camera's picture of a land: its tiles from above, one colour each
 // by biome, on any floor, with buildings outlined, walls on tiles' sides as
@@ -75,6 +75,15 @@ export function drawPlan(canvas: HTMLCanvasElement, p: PlanPicture): void {
   const thick = Math.max(2, c * 0.25) / c;
   for (const w of map.edgeWalls ?? []) {
     if (w.floor === floor) box(w.x - (w.along === 'v' ? thick / 2 : 0), w.y - (w.along === 'h' ? thick / 2 : 0), w.along === 'h' ? 1 : thick, w.along === 'v' ? 1 : thick);
+  }
+  // With Hitboxes on, the band each wall stops bodies in, in the blocked tiles' red.
+  if (layers.hitboxes) {
+    g.fillStyle = 'rgba(246, 117, 122, 0.85)';
+    for (const w of map.edgeWalls ?? []) {
+      if (w.floor !== floor) continue;
+      const b = wallBox(w);
+      box(b.x, b.y, b.w, b.h);
+    }
   }
   const dot = (x: number, y: number, colour: string) => {
     g.fillStyle = colour;

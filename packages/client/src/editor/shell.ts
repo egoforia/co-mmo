@@ -89,7 +89,7 @@ export function barHtml(s: BarState): string {
       <select name="view-hour" aria-label="See it at">${hours}</select><select name="view-weather" aria-label="In weather">${weathers}</select></span>`;
   const marks = `<span class="view-toggles">
       <label class="toggle" title="Thin lines around every tile near you"><input type="checkbox" name="tile-grid"${s.showGrid ? ' checked' : ''} /> Tiles</label>
-      <label class="toggle" title="Tiles nobody can walk on"><input type="checkbox" name="hitboxes"${s.showHitboxes ? ' checked' : ''} /> Hitboxes</label></span>`;
+      <label class="toggle" title="What nobody can walk through: blocked tiles, and walls on a tile's side"><input type="checkbox" name="hitboxes"${s.showHitboxes ? ' checked' : ''} /> Hitboxes</label></span>`;
   const camera = `<span class="seg camera-pick" role="group" aria-label="Camera" title="Switch cameras (Tab)">${([['world', 'World'], ['plan', 'Plan']] as const).map(([id, name]) =>
     `<button type="button" data-camera="${id}" class="${s.camera === id ? 'on' : 'quiet'}" aria-pressed="${s.camera === id}">${name}</button>`).join('')}</span>`;
   // The plan has its own tiles and hitboxes switches, and no sky.

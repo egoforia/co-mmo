@@ -29,11 +29,55 @@ interface Prediction {
   urls?: { get?: string };
   detail?: string;
   title?: string;
+  invalid_fields?: { type?: string; field?: string; description?: string }[];
   retry_after?: number;
 }
 
 /**
- * A video model on Replicate, such as Alibaba's Wan 3.0. Like Veo, a clip is
+ * Resolves the resolution string for Replicate video models that accept a resolution input.
+ * Returns undefined for models that do not take a resolution parameter.
+ */
+export function replicateResolution(model: string, requested?: string): string | undefined {
+  const norm = requested?.trim().toLowerCase();
+  const lower = model.toLowerCase();
+
+  // MiniMax video-01 models take no resolution parameter.
+  if (lower.includes('video-01')) return undefined;
+
+  // MiniMax H3 series (such as minimax/h3-lite, minimax/h3) requires uppercase "480P" or "768P".
+  if (lower.includes('h3-lite')) {
+    return norm === '480p' ? '480P' : '768P';
+  }
+  if (lower.includes('minimax') || lower.includes('h3')) {
+    if (norm === '480p') return '480P';
+    if (norm === '1080p') return '1080P';
+    return '768P';
+  }
+
+  // Wan video models (such as alibaba/wan-3, wan-video/wan-2.1) accept "480p", "720p", "1080p".
+  if (lower.includes('wan')) {
+    if (norm === '1080p' || norm === '480p') return norm;
+    return '720p';
+  }
+
+  // Kling models accept "720p", "1080p".
+  if (lower.includes('kling')) {
+    if (norm === '1080p') return '1080p';
+    return '720p';
+  }
+
+  // Luma Ray accepts "540p", "720p", "1080p".
+  if (lower.includes('luma') || lower.includes('ray')) {
+    if (norm === '540p' || norm === '1080p') return norm;
+    return '720p';
+  }
+
+  // For models with no known resolution parameter, only include if explicitly requested.
+  return requested?.trim() || undefined;
+}
+
+/**
+ * A video model on Replicate, such as Alibaba's Wan 3.0 or MiniMax's H3-Lite. Like Veo, a clip is
  * a job: it is started, checked every few seconds until it is done, and then
  * downloaded. Wan starts from one picture and cannot be given the last one,
  * so a looping walk is asked for in words only.
@@ -52,14 +96,22 @@ export class ReplicateVideoProvider implements VideoProvider {
 
   async generate(request: VideoRequest): Promise<GeneratedVideo> {
     const seconds = Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, Math.round(request.seconds)));
-    const resolution = request.resolution === '1080p' || request.resolution === '480p' ? request.resolution : '720p';
+    const pictureUrl = await this.picture(request.first);
+    const lastPictureUrl = request.last ? await this.picture(request.last) : undefined;
+    const resolution = replicateResolution(this.model, request.resolution);
+    const isMinimax = this.model.toLowerCase().includes('minimax');
+    const isKling = this.model.toLowerCase().includes('kling');
     const input: Record<string, unknown> = {
       prompt: request.prompt,
-      image: await this.picture(request.first),
-      resolution,
+      image: pictureUrl,
+      ...(isMinimax ? { first_frame_image: pictureUrl } : {}),
+      ...(isMinimax && lastPictureUrl ? { last_frame_image: lastPictureUrl } : {}),
+      ...(isKling ? { start_image: pictureUrl } : {}),
+      ...(resolution ? { resolution } : {}),
       duration: seconds,
       // Prompt rewriting makes up gestures and props the walk prompt forbids (docs/art-pipeline.md).
       enable_prompt_expansion: false,
+      ...(isMinimax ? { prompt_optimizer: false } : {}),
       ...(request.negativePrompt ? { negative_prompt: request.negativePrompt } : {}),
       ...(request.seed !== undefined ? { seed: request.seed } : {}),
     };
@@ -83,7 +135,12 @@ export class ReplicateVideoProvider implements VideoProvider {
     // The file is on Replicate's delivery host, which needs no token: keep the token on api.replicate.com.
     const file = await this.fetchImpl(url);
     if (!file.ok) throw new ProviderError(this.id, file.status, 'downloading the video failed');
-    return { mimeType: file.headers.get('content-type')?.startsWith('video/') ? file.headers.get('content-type')! : 'video/mp4', data: Buffer.from(await file.arrayBuffer()), seconds, resolution };
+    return {
+      mimeType: file.headers.get('content-type')?.startsWith('video/') ? file.headers.get('content-type')! : 'video/mp4',
+      data: Buffer.from(await file.arrayBuffer()),
+      seconds,
+      ...(resolution ? { resolution } : {}),
+    };
   }
 
   /** Starts the job by the model's name, or through the general endpoint when Replicate does not run that model by name. */
@@ -125,7 +182,8 @@ function finished(p: Prediction): boolean {
 
 /** A Replicate refusal as a ProviderError; a 429 keeps how long Replicate asked us to wait. */
 export function replicateError(provider: string, res: Response, body: Prediction, fallback: string): ProviderError {
-  const said = body.detail?.trim() || body.error?.trim() || body.title?.trim() || fallback;
+  const invalidFields = body.invalid_fields?.map((f) => f.description || `${f.field}: invalid`).join('; ');
+  const said = body.detail?.trim() || invalidFields || body.error?.trim() || body.title?.trim() || fallback;
   if (res.status !== 429) return new ProviderError(provider, res.ok ? 502 : res.status, said);
   const seconds = Number(res.headers.get('retry-after') ?? body.retry_after);
   return new ProviderError(provider, 429, said, { quotas: [], ...(Number.isFinite(seconds) ? { retryAfterMs: Math.ceil(seconds * 1000) } : {}) });

@@ -11,6 +11,18 @@ describe('walks', () => {
     expect(body.frames / walkFrameRate(body.frames, PLAYER_SPEED, body.cycleSeconds)).toBeCloseTo(body.cycleSeconds);
   });
 
+  it('defines body types for walking including four-legged 2 heads tall', () => {
+    expect(BODY_TYPES['four-legged']).toEqual({
+      id: 'four-legged',
+      name: 'Four-legged, 2 heads tall',
+      frames: 12,
+      cycleSeconds: 0.6,
+    });
+    expect(BODY_TYPES['4-legged']).toBe(BODY_TYPES['four-legged']);
+    const bodies = Object.values(BODY_TYPES);
+    expect(bodies.map((b) => b.id)).toEqual(['two-legged', 'four-legged', 'six-legged']);
+  });
+
   it('faces only the isometric ways, each turned to one side', () => {
     expect(FACINGS).toEqual(ISO_WAYS);
     expect(ISO_WAYS.every(isFacing)).toBe(true);

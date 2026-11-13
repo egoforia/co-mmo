@@ -303,6 +303,13 @@ export function artChange(target: HTMLElement): boolean {
     artState.ctx.rerender();
     return true;
   }
+  const select = target as HTMLSelectElement;
+  if (select.name === 'body') {
+    const walkerId = target.closest?.('.walker')?.getAttribute?.('data-walker') ?? (target.closest?.('.walker') as HTMLElement)?.dataset?.walker;
+    const w = artState.data?.walkers.find((x) => x.id === walkerId);
+    if (w) w.body = select.value;
+    return true;
+  }
   if (
     handleWorkbenchChange(target) ||
     handleSkillStageChange(target) ||

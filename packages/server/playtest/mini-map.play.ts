@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { buildFloors, generateRegion, newCharacter, regionDef } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
-import { chooseTool, goLive, playWorld } from './harness.ts';
+import { giveFloors, goLive, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -81,10 +81,7 @@ describe('the mini map', () => {
     await page.click('#edit-world-button');
     // Live at once, not a draft, so the land players walk has the floors.
     await goLive(page);
-    await chooseTool(page, 'floors');
-    await page.selectOption('#editor select[name="up"]', '1');
-    await page.selectOption('#editor select[name="down"]', '1');
-    await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await giveFloors(page, { x: canvas.x + canvas.width / 2, y: canvas.y + canvas.height / 2 }, 1, 1);
     await expect.poll(() => world.store.worldEdits('sanctum').edits.length, { timeout: 10_000 }).toBe(1);
     await page.click('#editor [data-done]');
     await expect.poll(() => page.locator('#mini-map [data-act="up"]').isEnabled(), { timeout: 10_000 }).toBe(true);

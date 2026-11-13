@@ -11,6 +11,15 @@ export const FOOTPRINT: EditKind<'footprint'> = {
   pointer: 'click',
   onFloors: true,
   targets: 'piece',
+  inspects: {
+    picks: ['landmark'],
+    title: 'Tiles it blocks',
+    action: 'Change it',
+    current: (map, p) => {
+      const piece = landmarkAt(map, [p.box.x, p.box.y], p.level);
+      return piece && { width: piece.footprint.width, height: piece.footprint.height };
+    },
+  },
   fields: [
     { key: 'width', label: 'Across', type: 'number', min: 1, max: MAX_FOOTPRINT, default: 2 },
     { key: 'height', label: 'Deep', type: 'number', min: 1, max: MAX_FOOTPRINT, default: 2 },

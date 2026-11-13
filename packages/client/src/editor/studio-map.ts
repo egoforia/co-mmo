@@ -47,6 +47,7 @@ interface AiStep {
 }
 
 const core = new EditorCore();
+let foldsHeard = false;
 const state = {
   regionId: 'sanctum',
   floor: 0,
@@ -254,6 +255,14 @@ function draw(canvas: HTMLCanvasElement): void {
 }
 
 function wire(canvas: HTMLCanvasElement): void {
+  // The inspector's sections stay folded or open as the tab is drawn again (a fold's toggle does not bubble).
+  if (!foldsHeard) {
+    foldsHeard = true;
+    document.addEventListener('toggle', (event) => {
+      const fold = event.target as HTMLElement;
+      if (fold instanceof HTMLDetailsElement && fold.dataset.section && fold.closest('.studio-map')) core.inspector.toggled(fold.dataset.section, fold.open);
+    }, true);
+  }
   const tileOf = (e: MouseEvent): TilePoint | null => {
     const map = state.data?.map;
     if (!map) return null;
@@ -387,8 +396,8 @@ export function handleMapEditorChange(target: HTMLElement): boolean {
     return true;
   }
   if (!core.set(input.name, input.value, input.checked)) return false;
-  // Settings can change what the tool says below them (the kit building's shape checks).
-  if (core.hasNotes()) artState.ctx.rerender();
+  // Settings can change what the panel shows (the kit building's shape checks, settings that apply only sometimes).
+  if (core.redraws(input.name)) artState.ctx.rerender();
   return true;
 }
 

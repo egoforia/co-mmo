@@ -559,6 +559,14 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .bookmarks .note { display: block; font-size: 11px; }
 .picked { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+/* Select's inspector: the picked thing, its actions, and a fold per kind of change. */
+.inspector { width: 100%; }
+.inspector header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.inspector header .kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.inspector kbd { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+.inspector details.inspect { border-top: 1px solid rgba(255, 255, 255, 0.12); margin-top: 6px; padding-top: 6px; }
+.inspector details.inspect summary { cursor: pointer; font-weight: 600; }
+.inspector details.inspect .settings { margin: 6px 0; }
 /* While editing, the game steps back: its HUD, chat (unless asked for) and windows of play. */
 body.editing #hud, body.editing #stats, body.editing #quests, body.editing #keys, body.editing #abilities,
 body.editing #party, body.editing #party-invite, body.editing #sound-panel { display: none !important; }

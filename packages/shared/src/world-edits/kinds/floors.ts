@@ -9,6 +9,17 @@ export const FLOORS: EditKind<'floors'> = {
   hint: 'Click a building to give it floors above and below the ground, joined by stairs or ladders. 0 and 0 takes them off.',
   pointer: 'click',
   targets: 'building',
+  inspects: {
+    picks: ['building'],
+    title: 'Floors above and below',
+    action: 'Set the floors',
+    current: (map, p) => {
+      // The floors it has now: the storeys standing over its box.
+      const over = map.storeys.filter((s) => s.x < p.box.x + p.box.w && s.x + s.width > p.box.x && s.y < p.box.y + p.box.h && s.y + s.height > p.box.y).map((s) => s.floor);
+      const ladders = map.stairways.some((s) => s.kind === 'ladder' && s.x >= p.box.x && s.y >= p.box.y && s.x < p.box.x + p.box.w && s.y < p.box.y + p.box.h);
+      return { up: Math.max(0, ...over), down: Math.max(0, ...over.map((f) => -f)), ladders };
+    },
+  },
   fields: [
     { key: 'up', label: 'Floors up', type: 'number', min: 0, max: MAX_FLOORS.up, default: 1 },
     { key: 'down', label: 'Floors down', type: 'number', min: 0, max: MAX_FLOORS.down, default: 0 },

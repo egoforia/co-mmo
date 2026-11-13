@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { buildFloors, collides, generateRegion, newCharacter, regionDef, type Stairway } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
-import { chooseTool, goLive, playWorld } from './harness.ts';
+import { giveFloors, goLive, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -71,15 +71,12 @@ describe('floors', () => {
     const centre = { x: canvas.x + canvas.width / 2, y: canvas.y + canvas.height / 2 };
     const floor = () => app!.world.home.position(id)?.floor ?? 0;
 
-    // The Floors tool, clicked on the shop we stand in.
+    // The shop we stand in, selected, gets its floors from the inspector.
     await page.click('#edit-world-button');
     await page.waitForSelector('#editor:not([hidden]) .editor-rail');
     // These changes are for everyone at once, not drafts.
     await goLive(page);
-    await chooseTool(page, 'floors');
-    await page.selectOption('#editor select[name="up"]', '1');
-    await page.selectOption('#editor select[name="down"]', '1');
-    await page.mouse.click(centre.x, centre.y);
+    await giveFloors(page, centre, 1, 1);
     await expect.poll(() => world.store.worldEdits('sanctum').edits.length, { timeout: 10_000 }).toBe(1);
     // The same stairs, besides the names the land gives them (world-edits/names.ts).
     const unnamed = (list: Stairway[]) => list.map(({ id: _, ...s }) => s);

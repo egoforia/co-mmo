@@ -1347,6 +1347,12 @@ button.queue-add-btn.staged {
 /* The Select tool's card in the Studio map. */
 .studio-map .picked { display: flex; flex-direction: column; gap: 2px; }
 .studio-map .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.studio-map .inspector header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.studio-map .inspector header .kind { font-size: 11px; text-transform: uppercase; opacity: 0.7; }
+.studio-map .inspector kbd { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+.studio-map .inspector details.inspect { border-top: 1px solid rgba(0, 0, 0, 0.12); margin-top: 6px; padding-top: 6px; }
+.studio-map .inspector details.inspect summary { cursor: pointer; font-weight: 600; }
+.studio-map .inspector details.inspect .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
 
 /* Drafts and publishing beside the Studio map's edit list. */
 .studio-map .drafts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 10px; }

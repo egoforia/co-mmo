@@ -14,7 +14,7 @@
 // and the AI Map Architect call). Add a kind in kinds/ and the registry.
 
 export * from './world-edits/types.ts';
-export type { EditContext, EditField, EditKind, EditPointer, FieldValue, Outline, ToolUse } from './world-edits/kind.ts';
+export type { EditContext, EditField, EditKind, EditPointer, FieldValue, Inspects, Outline, ToolUse } from './world-edits/kind.ts';
 export { buildingAt, footprint as landmarkBox, landmarkAt } from './world-edits/tiles.ts';
 export { nameThings, thingById, type Thing, type ThingKind } from './world-edits/names.ts';
 export { MAX_AREA_EDITS, copyArea, pasteArea, shiftDraft, type AreaCopy } from './world-edits/area.ts';

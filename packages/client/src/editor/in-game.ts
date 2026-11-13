@@ -7,6 +7,7 @@ import { CameraKeys } from './camera-keys.ts';
 import { EditorCore, editListHtml, hereWords, type ToolId, type ToolStep } from './core.ts';
 import { findables, type FindSources } from './find-sources.ts';
 import { Finder } from './palette.ts';
+import { keyAction } from './edit-keys.ts';
 import { groupOf, groups, optionsHtml, railHtml, toolFor } from './rail.ts';
 import { bookmarksHtml, checkLand, checksHtml, problemCount, takeShot, type LandCheck } from './land-panel.ts';
 import { drawMarks, marksKey } from './marks.ts';
@@ -92,36 +93,30 @@ export class EditorUi {
     this.box.addEventListener('toggle', (event) => {
       const fold = event.target as HTMLDetailsElement;
       if (fold.classList?.contains('bookmarks-box')) this.marksOpen = fold.open;
+      else if (fold.dataset?.section) this.core.inspector.toggled(fold.dataset.section, fold.open);
     }, true);
     document.addEventListener('keydown', (event) => this.key(event));
   }
 
   private key(event: KeyboardEvent): void {
     if (!this.open || (event.target as HTMLElement).closest?.('input, textarea, select')) return;
-    const key = event.key.toLowerCase();
     if (this.panKeys.down(event)) return event.preventDefault();
-    const plain = !(event.ctrlKey || event.metaKey || event.altKey);
-    if ((key === 'k' && (event.ctrlKey || event.metaKey)) || (key === '/' && plain)) {
-      event.preventDefault();
-      return this.finder.show(findables(this.finding()));
-    }
-    const group = plain && groups(this.core).find((g) => g.key === key);
-    if (group) return this.chooseTool(toolFor(this.core, group, this.lastTool, groupOf(this.core, this.core.current().id)?.id === group.id));
-    if (key === 'home') return this.backToMe();
-    if ((key === '+' || key === '=' || key === '-') && !(event.ctrlKey || event.metaKey)) return this.zoom(key === '-' ? -1 : 1);
-    if (key === 'escape') {
-      // Esc drops what a tool is part way through first, then closes the editor.
-      if (this.core.midway()) {
-        this.core.cancel();
-        this.render('');
-      } else this.toggle(false);
-      return;
-    }
-    if (!(event.ctrlKey || event.metaKey)) return;
-    if (key === 'z' && !event.shiftKey) void this.act({ undo: true });
-    else if (key === 'y' || (key === 'z' && event.shiftKey)) void this.act({ redo: true });
-    else return;
-    event.preventDefault();
+    const action = keyAction(event, this.core, this.lastTool);
+    if (!action) return;
+    // Group letters and Esc keep their usual meaning nowhere else on the page; the rest would.
+    if (!('tool' in action || 'escape' in action)) event.preventDefault();
+    if ('find' in action) this.finder.show(findables(this.finding()));
+    else if ('pick' in action) void this.step(this.core.pickAction(action.pick));
+    else if ('tool' in action) this.chooseTool(action.tool);
+    else if ('home' in action) this.backToMe();
+    else if ('zoom' in action) this.zoom(action.zoom);
+    else if ('undo' in action) void this.act({ undo: true });
+    else if ('redo' in action) void this.act({ redo: true });
+    // Esc drops what a tool is part way through first, then closes the editor.
+    else if (this.core.midway()) {
+      this.core.cancel();
+      this.render('');
+    } else this.toggle(false);
   }
 
   /** Opens or closes the editor. */
@@ -438,7 +433,7 @@ export class EditorUi {
     else if (input.name === 'live') {
       this.live = input.checked;
       this.render();
-    } else if (this.core.set(input.name, input.value, input.checked) && this.core.hasNotes()) this.render();
+    } else if (this.core.set(input.name, input.value, input.checked) && this.core.redraws(input.name)) this.render();
     // Hand the keys back to walking.
     input.blur();
   }

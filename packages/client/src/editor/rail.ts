@@ -4,7 +4,8 @@ import type { EditorCore, ToolId } from './core.ts';
 // The editor's tools in a few groups instead of one wall of buttons: a rail
 // of groups (each with a key), and an options bar with the tools of the
 // group chosen. Both editor views draw them from here. A kind of edit no
-// group names (a new one from a wish) lands in "More", so nothing is lost.
+// group names (a new one from a wish) lands in "More", so nothing is lost;
+// the kinds that change a thing already there are in Select's inspector.
 // Buttons: `data-group` on the rail (its `data-tools` lists its tools, for
 // playtests and screen readers), `data-tool` in the options bar.
 
@@ -20,19 +21,25 @@ export interface ToolGroup {
 
 /** The rail's groups, in order. */
 export const GROUPS: readonly ToolGroup[] = [
-  { id: 'select', name: 'Select', key: 'v', tools: ['select', 'area', 'move', 'remove'] },
+  { id: 'select', name: 'Select', key: 'v', tools: ['select', 'area'] },
   { id: 'ground', name: 'Ground', key: 'g', tools: ['paint', 'scenery', 'road'] },
-  { id: 'build', name: 'Build', key: 'b', tools: ['kit', 'house', 'storey', 'stairs', 'restyle', 'floors'] },
-  { id: 'furnish', name: 'Furnish', key: 'f', tools: ['furniture', 'piece', 'light', 'footprint'] },
-  { id: 'life', name: 'Life', key: 'l', tools: ['person', 'quest', 'spawn', 'monsters', 'patrol', 'clear', 'spot'] },
+  { id: 'build', name: 'Build', key: 'b', tools: ['kit', 'house', 'storey', 'stairs'] },
+  { id: 'furnish', name: 'Furnish', key: 'f', tools: ['furniture', 'piece', 'light'] },
+  { id: 'life', name: 'Life', key: 'l', tools: ['person', 'spawn', 'spot'] },
   { id: 'places', name: 'Places', key: 'p', tools: ['bookmark', 'land'] },
 ];
+/**
+ * Tools folded into Select's inspector (inspector.ts): they change a thing
+ * already there, so it is selected first. They stay in the finder (Move
+ * still lifts trees, rocks and water, which cannot be selected).
+ */
+export const FOLDED: readonly ToolId[] = ['move', 'remove', 'restyle', 'floors', 'footprint', 'monsters', 'patrol', 'clear', 'quest'];
 const MORE: Omit<ToolGroup, 'tools'> = { id: 'more', name: 'More', key: 'm' };
 
 /** The groups with the tools on offer now (set pieces only while their wish is on), and More for any tool no group names. */
 export function groups(core: EditorCore): ToolGroup[] {
   const offered = new Set(core.tools().map((t) => t.id));
-  const named = new Set(GROUPS.flatMap((g) => g.tools));
+  const named = new Set([...GROUPS.flatMap((g) => g.tools), ...FOLDED]);
   const out = GROUPS.map((g) => ({ ...g, tools: g.tools.filter((t) => offered.has(t)) })).filter((g) => g.tools.length);
   const rest = [...offered].filter((t) => !named.has(t));
   return rest.length ? [...out, { ...MORE, tools: rest }] : out;

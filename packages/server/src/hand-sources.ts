@@ -19,7 +19,7 @@ export function artFileReader(artDir: string, shippedManifest: string | undefine
   };
 }
 
-/** Every walk, run and attack strip (all painted as walks), walking look and wished look (their hands), the isometric ways' standing pictures, and every weapon, off-hand item and charm (their grips). */
+/** Every walk, run and attack strip (all painted as walks), walking look and wished look (their hands), the isometric ways' standing pictures, and every weapon, off-hand item, charm and craft tool (their grips). */
 export function pointSources(store: Store, shipped: ArtManifest, painted: ArtManifest, read: (file: string) => Promise<Buffer>): PointSource[] {
   // As the client merges them: shipped art wins, except what the Owner had painted again.
   const art: ArtManifest = { ...painted, ...shipped, ...Object.fromEntries(Object.entries(painted).filter(([, e]) => e.redone)) };
@@ -42,8 +42,11 @@ export function pointSources(store: Store, shipped: ArtManifest, painted: ArtMan
     ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'stand' && movingArt(id) ? source(id, 'hands', e.file) : [])),
     ...WALKING_LOOKS.flatMap((id) => source(id, 'hands', art[id]?.file)),
     ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),
-    ...Object.values(ITEMS).filter((item) => item.slot === 'weapon' || item.slot === 'offhand' || item.slot === 'charm')
-      .flatMap((item) => source(item.art, 'grip', item.art.startsWith('wished-') ? wished.get(item.art) : art[item.art]?.file)),
+    ...[...new Set(
+      Object.values(ITEMS)
+        .filter((item) => item.slot === 'weapon' || item.slot === 'offhand' || item.slot === 'charm' || item.kind === 'tool')
+        .map((item) => item.art),
+    )].flatMap((artId) => source(artId, 'grip', artId.startsWith('wished-') ? wished.get(artId) : art[artId]?.file)),
     // Each family's own picture, which a weapon shows until its own is painted.
     ...HELD_FAMILIES.flatMap((family) => source(familyArt(family), 'grip', art[familyArt(family)]?.file)),
   ];

@@ -112,7 +112,9 @@ export class ReplicateVideoProvider implements VideoProvider {
       // Prompt rewriting makes up gestures and props the walk prompt forbids (docs/art-pipeline.md).
       enable_prompt_expansion: false,
       ...(isMinimax ? { prompt_optimizer: false } : {}),
-      ...(request.negativePrompt ? { negative_prompt: request.negativePrompt } : {}),
+      negative_prompt: request.negativePrompt
+        ? `${request.negativePrompt}, black background, dark background, changing background color, floor, shadows`
+        : 'black background, dark background, changing background color, floor, shadows',
       ...(request.seed !== undefined ? { seed: request.seed } : {}),
     };
     let prediction = await this.start(input);

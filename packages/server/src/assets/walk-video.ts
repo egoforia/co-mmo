@@ -144,7 +144,7 @@ export function walkVideoPrompt(gear: Carried[], direction: IsoWay, body = 'two-
     `${STYLE.animation} The ${subject} from the image ${walkLocomotion}`,
     gear.length ? `Everything they carry stays in the same hand and on the same side of the body as in the image, held steady at the same angle. ${gearPlacement(gear, direction)}` : '',
     `The camera is completely still: no zoom, no pan. The ${subject} stays in the centre of the picture at the same size and never turns.`,
-    `The background stays one flat, even, pure magenta colour the whole time, with no floor, shadow, scenery or lighting change. Only this one ${subject}, no one else. No text. Keep the painted look of the image.`,
+    `The background MUST stay one flat, even, solid pure magenta colour (#FF00FF) in every single frame the entire time, with no floor, shadow, scenery, darkening, fading to black, or lighting change. The character is keyed against magenta; never change or fade the background color. Only this one ${subject}, no one else. No text. Keep the painted look of the image.`,
   ].filter(Boolean).join(' ');
 }
 

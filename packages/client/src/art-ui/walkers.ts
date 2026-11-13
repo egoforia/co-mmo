@@ -170,7 +170,7 @@ export function waysHtml(w: WalkerView): string {
     const clip = view.url ? `<button type="button" data-art-review="${esc(JSON.stringify({ what: 'clip', walker: w.id, body: w.body ?? 'two-legged', direction: d }))}" data-walker-body>${strip ? 'Make clip again' : 'Make walk clip'} · about ${usd(w.clipUsd)}</button>` : '';
     const queueClip = view.url && !strip ? queueButtonHtml({ kind: 'clip', targetId: w.id, direction: d, body: w.body ?? 'two-legged', label: `Walk clip: ${w.name} (${label})`, category: 'Walk Clips', estimateUsd: w.clipUsd }) : '';
     const denied = w.denied?.[d];
-    const deniedNotice = !strip && denied ? `
+    const deniedNotice = denied ? `
       <div class="denied-notice" style="margin: 6px 0; padding: 6px 8px; border: 1px dashed var(--bad, #d9534f); border-radius: 4px; background: rgba(217, 83, 79, 0.08); font-size: 11px;">
         <span style="color: var(--bad, #d9534f); font-weight: bold;">⚠️ Walk clip denied:</span> ${esc(denied.problems[0] ?? denied.reason ?? 'Failed consistency check')}
         <div style="margin-top: 4px;">

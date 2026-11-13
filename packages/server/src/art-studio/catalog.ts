@@ -197,7 +197,7 @@ export class ArtCatalog {
         }
 
         const denied = await this.options.walks.deniedClip(w.id, d);
-        if (denied && !entry) {
+        if (denied) {
           deniedWalks[d] = denied;
         }
 

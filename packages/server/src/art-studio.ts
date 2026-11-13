@@ -11,8 +11,13 @@ import sharp from 'sharp';
 import {
   BODY_TYPES,
   BUILDING_STYLES,
+  generateAngleTurnaroundPrompt,
   walkArt,
+  type AngleReferenceType,
+  type AngleTargetType,
+  type AngleTurnaroundResult,
   type ArtManifest,
+  type IsoWay,
 } from '@co-mmo/shared';
 import { ArtHistory } from './art-history.ts';
 import { plain, type ArtJob, type ArtJobHandle } from './art-jobs.ts';
@@ -391,6 +396,27 @@ export class ArtStudio {
     const walker = this.catalog.walker(walkerId, body);
     const d = this.catalog.way(direction);
     return this.options.walks.adoptDeniedClip(walker, d, useRetry);
+  }
+
+  /** Generates an exact prompt to copy a single reference at a rotated isometric angle. */
+  anglePrompt(options: {
+    walker: string;
+    sourceDirection: IsoWay;
+    targetDirection: IsoWay;
+    referenceType: AngleReferenceType;
+    targetType: AngleTargetType;
+    body?: string;
+  }): AngleTurnaroundResult {
+    const walker = this.catalog.walkerList().find((w) => w.id === options.walker);
+    return generateAngleTurnaroundPrompt({
+      name: walker?.name ?? options.walker,
+      sourceDirection: options.sourceDirection,
+      targetDirection: options.targetDirection,
+      referenceType: options.referenceType,
+      targetType: options.targetType,
+      body: options.body ?? walker?.body,
+      kind: walker?.kind,
+    });
   }
 
   /**

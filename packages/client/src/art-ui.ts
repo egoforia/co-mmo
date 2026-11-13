@@ -24,6 +24,7 @@ import {
 } from './art-ui/art-director.ts';
 import { buildingsPage, footprintSubmit, loadBuildings } from './art-ui/buildings.ts';
 import {
+  openAnglePromptDialog,
   openDeniedWalkReview,
   openReview,
   pictureVersions,
@@ -227,6 +228,11 @@ const BUTTON_ACTIONS: Record<string, (t: HTMLButtonElement) => void> = {
   viewVersions: (t) => {
     const w = artState.data!.walkers.find((x) => x.id === t.dataset.viewVersions);
     if (w) viewVersions(w, t.dataset.direction as Facing);
+  },
+  anglePrompt: (t) => {
+    const ask = JSON.parse(t.dataset.anglePrompt!) as { walker: string; direction?: Facing };
+    const w = artState.data!.walkers.find((x) => x.id === ask.walker);
+    if (w) openAnglePromptDialog(w, ask.direction);
   },
   reviewDenied: (t) => {
     const { walker, direction } = JSON.parse(t.dataset.reviewDenied!) as { walker: string; direction: Facing };

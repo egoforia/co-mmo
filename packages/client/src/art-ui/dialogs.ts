@@ -3,7 +3,12 @@
 
 import {
   ISO_WAYS,
+  ISO_WAY_LABELS,
+  generateAngleTurnaroundPrompt,
+  type AngleReferenceType,
+  type AngleTargetType,
   type Facing,
+  type IsoWay,
 } from '@co-mmo/shared';
 import {
   type ArtItem,
@@ -83,7 +88,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       ${ask.what === 'view' ? sourcesHtml(ask) : ''}
       ${review.references ? referencesHtml(review) : ''}
       ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
-        <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button><button type="button" class="quiet director-btn" data-harmonize-prompt>✦ Harmonize with Art Director</button>${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
+        <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button><button type="button" class="quiet director-btn" data-harmonize-prompt>✦ Harmonize with Art Director</button>${'walker' in ask ? '<button type="button" class="quiet" data-angle-turnaround-review>✦ Turn from another angle</button>' : ''}${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
       ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><div class="card-actions"><button type="submit" class="quiet">Show with these words</button><button type="button" class="quiet director-btn" data-harmonize-note>✦ Harmonize with Art Director</button></div></form>` : ''}
       ${review.parts.map((p) => `${many ? `<details><summary><b>${esc(p.name)}</b> · about ${usd(p.recipe.steps.reduce((n, s) => n + s.usd, 0))}</summary>${recipeHtml(p.recipe, undefined, true)}</details>` : recipeHtml(p.recipe, undefined, true)}`).join('')}
     </div>
@@ -226,6 +231,16 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       btn.disabled = false;
       btn.textContent = '✦ Harmonize with Art Director';
       ctx.toast((err as Error).message);
+    }
+  });
+  d.querySelector<HTMLButtonElement>('[data-angle-turnaround-review]')?.addEventListener('click', () => {
+    const walkerId = 'walker' in ask ? ask.walker : undefined;
+    const direction = 'direction' in ask ? (ask.direction as Facing) : undefined;
+    const walker = walkerId ? artState.data?.walkers.find((x) => x.id === walkerId) : undefined;
+    if (walker) {
+      const others = ISO_WAYS.filter((way) => way !== direction && (walker.standing[way]?.url || walker.walks[way]));
+      const source = others[0] ?? (direction === 'front-right' ? 'front-left' : 'front-right');
+      openAnglePromptDialog(walker, source, direction, ask.what === 'clip' ? 'clip' : 'standing');
     }
   });
   d.querySelector<HTMLButtonElement>('[data-approve]')!.addEventListener('click', async (e) => {
@@ -487,3 +502,208 @@ export function openDeniedWalkReview(walkerId: string, direction: Facing): void 
   render();
   if (!d.open) d.showModal();
 }
+
+/** Opens an interactive prompt generator to copy a single standing image or walking clip as reference to one of the other 3 isometric angles. */
+export function openAnglePromptDialog(
+  w: WalkerView,
+  initialSource?: Facing,
+  initialTarget?: Facing,
+  initialTargetType?: 'standing' | 'clip',
+): void {
+  const d = dialog();
+  const availableDirections = ISO_WAYS.filter((way) => Boolean(w.standing[way]?.url || w.walks[way]));
+  let sourceDirection: IsoWay = initialSource && ISO_WAYS.includes(initialSource as IsoWay)
+    ? (initialSource as IsoWay)
+    : (availableDirections[0] ?? 'front-right');
+
+  const otherDirections = (src: IsoWay) => ISO_WAYS.filter((way) => way !== src);
+
+  let targetDirection: IsoWay = initialTarget && initialTarget !== sourceDirection && ISO_WAYS.includes(initialTarget as IsoWay)
+    ? (initialTarget as IsoWay)
+    : otherDirections(sourceDirection)[0]!;
+
+  const hasStanding = Boolean(w.standing[sourceDirection]?.url);
+  const hasClip = Boolean(w.walks[sourceDirection]);
+  let referenceType: AngleReferenceType = hasStanding ? 'standing' : hasClip ? 'clip' : 'standing';
+  let targetType: AngleTargetType = initialTargetType ?? (referenceType === 'clip' ? 'clip' : 'standing');
+
+  const render = () => {
+    if (targetDirection === sourceDirection) {
+      targetDirection = otherDirections(sourceDirection)[0]!;
+    }
+    const curHasStanding = Boolean(w.standing[sourceDirection]?.url);
+    const curHasClip = Boolean(w.walks[sourceDirection]);
+
+    if (referenceType === 'standing' && !curHasStanding && curHasClip) {
+      referenceType = 'clip';
+    } else if (referenceType === 'clip' && !curHasClip && curHasStanding) {
+      referenceType = 'standing';
+    }
+
+    const { prompt, rotationSummary, sourceLabel } = generateAngleTurnaroundPrompt({
+      name: w.name,
+      sourceDirection,
+      targetDirection,
+      referenceType,
+      targetType,
+      body: w.body,
+      kind: w.kind,
+    });
+
+    const sourceView = w.standing[sourceDirection];
+    const sourceStrip = w.walks[sourceDirection];
+    const sourcePreview = referenceType === 'standing' && sourceView?.url
+      ? `<img src="${esc(sourceView.url)}" alt="${esc(sourceLabel)} standing" style="max-height: 80px; max-width: 80px; object-fit: contain; border: 1px solid var(--rim, #444); border-radius: 4px; background: #1a1a1a;">`
+      : referenceType === 'clip' && sourceStrip
+        ? stripHtml(sourceStrip, sourceLabel, 80)
+        : '<span class="ph" style="font-size: 11px;">no art</span>';
+
+    const others = otherDirections(sourceDirection);
+
+    d.innerHTML = `
+      <header>
+        <h2>Angle Turnaround Prompt · ${esc(w.name)}</h2>
+        <button type="button" class="quiet" data-close aria-label="Close">✕</button>
+      </header>
+      <div class="dialog-body">
+        <p class="note">Generate an exact prompt that uses a single standing image or walking clip as reference to copy the character with 100% fidelity while rotating to one of the other 3 isometric angles.</p>
+
+        <div style="display: flex; gap: 16px; margin: 12px 0; flex-wrap: wrap;">
+          <fieldset style="flex: 1; min-width: 250px; border: 1px solid var(--rim, #444); border-radius: 6px; padding: 10px 14px; background: rgba(255, 255, 255, 0.02);">
+            <legend style="font-weight: bold; padding: 0 6px;">1. Reference Source</legend>
+            <div style="margin-bottom: 8px;">
+              <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-dim, #888);">Source direction:</label>
+              <select class="source-dir-select" style="width: 100%; padding: 4px 8px; border-radius: 4px;">
+                ${WAYS.map(([way, label]) => {
+                  const sHasImg = Boolean(w.standing[way]?.url);
+                  const sHasClip = Boolean(w.walks[way]);
+                  const badge = sHasImg && sHasClip ? ' (image + clip)' : sHasImg ? ' (image)' : sHasClip ? ' (clip)' : ' (empty)';
+                  return `<option value="${way}" ${way === sourceDirection ? 'selected' : ''}>${esc(label)}${badge}</option>`;
+                }).join('')}
+              </select>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-dim, #888);">Reference type:</label>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="radio" name="angle-ref-type" value="standing" ${referenceType === 'standing' ? 'checked' : ''} ${!curHasStanding ? 'disabled' : ''}>
+                  <span>Standing image ${!curHasStanding ? '(none)' : ''}</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="radio" name="angle-ref-type" value="clip" ${referenceType === 'clip' ? 'checked' : ''} ${!curHasClip ? 'disabled' : ''}>
+                  <span>Walking clip ${!curHasClip ? '(none)' : ''}</span>
+                </label>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--rim, #333);">
+              <span style="font-size: 11px; color: var(--text-dim, #888);">Preview:</span>
+              ${sourcePreview}
+            </div>
+          </fieldset>
+
+          <fieldset style="flex: 1.2; min-width: 280px; border: 1px solid var(--rim, #444); border-radius: 6px; padding: 10px 14px; background: rgba(255, 255, 255, 0.02);">
+            <legend style="font-weight: bold; padding: 0 6px;">2. Target Angle &amp; Media</legend>
+            <div style="margin-bottom: 8px;">
+              <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-dim, #888);">Rotate to one of the other 3 isometric angles:</label>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                ${others.map((way) => {
+                  const lbl = ISO_WAY_LABELS[way];
+                  const active = way === targetDirection;
+                  return `
+                    <label class="button quiet" style="font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; ${active ? 'background: rgba(255, 204, 0, 0.15); border: 1px solid var(--accent, #e5a93c); font-weight: bold;' : 'border: 1px solid var(--rim, #444);'}">
+                      <input type="radio" name="angle-target-dir" value="${way}" ${active ? 'checked' : ''} style="margin: 0;">
+                      <span>${esc(lbl)}</span>
+                    </label>`;
+                }).join('')}
+              </div>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <label style="display: block; font-size: 12px; margin-bottom: 4px; color: var(--text-dim, #888);">Target output media:</label>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="radio" name="angle-target-type" value="standing" ${targetType === 'standing' ? 'checked' : ''}>
+                  <span>Standing picture</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer;">
+                  <input type="radio" name="angle-target-type" value="clip" ${targetType === 'clip' ? 'checked' : ''}>
+                  <span>Walk clip</span>
+                </label>
+              </div>
+            </div>
+            <div style="padding: 6px 10px; border-radius: 4px; background: rgba(255, 255, 255, 0.04); font-size: 12px; color: var(--accent, #e5a93c); border: 1px solid rgba(255, 204, 0, 0.2); margin-top: 8px;">
+              ${esc(rotationSummary)}
+            </div>
+          </fieldset>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="font-weight: bold; font-size: 12px;">Generated Turnaround Prompt</label>
+            <span style="font-size: 11px; color: var(--text-dim, #888);">${prompt.length} characters</span>
+          </div>
+          <textarea class="angle-prompt-output" rows="9" style="width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px; line-height: 1.45; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--rim, #444); background: #141414; color: #eee; resize: vertical;" readonly>${esc(prompt)}</textarea>
+        </div>
+      </div>
+      <footer>
+        <button type="button" class="quiet" data-close>Close</button>
+        <button type="button" class="quiet" data-copy-prompt>📋 Copy Prompt</button>
+        <button type="button" data-use-in-studio>✦ Review &amp; Paint in Studio</button>
+      </footer>
+    `;
+
+    for (const b of d.querySelectorAll('[data-close]')) b.addEventListener('click', () => d.close());
+
+    d.querySelector('.source-dir-select')?.addEventListener('change', (e) => {
+      sourceDirection = (e.target as HTMLSelectElement).value as IsoWay;
+      render();
+    });
+
+    for (const radio of d.querySelectorAll<HTMLInputElement>('input[name="angle-ref-type"]')) {
+      radio.addEventListener('change', (e) => {
+        referenceType = (e.target as HTMLInputElement).value as AngleReferenceType;
+        render();
+      });
+    }
+
+    for (const radio of d.querySelectorAll<HTMLInputElement>('input[name="angle-target-dir"]')) {
+      radio.addEventListener('change', (e) => {
+        targetDirection = (e.target as HTMLInputElement).value as IsoWay;
+        render();
+      });
+    }
+
+    for (const radio of d.querySelectorAll<HTMLInputElement>('input[name="angle-target-type"]')) {
+      radio.addEventListener('change', (e) => {
+        targetType = (e.target as HTMLInputElement).value as AngleTargetType;
+        render();
+      });
+    }
+
+    const copyBtn = d.querySelector<HTMLButtonElement>('[data-copy-prompt]');
+    copyBtn?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(prompt);
+        copyBtn.textContent = '✓ Copied!';
+        artState.ctx.toast('Prompt copied to clipboard!');
+        setTimeout(() => {
+          if (copyBtn) copyBtn.textContent = '📋 Copy Prompt';
+        }, 1800);
+      } catch {
+        artState.ctx.toast('Could not copy to clipboard.');
+      }
+    });
+
+    d.querySelector<HTMLButtonElement>('[data-use-in-studio]')?.addEventListener('click', () => {
+      d.close();
+      if (targetType === 'standing') {
+        void openReview({ what: 'view', walker: w.id, direction: targetDirection, prompt, from: [sourceDirection] }, false);
+      } else {
+        void openReview({ what: 'clip', walker: w.id, body: w.body ?? 'two-legged', direction: targetDirection, prompt }, true);
+      }
+    });
+  };
+
+  render();
+  if (!d.open) d.showModal();
+}
+

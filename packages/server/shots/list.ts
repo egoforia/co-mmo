@@ -222,7 +222,7 @@ export const SHOTS: Shot[] = [
     mustSee: [
       'edit mode: the game HUD, chat, stats and key bar are gone; a top bar (land, floor stepper, hour and weather, Tiles and Hitboxes, drafts, Done) runs across the top',
       'the editor panel on the right and the mini map at the bottom left, neither covering the other',
-      'the panel says to click something to see and change it, or drag over bare ground to copy an area, and the edit list is readable',
+      'with nothing selected the panel shows the land: its name, tabs Changes, Places (25), Checks and Land, and the Changes tab with Drafts, Published and a folded Built in list',
       'a status strip along the bottom with Chat, Undo and Redo',
       'no red hitbox fill: hitboxes start off',
     ],
@@ -271,6 +271,31 @@ export const SHOTS: Shot[] = [
       'the finder in the middle near the top: Stairs first, then bookmarks to go to (Go to …), with Tool, Place or Do beside each',
       'the panel on the right no longer has a wall of tool buttons',
     ],
+  },
+  {
+    name: 'editor-land-places',
+    about: "The world editor's land panel on its Places tab, in the Architectural Testbed.",
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-land-tab="places"]');
+    },
+    mustSee: ['the Places tab chosen: a name box and "Bookmark this view (Ctrl D)", then the testbed\'s bookmarks each with Go', 'the list scrolls inside the panel, above the status strip'],
+  },
+  {
+    name: 'editor-land-checks',
+    about: "The world editor's land panel after Check again, in the Sanctum.",
+    region: 'sanctum',
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-land-tab="checks"]');
+      await page.click('#editor [data-check]');
+      await page.waitForTimeout(500);
+    },
+    mustSee: ['the Checks tab chosen, with Shapes, Walks and Not painted yet, each saying all is well or listing what it found', 'when something is listed, the Checks tab shows a count and red squares mark those places in the world'],
   },
   {
     name: 'editor-inspector',

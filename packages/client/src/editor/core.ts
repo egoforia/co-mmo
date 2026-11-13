@@ -126,6 +126,11 @@ export class EditorCore {
 
   /** Sets one of the current tool's settings from its input; false when it is not one. */
   set(key: string, raw: string, checked?: boolean): boolean {
+    const form = this.formField(key);
+    if (form) {
+      (this.values[form.kind.kind] ??= {})[form.key] = readField(form.kind.fields.find((f) => f.key === form.key)!, raw, checked);
+      return true;
+    }
     if (this.tool === 'select') return this.inspector.set(key, raw, checked);
     if (this.tool === 'area') return this.area.set(key, raw);
     const kind = this.kind();
@@ -135,8 +140,28 @@ export class EditorCore {
     return true;
   }
 
+  /** A kind's own settings drawn outside its tool (the land panel's Land tab), inputs named `form.<kind>.<key>`. */
+  formHtml(kindId: EditKindId): string {
+    const kind = EDIT_KINDS[kindId] as unknown as EditKind<EditKindId>;
+    return fieldsHtml(kind.fields, this.settings(kind), `form.${kindId}.`);
+  }
+
+  /** The edit a kind's own settings make at a tile, as its tool would there. */
+  makeAt(kindId: EditKindId, region: string, at: TilePoint, level: number): ToolStep {
+    return this.make(EDIT_KINDS[kindId] as unknown as EditKind<EditKindId>, { at }, region, level);
+  }
+
+  private formField(name: string): { kind: EditKind<EditKindId>; key: string } | undefined {
+    const [head, kindId, key] = name.split('.');
+    if (head !== 'form' || !kindId || !Object.hasOwn(EDIT_KINDS, kindId)) return undefined;
+    const kind = EDIT_KINDS[kindId as EditKindId] as unknown as EditKind<EditKindId>;
+    return kind.fields.some((f) => f.key === key) ? { kind, key: key! } : undefined;
+  }
+
   /** True when a change to this input changes what the panel shows (notes under the settings, or settings that apply only sometimes), so the view draws it again. */
   redraws(key: string): boolean {
+    const form = this.formField(key);
+    if (form) return hasRules(form.kind.fields);
     if (this.tool === 'select') return this.inspector.redraws(key);
     const kind = this.kind();
     return !!kind && (!!kind.notes || hasRules(kind.fields));

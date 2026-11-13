@@ -1,17 +1,19 @@
-import Phaser from 'phaser';
-import { MAX_FLOORS, type Bookmark, type Outline, type TilePoint, type Weather } from '@co-mmo/shared';
+import type Phaser from 'phaser';
+import { MAX_FLOORS, type Bookmark, type TilePoint, type Weather } from '@co-mmo/shared';
 import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
 import { CameraKeys } from './camera-keys.ts';
-import { EditorCore, editListHtml, hereWords, type ToolId, type ToolStep } from './core.ts';
+import { EditorCore, hereWords, type ToolId, type ToolStep } from './core.ts';
 import { findables, type FindSources } from './find-sources.ts';
 import { Finder } from './palette.ts';
 import { keyAction } from './edit-keys.ts';
 import { groupOf, groups, optionsHtml, railHtml, toolFor } from './rail.ts';
-import { bookmarksHtml, checkLand, checksHtml, problemCount, takeShot, type LandCheck } from './land-panel.ts';
+import { LandControl } from './land-control.ts';
+import { takeShot } from './land-panel.ts';
 import { drawMarks, marksKey } from './marks.ts';
 import { PREVIEW_HOURS, PREVIEW_WEATHER, barHtml, stripHtml } from './shell.ts';
+import { OUTLINE_DEPTH, hearWorld, strokeOutlines, type PointerKind } from './world-input.ts';
 
 /** Where the tile wireframe switch is remembered, on this browser only. */
 const GRID_KEY = 'co-mmo.editor.tileGrid';
@@ -19,17 +21,14 @@ const GRID_KEY = 'co-mmo.editor.tileGrid';
 // The world editor in the game, for the Owner and Stewards: an edit mode
 // that takes over the screen. The game's HUD steps back (the page's
 // `editing` class), a top bar and a status strip frame the world
-// (shell.ts), and the panel on the right holds the tools, their settings and
-// the land's edits. The tools, their settings and what they make come from
+// (shell.ts), and the panel on the right holds the tool's settings, what
+// Select picked (inspector.ts) or, with nothing picked, the land itself
+// (land-panel.ts). The tools, their settings and what they make come from
 // the editor core (core.ts), the same as the Studio's map. Each change goes
 // to the server, which saves it, lays the land out again everywhere and
 // shows it to everyone there (or to editors only, while it is a draft); undo
 // takes it back. The outlines and marks it draws over the world are the
 // editor's own, seen only while it is open, never game art.
-
-/** Above everything in the world, labels included. */
-const OUTLINE_DEPTH = 1_000_010;
-const TONES: Record<NonNullable<Outline['tone']>, number> = { aim: 0xf2dc6b, held: 0x6fd08c, warn: 0xf6757a };
 
 export interface EditorOptions {
   token: string;
@@ -70,10 +69,6 @@ export class EditorUi {
   private readonly sky: { hour: string; weather?: Weather } = { hour: '' };
   /** The floor the editor works on and shows, or undefined for the one we stand on. */
   private floor?: number;
-  /** What the last check of a land found, shown while the list shows that land. */
-  private checks?: LandCheck;
-  /** Whether the bookmarks list is unfolded, kept as the window is drawn again. */
-  private marksOpen = false;
   /** New edits go live at once instead of waiting as drafts. */
   private live = false;
   private readonly panKeys = new CameraKeys();
@@ -82,6 +77,18 @@ export class EditorUi {
   private readonly finder: Finder;
   /** The tool last used in each group, so a group's key brings it back. */
   private readonly lastTool: Partial<Record<string, ToolId>> = {};
+  private readonly land = new LandControl({
+    core: this.core,
+    scene: () => this.attached,
+    open: () => this.open,
+    region: () => this.listRegion,
+    log: () => this.log,
+    levelIn: (region) => this.levelIn(region),
+    showFloor: (region, level) => region === this.options.region().id && level !== this.shownFloor() && this.chooseFloor(level),
+    render: (status) => this.render(status),
+    send: (edit, region) => this.act({ edit, live: this.live }, region),
+    step: (step) => this.step(step),
+  });
 
   constructor(private readonly options: EditorOptions) {
     this.box.classList.add('edit-mode');
@@ -89,12 +96,15 @@ export class EditorUi {
     this.finder = new Finder(this.box);
     this.box.addEventListener('click', (event) => void this.clicked(event));
     this.box.addEventListener('change', (event) => this.changed(event));
+    this.box.addEventListener('input', (event) => this.land.input(event.target as HTMLInputElement));
     // A fold's toggle does not bubble: listen on the way down.
     this.box.addEventListener('toggle', (event) => {
       const fold = event.target as HTMLDetailsElement;
-      if (fold.classList?.contains('bookmarks-box')) this.marksOpen = fold.open;
-      else if (fold.dataset?.section) this.core.inspector.toggled(fold.dataset.section, fold.open);
+      if (fold.dataset?.section) this.core.inspector.toggled(fold.dataset.section, fold.open);
     }, true);
+    // Hovering a change outlines it in the world.
+    this.panel.addEventListener('mouseover', (event) => this.land.hover((event.target as HTMLElement).closest<HTMLElement>('[data-edit]')?.dataset.edit));
+    this.panel.addEventListener('mouseleave', () => this.land.hover(undefined));
     document.addEventListener('keydown', (event) => this.key(event));
   }
 
@@ -110,6 +120,7 @@ export class EditorUi {
     else if ('tool' in action) this.chooseTool(action.tool);
     else if ('home' in action) this.backToMe();
     else if ('zoom' in action) this.zoom(action.zoom);
+    else if ('bookmark' in action) void this.land.bookmarkView();
     else if ('undo' in action) void this.act({ undo: true });
     else if ('redo' in action) void this.act({ redo: true });
     // Esc drops what a tool is part way through first, then closes the editor.
@@ -133,6 +144,7 @@ export class EditorUi {
       this.outline?.clear();
       this.hitboxGraphics?.clear();
       this.gridGraphics?.clear();
+      this.land.clear();
       this.drawnAt = '';
       this.attached?.viewFloor(undefined);
       this.attached?.previewEdits(this.listRegion);
@@ -168,7 +180,7 @@ export class EditorUi {
         ['Redo', () => void this.act({ redo: true })],
         ['Back to me', () => this.backToMe()],
         ['Bring me here', () => this.bringMe()],
-        ['Check this land', () => this.check()],
+        ['Check this land', () => this.land.check()],
         ['Take a shot here', () => this.attached && takeShot(this.attached, this.options.region().id, (w) => this.render(w))],
         ['Zoom in', () => this.zoom(1)],
         ['Zoom out', () => this.zoom(-1)],
@@ -223,6 +235,7 @@ export class EditorUi {
     try {
       this.log = await worldEdits(this.options.token, this.listRegion);
       this.showDrafts();
+      this.land.checkSoon();
     } catch (err) {
       this.status = (err as Error).message;
     }
@@ -240,30 +253,22 @@ export class EditorUi {
     if (!scene || this.attached === scene || !scene.sys.isActive()) return;
     this.attached = scene;
     this.outline = scene.add.graphics().setDepth(OUTLINE_DEPTH);
+    this.land.attach(scene, this.outline);
     this.hitboxGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 5);
     this.gridGraphics = scene.add.graphics().setDepth(OUTLINE_DEPTH - 6);
-    // The pan keys move the camera; moving it (or the floor shown changing) moves what the marks are drawn around.
-    scene.events.on('update', (_time: number, delta: number) => {
-      if (!this.open) return;
-      scene.panCamera(...this.panKeys.step(delta));
-      if (marksKey(scene) !== this.drawnAt) this.drawMarks();
+    hearWorld(scene, {
+      open: () => this.open,
+      zoom: (d) => this.zoom(d),
+      pointer: (p, kind) => this.pointer(p, kind),
+      // The pan keys move the camera; moving it (or the floor shown changing) moves what the marks are drawn around.
+      frame: (delta) => {
+        scene.panCamera(...this.panKeys.step(delta));
+        if (marksKey(scene) !== this.drawnAt) this.drawMarks();
+      },
     });
-    // The wheel zooms; dragging with the right or middle button pans.
-    scene.input.mouse?.disableContextMenu();
-    scene.input.on('wheel', (_p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) => {
-      if (this.open && dy) this.zoom(dy > 0 ? -1 : 1);
-    });
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (this.open && (p.rightButtonDown() || p.middleButtonDown())) return scene.panCamera(p.prevPosition.x - p.x, p.prevPosition.y - p.y);
-      this.pointer(p, p.isDown ? 'drag' : 'hover');
-    });
-    scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (p.leftButtonDown()) this.pointer(p, 'down');
-    });
-    scene.input.on('pointerup', (p: Phaser.Input.Pointer) => this.pointer(p, 'up'));
   }
 
-  private pointer(p: Phaser.Input.Pointer, kind: 'hover' | 'down' | 'drag' | 'up'): void {
+  private pointer(p: Phaser.Input.Pointer, kind: PointerKind): void {
     const scene = this.attached;
     if (!this.open || !scene) return;
     if (kind === 'up') return void this.step(this.core.release());
@@ -277,11 +282,7 @@ export class EditorUi {
     this.readOut(hereWords(at.map, spot, level));
     if (kind === 'down' && !this.busy) void this.step(this.core.press(at.region, at.map, spot, level));
     else if (kind === 'drag') this.core.drag(at.region, at.map, spot);
-    this.outline?.clear();
-    for (const o of this.core.outlines(at.region, at.map, spot, level)) {
-      this.outline?.lineStyle(2, TONES[o.tone ?? 'aim'], 0.95);
-      this.outline?.strokePoints(scene.tileCorners(at.map, o.x, o.y, o.w, o.h), true);
-    }
+    strokeOutlines(this.outline, scene, at.map, this.core.outlines(at.region, at.map, spot, level));
   }
 
   /** Says what is under the pointer in the status strip, without drawing the rest again. */
@@ -311,6 +312,7 @@ export class EditorUi {
       this.listRegion = region;
       this.listName = name;
       this.showDrafts();
+      this.land.checkSoon();
       this.status = 'undo' in action ? 'Taken back.' : 'redo' in action ? 'Made again.' : 'remove' in action ? 'Taken out.'
         : 'publish' in action ? 'Published. Everyone here sees it now.' : 'discard' in action ? 'Drafts thrown away. Redo brings them back.'
         : this.live ? 'Done. Everyone here sees it now.' : 'Drafted. Only editors see it until you publish.';
@@ -344,14 +346,6 @@ export class EditorUi {
     if (hour !== undefined) this.sky.hour = Object.hasOwn(PREVIEW_HOURS, hour) ? hour : '';
     if (weather !== undefined) this.sky.weather = (PREVIEW_WEATHER as string[]).includes(weather) && weather ? (weather as Weather) : undefined;
     this.attached?.previewSky({ ...(PREVIEW_HOURS[this.sky.hour]?.phase !== undefined ? { phase: PREVIEW_HOURS[this.sky.hour]!.phase } : {}), ...(this.sky.weather ? { weather: this.sky.weather } : {}) });
-  }
-
-  /** Checks the land the list shows: shapes, walks, and pictures not painted yet. */
-  private check(): void {
-    const found = this.attached && checkLand(this.attached, this.listRegion);
-    if (!found) return this.render('That land is not in sight to check.');
-    this.checks = found;
-    this.render(problemCount(found) ? 'Checked. See what turned up in the panel.' : 'Checked. All is well here.');
   }
 
   private bookmarks(): Bookmark[] {
@@ -399,9 +393,9 @@ export class EditorUi {
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.listRegion)));
     if (d.pick) return this.step(this.core.pickAction(d.pick));
     if (d.area) return this.step(this.core.areaAction(d.area, d.value));
-    if (d.check !== undefined) return this.check();
     if (d.shot !== undefined) return this.attached ? takeShot(this.attached, this.options.region().id, (w) => this.render(w)) : this.render('The game is not running yet.');
-    if (d.go !== undefined) this.goTo(Number(d.go));
+    if (d.go !== undefined) return this.goTo(Number(d.go));
+    this.land.click(d);
   }
 
   /** Goes to one of the land's bookmarks, the camera following. */
@@ -429,6 +423,7 @@ export class EditorUi {
       this.drawMarks();
     } else if (input.name === 'view-floor') this.chooseFloor(Number(input.value));
     else if (input.name === 'view-hour') this.chooseSky(input.value);
+    else if (this.land.input(input)) return;
     else if (input.name === 'view-weather') this.chooseSky(undefined, input.value);
     else if (input.name === 'live') {
       this.live = input.checked;
@@ -436,6 +431,11 @@ export class EditorUi {
     } else if (this.core.set(input.name, input.value, input.checked) && this.core.redraws(input.name)) this.render();
     // Hand the keys back to walking.
     input.blur();
+  }
+
+  /** With nothing selected (and no other tool), the panel shows the land itself. */
+  private landShown(): boolean {
+    return this.core.current().id === 'select' && !this.core.inspector.picked;
   }
 
   private render(status?: string): void {
@@ -453,11 +453,7 @@ export class EditorUi {
     this.panel.innerHTML = `
       <p class="small-screen note">The world editor needs a bigger screen than this. Open it on a computer or a tablet held sideways.</p>
       <p class="note">${escapeHtml(tool.hint)}</p>
-      <div class="settings">${this.core.settingsHtml()}</div>
-      <h3>Edits in ${escapeHtml(this.listName)}</h3>
-      ${editListHtml(this.log)}
-      ${bookmarksHtml(this.bookmarks(), this.marksOpen)}
-      ${checksHtml(this.checks, this.listRegion)}`;
+      ${this.landShown() ? `<h3>${escapeHtml(this.listName)}</h3>${this.land.html(this.bookmarks())}` : `<div class="settings">${this.core.settingsHtml()}</div>`}`;
     this.strip.innerHTML = stripHtml({ here: this.here, status: this.status, list: this.log, busy: this.busy, chatOpen: document.body.classList.contains('editing-chat') });
     this.drawMarks();
   }

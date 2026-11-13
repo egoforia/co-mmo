@@ -295,8 +295,12 @@ page's `editing` class) and frames the world with a top bar and a status
 strip (`shell.ts`: land, floor stepper, hour and weather, Tiles and
 Hitboxes, the drafts pill with Publish, Done; what is under the pointer,
 the last result, Chat, Undo and Redo); the panel on the right holds the
-tools, the edit list and the land's bookmarks and checks (`land-panel.ts`),
-and `marks.ts` draws the hitboxes and tile wireframe. Their outlines and the
+tool's settings, what Select picked, or, with nothing picked, the land panel
+(`land-panel.ts`, run by `land-control.ts`): Changes (drafts, published and
+built in, `changes.ts`, hover to outline, Go, a filter by group), Places
+(bookmarks, Bookmark this view with Ctrl D), Checks (run again after each
+change, the places they name marked red) and Land (its settings). `world-input.ts`
+wires the pointer, wheel and frames, and `marks.ts` draws the hitboxes and tile wireframe. Their outlines and the
 Studio's tile plan are the editor's own marks, seen only while it is open,
 never game art. The redesign plan it follows step by step:
 https://claude.ai/artifact/QwzvrLNrhdy6J6w6hBWvRR.

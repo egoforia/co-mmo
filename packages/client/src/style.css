@@ -559,6 +559,19 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .bookmarks .note { display: block; font-size: 11px; }
 .picked { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+/* The land panel (nothing selected): tabs, the Changes lists, Places and Checks. */
+#editor .land-tabs { display: flex; gap: 2px; margin: 8px 0; border-bottom: 1px solid var(--edge); }
+#editor .land-tabs button { flex: 1; padding: 4px 2px; font-size: 12px; border-radius: 4px 4px 0 0; }
+#editor .land-tabs button.warn:not(.on) { color: #f6757a; }
+#editor .land-tab h4 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+#editor .land-tab .filter { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+#editor .land-tab .edits li { grid-template-columns: 1fr auto auto auto; }
+#editor .land-tab .edits li:hover { background: rgba(111, 208, 140, 0.08); }
+#editor .land-tab .built-in summary { margin: 10px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; cursor: pointer; }
+#editor .bookmark-view { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+#editor .bookmark-view input { flex: 1 1 100%; min-width: 0; box-sizing: border-box; }
+#editor .bookmark-view kbd, #editor .land-tab kbd { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+
 /* Select's inspector: the picked thing, its actions, and a fold per kind of change. */
 .inspector { width: 100%; }
 .inspector header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

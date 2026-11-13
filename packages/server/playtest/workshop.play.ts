@@ -157,7 +157,8 @@ describe('the world editor in a workshop land', () => {
     expect(land().bookmarks![0]).toMatchObject({ name: 'Terrace floor', x: 106.5, y: 46.5, floor: 1, note: 'High terrace open interior floor' });
     await page.waitForTimeout(800);
     await page.screenshot({ path: resolve(shots, 'workshop-terraces-floor-1.png') });
-    await page.click('#editor .bookmarks-box summary');
+    await chooseTool(page, 'select');
+    await page.click('#editor [data-land-tab="places"]');
     await page.click('#editor [data-go="0"]');
     await page.waitForFunction(() => (window as unknown as { scene: { floor: number } }).scene.floor === 1, undefined, { timeout: 10_000 });
     await page.waitForTimeout(800);
@@ -257,6 +258,8 @@ describe('the world editor in a workshop land', () => {
     await clickTile(page, 96, 86);
     await expect.poll(() => paths(97, 87), { timeout: 10_000 }).toBe(12);
     // The checks find Hesper up on the terrace with no stairs to it.
+    await chooseTool(page, 'select');
+    await page.click('#editor [data-land-tab="checks"]');
     await page.click('#editor [data-check]');
     await expect.poll(() => page.locator('#editor .checks-box').textContent()).toContain('Hesper at (108, 46) on floor 1 cannot be walked to.');
     // Dusk, on this screen only, and a shot of it saved.

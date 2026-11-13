@@ -121,7 +121,9 @@ describe('the world editor', () => {
     expect.soft(app!.world.home.creatureIds().length, 'four more monsters').toBe(before + 4);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: resolve(shots, 'editor-house.png') });
-    await expect.poll(() => page.locator('#editor .edits li').count()).toBe(3);
+    // With Select and nothing picked, the panel shows the land: its three changes.
+    await chooseTool(page, 'select');
+    await expect.poll(() => page.locator('#editor [data-edit]').count()).toBe(3);
 
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

@@ -16,6 +16,9 @@ export const KEY_LISTS: [string, [string, string][]][] = [
     ['Right drag', 'Pan'],
     ['Home', 'Back to you'],
   ]],
+  ['Tools', [
+    ['R, Shift R', 'Turn the wall to the next side, or back'],
+  ]],
   ['What is picked', [
     ['M', 'Move it'],
     ['Ctrl C', 'Copy it'],

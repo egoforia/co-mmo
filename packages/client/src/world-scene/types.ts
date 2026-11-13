@@ -20,6 +20,7 @@ import {
 } from '@co-mmo/shared';
 import type { HouseSource } from '../kit-house-view.ts';
 import type { LitPoint } from '../lights.ts';
+import type { EdgeWallView } from './edge-walls.ts';
 import { PROJECTION } from '../projection.ts';
 
 export interface Avatar {
@@ -109,6 +110,8 @@ export interface DrawnRegion {
   floors: FloorView[];
   /** Stair pictures and labels on the ground out in the open, shown while we are on the ground. */
   stairs: Phaser.GameObjects.GameObject[];
+  /** Walls standing on one side of a tile, each see-through while it stands in front of us. */
+  edgeWalls: EdgeWallView[];
 }
 
 /** A storey drawn over its rectangle: its tiles, its furniture, and its stairs' pictures and labels. */

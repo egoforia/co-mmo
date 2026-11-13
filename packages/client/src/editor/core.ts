@@ -145,6 +145,27 @@ export class EditorCore {
     return true;
   }
 
+  /** True when the tool has a setting R turns (a wall's side). */
+  turns(): boolean {
+    return !!this.kind()?.fields.some((f) => f.type === 'choice' && f.turns);
+  }
+
+  /**
+   * The R key: steps the tool's turning setting (a wall's side) to its next
+   * choice, or back; the new choice's name, or undefined when the tool has
+   * nothing to turn.
+   */
+  turn(direction: 1 | -1): string | undefined {
+    const kind = this.kind();
+    const field = kind?.fields.find((f) => f.type === 'choice' && f.turns);
+    if (!kind || field?.type !== 'choice') return undefined;
+    const choices = field.choices(CONTEXT);
+    const now = choices.findIndex((c) => c.id === String(this.settings(kind)[field.key]));
+    const next = choices[(Math.max(0, now) + direction + choices.length) % choices.length]!;
+    (this.values[kind.kind] ??= {})[field.key] = next.id;
+    return next.name;
+  }
+
   /** A picture choice's setting by its input's name (the tool's, the inspector's or a form's): its label, choices and value now. */
   assetChoices(name: string): { label: string; choices: FieldChoice[]; value: string } | undefined {
     const [head, kindId, key] = name.split('.');
@@ -364,9 +385,10 @@ export class EditorCore {
     if (this.tool === 'area') return this.area.outlines(region, at);
     const kind = this.kind();
     if (!kind) return [{ x: at[0], y: at[1], w: 1, h: 1 }];
-    const stroke = this.stroke?.region === region ? [...this.stroke.tiles.values()].map(([x, y]) => ({ x, y, w: 1, h: 1 })) : [];
+    const values = this.settings(kind);
+    const stroke = this.stroke?.region === region ? [...this.stroke.tiles.values()].map((t) => kind.mark?.(t, values) ?? { x: t[0], y: t[1], w: 1, h: 1 }) : [];
     const from = this.held?.region === region ? this.held.at : undefined;
-    const aim = kind.outline?.(map, { at, level, ...(from ? { from } : {}) }, this.settings(kind)) ?? [{ x: at[0], y: at[1], w: 1, h: 1 }];
+    const aim = kind.outline?.(map, { at, level, ...(from ? { from } : {}) }, values) ?? [{ x: at[0], y: at[1], w: 1, h: 1 }];
     return [...stroke, ...aim];
   }
 }

@@ -1,9 +1,9 @@
 import { Tile, isBlocking, tileAt, type Outline, type RegionMap, type WorldEditDraft } from '@co-mmo/shared';
 
 // The Plan camera's picture of a land: its tiles from above, one colour each
-// by biome, on any floor, with buildings outlined, spots, people and
-// monsters as dots, the AI Map Architect's checked steps in cyan and the
-// tool's outlines on top. The editor's own plan, never game art.
+// by biome, on any floor, with buildings outlined, walls on tiles' sides as
+// thin bars, spots, people and monsters as dots, the AI Map Architect's checked
+// steps in cyan and the tool's outlines on top. The editor's own plan, never game art.
 
 const BIOME_COLORS: Record<string, { ground: string; path: string; water: string; tree: string; rock: string; wall: string; floor: string }> = {
   sanctum: { ground: '#6b6650', path: '#b8aa86', water: '#3b7a9e', tree: '#3c6e3f', rock: '#8a877c', wall: '#d6ccb2', floor: '#9c8665' },
@@ -70,6 +70,12 @@ export function drawPlan(canvas: HTMLCanvasElement, p: PlanPicture): void {
   g.strokeStyle = '#f2dc6b';
   g.lineWidth = 1.5;
   for (const b of map.buildings) g.strokeRect(b.x * c, b.y * c, b.width * c, b.height * c);
+  // Walls on a tile's side, as thin boxes along their edges.
+  g.fillStyle = palette.wall;
+  const thick = Math.max(2, c * 0.25) / c;
+  for (const w of map.edgeWalls ?? []) {
+    if (w.floor === floor) box(w.x - (w.along === 'v' ? thick / 2 : 0), w.y - (w.along === 'h' ? thick / 2 : 0), w.along === 'h' ? 1 : thick, w.along === 'v' ? 1 : thick);
+  }
   const dot = (x: number, y: number, colour: string) => {
     g.fillStyle = colour;
     g.beginPath();
@@ -84,7 +90,7 @@ export function drawPlan(canvas: HTMLCanvasElement, p: PlanPicture): void {
   // The AI Architect's checked steps.
   g.fillStyle = 'rgba(44, 232, 245, 0.32)';
   for (const dr of p.steps ?? []) {
-    if (dr.kind === 'paint') for (const [x, y] of dr.tiles) box(x, y);
+    if (dr.kind === 'paint' || dr.kind === 'wall') for (const [x, y] of dr.tiles) box(x, y);
     else if (dr.kind === 'road') {
       const [[x0, y0], [x1, y1]] = [dr.from, dr.to];
       box(Math.min(x0, x1), y0, Math.abs(x1 - x0) + 1, 2);

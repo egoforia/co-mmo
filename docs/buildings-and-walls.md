@@ -182,6 +182,17 @@ Every stairway supports 4 cardinal headings resolved via `stairHeading(s)` in `p
 ### 5. Automated Verification
 - `packages/client/test/biome-stairs.test.ts` programmatically validates all 80 directional biome stairs and 8 generic stairs for file existence, manifest registration, $256 \times 256$ dimensions, and the $L \ge 110$ luminance standard.
 
+## Walls on one side of a tile
+
+The world editor's Wall tool (`wall` edit kind) stands walls on the line
+between two tiles instead of filling a tile (`RegionMap.edgeWalls`, shared
+`edge-walls.ts`). Each is one upright face of its look's single seamless
+`<style>-wall.png`, made by `registerWallFace` like a building's walls: a
+storey high (`ground.height * 2`, 160 px) or half that, the east-facing ones
+tinted `EAST_WALL_TINT`, sorted at the middle of their edge. They are
+painted, never drawn: a look whose wall is not painted borrows the fallback
+look's. One standing in front of the player turns see-through.
+
 ## Wished buildings
 
 An Engine wish for a building adds a style to `BUILDING_STYLES` and places

@@ -25,6 +25,7 @@ import { SPAWN } from './kinds/spawn.ts';
 import { SPOT } from './kinds/spot.ts';
 import { STAIRS } from './kinds/stairs.ts';
 import { STOREY } from './kinds/storey.ts';
+import { WALL } from './kinds/wall.ts';
 import { nameThings } from './names.ts';
 import type { EditKindId, EditStamp, WorldEdit, WorldEditDraft } from './types.ts';
 
@@ -35,6 +36,7 @@ import type { EditKindId, EditStamp, WorldEdit, WorldEditDraft } from './types.t
 /** Every kind of edit, in the order the editors offer their tools. */
 export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   paint: PAINT,
+  wall: WALL,
   scenery: SCENERY,
   move: MOVE,
   road: ROAD,

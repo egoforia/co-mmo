@@ -24,7 +24,7 @@ world:
   | --- | --- | --- |
   | V | Select | Select, Copy and paste |
   | G | Ground | Paint, Scenery, Road |
-  | B | Build | Kit building, House, Storey, Stairs |
+  | B | Build | Kit building, House, Wall, Storey, Stairs |
   | F | Furnish | Furniture, Set piece, Light |
   | L | Life | Person, Monsters, Gathering |
   | P | Places | Bookmark, Land settings |
@@ -52,6 +52,17 @@ world:
   zoom, and Tiles, Hitboxes, Spots and People layers. The same tools, panel
   and drafts work here. The Art Studio's **Map editor** tab opens the game
   straight into the Plan camera.
+
+## Walls on one side of a tile
+
+**Wall** (under Build) stands an upright wall on one side of each tile you
+drag over, in a building's look, a storey high or half that. The tiles stay
+open; only the line between them is closed, so nobody walks through it.
+**R** turns the side (north, east, south, west), and **Shift R** turns it
+back; a thin outline along the tile under the pointer shows the side. Choose
+**Line** as the shape for a straight run. Tick **Take walls down instead** and
+drag again to take walls away. A wall standing in front of your character
+turns see-through so it never hides them.
 
 ## Select first, then change
 
@@ -90,6 +101,7 @@ changes go live at once.
 ## Keys
 
 Press **?** (or **Keys** in the status strip) for the sheet of every key.
+**R** turns the Wall tool's side.
 **Ctrl K** or **/** opens the finder: type a few letters to choose a tool,
 go to a bookmark or do one of the editor's actions. **Esc** first stops what
 a tool is part way through, then closes the editor.

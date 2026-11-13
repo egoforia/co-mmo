@@ -21,6 +21,7 @@ import {
 } from '@co-mmo/shared';
 import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../kit-house-view.ts';
 import { dropLight, makeLight, placeLight } from '../lights.ts';
+import { standEdgeWalls } from './edge-walls.ts';
 import { PROJECTION } from '../projection.ts';
 import {
   propTexture,
@@ -261,12 +262,15 @@ const floors: FloorView[] = map.storeys.map((storey) => {
     objects: [layer, ...cutawayWalls, ...upperShellWalls],
   };
 });
+  // Walls on a tile's side: those off the ground show with their floor.
+  const edgeWalls = standEdgeWalls(scene, map, ox, oy);
+  for (const { wall, image } of edgeWalls) if (wall.floor) floors.find((f) => f.storey.floor === wall.floor && (within(f.storey, wall.x, wall.y) || within(f.storey, wall.x - (wall.along === 'v' ? 1 : 0), wall.y - (wall.along === 'h' ? 1 : 0))))?.objects.push(image);
   placeLandmarks(scene, map, ox, oy, views, floors, art);
   placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);
   const objects = scene.children.list.filter((o) => !before.has(o));
   const lamps = placeLamps(scene, map, ox, oy, views);
-  return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs };
+  return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls };
 }
 
 /** Landmarks: set pieces out in the land, furniture inside buildings, and furniture on the floors above and below. */

@@ -1,4 +1,5 @@
 import { PLAYER_RADIUS, PLAYER_SPEED, TICK_SECONDS } from './constants.ts';
+import { touchesEdgeWall } from './edge-walls.ts';
 import { roomFor, type Among } from './hit-boxes.ts';
 import { OPPOSITE, isBlocking, tileAt, type RegionMap, type Side } from './world.ts';
 
@@ -30,14 +31,15 @@ export function step(map: RegionMap, pos: Vec2, dx: number, dy: number, floor = 
   return { x, y };
 }
 
-/** True when a body standing at (x, y) on a floor (the ground unless said) would touch something solid. */
+/** True when a body standing at (x, y) on a floor (the ground unless said) would touch something solid: a blocking tile, or a wall on a tile's side. */
 export function collides(map: RegionMap, x: number, y: number, floor = 0): boolean {
   const r = PLAYER_RADIUS;
   return (
     isBlocking(tileAt(map, x - r, y - r, floor)) ||
     isBlocking(tileAt(map, x + r, y - r, floor)) ||
     isBlocking(tileAt(map, x - r, y + r, floor)) ||
-    isBlocking(tileAt(map, x + r, y + r, floor))
+    isBlocking(tileAt(map, x + r, y + r, floor)) ||
+    touchesEdgeWall(map, x, y, floor, r)
   );
 }
 

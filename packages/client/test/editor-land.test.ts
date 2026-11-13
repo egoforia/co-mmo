@@ -34,7 +34,7 @@ describe('the land panel', () => {
 
   it('counts drafts and problems on the tabs, and marks the places a check names', () => {
     const checks = { region: 'sanctum', found: { shapes: ['The building at (12, 30): falls apart'], walks: ['Hesper at (108, 46) on floor 1 cannot be walked to.'] }, unpainted: [] };
-    const html = landPanelHtml({ tab: 'checks', region: 'sanctum', list: { edits: [house], undone: 0 }, map, filter: 'all', marks: [], viewName: '', checks, landForm: '' });
+    const html = landPanelHtml({ tab: 'checks', region: 'sanctum', list: { edits: [house], undone: 0 }, map, filter: 'all', marks: [], viewName: '', checks, landForm: '', architect: '', steps: 0, lands: '' });
     expect(html).toContain('Changes (1)');
     expect(html).toContain('Checks (2)');
     expect(html).toContain('falls apart');

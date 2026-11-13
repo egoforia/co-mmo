@@ -5,15 +5,16 @@ import { changesHtml } from './changes.ts';
 import type { EditList } from './core.ts';
 
 // The land panel: what the editor's panel shows while nothing is selected,
-// the land as a whole in four tabs (`data-land-tab`). Changes lists its
+// the land as a whole in five tabs (`data-land-tab`). Changes lists its
 // edits (changes.ts); Places its bookmarks, with Bookmark this view
 // (`data-bookmark-view`, Ctrl D); Checks what is wrong with it (shapes, walks,
 // pictures not painted yet), run again after each change, with Take a shot;
-// Land its settings (`data-land-apply`). Plain HTML from state, plus the
-// checks and the shot.
+// Architect the AI Map Architect (architect.ts); Land its settings
+// (`data-land-apply`), workshop lands and files (lands-io.ts). Plain HTML
+// from state, plus the checks and the shot.
 
 /** The land panel's tabs, in order. */
-export const LAND_TABS = [['changes', 'Changes'], ['places', 'Places'], ['checks', 'Checks'], ['land', 'Land']] as const;
+export const LAND_TABS = [['changes', 'Changes'], ['places', 'Places'], ['checks', 'Checks'], ['architect', 'Architect'], ['land', 'Land']] as const;
 export type LandTab = (typeof LAND_TABS)[number][0];
 
 /** What the land panel draws. */
@@ -30,18 +31,24 @@ export interface LandPanelState {
   checks: LandCheck | undefined;
   /** The land kind's settings as inputs (core.formHtml). */
   landForm: string;
+  /** The Architect's card (architectHtml), and how many steps it holds. */
+  architect: string;
+  steps: number;
+  /** Workshop lands and files (landsHtml), under the land's settings. */
+  lands: string;
 }
 
 /** The land panel: its tabs, each with a count where one helps, and the tab chosen. */
 export function landPanelHtml(s: LandPanelState): string {
   const drafts = s.list.edits.filter((e) => e.draft).length;
   const problems = s.checks?.region === s.region ? problemCount(s.checks) : undefined;
-  const count: Record<LandTab, string> = { changes: drafts ? ` (${drafts})` : '', places: s.marks.length ? ` (${s.marks.length})` : '', checks: problems ? ` (${problems})` : '', land: '' };
+  const count: Record<LandTab, string> = { changes: drafts ? ` (${drafts})` : '', places: s.marks.length ? ` (${s.marks.length})` : '', checks: problems ? ` (${problems})` : '', architect: s.steps ? ` (${s.steps})` : '', land: '' };
   const tabs = LAND_TABS.map(([id, name]) => `<button type="button" role="tab" data-land-tab="${id}" aria-selected="${id === s.tab}" class="${id === s.tab ? 'on' : 'quiet'}${id === 'checks' && problems ? ' warn' : ''}">${name}${count[id]}</button>`).join('');
   const body = s.tab === 'changes' ? changesHtml(s.list, s.map, s.filter)
     : s.tab === 'places' ? placesHtml(s.marks, s.viewName)
     : s.tab === 'checks' ? checksHtml(s.checks, s.region)
-    : `<p class="note">The weather here, and where players arrive (the middle of the screen when ticked).</p><div class="settings">${s.landForm}</div><button type="button" data-land-apply>Set for this land</button>`;
+    : s.tab === 'architect' ? s.architect
+    : `<p class="note">The weather here, and where players arrive (the middle of the screen when ticked).</p><div class="settings">${s.landForm}</div><button type="button" data-land-apply>Set for this land</button>${s.lands}`;
   return `<nav class="land-tabs" role="tablist" aria-label="This land">${tabs}</nav><div class="land-tab">${body}</div>`;
 }
 
@@ -64,14 +71,12 @@ export interface LandCheck {
   unpainted: string[];
 }
 
-/** Checks a land drawn on this screen: shapes, walks, and pictures not painted yet; undefined when it is not in sight. */
-export function checkLand(scene: WorldScene, region: string): LandCheck | undefined {
-  const map = scene.landMap(region);
-  if (!map) return undefined;
-  // Pictures the land shows that this screen has none of: people, monsters and pieces.
+/** Checks a land: shapes, walks, and pictures not painted yet (`painted` says which are). */
+export function checkLand(map: RegionMap, painted: (asset: string) => boolean): LandCheck {
+  // Pictures the land shows that have none yet: people, monsters and pieces.
   const assets = new Set([...map.npcs.map((n) => n.asset), ...map.creatures.map((c) => c.asset), ...map.landmarks.map((l) => l.asset)]);
-  const unpainted = [...assets].filter((a) => a && !scene.textures.exists(a)).sort();
-  return { region, found: landChecks(map), unpainted };
+  const unpainted = [...assets].filter((a) => a && !painted(a)).sort();
+  return { region: map.def.id, found: landChecks(map), unpainted };
 }
 
 /** How many things a check found. */

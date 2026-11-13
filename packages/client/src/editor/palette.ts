@@ -2,7 +2,8 @@ import { escapeHtml } from '../ui.ts';
 
 // The editor's finder (Ctrl K, or /): type a few letters to choose a tool,
 // go to a bookmark or do one of the editor's actions, without hunting for
-// its button. The editor hands it what can be found each time it opens.
+// its button, or say in plain words what to change and ask the AI Map
+// Architect. The editor hands it what can be found each time it opens.
 
 /** One thing the finder can find. */
 export interface Findable {
@@ -38,13 +39,15 @@ export class Finder {
   private items: Findable[] = [];
   private shown: Findable[] = [];
   private chosen = 0;
+  /** Asks the Architect with the words typed, when the editor offers it. */
+  private ask?: (words: string) => void;
 
   constructor(parent: HTMLElement) {
     this.el.className = 'editor-finder';
     this.el.hidden = true;
     this.el.setAttribute('role', 'dialog');
     this.el.setAttribute('aria-label', 'Find a tool, a place or an action');
-    this.el.innerHTML = '<input name="finder" type="text" autocomplete="off" placeholder="Find a tool, a place or an action…" aria-label="Find" /><ol class="found" role="listbox"></ol><p class="note">↑ ↓ to choose · Enter to use · Esc to close</p>';
+    this.el.innerHTML = '<input name="finder" type="text" autocomplete="off" placeholder="Find a tool, a place or an action, or ask the Architect…" aria-label="Find" /><ol class="found" role="listbox"></ol><p class="note">↑ ↓ to choose · Enter to use · Esc to close</p>';
     parent.append(this.el);
     const input = this.input();
     input.addEventListener('input', () => this.list(input.value));
@@ -72,9 +75,10 @@ export class Finder {
     return !this.el.hidden;
   }
 
-  /** Opens the finder with what can be found now. */
-  show(items: Findable[]): void {
+  /** Opens the finder with what can be found now; with `ask`, the last row asks the Architect with the words typed. */
+  show(items: Findable[], ask?: (words: string) => void): void {
     this.items = items;
+    this.ask = ask;
     this.el.hidden = false;
     const input = this.input();
     input.value = '';
@@ -93,6 +97,9 @@ export class Finder {
 
   private list(typed: string): void {
     this.shown = find(this.items, typed);
+    const words = typed.trim();
+    const ask = this.ask;
+    if (ask && words.includes(' ')) this.shown.push({ name: `Ask the Architect: ${words}`, kind: 'Ask', run: () => ask(words) });
     this.chosen = 0;
     this.draw();
   }

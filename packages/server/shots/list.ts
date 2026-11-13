@@ -406,27 +406,40 @@ export const SHOTS: Shot[] = [
     mustSee: ['thin light lines along the tile edges around the player, lying flat on the ground in the diamond grid', 'the Tiles switch ticked beside Hitboxes in the editor title', 'the lines stop at the land\'s edge and do not cover the editor window'],
   },
   {
-    name: 'studio-map',
-    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Build group chosen.",
-    page: '/art-studio.html#art/map-editor',
-    ready: '#studio-map-canvas',
+    name: 'editor-plan',
+    about: "The world editor's Plan camera over the Sanctum, zoomed in twice, with the Build group chosen.",
+    region: 'sanctum',
     open: async (page) => {
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-group="build"]');
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-camera="plan"]');
+      await page.waitForSelector('#editor .editor-plan canvas');
+      await page.click('#editor [data-plan-zoom="in"]');
+      await page.click('#editor [data-plan-zoom="in"]');
+      await page.click('#editor [data-group="build"]');
     },
-    mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Build tools (Kit building, House, Storey, Stairs) with Kit building\'s settings', 'the edit list beside the map'],
+    mustSee: ['the Sanctum from above, coloured by tile, filling the space between the rail and the panel and scrolling inside it', 'World and Plan in the top bar with Plan chosen; the plan\'s own bar with the land menu, zoom at 225% and Tiles, Hitboxes, Spots, People & monsters', 'the Build tools (Kit building, House, Storey, Stairs) and Kit building\'s settings in the panel', 'no mini map, sky or game HUD showing through'],
   },
   {
-    name: 'studio-map-tiles',
-    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Tiles layer on.",
-    page: '/art-studio.html#art/map-editor',
-    ready: '#studio-map-canvas',
+    name: 'editor-plan-architect',
+    about: "The world editor's Plan camera over the Sanctum with its Tiles layer on and the land panel's Architect tab.",
+    region: 'sanctum',
     open: async (page) => {
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-map-layer="showGrid"]');
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.keyboard.press('Tab');
+      await page.waitForSelector('#editor .editor-plan canvas');
+      await page.click('#editor [data-plan-zoom="in"]');
+      await page.click('#editor input[name="plan-layer"][value="grid"]');
+      await page.click('#editor [data-land-tab="architect"]');
     },
-    mustSee: ['a thin line around every tile, brighter every fifth tile', 'the Tiles box ticked beside Hitboxes'],
+    mustSee: ['a thin line around every tile of the plan, brighter every fifth tile', 'the Architect tab chosen: a box to say what to change and "Show the steps"', 'the Tiles box ticked in the plan\'s bar'],
+  },
+  {
+    name: 'studio-map',
+    about: "The Art Studio's Map editor tab: a link into the game's Plan camera.",
+    page: '/art-studio.html#art/map-editor',
+    ready: '[data-plan-link]',
+    mustSee: ['a short card saying the map editor is in the game now', 'a button-like link "Open the Plan camera in the game"'],
   },
 ];

@@ -31,8 +31,8 @@ import { AreaTool } from './area.ts';
 import { CONTEXT, fieldsHtml, filled, hasRules, readField } from './fields.ts';
 import { Inspector } from './inspector.ts';
 
-// The world editor's core, shared by its two views: the window beside the
-// game (in-game.ts) and the Studio's map (studio-map.ts). It knows the tools
+// The world editor's core, shared by edit mode's two cameras (in-game.ts):
+// the World (the game's own view) and the Plan (a land from above). It knows the tools
 // (one per kind of edit in the registry, plus Select and Copy and paste), their settings, the
 // Select tool's inspector (inspector.ts), what a
 // press, drag or release on a tile makes, what to outline under the pointer,
@@ -389,6 +389,11 @@ export function describe(map: RegionMap, at: TilePoint, level = 0): string {
 /** The status strip's words for the tile under the pointer: what stands there, where, and on which floor. */
 export function hereWords(map: RegionMap, at: TilePoint, level = 0): string {
   return `${describe(map, at, level)} · ${at[0]}, ${at[1]}${level ? ` · ${floorName(level)}` : ''}`;
+}
+
+/** The status strip's words for the pointer: whether a making tool's thing fits there (aimAt), then what is there. */
+export function aimWords(aim: { problem?: string } | undefined, map: RegionMap, at: TilePoint, level = 0): string {
+  return `${aim ? (aim.problem ? `✗ ${aim.problem} · ` : '✓ It fits here · ') : ''}${hereWords(map, at, level)}`;
 }
 
 /** A land's edits, newest first, drafts marked, each with a button to take it out (`data-remove`). */

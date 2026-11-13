@@ -125,6 +125,24 @@ describe('the world editor', () => {
     await chooseTool(page, 'select');
     await expect.poll(() => page.locator('#editor [data-edit]').count()).toBe(3);
 
+    // The Plan camera (Tab): the land from above, where the same tools work. A tree four tiles south of us.
+    await page.keyboard.press('Tab');
+    const plan = page.locator('#editor .editor-plan canvas');
+    await plan.waitFor();
+    await chooseTool(page, 'paint');
+    await page.selectOption('#editor select[name="tile"]', 'tree');
+    const box = (await plan.boundingBox())!;
+    await page.mouse.click(box.x + ((spot.x + 0.5) / map.width) * box.width, box.y + ((spot.y + 4.5) / map.height) * box.height);
+    await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(4);
+    expect.soft(tile(spot.x, spot.y + 4), 'a tree drawn on the plan').toBe(Tile.Tree);
+    await page.screenshot({ path: resolve(shots, 'editor-plan.png') });
+    // The Architect has its tab in the land panel, in either camera.
+    await chooseTool(page, 'select');
+    await page.click('#editor [data-land-tab="architect"]');
+    await page.waitForSelector('#editor #architect-form textarea');
+    await page.keyboard.press('Tab');
+    await expect.poll(() => page.locator('#editor .editor-plan').isHidden()).toBe(true);
+
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);
     await context.close();

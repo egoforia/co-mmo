@@ -369,6 +369,36 @@ export const SHOTS: Shot[] = [
     ],
   },
   {
+    name: 'editor-wall-hitboxes',
+    about: 'The same L of walls as editor-wall, with Hitboxes switched on: each wall marked by a thin red band along its edge, not a whole tile.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-tools~="wall"]');
+      await page.click('#editor [data-tool="wall"]');
+      await page.selectOption('#editor select[name="shape"]', 'line');
+      const line = async (from: [number, number], to: [number, number]) => {
+        await page.mouse.move(...from);
+        await page.mouse.down();
+        await page.mouse.move(...to, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(800);
+      };
+      await line([440, 300], [600, 380]);
+      await page.keyboard.press('r');
+      await line([600, 380], [440, 460]);
+      await page.click('#editor input[name="hitboxes"]');
+      await page.mouse.move(380, 520);
+      await page.waitForTimeout(1200);
+    },
+    mustSee: [
+      'thin red bands on the ground along the foot of both walls of the L, each as long as the wall and much thinner than a tile',
+      'the buildings\' walls nearby filled red tile by tile as before',
+    ],
+  },
+  {
     name: 'editor-inspector',
     about: 'The world editor with the shop the player stands in selected: its inspector, with the Floors section unfolded.',
     region: 'sanctum',

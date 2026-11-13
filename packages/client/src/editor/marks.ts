@@ -1,12 +1,16 @@
 import type Phaser from 'phaser';
-import { Tile, isBlocking, tileAt } from '@co-mmo/shared';
+import { Tile, isBlocking, tileAt, wallBox } from '@co-mmo/shared';
 import type { WorldScene } from '../world-scene.ts';
 import { GRID_RADIUS, drawTileGrid } from './tile-grid.ts';
 
 // The editor's marks over the world around the middle of the screen (the
 // free camera's centre, or the player when it is over another land): the
-// hitboxes of the floor we stand on (tiles nobody can walk on) and the tile
+// hitboxes of the floor we stand on (tiles nobody can walk on, and the thin
+// band along each wall on a tile's side) and the tile
 // wireframe of the floor shown. They are the editor's own lines, never game art.
+
+/** The colour of a wall's hitbox: the same red as a blocked tile's. */
+const WALL_MARK = 0xf6757a;
 
 /** Where the tile wireframe switch is remembered, on this browser only. */
 const GRID_KEY = 'co-mmo.editor.tileGrid';
@@ -52,6 +56,16 @@ export function drawMarks(scene: WorldScene, hitboxes: Phaser.GameObjects.Graphi
       hitboxes.lineStyle(1.5, colour, 0.9);
       hitboxes.strokePoints(pts, true);
     }
+  }
+  // Walls on a tile's side stop bodies only in a thin band along their edge.
+  for (const w of map.edgeWalls ?? []) {
+    if (w.floor !== floor || Math.abs(w.x - cx) > GRID_RADIUS || Math.abs(w.y - cy) > GRID_RADIUS) continue;
+    const b = wallBox(w);
+    const pts = scene.tileCorners(map, b.x, b.y, b.w, b.h);
+    hitboxes.fillStyle(WALL_MARK, 0.6);
+    hitboxes.fillPoints(pts, true);
+    hitboxes.lineStyle(1.5, WALL_MARK, 0.95);
+    hitboxes.strokePoints(pts, true);
   }
 }
 

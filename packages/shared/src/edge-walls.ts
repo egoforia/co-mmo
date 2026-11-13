@@ -38,6 +38,12 @@ export interface EdgeWall {
 /** Half how thick a wall is, in tiles: a body is stopped this far from its line. */
 export const WALL_HALF_THICKNESS = 0.08;
 
+/** The box of tiles a wall stops bodies in: its edge, `WALL_HALF_THICKNESS` either side (the editor's Hitboxes draw it). */
+export function wallBox(wall: Pick<EdgeWall, 'x' | 'y' | 'along'>): { x: number; y: number; w: number; h: number } {
+  const t = WALL_HALF_THICKNESS;
+  return wall.along === 'h' ? { x: wall.x, y: wall.y - t, w: 1, h: t * 2 } : { x: wall.x - t, y: wall.y, w: t * 2, h: 1 };
+}
+
 /** The edge a side of a tile stands on. */
 export function edgeOf(x: number, y: number, side: WallSide): { x: number; y: number; along: 'h' | 'v' } {
   if (side === 'north') return { x, y, along: 'h' };

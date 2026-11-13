@@ -12,6 +12,7 @@ import {
   stampEdit,
   step,
   turnSide,
+  wallBox,
   wallBetween,
   wallOn,
   type RegionMap,
@@ -88,5 +89,11 @@ describe('walls on a tile\'s side', () => {
     expect(checkEdit(map, { ...ok, tiles: [[-1, 5]] }, CREATURES)).toBe('That spot is off the edge of this land.');
     expect(checkEdit(map, { ...ok, level: 1 }, CREATURES)).toBe('A wall off the ground stands on a storey: keep it on the floor shown.');
     expect(editWords(ok)).toBe('A wall on the north side of 1 tile');
+  });
+
+  it('show their hitbox as the thin band along their edge that stops bodies', () => {
+    const t = WALL_HALF_THICKNESS;
+    expect(wallBox({ x: 4, y: 7, along: 'h' })).toEqual({ x: 4, y: 7 - t, w: 1, h: 2 * t });
+    expect(wallBox({ x: 4, y: 7, along: 'v' })).toEqual({ x: 4 - t, y: 7, w: 2 * t, h: 1 });
   });
 });

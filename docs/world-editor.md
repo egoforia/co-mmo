@@ -62,7 +62,8 @@ open; only the line between them is closed, so nobody walks through it.
 back; a thin outline along the tile under the pointer shows the side. Choose
 **Line** as the shape for a straight run. Tick **Take walls down instead** and
 drag again to take walls away. A wall standing in front of your character
-turns see-through so it never hides them.
+turns see-through so it never hides them. With **Hitboxes** on, each wall shows a thin red band along its
+edge: the part that stops you, not a whole tile.
 
 ## Select first, then change
 

@@ -10,6 +10,7 @@ import { groupOf, groups, toolFor } from './rail.ts';
 export type KeyAction =
   | { find: true }
   | { camera: true }
+  | { keys: true }
   | { pick: 'remove' | 'move' | 'copy' }
   | { tool: ToolId }
   | { home: true }
@@ -25,6 +26,7 @@ export function keyAction(event: KeyboardEvent, core: EditorCore, lastTool: Part
   const ctrl = event.ctrlKey || event.metaKey;
   const plain = !(ctrl || event.altKey);
   if ((key === 'k' && ctrl) || (key === '/' && plain)) return { find: true };
+  if (key === '?' && plain) return { keys: true };
   if (key === 'd' && ctrl) return { bookmark: true };
   if (key === 'tab' && plain && !event.shiftKey) return { camera: true };
   // What is picked: M moves it, Ctrl C copies it, Delete takes it away.

@@ -2,7 +2,7 @@ import type { RegionMap } from '@co-mmo/shared';
 import { PROJECTION } from './projection.ts';
 import { floorPlan, PLAN_PIXELS, type PlanPiece } from './mini-map-art.ts';
 import { MAP_ZOOMS, MAP_ZOOM_START, floorsAt, fromMap, mapCaption, mapTransform, nextZoom, onMap, peekStep } from './mini-map-plan.ts';
-import { isTyping } from './ui.ts';
+import { isEditing, isTyping } from './ui.ts';
 import type { MiniMapView } from './world-scene.ts';
 
 // The mini map in the corner: the floor you are on, centred on you, turned
@@ -68,7 +68,8 @@ export class MiniMap {
       if (this.options.jump(at.x, at.y)) this.draw();
     });
     window.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === 'm' && !isTyping() && !e.ctrlKey && !e.metaKey && !e.altKey) this.toggle();
+      // In edit mode M is the editor's (Move, or the More tools).
+      if (e.key.toLowerCase() === 'm' && !isTyping() && !isEditing() && !e.ctrlKey && !e.metaKey && !e.altKey) this.toggle();
     });
     this.show(saved.window);
   }

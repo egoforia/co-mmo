@@ -315,7 +315,10 @@ the art manifests by `art-index.ts`. A one-click making tool shows a
 see-through ghost of what it would stand under the pointer (`ghost.ts`) and
 the server's own check of that spot in the status strip (`EditorCore.aimAt`).
 `world-input.ts`
-wires the pointer, wheel and frames, and `marks.ts` draws the hitboxes and tile wireframe. Their outlines and the
+wires the pointer, wheel and frames, and `marks.ts` draws the hitboxes and tile wireframe.
+`keys-sheet.ts` is the sheet of keys (?), and `panel-size.ts` the panel's
+grip (its width remembered in the browser, set as `--panel-w`). How it is
+used, for the person editing: `docs/world-editor.md`. Their outlines and the
 Plan camera's tile plan are the editor's own marks, seen only while it is open,
 never game art. The redesign plan it follows step by step:
 https://claude.ai/artifact/QwzvrLNrhdy6J6w6hBWvRR.

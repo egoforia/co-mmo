@@ -519,7 +519,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .editor-rail button { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; }
 #editor .editor-rail button kbd { margin: 0; }
 #editor .editor-rail button.on kbd { color: var(--bg); }
-#editor .editor-options { position: absolute; top: calc(var(--editor-top, 44px) + 12px); left: 108px; right: 364px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border-width: 1px; width: fit-content; max-width: calc(100vw - 480px); }
+#editor .editor-options { position: absolute; top: calc(var(--editor-top, 44px) + 12px); left: 108px; right: calc(var(--panel-w, 340px) + 24px); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border-width: 1px; width: fit-content; max-width: calc(100vw - 140px - var(--panel-w, 340px)); }
 #editor .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 #editor .editor-finder { position: absolute; top: calc(var(--editor-top, 44px) + 52px); left: 50%; transform: translateX(-50%); z-index: 3; width: min(480px, calc(100vw - 32px)); padding: 10px; border-width: 1px; border-color: var(--accent); background: var(--bg); }
 #editor .editor-finder input { width: 100%; font-size: 15px; padding: 8px; }
@@ -528,7 +528,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .editor-finder .found li.chosen { background: rgba(254, 174, 52, 0.18); outline: 1px solid var(--accent); }
 #editor .editor-finder .found .kind { color: var(--muted); font-size: 11px; }
 #editor .editor-finder .note { color: var(--muted); font-size: 11px; margin: 0; }
-#editor .editor-panel { position: absolute; top: calc(var(--editor-top, 44px) + 12px); right: 12px; bottom: 48px; width: min(340px, calc(100vw - 24px)); overflow: auto; padding: 12px 14px; border-width: 1px; }
+#editor .editor-panel { position: absolute; top: calc(var(--editor-top, 44px) + 12px); right: 12px; bottom: 48px; width: min(var(--panel-w, 340px), calc(100vw - 24px)); overflow: auto; padding: 12px 14px; border-width: 1px; }
 #editor .editor-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 #editor .editor-panel .note { color: var(--muted); font-size: 12px; }
 #editor .editor-panel .small-screen { display: none; }
@@ -577,7 +577,7 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .file-pick { display: inline-block; cursor: pointer; border: 1px solid var(--edge); padding: 4px 10px; }
 #editor .file-pick input { display: none; }
 /* The Plan camera: a land from above, between the rail and the panel, over the world. */
-#editor .editor-plan { position: absolute; top: calc(var(--editor-top, 44px) + 56px); left: 108px; right: 364px; bottom: 48px; display: flex; flex-direction: column; border-width: 1px; background: var(--bg); }
+#editor .editor-plan { position: absolute; top: calc(var(--editor-top, 44px) + 56px); left: 108px; right: calc(var(--panel-w, 340px) + 24px); bottom: 48px; display: flex; flex-direction: column; border-width: 1px; background: var(--bg); }
 #editor .editor-plan[hidden] { display: none; }
 #editor .plan-bar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--edge); background: var(--panel); }
 #editor .plan-bar .check { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); cursor: pointer; }
@@ -592,6 +592,21 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .ai-steps .check { display: flex; gap: 6px; align-items: flex-start; }
 #editor .ai-steps small.bad { color: #f6757a; }
 body.editing-plan #mini-map { display: none !important; }
+/* The panel's grip: drag its left edge to make it wider (remembered in this browser). */
+#editor .panel-grip { position: absolute; z-index: 1; top: calc(var(--editor-top, 44px) + 12px); bottom: 48px; right: calc(var(--panel-w, 340px) + 8px); width: 8px; cursor: col-resize; background: transparent; touch-action: none; }
+#editor .panel-grip:hover, #editor .panel-grip.dragging { background: rgba(254, 174, 52, 0.35); }
+/* The sheet of keys (?). */
+#editor .editor-keys { position: absolute; z-index: 4; top: calc(var(--editor-top, 44px) + 52px); left: 50%; transform: translateX(-50%); width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 160px); overflow: auto; padding: 10px 16px 14px; border-width: 1px; border-color: var(--accent); background: var(--bg); }
+#editor .editor-keys[hidden] { display: none; }
+#editor .editor-keys header { display: flex; justify-content: space-between; align-items: center; }
+#editor .editor-keys h3 { margin: 0; font-size: 14px; color: var(--accent); }
+#editor .editor-keys .lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 4px 24px; }
+#editor .editor-keys h4 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+#editor .editor-keys dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; margin: 0; }
+#editor .editor-keys dt { white-space: nowrap; }
+#editor .editor-keys dd { margin: 0; color: var(--ink); }
+#editor .editor-keys .note { margin: 0 0 6px; color: var(--muted); font-size: 12px; }
+#editor .editor-keys kbd { display: inline-block; margin: 0; padding: 0 5px; border: 1px solid var(--edge); border-radius: 3px; color: var(--ink); }
 
 /* Select's inspector: the picked thing, its actions, and a fold per kind of change. */
 .inspector { width: 100%; }
@@ -614,7 +629,7 @@ body.editing #mini-map { top: auto; right: auto; left: 12px; bottom: 48px; }
   #editor .editor-panel { top: 52px; bottom: auto; left: 12px; right: 12px; width: auto; }
   #editor .editor-panel > :not(.small-screen) { display: none; }
   #editor .editor-panel .small-screen { display: block; font-size: 14px; color: var(--ink); }
-  #editor .editor-strip, #editor .editor-rail, #editor .editor-options, #editor .editor-plan { display: none; }
+  #editor .editor-strip, #editor .editor-rail, #editor .editor-options, #editor .editor-plan, #editor .panel-grip { display: none; }
 }
 
 /* --- Performance overlay (Stewards and the Owner, F3) ---------------------- */

@@ -436,6 +436,23 @@ export const SHOTS: Shot[] = [
     mustSee: ['a thin line around every tile of the plan, brighter every fifth tile', 'the Architect tab chosen: a box to say what to change and "Show the steps"', 'the Tiles box ticked in the plan\'s bar'],
   },
   {
+    name: 'editor-keys',
+    about: "The world editor's sheet of keys (?), over the Sanctum, with the panel dragged 100 pixels wider.",
+    region: 'sanctum',
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      const grip = (await page.locator('#editor .panel-grip').boundingBox())!;
+      await page.mouse.move(grip.x + 4, grip.y + 200);
+      await page.mouse.down();
+      await page.mouse.move(grip.x - 96, grip.y + 200, { steps: 6 });
+      await page.mouse.up();
+      await page.keyboard.press('?');
+      await page.waitForSelector('#editor .editor-keys:not([hidden])');
+    },
+    mustSee: ['a sheet of keys in the middle: Tools with each group\'s letter, Camera, What is picked and Editor', 'the panel on the right about 440 pixels wide, the options bar and world left of it', 'Keys ? in the status strip'],
+  },
+  {
     name: 'studio-map',
     about: "The Art Studio's Map editor tab: a link into the game's Plan camera.",
     page: '/art-studio.html#art/map-editor',

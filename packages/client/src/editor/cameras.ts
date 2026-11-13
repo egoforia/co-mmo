@@ -35,8 +35,8 @@ export class Cameras {
     this.id = id;
     if (id === 'plan') return void this.plan.show(region);
     this.plan.hide();
-    // The World camera shows only the lands drawn around us.
-    if (!this.host.scene()?.landMap(this.host.listed())) this.host.followUs();
+    // Back in the World camera, the editor works on the land we are in again.
+    if (this.host.listed() !== this.host.ourLand()) this.host.followUs();
   }
 
   /** The other camera. */

@@ -56,6 +56,8 @@ export interface BarState {
   list: EditList;
   live: boolean;
   busy: boolean;
+  /** The drafts pill's menu is open (it stays open when the bar is drawn again). */
+  menuOpen?: boolean;
 }
 
 /** What the status strip shows. */
@@ -92,7 +94,7 @@ export function barHtml(s: BarState): string {
     `<button type="button" data-camera="${id}" class="${s.camera === id ? 'on' : 'quiet'}" aria-pressed="${s.camera === id}">${name}</button>`).join('')}</span>`;
   // The plan has its own tiles and hitboxes switches, and no sky.
   return `<span class="land-name" title="The land you are editing">✎ <b>${escapeHtml(s.land)}</b></span>
-    ${camera}${floor}${s.camera === 'world' ? `${sky}${marks}` : ''}<span class="spacer"></span>${draftsPillHtml(s.list, s.live, s.busy)}
+    ${camera}${floor}${s.camera === 'world' ? `${sky}${marks}` : ''}<span class="spacer"></span>${draftsPillHtml(s.list, s.live, s.busy, s.menuOpen)}
     <button type="button" class="quiet done" data-done title="Close the editor (Esc)">Done <kbd>Esc</kbd></button>`;
 }
 
@@ -100,7 +102,7 @@ export function barHtml(s: BarState): string {
  * The drafts pill: how many changes only editors see, Publish (`data-publish`),
  * and a menu with Throw away (`data-discard`) and whether new changes go live at once (`name="live"`).
  */
-export function draftsPillHtml(list: EditList, live: boolean, busy = false): string {
+export function draftsPillHtml(list: EditList, live: boolean, busy = false, menuOpen = false): string {
   const drafts = list.edits.filter((e) => e.draft).length;
   const off = busy ? ' disabled' : '';
   const words = live ? 'Changes go live at once' : drafts ? `${drafts} draft${drafts === 1 ? '' : 's'}` : 'No drafts';
@@ -108,7 +110,7 @@ export function draftsPillHtml(list: EditList, live: boolean, busy = false): str
   return `<span class="drafts-pill${drafts ? ' has-drafts' : ''}" title="${escapeHtml(title)}">
       ${drafts ? '<span class="dot" aria-hidden="true"></span>' : ''}<span>${escapeHtml(words)}</span>
       ${drafts ? `<button type="button" data-publish${off}>Publish</button>` : ''}
-      <details class="publish-menu"><summary aria-label="Draft settings" title="Draft settings">▾</summary><div class="menu">
+      <details class="publish-menu"${menuOpen ? ' open' : ''}><summary aria-label="Draft settings" title="Draft settings">▾</summary><div class="menu">
         <label class="check"><input type="checkbox" name="live"${live ? ' checked' : ''} /> Make my changes live at once</label>
         ${drafts ? `<button type="button" class="quiet" data-discard${off}>Throw ${drafts === 1 ? 'the draft' : `all ${drafts} drafts`} away</button>` : ''}
       </div></details></span>`;
@@ -122,6 +124,7 @@ export function stripHtml(s: StripState): string {
     <button type="button" class="quiet" data-me title="The camera goes back to you (Home)">Back to me</button>
     <button type="button" class="quiet" data-bring title="Moves you to the middle of the screen">Bring me here</button>
     <button type="button" class="quiet" data-chat aria-pressed="${s.chatOpen}" title="Show or hide the chat">Chat</button>
+    <button type="button" class="quiet" data-keys title="Every key the editor knows (?)">Keys <kbd>?</kbd></button>
     ${historyHtml(s.list, s.busy)}`;
 }
 

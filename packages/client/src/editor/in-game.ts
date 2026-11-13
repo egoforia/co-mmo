@@ -15,6 +15,8 @@ import { pickFor } from './asset-picker.ts';
 import { takeShot } from './land-panel.ts';
 import { WorldMarks } from './marks.ts';
 import { PlanView } from './plan-view.ts';
+import { keysSheet, keysSheetHtml } from './keys-sheet.ts';
+import { PanelSize } from './panel-size.ts';
 import { Cameras, type CameraId } from './cameras.ts';
 import { Editing } from './editing.ts';
 import { barHtml, chooseSky, stripHtml, type SkyChoice } from './shell.ts';
@@ -66,6 +68,10 @@ export class EditorUi {
   private readonly rail = part('editor-rail', 'nav');
   private readonly optionsBar = part('editor-options', 'div');
   private readonly finder: Finder;
+  /** The sheet of keys (?). */
+  private readonly keysSheet = keysSheet();
+  /** The drafts menu was used: it folds away when the bar is drawn again. */
+  private foldMenu = false;
   /** The tool last used in each group, so a group's key brings it back. */
   private readonly lastTool: Partial<Record<string, ToolId>> = {};
   private readonly ghost = new Ghost();
@@ -132,7 +138,7 @@ export class EditorUi {
       render: (status) => this.render(status),
     });
     this.box.classList.add('edit-mode');
-    this.box.append(this.bar, this.rail, this.optionsBar, this.plan.el, this.panel, this.strip);
+    this.box.append(this.bar, this.rail, this.optionsBar, this.plan.el, this.panel, new PanelSize(this.box).grip, this.strip, this.keysSheet);
     this.finder = new Finder(this.box);
     this.box.addEventListener('click', (event) => void this.clicked(event));
     this.box.addEventListener('change', (event) => this.changed(event));
@@ -159,7 +165,9 @@ export class EditorUi {
     if (!action) return;
     // Group letters and Esc keep their usual meaning nowhere else on the page; the rest would.
     if (!('tool' in action || 'escape' in action)) event.preventDefault();
-    if ('find' in action) this.finder.show(findables(this.finding()), (words) => void this.land.ask(words));
+    if (!this.keysSheet.hidden && ('escape' in action || 'keys' in action)) return this.showKeys(false);
+    if ('keys' in action) this.showKeys(true);
+    else if ('find' in action) this.finder.show(findables(this.finding()), (words) => void this.land.ask(words));
     else if ('camera' in action) this.chooseCamera(this.cameras.other());
     else if ('pick' in action) void this.step(this.core.pickAction(action.pick));
     else if ('tool' in action) this.chooseTool(action.tool);
@@ -185,6 +193,7 @@ export class EditorUi {
     this.core.cancel();
     this.panKeys.clear();
     this.finder.close();
+    this.keysSheet.hidden = true;
     this.attached?.freeCamera(open);
     if (!open) {
       this.outline?.clear();
@@ -240,6 +249,7 @@ export class EditorUi {
         ['Check this land', () => this.land.check()],
         [this.plan.open ? 'World camera: see it as players do' : 'Plan camera: any land from above', () => this.chooseCamera(this.cameras.other())],
         ['Ask the Architect', () => this.askTab()],
+        ['Show the keys', () => this.showKeys(true)],
         ['Take a shot here', () => this.attached && takeShot(this.attached, this.options.region().id, (w) => this.render(w))],
         ['Zoom in', () => this.cameras.zoom(1)],
         ['Zoom out', () => this.cameras.zoom(-1)],
@@ -251,6 +261,12 @@ export class EditorUi {
   /** The mini map was clicked at a tile of the land we are in: the camera goes there. False when the editor is closed. */
   jumpTo(x: number, y: number): boolean {
     return this.open && this.cameras.jumpTo(x, y);
+  }
+
+  /** Shows or hides the sheet of keys. */
+  private showKeys(show: boolean): void {
+    if (show) this.keysSheet.innerHTML = keysSheetHtml(this.core);
+    this.keysSheet.hidden = !show;
   }
 
   /** The panel shows the Architect, with nothing picked. */
@@ -276,6 +292,11 @@ export class EditorUi {
     this.outline = scene.add.graphics().setDepth(OUTLINE_DEPTH);
     this.land.attach(scene, this.outline);
     this.marks.attach(scene, OUTLINE_DEPTH);
+    // A scene started while the editor is open (a new land laid out, a reconnect) gets the editor's camera and floor too.
+    if (this.open) {
+      scene.freeCamera(true);
+      scene.viewFloor(this.floor);
+    }
     hearWorld(scene, {
       open: () => this.open,
       zoom: (d) => this.cameras.zoom(d),
@@ -375,6 +396,7 @@ export class EditorUi {
     if (!button) return;
     const d = button.dataset;
     if (d.done !== undefined) return this.toggle(false);
+    if (d.keys !== undefined || d.keysClose !== undefined) return this.showKeys(d.keys !== undefined && this.keysSheet.hidden);
     if (d.camera) return this.chooseCamera(d.camera === 'plan' ? 'plan' : 'world');
     if (d.chat !== undefined) {
       document.body.classList.toggle('editing-chat');
@@ -394,7 +416,10 @@ export class EditorUi {
     if (d.redo !== undefined) return this.edits.act({ redo: true });
     if (d.remove) return this.edits.act({ remove: d.remove });
     if (d.publish !== undefined) return this.edits.act({ publish: true });
-    if (d.discard !== undefined) return this.edits.act({ discard: true });
+    if (d.discard !== undefined) {
+      this.foldMenu = true;
+      return this.edits.act({ discard: true });
+    }
     if (d.away !== undefined) return this.step(this.core.takeAway(this.levelIn(this.edits.region)));
     if (d.pick) return this.step(this.core.pickAction(d.pick));
     if (d.assetField) return void pickFor(this.core, d.assetField, this.mapOf(this.edits.region), () => this.render());
@@ -425,6 +450,7 @@ export class EditorUi {
     else if (input.name === 'view-weather') this.chooseSky(undefined, input.value);
     else if (input.name === 'live') {
       this.edits.live = input.checked;
+      this.foldMenu = true;
       this.render();
     } else if (this.core.set(input.name, input.value, input.checked) && this.core.redraws(input.name)) this.render();
     // Hand the keys back to walking.
@@ -444,9 +470,12 @@ export class EditorUi {
     const tool = this.core.current();
     this.rail.innerHTML = railHtml(this.core);
     this.optionsBar.innerHTML = optionsHtml(this.core);
+    // The drafts menu stays open while the bar is drawn again (after a change, a check), until it is used.
+    const menuOpen = !this.foldMenu && !!this.bar.querySelector<HTMLDetailsElement>('.publish-menu')?.open;
+    this.foldMenu = false;
     this.bar.innerHTML = barHtml({
       land: this.edits.name, floor: this.levelIn(this.edits.region), floorChosen: this.floor !== undefined, sky: this.sky, camera: this.cameras.id,
-      showGrid: this.marks.show.grid, showHitboxes: this.marks.show.hitboxes, list: this.edits.log, live: this.edits.live, busy: this.edits.busy,
+      showGrid: this.marks.show.grid, showHitboxes: this.marks.show.hitboxes, list: this.edits.log, live: this.edits.live, busy: this.edits.busy, menuOpen,
     });
     this.panel.innerHTML = `
       <p class="small-screen note">The world editor needs a bigger screen than this. Open it on a computer or a tablet held sideways.</p>

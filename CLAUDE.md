@@ -19,6 +19,7 @@ Read the matching skill or guide before making changes:
 | Pull requests, conflicts & merge rules | `.claude/skills/steward/SKILL.md` |
 | Product decisions, Wish Workshop, mods & milestones | `docs/design.md`, `docs/building-wishes.md`, `docs/sign-in.md` |
 | Gathering, crafts, recipes & crafted copies | `docs/crafting.md` |
+| The world editor (edit mode, cameras, keys) | `docs/world-editor.md`, `docs/architecture.md` |
 
 ## Checks
 

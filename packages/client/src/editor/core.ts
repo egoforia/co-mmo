@@ -401,9 +401,3 @@ export function draftsHtml(list: EditList, live: boolean, busy = false): string 
     : '';
   return `<div class="drafts"><label class="check"><input type="checkbox" name="live"${live ? ' checked' : ''} /> Make changes live at once</label>${buttons}</div>`;
 }
-
-/** The tool buttons (`data-tool`), the chosen one standing out. */
-export function toolsHtml(core: EditorCore): string {
-  const chosen = core.current().id;
-  return core.tools().map((t) => `<button type="button" data-tool="${t.id}" class="${t.id === chosen ? '' : 'quiet'}">${escapeHtml(t.name)}</button>`).join('');
-}

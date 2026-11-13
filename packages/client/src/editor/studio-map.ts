@@ -2,7 +2,8 @@ import { MAX_FLOORS, Tile, isBlocking, tileAt, type Outline, type RegionMap, typ
 import { loadToken } from '../api.ts';
 import { artState, esc, usd } from '../art-ui/state.ts';
 import { landsCard, layFile, makeLand, saveEdits } from './studio-lands.ts';
-import { EditorCore, draftsHtml, editListHtml, hereWords, historyHtml, toolsHtml, type ToolStep } from './core.ts';
+import { EditorCore, draftsHtml, editListHtml, hereWords, historyHtml, type ToolStep } from './core.ts';
+import { groups, optionsHtml, railHtml, toolFor } from './rail.ts';
 
 // The world editor's second view: the Art Studio's map of a whole land
 // (Map Preview & Editor), seen from above, any floor, zoomed in or out, with
@@ -118,7 +119,7 @@ export function mapEditorPage(): string {
       </div>
     </div>
     <div class="studio-card map-toolbar-card">
-      <div class="map-tools-row">${toolsHtml(core)}</div>
+      <div class="map-tools-row"><nav class="map-rail" aria-label="Tool groups">${railHtml(core)}</nav><div class="map-options">${optionsHtml(core)}</div></div>
       <div class="map-tool-subbar">
         <span class="note">${esc(core.current().hint)}</span>
         <div class="map-tool-options">${core.settingsHtml()}</div>
@@ -316,6 +317,10 @@ export function handleMapEditorClick(t: HTMLButtonElement): boolean {
   if (!t.closest('.studio-map') || !state.data) return false;
   const d = t.dataset;
   if (d.tool) core.choose(d.tool);
+  else if (d.group) {
+    const group = groups(core).find((g) => g.id === d.group);
+    if (group) core.choose(toolFor(core, group, {}, false));
+  }
   else if (d.mapFloor !== undefined) state.floor = Number(d.mapFloor);
   else if (d.mapZoom) zoom(d.mapZoom === 'in' ? 'in' : 'out');
   else if (d.away !== undefined) return void step(core.takeAway(state.floor)), true;

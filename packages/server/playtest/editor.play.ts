@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser } from 'playwright';
 import { Tile, generateRegion, newCharacter, regionDef, type RegionMap } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
-import { playWorld } from './harness.ts';
+import { chooseTool, goLive, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -80,13 +80,12 @@ describe('the world editor', () => {
     const edits = () => world.store.worldEdits('sanctum').edits;
 
     await page.click('#edit-world-button');
-    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.waitForSelector('#editor:not([hidden]) .editor-rail');
     // These changes are for everyone at once, not drafts.
-    await page.click('#editor .publish-menu summary');
-    await page.check('#editor input[name="live"]');
+    await goLive(page);
 
     // Plant a tree three tiles south (east of us is under the editor's window).
-    await page.click('#editor [data-tool="paint"]');
+    await chooseTool(page, 'paint');
     await page.selectOption('#editor select[name="tile"]', 'tree');
     await clickTile(0, 3);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
@@ -101,11 +100,11 @@ describe('the world editor', () => {
     expect.soft(tile(spot.x, spot.y + 3), 'the tree is gone again').toBe(Tile.Ground);
 
     // A road west (east of us is under the editor's window), and a small house at its end.
-    await page.click('#editor [data-tool="road"]');
+    await chooseTool(page, 'road');
     await clickTile(-1, 1);
     await clickTile(-7, 1);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
-    await page.click('#editor [data-tool="house"]');
+    await chooseTool(page, 'house');
     await page.selectOption('#editor select[name="size"]', '0');
     await clickTile(-8, 1);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(2);
@@ -114,7 +113,7 @@ describe('the world editor', () => {
     expect.soft(tile(spot.x - 2, spot.y + 1), 'the road').toBe(Tile.Path);
 
     // Monsters to the south.
-    await page.click('#editor [data-tool="spawn"]');
+    await chooseTool(page, 'spawn');
     await page.selectOption('#editor select[name="creature"]', 'lantern-moth');
     const before = app!.world.home.creatureIds().length;
     await clickTile(2, 5);

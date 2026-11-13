@@ -253,6 +253,26 @@ export const SHOTS: Shot[] = [
     ],
   },
   {
+    name: 'editor-finder',
+    about: 'The world editor with the Life group chosen on the rail and the finder (Ctrl K) open with "sta" typed.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="life"]');
+      await page.keyboard.press('Control+k');
+      await page.keyboard.type('sta');
+      await page.waitForTimeout(300);
+    },
+    mustSee: [
+      'a rail of six groups down the left (Select, Ground, Build, Furnish, Life, Places), each with its key letter, Life standing out',
+      'the options bar beside the rail with the Life tools (Person, Quest, Monsters, Change monsters, Patrol path, Clear, Gathering), Person chosen',
+      'the finder in the middle near the top: Stairs first, then bookmarks to go to (Go to …), with Tool, Place or Do beside each',
+      'the panel on the right no longer has a wall of tool buttons',
+    ],
+  },
+  {
     name: 'editor-kit-form',
     about: 'The world editor in edit mode with the Kit building tool chosen, so its settings and shape checks show in the panel.',
     region: 'arch-testbed',
@@ -260,6 +280,7 @@ export const SHOTS: Shot[] = [
     open: async (page) => {
       await page.click('#edit-world-button');
       await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="build"]');
       await page.click('#editor [data-tool="kit"]');
     },
     mustSee: ['the Kit building settings (Look, Bays across, Bays deep, Storeys) in the panel under the tools', 'the panel ends above the status strip and scrolls rather than running off the screen'],
@@ -310,6 +331,7 @@ export const SHOTS: Shot[] = [
     open: async (page) => {
       await page.click('.studio-map [data-map-zoom="in"]');
       await page.click('.studio-map [data-map-zoom="in"]');
+      await page.click('.studio-map [data-group="build"]');
       await page.click('.studio-map [data-tool="floors"]');
     },
     mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Floors tool settings (up, down, ladders)', 'the edit list beside the map'],

@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright';
 import { ARCH_TESTBED_REGION, Tile, generateRegion, newCharacter, type Storey } from '@co-mmo/shared';
 import { account, api, app } from '../test/helpers.ts';
-import { playWorld } from './harness.ts';
+import { chooseTool, goLive, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -86,7 +86,7 @@ describe('the world editor in a workshop land', () => {
     await page.waitForSelector('#game canvas', { timeout: 20_000 });
     await page.waitForTimeout(1500);
     await page.click('#edit-world-button');
-    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.waitForSelector('#editor:not([hidden]) .editor-rail');
     // Let the land settle (the editor reads its edits) before pointing at it.
     await page.waitForTimeout(1500);
 
@@ -107,7 +107,7 @@ describe('the world editor in a workshop land', () => {
     const terrace = async (floor: number, from: [number, number], to: [number, number]) => {
       const before = edits().length;
       await page.selectOption('#editor select[name="view-floor"]', String(floor));
-      await page.click('#editor [data-tool="storey"]');
+      await chooseTool(page, 'storey');
       await page.selectOption('#editor select[name="storey"]', String(floor));
       await page.selectOption('#editor select[name="style"]', 'frostpeak-eyrie');
       await page.check('#editor input[name="open"]');
@@ -135,8 +135,8 @@ describe('the world editor in a workshop land', () => {
     expect(land().storeys.map(shape)).toEqual(testbed.map(shape));
 
     // Select the summit, take it away, and take that back: made live at once this time.
-    await page.check('#editor input[name="live"]');
-    await page.click('#editor [data-tool="select"]');
+    await goLive(page);
+    await chooseTool(page, 'select');
     await aim([120, 42], [120, 42]);
     await clickTile(page, 120, 42);
     await expect.poll(() => page.locator('#editor .picked strong').textContent()).toBe('A terrace');
@@ -148,7 +148,7 @@ describe('the world editor in a workshop land', () => {
     // A bookmark on the first terrace, and going there.
     await page.selectOption('#editor select[name="view-floor"]', '1');
     await aim([100, 40], [111, 51]);
-    await page.click('#editor [data-tool="bookmark"]');
+    await chooseTool(page, 'bookmark');
     await page.fill('#editor input[name="name"]', 'Terrace floor');
     await page.fill('#editor input[name="note"]', 'High terrace open interior floor');
     await page.locator('#editor input[name="note"]').blur();
@@ -164,7 +164,7 @@ describe('the world editor in a workshop land', () => {
     await page.screenshot({ path: resolve(shots, 'workshop-bookmark.png') });
 
     // Someone new on the terrace: a smith who sells tools, buys, and makes masters of smithing.
-    await page.click('#editor [data-tool="person"]');
+    await chooseTool(page, 'person');
     await page.fill('#editor input[name="name"]', 'Hesper');
     await page.fill('#editor input[name="greeting"]', 'Mind the forge, traveller.');
     await page.locator('#editor input[name="greeting"]').blur();
@@ -177,12 +177,12 @@ describe('the world editor in a workshop land', () => {
     await clickTile(page, 108, 46);
     await expect.poll(() => land().npcs.find((n) => n.name === 'Hesper')?.floor, { timeout: 10_000 }).toBe(1);
     // A violet light of its own beside them.
-    await page.click('#editor [data-tool="light"]');
+    await chooseTool(page, 'light');
     await page.selectOption('#editor select[name="color"]', 'arcane');
     await clickTile(page, 105, 47);
     await expect.poll(() => land().lights?.[0]?.light.color, { timeout: 10_000 }).toBe('#c49bff');
     // Spoken to and traded with in the game, the editor closed.
-    await page.click('#editor .close');
+    await page.click('#editor [data-done]');
     app!.world.local(region)!.placePlayer(id, 107.5, 46.5, 1);
     await page.evaluate(() => {
       const scene = (window as unknown as { scene: { me: { body: unknown }; cameras: { main: { startFollow(b: unknown): void } } } }).scene;
@@ -196,11 +196,11 @@ describe('the world editor in a workshop land', () => {
     await page.screenshot({ path: resolve(shots, 'workshop-person.png') });
     await page.click('#shop [data-close]');
     await page.click('#edit-world-button');
-    await page.waitForSelector('#editor:not([hidden]) .tools');
-    await page.check('#editor input[name="live"]');
+    await page.waitForSelector('#editor:not([hidden]) .editor-rail');
+    await goLive(page);
 
     // A kit building from the designer: a flat roof behind battlements with towers at the front, its shape checked as it is chosen.
-    await page.click('#editor [data-tool="kit"]');
+    await chooseTool(page, 'kit');
     await page.selectOption('#editor select[name="style"]', 'sanctum-arcanum');
     for (const name of ['across', 'deep']) {
       await page.fill(`#editor input[name="${name}"]`, '4');
@@ -219,7 +219,7 @@ describe('the world editor in a workshop land', () => {
     const status = async () => (await api(world.base, `/api/kit-houses?region=${region}`, token)).body.houses[0]?.status;
     await expect.poll(status, { timeout: 90_000, interval: 2000 }).toBe('ready');
     // Seen from the ground outside it, the editor closed.
-    await page.click('#editor .close');
+    await page.click('#editor [data-done]');
     app!.world.local(region)!.placePlayer(id, 101, 76, 0);
     await page.waitForFunction(() => (window as unknown as { scene: { floor: number } }).scene.floor === 0, undefined, { timeout: 10_000 });
     await page.evaluate(() => {
@@ -231,9 +231,9 @@ describe('the world editor in a workshop land', () => {
 
     // Group C: a rectangle of path dragged out, copied and pasted south of it.
     await page.click('#edit-world-button');
-    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.waitForSelector('#editor:not([hidden]) .editor-rail');
     await page.selectOption('#editor select[name="view-floor"]', '0');
-    await page.click('#editor [data-tool="paint"]');
+    await chooseTool(page, 'paint');
     await page.selectOption('#editor select[name="tile"]', 'path');
     await page.selectOption('#editor select[name="shape"]', 'rect');
     await aim([94, 78], [104, 92]);
@@ -250,7 +250,7 @@ describe('the world editor in a workshop land', () => {
       return n;
     };
     await expect.poll(() => paths(97, 80), { timeout: 10_000 }).toBe(12);
-    await page.click('#editor [data-tool="area"]');
+    await chooseTool(page, 'area');
     await clickTile(page, 96, 79);
     await clickTile(page, 101, 83);
     await expect.poll(() => page.locator('#editor .status').textContent()).toMatch(/^Copied /);

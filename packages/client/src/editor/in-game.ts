@@ -3,7 +3,11 @@ import { MAX_FLOORS, type Bookmark, type Outline, type TilePoint, type Weather }
 import { worldEdits, type EditLog } from '../api.ts';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
-import { EditorCore, editListHtml, hereWords, toolsHtml, type ToolStep } from './core.ts';
+import { CameraKeys } from './camera-keys.ts';
+import { EditorCore, editListHtml, hereWords, type ToolId, type ToolStep } from './core.ts';
+import { findables, type FindSources } from './find-sources.ts';
+import { Finder } from './palette.ts';
+import { groupOf, groups, optionsHtml, railHtml, toolFor } from './rail.ts';
 import { bookmarksHtml, checkLand, checksHtml, problemCount, takeShot, type LandCheck } from './land-panel.ts';
 import { drawMarks, marksKey } from './marks.ts';
 import { PREVIEW_HOURS, PREVIEW_WEATHER, barHtml, stripHtml } from './shell.ts';
@@ -21,13 +25,6 @@ const GRID_KEY = 'co-mmo.editor.tileGrid';
 // shows it to everyone there (or to editors only, while it is a draft); undo
 // takes it back. The outlines and marks it draws over the world are the
 // editor's own, seen only while it is open, never game art.
-
-/** How fast the keys pan the free camera, in screen pixels a second (twice that with Shift). */
-const PAN_SPEED = 700;
-/** The keys that pan the free camera, and which way. */
-const PAN_KEYS: Record<string, [number, number]> = {
-  w: [0, -1], arrowup: [0, -1], s: [0, 1], arrowdown: [0, 1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0],
-};
 
 /** Above everything in the world, labels included. */
 const OUTLINE_DEPTH = 1_000_010;
@@ -78,13 +75,17 @@ export class EditorUi {
   private marksOpen = false;
   /** New edits go live at once instead of waiting as drafts. */
   private live = false;
-  /** The pan keys held down, and whether Shift is. */
-  private readonly held = new Set<string>();
-  private fast = false;
+  private readonly panKeys = new CameraKeys();
+  private readonly rail = part('editor-rail', 'nav');
+  private readonly optionsBar = part('editor-options', 'div');
+  private readonly finder: Finder;
+  /** The tool last used in each group, so a group's key brings it back. */
+  private readonly lastTool: Partial<Record<string, ToolId>> = {};
 
   constructor(private readonly options: EditorOptions) {
     this.box.classList.add('edit-mode');
-    this.box.append(this.bar, this.panel, this.strip);
+    this.box.append(this.bar, this.rail, this.optionsBar, this.panel, this.strip);
+    this.finder = new Finder(this.box);
     this.box.addEventListener('click', (event) => void this.clicked(event));
     this.box.addEventListener('change', (event) => this.changed(event));
     // A fold's toggle does not bubble: listen on the way down.
@@ -93,22 +94,19 @@ export class EditorUi {
       if (fold.classList?.contains('bookmarks-box')) this.marksOpen = fold.open;
     }, true);
     document.addEventListener('keydown', (event) => this.key(event));
-    document.addEventListener('keyup', (event) => {
-      this.held.delete(event.key.toLowerCase());
-      this.fast = event.shiftKey;
-    });
-    window.addEventListener('blur', () => this.held.clear());
   }
 
   private key(event: KeyboardEvent): void {
     if (!this.open || (event.target as HTMLElement).closest?.('input, textarea, select')) return;
     const key = event.key.toLowerCase();
-    this.fast = event.shiftKey;
-    if (PAN_KEYS[key] && !(event.ctrlKey || event.metaKey || event.altKey)) {
-      this.held.add(key);
+    if (this.panKeys.down(event)) return event.preventDefault();
+    const plain = !(event.ctrlKey || event.metaKey || event.altKey);
+    if ((key === 'k' && (event.ctrlKey || event.metaKey)) || (key === '/' && plain)) {
       event.preventDefault();
-      return;
+      return this.finder.show(findables(this.finding()));
     }
+    const group = plain && groups(this.core).find((g) => g.key === key);
+    if (group) return this.chooseTool(toolFor(this.core, group, this.lastTool, groupOf(this.core, this.core.current().id)?.id === group.id));
     if (key === 'home') return this.backToMe();
     if ((key === '+' || key === '=' || key === '-') && !(event.ctrlKey || event.metaKey)) return this.zoom(key === '-' ? -1 : 1);
     if (key === 'escape') {
@@ -133,7 +131,8 @@ export class EditorUi {
     document.body.classList.toggle('editing', open);
     if (!open) document.body.classList.remove('editing-chat');
     this.core.cancel();
-    this.held.clear();
+    this.panKeys.clear();
+    this.finder.close();
     this.attached?.freeCamera(open);
     if (!open) {
       this.outline?.clear();
@@ -150,6 +149,37 @@ export class EditorUi {
     this.follow();
     this.render();
     void this.reload();
+  }
+
+  /** Chooses a tool, remembering it as its group's last. */
+  private chooseTool(tool: ToolId): void {
+    this.core.choose(tool);
+    const group = groupOf(this.core, this.core.current().id);
+    if (group) this.lastTool[group.id] = this.core.current().id;
+    this.render('');
+  }
+
+  /** What the finder can find now: every tool, this land's bookmarks, and the editor's actions. */
+  private finding(): FindSources {
+    return {
+      core: this.core,
+      bookmarks: this.bookmarks(),
+      tool: (t) => this.chooseTool(t),
+      go: (i) => this.goTo(i),
+      actions: [
+        ['Publish the drafts', () => void this.act({ publish: true })],
+        ['Throw the drafts away', () => void this.act({ discard: true })],
+        ['Undo', () => void this.act({ undo: true })],
+        ['Redo', () => void this.act({ redo: true })],
+        ['Back to me', () => this.backToMe()],
+        ['Bring me here', () => this.bringMe()],
+        ['Check this land', () => this.check()],
+        ['Take a shot here', () => this.attached && takeShot(this.attached, this.options.region().id, (w) => this.render(w))],
+        ['Zoom in', () => this.zoom(1)],
+        ['Zoom out', () => this.zoom(-1)],
+        ['Done: close the editor', () => this.toggle(false)],
+      ],
+    };
   }
 
   /** The mini map was clicked at a tile of the land we are in: the camera goes there. False when the editor is closed. */
@@ -220,12 +250,7 @@ export class EditorUi {
     // The pan keys move the camera; moving it (or the floor shown changing) moves what the marks are drawn around.
     scene.events.on('update', (_time: number, delta: number) => {
       if (!this.open) return;
-      if (this.held.size) {
-        let [dx, dy] = [0, 0];
-        for (const k of this.held) [dx, dy] = [dx + PAN_KEYS[k]![0], dy + PAN_KEYS[k]![1]];
-        const step = (PAN_SPEED * (this.fast ? 2 : 1) * Math.min(delta, 250)) / 1000;
-        scene.panCamera(dx * step, dy * step);
-      }
+      scene.panCamera(...this.panKeys.step(delta));
       if (marksKey(scene) !== this.drawnAt) this.drawMarks();
     });
     // The wheel zooms; dragging with the right or middle button pans.
@@ -365,9 +390,11 @@ export class EditorUi {
     if (d.floorMine !== undefined) return this.chooseFloor(undefined);
     if (d.me !== undefined) return this.backToMe();
     if (d.bring !== undefined) return this.bringMe();
-    if (d.tool) {
-      this.core.choose(d.tool);
-      return this.render('');
+    if (d.tool) return this.chooseTool(d.tool as ToolId);
+    if (d.group) {
+      const group = groups(this.core).find((g) => g.id === d.group);
+      if (group) this.chooseTool(toolFor(this.core, group, this.lastTool, false));
+      return;
     }
     if (d.undo !== undefined) return this.act({ undo: true });
     if (d.redo !== undefined) return this.act({ redo: true });
@@ -379,14 +406,17 @@ export class EditorUi {
     if (d.area) return this.step(this.core.areaAction(d.area, d.value));
     if (d.check !== undefined) return this.check();
     if (d.shot !== undefined) return this.attached ? takeShot(this.attached, this.options.region().id, (w) => this.render(w)) : this.render('The game is not running yet.');
-    if (d.go !== undefined) {
-      const mark = this.bookmarks()[Number(d.go)];
-      if (!mark) return;
-      this.chooseFloor(undefined);
-      this.options.teleport?.({ region: this.listRegion, x: mark.x, y: mark.y, floor: mark.floor });
-      this.attached?.followMe();
-      this.render(`Going to ${mark.name}.`);
-    }
+    if (d.go !== undefined) this.goTo(Number(d.go));
+  }
+
+  /** Goes to one of the land's bookmarks, the camera following. */
+  private goTo(index: number): void {
+    const mark = this.bookmarks()[index];
+    if (!mark) return;
+    this.chooseFloor(undefined);
+    this.options.teleport?.({ region: this.listRegion, x: mark.x, y: mark.y, floor: mark.floor });
+    this.attached?.followMe();
+    this.render(`Going to ${mark.name}.`);
   }
 
   private changed(event: Event): void {
@@ -402,7 +432,8 @@ export class EditorUi {
         // No storage here: the switch still works until the page is reloaded.
       }
       this.drawMarks();
-    } else if (input.name === 'view-hour') this.chooseSky(input.value);
+    } else if (input.name === 'view-floor') this.chooseFloor(Number(input.value));
+    else if (input.name === 'view-hour') this.chooseSky(input.value);
     else if (input.name === 'view-weather') this.chooseSky(undefined, input.value);
     else if (input.name === 'live') {
       this.live = input.checked;
@@ -418,13 +449,14 @@ export class EditorUi {
     // The game may not have been running yet when the editor opened.
     this.attach();
     const tool = this.core.current();
+    this.rail.innerHTML = railHtml(this.core);
+    this.optionsBar.innerHTML = optionsHtml(this.core);
     this.bar.innerHTML = barHtml({
       land: this.listName, floor: this.shownFloor(), floorChosen: this.floor !== undefined, sky: this.sky,
       showGrid: this.showGrid, showHitboxes: this.showHitboxes, list: this.log, live: this.live, busy: this.busy,
     });
     this.panel.innerHTML = `
       <p class="small-screen note">The world editor needs a bigger screen than this. Open it on a computer or a tablet held sideways.</p>
-      <div class="tools">${toolsHtml(this.core)}</div>
       <p class="note">${escapeHtml(tool.hint)}</p>
       <div class="settings">${this.core.settingsHtml()}</div>
       <h3>Edits in ${escapeHtml(this.listName)}</h3>

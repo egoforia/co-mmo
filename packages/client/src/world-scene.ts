@@ -692,8 +692,9 @@ export class WorldScene extends Phaser.Scene {
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
     revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant, this.shownFloor);
-    seeThroughWalls([...this.drawn.values()].flatMap((r) => r.edgeWalls), this.origin.x + this.shown.x, this.origin.y + this.shown.y, this.shownFloor);
     this.applyFloor();
+    // After the floor view, which sets every picture solid again.
+    seeThroughWalls([...this.drawn.values()].flatMap((r) => r.edgeWalls), this.origin.x + this.shown.x, this.origin.y + this.shown.y, this.shownFloor);
   }
 
   private readInput(): { dx: number; dy: number } {

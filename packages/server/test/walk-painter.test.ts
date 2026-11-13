@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { ISO_WAYS, walkArt, walkStandArt } from '@co-mmo/shared';
-import type { ImageProvider, ImageRequest } from '../src/assets/provider.ts';
+import { ProviderError, type ImageProvider, type ImageRequest } from '../src/assets/provider.ts';
 import type { VideoProvider, VideoRequest } from '../src/assets/video.ts';
-import { WalkPainter } from '../src/walk-painter.ts';
+import { isUnprocessable, WalkPainter } from '../src/walk-painter.ts';
 
 // Test pictures: simple shapes on magenta, standing in for painted looks.
 const picture = (width: number, height: number, shapes: string) =>
@@ -284,4 +284,65 @@ describe('walk painter', () => {
     const after = await painter.deniedClip('player-mara', 'front-left');
     expect(after).toBeUndefined();
   }, 30_000);
+
+  it('does not retry when the video provider fails with an unprocessable 422 error', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'walks-422-'));
+    const anchorDir = join(root, 'anchors'), artDir = join(root, 'art');
+    await mkdir(join(anchorDir, 'raw'), { recursive: true });
+    await writeFile(join(anchorDir, 'raw', 'player-mara.png'), await picture(300, 300, walker(150, 280)));
+    await mkdir(join(artDir, 'walks', 'views'), { recursive: true });
+    await writeFile(join(artDir, 'walks', 'views', 'player-mara-front-left.png'), await picture(300, 300, walker(150, 280)));
+
+    let videoCalls = 0;
+    const video: VideoProvider = {
+      id: 'replicate',
+      model: 'minimax/h3-lite',
+      generate: async () => {
+        videoCalls++;
+        throw new ProviderError('replicate', 422, '- input.resolution: resolution must be one of the following: "480P", "768P"');
+      },
+    };
+
+    const painter = new WalkPainter({
+      provider: () => undefined,
+      video: () => video,
+      overBudget: () => false,
+      spend: () => {},
+      spendVideo: () => {},
+      anchorDir,
+      artDir,
+      shipped: async () => ({}),
+      toFrames: frames,
+    });
+    await painter.load();
+
+    const failedMessages: string[] = [];
+    const mockHandle = {
+      start: () => {},
+      done: () => {},
+      skip: () => {},
+      fail: (msg: string) => { failedMessages.push(msg); },
+    };
+
+    const mara = painter.anchorWalker('player-mara');
+    const result = await painter.makeClip(mara, 'front-left', undefined, mockHandle as any);
+
+    expect(result).toBe(true);
+    // Should only have called generate once; no retry attempt
+    expect(videoCalls).toBe(1);
+    expect(failedMessages).toHaveLength(1);
+    expect(failedMessages[0]).toBe('replicate: - input.resolution: resolution must be one of the following: "480P", "768P"');
+    expect(failedMessages[0]).not.toContain('Tried twice.');
+  });
+});
+
+describe('isUnprocessable', () => {
+  it('identifies 422 errors and ignores others', () => {
+    expect(isUnprocessable(new ProviderError('replicate', 422, 'invalid input'))).toBe(true);
+    expect(isUnprocessable({ status: 422 })).toBe(true);
+    expect(isUnprocessable(new ProviderError('replicate', 429, 'rate limit'))).toBe(false);
+    expect(isUnprocessable(new ProviderError('gemini', 500, 'server error'))).toBe(false);
+    expect(isUnprocessable(new Error('general error'))).toBe(false);
+    expect(isUnprocessable(null)).toBe(false);
+  });
 });

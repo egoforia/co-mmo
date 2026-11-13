@@ -8,6 +8,7 @@ import {
   buildingAt,
   copyDraft,
   editWords,
+  floorName,
   landmarkAt,
   moveDrafts,
   brushTiles,
@@ -35,13 +36,13 @@ import { AreaTool } from './area.ts';
 
 // The world editor's core, shared by its two views: the window beside the
 // game (in-game.ts) and the Studio's map (studio-map.ts). It knows the tools
-// (one per kind of edit in the registry, plus Look), their settings, what a
+// (one per kind of edit in the registry, plus Select and Copy and paste), their settings, what a
 // press, drag or release on a tile makes, what to outline under the pointer,
 // and how the edit list reads. The views only turn the pointer into tiles,
 // draw the outlines their own way and send what the core makes.
 
-/** A tool: Look, Select, or one kind of edit. */
-export type ToolId = EditKindId | 'look' | 'select' | 'area';
+/** A tool: Select, Copy and paste, or one kind of edit. What is under the pointer is read out by the views, so there is no Look tool. */
+export type ToolId = EditKindId | 'select' | 'area';
 
 /** What a press or release asks the view to do: say something, send an edit (or edits made together), or nothing yet. */
 export interface ToolStep {
@@ -61,7 +62,6 @@ export interface EditList {
   unlaid?: string[];
 }
 
-const LOOK = { id: 'look' as const, name: 'Look', hint: 'Point at the world to see what is there.' };
 const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see it, then take it away, copy it or move it.' };
 const AREA = { id: 'area' as const, name: 'Copy and paste', hint: 'Click two corners to copy an area: its ground and everything standing in it. Then each click pastes it, all or none. Keep a copy as a prefab to paste in any land.' };
 const CONTEXT: EditContext = { creatures: CREATURES };
@@ -76,7 +76,7 @@ const TILE_NAMES: Partial<Record<Tile, string>> = {
 
 /** The editor's tools, settings and half-made edits, for one view. */
 export class EditorCore {
-  tool: ToolId = 'look';
+  tool: ToolId = 'select';
   private readonly values: Partial<Record<EditKindId, Record<string, FieldValue>>> = {};
   /** Mid-tool: the brush stroke, or what was picked up (or where a road starts). */
   private stroke: { region: string; level: number; tiles: Map<string, TilePoint>; from: TilePoint } | undefined;
@@ -88,20 +88,20 @@ export class EditorCore {
   /** The tools on offer now: set pieces only while their kit's wish is on. */
   tools(): { id: ToolId; name: string; hint: string }[] {
     const kinds = Object.values(EDIT_KINDS) as EditKind<EditKindId>[];
-    return [LOOK, SELECT, AREA, ...kinds.filter((k) => k.available?.() ?? true).map((k) => ({ id: k.kind, name: k.name, hint: k.hint }))];
+    return [SELECT, AREA, ...kinds.filter((k) => k.available?.() ?? true).map((k) => ({ id: k.kind, name: k.name, hint: k.hint }))];
   }
 
-  /** The chosen tool, falling back to Look when it is no longer on offer. */
+  /** The chosen tool, falling back to Select when it is no longer on offer. */
   current(): { id: ToolId; name: string; hint: string } {
     const tools = this.tools();
     const found = tools.find((t) => t.id === this.tool);
-    if (!found) this.tool = 'look';
-    return found ?? LOOK;
+    if (!found) this.tool = 'select';
+    return found ?? SELECT;
   }
 
   /** Picks a tool, dropping whatever the last one was in the middle of. */
   choose(tool: string): void {
-    if (tool === 'look' || tool === 'select' || tool === 'area' || Object.hasOwn(EDIT_KINDS, tool)) this.tool = tool as ToolId;
+    if (tool === 'select' || tool === 'area' || Object.hasOwn(EDIT_KINDS, tool)) this.tool = tool as ToolId;
     this.cancel();
   }
 
@@ -113,13 +113,18 @@ export class EditorCore {
     this.area.reset();
   }
 
+  /** True while a tool is part way through something Esc would drop: a stroke, a first click, a pick or an area corner. */
+  midway(): boolean {
+    return !!(this.stroke || this.held || this.picked || this.area.midway());
+  }
+
   /** True while a thing is picked up (the move tool's Take it away). */
   holding(): boolean {
     return !!this.held && this.tool === 'move';
   }
 
   private kind(): EditKind<EditKindId> | undefined {
-    return this.tool === 'look' || this.tool === 'select' || this.tool === 'area' ? undefined : (EDIT_KINDS[this.tool] as unknown as EditKind<EditKindId>);
+    return this.tool === 'select' || this.tool === 'area' ? undefined : (EDIT_KINDS[this.tool] as unknown as EditKind<EditKindId>);
   }
 
   /** The current tool's settings, chosen or as they start. */
@@ -361,6 +366,11 @@ export function describe(map: RegionMap, at: TilePoint, level = 0): string {
   const words = TILE_NAMES[tileAt(map, x, y, level)] ?? 'Something';
   const name = building && BUILDING_STYLES[building.style]?.name;
   return `${words[0]!.toUpperCase()}${words.slice(1)}${name ? ` of ${name}` : ''}`;
+}
+
+/** The status strip's words for the tile under the pointer: what stands there, where, and on which floor. */
+export function hereWords(map: RegionMap, at: TilePoint, level = 0): string {
+  return `${describe(map, at, level)} · ${at[0]}, ${at[1]}${level ? ` · ${floorName(level)}` : ''}`;
 }
 
 /** A land's edits, newest first, drafts marked, each with a button to take it out (`data-remove`). */

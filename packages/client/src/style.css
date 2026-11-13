@@ -488,19 +488,44 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #loot .buttons { display: flex; gap: 8px; margin-top: 12px; }
 #loot .note kbd { border: 1px solid var(--edge); padding: 0 4px; margin-right: 2px; }
 
-/* The world editor (Owner and Stewards): beside the world, so what it changes stays in view. */
-#editor { inset: 64px 16px auto auto; margin: 0; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 96px); }
-#editor .view-toggles { display: inline-flex; gap: 8px; margin-left: auto; margin-right: 6px; }
-#editor .hitbox-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent); cursor: pointer; text-transform: none; font-weight: normal; }
-#editor .hitbox-toggle input { cursor: pointer; margin: 0; }
+/* The world editor's edit mode (Owner and Stewards): a top bar, a panel on the
+   right and a status strip around the world; the game's HUD steps back. */
+#editor { position: fixed; inset: 0; z-index: 6; pointer-events: none; font-size: 13px; }
+#editor > * { pointer-events: auto; background: var(--panel); border: 0 solid var(--edge); }
+#editor button { padding: 4px 10px; background: var(--accent); color: var(--bg); border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+#editor button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
+#editor button:disabled { opacity: 0.45; cursor: default; }
+#editor kbd { font: inherit; font-size: 11px; color: var(--muted); margin-left: 4px; }
+#editor select, #editor input { background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; padding: 4px; max-width: 100%; }
+#editor input[type='number'] { width: 70px; }
+#editor .editor-bar { position: absolute; z-index: 2; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 8px 12px; border-bottom-width: 1px; }
+#editor .editor-bar .land-name { color: var(--accent); }
+#editor .editor-bar .spacer { flex: 1; }
+#editor .floor-step, #editor .sky-pick, #editor .view-toggles { display: inline-flex; gap: 6px; align-items: center; }
+#editor .floor-step .floor-name { min-width: 7em; text-align: center; }
+#editor .floor-step button { padding: 2px 8px; }
+#editor .toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); }
+#editor .toggle input { margin: 0; cursor: pointer; }
+#editor .drafts-pill { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 2px 4px 2px 10px; border: 1px solid var(--edge); border-radius: 99px; color: var(--muted); white-space: nowrap; }
+#editor .drafts-pill.has-drafts { border-color: var(--accent); color: var(--accent); }
+#editor .drafts-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+#editor .drafts-pill button { border-radius: 99px; }
+#editor .publish-menu summary { list-style: none; cursor: pointer; padding: 0 6px; }
+#editor .publish-menu summary::-webkit-details-marker { display: none; }
+#editor .publish-menu .menu { position: absolute; right: 0; top: calc(100% + 6px); display: grid; gap: 8px; min-width: 240px; padding: 10px; background: var(--bg); border: 1px solid var(--edge); color: var(--ink); white-space: normal; }
+#editor .publish-menu .check { display: flex; gap: 6px; align-items: center; }
+#editor .editor-panel { position: absolute; top: 56px; right: 12px; bottom: 48px; width: min(340px, calc(100vw - 24px)); overflow: auto; padding: 12px 14px; border-width: 1px; }
+#editor .editor-panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+#editor .editor-panel .note { color: var(--muted); font-size: 12px; }
+#editor .editor-panel .small-screen { display: none; }
+#editor .editor-strip { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; padding: 6px 12px; border-top-width: 1px; }
+#editor .editor-strip .here { color: var(--ink); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; }
+#editor .editor-strip .status { color: #f2dc6b; flex: 2 1 0; text-align: center; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#editor .editor-strip > span:last-child { display: flex; gap: 4px; }
 #editor .tools { display: flex; flex-wrap: wrap; gap: 4px; }
 #editor .settings { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 #editor .settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); font-size: 12px; }
-#editor select, #editor input { background: var(--bg); color: var(--ink); border: 1px solid var(--edge); font: inherit; padding: 4px; max-width: 100%; }
-#editor input[type='number'] { width: 70px; }
-#editor .status { min-height: 1.4em; margin: 6px 0; color: #f2dc6b; }
-#editor h3 { display: flex; justify-content: space-between; align-items: center; }
-#editor h3 span { display: flex; gap: 4px; text-transform: none; }
+#editor .settings label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
 #editor .edits { list-style: none; margin: 0; padding: 0; }
 #editor .edits li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--edge); }
 #editor .edits .by { color: var(--muted); font-size: 11px; }
@@ -508,8 +533,6 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .tool-notes, .studio-map .tool-notes { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 12px; }
 #editor .tool-notes .ok, .studio-map .tool-notes .ok { color: #6fd08c; }
 #editor .tool-notes .bad, .studio-map .tool-notes .bad { color: #f6757a; }
-#editor .drafts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
-#editor .drafts .check { width: 100%; display: flex; gap: 6px; align-items: center; }
 #editor .edits li.draft > span:first-child { font-style: italic; }
 #editor .bookmarks-box summary { margin: 14px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
 #editor .checks-box summary { margin: 14px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
@@ -521,9 +544,21 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .bookmarks .note { display: block; font-size: 11px; }
 .picked { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-@media (max-width: 600px) { #editor { inset: auto 16px 16px 16px; width: auto; max-height: 50vh; } }
-#editor button.quiet:not(.close) { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
-#editor button:disabled { opacity: 0.45; cursor: default; }
+/* While editing, the game steps back: its HUD, chat (unless asked for) and windows of play. */
+body.editing #hud, body.editing #stats, body.editing #quests, body.editing #keys, body.editing #abilities,
+body.editing #party, body.editing #party-invite, body.editing #sound-panel { display: none !important; }
+body.editing:not(.editing-chat) #chat { display: none !important; }
+body.editing #chat { bottom: 48px; z-index: 7; }
+body.editing #mini-map { top: auto; right: auto; left: 12px; bottom: 48px; }
+/* A phone's screen has no room for the world and the editor: it says so. */
+@media (max-width: 700px) {
+  #editor .editor-bar > :not(.done) { display: none; }
+  #editor .editor-bar { justify-content: flex-end; }
+  #editor .editor-panel { top: 52px; bottom: auto; left: 12px; right: 12px; width: auto; }
+  #editor .editor-panel > :not(.small-screen) { display: none; }
+  #editor .editor-panel .small-screen { display: block; font-size: 14px; color: var(--ink); }
+  #editor .editor-strip { display: none; }
+}
 
 /* --- Performance overlay (Stewards and the Owner, F3) ---------------------- */
 
@@ -570,11 +605,6 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #mini-map.max { width: min(70vh, calc(100vw - 24px)); z-index: 4; }
 body.has-mini-map #quests { top: 372px; }
 body.has-mini-map-min #quests { top: 92px; }
-/* The world editor stands beside the mini map, not over it (a folded map leaves its title bar room). */
-@media (min-width: 721px) {
-  body.has-mini-map #editor { right: 244px; }
-  body.has-mini-map-min #editor { top: 96px; }
-}
 @media (max-width: 720px) {
   #mini-map { width: 150px; }
   body.has-mini-map #quests { top: 292px; }

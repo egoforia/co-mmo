@@ -82,6 +82,7 @@ describe('the world editor', () => {
     await page.click('#edit-world-button');
     await page.waitForSelector('#editor:not([hidden]) .tools');
     // These changes are for everyone at once, not drafts.
+    await page.click('#editor .publish-menu summary');
     await page.check('#editor input[name="live"]');
 
     // Plant a tree three tiles south (east of us is under the editor's window).

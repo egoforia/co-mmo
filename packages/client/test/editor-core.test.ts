@@ -17,9 +17,11 @@ function openGround(): TilePoint {
 }
 
 describe('the editor core', () => {
-  it('offers Look and every kind of edit there is', () => {
-    const ids = new EditorCore().tools().map((t) => t.id);
-    expect(ids.slice(0, 2)).toEqual(['look', 'select']);
+  it('starts on Select and offers every kind of edit there is', () => {
+    const core = new EditorCore();
+    const ids = core.tools().map((t) => t.id);
+    expect(ids.slice(0, 2)).toEqual(['select', 'area']);
+    expect(core.current().id).toBe('select');
     for (const kind of Object.values(EDIT_KINDS)) if (kind.available?.() ?? true) expect(ids).toContain(kind.kind);
   });
 

@@ -284,14 +284,23 @@ each land's edits in the store (`world_edits` table) with undo and redo,
 refuses edits that do not fit or would block where players arrive, and has
 `World.reshape` set the land up again wherever it runs, players put back
 where they stood or the nearest open spot. Routes in `world-edit-routes.ts`;
-the browser side is `client/src/editor/`: `core.ts` holds the tools (Look
-and one per kind in the registry), their settings drawn from each kind's
-fields, what a press, drag or release makes (`make`) and what to outline
-(`outline`), and two views use it: `in-game.ts`, the window beside the game,
+the browser side is `client/src/editor/`: `core.ts` holds the tools (Select,
+Copy and paste, and one per kind in the registry), their settings drawn from
+each kind's fields, what a press, drag or release makes (`make`), what to
+outline (`outline`) and the words for what is under the pointer
+(`hereWords`), and two views use it: `in-game.ts`, the game's edit mode,
 and `studio-map.ts`, the Art Studio's Map Preview & Editor (any floor, zoom
-in and out, the AI Map Architect). Their outlines and the Studio's tile plan
-are the editor's own marks, seen only while it is open, never game art.
-The in-game window has a floor picker (any floor from 3 down to 4 up; the
+in and out, the AI Map Architect). Edit mode hides the game's HUD (the
+page's `editing` class) and frames the world with a top bar and a status
+strip (`shell.ts`: land, floor stepper, hour and weather, Tiles and
+Hitboxes, the drafts pill with Publish, Done; what is under the pointer,
+the last result, Chat, Undo and Redo); the panel on the right holds the
+tools, the edit list and the land's bookmarks and checks (`land-panel.ts`),
+and `marks.ts` draws the hitboxes and tile wireframe. Their outlines and the
+Studio's tile plan are the editor's own marks, seen only while it is open,
+never game art. The redesign plan it follows step by step:
+https://claude.ai/artifact/QwzvrLNrhdy6J6w6hBWvRR.
+The in-game floor stepper reaches any floor from 3 down to 4 up (the
 scene shows that floor, `WorldScene.viewFloor`, while the player stays where
 they are). The Select tool (`world-edits/select.ts`, `pickAt`) picks the
 smallest thing on a tile of a floor (bookmark, spot, person, monster's home,

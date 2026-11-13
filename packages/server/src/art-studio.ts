@@ -78,8 +78,26 @@ export class ArtStudio {
   readonly pending = new Set<Promise<void>>();
   /** Requests a limit stopped (the budget, today's clips), kept until resume() asks for them again. */
   private stopped: { request: PaintRequest; release: () => void }[] = [];
+  private cachedCatalog: {
+    imageModel: string | null;
+    videoModel: string | null;
+    items: ArtItem[];
+    groups: ArtGroup[];
+    walkers: WalkerView[];
+    bodies: { id: string; name: string }[];
+    sounds: SoundItem[];
+    effectsModel: string | null;
+    musicModel: string | null;
+  } | null = null;
+  private cachedAt = 0;
+  private catalogPromise: Promise<NonNullable<ArtStudio['cachedCatalog']>> | null = null;
 
   constructor(private readonly options: ArtStudioOptions) {
+    const origOnPainted = options.onPainted;
+    options.onPainted = (ids) => {
+      this.invalidateOverview();
+      origOnPainted?.(ids);
+    };
     this.history = new ArtHistory(options.artDir, options.recipes);
     this.catalog = new ArtCatalog(options, this.history, this.redoneDir, () => this.manifest());
     this.upNext = new UpNextQueue(options.artDir, options.store.kept);
@@ -104,6 +122,33 @@ export class ArtStudio {
     return this.redone;
   }
 
+  /** Invalidates the in-memory cached overview so the next overview call fetches fresh catalog data. */
+  invalidateOverview(): void {
+    this.cachedCatalog = null;
+    this.cachedAt = 0;
+  }
+
+  private async buildCatalogData(): Promise<NonNullable<ArtStudio['cachedCatalog']>> {
+    await this.load();
+    await this.options.walks.load();
+    const imageModel = this.options.ai.image()?.model ?? null;
+    const videoModel = this.options.ai.video()?.model ?? null;
+    const shipped = await this.options.shipped();
+    const painted: ArtManifest = { ...(await this.options.wishes.kitManifest()), ...this.options.buildings.manifest(), ...this.options.walks.manifest() };
+    const items = await this.catalog.items(shipped, painted);
+    return {
+      imageModel,
+      videoModel,
+      items,
+      groups: groupsOf(items),
+      walkers: await this.catalog.walkerViews(shipped, painted, this.catalog.pictureUsd('walks')),
+      bodies: Object.values(BODY_TYPES).map((b) => ({ id: b.id, name: b.name })),
+      sounds: (await this.options.sounds?.list()) ?? [],
+      effectsModel: this.options.sounds?.models().effects ?? null,
+      musicModel: this.options.sounds?.models().music ?? null,
+    };
+  }
+
   /** Everything the Art tab shows. */
   async overview(): Promise<{
     imageModel: string | null;
@@ -119,26 +164,22 @@ export class ArtStudio {
     musicModel: string | null;
     sheets: KitSheetView[];
   }> {
-    await this.load();
-    await this.options.walks.load();
-    const imageModel = this.options.ai.image()?.model ?? null;
-    const videoModel = this.options.ai.video()?.model ?? null;
-    const shipped = await this.options.shipped();
-    const painted: ArtManifest = { ...(await this.options.wishes.kitManifest()), ...this.options.buildings.manifest(), ...this.options.walks.manifest() };
-    const items = await this.catalog.items(shipped, painted);
+    const TTL_MS = 60_000;
+    const now = Date.now();
+    if (!this.cachedCatalog || now - this.cachedAt > TTL_MS) {
+      if (!this.catalogPromise) {
+        this.catalogPromise = this.buildCatalogData().finally(() => {
+          this.catalogPromise = null;
+        });
+      }
+      this.cachedCatalog = await this.catalogPromise;
+      this.cachedAt = Date.now();
+    }
     return {
-      imageModel,
-      videoModel,
+      ...this.cachedCatalog,
+      sheets: (await this.options.sheets?.overview()) ?? [],
       budget: this.options.budget.state(),
       jobs: this.options.jobs.list(),
-      items,
-      groups: groupsOf(items),
-      walkers: await this.catalog.walkerViews(shipped, painted, this.catalog.pictureUsd('walks')),
-      bodies: Object.values(BODY_TYPES).map((b) => ({ id: b.id, name: b.name })),
-      sounds: (await this.options.sounds?.list()) ?? [],
-      effectsModel: this.options.sounds?.models().effects ?? null,
-      musicModel: this.options.sounds?.models().music ?? null,
-      sheets: (await this.options.sheets?.overview()) ?? [],
     };
   }
 
@@ -220,10 +261,12 @@ export class ArtStudio {
       const usd = imageUsd(provider.model, image);
       this.options.budget.spend('image', { provider: provider.id, model: provider.model }, usd);
       const kept = await this.options.sheets!.keep(look, image.data, guide);
+      this.invalidateOverview();
       await this.options.recipes.record(`${id}-${kept.id.split('/')[1]}`, { at: Date.now(), steps: [await this.options.recipes.imageStep(label, provider, request, usd)] });
       handle.done(usd);
       // checked now, so the Art tab shows how it fared as soon as it can
-      void this.options.sheets!.checked(look).catch(() => undefined);
+      const checking = this.options.sheets!.checked(look).finally(() => this.invalidateOverview());
+      this.hold(checking);
     }, handle, { kind: 'sheet', look, ...(textures.length ? { textures } : {}), ...(note ? { note } : {}) });
     return { estimateUsd };
   }
@@ -344,6 +387,7 @@ export class ArtStudio {
 
   /** Adopts a denied walk clip that was previously flagged by automated consistency checks. */
   async adoptDeniedClip(walkerId: string, body: string, direction: string, useRetry = false): Promise<boolean> {
+    this.invalidateOverview();
     const walker = this.catalog.walker(walkerId, body);
     const d = this.catalog.way(direction);
     return this.options.walks.adoptDeniedClip(walker, d, useRetry);
@@ -383,6 +427,7 @@ export class ArtStudio {
    * the picture that shipped with the game. The one it replaces is kept.
    */
   async restore(asset: string, version: string): Promise<void> {
+    this.invalidateOverview();
     if (version === 'shipped') {
       if (!(await this.options.shipped())[asset]) throw new ArtRequestError('That picture did not ship with the game.');
       await this.load();
@@ -409,6 +454,7 @@ export class ArtStudio {
 
   /** Puts a walk in one direction back as it was in an earlier version, for free. */
   async restoreWalk(walkerId: string, direction: string, version: string): Promise<void> {
+    this.invalidateOverview();
     const found = this.catalog.walkerList().find((w) => w.id === walkerId);
     if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
     if (!(await this.options.walks.restore(found, this.catalog.facing(direction), version))) throw new ArtRequestError('That earlier walk is not there any more.');
@@ -416,6 +462,7 @@ export class ArtStudio {
 
   /** Puts an earlier standing picture back in one direction, for free; its walk clip is not made again. */
   async restoreView(walkerId: string, direction: string, version: string): Promise<void> {
+    this.invalidateOverview();
     const found = this.catalog.walkerList().find((w) => w.id === walkerId);
     if (!found) throw new ArtRequestError('There is nothing by that name that walks.');
     if (!(await this.options.walks.restoreView(found, this.catalog.facing(direction), version))) throw new ArtRequestError('That earlier picture is not there any more.');
@@ -423,6 +470,7 @@ export class ArtStudio {
 
   /** Puts an earlier version of a sound back, for free. */
   async restoreSound(id: string, version: string): Promise<void> {
+    this.invalidateOverview();
     if (!(await this.options.sounds?.restore(id, version))) throw new ArtRequestError('That earlier version is not there any more.');
   }
 
@@ -435,6 +483,7 @@ export class ArtStudio {
   private async saveRedone(): Promise<void> {
     await mkdir(this.redoneDir, { recursive: true });
     await writeFile(resolve(this.redoneDir, 'manifest.json'), JSON.stringify(this.redone, null, 2));
+    this.invalidateOverview();
   }
 
   /** The painting log, newest first. */
@@ -445,6 +494,7 @@ export class ArtStudio {
   /** Waits for every request so far (tests and shutdown). */
   async idle(): Promise<void> {
     while (this.pending.size) await Promise.all([...this.pending]);
+    this.invalidateOverview();
   }
 
   private refuseWhenSpent(): void {
@@ -498,11 +548,16 @@ export class ArtStudio {
         handle?.skip(budget.why ?? 'The budget is spent.');
         return this.stop(request);
       }
-      if ((await task()) === false) this.stop(request);
+      try {
+        if ((await task()) === false) this.stop(request);
+      } finally {
+        this.invalidateOverview();
+      }
     });
     this.queue = run.catch((err) => {
       console.error("Painting from God's View failed:", (err as Error).message);
       handle?.fail(plain(err));
+      this.invalidateOverview();
     });
     this.hold(this.queue);
     if (request) this.options.requests?.hold(request, this.queue);

@@ -99,6 +99,16 @@ export async function refreshArtJobs(context: ArtContext): Promise<void> {
   const r = await context.api<{ jobs: ArtJob[]; budget: Budget }>('art/jobs').catch(() => null);
   if (!r) return;
   notifyFailedJobs(r.jobs, context.toast);
+  if (artState.data) {
+    const hadOpen = artState.data.jobs.some(isOpen);
+    artState.data.jobs = r.jobs;
+    artState.data.budget = r.budget;
+    const hasOpen = r.jobs.some(isOpen);
+    if (hadOpen && !hasOpen) {
+      // Invalidate cached overview when running jobs finish so painted art updates
+      artState.data = null;
+    }
+  }
   const box = document.getElementById('art-jobs');
   if (!box || !document.body.contains(box)) return;
   const open = box.querySelector('details')?.open;

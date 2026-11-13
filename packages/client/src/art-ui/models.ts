@@ -37,6 +37,10 @@ let modelsState: StudioAiSettings | null = null;
 const providerLabel = (id: string) =>
   ({ gemini: 'Google Gemini', anthropic: 'Anthropic Claude', openai: 'OpenAI-compatible', offline: 'Offline God' })[id] ?? id;
 
+export function hasModelsState(): boolean {
+  return modelsState !== null;
+}
+
 export async function loadArtModels(): Promise<StudioAiSettings> {
   modelsState = await artState.ctx.api<StudioAiSettings>('ai');
   return modelsState;

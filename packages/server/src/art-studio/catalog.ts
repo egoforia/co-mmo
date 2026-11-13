@@ -95,7 +95,7 @@ export class ArtCatalog {
       }
     }
     items.push(...this.wishedItems(this.pictureUsd('wishes')));
-    for (const item of items) {
+    const enrich = async (item: ArtItem) => {
       // Normal maps are painted for the game's own pictures, which share their id with the picture the game draws.
       if (!item.id.includes(':') && item.url && this.options.readArt) item.normalPaintable = true;
       const normal = redone[normalMapId(item.id)];
@@ -109,6 +109,10 @@ export class ArtCatalog {
         const first = await this.shippedRecipe(item.id);
         item.shipped = { url: slash(shipped[item.id]!.file), ...(first ? { recipe: first } : {}) };
       }
+    };
+    const BATCH = 32;
+    for (let i = 0; i < items.length; i += BATCH) {
+      await Promise.all(items.slice(i, i + BATCH).map(enrich));
     }
     return items;
   }
@@ -177,9 +181,8 @@ export class ArtCatalog {
 
   async walkerViews(shipped: ArtManifest, painted: ArtManifest, picture: number): Promise<WalkerView[]> {
     const clip = estimateClipUsd(this.options.ai.video()?.model ?? '');
-    const views: WalkerView[] = [];
     const redone = await this.getRedone();
-    for (const w of this.walkerList()) {
+    const buildView = async (w: ReturnType<typeof this.walkerList>[number]): Promise<WalkerView> => {
       const walks: WalkerView['walks'] = {};
       const runs: WalkerView['runs'] = {};
       const attacks: WalkerView['attacks'] = {};
@@ -219,9 +222,9 @@ export class ArtCatalog {
       const sheet = ISO_WAYS.some((d) => !standing[d].url) ? picture : 0;
       const estimateUsd = sheet + ISO_WAYS.filter((d) => !walks[d]).length * clip;
       const currentUrl = redone[w.id] ? `/${redone[w.id]!.file}` : w.url;
-      views.push({ id: w.id, name: w.name, kind: w.kind, ...(currentUrl ? { url: currentUrl } : {}), place: w.place, walks, runs, attacks, lost, ...(Object.keys(deniedWalks).length ? { denied: deniedWalks } : {}), standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body });
-    }
-    return views;
+      return { id: w.id, name: w.name, kind: w.kind, ...(currentUrl ? { url: currentUrl } : {}), place: w.place, walks, runs, attacks, lost, ...(Object.keys(deniedWalks).length ? { denied: deniedWalks } : {}), standing, estimateUsd, clipUsd: clip, viewUsd: picture, ...(w.tier ? { tier: w.tier } : {}), ...(w.biome ? { biome: w.biome } : {}), body: w.body };
+    };
+    return Promise.all(this.walkerList().map(buildView));
   }
 
   /** One group's pictures that can be painted again; refused when there are none. */

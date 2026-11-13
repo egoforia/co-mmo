@@ -30,7 +30,7 @@ let apiLogOpen = false;
 const artContext: ArtContext = {
   api,
   toast,
-  rerender: () => void render(),
+  rerender: (force?: boolean) => void render(force ?? true),
 };
 
 function waitForGame(): void {
@@ -58,7 +58,7 @@ async function boot(): Promise<void> {
     return;
   }
 
-  addEventListener('hashchange', () => void render());
+  addEventListener('hashchange', () => void render(false));
 
   // Wire the collapsible Art API Call Log drawer
   wireApiLog(
@@ -70,7 +70,7 @@ async function boot(): Promise<void> {
   document.getElementById('toggle-api-log')?.addEventListener('click', () => void toggleApiLog());
   document.getElementById('close-api-log')?.addEventListener('click', () => void toggleApiLog(false));
 
-  await render();
+  await render(true);
 
   // Keep live job status and background hand-finder progress fresh
   setInterval(() => {
@@ -94,10 +94,10 @@ async function toggleApiLog(force?: boolean): Promise<void> {
   }
 }
 
-async function render(): Promise<void> {
+async function render(force = false): Promise<void> {
   if (waiting) return;
   try {
-    const html = await artPage(artContext);
+    const html = await artPage(artContext, force);
     // Preserve active text input focus if the user is typing
     if (
       main.contains(document.activeElement) &&

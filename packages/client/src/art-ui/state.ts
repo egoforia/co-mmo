@@ -16,8 +16,8 @@ import { escapeHtml } from '../ui.ts';
 export interface ArtContext {
   api<T>(path: string, method?: string, body?: unknown): Promise<T>;
   toast(text: string, bad?: boolean): void;
-  /** Draws the open tab again. */
-  rerender(): void;
+  /** Draws the open tab again. Pass force=true to re-fetch catalog data. */
+  rerender(force?: boolean): void;
 }
 
 export interface Budget {

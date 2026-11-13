@@ -14,5 +14,16 @@ export interface BodyType {
 /** The body types the game knows; wishes may add more. */
 export const BODY_TYPES: Record<string, BodyType> = {
   'two-legged': { id: 'two-legged', name: 'Two-legged, 3 heads tall', frames: 12, cycleSeconds: 0.6 },
+  'four-legged': { id: 'four-legged', name: 'Four-legged, 2 heads tall', frames: 12, cycleSeconds: 0.6 },
   'six-legged': { id: 'six-legged', name: 'Six-legged crawler', frames: 12, cycleSeconds: 0.5 },
 };
+
+// Aliases so lookup by '4-legged' or descriptive text works without duplicating dropdown entries
+for (const alias of ['4-legged', '4 legs 2 heads tall', 'four-legged-2-heads']) {
+  Object.defineProperty(BODY_TYPES, alias, {
+    value: BODY_TYPES['four-legged'],
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+}

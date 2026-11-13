@@ -31,6 +31,8 @@ export interface ArtJob {
   usd?: number;
   /** Why it waits, failed or was skipped, in plain words. */
   reason?: string;
+  /** HTTP or validation status code when failed (such as 422). */
+  statusCode?: number;
   queuedAt: number;
   startedAt?: number;
   endedAt?: number;
@@ -43,7 +45,7 @@ export interface ArtJobHandle {
   /** Held back by the model's rate limit, with why. */
   wait(reason: string): void;
   done(usd: number): void;
-  fail(reason: string): void;
+  fail(reason: string, statusCode?: number): void;
   skip(reason: string): void;
 }
 
@@ -106,7 +108,7 @@ export class ArtJobs {
         this.onChange?.();
       },
       done: (usd) => end('done', { usd }),
-      fail: (reason) => end('failed', { reason }),
+      fail: (reason, statusCode) => end('failed', { reason, ...(statusCode !== undefined ? { statusCode } : {}) }),
       skip: (reason) => end('skipped', { reason }),
     };
   }
@@ -119,7 +121,8 @@ export class ArtJobs {
       handle.done(usd);
       return value;
     } catch (err) {
-      handle.fail(plain(err));
+      const code = (err as { status?: number })?.status;
+      handle.fail(plain(err), typeof code === 'number' ? code : undefined);
       throw err;
     }
   }

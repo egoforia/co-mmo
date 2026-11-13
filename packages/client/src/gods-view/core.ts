@@ -103,6 +103,36 @@ export class GameDown extends Error {
   }
 }
 
+/** Extracts a readable error description from an API response body. */
+export function formatError(data: unknown, status?: number): string {
+  if (!data || typeof data !== 'object') {
+    return status === 422 ? 'Validation failed (422)' : 'Something went wrong. Try again.';
+  }
+  const d = data as Record<string, unknown>;
+  const fields = Array.isArray(d.invalid_fields)
+    ? (d.invalid_fields as Array<{ field?: string; description?: string }>)
+        .map((f) => `${f.field ? f.field + ': ' : ''}${f.description ?? ''}`.trim())
+        .filter(Boolean)
+        .join('; ')
+    : '';
+  const detail = typeof d.detail === 'string' ? d.detail.trim().replace(/^-\s*/, '') : '';
+  const message = typeof d.message === 'string' ? d.message.trim() : '';
+  const error = typeof d.error === 'string' ? d.error.trim() : '';
+  const title = typeof d.title === 'string' ? d.title.trim() : '';
+
+  const details = fields || detail || message || error;
+  if (status === 422) {
+    if (details) {
+      return details.toLowerCase().includes('422') || details.toLowerCase().startsWith('validation')
+        ? details
+        : `Validation failed (422): ${details}`;
+    }
+    return title ? `${title} (422)` : 'Validation failed (422)';
+  }
+
+  return details || title || 'Something went wrong. Try again.';
+}
+
 /** Calls God's View's API as the signed-in person. */
 export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const res = await fetch(`/api/admin/${path}`, {
@@ -113,16 +143,34 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
   // No answer, or the dev proxy saying the server behind it is down.
   if (!res || res.status === 502 || res.status === 503 || res.status === 504) throw new GameDown();
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message ?? data.error ?? 'Something went wrong. Try again.');
+  if (!res.ok) {
+    const errorText = formatError(data, res.status);
+    if (res.status === 422) {
+      toast(errorText, true);
+    }
+    const err = new Error(errorText) as Error & { status?: number; data?: unknown };
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data as T;
 }
 
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
 /** A short note at the bottom of the page. */
-export function toast(text: string): void {
-  const el = document.getElementById('toast')!;
+export function toast(text: string, bad?: boolean): void {
+  const el = typeof document !== 'undefined' ? document.getElementById('toast') : null;
+  if (!el) return;
   el.textContent = text;
+  const isBad = bad ?? /\b(422|500|400|404|409|failed|error|refused|denied|invalid)\b/i.test(text);
+  el.classList.toggle('bad', isBad);
   el.hidden = false;
-  setTimeout(() => (el.hidden = true), 4000);
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.hidden = true;
+    el.classList.remove('bad');
+  }, isBad ? 7000 : 4000);
 }
 
 /** Dollars, to a tenth of a cent under a dollar. */

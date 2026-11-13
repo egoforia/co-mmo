@@ -252,6 +252,13 @@ describe('the hand finder', () => {
     }
     expect(heldArts('scarab-charm')).toEqual(['item-scarab-charm']);
     expect(HELD_FAMILIES).toHaveLength(18);
+
+    // Craft tools are holdable and have grips found once painted or shipped
+    const painted = { 'item-tool-woodcarving': { file: 'wished-art/redone/item-tool-woodcarving.png', kind: 'item' as const, width: 128, height: 128 } };
+    const toolGrips = pointSources(store, {}, painted, async () => Buffer.alloc(0)).filter((x) => x.kind === 'grip').map((x) => x.id);
+    expect(toolGrips).toContain('item-tool-woodcarving');
+    // Multiple tiers of a craft tool share art and should not duplicate sources
+    expect(toolGrips.filter((id) => id === 'item-tool-woodcarving')).toHaveLength(1);
   });
 
   it('sends a wished weapon\'s family picture first when it is painted', () => {

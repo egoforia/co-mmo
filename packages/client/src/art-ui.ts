@@ -242,7 +242,16 @@ const BUTTON_ACTIONS: Record<string, (t: HTMLButtonElement) => void> = {
     t.disabled = true;
     t.classList.add('busy');
     void artState.ctx.api<{ looked: number }>('art/hands/find', 'POST', JSON.parse(t.dataset.handsFind!)).then(
-      (r) => { artState.ctx.toast(`Looked again at ${r.looked} ${r.looked === 1 ? 'frame' : 'frames'}. Players see it after they reload.`); artState.ctx.rerender(); },
+      (r) => {
+        if (r.looked > 0) {
+          artState.ctx.toast(`Looked again at ${r.looked} ${r.looked === 1 ? 'frame' : 'frames'}. Players see it after they reload.`);
+          artState.ctx.rerender();
+        } else {
+          t.disabled = false;
+          t.classList.remove('busy');
+          artState.ctx.toast('No matching pictures or frames found to look at.');
+        }
+      },
       (err: Error) => { t.disabled = false; t.classList.remove('busy'); artState.ctx.toast(err.message); },
     );
   },

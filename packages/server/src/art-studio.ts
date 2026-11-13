@@ -88,7 +88,6 @@ export class ArtStudio {
     sounds: SoundItem[];
     effectsModel: string | null;
     musicModel: string | null;
-    sheets: KitSheetView[];
   } | null = null;
   private cachedAt = 0;
   private catalogPromise: Promise<NonNullable<ArtStudio['cachedCatalog']>> | null = null;
@@ -147,7 +146,6 @@ export class ArtStudio {
       sounds: (await this.options.sounds?.list()) ?? [],
       effectsModel: this.options.sounds?.models().effects ?? null,
       musicModel: this.options.sounds?.models().music ?? null,
-      sheets: (await this.options.sheets?.overview()) ?? [],
     };
   }
 
@@ -179,6 +177,7 @@ export class ArtStudio {
     }
     return {
       ...this.cachedCatalog,
+      sheets: (await this.options.sheets?.overview()) ?? [],
       budget: this.options.budget.state(),
       jobs: this.options.jobs.list(),
     };
@@ -266,7 +265,8 @@ export class ArtStudio {
       await this.options.recipes.record(`${id}-${kept.id.split('/')[1]}`, { at: Date.now(), steps: [await this.options.recipes.imageStep(label, provider, request, usd)] });
       handle.done(usd);
       // checked now, so the Art tab shows how it fared as soon as it can
-      void this.options.sheets!.checked(look).catch(() => undefined);
+      const checking = this.options.sheets!.checked(look).finally(() => this.invalidateOverview());
+      this.hold(checking);
     }, handle, { kind: 'sheet', look, ...(textures.length ? { textures } : {}), ...(note ? { note } : {}) });
     return { estimateUsd };
   }
@@ -494,6 +494,7 @@ export class ArtStudio {
   /** Waits for every request so far (tests and shutdown). */
   async idle(): Promise<void> {
     while (this.pending.size) await Promise.all([...this.pending]);
+    this.invalidateOverview();
   }
 
   private refuseWhenSpent(): void {
@@ -547,11 +548,16 @@ export class ArtStudio {
         handle?.skip(budget.why ?? 'The budget is spent.');
         return this.stop(request);
       }
-      if ((await task()) === false) this.stop(request);
+      try {
+        if ((await task()) === false) this.stop(request);
+      } finally {
+        this.invalidateOverview();
+      }
     });
     this.queue = run.catch((err) => {
       console.error("Painting from God's View failed:", (err as Error).message);
       handle?.fail(plain(err));
+      this.invalidateOverview();
     });
     this.hold(this.queue);
     if (request) this.options.requests?.hold(request, this.queue);

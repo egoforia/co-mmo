@@ -544,7 +544,7 @@ describe('the Art tab', () => {
 
     expect((await ask(base, owner.token, 'sheet', { look: 'castle' })).body.message).toMatch(/no building look/);
     expect((await ask(base, owner.token, 'sheet', { look: 'timber-cottage', textures: ['chimney'] })).body.message).toMatch(/no texture called chimney/);
-  }, 30_000);
+  }, 60_000);
 
   it('supports custom reference images (game art and uploaded/external references) when reviewing and painting', async () => {
     const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });

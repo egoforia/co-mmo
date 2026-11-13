@@ -689,7 +689,13 @@ export class WalkPainter {
       if (!provider || this.options.overBudget()) return { stop: stopReason(this.options) };
       try {
         // The same picture first and last makes the clip loop back to the standing pose.
-        const clip = await watched(provider, handle).generate({ prompt, first, last: first, seconds: CLIP_SECONDS });
+        const clip = await watched(provider, handle).generate({
+          prompt,
+          first,
+          last: first,
+          seconds: CLIP_SECONDS,
+          negativePrompt: 'black background, dark background, changing background color, background transition, floor, ground shadow, scenery, lighting change',
+        });
         sent = provider;
         const cost = videoUsd(provider.model, clip);
         usd += cost;

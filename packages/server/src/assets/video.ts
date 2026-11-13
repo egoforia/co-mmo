@@ -67,6 +67,8 @@ const DEFAULT_USD_PER_SECOND: Record<string, [number, number]> = {
   'alibaba/wan-3': [0.1, 0.2],
   'replicate/wan-2.1': [0.05, 0.08],
   'replicate/wan-3.0': [0.1, 0.2],
+  'minimax/h3-lite': [0.04, 0.04],
+  'minimax/h3': [0.08, 0.12],
   default: [0.4, 0.4],
 };
 
@@ -75,6 +77,8 @@ const USD_PER_SECOND_480P: Record<string, number> = {
   'alibaba/wan-3': 0.05,
   'wan-3.0': 0.05,
   'replicate/wan-3.0': 0.05,
+  'minimax/h3-lite': 0.025,
+  'minimax/h3': 0.05,
 };
 
 const customUsdPerSecond: Record<string, [number, number]> = {};
@@ -111,8 +115,9 @@ export function knownVideoModels(): string[] {
 /** What a clip cost; an unknown model is priced like the dearest one, so budgets err safe. */
 export function videoUsd(model: string, video: GeneratedVideo): number {
   const [hd, fullHd] = videoRatesPerSecond(model);
-  const sd = video.resolution === '480p' ? USD_PER_SECOND_480P[model.toLowerCase().trim()] : undefined;
-  return (sd ?? (video.resolution === '1080p' ? fullHd : hd)) * video.seconds;
+  const norm = video.resolution?.toLowerCase();
+  const sd = norm === '480p' ? USD_PER_SECOND_480P[model.toLowerCase().trim()] : undefined;
+  return (sd ?? (norm === '1080p' ? fullHd : hd)) * video.seconds;
 }
 
 /** Dollars per second of video, backwards-compatible proxy mapping. */

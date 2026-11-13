@@ -158,6 +158,8 @@ export function handleQueueClick(t: HTMLButtonElement): boolean {
       body?: string;
       estimateUsd: number;
     };
+    const walkerBody = t.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value;
+    if (walkerBody && entry.kind === 'clip') entry.body = walkerBody;
     t.disabled = true;
     void artState.ctx.api<UpNextState>('art/queue', 'POST', { action: 'add', items: [entry] }).then(
       (state) => {

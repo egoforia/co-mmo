@@ -15,7 +15,7 @@ import { escapeHtml } from '../ui.ts';
 /** What the Art tab needs from God's View. */
 export interface ArtContext {
   api<T>(path: string, method?: string, body?: unknown): Promise<T>;
-  toast(text: string): void;
+  toast(text: string, bad?: boolean): void;
   /** Draws the open tab again. */
   rerender(): void;
 }
@@ -38,6 +38,8 @@ export interface ArtJob {
   estimateUsd: number;
   usd?: number;
   reason?: string;
+  /** HTTP or validation status code when failed (such as 422). */
+  statusCode?: number;
   queuedAt: number;
   startedAt?: number;
   endedAt?: number;

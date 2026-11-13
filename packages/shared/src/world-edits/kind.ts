@@ -1,4 +1,5 @@
 import type { RegionMap } from '../world.ts';
+import type { PickKind, Picked } from './select.ts';
 import type { DraftOf, EditKindId, EditOf, TilePoint } from './types.ts';
 
 // The contract every kind of world edit keeps. One file per kind in kinds/
@@ -43,12 +44,41 @@ export type EditPointer =
   /** Click a thing to pick it up, then where it goes. */
   | 'pick-then-click';
 
+/** One choice of a choice setting: its id and name, and for things placed in the world the picture it is (an art id) and the tiles it stands on, so an editor can offer it as a picture. */
+export interface FieldChoice {
+  id: string;
+  name: string;
+  art?: string;
+  size?: [width: number, depth: number];
+}
+
+/** What every setting has: its key, its label, and when it applies. */
+interface FieldBase {
+  key: string;
+  label: string;
+  /** When it applies, from the settings as they are; an editor shows it only then. Always when left out. */
+  when?: (values: Record<string, FieldValue>) => boolean;
+}
+
 /** One setting a tool offers beside the world, described so any editor can draw it. */
-export type EditField =
-  | { key: string; label: string; type: 'choice'; choices: (ctx: EditContext) => { id: string; name: string }[]; default?: (ctx: EditContext) => string }
-  | { key: string; label: string; type: 'number'; min: number; max: number; default: number }
-  | { key: string; label: string; type: 'flag'; default: boolean }
-  | { key: string; label: string; type: 'text'; max: number; default: string };
+export type EditField = FieldBase & (
+  | { type: 'choice'; choices: (ctx: EditContext) => FieldChoice[]; default?: (ctx: EditContext) => string }
+  | { type: 'number'; min: number; max: number; default: number }
+  | { type: 'flag'; default: boolean }
+  | { type: 'text'; max: number; default: string });
+
+/**
+ * How a kind changes a thing already standing, from the editor's inspector:
+ * the things it changes once picked, the section's title and button there,
+ * and the thing's settings as they are now (the kind's starting ones when left out).
+ */
+export interface Inspects {
+  picks: PickKind[];
+  title: string;
+  /** The button's words: "Change it", "Add this quest". */
+  action: string;
+  current?(map: RegionMap, picked: Picked): Record<string, FieldValue> | undefined;
+}
 
 /** Everything about one kind of edit. */
 export interface EditKind<K extends EditKindId> {
@@ -64,6 +94,8 @@ export interface EditKind<K extends EditKindId> {
   targets?: 'building' | 'piece' | 'thing' | 'person';
   /** Its settings, drawn the same by every editor. */
   fields: EditField[];
+  /** When it changes a picked thing from the inspector (Select first) instead of being a tool of its own. */
+  inspects?: Inspects;
   /** False while it has nothing to offer (set pieces while their kit's wish is off). */
   available?(): boolean;
   /** Lines to show under the settings as they are now: the kit building's shape checks. */

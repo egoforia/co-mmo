@@ -82,7 +82,7 @@ Each shipped biome has four kinds of spot (`SPOTS`). `layOutSpots` stands 12 of 
 - The layout is the same every time.
 - Each spot blocks its tile.
 
-The world editor's **Gathering** tool stands a spot or takes one away (the `spot` edit). Painting over a spot removes it.
+The world editor's **Gathering** tool (in the Life group) stands a spot or takes one away (the `spot` edit). Painting over a spot removes it.
 
 Pressing **E** checks for these in order: an NPC to talk to, a body to loot, a spot to gather. Gathering at a spot:
 

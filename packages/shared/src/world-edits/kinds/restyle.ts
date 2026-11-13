@@ -1,7 +1,7 @@
 import { BUILDING_STYLES } from '../../buildings.ts';
 import { building } from '../../world.ts';
 import type { EditKind } from '../kind.ts';
-import { buildingFor, inside, overlaps } from '../tiles.ts';
+import { buildingAt, buildingFor, inside, overlaps } from '../tiles.ts';
 import { HOUSE_FLOOR } from '../types.ts';
 import { takeBuilding } from './remove.ts';
 
@@ -17,6 +17,15 @@ export const RESTYLE: EditKind<'restyle'> = {
   hint: 'Choose a look, and a floor size if it should change (0 keeps it), then click a building. A new size lays it again from the same corner, empty inside.',
   pointer: 'click',
   targets: 'building',
+  inspects: {
+    picks: ['building'],
+    title: 'Look and size',
+    action: 'Change it',
+    current: (map, p) => {
+      const b = buildingAt(map, [p.box.x, p.box.y]);
+      return b && { style: b.style, width: 0, depth: 0 };
+    },
+  },
   fields: [
     { key: 'style', label: 'Look', type: 'choice', choices: () => Object.values(BUILDING_STYLES).map((s) => ({ id: s.id, name: `${s.name}${s.kit ? ' (kit house)' : ''}` })) },
     { key: 'width', label: 'Floor across (0 keeps it)', type: 'number', min: 0, max: HOUSE_FLOOR.max, default: 0 },

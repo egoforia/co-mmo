@@ -12,7 +12,7 @@ export const PIECE: EditKind<'piece'> = {
   pointer: 'click',
   onFloors: true,
   available: () => setPieces().length > 0,
-  fields: [{ key: 'piece', label: 'Piece', type: 'choice', choices: () => setPieces().map((p) => ({ id: p.id, name: p.name })) }],
+  fields: [{ key: 'piece', label: 'Piece', type: 'choice', choices: () => setPieces().map((p) => ({ id: p.id, name: p.name, art: p.id, size: [p.footprint.width, p.footprint.height] as [number, number] })) }],
   shape: '{"kind":"piece","piece":"<pieceId>","at":[x,y]}',
   outline(_map, { at }, v) {
     const f = setPiece(String(v.piece))?.footprint ?? { width: 1, height: 1 };

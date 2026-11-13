@@ -156,6 +156,8 @@ export interface WorldSceneOptions {
   typing: () => boolean;
   /** The kit houses of a region, for the isometric camera. */
   houses?: HouseSource;
+  /** True while the world editor is open: clicks are its tools', not choosing a target. */
+  editing?: () => boolean;
 }
 
 export const T = TILE_PIXELS;
@@ -190,6 +192,8 @@ export interface MiniMapView {
   floor: number;
   /** Us first, then everyone near us on our floor. */
   figures: MapFigure[];
+  /** Where the map is centred instead of on us: the world editor's free camera, in our land's tiles. */
+  centre?: { x: number; y: number };
 }
 
 /** What the world scene holds right now, for the performance overlay. */

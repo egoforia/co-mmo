@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser } from 'playwright';
 import { Tile, generateRegion, newCharacter, regionDef, type RegionMap } from '@co-mmo/shared';
 import { account, app } from '../test/helpers.ts';
-import { playWorld } from './harness.ts';
+import { chooseTool, goLive, pickAsset, playWorld } from './harness.ts';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
@@ -80,12 +80,12 @@ describe('the world editor', () => {
     const edits = () => world.store.worldEdits('sanctum').edits;
 
     await page.click('#edit-world-button');
-    await page.waitForSelector('#editor:not([hidden]) .tools');
+    await page.waitForSelector('#editor:not([hidden]) .editor-rail');
     // These changes are for everyone at once, not drafts.
-    await page.check('#editor input[name="live"]');
+    await goLive(page);
 
     // Plant a tree three tiles south (east of us is under the editor's window).
-    await page.click('#editor [data-tool="paint"]');
+    await chooseTool(page, 'paint');
     await page.selectOption('#editor select[name="tile"]', 'tree');
     await clickTile(0, 3);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
@@ -100,11 +100,11 @@ describe('the world editor', () => {
     expect.soft(tile(spot.x, spot.y + 3), 'the tree is gone again').toBe(Tile.Ground);
 
     // A road west (east of us is under the editor's window), and a small house at its end.
-    await page.click('#editor [data-tool="road"]');
+    await chooseTool(page, 'road');
     await clickTile(-1, 1);
     await clickTile(-7, 1);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(1);
-    await page.click('#editor [data-tool="house"]');
+    await chooseTool(page, 'house');
     await page.selectOption('#editor select[name="size"]', '0');
     await clickTile(-8, 1);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(2);
@@ -113,15 +113,35 @@ describe('the world editor', () => {
     expect.soft(tile(spot.x - 2, spot.y + 1), 'the road').toBe(Tile.Path);
 
     // Monsters to the south.
-    await page.click('#editor [data-tool="spawn"]');
-    await page.selectOption('#editor select[name="creature"]', 'lantern-moth');
+    await chooseTool(page, 'spawn');
+    await pickAsset(page, 'creature', 'lantern-moth');
     const before = app!.world.home.creatureIds().length;
     await clickTile(2, 5);
     await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(3);
     expect.soft(app!.world.home.creatureIds().length, 'four more monsters').toBe(before + 4);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: resolve(shots, 'editor-house.png') });
-    await expect.poll(() => page.locator('#editor .edits li').count()).toBe(3);
+    // With Select and nothing picked, the panel shows the land: its three changes.
+    await chooseTool(page, 'select');
+    await expect.poll(() => page.locator('#editor [data-edit]').count()).toBe(3);
+
+    // The Plan camera (Tab): the land from above, where the same tools work. A tree four tiles south of us.
+    await page.keyboard.press('Tab');
+    const plan = page.locator('#editor .editor-plan canvas');
+    await plan.waitFor();
+    await chooseTool(page, 'paint');
+    await page.selectOption('#editor select[name="tile"]', 'tree');
+    const box = (await plan.boundingBox())!;
+    await page.mouse.click(box.x + ((spot.x + 0.5) / map.width) * box.width, box.y + ((spot.y + 4.5) / map.height) * box.height);
+    await expect.poll(() => edits().length, { timeout: 10_000 }).toBe(4);
+    expect.soft(tile(spot.x, spot.y + 4), 'a tree drawn on the plan').toBe(Tile.Tree);
+    await page.screenshot({ path: resolve(shots, 'editor-plan.png') });
+    // The Architect has its tab in the land panel, in either camera.
+    await chooseTool(page, 'select');
+    await page.click('#editor [data-land-tab="architect"]');
+    await page.waitForSelector('#editor #architect-form textarea');
+    await page.keyboard.press('Tab');
+    await expect.poll(() => page.locator('#editor .editor-plan').isHidden()).toBe(true);
 
     expect(problems).toEqual([]);
     expect(world.problems()).toEqual([]);

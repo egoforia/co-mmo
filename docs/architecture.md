@@ -276,7 +276,7 @@ registry; `world-edits.ts` is the face over them. Everything standing on a land 
 (`level`, the ground when missing) and, for tools that change one thing, that
 thing (`target`); kinds marked `onFloors` work on every floor, the rest on the
 ground for now. An edit that no longer fits is passed over and listed in
-`RegionMap.unlaid`, which both editors show. Checks and previews lay one more
+`RegionMap.unlaid`, which the editor shows. Checks and previews lay one more
 edit on a copy of the laid land (`withEdit`) instead of laying it all again. `generateRegion` lays the edits over the land in order, so the server,
 every region server and every browser lay out the same map, and a browser
 draws a land again when its definition changes. `world-editor.ts` keeps
@@ -284,21 +284,60 @@ each land's edits in the store (`world_edits` table) with undo and redo,
 refuses edits that do not fit or would block where players arrive, and has
 `World.reshape` set the land up again wherever it runs, players put back
 where they stood or the nearest open spot. Routes in `world-edit-routes.ts`;
-the browser side is `client/src/editor/`: `core.ts` holds the tools (Look
-and one per kind in the registry), their settings drawn from each kind's
-fields, what a press, drag or release makes (`make`) and what to outline
-(`outline`), and two views use it: `in-game.ts`, the window beside the game,
-and `studio-map.ts`, the Art Studio's Map Preview & Editor (any floor, zoom
-in and out, the AI Map Architect). Their outlines and the Studio's tile plan
-are the editor's own marks, seen only while it is open, never game art.
-The in-game window has a floor picker (any floor from 3 down to 4 up; the
+the browser side is `client/src/editor/`: `core.ts` holds the tools (Select,
+Copy and paste, and one per kind in the registry), their settings drawn from
+each kind's fields, what a press, drag or release makes (`make`), what to
+outline (`outline`) and the words for what is under the pointer
+(`hereWords`), and `in-game.ts`, the game's edit mode, uses it through two
+cameras (`cameras.ts`; Tab, or World and Plan in the top bar): the World
+camera is the game's own view, free of the player, and the Plan camera
+(`plan-view.ts`, drawn by `plan-draw.ts`) shows any land from above, read
+from the server (`lands-io.ts`, `readLand`), on any floor, zoomed in or out,
+with the same tools, inspector, panel and drafts. The land being changed and
+its edits are `editing.ts`. Edit mode hides the game's HUD (the
+page's `editing` class) and frames the world with a top bar and a status
+strip (`shell.ts`: land, camera, floor stepper, hour and weather, Tiles and
+Hitboxes, the drafts pill with Publish, Done; what is under the pointer,
+the last result, Chat, Undo and Redo); the panel on the right holds the
+tool's settings, what Select picked, or, with nothing picked, the land panel
+(`land-panel.ts`, run by `land-control.ts`): Changes (drafts, published and
+built in, `changes.ts`, hover to outline, Go, a filter by group), Places
+(bookmarks, Bookmark this view with Ctrl D), Checks (run again after each
+change, the places they name marked red), Architect (the AI Map Architect,
+`architect.ts`: say in plain words what to change, or type it in the finder;
+its steps are checked by the server and marked on the land, cyan on the plan,
+to tick before anything is made) and Land (its settings, workshop lands and
+files). The Art Studio's Map tab is a link into the Plan camera (`/?edit=plan`). A choice
+whose items carry `art` (and `size`) is a thing to place: the forms draw it as a
+picture button and `asset-picker.ts` offers it as pictures (search, Kept,
+Recent, In this land, Not painted yet, a large preview), its pictures read from
+the art manifests by `art-index.ts`. A one-click making tool shows a
+see-through ghost of what it would stand under the pointer (`ghost.ts`) and
+the server's own check of that spot in the status strip (`EditorCore.aimAt`).
+`world-input.ts`
+wires the pointer, wheel and frames, and `marks.ts` draws the hitboxes and tile wireframe.
+`keys-sheet.ts` is the sheet of keys (?), and `panel-size.ts` the panel's
+grip (its width remembered in the browser, set as `--panel-w`). How it is
+used, for the person editing: `docs/world-editor.md`. Their outlines and the
+Plan camera's tile plan are the editor's own marks, seen only while it is open,
+never game art. The redesign plan it follows step by step:
+https://claude.ai/artifact/QwzvrLNrhdy6J6w6hBWvRR.
+The in-game floor stepper reaches any floor from 3 down to 4 up (the
 scene shows that floor, `WorldScene.viewFloor`, while the player stays where
 they are). The Select tool (`world-edits/select.ts`, `pickAt`) picks the
 smallest thing on a tile of a floor (bookmark, spot, person, monster's home,
 piece, stairs, storey, building) and shows what it is; Take it away is a
 `remove` edit naming it, Copy lays a new edit read from it (`copyDraft`), and
 Move is the piece's own `move`, or a take-away and a copy sent together
-(`moveDrafts`). Edits sent together (`POST /api/world-edits { edits }`) are
+(`moveDrafts`). Select is the editor's inspector (`client/src/editor/inspector.ts`):
+select first, then change. A kind that changes a thing already there
+declares `inspects` (the picked kinds it changes, its section's title and
+button, and the thing's settings as they are now), and its fields may carry a
+`when` rule so they show only when they apply (`editor/fields.ts`). Change
+building, Floors, Footprint, Change monsters, Patrol path, Clear and Quest
+are sections of the inspector, not tools on the rail (`rail.ts`, `FOLDED`;
+they stay in the finder), and dragging over bare ground with Select copies
+that area for Copy and paste. `edit-keys.ts` says what each key does. Edits sent together (`POST /api/world-edits { edits }`) are
 made all or none and share a `group`, so undo, redo and take out treat them
 as one step. A `bookmark` edit names a place to look from on a floor with a
 line on what it tests (`RegionMap.bookmarks`); the window lists a land's
@@ -384,7 +423,7 @@ nothing else; everything on it is laid by edits, those it ships with
 world grid: no roads join it, nothing grows beside it, and players reach it
 with `/teleport`. The Architectural Testbed is one, its bays shipped as
 `shared/src/testbed/arch-testbed.edits.json`; the Owner and Stewards make
-more from the Studio map (`POST /api/world-edits/lands`, server
+more from the editor's Land tab (`POST /api/world-edits/lands`, server
 `workshop-lands.ts`, kept with the land's edits in `world_edits`). Any land's
 edits go out as a file (`?export=1`) and are laid on another land
 (`/import`), each checked as if made by hand. The kinds that build a land up

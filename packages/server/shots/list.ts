@@ -219,7 +219,179 @@ export const SHOTS: Shot[] = [
       await page.click('#edit-world-button');
       await page.waitForSelector('#editor:not([hidden])');
     },
-    mustSee: ['the editor window and the mini map side by side, neither covering the other', 'the tool buttons (Select, Take away and Bookmark among them), the floor picker and the edit list are readable'],
+    mustSee: [
+      'edit mode: the game HUD, chat, stats and key bar are gone; a top bar (land, floor stepper, hour and weather, Tiles and Hitboxes, drafts, Done) runs across the top',
+      'the editor panel on the right and the mini map at the bottom left, neither covering the other',
+      'with nothing selected the panel shows the land: its name, tabs Changes, Places (25), Checks and Land, and the Changes tab with Drafts, Published and a folded Built in list',
+      'a status strip along the bottom with Chat, Undo and Redo',
+      'no red hitbox fill: hitboxes start off',
+    ],
+  },
+  {
+    name: 'editor-free-camera',
+    about: 'The world editor with its camera moved away from the player and zoomed out one step, with the tile wireframe on around the middle of the screen.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor input[name="tile-grid"]');
+      await page.mouse.move(400, 400);
+      await page.mouse.wheel(0, 200);
+      // A right-drag pans (the keys pan too, but software drawing runs too few frames to show it here).
+      await page.mouse.move(600, 450);
+      await page.mouse.down({ button: 'right' });
+      await page.mouse.move(400, 450, { steps: 8 });
+      await page.mouse.up({ button: 'right' });
+      await page.waitForTimeout(1200);
+    },
+    mustSee: [
+      'the world seen from further out than editor-testbed, panned east: the player stands well left of the middle',
+      'the tile wireframe around the middle of the screen, not around the player',
+      'the status strip says the zoom (75%) and offers Back to me and Bring me here',
+      'the mini map centred on the camera rather than on the player',
+    ],
+  },
+  {
+    name: 'editor-finder',
+    about: 'The world editor with the Life group chosen on the rail and the finder (Ctrl K) open with "sta" typed.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="life"]');
+      await page.keyboard.press('Control+k');
+      await page.keyboard.type('sta');
+      await page.waitForTimeout(300);
+    },
+    mustSee: [
+      'a rail of six groups down the left (Select, Ground, Build, Furnish, Life, Places), each with its key letter, Life standing out',
+      'the options bar beside the rail with the Life tools (Person, Monsters, Gathering), Person chosen',
+      'the finder in the middle near the top: Stairs first, then bookmarks to go to (Go to …), with Tool, Place or Do beside each',
+      'the panel on the right no longer has a wall of tool buttons',
+    ],
+  },
+  {
+    name: 'editor-land-places',
+    about: "The world editor's land panel on its Places tab, in the Architectural Testbed.",
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-land-tab="places"]');
+    },
+    mustSee: ['the Places tab chosen: a name box and "Bookmark this view (Ctrl D)", then the testbed\'s bookmarks each with Go', 'the list scrolls inside the panel, above the status strip'],
+  },
+  {
+    name: 'editor-land-checks',
+    about: "The world editor's land panel after Check again, in the Sanctum.",
+    region: 'sanctum',
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-land-tab="checks"]');
+      await page.click('#editor [data-check]');
+      await page.waitForTimeout(500);
+    },
+    mustSee: ['the Checks tab chosen, with Shapes, Walks and Not painted yet, each saying all is well or listing what it found', 'when something is listed, the Checks tab shows a count and red squares mark those places in the world'],
+  },
+  {
+    name: 'editor-asset-picker',
+    about: "The world editor's asset picker, opened from the Person tool's \"Looks like\", with the pointer over a picture.",
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="life"]');
+      await page.click('#editor [data-asset-field="look"]');
+      await page.waitForSelector('.asset-picker:not([hidden]) [data-asset]');
+      await page.hover('.asset-picker [data-asset]:nth-child(3)');
+      await page.waitForTimeout(800);
+    },
+    mustSee: [
+      'a picker over the editor: "Choose: Looks like", a search box, and filters All, Kept, Recent, In this land, Not painted yet',
+      'a grid of character pictures, each with its name and a star to keep it; the chosen one outlined in green',
+      'the hovered picture large on the right with its name and "Stands on 1 × 1 tile"',
+    ],
+  },
+  {
+    name: 'editor-ghost',
+    about: 'The Person tool in the world editor with the pointer over open ground: a see-through ghost of who would stand there and the check result.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="life"]');
+      await page.mouse.move(700, 520);
+      await page.mouse.move(720, 540, { steps: 4 });
+      await page.waitForTimeout(500);
+    },
+    mustSee: [
+      'a see-through figure standing on the tile under the pointer, the size of the player, with a yellow outline on its tile',
+      'the status strip starts with "✓ It fits here"',
+      'the Person form shows "Looks like" as a picture button',
+    ],
+  },
+  {
+    name: 'editor-inspector',
+    about: 'The world editor with the shop the player stands in selected: its inspector, with the Floors section unfolded.',
+    region: 'sanctum',
+    at: inside('sanctum-arcanum'),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.mouse.click(640, 400);
+      await page.click('#editor details[data-section="floors"] summary');
+      await page.waitForTimeout(300);
+    },
+    mustSee: [
+      'the shop outlined in green in the world',
+      'the inspector: the building\'s name with "Building" beside it, its size, and Move (M), Copy (Ctrl C) and Take away (Del)',
+      'sections "Look and size" (open, its look chosen) and "Floors above and below" (open, with Floors up, Floors down and Ladders, and a "Set the floors" button)',
+    ],
+  },
+  {
+    name: 'editor-kit-form',
+    about: 'The world editor in edit mode with the Kit building tool chosen, so its settings and shape checks show in the panel.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-group="build"]');
+      await page.click('#editor [data-tool="kit"]');
+    },
+    mustSee: ['the Kit building settings (Look, Bays across, Bays deep, Storeys) in the panel under the tools', 'the panel ends above the status strip and scrolls rather than running off the screen'],
+  },
+  {
+    name: 'editor-drafts-menu',
+    about: 'The world editor with the drafts menu open and hitboxes switched on.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor input[name="hitboxes"]');
+      await page.click('#editor .publish-menu summary');
+    },
+    mustSee: ['the drafts pill reads "No drafts" and its menu shows "Make my changes live at once"', 'red and orange hitbox fills on the walls near the player', 'the Hitboxes box ticked in the top bar'],
+  },
+  {
+    name: 'editor-phone',
+    about: 'The world editor opened on a phone-sized screen, which says it needs a bigger one.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    screen: 'phone',
+    open: async (page) => {
+      // The HUD may push the button off a narrow screen; the shot is about what the editor shows.
+      await page.evaluate(() => document.getElementById('edit-world-button')?.click());
+      await page.waitForSelector('#editor:not([hidden])');
+    },
+    mustSee: ['a short note saying the world editor needs a bigger screen', 'a Done button to leave', 'no squeezed tool panel'],
   },
   {
     name: 'editor-tile-grid',
@@ -234,27 +406,57 @@ export const SHOTS: Shot[] = [
     mustSee: ['thin light lines along the tile edges around the player, lying flat on the ground in the diamond grid', 'the Tiles switch ticked beside Hitboxes in the editor title', 'the lines stop at the land\'s edge and do not cover the editor window'],
   },
   {
-    name: 'studio-map',
-    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Floors tool chosen.",
-    page: '/art-studio.html#art/map-editor',
-    ready: '#studio-map-canvas',
+    name: 'editor-plan',
+    about: "The world editor's Plan camera over the Sanctum, zoomed in twice, with the Build group chosen.",
+    region: 'sanctum',
     open: async (page) => {
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-tool="floors"]');
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-camera="plan"]');
+      await page.waitForSelector('#editor .editor-plan canvas');
+      await page.click('#editor [data-plan-zoom="in"]');
+      await page.click('#editor [data-plan-zoom="in"]');
+      await page.click('#editor [data-group="build"]');
     },
-    mustSee: ['the map fills its box and scrolls, tiles bigger than zoomed out', 'zoom buttons, floors from 3 down to 4 up, and the Floors tool settings (up, down, ladders)', 'the edit list beside the map'],
+    mustSee: ['the Sanctum from above, coloured by tile, filling the space between the rail and the panel and scrolling inside it', 'World and Plan in the top bar with Plan chosen; the plan\'s own bar with the land menu, zoom at 225% and Tiles, Hitboxes, Spots, People & monsters', 'the Build tools (Kit building, House, Storey, Stairs) and Kit building\'s settings in the panel', 'no mini map, sky or game HUD showing through'],
   },
   {
-    name: 'studio-map-tiles',
-    about: "The Art Studio's map of the Sanctum, zoomed in twice, with the Tiles layer on.",
-    page: '/art-studio.html#art/map-editor',
-    ready: '#studio-map-canvas',
+    name: 'editor-plan-architect',
+    about: "The world editor's Plan camera over the Sanctum with its Tiles layer on and the land panel's Architect tab.",
+    region: 'sanctum',
     open: async (page) => {
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-map-zoom="in"]');
-      await page.click('.studio-map [data-map-layer="showGrid"]');
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.keyboard.press('Tab');
+      await page.waitForSelector('#editor .editor-plan canvas');
+      await page.click('#editor [data-plan-zoom="in"]');
+      await page.click('#editor input[name="plan-layer"][value="grid"]');
+      await page.click('#editor [data-land-tab="architect"]');
     },
-    mustSee: ['a thin line around every tile, brighter every fifth tile', 'the Tiles box ticked beside Hitboxes'],
+    mustSee: ['a thin line around every tile of the plan, brighter every fifth tile', 'the Architect tab chosen: a box to say what to change and "Show the steps"', 'the Tiles box ticked in the plan\'s bar'],
+  },
+  {
+    name: 'editor-keys',
+    about: "The world editor's sheet of keys (?), over the Sanctum, with the panel dragged 100 pixels wider.",
+    region: 'sanctum',
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      const grip = (await page.locator('#editor .panel-grip').boundingBox())!;
+      await page.mouse.move(grip.x + 4, grip.y + 200);
+      await page.mouse.down();
+      await page.mouse.move(grip.x - 96, grip.y + 200, { steps: 6 });
+      await page.mouse.up();
+      await page.keyboard.press('?');
+      await page.waitForSelector('#editor .editor-keys:not([hidden])');
+    },
+    mustSee: ['a sheet of keys in the middle: Tools with each group\'s letter, Camera, What is picked and Editor', 'the panel on the right about 440 pixels wide, the options bar and world left of it', 'Keys ? in the status strip'],
+  },
+  {
+    name: 'studio-map',
+    about: "The Art Studio's Map editor tab: a link into the game's Plan camera.",
+    page: '/art-studio.html#art/map-editor',
+    ready: '[data-plan-link]',
+    mustSee: ['a short card saying the map editor is in the game now', 'a button-like link "Open the Plan camera in the game"'],
   },
 ];

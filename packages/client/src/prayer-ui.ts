@@ -1,5 +1,5 @@
 import type { DraftMessage, DraftUpdateMessage, DraftView, GodMessage, WishCard } from '@co-mmo/shared';
-import { escapeHtml, isTyping } from './ui.ts';
+import { escapeHtml, isEditing, isTyping } from './ui.ts';
 import { WorkshopUi } from './workshop-ui.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -87,7 +87,7 @@ export class PrayerUi {
       if (e.key === 'Escape' && !el.hidden) {
         this.input.blur();
         this.toggle(false);
-      } else if (e.key.toLowerCase() === 'g' && !isTyping() && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      } else if (e.key.toLowerCase() === 'g' && !isTyping() && !isEditing() && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         this.toggle();
       }

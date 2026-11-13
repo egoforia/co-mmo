@@ -7,7 +7,7 @@
 // - art-ui/hand-editor.ts: Interactive Frame-by-Frame Hand & Grip Workbench
 // - art-ui/skill-stage.ts: Interactive Attack, Skill & Status Effect Stage
 // - art-ui/hud-fx.ts: HUD Elements, Status Icons, Skill FX, Hotbar & 7-Slot Equipment Paperdoll
-// - editor/studio-map.ts: the world editor's Studio view (Map Preview & Editor) with the AI Map Architect
+// - the Map tab: a link to the world editor's Plan camera in the game (editor/plan-view.ts)
 // - art-ui/models.ts: Decoupled Art, Video, Sound, Music & AI Art Director models
 // - art-ui/pages.ts: Items, Biomes (with Gathering Spots), Building looks, and Sounds & music
 // - art-ui/buildings.ts: Buildings sub-tab (how each building stands, its kit views, furniture footprints)
@@ -43,15 +43,7 @@ import {
   handleLookPreviewClick,
   mountLookBiomePreviews,
 } from './art-ui/look-preview.ts';
-import {
-  handleMapEditorChange,
-  handleMapEditorClick,
-  handleMapEditorSubmit,
-  hasMapEditorData,
-  loadMapEditorData,
-  mapEditorPage,
-  mountMapEditorCanvas,
-} from './editor/studio-map.ts';
+
 import { collectMissingGaps, handleMissingClick, missingPage } from './art-ui/missing.ts';
 import {
   handleModelsChange,
@@ -101,12 +93,11 @@ export { focusHandFinder, refreshArtJobs, refreshHandStatus, type ArtContext };
 
 let lastFocusedKey = '';
 
-/** Mounts interactive canvases (Hand Workbench, Attack/Skill Stage, Map Editor) after DOM render. */
+/** Mounts interactive canvases (Hand Workbench, Attack/Skill Stage) after DOM render. */
 export function afterArtRender(): void {
   focusHandFinder();
   mountHandWorkbenches();
   mountSkillStages();
-  mountMapEditorCanvas();
   mountLookBiomePreviews();
   const { asset, walker } = where();
   const focusKey = asset ? `asset:${asset}` : walker ? `walker:${walker}` : '';
@@ -144,7 +135,6 @@ export async function artPage(context: ArtContext, force = false): Promise<strin
   const { sub, page } = where();
   if ((force || !artState.buildings) && (sub === 'buildings' || sub === 'looks')) await loadBuildings();
   if ((force || !hasDirectorState()) && sub === 'art-director') await loadArtDirector();
-  if ((force || !hasMapEditorData()) && sub === 'map-editor') await loadMapEditorData();
   if ((force || !hasModelsState()) && sub === 'models') await loadArtModels();
   if ((force || !artState.upNext) && sub === 'queue') await loadUpNext();
 
@@ -165,7 +155,7 @@ export async function artPage(context: ArtContext, force = false): Promise<strin
     buildings: buildingsPage,
     'hud-fx': () => hudFxPage(page),
     sounds: soundsPage,
-    'map-editor': mapEditorPage,
+    'map-editor': mapLinkPage,
     models: modelsPage,
   };
 
@@ -297,7 +287,6 @@ export function artClick(target: HTMLElement): boolean {
     handleSkillStageClick(t) ||
     handleLookPreviewClick(t) ||
     handleHudFxClick(t) ||
-    handleMapEditorClick(t) ||
     handleEntityFilterClick(t)
   ) {
     t.blur();
@@ -331,7 +320,6 @@ export function artChange(target: HTMLElement): boolean {
     handleWorkbenchChange(target) ||
     handleSkillStageChange(target) ||
     handleLookPreviewChange(target) ||
-    handleMapEditorChange(target) ||
     handleModelsChange(target)
   ) {
     return true;
@@ -361,7 +349,6 @@ export function artSubmit(form: HTMLFormElement): boolean {
     footprintSubmit(form) ||
     handleQueueSubmit(form) ||
     handleDirectorSubmit(form) ||
-    handleMapEditorSubmit(form) ||
     handleModelsSubmit(form)
   ) {
     return true;
@@ -377,4 +364,12 @@ export function artSubmit(form: HTMLFormElement): boolean {
     return true;
   }
   return false;
+}
+
+/** The Map tab: the map editor lives in the game now, as the world editor's Plan camera. */
+function mapLinkPage(): string {
+  return `<section class="studio-card"><h2>Map editor</h2>
+    <p class="note">The map editor is part of the world editor in the game now: its <b>Plan camera</b> shows any land from above, on any floor,
+    with the same tools, drafts and AI Map Architect as the World camera. Workshop lands and saving edits to a file are in its Land tab.</p>
+    <p><a class="button" href="/?edit=plan" data-plan-link>Open the Plan camera in the game</a></p></section>`;
 }

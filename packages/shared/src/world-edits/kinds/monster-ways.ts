@@ -36,7 +36,7 @@ export const WAYS_FIELDS: EditField[] = [
   { key: 'behavior', label: 'Ways', type: 'choice', choices: () => [{ id: 'own', name: 'Its own' }, ...BEHAVIORS.map((b) => ({ id: b, name: BEHAVIOR_NAMES[b] }))] },
   { key: 'active', label: 'Up and about', type: 'choice', choices: () => [{ id: 'own', name: 'Its own hours' }, ...(Object.keys(ACTIVE_NAMES) as Active[]).map((a) => ({ id: a, name: ACTIVE_NAMES[a] }))] },
   { key: 'loot', label: 'Also leaves', type: 'choice', choices: () => [{ id: 'none', name: 'Only its own loot' }, ...lootable().map((id) => ({ id, name: ITEMS[id]!.name }))] },
-  { key: 'lootChance', label: 'Chance of it, in 100', type: 'number', min: 1, max: 100, default: 25 },
+  { key: 'lootChance', label: 'Chance of it, in 100', when: (v) => v.loot !== 'none', type: 'number', min: 1, max: 100, default: 25 },
 ];
 
 /** Items a monster may leave: any the game knows that are not bound to their owner, by name. */

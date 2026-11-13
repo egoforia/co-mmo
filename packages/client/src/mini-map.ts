@@ -1,8 +1,8 @@
 import type { RegionMap } from '@co-mmo/shared';
 import { PROJECTION } from './projection.ts';
 import { floorPlan, PLAN_PIXELS, type PlanPiece } from './mini-map-art.ts';
-import { MAP_ZOOMS, MAP_ZOOM_START, floorsAt, mapCaption, mapTransform, nextZoom, onMap, peekStep } from './mini-map-plan.ts';
-import { isTyping } from './ui.ts';
+import { MAP_ZOOMS, MAP_ZOOM_START, floorsAt, fromMap, mapCaption, mapTransform, nextZoom, onMap, peekStep } from './mini-map-plan.ts';
+import { isEditing, isTyping } from './ui.ts';
 import type { MiniMapView } from './world-scene.ts';
 
 // The mini map in the corner: the floor you are on, centred on you, turned
@@ -28,6 +28,8 @@ const WINDOWS: readonly MapWindow[] = ['open', 'max', 'min', 'closed'];
 export interface MiniMapOptions {
   /** The scene's view of our floor, when there is one. */
   view: () => MiniMapView | undefined;
+  /** A click on the map at a tile of our land; true when it was used (the world editor's camera jumps there). */
+  jump?: (x: number, y: number) => boolean;
 }
 
 /** The mini map's window, its buttons and its drawing. */
@@ -46,6 +48,8 @@ export class MiniMap {
   private planned?: { map: RegionMap; art: number };
   private timer?: number;
   private state: MapWindow = 'open';
+  /** The transform the map was last drawn with, to turn a click back into a tile. */
+  private drawnWith?: [number, number, number, number, number, number];
 
   constructor(private readonly options: MiniMapOptions) {
     const saved = load();
@@ -56,8 +60,16 @@ export class MiniMap {
       const act = (e.target as HTMLElement).closest<HTMLButtonElement>('button')?.dataset.act;
       if (act) this.act(act);
     });
+    this.canvas.addEventListener('click', (e) => {
+      if (!this.drawnWith || !this.options.jump) return;
+      const box = this.canvas.getBoundingClientRect();
+      const scale = this.canvas.width / Math.max(1, box.width);
+      const at = fromMap(this.drawnWith, (e.clientX - box.left) * scale, (e.clientY - box.top) * scale);
+      if (this.options.jump(at.x, at.y)) this.draw();
+    });
     window.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === 'm' && !isTyping() && !e.ctrlKey && !e.metaKey && !e.altKey) this.toggle();
+      // In edit mode M is the editor's (Move, or the More tools).
+      if (e.key.toLowerCase() === 'm' && !isTyping() && !isEditing() && !e.ctrlKey && !e.metaKey && !e.altKey) this.toggle();
     });
     this.show(saved.window);
   }
@@ -134,7 +146,9 @@ export class MiniMap {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, size, size);
     const step = MAP_ZOOMS[this.zoom]! * (window.devicePixelRatio || 1);
-    const t = mapTransform(PROJECTION.ground.kind, step, me.x, me.y, size);
+    const centre = view.centre ?? me;
+    const t = mapTransform(PROJECTION.ground.kind, step, centre.x, centre.y, size);
+    this.drawnWith = t;
     ctx.setTransform(...t);
     // Shrunk, the painted tiles blend smoothly; grown, they keep their edges.
     ctx.imageSmoothingEnabled = step < PLAN_PIXELS;

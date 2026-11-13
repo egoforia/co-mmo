@@ -9,6 +9,15 @@ export const MONSTERS: EditKind<'monsters'> = {
   hint: 'Choose a level, ways and hours, then click a monster’s home: every monster of its spawn changes. “Its own” puts back what its kind does.',
   pointer: 'click',
   onFloors: true,
+  inspects: {
+    picks: ['monster'],
+    title: 'Level, ways and hours',
+    action: 'Change their spawn',
+    current: (map, p) => {
+      const c = spawnAt(map, [p.box.x, p.box.y], p.level)[0];
+      return c && { monsterLevel: c.level ?? 0, behavior: c.behavior ?? 'own', active: c.active ?? 'own', loot: c.loot?.[0]?.item ?? 'none', lootChance: c.loot?.[0] ? Math.round(c.loot[0].chance * 100) : 25 };
+    },
+  },
   fields: WAYS_FIELDS,
   shape: '{"kind":"monsters","at":[x,y],"monsterLevel":5,"behavior":"guard","active":"night"}',
   make: (use, v) => ({ kind: 'monsters', at: use.at, ...waysFrom(v) }),

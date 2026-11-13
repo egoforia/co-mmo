@@ -6,7 +6,7 @@ import { AccountWindow, showSignIn } from './account-ui.ts';
 import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
 import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
-import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
+import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isEditing, isTyping, onAccountClick, onInviteClick, readChat, setHud, showPanel, toast } from './ui.ts';
 import { RpgUi } from './rpg-ui.ts';
 import { KitUi } from './kit-ui.ts';
 import { LootUi } from './loot-ui.ts';
@@ -351,6 +351,12 @@ function play(token: string): void {
       editor = opened;
       edit.hidden = false;
       edit.addEventListener('click', () => opened.toggle());
+      // The Art Studio's Map tab opens the game straight into the editor's Plan camera.
+      const editAt = new URLSearchParams(location.search).get('edit');
+      if (editAt) {
+        opened.toggle(true, editAt === 'plan' ? 'plan' : 'world');
+        history.replaceState(null, '', location.pathname);
+      }
     }
     // Painted status icons show in the stats line; a status without one is named instead.
     const statusIcon = (key: string) => manifest[key]?.file;
@@ -368,12 +374,12 @@ function play(token: string): void {
       accept: (quest) => connection.send({ t: 'accept', quest }),
       choosePath: (npc, path) => connection.send({ t: 'choosePath', npc, path }),
       report: (kind, target, reason) => connection.send({ t: 'report', kind, target, reason }),
-      typing: isTyping,
+      typing: () => isTyping() || isEditing(),
       prayer: () => prayer?.toggle(true),
       spendPoint: (stat) => connection.send({ t: 'spendPoint', stat }),
     });
     rpg.statusIcon = statusIcon;
-    loot = new LootUi({ send: (m) => connection.send(m), typing: isTyping });
+    loot = new LootUi({ send: (m) => connection.send(m), typing: () => isTyping() || isEditing() });
     kit = new KitUi(welcome.character, {
       ability: (ability) => {
         const target = scene?.target;
@@ -384,7 +390,7 @@ function play(token: string): void {
       craft: (recipe, lean) => connection.send({ t: 'craft', recipe, ...(lean ? { lean } : {}) }),
       shop: (action, npc, id, qty, replace) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}), ...(replace ? { replace } : {}) }),
       trade: (m) => connection.send(m),
-      typing: isTyping,
+      typing: () => isTyping() || isEditing(),
     });
     // Set the isometric camera before creating the scene.
     chooseCamera(welcome.you.role);
@@ -396,7 +402,9 @@ function play(token: string): void {
       // Kit houses stand in the isometric camera, drawn on the server the first time they are asked for.
       houses: (region: string) => kitHouses(token, region),
       // The arrow keys choose loot while its window is open, so the player stands still.
-      typing: () => isTyping() || !!loot?.open,
+      // While editing, the keys move the editor's camera, not the player.
+      typing: () => isTyping() || !!loot?.open || isEditing(),
+      editing: isEditing,
     });
     const game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -413,7 +421,8 @@ function play(token: string): void {
     (window as any).game = game;
     (window as any).scene = scene;
     // The mini map of your floor.
-    new MiniMap({ view: () => scene?.miniMapView() });
+    // While the world editor is open, a click on the mini map takes its camera there.
+    new MiniMap({ view: () => scene?.miniMapView(), jump: (x, y) => !!editor?.jumpTo(x, y) });
     // The performance overlay, for Stewards and the Owner checking where the game is slow.
     if (welcome.you.role !== 'player') {
       const world = scene;

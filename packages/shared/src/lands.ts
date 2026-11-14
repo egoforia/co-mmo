@@ -34,47 +34,47 @@ export function levelledCreature(def: Omit<CreatureDef, 'hp' | 'damage' | 'coold
 /** The bigger lands' creatures. */
 export const LAND_CREATURES: Record<string, CreatureDef> = {
   'lantern-moth': levelledCreature({
-    name: 'Lantern Moth', art: 'sanctum-lantern-moth', description: 'A soft moth as big as a cat whose belly glows like a paper lantern. It flutters away from anyone who comes close.',
+    name: 'Lantern Moth', art: 'sanctum-lantern-moth', size: 'tiny', description: 'A soft moth as big as a cat whose belly glows like a paper lantern. It flutters away from anyone who comes close.',
     behavior: 'timid', active: 'night', level: 1, speed: 3, notice: 3.5, drops: [{ item: 'moth-dust', chance: 0.7 }],
   }),
   'thorn-wolf': levelledCreature({
-    name: 'Thorn Wolf', art: 'woods-thorn-wolf', description: 'A lean wolf with a mane of bramble thorns. Thorn wolves hunt the woods by night, always together.',
+    name: 'Thorn Wolf', art: 'woods-thorn-wolf', size: 'medium', description: 'A lean wolf with a mane of bramble thorns. Thorn wolves hunt the woods by night, always together.',
     behavior: 'pack', active: 'night', level: 2, speed: 3, notice: 4.5, drops: [{ item: 'wolf-pelt', chance: 0.5 }, { item: 'tonic', chance: 0.15 }],
   }),
   'bark-golem': levelledCreature({
-    name: 'Bark Golem', art: 'woods-bark-golem', description: 'A hulking figure of living bark and moss that guards the road to Mossgate Castle.',
+    name: 'Bark Golem', art: 'woods-bark-golem', size: 'high', description: 'A hulking figure of living bark and moss that guards the road to Mossgate Castle.',
     behavior: 'guard', level: 3, speed: 1.8, notice: 3, tough: 1.6, drops: [{ item: 'heartwood', chance: 0.6 }, { item: 'golem-club', chance: 0.08 }],
   }),
   'gull-raider': levelledCreature({
-    name: 'Gull Raider', art: 'shore-gull-raider', description: 'A big grey gull in a pirate bandana that swoops in with its flock to steal from travellers.',
+    name: 'Gull Raider', art: 'shore-gull-raider', size: 'small', description: 'A big grey gull in a pirate bandana that swoops in with its flock to steal from travellers.',
     behavior: 'pack', active: 'day', level: 2, speed: 3.2, notice: 4, drops: [{ item: 'gull-feather', chance: 0.6 }, { item: 'pearl', chance: 0.08 }],
   }),
   'hermit-crab': levelledCreature({
-    name: 'Hermit Crab', art: 'shore-hermit-crab', description: 'A shy crab in a shell far too big for it. It scuttles off sideways at the first footstep.',
+    name: 'Hermit Crab', art: 'shore-hermit-crab', size: 'small', description: 'A shy crab in a shell far too big for it. It scuttles off sideways at the first footstep.',
     behavior: 'timid', level: 1, speed: 2.8, notice: 3, drops: [{ item: 'crab-shell', chance: 0.4 }, { item: 'pearl', chance: 0.15 }],
   }),
   'drowned-deckhand': levelledCreature({
-    name: 'Drowned Deckhand', art: 'shore-drowned-deckhand', description: 'A sailor of seaweed and old rope who still walks the rounds of a ship long sunk. It wakes when the moon is up.',
+    name: 'Drowned Deckhand', art: 'shore-drowned-deckhand', size: 'medium', description: 'A sailor of seaweed and old rope who still walks the rounds of a ship long sunk. It wakes when the moon is up.',
     behavior: 'patrol', active: 'night', level: 4, speed: 2.2, notice: 3.5, undead: true, drops: [{ item: 'pearl', chance: 0.35 }, { item: 'coral-spear', chance: 0.08 }],
   }),
   'dune-jackal': levelledCreature({
-    name: 'Dune Jackal', art: 'desert-dune-jackal', description: 'A sand-coloured jackal with a turquoise collar. They lope out of the dunes after dark and hunt in packs.',
+    name: 'Dune Jackal', art: 'desert-dune-jackal', size: 'small', description: 'A sand-coloured jackal with a turquoise collar. They lope out of the dunes after dark and hunt in packs.',
     behavior: 'pack', active: 'night', level: 3, speed: 3.1, notice: 4.5, drops: [{ item: 'jackal-fang', chance: 0.5 }, { item: 'tonic', chance: 0.15 }],
   }),
   'mummy-guard': levelledCreature({
-    name: 'Mummy Guard', art: 'desert-mummy-guard', description: 'A tall guard wrapped in old linen with a golden mask, still walking its rounds for a king long gone.',
+    name: 'Mummy Guard', art: 'desert-mummy-guard', size: 'high', description: 'A tall guard wrapped in old linen with a golden mask, still walking its rounds for a king long gone.',
     behavior: 'patrol', active: 'night', level: 4, speed: 2, notice: 3.5, tough: 1.3, undead: true, drops: [{ item: 'ancient-linen', chance: 0.6 }, { item: 'sunstone-amulet', chance: 0.05 }],
   }),
   'sand-wyrm': levelledCreature({
-    name: 'Sand Wyrm', art: 'desert-sand-wyrm', description: 'A great armoured worm that sleeps under the old bones and rises at anyone who comes too near.',
+    name: 'Sand Wyrm', art: 'desert-sand-wyrm', size: 'colossal', description: 'A great armoured worm that sleeps under the old bones and rises at anyone who comes too near.',
     behavior: 'guard', level: 5, speed: 2.4, notice: 4, tough: 2.5, drops: [{ item: 'wyrm-scale', chance: 0.8 }, { item: 'sunstone-amulet', chance: 0.15 }],
   }),
   'crypt-skeleton': levelledCreature({
-    name: 'Crypt Skeleton', art: 'desert-mummy-guard', description: 'Restless bones awakened in the cold dark catacombs beneath the High Cathedral.',
+    name: 'Crypt Skeleton', art: 'desert-mummy-guard', size: 'medium', description: 'Restless bones awakened in the cold dark catacombs beneath the High Cathedral.',
     behavior: 'patrol', level: 3, speed: 2.1, notice: 3.5, undead: true, drops: [{ item: 'ancient-bone', chance: 0.6 }, { item: 'holy-water', chance: 0.2 }],
   }),
   'chained-demon': levelledCreature({
-    name: 'Chained Demon', art: 'desert-sand-wyrm', description: 'An ancient terror imprisoned in the subterranean depths by celestial runes and heavy iron chains.',
+    name: 'Chained Demon', art: 'desert-sand-wyrm', size: 'colossal', description: 'An ancient terror imprisoned in the subterranean depths by celestial runes and heavy iron chains.',
     behavior: 'guard', level: 6, speed: 1.5, notice: 4, tough: 3.0, drops: [{ item: 'demon-horn', chance: 0.8 }, { item: 'sanctum-relic', chance: 0.35 }],
   }),
 };

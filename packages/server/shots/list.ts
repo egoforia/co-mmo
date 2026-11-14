@@ -62,6 +62,13 @@ const bookmark = (name: string) => (map: RegionMap): Spot => {
   return { x: b.x, y: b.y, floor: b.floor };
 };
 
+/** Standing a little way from the first home of a kind of monster, to see it beside the player. */
+const nearMonster = (kind: string, dx = 2) => (map: RegionMap): Spot => {
+  const c = map.creatures.find((m) => m.kind === kind);
+  if (!c) throw new Error(`No ${kind} lives here.`);
+  return { x: Math.floor(c.x) + dx, y: Math.floor(c.y), floor: c.floor };
+};
+
 /** Every shot, in the order the contact sheet shows them. */
 export const SHOTS: Shot[] = [
   {
@@ -179,6 +186,25 @@ export const SHOTS: Shot[] = [
     page: '/gods-view.html',
     ready: 'nav [data-tab]',
     mustSee: ['tabs along the top, the first tab filled in', 'no error text'],
+  },
+  {
+    name: 'gods-view-monsters',
+    about: "God's View Monsters tab: every kind of monster with its size and loot, one size form open.",
+    page: '/gods-view.html',
+    ready: 'nav [data-tab]',
+    open: async (page) => {
+      await page.click('nav [data-tab="loot"]');
+      await page.waitForSelector('section.loot');
+      await page.click('section.loot details:first-of-type summary');
+    },
+    mustSee: ['the tab is called Monsters', 'each monster card shows its level and its size', 'the first card\'s size form is open: a Size list with its height in px, which size is its own, and the other monsters of the same size'],
+  },
+  {
+    name: 'woods-monsters',
+    about: 'Walking mushrooms (small, harmless) beside the player in Whispering Woods, to check monsters stand their size.',
+    region: 'woods',
+    at: nearMonster('walking-mushroom'),
+    mustSee: ['the walking mushrooms stand about two thirds of the player\'s height (112 against 168 px before the camera shrinks them)', 'their feet stand on the ground'],
   },
   {
     name: 'art-studio',

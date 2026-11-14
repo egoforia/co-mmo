@@ -571,6 +571,8 @@ export function worldLines(def: WishDefinition): string[] {
         'Anyone can take what is left on its body.',
       ];
     }
+    case 'size':
+      return [def.description];
   }
 }
 

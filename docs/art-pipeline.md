@@ -25,6 +25,7 @@ All characters and creatures in co-MMO adhere to strict visual conventions (`FLA
   | **`medium`** | `168px` | `1.00×` | Humanoids, beastfolk, thorn wolves, deckhands |
   | **`high`** | `224px` | `~1.33×` | Large guardians, bark golems, mounted foes |
   | **`colossal`** | `320px` | `~1.90×` | World bosses, ancient wyrms, towering colossi |
+- **In the game,** a creature's picture is fitted to its kind's size whatever height it was painted at, and the Owner or a Steward can choose another size for every monster of a kind in God's View (Monsters tab). The size also sets how wide its body is and how far it reaches (`creature-size.ts`).
 
 ### The Four Canonical Isometric Facings
 Characters never use 2D horizontal mirroring. Every character is modeled/painted across all four distinct isometric directions:

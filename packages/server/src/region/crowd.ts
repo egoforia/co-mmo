@@ -1,4 +1,4 @@
-import { BodyGrid, PERSON_RADIUS, bodyOf, creatureRadius, type Among, type Bodies, type BodyKind, type HitBody, type RegionMap } from '@co-mmo/shared';
+import { BodyGrid, PERSON_RADIUS, bodyOf, creatureRadius, creatureSize, type Among, type Bodies, type BodyKind, type HitBody, type RegionMap } from '@co-mmo/shared';
 import type { Ghosts } from '../region.ts';
 import { findSpots } from '../walkers.ts';
 import type { Creature } from '../creature-brain.ts';
@@ -25,7 +25,7 @@ export class Crowd {
   gather(ghosts: Iterable<Ghosts> = []): void {
     const grid = new BodyGrid();
     for (const p of this.s.players.values()) if (!this.unseen(p)) grid.add(bodyOf(p, PERSON_RADIUS, 'player'));
-    for (const c of this.s.creatures) if (c.respawnAt === null) grid.add(bodyOf(c, creatureRadius(c.def.size), 'creature'));
+    for (const c of this.s.creatures) if (c.respawnAt === null) grid.add(bodyOf(c, creatureRadius(creatureSize(c.kind)), 'creature'));
     for (const n of this.s.townsfolk) grid.add(bodyOf(n, PERSON_RADIUS, 'npc'));
     for (const g of ghosts) {
       for (const e of g.players) if (!e.fallen) grid.add(still(e, PERSON_RADIUS, 'player'));
@@ -60,8 +60,8 @@ function still(e: { x: number; y: number; floor?: number }, r: number, kind: Bod
 export function spreadHomes(map: RegionMap, creatures: Creature[]): void {
   const placed: Creature[] = [];
   for (const c of creatures) {
-    const r = creatureRadius(c.def.size);
-    const clear = (x: number, y: number) => placed.every((o) => o.home.floor !== c.home.floor || Math.hypot(o.home.x - x, o.home.y - y) >= r + creatureRadius(o.def.size));
+    const r = creatureRadius(creatureSize(c.kind));
+    const clear = (x: number, y: number) => placed.every((o) => o.home.floor !== c.home.floor || Math.hypot(o.home.x - x, o.home.y - y) >= r + creatureRadius(creatureSize(o.kind)));
     if (!clear(c.home.x, c.home.y)) {
       const spot = findSpots(map, c.home.x, c.home.y, 24, 0.75, 4, c.home.floor).find((s) => clear(s.x, s.y));
       if (spot) {

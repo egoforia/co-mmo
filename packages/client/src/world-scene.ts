@@ -50,6 +50,7 @@ import {
   makeAvatar,
   makeBody,
   makeCreature,
+  sizeCreature,
   makeNpc,
   makeWalk,
   makeWalks,
@@ -483,6 +484,8 @@ export class WorldScene extends Phaser.Scene {
       const creature = this.creatures.get(c.id);
       creature?.label.setText(creatureLabel(c, painted));
       if (creature) setStatusIcons(this, creature, c.statuses);
+      // Its kind's size can change in God's View while it is in view.
+      if (creature) sizeCreature(this, this.metrics, creature, c.size);
     }
     setStatusIcons(this, this.me, (snapshot.statuses ?? []).map((s) => s.id));
     this.marks ??= new Marks(this);

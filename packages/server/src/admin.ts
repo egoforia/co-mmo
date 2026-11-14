@@ -1004,6 +1004,19 @@ export async function handleAdmin(
     }
   }
 
+  // The Loot tab's size choice: how big every monster of one kind stands (creature-size.ts).
+  const setSize = route.match(/^creature-size\/([\w-]+)$/);
+  if (setSize && method === 'PUT') {
+    const body = await ctx.readJson(req);
+    try {
+      const record = wishes.setSize({ id: account.id, name: account.name }, { creature: setSize[1], size: body?.size });
+      return json(res, 200, { ok: true, id: record.id }), true;
+    } catch (err) {
+      if (!(err instanceof WishError)) throw err;
+      return json(res, 400, { error: 'invalid', message: err.message }), true;
+    }
+  }
+
   // --- Replay recording (Owner-only) -------------------------------------------
   if (route === 'replay/start' && method === 'POST') {
     if (ownerOnly()) return true;

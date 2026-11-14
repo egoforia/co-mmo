@@ -704,6 +704,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     gold: [0, 2],
     drops: [{ item: 'mushroom-cap', chance: 0.6 }, { item: 'tonic', chance: 0.25 }],
     respawnSeconds: 20,
+    size: 'small',
   },
   'crab-knight': {
     name: 'Crab Knight',
@@ -722,6 +723,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     gold: [2, 6],
     drops: [{ item: 'crab-shell', chance: 0.5 }, { item: 'tonic', chance: 0.2 }],
     respawnSeconds: 25,
+    size: 'small',
   },
   'sun-scarab': {
     name: 'Sun Scarab',
@@ -741,6 +743,7 @@ export const CREATURES: Record<string, CreatureDef> = {
     gold: [1, 5],
     drops: [{ item: 'scarab-shell', chance: 0.45 }, { item: 'goat-horn', chance: 0.25 }, { item: 'tonic', chance: 0.15 }],
     respawnSeconds: 25,
+    size: 'tiny',
   },
 };
 

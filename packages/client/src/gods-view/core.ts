@@ -69,7 +69,7 @@ export interface Entry {
 
 /** An Engine wish being built on GitHub. */
 export interface Build {
-  state: 'queued' | 'building' | 'fixing' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
+  state: 'queued' | 'building' | 'fixing' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split' | 'resolved';
   at: number;
   note?: string;
   allowCore?: boolean;

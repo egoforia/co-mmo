@@ -315,9 +315,10 @@ export interface WishProgress {
  * the pull request, merged and waiting for the Updates tab, then live. When
  * the pull request's checks fail, the coding agent fixes it before it goes
  * back to review. It can fail, be closed by the Owner, or be split into
- * smaller wishes.
+ * smaller wishes. 'resolved' is an issue someone closed by hand on GitHub,
+ * for example because another change already did it.
  */
-export type BuildState = 'queued' | 'building' | 'fixing' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split';
+export type BuildState = 'queued' | 'building' | 'fixing' | 'review' | 'merged' | 'live' | 'failed' | 'closed' | 'split' | 'resolved';
 
 export interface BuildTrack {
   state: BuildState;
@@ -353,6 +354,9 @@ export interface WishTrack {
 
 export function wishProgress(entry: Pick<ContentEntry, 'status' | 'tier' | 'definition' | 'off'> & WishTrack): WishProgress {
   const { status, draft, test, rule, build } = entry;
+  if (build?.state === 'resolved') {
+    return { state: 'closed', label: 'Closed on GitHub', ...(build.message ? { detail: build.message } : {}), ...(build.issue ? { link: build.issue.url } : {}) };
+  }
   if (status === 'rejected') return { state: 'closed', label: 'Not approved' };
   if (status === 'rolled-back') return { state: 'closed', label: 'Undone' };
   if (status === 'granted' && entry.off) {
@@ -397,6 +401,8 @@ function buildProgress(status: WishStatus, b: BuildTrack): WishProgress | undefi
       return { state: 'done', label: 'Live' };
     case 'split':
       return { state: 'closed', label: 'Split into smaller wishes', detail: b.message };
+    case 'resolved':
+      return withLink({ state: 'closed', label: 'Closed on GitHub', detail: b.message });
     case 'closed':
       return status === 'pending'
         ? withLink({ state: 'needs-input', label: 'Waiting for the Owner', detail: `The pull request was closed${b.message ? `: ${b.message}` : '.'} Approve it to build again, or reject it.` })

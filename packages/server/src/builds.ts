@@ -1,7 +1,9 @@
-import { execFileSync } from 'node:child_process';
 import type { BuildTrack } from '@co-mmo/shared';
 import { type ContentRecord, type Store } from './store.ts';
 import { DEFAULT_BUILDS, type BuildSettings } from './settings.ts';
+import { GitHubIssues, repoFromRemote } from './builds/github.ts';
+
+export { GitHubIssues, githubError, repoFromRemote } from './builds/github.ts';
 
 /**
  * The only GitHub access the game server has: opening, reading and closing
@@ -14,6 +16,15 @@ export interface BuildIssues {
   createIssue(title: string, body: string): Promise<{ number: number; url: string }>;
   comments(issue: number): Promise<IssueComment[]>;
   close(issue: number, comment?: string): Promise<void>;
+  /** Whether the issue is still open; someone may close it by hand on GitHub. */
+  issue?(issue: number): Promise<IssueState>;
+}
+
+/** An issue's state on GitHub. */
+export interface IssueState {
+  open: boolean;
+  /** When it was closed, if it is. */
+  closedAt?: number;
 }
 
 export interface IssueComment {
@@ -309,9 +320,31 @@ export class Builds {
       else if (build.state === 'building' && this.settings.agent === 'claude' && this.now() - build.at > BUILD_TIMEOUT_MS) {
         await this.apply(record, { state: 'failed', reason: 'The coding agent did not report back in three hours. Check the Actions tab on GitHub.' });
       }
+      await this.settleClosed(record.id, comments);
     }
     this.lastSync = this.now();
     await this.pump();
+  }
+
+  /**
+   * A wish whose issue someone closed by hand on GitHub (solved by another
+   * change, or not wanted) stops waiting: no workflow reports that, so the
+   * issue itself is read. A merge closes its issue too, so a fresh close waits
+   * a few minutes for the merge report to arrive first.
+   */
+  private async settleClosed(id: string, comments: IssueComment[]): Promise<void> {
+    const record = this.store.contentById(id);
+    const build = record?.build;
+    if (!record || !build?.issue || !followed(build) || !this.issues?.issue) return;
+    const state = await this.issues.issue(build.issue.number).catch(() => undefined);
+    if (!state || state.open || this.now() - (state.closedAt ?? 0) < CLOSE_GRACE_MS) return;
+    const why = closingNote(comments);
+    this.store.updateContent(id, {
+      status: 'rejected',
+      build: { ...build, state: 'resolved', at: this.now(), message: `Issue #${build.issue.number} was closed on GitHub${why ? `: ${why}` : '.'}` },
+    });
+    this.hooks.changed(id);
+    this.hooks.tellWisher(record, `Your wish "${record.title}" was closed on GitHub${why ? `: ${why}` : '.'}`);
   }
 
   /** Counts what each coding-agent run on this wish really cost, once per run. */
@@ -434,6 +467,15 @@ export class Builds {
   }
 }
 
+/** How long a closed issue waits for a merge report before it counts as closed by hand. */
+const CLOSE_GRACE_MS = 10 * 60_000;
+
+/** The last thing a person (not a workflow) said on the issue, as the reason it was closed. */
+function closingNote(comments: IssueComment[]): string {
+  const last = [...comments].reverse().find((c) => c.author && !c.author.endsWith('[bot]'));
+  return (last?.body ?? '').replace(/<!--[\s\S]*?-->/g, '').replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
 /**
  * Builds whose issue is still read on GitHub: those being built, fixed or
  * reviewed, and failed ones with an open pull request, which the Owner can
@@ -501,74 +543,4 @@ export function issueBody(record: ContentRecord, build: BuildTrack, agent: Build
       ? '_Opened by the game when the Owner approved this wish. The "Build a wish" workflow builds it and reports back here._'
       : '_Opened by the game when the Owner approved this wish. Build it on a branch named `wish/<this issue number>`, and open a pull request that says `Closes #<this issue number>`._',
   ].join('\n');
-}
-
-/** GitHub's REST API with a token that may only open and read issues. */
-export class GitHubIssues implements BuildIssues {
-  private readonly fetch: typeof fetch;
-
-  constructor(readonly repo: string, private readonly token: string, fetchImpl?: typeof fetch) {
-    this.fetch = fetchImpl ?? fetch;
-  }
-
-  async createIssue(title: string, body: string): Promise<{ number: number; url: string }> {
-    const issue = (await this.call('POST', '/issues', { title: title.slice(0, 200), body })) as { number: number; html_url: string };
-    return { number: issue.number, url: issue.html_url };
-  }
-
-  async comments(issue: number): Promise<IssueComment[]> {
-    const list = (await this.call('GET', `/issues/${issue}/comments?per_page=100`)) as { user?: { login?: string }; body?: string; created_at?: string }[];
-    return list.map((c) => ({ author: c.user?.login ?? '', body: c.body ?? '', at: Date.parse(c.created_at ?? '') || 0 }));
-  }
-
-  async close(issue: number, comment?: string): Promise<void> {
-    if (comment) await this.call('POST', `/issues/${issue}/comments`, { body: comment });
-    await this.call('PATCH', `/issues/${issue}`, { state: 'closed', state_reason: 'not_planned' });
-  }
-
-  private async call(method: string, path: string, body?: unknown): Promise<unknown> {
-    const res = await this.fetch(`https://api.github.com/repos/${this.repo}${path}`, {
-      method,
-      headers: {
-        accept: 'application/vnd.github+json',
-        authorization: `Bearer ${this.token}`,
-        'x-github-api-version': '2022-11-28',
-        'user-agent': 'co-mmo-server',
-        ...(body ? { 'content-type': 'application/json' } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(20_000),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message = (data as { message?: string }).message ?? res.statusText;
-      throw new Error(githubError(res.status, message, this.repo));
-    }
-    return data;
-  }
-}
-
-/**
- * What the Owner reads in God's View when GitHub refuses a call. A 401 means
- * GitHub does not know the token at all (expired, deleted or mistyped), which
- * a permission change cannot fix, so it says to make a new one.
- */
-export function githubError(status: number, message: string, repo: string): string {
-  if (status === 401) {
-    return `GitHub no longer accepts the token (${message}). It has probably expired or been deleted. Make a new fine-grained token for ${repo} with Issues set to read and write, put it in the server's .env as GITHUB_ISSUES_TOKEN, and restart the game.`;
-  }
-  if (status === 403 || status === 404) {
-    return `GitHub said ${status} (${message}). The token works but cannot reach issues on ${repo}: check that it was made for this repository with Issues set to read and write.`;
-  }
-  return `GitHub said ${status}: ${message}`;
-}
-
-/** owner/name from the checkout's origin remote, if it is on GitHub. */
-export function repoFromRemote(repoDir: string): string | null {
-  try {
-    const url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: repoDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return url.match(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/)?.[1] ?? null;
-  } catch {
-    return null;
-  }
 }

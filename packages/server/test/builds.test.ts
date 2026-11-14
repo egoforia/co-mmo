@@ -8,7 +8,7 @@ import { account, api, joined, start, stop } from './helpers.ts';
 function fakeGitHub() {
   let next = 0;
   let clock = 0;
-  const issues = new Map<number, { title: string; body: string; comments: IssueComment[]; closed: boolean }>();
+  const issues = new Map<number, { title: string; body: string; comments: IssueComment[]; closed: boolean; closedAt?: number }>();
   const github: BuildIssues & {
     issues: typeof issues;
     report(issue: number, report: BuildReport, author?: string): void;
@@ -25,6 +25,10 @@ function fakeGitHub() {
     },
     async comments(issue) {
       return issues.get(issue)?.comments ?? [];
+    },
+    async issue(issue) {
+      const i = issues.get(issue)!;
+      return { open: !i.closed, ...(i.closedAt !== undefined ? { closedAt: i.closedAt } : {}) };
     },
     async close(issue, comment) {
       const i = issues.get(issue)!;
@@ -301,6 +305,32 @@ describe('building Engine wishes', () => {
     // Approving again builds it again.
     await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true });
     expect(store.contentById(record.id)!.build!.state).toBe('building');
+  });
+
+  it('settles a wish whose issue was closed by hand on GitHub, once a merge report could have come', async () => {
+    const { store, base, ws, github, owner, mara } = await setup();
+    const player = await joined(ws, mara.token);
+    const record = engineWish(store, mara.id);
+    await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true });
+    github.report(1, { state: 'review', pr: 26, url: pr(26) });
+    await api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    expect(store.contentById(record.id)!.build!.state).toBe('review');
+
+    // Closed just now: a merge closes its issue too, so wait for its report.
+    const issue = github.issues.get(1)!;
+    issue.comments.push({ author: 'egoforia', body: 'this has been solved on another PR', at: Date.now() });
+    issue.closed = true;
+    issue.closedAt = Date.now();
+    await api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    expect(store.contentById(record.id)!.build!.state).toBe('review');
+
+    issue.closedAt = Date.now() - 11 * 60_000;
+    await api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    expect(store.contentById(record.id)).toMatchObject({ status: 'rejected', build: { state: 'resolved' } });
+    const { body } = await api(base, '/api/admin/content', owner.token);
+    expect(body.content[0].progress).toMatchObject({ state: 'closed', label: 'Closed on GitHub', link: 'https://github.com/egoforia/co-mmo/issues/1' });
+    expect(body.content[0].progress.detail).toContain('solved on another PR');
+    await player.waitFor((m) => m.t === 'notice' && /closed on GitHub/.test((m as { text: string }).text));
   });
 
   it('splits a wish that is too big into steps for the Owner', async () => {

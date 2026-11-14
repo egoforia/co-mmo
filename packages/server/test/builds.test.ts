@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { wishProgress } from '@co-mmo/shared';
-import { issueBody, latestReport, parseCosts, parseReport, type BuildIssues, type BuildReport, type IssueComment } from '../src/builds.ts';
+import { githubError, issueBody, latestReport, parseCosts, parseReport, type BuildIssues, type BuildReport, type IssueComment } from '../src/builds.ts';
 import { Store, type ContentRecord } from '../src/store.ts';
 import { account, api, joined, start, stop } from './helpers.ts';
 
@@ -339,5 +339,18 @@ describe('building Engine wishes', () => {
     expect(entry.build).toBeUndefined();
     expect(JSON.stringify(entry)).not.toContain('secret plans');
     expect(entry.progress).toMatchObject({ label: 'Being built' });
+  });
+});
+
+describe('githubError', () => {
+  it('tells the Owner to make a new token when GitHub does not know the old one', () => {
+    const text = githubError(401, 'Bad credentials', 'egoforia/co-mmo');
+    expect(text).toContain('no longer accepts the token');
+    expect(text).toContain('GITHUB_ISSUES_TOKEN');
+  });
+
+  it('points at permissions when the token works but cannot reach issues', () => {
+    expect(githubError(403, 'Resource not accessible by personal access token', 'a/b')).toContain('Issues set to read and write');
+    expect(githubError(500, 'Server error', 'a/b')).toBe('GitHub said 500: Server error');
   });
 });

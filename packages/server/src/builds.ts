@@ -542,12 +542,25 @@ export class GitHubIssues implements BuildIssues {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const message = (data as { message?: string }).message ?? res.statusText;
-      throw new Error(res.status === 401 || res.status === 403 || res.status === 404
-        ? `GitHub said ${res.status} (${message}). Check that the token can read and write issues on ${this.repo}.`
-        : `GitHub said ${res.status}: ${message}`);
+      throw new Error(githubError(res.status, message, this.repo));
     }
     return data;
   }
+}
+
+/**
+ * What the Owner reads in God's View when GitHub refuses a call. A 401 means
+ * GitHub does not know the token at all (expired, deleted or mistyped), which
+ * a permission change cannot fix, so it says to make a new one.
+ */
+export function githubError(status: number, message: string, repo: string): string {
+  if (status === 401) {
+    return `GitHub no longer accepts the token (${message}). It has probably expired or been deleted. Make a new fine-grained token for ${repo} with Issues set to read and write, put it in the server's .env as GITHUB_ISSUES_TOKEN, and restart the game.`;
+  }
+  if (status === 403 || status === 404) {
+    return `GitHub said ${status} (${message}). The token works but cannot reach issues on ${repo}: check that it was made for this repository with Issues set to read and write.`;
+  }
+  return `GitHub said ${status}: ${message}`;
 }
 
 /** owner/name from the checkout's origin remote, if it is on GitHub. */

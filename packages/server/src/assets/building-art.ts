@@ -162,16 +162,16 @@ export async function processBuildingArt(job: BuildingArtJob, raw: Buffer, outDi
       .toBuffer();
     out = await shrink(await makeSeamless(crop), TILE_ART_PIXELS, TILE_ART_PIXELS, 16);
   } else if (job.kind === 'furniture') {
-    const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
-    const trimmed = await sharp(await removeKeySpill(keyed)).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
+    const { png: keyed, key } = await removeKeyBackground(png, undefined, { holes: true });
+    const trimmed = await sharp(await removeKeySpill(keyed, undefined, key)).trim({ threshold: 1 }).png().toBuffer({ resolveWithObject: true });
     // Painted standing on its tiles, as wide as their diamond; else as wide as its tile count.
     const w = Math.round(job.footprint ? isoSpan(job.footprint.width, job.footprint.height) / PIXEL_ART_SCALE : (job.width ?? 1) * TILE_ART_PIXELS);
     const h = Math.max(1, Math.round((w * trimmed.info.height) / trimmed.info.width));
     out = await shrink(trimmed.data, w, h, 24);
   } else {
     // Keep the full width: the door is painted at the middle of it.
-    const { png: keyed } = await removeKeyBackground(png, undefined, { holes: true });
-    const rows = await trimRows(await removeKeySpill(keyed));
+    const { png: keyed, key } = await removeKeyBackground(png, undefined, { holes: true });
+    const rows = await trimRows(await removeKeySpill(keyed, undefined, key));
     const { width = 0 } = await sharp(rows).metadata();
     // WebP keeps this big picture to a sensible download.
     out = await sharp(rows).resize({ width: Math.min(width, MAX_EXTERIOR_PIXELS), kernel: 'lanczos3' }).webp({ quality: 90, alphaQuality: 100 }).toBuffer();

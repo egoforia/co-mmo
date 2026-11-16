@@ -251,7 +251,8 @@ export function wander(map: RegionMap, w: Walker, speed: number, radius: number,
       const t = { x: around.x + Math.cos(angle) * dist, y: around.y + Math.sin(angle) * dist };
       const width = w.width ?? 1;
       const at = anchorNear(t.x, t.y, width);
-      if (!outsideSide(map, t.x, t.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = t;
+      const mid = spotMiddle(at, width);
+      if (Math.hypot(mid.x - around.x, mid.y - around.y) <= radius && !outsideSide(map, mid.x, mid.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = mid;
     }
     if (!w.target) w.rest = TICK_RATE;
     return;

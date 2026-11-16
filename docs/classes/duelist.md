@@ -23,7 +23,7 @@ King had none.
 | Attributes | **Might** (primary), **Agility** (secondary) |
 | Role | Melee damage: damage 5, mobility 5, survival 3, support 1, range 1 |
 | Weapons | Sword, twin blades, greatsword |
-| Gauge | **Momentum**: +1 for every hit that lands, and 1 Energy with each. Finishers spend it. Empties if you go 6 s without a hit |
+| Gauge | **Momentum**: +1 for every hit that lands, and 1 Energy with each. Each pip turns aside 5% of a creature's blow. Finishers spend it. Empties if you go 6 s without a hit |
 | Mentors | Dune Scorpid (Sanctum), Sultana Zahra (the Mirage Palace) |
 | Trial | *Sun and Sand*: duel Zahra's champion on the palace floor, then lay four of the Sun King's guards to rest without falling |
 
@@ -34,9 +34,9 @@ weapon's damage too ([attributes.md](../attributes.md#damage)).
 
 | Skill | Level | Effect | Energy | Cooldown | Range | Amount | What it does |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Lunge | 1 | dash + strike | 6 | 6 | Dash 4 | 4 + Might × 1.0 | Dash to the target and strike; +1 Momentum |
+| Lunge | 1 | dash + strike | 6 | 6 | Dash 4 | 4 + Might × 1.2 | Dash to the target and strike; +1 Momentum |
 | Riposte | 2 | stance | 6 | 8 | Self, then melee | 6 + Might × 1.2 | For 1.5 s the next melee hit on you does nothing and you strike back; +2 Momentum |
-| Whirl | 4 | area (finisher) | 10 | 6 | 2 around you | 3 + Might × 0.6 | Hits everything around you; spends all Momentum, +25% per pip |
+| Whirl | 4 | area (finisher) | 10 | 6 | 2 around you | 3 + Might × 0.8 | Hits everything around you; spends all Momentum, +25% per pip |
 | Rend | 6 | strike + Bleeding | 8 | 8 | Melee | 2 + Agility × 0.6, then 2 + Agility × 0.3 per second for 6 s | A cut that keeps bleeding through Armor |
 | Sidestep | 8 | dash | 5 | 10 | 3 | None | Step aside: +30% dodge for 2 s and +1 Momentum |
 

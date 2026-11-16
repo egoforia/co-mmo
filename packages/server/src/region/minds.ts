@@ -141,7 +141,8 @@ export class Minds {
       if (warden) this.gauges.add(warden, 1, 'resolve');
     }
     const targetArmor = armor(p.character) + this.paths.extraArmor(p);
-    const afterArmorVal = afterArmor(raw, targetArmor) * (1 - (guard?.amount ?? 0) / 100);
+    // A Duelist in full flow is hard to catch square: each Momentum pip turns a share aside.
+    const afterArmorVal = afterArmor(raw, targetArmor) * (1 - (guard?.amount ?? 0) / 100) * (1 - this.gauges.guard(p));
     const absorbed = absorb(p, afterArmorVal, now);
     const amount = this.paths.floor(p, absorbed, now);
     const shieldAbsorb = afterArmorVal - absorbed;

@@ -30,8 +30,10 @@ before it was worth a rate.
 - a Warden ending a fight hurt less than a Duelist.
 
 `npm run balance -- --check` prints whether the balance holds and fails
-when it does not. The balance workflow runs it on pull requests that change
-fight numbers and puts the tables in the run's summary.
+when it does not. The balance workflow (`.github/workflows/balance.yml`)
+runs it on pull requests that change fight numbers (skills, Callings,
+weapons, attributes, creatures, tiles, the region's combat) and puts the
+tables in the run's summary; it can also be run by hand from the Actions tab.
 
 ## Balance pass (2026-11-16, the Owner's choice "Even out damage callings")
 

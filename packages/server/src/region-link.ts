@@ -114,6 +114,8 @@ export interface WorldState {
   borders?: string[];
   /** How regions thin their snapshots out (region/far.ts). */
   tuning?: import('./region/far.ts').SnapshotTuning;
+  /** The Owner's combat rules (God's View, Combat page). */
+  combat?: import('@co-mmo/shared').CombatRules;
 }
 
 /** How busy a region server is, sent every couple of seconds. */

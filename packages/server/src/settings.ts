@@ -51,6 +51,8 @@ export interface Settings {
   builds?: BuildSettings;
   /** The Wish Workshop (missing in older saves). */
   workshop?: WorkshopSettings;
+  /** How fights play (God's View, Combat page; missing in older saves: shared combatRules fills it in). */
+  combat?: import('@co-mmo/shared').CombatRules;
 }
 
 /** The daily spending cap unless the Owner sets one: a busy day's painting, well under the month. */

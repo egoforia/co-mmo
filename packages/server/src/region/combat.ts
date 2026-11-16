@@ -1,6 +1,13 @@
 import {
+  SIZE_TILES,
+  anchorNear,
+  clearLine,
   creatureSize,
-  sizeReach,
+  inLine,
+  nearestOf,
+  tilesApart,
+  tilesFor,
+  type TileSpot,
   ABILITIES,
   MARK_BONUS,
   abilityAmount,
@@ -87,9 +94,11 @@ export class Combat implements EffectKit {
     if (ch.hp <= 0 || !canAct(p, now) || now - p.lastAttack < attackCooldown(ch) * 1000 - 1) return;
     p.lastAttack = now;
     const reach = attackReach(ch);
-    const target = (targetId && this.creatureInReach(p, reach, targetId)) || this.creatureInReach(p, reach);
-    if (!target) return;
     const family = wieldedFamily(ch);
+    // Spears, greatswords and censers reach a second tile, but only straight ahead.
+    const straight = !family.ranged && tilesFor(reach) > 1;
+    const target = (targetId && this.creatureInReach(p, reach, targetId, straight)) || this.creatureInReach(p, reach, undefined, straight);
+    if (!target) return;
     const trained = wieldsTrained(ch);
     const hits = [target];
     if (trained && family.targets) {
@@ -119,11 +128,18 @@ export class Combat implements EffectKit {
     }
   }
 
-  /** Live creatures on the player's floor within `range` of a point (of their edge, for big ones), nearest first. */
+  /**
+   * Live creatures on the player's floor within `range` of a point, nearest
+   * first: an area is a square of tiles (docs/combat.md), so a creature is in
+   * it when any tile of its square is.
+   */
   creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[] {
+    const from = anchorNear(at.x, at.y);
+    const tiles = tilesFor(range);
+    const apart = (c: Creature) => tilesApart(from, 1, squareOf(c).anchor, squareOf(c).width);
     return this.s.creatures
-      .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) - sizeReach(creatureSize(c.kind)) <= range)
-      .sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
+      .filter((c) => c.respawnAt === null && c.floor === p.floor && apart(c) <= tiles)
+      .sort((a, b) => apart(a) - apart(b) || Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
   }
 
   /** A heavy blow cancels the creature's next attack: it waits a whole rest from now. */
@@ -134,21 +150,59 @@ export class Combat implements EffectKit {
 
   /**
    * The nearest live creature within reach, or the one asked for if it is in
-   * reach. A big creature is reached at its edge: its body keeps players
-   * farther from its middle (hit-boxes.ts).
+   * reach, counted in tiles from the player's tile to the nearest tile of its
+   * square (a big creature is reached at its edge). Past the touching tiles a
+   * blow or a shot needs a clear line (tiles/sight.ts): trees, rocks and walls
+   * stop it, and bodies too when the Combat page says so. A long blade
+   * (`straight`) reaches its second tile only in a straight line.
    */
-  creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined {
+  creatureInReach(p: PlayerState, range: number, id?: string, straight = false): Creature | undefined {
+    const tiles = tilesFor(range);
+    const from = anchorNear(p.x, p.y);
     let target: Creature | undefined;
-    let best = range;
+    let best = Infinity;
     for (const c of this.s.creatures) {
       if (c.respawnAt !== null || c.floor !== p.floor || (id && c.id !== id)) continue;
-      const d = Math.hypot(c.x - p.x, c.y - p.y) - sizeReach(creatureSize(c.kind));
-      if (d <= best) {
-        best = d;
-        target = c;
-      }
+      const { anchor, width } = squareOf(c);
+      const d = tilesApart(from, 1, anchor, width);
+      if (d > tiles) continue;
+      const far = Math.hypot(c.x - p.x, c.y - p.y);
+      if (d * 1000 + far >= best) continue;
+      if (d > 1 && straight && !inLine(from, anchor, width)) continue;
+      if (d > 1 && !this.inSight(p, from, c, nearestOf(anchor, width, from))) continue;
+      best = d * 1000 + far;
+      target = c;
     }
     return target;
+  }
+
+  /**
+   * True when a shot from the player's tile reaches a tile of the creature:
+   * the land lets it through, and, when bodies stop shots, nobody else
+   * stands on a tile in between.
+   */
+  private inSight(p: PlayerState, from: TileSpot, target: Creature, to: TileSpot): boolean {
+    const blocked = this.s.combatRules.bodiesBlockShots ? this.heldTiles(p, target) : undefined;
+    return clearLine(this.s.map, from, to, p.floor, blocked && ((t) => blocked.has(`${t.tx},${t.ty}`)));
+  }
+
+  /** The tiles bodies other than the shooter and the target stand on, on the shooter's floor. */
+  private heldTiles(p: PlayerState, target: Creature): Set<string> {
+    const held = new Set<string>();
+    const hold = (anchor: TileSpot, width: number) => {
+      for (let y = 0; y < width; y++) for (let x = 0; x < width; x++) held.add(`${anchor.tx + x},${anchor.ty + y}`);
+    };
+    for (const c of this.s.creatures) {
+      if (c === target || c.respawnAt !== null || c.floor !== p.floor) continue;
+      const sq = squareOf(c);
+      hold(sq.anchor, sq.width);
+    }
+    for (const o of this.s.players.values()) {
+      if (o === p || o.floor !== p.floor || o.character.hp <= 0) continue;
+      hold(anchorNear(o.x, o.y), 1);
+    }
+    for (const n of this.s.townsfolk) if ((n.floor ?? 0) === p.floor) hold(anchorNear(n.x, n.y), 1);
+    return held;
   }
 
   /** Party members on their feet within `radius` of the player (and the player, first). */
@@ -376,4 +430,10 @@ export class Combat implements EffectKit {
 /** A damage status's tick: Burning is arcane; Bleeding and Poison go past armour. */
 function statusBlow(id: StatusId): Blow {
   return id === 'burning' ? { type: 'arcane' } : { type: 'physical', pierce: true };
+}
+
+/** The square of tiles a creature stands on. */
+function squareOf(c: Creature): { anchor: TileSpot; width: number } {
+  const width = c.width ?? SIZE_TILES[creatureSize(c.kind)];
+  return { anchor: anchorNear(c.x, c.y, width), width };
 }

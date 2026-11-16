@@ -1,5 +1,6 @@
 import {
   CREATURES,
+  type CombatRules,
   SIZE_TILES,
   creatureSize,
   tunedCreature,
@@ -249,6 +250,11 @@ export class Region {
   strain = 0;
   /** How snapshots are thinned out (region/far.ts): set by the world from the game's network choices. */
   tuning: SnapshotTuning = STEADY;
+
+  /** The Owner's combat rules (God's View, Combat page): the world sets them each tick. */
+  set combatRules(rules: CombatRules) {
+    this.s.combatRules = rules;
+  }
   readonly logger: CombatLogger = combatLogger;
   /** Measures the simulation phases of each tick. */
   readonly profiler = new TickProfiler();
@@ -592,7 +598,7 @@ export class Region {
   /** Moves a creature, for tests and (later) wishes. */
   placeCreature(id: string, x: number, y: number, floor = 0): void {
     const c = this.s.creatures.find((k) => k.id === id);
-    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined });
+    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined, to: undefined });
   }
 
   /** The floor a creature or NPC is on, for tests and tools. */

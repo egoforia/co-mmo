@@ -254,12 +254,11 @@ export function wander(map: RegionMap, w: Walker, speed: number, radius: number,
     for (let tries = 0; tries < 5 && !w.target; tries++) {
       const angle = random() * Math.PI * 2;
       const dist = 1 + random() * Math.max(0, radius - 1);
+      const t = { x: around.x + Math.cos(angle) * dist, y: around.y + Math.sin(angle) * dist };
       const width = w.width ?? 1;
-      const at = anchorNear(around.x + Math.cos(angle) * dist, around.y + Math.sin(angle) * dist, width);
-      // Walkers stop on tile middles, so the spot is the tile's middle, and that must be inside the radius too.
-      const t = spotMiddle(at, width);
-      const near = Math.hypot(t.x - around.x, t.y - around.y) <= radius;
-      if (near && !outsideSide(map, t.x, t.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = t;
+      const at = anchorNear(t.x, t.y, width);
+      const mid = spotMiddle(at, width);
+      if (Math.hypot(mid.x - around.x, mid.y - around.y) <= radius && !outsideSide(map, mid.x, mid.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = mid;
     }
     if (!w.target) w.rest = TICK_RATE;
     return;

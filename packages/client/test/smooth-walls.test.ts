@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Tile } from '@co-mmo/shared';
 
 describe('smooth connecting walls autotiling and storey awareness', () => {
-  it('autotiles half-diamond coping caps into a continuous smooth ribbon on straight runs', () => {
+  it('autotiles 1/8-tile diamond coping caps into a continuous smooth ribbon on straight runs', () => {
     // 6x4 room with perimeter walls and interior floor
     const rows: number[][] = [
       [Tile.Wall, Tile.Wall, Tile.Wall, Tile.Wall, Tile.Wall, Tile.Wall],
@@ -15,7 +15,7 @@ describe('smooth connecting walls autotiling and storey awareness', () => {
     const wall = (x: number, y: number) => rows[y]?.[x] === Tile.Wall;
     const open = (x: number, y: number) => rows[y]?.[x] === undefined || rows[y]![x] !== Tile.Wall;
 
-    const halfRows: number[][] = Array.from({ length: h * 2 }, () => Array<number>(w * 2).fill(-1));
+    const eighthRows: number[][] = Array.from({ length: h * 8 }, () => Array<number>(w * 8).fill(-1));
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         if (!wall(x, y)) continue;
@@ -24,29 +24,28 @@ describe('smooth connecting walls autotiling and storey awareness', () => {
         const openW = open(x - 1, y);
         const openE = open(x + 1, y);
 
+        const bx = x * 8;
+        const by = y * 8;
+
         if (openN) {
-          halfRows[y * 2]![x * 2] = Tile.Wall;
-          halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
+          for (let i = 0; i < 8; i++) eighthRows[by + 0]![bx + i] = Tile.Wall;
         }
         if (openS) {
-          halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
-          halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+          for (let i = 0; i < 8; i++) eighthRows[by + 7]![bx + i] = Tile.Wall;
         }
         if (openW) {
-          halfRows[y * 2]![x * 2] = Tile.Wall;
-          halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
+          for (let j = 0; j < 8; j++) eighthRows[by + j]![bx + 0] = Tile.Wall;
         }
         if (openE) {
-          halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
-          halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+          for (let j = 0; j < 8; j++) eighthRows[by + j]![bx + 7] = Tile.Wall;
         }
       }
     }
 
     // On row 0 (the North wall):
     // Sub-row 0 (the northern edge) must be 100% continuous across all columns without missing teeth
-    for (let hx = 0; hx < w * 2; hx++) {
-      expect(halfRows[0]![hx], `North wall sub-diamond at column ${hx} must not be empty`).toBe(Tile.Wall);
+    for (let hx = 0; hx < w * 8; hx++) {
+      expect(eighthRows[0]![hx], `North wall sub-diamond at column ${hx} must not be empty`).toBe(Tile.Wall);
     }
   });
 

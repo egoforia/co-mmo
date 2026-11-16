@@ -132,6 +132,56 @@ export function registerWallFace(scene: Phaser.Scene, face: string, side: 'south
   return key;
 }
 
+/**
+ * A painted wall coping cap fitted to the top edge of a wall: runs along the
+ * edge of a diamond `width` by `height`, with a fixed thickness `thickness`
+ * (share of a tile, default 1/8).
+ */
+export function registerWallCopingCap(
+  scene: Phaser.Scene,
+  face: string,
+  side: 'south' | 'east',
+  width: number,
+  height: number,
+  thickness = 1 / 8,
+): string | undefined {
+  if (!scene.textures.exists(face)) return undefined;
+  const key = `${face}-cap-${side}-${width}x${height}-${thickness}`;
+  if (scene.textures.exists(key)) return key;
+  const source = scene.textures.get(face).getSourceImage() as CanvasImageSource & { width: number; height: number };
+  const canvas = document.createElement('canvas');
+  const tw = Math.round((width / 2) * thickness);
+  const th = Math.round((height / 2) * thickness);
+  canvas.width = Math.ceil(width / 2 + tw);
+  canvas.height = Math.ceil(height / 2 + th);
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.save();
+  ctx.beginPath();
+  if (side === 'south') {
+    ctx.moveTo(tw, 0);
+    ctx.lineTo(tw + width / 2, height / 2);
+    ctx.lineTo(width / 2, height / 2 + th);
+    ctx.lineTo(0, th);
+  } else {
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(0, height / 2);
+    ctx.lineTo(tw, height / 2 + th);
+    ctx.lineTo(width / 2 + tw, th);
+  }
+  ctx.closePath();
+  ctx.clip();
+  if (side === 'south') {
+    ctx.setTransform(width / 2 / source.width, height / 2 / source.width, -tw / source.height, th / source.height, tw, 0);
+  } else {
+    ctx.setTransform(-width / 2 / source.width, height / 2 / source.width, tw / source.height, th / source.height, width / 2, 0);
+  }
+  ctx.drawImage(source, 0, 0);
+  ctx.restore();
+  scene.textures.addCanvas(key, canvas);
+  return key;
+}
+
 /** A building style's inside tiles, each falling back to the fallback style's. */
 function buildingTiles(scene: Phaser.Scene, style: string): Partial<Record<Tile, string>> {
   const part = (p: BuildingPart) => loaded(scene, buildingArt(style, p), buildingArt(FALLBACK_BUILDING_STYLE, p));

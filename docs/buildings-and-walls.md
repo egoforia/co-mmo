@@ -48,10 +48,11 @@ Vertical wall extrusion and cutaway rendering are handled by `rockWalls()` in [`
 - `registerWallFace()` tiles the texture vertically per storey (`storeys = Math.max(1, Math.round(rise / (height * 2)))`) so multi-storey walls keep uniform stone/timber courses without stretching.
 - East-facing wall segments receive a subtle cool-grey tint (`EAST_WALL_TINT = 0xd4d4dc`, stored in `baseTint`) so $90^\circ$ corners read clearly in 3D space.
 
-### 2. Half-Tile ($0.5\times$) Wall Thickness (`80×40px` Sub-Diamonds)
+### 2. Fixed 1/8-Tile ($0.125\times$) Wall Thickness (`20×10px` Sub-Diamonds)
 - Full ground tiles are $160\times 80\text{px}$ diamonds (`PROJECTION.ground`).
-- Wall top coping caps are rendered on a $2W \times 2H$ half-tile diamond grid (`halfGround = { width: 80, height: 40 }`) via `registerDiamondTileset(scene, tilesetKey, 80, 40)`.
-- The inner half of each wall tile exposes the room's floor tile seamlessly (`floorRows` maps `Tile.Wall` to `Tile.Floor` on the base layer), giving walls a realistic $0.5\text{m}$ thickness and opening up interior floor space.
+- Wall top coping caps are rendered on an $8W \times 8H$ eighth-tile diamond grid (`eighthGround = { width: 20, height: 10 }`) via `registerDiamondTileset(scene, tilesetKey, 20, 10)`.
+- Edge walls similarly use a fixed 1/8-tile width ($0.125$ tiles), with collision spanning `WALL_HALF_THICKNESS = 0.0625` on either side of the edge line, and top coping caps rendered via `registerWallCopingCap`.
+- The inner $7/8$ of each building wall tile exposes the room's floor tile seamlessly (`floorRows` maps `Tile.Wall` to `Tile.Floor` on the base layer), giving walls a consistent, realistic fixed thickness and opening up interior floor space.
 
 ### 3. Asymmetric Cutaway & 4-Direction Corridor Rule
 - **Closed Exterior Shell (`v.outside`, `cutaway = false`):**

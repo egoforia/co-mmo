@@ -1,4 +1,4 @@
-import { Tile, isBlocking, tileAt, wallBox, type Outline, type RegionMap, type WorldEditDraft } from '@co-mmo/shared';
+import { Tile, WALL_THICKNESS, isBlocking, tileAt, wallBox, type Outline, type RegionMap, type WorldEditDraft } from '@co-mmo/shared';
 
 // The Plan camera's picture of a land: its tiles from above, one colour each
 // by biome, on any floor, with buildings outlined, walls on tiles' sides as
@@ -72,7 +72,7 @@ export function drawPlan(canvas: HTMLCanvasElement, p: PlanPicture): void {
   for (const b of map.buildings) g.strokeRect(b.x * c, b.y * c, b.width * c, b.height * c);
   // Walls on a tile's side, as thin boxes along their edges.
   g.fillStyle = palette.wall;
-  const thick = Math.max(2, c * 0.25) / c;
+  const thick = Math.max(2, c * WALL_THICKNESS) / c;
   for (const w of map.edgeWalls ?? []) {
     if (w.floor === floor) box(w.x - (w.along === 'v' ? thick / 2 : 0), w.y - (w.along === 'h' ? thick / 2 : 0), w.along === 'h' ? 1 : thick, w.along === 'v' ? 1 : thick);
   }

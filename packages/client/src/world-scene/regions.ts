@@ -168,7 +168,7 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
     const inside = data.slice(b.y, b.y + b.height).map((row) => row.slice(b.x, b.x + b.width));
     for (let y = b.y; y < b.y + b.height; y++) for (let x = b.x; x < b.x + b.width; x++) if (data[y]?.[x] !== undefined) data[y]![x] = Tile.Ground;
     const hasWall = Boolean(wallFaceKey(scene, b.style, b.art));
-    // With 0.5-tile walls, the inner half of each wall tile exposes the room's floor seamlessly.
+    // With fixed 1/8-tile walls, the inner 7/8 of each wall tile exposes the room's floor seamlessly.
     const floorRows = hasWall ? inside.map((row) => row.map((t) => (t === Tile.Wall ? Tile.Floor : t))) : inside;
     const floor = groundLayer(scene, floorRows, ox + b.x, oy + b.y, roomFloorDepth(ox + b.x, oy + b.y, 0), registerKitTileset(scene, b.style, b.art)).setData('shell', true);
     tilemaps.push(floor.tilemap);

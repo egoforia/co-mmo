@@ -1,4 +1,4 @@
-// Tilemap layers, isometric cutaway walls (0.5-tile thick with tall North/West
+// Tilemap layers, isometric cutaway walls (fixed 1/8-tile thick with tall North/West
 // back walls and low South/East near walls), and roof/coping caps.
 
 import Phaser from 'phaser';
@@ -70,7 +70,7 @@ export function wallFaceKey(scene: Phaser.Scene, style: string, art?: TileArt): 
 }
 
 /**
- * Builds 0.5-tile thick isometric walls from a single seamless wall texture:
+ * Builds fixed 1/8-tile thick isometric walls from a single seamless wall texture:
  * - When `cutaway` is false (exterior shell), all perimeter walls stand at full storey height (`storeyRise`),
  *   and `roofCap` closes the top across the building footprint.
  * - When `cutaway` is true (interior cutaway or active storey), far North/West back walls (and far North/West
@@ -147,8 +147,8 @@ export function rockWalls(
 
   const parts: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = [];
   const tilesetKey = registerKitTileset(scene, style, art);
-  const halfGround = { width: ground.width / 2, height: ground.height / 2 };
-  const halfTileset = registerDiamondTileset(scene, tilesetKey, halfGround.width, halfGround.height);
+  const eighthGround = { width: ground.width / 8, height: ground.height / 8 };
+  const eighthTileset = registerDiamondTileset(scene, tilesetKey, eighthGround.width, eighthGround.height);
   const atTop = PROJECTION.toScreen(left, top);
 
   if (roofCap && !cutaway) {
@@ -158,8 +158,8 @@ export function rockWalls(
     tilemaps.push(roofLayer.tilemap);
     parts.push(roofLayer);
   } else {
-    const makeHalfCap = (wantFull: boolean, rise: number, depth: number) => {
-      const halfRows: number[][] = Array.from({ length: h * 2 }, () => Array<number>(w * 2).fill(-1));
+    const makeWallCap = (wantFull: boolean, rise: number, depth: number) => {
+      const eighthRows: number[][] = Array.from({ length: h * 8 }, () => Array<number>(w * 8).fill(-1));
       let any = false;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -171,50 +171,51 @@ export function rockWalls(
           const openW = open(x - 1, y);
           const openE = open(x + 1, y);
 
-          // Sub-diamonds for tile (x, y):
-          // (2x, 2y): North tip (along North-East & North-West edges)
-          // (2x + 1, 2y): East tip (along North-East & South-East edges)
-          // (2x, 2y + 1): West tip (along North-West & South-West edges)
-          // (2x + 1, 2y + 1): South tip (along South-West & South-East edges)
+          const bx = x * 8;
+          const by = y * 8;
+
+          // Sub-diamonds for tile (x, y) on an 8x8 sub-grid (fixed 1/8 tile width):
+          // North rim (along North-East & North-West edges): row by + 0
+          // South rim (along South-West & South-East edges): row by + 7
+          // West rim (along North-West & South-West edges): col bx + 0
+          // East rim (along North-East & South-East edges): col bx + 7
           if (openN) {
-            halfRows[y * 2]![x * 2] = Tile.Wall;
-            halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
+            for (let i = 0; i < 8; i++) eighthRows[by + 0]![bx + i] = Tile.Wall;
           }
           if (openS) {
-            halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
-            halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+            for (let i = 0; i < 8; i++) eighthRows[by + 7]![bx + i] = Tile.Wall;
           }
           if (openW) {
-            halfRows[y * 2]![x * 2] = Tile.Wall;
-            halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
+            for (let j = 0; j < 8; j++) eighthRows[by + j]![bx + 0] = Tile.Wall;
           }
           if (openE) {
-            halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
-            halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+            for (let j = 0; j < 8; j++) eighthRows[by + j]![bx + 7] = Tile.Wall;
           }
 
           if (!openN && !openS && !openW && !openE) {
-            if (open(x - 1, y - 1)) halfRows[y * 2]![x * 2] = Tile.Wall;
-            if (open(x + 1, y - 1)) halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
-            if (open(x - 1, y + 1)) halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
-            if (open(x + 1, y + 1)) halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+            if (open(x - 1, y - 1)) eighthRows[by + 0]![bx + 0] = Tile.Wall;
+            if (open(x + 1, y - 1)) eighthRows[by + 0]![bx + 7] = Tile.Wall;
+            if (open(x - 1, y + 1)) eighthRows[by + 7]![bx + 0] = Tile.Wall;
+            if (open(x + 1, y + 1)) eighthRows[by + 7]![bx + 7] = Tile.Wall;
             if (!open(x - 1, y - 1) && !open(x + 1, y - 1) && !open(x - 1, y + 1) && !open(x + 1, y + 1)) {
-              halfRows[y * 2]![x * 2] = Tile.Wall;
-              halfRows[y * 2]![x * 2 + 1] = Tile.Wall;
-              halfRows[y * 2 + 1]![x * 2] = Tile.Wall;
-              halfRows[y * 2 + 1]![x * 2 + 1] = Tile.Wall;
+              for (let k = 0; k < 8; k++) {
+                eighthRows[by + 0]![bx + k] = Tile.Wall;
+                eighthRows[by + 7]![bx + k] = Tile.Wall;
+                eighthRows[by + k]![bx + 0] = Tile.Wall;
+                eighthRows[by + k]![bx + 7] = Tile.Wall;
+              }
             }
           }
         }
       }
       if (!any) return;
-      const cap = diamondLayer(scene, halfRows, atTop, halfTileset, halfGround).setDepth(depth).setData('shell', true);
+      const cap = diamondLayer(scene, eighthRows, atTop, eighthTileset, eighthGround).setDepth(depth).setData('shell', true);
       cap.y -= lift + rise;
       tilemaps.push(cap.tilemap);
       parts.push(cap);
     };
-    makeHalfCap(true, storeyRise, wallCapDepth(left, top, floor, true));
-    if (cutaway) makeHalfCap(false, cutRise, wallCapDepth(left, top, floor, false));
+    makeWallCap(true, storeyRise, wallCapDepth(left, top, floor, true));
+    if (cutaway) makeWallCap(false, cutRise, wallCapDepth(left, top, floor, false));
   }
 
   rows.forEach((row, y) => row.forEach((_, x) => {

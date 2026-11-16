@@ -100,7 +100,7 @@ stops whom (creatures stop everyone; players walk through players and
 people step aside for them); `region/crowd.ts` gathers the region's bodies into a grid each tick
 (neighbour cells' ghosts too), players step with it (`walkOn`, predicted the
 same in the browser from the snapshot), and walkers steer round it, so only
-a ring of creatures can reach one player at once. The hour and weather come from shared `sky.ts`, worked out from the
+a ring of creatures can reach one player at once. Moving on tiles (being built, `docs/combat.md`): shared `tiles.ts` (`tiles/`) holds the grid rules that will replace free movement and round bodies: eight-way steps checked against the land (`canStep`), one body per tile (`TileClaims`), routes (`findTileRoute`) and steps under way (`Stride`). The hour and weather come from shared `sky.ts`, worked out from the
 clock and the region alone, so every server, cell and browser agrees
 without being told; people's days are in shared `routines.ts`.
 Character rules are shared `rpg.ts`, a face over `rpg/`: `attributes.ts`

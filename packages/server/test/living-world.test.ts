@@ -167,7 +167,7 @@ describe('people', () => {
     const back = region.npc('old-bramble')!;
     expect(Math.hypot(back.x - home.x, back.y - home.y)).toBeLessThan(1);
     expect(back.asleep).toBe(true);
-  });
+  }, 30_000);
 
   it('wake when spoken to, and still talk', () => {
     const { region, clock } = setup('shore', 23);

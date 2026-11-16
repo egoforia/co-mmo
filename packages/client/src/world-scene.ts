@@ -13,7 +13,6 @@ import {
   SnapshotClock,
   bodiesSeen,
   TICK_SECONDS,
-  floorDrawnFrom,
   WALK_FRAMES,
   generateRegion,
   heldItem,
@@ -70,6 +69,7 @@ import {
   applyFloorView,
   drawNearChunks,
   drawRegion,
+  isAvatarVisible,
   lightLamps,
   raiseHouses,
   revealBuildings,
@@ -576,19 +576,34 @@ export class WorldScene extends Phaser.Scene {
         const screen = { dx: Math.abs(dx) > 0.5 ? dx : 0, dy: Math.abs(dy) > 0.5 ? dy : 0 };
         const step = was && (screen.dx || screen.dy) ? { dx: pos.x - was.x, dy: pos.y - was.y } : { dx: 0, dy: 0 };
         walkAvatar(this, this.metrics, remote, step, screen);
-        // People indoors stay out of sight until we come close enough to see in.
-        // Upstairs on a terrace or rooftop over no building they remain visible;
-        // a building's upper floors are hidden from outside, and so is whoever is on them.
-        // NPCs show only on our own floor, and no player stands on a floor that is not drawn.
-        if (group === this.remotes || group === this.npcs) {
-          const floor = remote.floor ?? 0;
-          const [wx, wy] = [this.origin.x + pos.x, this.origin.y + pos.y];
-          const onDrawnFloor = group === this.npcs ? floor === this.shownFloor : floorDrawnFrom(this.map, this.floor, floor, wx, wy);
-          const sameIndoor = floor !== 0 && floor === this.floor;
-          const openUpper = floor > 0 && this.map.storeys.some((s) => s.floor === floor && !this.map.buildings.some((b) => overlaps(s, b)) && within(s, Math.floor(wx), Math.floor(wy)));
-          const seen = onDrawnFloor && (sameIndoor || openUpper || !this.buildings().some((v) => !v.open && within(v.building, Math.floor(wx - v.ox), Math.floor(wy - v.oy))));
-          for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
+        // People and creatures indoors or on hidden storeys stay out of sight.
+        // Upstairs on an open terrace over no building they remain visible while the storey is drawn;
+        // when an upper storey is hidden (or occluding), whoever stands on it is hidden together with the storey.
+        // NPCs show only on our own floor, and no entity stands on a floor that is not drawn.
+        const floor = remote.floor ?? 0;
+        const [wx, wy] = [this.origin.x + pos.x, this.origin.y + pos.y];
+        const region =
+          [...this.drawn.values()].find((r) => {
+            const ox = r.map.def.at.x * r.map.width;
+            const oy = r.map.def.at.y * r.map.height;
+            return wx >= ox && wx < ox + r.map.width && wy >= oy && wy < oy + r.map.height;
+          }) ?? this.drawn.get(this.welcome.region.def.id);
+        const seen = isAvatarVisible(
+          region,
+          this.shownFloor,
+          this.shown,
+          wx,
+          wy,
+          floor,
+          group === this.npcs,
+        );
+        for (const part of [remote.body, remote.shadow, remote.label]) part.setVisible(seen);
+        if (remote.bar) {
+          remote.bar.bg.setVisible(seen);
+          remote.bar.fill.setVisible(seen);
         }
+        if (remote.held?.image) remote.held.image.setVisible(seen);
+        if (remote.offHeld?.image) remote.offHeld.image.setVisible(seen);
         const delta = Math.max(0, this.floor - (remote.floor ?? 0));
         setDepthShade(remote.body, delta);
         if (remote.held?.image) setDepthShade(remote.held.image, delta);

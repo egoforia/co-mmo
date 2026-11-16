@@ -124,6 +124,7 @@ export interface DrawnRegion {
 export interface FloorView {
   storey: Storey;
   objects: Phaser.GameObjects.GameObject[];
+  visible?: boolean;
 }
 
 /** A light standing in the world, at a screen point; windows light up only after dark. */

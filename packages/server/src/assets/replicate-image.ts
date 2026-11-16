@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { REFERENCE_NOTE } from './gemini.ts';
 import { ProviderError, type GeneratedImage, type ImageProvider, type ImageRequest } from './provider.ts';
 import { MAX_DATA_URL_BYTES, replicateError, type Prediction } from './replicate.ts';
@@ -122,11 +123,15 @@ export class ReplicateImageProvider implements ImageProvider {
 
   async generate(request: ImageRequest): Promise<GeneratedImage> {
     const inputs = await this.schema();
-    const references = await Promise.all((request.references ?? []).map((r, i) => this.picture(r, i)));
+    const references = await Promise.all((request.references ?? []).map((r) => this.picture(r)));
     let prediction = await this.start(fitInput(inputs, request, references));
     // Most pictures come back within the minute the start call waits; give up after five more.
     for (let i = 0; !finished(prediction); i++) {
-      if (i >= 150) throw new ProviderError(this.id, 504, 'the picture took too long');
+      if (i >= 150) {
+        // Left alone, a job we gave up on keeps running (and may still be charged): stop it.
+        await this.fetchImpl(prediction.urls?.cancel ?? `${API}/predictions/${encodeURIComponent(prediction.id!)}/cancel`, { method: 'POST', headers: this.headers() }).catch(() => undefined);
+        throw new ProviderError(this.id, 504, 'the picture took too long');
+      }
       await this.wait(2_000);
       const poll = await this.fetchImpl(prediction.urls?.get ?? `${API}/predictions/${encodeURIComponent(prediction.id!)}`, { headers: this.headers() });
       // Checking too often is refused too; the picture is already paid for, so keep checking.
@@ -176,16 +181,15 @@ export class ReplicateImageProvider implements ImageProvider {
     return body;
   }
 
-  /** A small picture inline; a bigger one uploaded to Replicate's files, by its address. */
-  private async picture(image: GeneratedImage, i: number): Promise<string> {
-    if (image.data.length <= MAX_DATA_URL_BYTES) return `data:${image.mimeType};base64,${image.data.toString('base64')}`;
-    const form = new FormData();
-    const ext = image.mimeType.split('/')[1] ?? 'png';
-    form.append('content', new Blob([new Uint8Array(image.data)], { type: image.mimeType }), `reference-${i + 1}.${ext}`);
-    const res = await this.fetchImpl(`${API}/files`, { method: 'POST', headers: { authorization: `Bearer ${this.token}` }, body: form });
-    const body = (await res.json().catch(() => ({}))) as Prediction & { urls?: { get?: string } };
-    if (!res.ok || !body.urls?.get) throw replicateError(this.id, res, body, 'a reference picture could not be sent');
-    return body.urls.get;
+  /**
+   * A reference picture, always inline and shrunk to fit. Never a Replicate
+   * files address: its urls.get answers with the file's details as JSON, not
+   * the picture, and gpt-image-2 waited on one forever (2026-11-16).
+   */
+  private async picture(original: GeneratedImage): Promise<string> {
+    const image = await shrinkReference(original);
+    if (image.data.length > MAX_DATA_URL_BYTES) throw new ProviderError(this.id, 422, 'a reference picture is too big to send');
+    return `data:${image.mimeType};base64,${image.data.toString('base64')}`;
   }
 
   private headers(): Record<string, string> {
@@ -195,4 +199,30 @@ export class ReplicateImageProvider implements ImageProvider {
 
 function finished(p: Prediction): boolean {
   return p.status === 'succeeded' || p.status === 'failed' || p.status === 'canceled';
+}
+
+/** Sides tried for a reference picture, largest first: enough to show a style, small enough to send inline. */
+const REFERENCE_SIDES = [1024, 768, 512];
+
+/**
+ * A reference picture that fits inline: scaled down step by step, as PNG and
+ * then WebP (both keep transparency), until it fits. Unchanged when it already
+ * fits or cannot be read.
+ */
+export async function shrinkReference(image: GeneratedImage): Promise<GeneratedImage> {
+  if (image.data.length <= MAX_DATA_URL_BYTES) return image;
+  try {
+    for (const side of REFERENCE_SIDES) {
+      const resized = sharp(image.data).resize(side, side, { fit: 'inside', withoutEnlargement: true });
+      const png = await resized.clone().png({ compressionLevel: 9 }).toBuffer();
+      if (png.length <= MAX_DATA_URL_BYTES) return { mimeType: 'image/png', data: png };
+      for (const quality of [90, 75]) {
+        const webp = await resized.clone().webp({ quality }).toBuffer();
+        if (webp.length <= MAX_DATA_URL_BYTES) return { mimeType: 'image/webp', data: webp };
+      }
+    }
+  } catch {
+    // Not a picture sharp can read: send it as it is.
+  }
+  return image;
 }

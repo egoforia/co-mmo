@@ -26,7 +26,7 @@ export interface Prediction {
   status?: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
   output?: string | string[] | null;
   error?: string | null;
-  urls?: { get?: string };
+  urls?: { get?: string; cancel?: string };
   detail?: string;
   title?: string;
   invalid_fields?: { type?: string; field?: string; description?: string }[];

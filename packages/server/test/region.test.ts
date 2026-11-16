@@ -49,7 +49,11 @@ describe('Region', () => {
     region.tick();
     const snap = a.messages.at(-1)!;
     expect(snap).toMatchObject({ t: 'snapshot', ack: 1 });
-    expect((snap as { x: number }).x).toBeCloseTo(region.map.spawn.x + PLAYER_SPEED * TICK_SECONDS);
+    // On tiles: a fifth of a tile toward the next tile's middle, which is still being stepped onto.
+    const { x, y, to } = snap as { x: number; y: number; to?: { tx: number; ty: number } };
+    expect(Math.hypot(x - region.map.spawn.x, y - region.map.spawn.y)).toBeCloseTo(PLAYER_SPEED * TICK_SECONDS);
+    expect(x).toBeGreaterThan(region.map.spawn.x);
+    expect(to).toBeDefined();
   });
 
   it('limits how far a flooding client can move per tick', () => {

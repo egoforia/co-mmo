@@ -7,6 +7,7 @@ import {
   VIEW_RADIUS,
   Tile,
   type Character,
+  type TileSpot,
   type CreatorCredit,
   type CreatureDef,
   type InventorySlot,
@@ -38,6 +39,8 @@ export interface PlayerState {
   y: number;
   /** The floor they are on (floors.ts): 0 the ground. */
   floor: number;
+  /** The tile they are stepping onto, while they step (tiles/walker.ts). */
+  to?: TileSpot;
   /** Gathering at a spot (region/gathering.ts): which, since and until when, and the tool in hand. */
   gathering?: { spot: string; started: number; until: number; tool: string };
   inputs: { seq: number; dx: number; dy: number }[];

@@ -40,9 +40,11 @@ export class Crowd {
     return this.grid;
   }
 
-  /** A player stepping among the others: stopped by creatures only (hit-boxes.ts stoppedBy). */
+  /** A player stepping among the others: stopped by creatures and players, but not their own party (hit-boxes.ts stoppedBy). */
   forPlayer(p: PlayerState): Among {
-    return { self: { r: PERSON_RADIUS, kind: 'player', floor: p.floor, of: p }, bodies: this.grid };
+    const party = new Set(this.s.hooks.party?.(p.info.id) ?? []);
+    const passes = party.size > 1 ? (o: HitBody) => o.kind === 'player' && party.has((o.of as PlayerState | undefined)?.info.id ?? '') : undefined;
+    return { self: { r: PERSON_RADIUS, kind: 'player', floor: p.floor, of: p }, bodies: this.grid, ...(passes ? { passes } : {}) };
   }
 }
 

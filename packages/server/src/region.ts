@@ -763,7 +763,7 @@ export class Region {
             continue;
           }
           // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
-          // Creatures stand in the way; people make way and players pass through (hit-boxes.ts).
+          // Players walk on tiles: creatures and other players stand in the way, party members let them by, people make way (hit-boxes.ts).
           const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now), this.crowd.forPlayer(p));
           if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
           const len = Math.hypot(input.dx, input.dy);
@@ -773,6 +773,7 @@ export class Region {
           p.x = next.x;
           p.y = next.y;
           p.floor = next.floor;
+          p.to = next.to;
           p.ack = input.seq;
         }
         const side = outsideSide(this.map, p.x, p.y);
@@ -870,7 +871,7 @@ export class Region {
         p.crowd = crowdOf(view, farEvery);
         const marks = allMarks.filter(near);
         p.conn.send({
-          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now),
+          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), ...(p.to ? { to: p.to } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now),
           players: view.players, creatures: view.creatures, bodies: view.bodies, npcs: view.npcs, ...(view.kept.length ? { kept: view.kept } : {}), ...(marks.length ? { marks } : {}), online,
         });
         this.s.flush(p);

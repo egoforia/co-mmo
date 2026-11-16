@@ -16,11 +16,11 @@ describe('hit boxes', () => {
     expect(pressesInto(me, { x: 0, y: 0 }, { x: 0.5, y: 0 }, [creature(1, 0, 1)])).toBe(false);
   });
 
-  it('players walk through players and people, but not through creatures', () => {
+  it('players walk through people, but not through players or creatures', () => {
     const player = { r: PERSON_RADIUS, kind: 'player' as const, floor: 0 };
     const at = { x: 0, y: 0 };
     const to = { x: 0.5, y: 0 };
-    expect(pressesInto(player, at, to, [{ x: 1, y: 0, r: PERSON_RADIUS, kind: 'player' }])).toBe(false);
+    expect(pressesInto(player, at, to, [{ x: 1, y: 0, r: PERSON_RADIUS, kind: 'player' }])).toBe(true);
     expect(pressesInto(player, at, to, [{ x: 1, y: 0, r: PERSON_RADIUS, kind: 'npc' }])).toBe(false);
     // People are stopped by players, and step aside for them (pushOut).
     expect(pressesInto({ r: PERSON_RADIUS, kind: 'npc' }, at, to, [{ x: 1, y: 0, r: PERSON_RADIUS, kind: 'player' }])).toBe(true);
@@ -78,11 +78,16 @@ describe('a player among bodies', () => {
     expect(after.y).toBeGreaterThan(start.y);
   });
 
-  it('is predicted to stop where the server stops it', () => {
-    const predictor = new Predictor(map, start);
-    predictor.bodies = bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: start.x + 0.7, y: start.y, health: 1 }]);
+  it('is predicted to stop where the server stops it, on tiles', () => {
+    const middle = { x: Math.floor(start.x) + 0.5, y: Math.floor(start.y) + 0.5 };
+    const predictor = new Predictor(map, middle);
+    predictor.bodies = bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: middle.x + 1, y: middle.y, health: 1 }]);
     for (let i = 0; i < 10; i++) predictor.apply(1, 0);
-    expect(predictor.position.x).toBe(start.x);
+    expect(predictor.position.x).toBe(middle.x);
+    // Another player stands in the way too.
+    predictor.bodies = bodiesSeen([], [{ x: middle.x + 1, y: middle.y }]);
+    for (let i = 0; i < 10; i++) predictor.apply(1, 0);
+    expect(predictor.position.x).toBe(middle.x);
     // Big creatures stand wider.
     expect(bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: 0, y: 0, health: 1, size: 'colossal' }])[0]!.r).toBe(creatureRadius('colossal'));
   });

@@ -3,6 +3,7 @@ import { PERSON_RADIUS, bodyList, creatureRadius, type Among, type HitBody } fro
 import type { CreatureState } from './protocol.ts';
 import type { Vec2 } from './movement.ts';
 import type { RegionMap } from './world.ts';
+import type { TileSpot } from './tiles/grid.ts';
 
 export interface PendingInput {
   seq: number;
@@ -60,10 +61,15 @@ export class Predictor {
     return input;
   }
 
+  /** True while our player is between tiles: the step must finish, so an input is sent each tick even with no key held. */
+  get stepping(): boolean {
+    return this.position.to !== undefined;
+  }
+
   /** Reconciles with the server's state after it applied input `ack`. */
-  reconcile(ack: number, server: Vec2 & { floor?: number }): void {
+  reconcile(ack: number, server: Vec2 & { floor?: number; to?: TileSpot }): void {
     this.pending = this.pending.filter((i) => i.seq > ack);
-    let pos: Placed = { x: server.x, y: server.y, floor: server.floor ?? 0 };
+    let pos: Placed = { x: server.x, y: server.y, floor: server.floor ?? 0, ...(server.to ? { to: server.to } : {}) };
     for (const input of this.pending) pos = walkOn(this.map, pos, input.dx, input.dy, this.pace, this.among(pos.floor));
     this.position = pos;
   }
@@ -78,9 +84,16 @@ export class Predictor {
   }
 }
 
-/** The bodies a snapshot shows that stand in a player's way: its creatures (people make way, players pass through). */
-export function bodiesSeen(creatures: CreatureState[] = []): HitBody[] {
-  return creatures.map((c): HitBody => ({ x: c.x, y: c.y, floor: c.floor ?? 0, r: creatureRadius(c.size), kind: 'creature' }));
+/**
+ * The bodies a snapshot shows that stand in a player's way: its creatures
+ * and other players (people make way). Party members do let us by; the
+ * server knows the party and puts us right if we guessed wrong.
+ */
+export function bodiesSeen(creatures: CreatureState[] = [], players: { x: number; y: number; floor?: number; fallen?: boolean }[] = []): HitBody[] {
+  return [
+    ...creatures.map((c): HitBody => ({ x: c.x, y: c.y, floor: c.floor ?? 0, r: creatureRadius(c.size), kind: 'creature' })),
+    ...players.filter((p) => !p.fallen).map((p): HitBody => ({ x: p.x, y: p.y, floor: p.floor ?? 0, r: PERSON_RADIUS, kind: 'player' })),
+  ];
 }
 
 interface Sample {

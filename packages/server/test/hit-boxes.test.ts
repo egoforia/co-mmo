@@ -75,7 +75,7 @@ describe('hit boxes', () => {
     expect(reaching).toBeLessThanOrEqual(8);
   });
 
-  it('stops a player walking into a creature, but not into another player', () => {
+  it('stops a player walking into a creature or another player', () => {
     CREATURES['test-biter'] = { ...BITER, behavior: 'wander', speed: 0 };
     const { region, ticks } = setup();
     const at = openSpot(region.map, region, 4);
@@ -91,8 +91,8 @@ describe('hit boxes', () => {
       }
     };
     walk('a', 20);
-    // Walked right through the other player.
-    expect(region.position('a')!.x).toBeGreaterThan(at.x + 2);
+    // Stopped a tile short of the other player (egoforia, 2026-11-16: players block players).
+    expect(region.position('a')!.x).toBeLessThan(at.x + 1.5);
 
     region.placePlayer('a', at.x, at.y + 2);
     region.addCreatures('test-biter', [{ x: at.x + 1.5, y: at.y + 2 }]);

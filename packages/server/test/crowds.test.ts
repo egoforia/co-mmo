@@ -76,6 +76,12 @@ function clearRow(map: RegionMap, x0: number, x1: number): number {
   throw new Error('no clear row');
 }
 
+/** A row beside `y` open at `x`, so someone standing there is not in the way of a walk along `y` (players block players on tiles). */
+function besideRow(map: RegionMap, x: number, y: number): number {
+  for (const dy of [-1, 1, -2, 2, -3, 3]) if (!collides(map, x, y + dy)) return y + dy;
+  throw new Error('no row beside');
+}
+
 async function settle(rounds = 10): Promise<void> {
   for (let i = 0; i < rounds; i++) await new Promise((r) => setImmediate(r));
 }
@@ -140,7 +146,7 @@ describe('crowded regions', () => {
     const tom = fakeConn();
     const y = clearRow(map, border - 4, border + 4);
     const left = { x: border - 3, y };
-    const right = { x: border + 2, y };
+    const right = { x: border + 2, y: besideRow(map, border + 2, y) };
     world.join(info('mara'), mara, { regionId: 'woods', ...left }, newCharacter());
     world.join(info('tom'), tom, { regionId: 'woods', ...right }, newCharacter());
     expect(woods.cells[0]!.has('mara')).toBe(true);
@@ -226,7 +232,7 @@ describe('crowded regions on region servers', () => {
     const mid = map.width / 2;
     const y = clearRow(map, mid - 4, mid + 4);
     world.join(info('mara'), mara, { regionId: 'shore', x: mid - 3, y }, newCharacter());
-    world.join(info('tom'), tom, { regionId: 'shore', x: mid + 2, y }, newCharacter());
+    world.join(info('tom'), tom, { regionId: 'shore', x: mid + 2, y: besideRow(map, mid + 2, y) }, newCharacter());
     await settle();
     await second(world);
     await until(() => (world.region('shore')!.cells?.length ?? 0) === 2);

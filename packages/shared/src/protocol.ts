@@ -389,6 +389,8 @@ export interface SnapshotMessage {
   y: number;
   /** The floor they are on (floors.ts), when not the ground; everyone below is on it too. */
   floor?: number;
+  /** The tile you are stepping onto, while you step (tiles/walker.ts), so prediction replays from the same step. */
+  to?: { tx: number; ty: number };
   hp: number;
   energy: number;
   /** While you lie Fallen: whole seconds left before you wake at the shrine. */

@@ -1,5 +1,6 @@
 import { PLAYER_RADIUS } from './constants.ts';
 import type { CreatureSizeTier } from './walk.ts';
+import type { TileSpot } from './tiles/grid.ts';
 
 // Hit boxes: every player, creature and person stands in a round body of
 // their own, so nobody stands where someone else stands. Bodies are what
@@ -11,9 +12,10 @@ import type { CreatureSizeTier } from './walk.ts';
 // - creatures are stopped by players, people and other creatures;
 // - people (NPCs) are stopped by everyone too, and step out of the way of
 //   anyone who walks into them (walkers.ts standClear);
-// - players are stopped by creatures only: they walk through other players,
-//   so nobody can wall off a doorway, a shrine or a shop, and people make way
-//   for them, so someone who stops to talk in a doorway never shuts it.
+// - players are stopped by creatures and by other players (egoforia,
+//   2026-11-16: on tiles, where you stand is the strategy), but party members
+//   may pass one another (Among.passes); people make way for players, so
+//   someone who stops to talk in a doorway never shuts it.
 // The Fallen and the Hidden have no body: creatures walk over the one and
 // would give the other away.
 //
@@ -34,17 +36,20 @@ export interface HitBody {
   kind: BodyKind;
   /** The player, creature or person it belongs to, so a mover never bumps into itself. */
   of?: object;
+  /** The tile it is stepping onto, for something that walks on tiles (tiles/walker.ts): it holds that tile too. */
+  to?: TileSpot;
 }
 
 /**
  * The body of something that moves: it reads where it stands from the thing
  * itself, so it stays right as the thing walks during a tick.
  */
-export function bodyOf(of: { x: number; y: number; floor?: number }, r: number, kind: BodyKind): HitBody {
+export function bodyOf(of: { x: number; y: number; floor?: number; to?: TileSpot }, r: number, kind: BodyKind): HitBody {
   return {
     get x() { return of.x; },
     get y() { return of.y; },
     get floor() { return of.floor ?? 0; },
+    get to() { return of.to; },
     r,
     kind,
     of,
@@ -79,7 +84,7 @@ export function sizeReach(size?: CreatureSizeTier): number {
 
 /** True when a body of `mover`'s kind is stopped by one of `other`'s kind. */
 export function stoppedBy(mover: BodyKind, other: BodyKind): boolean {
-  return mover !== 'player' || other === 'creature';
+  return mover !== 'player' || other !== 'npc';
 }
 
 /** Overlaps smaller than this are rounding, not a press. */
@@ -203,4 +208,6 @@ export function roomFor(self: Mover, from: Spot, to: Spot, bodies?: Bodies): boo
 export interface Among {
   self: Mover;
   bodies: Bodies;
+  /** Those this mover may pass through though its kind is stopped by theirs (a player's party). */
+  passes?: (other: HitBody) => boolean;
 }

@@ -25,8 +25,8 @@ tile in front of a healer really guards them.
 
 ## Build steps
 
-1. Shared tile rules (`packages/shared/src/tiles/`): grid, steps, claims, routes, strides.
-2. Players move on tiles: server, browser prediction, smooth tile-to-tile drawing.
+1. Shared tile rules (`packages/shared/src/tiles/`): grid, steps, claims, routes, strides. (Built.)
+2. Players move on tiles: server, browser prediction, smooth tile-to-tile drawing. Players block players except their party. (Built.)
 3. Monsters and NPCs move on tiles; hit boxes become tile claims.
 4. Reach, line of sight and tile shapes for skills and weapons; God's View Combat page.
 5. Tactics: flanking, free swings on leaving, monster tactics; editor snapping.

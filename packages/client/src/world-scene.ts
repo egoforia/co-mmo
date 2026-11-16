@@ -459,8 +459,8 @@ export class WorldScene extends Phaser.Scene {
     // Slowed, Rooted or Stunned: predict our steps at the pace the server allows.
     this.predictor.pace = paceFor((snapshot.statuses ?? []).map((s) => s.id));
     // Creatures stand in our way as they stand in the server's (hit-boxes.ts).
-    this.predictor.bodies = bodiesSeen(snapshot.creatures);
-    this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
+    this.predictor.bodies = bodiesSeen(snapshot.creatures, snapshot.players);
+    this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor, ...(snapshot.to ? { to: snapshot.to } : {}) });
     // On the server's time: when it was sent, not when it happened to arrive.
     const shift = this.clock.arrived(snapshot.tick, performance.now());
     if (shift) for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) for (const r of group.values()) r.interp.rebase(shift);
@@ -538,14 +538,19 @@ export class WorldScene extends Phaser.Scene {
     while (this.accumulator >= TICK_SECONDS) {
       this.accumulator -= TICK_SECONDS;
       const { dx, dy } = this.readInput();
-      if (dx !== 0 || dy !== 0) {
+      // On tiles a step once begun is finished, so the server hears every tick of it, key held or not.
+      if (dx !== 0 || dy !== 0 || predictor.stepping) {
         const step = PROJECTION.inputToWorld(dx, dy);
         const input = predictor.apply(step.dx, step.dy);
         this.options.send({ t: 'input', ...input });
       }
     }
     const held = this.readInput();
-    walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
+    // A step finishing after the key was let go still walks, the way it goes.
+    const to = predictor.position.to;
+    const going = !held.dx && !held.dy && to ? { dx: to.tx + 0.5 - predictor.position.x, dy: to.ty + 0.5 - predictor.position.y } : undefined;
+    if (going) walkAvatar(this, this.metrics, this.me, going, { dx: 1, dy: 0 });
+    else walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);

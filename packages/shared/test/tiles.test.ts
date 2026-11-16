@@ -11,7 +11,14 @@ import {
   stridePosition,
   tilesApart,
   wayOf,
+  walkTiles,
+  bodyList,
+  PERSON_RADIUS,
+  PLAYER_SPEED,
+  TICK_SECONDS,
   type EdgeWall,
+  type HitBody,
+  type TileWalker,
   type RegionMap,
   type TileSpot,
 } from '../src/index.ts';
@@ -154,5 +161,44 @@ describe('routes', () => {
     const map = land(8, 8, [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7]]);
     expect(findTileRoute(map, { from: at(1, 1), toward: at(5, 1), arrived: (t) => t.tx === 5 && t.ty === 1 })).toBeUndefined();
     expect(findTileRoute(map, { from: at(1, 1), toward: at(1, 1), arrived: (t) => t.tx === 1 && t.ty === 1 })).toEqual([]);
+  });
+});
+
+describe('walking on tiles', () => {
+  const ticksPerTile = Math.round(1 / (PLAYER_SPEED * TICK_SECONDS));
+
+  it('walks from tile middle to tile middle while a key is held', () => {
+    const map = land();
+    let w: TileWalker = { x: 1.5, y: 1.5, floor: 0 };
+    w = walkTiles(map, w, 1, 0);
+    expect(w.to).toEqual(at(2, 1));
+    for (let i = 1; i < ticksPerTile * 2; i++) w = walkTiles(map, w, 1, 0);
+    expect(w.x).toBeCloseTo(3.5);
+    expect(w.y).toBe(1.5);
+  });
+
+  it('finishes a step once begun, key or no key', () => {
+    const map = land();
+    let w: TileWalker = walkTiles(map, { x: 1.5, y: 1.5, floor: 0 }, 1, 0);
+    for (let i = 0; i < ticksPerTile; i++) w = walkTiles(map, w, 0, 0);
+    expect(w).toEqual({ x: 2.5, y: 1.5, floor: 0 });
+  });
+
+  it('slides along a wall of trees when walking into it at a slant', () => {
+    const map = land(8, 8, [[2, 2], [3, 2], [4, 2]]);
+    const w = walkTiles(map, { x: 2.5, y: 1.5, floor: 0 }, 1, 1);
+    expect(w.to).toEqual(at(3, 1));
+  });
+
+  it('stops at a tile someone stands on or is stepping onto, unless it may pass them', () => {
+    const map = land();
+    const other: HitBody = { x: 2.5, y: 1.5, floor: 0, r: PERSON_RADIUS, kind: 'player' };
+    const among = { self: { r: PERSON_RADIUS, kind: 'player' as const, floor: 0 }, bodies: bodyList([other]) };
+    const still: TileWalker = { x: 1.5, y: 1.5, floor: 0 };
+    expect(walkTiles(map, still, 1, 0, 1, among)).toBe(still);
+    expect(walkTiles(map, still, 1, 0, 1, { ...among, passes: () => true }).to).toEqual(at(2, 1));
+    // Someone halfway into the next tile holds it, and so does someone just setting off for it.
+    const coming: HitBody = { x: 3.4, y: 1.5, floor: 0, r: PERSON_RADIUS, kind: 'player', to: at(2, 1) };
+    expect(walkTiles(map, still, 1, 0, 1, { ...among, bodies: bodyList([coming]) })).toBe(still);
   });
 });

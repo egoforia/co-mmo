@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Tile, clearLine, combatRules, flanks, inLine, nearestOf, tilesBetween, tilesFor, type EdgeWall, type RegionMap } from '../src/index.ts';
+import { Tile, clearLine, combatRules, flanks, shapeTiles, inLine, nearestOf, tilesBetween, tilesFor, type EdgeWall, type RegionMap } from '../src/index.ts';
 
 // Reach and sight on tiles (docs/combat.md): how far a reach goes in
 // tiles, straight lines for long blades, and clear lines past trees and walls.
@@ -68,5 +68,24 @@ describe('flanking on tiles', () => {
     // A big one, two tiles wide: across it from any tile of one side to any of the other.
     expect(flanks(c, 2, { tx: 4, ty: 5 }, { tx: 7, ty: 6 })).toBe(true);
     expect(flanks(c, 2, { tx: 5, ty: 4 }, { tx: 6, ty: 7 })).toBe(true);
+  });
+});
+
+describe('skill shapes on tiles', () => {
+  const key = (ts: { tx: number; ty: number }[]) => ts.map((t) => `${t.tx},${t.ty}`).sort();
+  it('a line is a row of tiles straight ahead, cut short by a tree', () => {
+    expect(key(shapeTiles(land(), { shape: 'line', from: at(1, 1), dx: 1, dy: 0.2, range: 3 }))).toEqual(['2,1', '3,1', '4,1']);
+    expect(key(shapeTiles(land(), { shape: 'line', from: at(1, 1), dx: 1, dy: 1, range: 2 }))).toEqual(['2,2', '3,3']);
+    expect(key(shapeTiles(land(10, 10, [[3, 1, Tile.Tree]]), { shape: 'line', from: at(1, 1), dx: 1, dy: 0, range: 4 }))).toEqual(['2,1', '3,1']);
+  });
+
+  it('a cone opens a wedge ahead, as wide as it is far', () => {
+    expect(key(shapeTiles(land(), { shape: 'cone', from: at(5, 5), dx: 1, dy: 0, range: 2 }))).toEqual(['6,4', '6,5', '6,6', '7,3', '7,4', '7,5', '7,6', '7,7'].sort());
+    expect(shapeTiles(land(), { shape: 'cone', from: at(5, 5), dx: 1, dy: 1, range: 1 })).toHaveLength(3);
+  });
+
+  it('an area is a square of tiles about its middle, kept inside the land', () => {
+    expect(shapeTiles(land(), { shape: 'area', from: at(5, 5), dx: 0, dy: 0, range: 2 })).toHaveLength(25);
+    expect(shapeTiles(land(), { shape: 'area', from: at(0, 0), dx: 0, dy: 0, range: 1 })).toHaveLength(4);
   });
 });

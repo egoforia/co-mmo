@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ABILITIES,
+  CREATURES,
   ECHO_MS,
   FOCUS_CRIT,
   GAUGE_MAX,
@@ -181,6 +182,27 @@ describe('signature gauges', () => {
     t.use(whirl);
     expect(t.lastHit()).toBeGreaterThan(plain);
     expect(t.pips()).toBe(0);
+  });
+
+  it('Duelist: each Momentum pip turns aside 5% of a creature\'s blow', () => {
+    const taken = (pips: number) => {
+      const t = setup('duelist', 'desert');
+      // A hard-hitting creature that does not fall, so 5% shows past rounding.
+      const kind = t.region.creature(t.foe)!.kind;
+      CREATURES['gauge-brute'] ??= { ...CREATURES[kind]!, damage: 40, hp: 10_000 };
+      t.away();
+      const at = t.region.position('a')!;
+      t.region.addCreatures('gauge-brute', [{ x: at.x + 1, y: at.y }]);
+      for (let i = 0; i < pips; i++) {
+        t.clock.now += 2000;
+        t.region.handle('a', { t: 'attack', target: t.region.creatureIds().find((id) => id.includes('gauge-brute'))! });
+      }
+      expect(t.pips()).toBe(pips);
+      t.takeHit();
+      return of(t.conn, 'hit').filter((h) => h.target === 'a').at(-1)!.amount;
+    };
+    const plain = taken(0);
+    expect(taken(3) / plain).toBeCloseTo(0.85, 1);
   });
 
   it('Ranger: Focus grows each second standing still, 1 Energy a pip, and moving or being hit empties it', () => {

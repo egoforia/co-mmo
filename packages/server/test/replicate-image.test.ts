@@ -136,3 +136,47 @@ describe('Replicate image models', () => {
     expect(limitFor('openai/gpt-image-2')).toMatchObject({ perMinute: 6 });
   });
 });
+
+describe('reference pictures for Replicate', () => {
+  it('shrinks a big reference so it goes inline, not as a file address', async () => {
+    const sharp = (await import('sharp')).default;
+    const { shrinkReference } = await import('../src/assets/replicate-image.ts');
+    const { MAX_DATA_URL_BYTES } = await import('../src/assets/replicate.ts');
+    // Random noise does not compress: a 2048 square PNG of it is several megabytes.
+    const noise = Buffer.alloc(2048 * 2048 * 4);
+    for (let i = 0; i < noise.length; i++) noise[i] = (i * 2654435761) >>> 24;
+    const big = await sharp(noise, { raw: { width: 2048, height: 2048, channels: 4 } }).png().toBuffer();
+    expect(big.length).toBeGreaterThan(MAX_DATA_URL_BYTES);
+
+    const small = await shrinkReference({ mimeType: 'image/png', data: big });
+    expect(small.data.length).toBeLessThanOrEqual(MAX_DATA_URL_BYTES);
+    const meta = await sharp(small.data).metadata();
+    expect(Math.max(meta.width!, meta.height!)).toBeLessThanOrEqual(1024);
+    expect(meta.hasAlpha).toBe(true);
+  });
+
+  it('sends a big reference inline to the model', async () => {
+    const sharp = (await import('sharp')).default;
+    const big = await sharp({ create: { width: 3000, height: 3000, channels: 3, background: '#88aa44' } }).png({ compressionLevel: 0 }).toBuffer();
+    const { calls, fetchImpl } = fakeReplicate((call) => {
+      if (call.method === 'GET' && call.url.endsWith('/v1/models/openai/gpt-image-2')) return Response.json(gptSchema);
+      if (call.url.endsWith('/predictions')) return Response.json({ id: 'p3', status: 'succeeded', output: 'https://replicate.delivery/x.png' }, { status: 201 });
+      return new Response(Buffer.from('picture'), { headers: { 'content-type': 'image/png' } });
+    });
+    const provider = new ReplicateImageProvider('r8_token', undefined, fetchImpl, async () => {});
+    await provider.generate({ prompt: 'p', references: [{ mimeType: 'image/png', data: big }] });
+    expect(calls.some((c) => c.url.endsWith('/v1/files'))).toBe(false);
+    const start = calls.find((c) => c.url.endsWith('/predictions'))!;
+    expect(start.body.input.input_images[0]).toMatch(/^data:image\/(png|webp);base64,/);
+  });
+
+  it('cancels a job it gives up on', async () => {
+    const { calls, fetchImpl } = fakeReplicate((call) => {
+      if (call.method === 'GET' && call.url.endsWith('/v1/models/openai/gpt-image-2')) return Response.json(gptSchema);
+      return Response.json({ id: 'p4', status: 'processing', urls: { get: 'https://api.replicate.com/v1/predictions/p4', cancel: 'https://api.replicate.com/v1/predictions/p4/cancel' } }, { status: 201 });
+    });
+    const provider = new ReplicateImageProvider('r8_token', undefined, fetchImpl, async () => {});
+    await expect(provider.generate({ prompt: 'p' })).rejects.toThrow(/too long/);
+    expect(calls.at(-1)).toMatchObject({ method: 'POST', url: 'https://api.replicate.com/v1/predictions/p4/cancel' });
+  });
+});

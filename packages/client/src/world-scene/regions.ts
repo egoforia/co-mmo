@@ -260,6 +260,7 @@ const floors: FloorView[] = map.storeys.map((storey) => {
   return {
     storey,
     objects: [layer, ...cutawayWalls, ...upperShellWalls],
+    visible: false,
   };
 });
   // Walls on a tile's side: those off the ground show with their floor.
@@ -614,6 +615,7 @@ export function applyFloorView(
         (s.floor === mine ||
           isLower ||
           (isUpper && !compromisesPlayerView(s, region, shown, mine)));
+      f.visible = visible;
       for (const o of f.objects) {
         const isUpperShell = Boolean(o.getData('upperShell'));
         const isCutWall = Boolean(o.getData('wall')) && !isUpperShell;
@@ -637,3 +639,5 @@ export function applyFloorView(
     showFloorsBelow(scene, region, current, mine, here);
   }
 }
+
+export { isAvatarVisible } from './avatar-visibility.ts';

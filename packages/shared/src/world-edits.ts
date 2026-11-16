@@ -19,7 +19,7 @@ export { buildingAt, footprint as landmarkBox, landmarkAt } from './world-edits/
 export { nameThings, thingById, type Thing, type ThingKind } from './world-edits/names.ts';
 export { MAX_AREA_EDITS, copyArea, pasteArea, shiftDraft, type AreaCopy } from './world-edits/area.ts';
 export { landChecks, type LandChecks } from './world-edits/checks.ts';
-export { copyDraft, moveDrafts, pickAt, removeDraft, type PickKind, type Picked } from './world-edits/select.ts';
+export { copyDraft, monsterHome, moveDrafts, pickAt, removeDraft, type PickKind, type Picked } from './world-edits/select.ts';
 export { KIT_LIMITS, designSpec, kitProblems } from './world-edits/kinds/kit.ts';
 export { PERSON_LOOKS, personValues, shopFrom } from './world-edits/kinds/person.ts';
 export { brushTiles, type BrushShape } from './world-edits/kinds/paint.ts';

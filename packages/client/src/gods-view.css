@@ -59,6 +59,7 @@ button.quiet:hover { border-color: var(--gold); }
 .recent { padding-left: 18px; }
 
 .wish { background: var(--panel); border: 1px solid var(--edge); padding: 12px 14px; margin-bottom: 10px; }
+.wish.loot.linked { border-color: var(--accent); }
 .wish header { display: flex; gap: 10px; align-items: baseline; padding: 0; border: 0; }
 .wish header small { margin-left: auto; }
 .wish p { margin: 6px 0; }

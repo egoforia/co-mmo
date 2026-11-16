@@ -443,6 +443,44 @@ export const SHOTS: Shot[] = [
     ],
   },
   {
+    name: 'editor-monster',
+    about: "The world editor after clicking a wandering walking mushroom: its home is picked, and the inspector links to the monster's size and loot in God's View.",
+    region: 'woods',
+    at: nearMonster('walking-mushroom', 3),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      // Where a live walking mushroom is drawn on the screen (the game puts its scene on window for checks like this).
+      const at = await page.evaluate(() => {
+        const scene = (window as unknown as { scene: any }).scene;
+        const cam = scene.cameras.main;
+        const box = scene.game.canvas.getBoundingClientRect();
+        const ratio = box.width / scene.scale.width;
+        for (const [id, a] of scene.creatures) {
+          if (!String(id).includes('walking-mushroom') || !a.body.visible) continue;
+          const b = a.body.getBounds();
+          return { x: box.left + (b.centerX - cam.worldView.x) * cam.zoom * ratio, y: box.top + (b.centerY - cam.worldView.y) * cam.zoom * ratio };
+        }
+        return undefined;
+      });
+      if (!at) throw new Error('No walking mushroom is in view.');
+      await page.mouse.click(at.x, at.y);
+      await page.waitForSelector('#editor .gods-view-link');
+    },
+    mustSee: [
+      'the inspector says "Walking Mushroom’s home" with "Monster’s home" beside it, and its home outlined in the world (not where the mushroom was clicked)',
+      'a "Size and loot in God\'s View ↗" link under its details, then Move, Copy and Take away',
+      'the section "Level, ways and hours" open',
+    ],
+  },
+  {
+    name: 'gods-view-monster-link',
+    about: "God's View opened from the editor's link for the bark golem: the Monsters tab scrolled to its card, size form open.",
+    page: '/gods-view.html#loot/bark-golem',
+    ready: 'section.loot.linked',
+    mustSee: ['the Monsters tab chosen', 'the Bark Golem card at the top of the view, outlined in the accent colour, its "Change its size" form open with Tall chosen'],
+  },
+  {
     name: 'editor-kit-form',
     about: 'The world editor in edit mode with the Kit building tool chosen, so its settings and shape checks show in the panel.',
     region: 'arch-testbed',

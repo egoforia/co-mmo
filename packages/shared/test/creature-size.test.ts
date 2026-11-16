@@ -30,3 +30,15 @@ describe('creature sizes', () => {
     expect(validateSize({ creature: 'walking-mushroom', size: 'high' })).toMatchObject({ kind: 'size', description: 'Every Walking Mushroom stands tall.' });
   });
 });
+
+describe('picking a monster in the editor', () => {
+  it("finds a live monster's home from its id, and names its kind", async () => {
+    const { monsterHome, pickAt } = await import('@co-mmo/shared');
+    const map = { creatures: [{ kind: 'walking-mushroom', name: 'Walking Mushroom', asset: 'woods-mushroom', x: 4.5, y: 7.5 }, { kind: 'thorn-wolf', name: 'Thorn Wolf', asset: 'woods-thorn-wolf', x: 9.2, y: 3.1, floor: 1 }], npcs: [], spots: [], landmarks: [], stairways: [], buildings: [] } as never;
+    expect(monsterHome(map, 'woods', 'woods-thorn-wolf-1')).toEqual({ at: [9, 3], level: 1 });
+    expect(monsterHome(map, 'woods', 'woods-walking-mushroom-1')).toBeUndefined();
+    expect(monsterHome(map, 'shore', 'woods-thorn-wolf-1')).toBeUndefined();
+    expect(monsterHome(map, 'woods', 'walking-mushroom-3')).toBeUndefined();
+    expect(pickAt(map, [4, 7], 0)).toMatchObject({ kind: 'monster', creature: 'walking-mushroom' });
+  });
+});

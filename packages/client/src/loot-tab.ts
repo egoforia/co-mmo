@@ -96,6 +96,19 @@ export async function lootPage(ctx: LootContext): Promise<string> {
     ${o.creatures.map(card).join('')}`;
 }
 
+/**
+ * After the tab is drawn: a link to one monster (`#loot/<kind>`, from the
+ * world editor) scrolls to its card, opens its size form and marks the card.
+ */
+export function lootAfter(): void {
+  const kind = decodeURIComponent(location.hash.split('/')[1] ?? '');
+  const card = kind ? document.getElementById(`loot-${kind}`) : null;
+  if (!card) return;
+  card.classList.add('linked');
+  card.querySelector('details')?.setAttribute('open', '');
+  card.scrollIntoView({ block: 'start' });
+}
+
 /** Undoes a loot change. True when the click was the Loot tab's. */
 export function lootClick(target: HTMLElement, ctx: LootContext): boolean {
   const undo = target.closest<HTMLButtonElement>('button[data-loot-undo]')?.dataset.lootUndo;

@@ -1,5 +1,6 @@
 import {
   CREATURES,
+  type CombatRules,
   SIZE_TILES,
   creatureSize,
   tunedCreature,
@@ -19,6 +20,7 @@ import {
   canSeeAcrossFloors,
   storeyAt,
   walkOn,
+  anchorNear,
   wayTaken,
   Tile,
   type BodyState,
@@ -249,6 +251,11 @@ export class Region {
   strain = 0;
   /** How snapshots are thinned out (region/far.ts): set by the world from the game's network choices. */
   tuning: SnapshotTuning = STEADY;
+
+  /** The Owner's combat rules (God's View, Combat page): the world sets them each tick. */
+  set combatRules(rules: CombatRules) {
+    this.s.combatRules = rules;
+  }
   readonly logger: CombatLogger = combatLogger;
   /** Measures the simulation phases of each tick. */
   readonly profiler = new TickProfiler();
@@ -592,7 +599,7 @@ export class Region {
   /** Moves a creature, for tests and (later) wishes. */
   placeCreature(id: string, x: number, y: number, floor = 0): void {
     const c = this.s.creatures.find((k) => k.id === id);
-    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined });
+    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined, to: undefined });
   }
 
   /** The floor a creature or NPC is on, for tests and tools. */
@@ -766,6 +773,8 @@ export class Region {
           }
           // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
           // Players walk on tiles: creatures and other players stand in the way, party members let them by, people make way (hit-boxes.ts).
+          // The tile they stand on, or are stepping onto: a step begun from it may leave a fight.
+          const from = p.to ?? anchorNear(p.x, p.y);
           const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now), this.crowd.forPlayer(p));
           if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
           const len = Math.hypot(input.dx, input.dy);
@@ -777,6 +786,8 @@ export class Region {
           p.floor = next.floor;
           p.to = next.to;
           p.ack = input.seq;
+          const onto = next.to ?? anchorNear(next.x, next.y);
+          if (onto.tx !== from.tx || onto.ty !== from.ty) this.minds.leaving(p, from, onto, now);
         }
         const side = outsideSide(this.map, p.x, p.y);
         const cell = this.cell;

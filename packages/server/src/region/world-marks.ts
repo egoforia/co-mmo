@@ -1,10 +1,10 @@
-import { ECHO_ART, HALLOWED_ART, HAWK_SKILL, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TRAP_ART, type WorldMark } from '@co-mmo/shared';
+import { ECHO_ART, HALLOWED_ART, HAWK_SKILL, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TILE_MARKER_ART, TRAP_ART, type WorldMark } from '@co-mmo/shared';
 import { round } from '../region-views.ts';
 import type { RegionState } from './state.ts';
 
 // What skills leave in the world, as players see it (build plan step 10):
-// traps, Echoes on friends, hallowed ground, the spirit hawk and the sand
-// double. Each is only seen; what it does stays in its effect's own code.
+// traps, Echoes on friends, hallowed ground, the spirit hawk, the sand
+// double, and the tiles a cone, line or area just covered. Each is only seen; what it does stays in its effect's own code.
 
 /** Where a spirit hawk flies beside its owner, in tiles: just behind and to the left. */
 const HAWK_OFFSET = { x: -0.7, y: -0.5 };
@@ -15,6 +15,9 @@ export function worldMarks(s: RegionState, now: number): WorldMark[] {
   const add = (id: string, asset: string, x: number, y: number, floor: number) => marks.push({ id, asset, x: round(x), y: round(y), ...(floor ? { floor } : {}) });
   s.traps.forEach((t, i) => now < t.until && add(`trap-${t.owner}-${i}`, TRAP_ART, t.x, t.y, t.floor));
   s.zones.forEach((z, i) => now < z.until && add(`hallowed-${z.owner}-${i}`, HALLOWED_ART, z.x, z.y, z.floor));
+  // Shown for a moment; gone ones are dropped here, the one place that reads them.
+  s.shapes = s.shapes.filter((sh) => now < sh.until);
+  s.shapes.forEach((sh, i) => sh.tiles.forEach((t) => add(`shape-${sh.owner}-${sh.until}-${i}-${t.tx},${t.ty}`, TILE_MARKER_ART, t.tx + 0.5, t.ty + 0.5, sh.floor)));
   for (const d of s.doubles) if (now < d.until) add(`double-${d.owner}`, SAND_DOUBLE_ART, d.x, d.y, d.floor);
   for (const h of s.helpers) {
     const owner = s.players.get(h.owner);

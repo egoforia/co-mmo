@@ -37,10 +37,10 @@ damage too ([attributes.md](../attributes.md#damage)).
 
 | Skill | Level | Effect | Energy | Cooldown | Range | Amount | What it does |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Aimed Shot | 1 | bolt | 6 | 5 | 7 | 5 + Agility × 1.2 | +15% damage per Focus pip, and spends Focus |
+| Aimed Shot | 1 | bolt | 6 | 5 | 7 | 4 + Agility × 0.85 | +15% damage per Focus pip, and spends Focus |
 | Tumble | 2 | dash | 5 | 10 | 4 back | None | Roll away from the target; you keep your Focus |
 | Snare Trap | 4 | trap | 8 | 15 | Placed at your feet | 3 + Agility × 0.5 | The first creature to step on it is Rooted for 2.5 s; up to two traps for 30 s |
-| Volley | 6 | area | 12 | 12 | 2 around a spot up to 6 away | 6 + Agility × 1.5, over three waves | Arrows rain on a spot for 1.5 s |
+| Volley | 6 | area | 12 | 12 | 2 around a spot up to 6 away | 4 + Agility × 1.05, over three waves | Arrows rain on a spot for 1.5 s |
 | Hawk Mark | 8 | debuff | 6 | 15 | 8 | None | Marks a creature for 10 s: your whole party deals it 12% more damage, and it cannot hide |
 
 ## Paths (level 10)

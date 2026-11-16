@@ -1,4 +1,4 @@
-import {
+import { DEFAULT_COMBAT_RULES, type CombatRules,
   ABILITIES,
   coreSkillsAt,
   keyWords,
@@ -152,9 +152,13 @@ export class RegionState {
   doubles: SandDouble[] = [];
   /** Hallowed ground laid by players here. */
   zones: Zone[] = [];
+  /** The tiles cones, lines and areas covered just now, shown for a moment with the tile marker. */
+  shapes: { owner: string; tiles: TileSpot[]; floor: number; until: number }[] = [];
   /** The map's NPCs (the same objects as `map.npcs`, so it stays current) and those wishes added. */
   townsfolk: Townsperson[] = [];
   tickCount = 0;
+  /** The Owner's combat rules (God's View, Combat page), as the world last sent them. */
+  combatRules: CombatRules = DEFAULT_COMBAT_RULES;
 
   constructor(
     readonly map: RegionMap,

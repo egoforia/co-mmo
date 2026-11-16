@@ -1,5 +1,5 @@
-import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, statusOf, type Weather } from '@co-mmo/shared';
-import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
+import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, spotMiddle, statusOf, type TileSpot, type Weather } from '@co-mmo/shared';
+import { CREATURE_REACH, forget, think, tilesTo, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { Combat } from './combat.ts';
 import type { CombatLogger } from './combat-logger.ts';
@@ -69,6 +69,21 @@ export class Minds {
     return false;
   }
 
+  /**
+   * The player stepped off a tile beside creatures fighting them to one out
+   * of their reach: each that can act (not Stunned) takes one free swing as
+   * they go (docs/combat.md, Leaving a fight). A blink or a jump is no step,
+   * so it slips away clean.
+   */
+  leaving(p: PlayerState, from: TileSpot, to: TileSpot, now: number): void {
+    for (const c of this.s.creatures) {
+      if (c.aggro !== p.info.id || c.respawnAt !== null || c.floor !== p.floor || !canAct(c, now)) continue;
+      if (tilesTo(c, spotMiddle(from)) > CREATURE_REACH || tilesTo(c, spotMiddle(to)) <= CREATURE_REACH) continue;
+      this.s.notice(p, `The ${c.def.name} strikes at you as you turn away.`);
+      this.hurt(p, c, now);
+    }
+  }
+
   private hurt(p: PlayerState, c: Creature, now: number): void {
     // A creature's bite is physical: Agility may dodge it (more while
     // Evasive), a Poised Duelist turns it aside and strikes back, a shield
@@ -126,7 +141,8 @@ export class Minds {
       if (warden) this.gauges.add(warden, 1, 'resolve');
     }
     const targetArmor = armor(p.character) + this.paths.extraArmor(p);
-    const afterArmorVal = afterArmor(raw, targetArmor) * (1 - (guard?.amount ?? 0) / 100);
+    // A Duelist in full flow is hard to catch square: each Momentum pip turns a share aside.
+    const afterArmorVal = afterArmor(raw, targetArmor) * (1 - (guard?.amount ?? 0) / 100) * (1 - this.gauges.guard(p));
     const absorbed = absorb(p, afterArmorVal, now);
     const amount = this.paths.floor(p, absorbed, now);
     const shieldAbsorb = afterArmorVal - absorbed;

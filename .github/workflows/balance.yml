@@ -1,0 +1,44 @@
+# The balance test (docs/balance.md) on pull requests that change fight
+# numbers: skills, Callings, weapons, attributes, creatures, tiles and the
+# region's combat. It fails when the damage Callings drift more than 15%
+# apart or a crowd stops being deadly, and puts the tables in the run's
+# summary. Run it by hand on any branch from the Actions tab.
+name: Balance
+
+on:
+  pull_request:
+    paths:
+      - 'packages/shared/src/skills/**'
+      - 'packages/shared/src/classes.ts'
+      - 'packages/shared/src/weapons.ts'
+      - 'packages/shared/src/rpg.ts'
+      - 'packages/shared/src/rpg/**'
+      - 'packages/shared/src/lands.ts'
+      - 'packages/shared/src/creature-size.ts'
+      - 'packages/shared/src/creature-tune.ts'
+      - 'packages/shared/src/hit-boxes.ts'
+      - 'packages/shared/src/combat-rules.ts'
+      - 'packages/shared/src/tiles/**'
+      - 'packages/server/src/region/**'
+      - 'packages/server/src/creature-brain.ts'
+      - 'packages/server/src/walkers.ts'
+      - 'packages/server/src/balance.ts'
+      - 'packages/server/src/tools/balance.ts'
+      - '.github/workflows/balance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run balance -- --check

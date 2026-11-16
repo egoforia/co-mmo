@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
-import { TICK_SECONDS, type ArtManifest, type PhaseTimings, type SkyConfig } from '@co-mmo/shared';
+import { TICK_SECONDS, combatRules, type ArtManifest, type PhaseTimings, type SkyConfig } from '@co-mmo/shared';
 import { Auth, type Mailer } from './auth.ts';
 import { World } from './world.ts';
 import { Region } from './region.ts';
@@ -146,6 +146,7 @@ export function createApp(options: AppOptions): App {
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.seeAcross = options.net?.seeAcross ?? true;
   world.tuning = tuningFor(options.net ?? { compress: true });
+  world.combatRules = combatRules(store.settings.combat);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   // The workshop lands the Owner and Stewards made in the editor.
   for (const land of store.workshopLands()) world.addRegion(workshopDef(land));

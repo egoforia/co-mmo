@@ -82,12 +82,21 @@ describe('a player among bodies', () => {
     const middle = { x: Math.floor(start.x) + 0.5, y: Math.floor(start.y) + 0.5 };
     const predictor = new Predictor(map, middle);
     predictor.bodies = bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: middle.x + 1, y: middle.y, health: 1 }]);
-    for (let i = 0; i < 10; i++) predictor.apply(1, 0);
-    expect(predictor.position.x).toBe(middle.x);
+    // Never into it: round it, a tile away at least, as the server walks us.
+    const apart = (o: { x: number; y: number }) => {
+      let least = Infinity;
+      for (let i = 0; i < 20; i++) {
+        predictor.apply(1, 0);
+        least = Math.min(least, Math.hypot(predictor.position.x - o.x, predictor.position.y - o.y));
+      }
+      return least;
+    };
+    expect(apart({ x: middle.x + 1, y: middle.y })).toBeGreaterThanOrEqual(PERSON_RADIUS * 2);
+    expect(predictor.position.x).toBeGreaterThan(middle.x + 1);
     // Another player stands in the way too.
-    predictor.bodies = bodiesSeen([], [{ x: middle.x + 1, y: middle.y }]);
-    for (let i = 0; i < 10; i++) predictor.apply(1, 0);
-    expect(predictor.position.x).toBe(middle.x);
+    const there = { x: Math.floor(predictor.position.x) + 1.5, y: Math.floor(predictor.position.y) + 0.5 };
+    predictor.bodies = bodiesSeen([], [there]);
+    expect(apart(there)).toBeGreaterThanOrEqual(PERSON_RADIUS * 2);
     // Big creatures stand wider.
     expect(bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: 0, y: 0, health: 1, size: 'colossal' }])[0]!.r).toBe(creatureRadius('colossal'));
   });

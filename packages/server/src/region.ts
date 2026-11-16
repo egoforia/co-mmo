@@ -584,7 +584,7 @@ export class Region {
   /** Moves a player, for tests and tools. */
   placePlayer(id: string, x: number, y: number, floor = 0): void {
     const p = this.s.players.get(id);
-    if (p) Object.assign(p, { x, y, floor });
+    if (p) Object.assign(p, { x, y, floor, to: undefined });
   }
 
   /** Moves a creature, for tests and (later) wishes. */
@@ -894,6 +894,7 @@ export class Region {
     if (!free) return;
     p.x = free.x;
     p.y = free.y;
+    p.to = undefined;
     this.s.notice(p, 'You were wedged somewhere you could not move, so the world nudged you free.');
   }
 

@@ -40,10 +40,28 @@ export function tileTaken(among: Among | undefined, tile: TileSpot, floor: numbe
   return false;
 }
 
-/** The way to step for an input, from a tile: straight on, else (for a diagonal) along one side of it; undefined when nothing is open. */
+/**
+ * The way to step for an input, from a tile: straight on; for a diagonal
+ * blocked by the land, along one side of it (sliding along a wall); and when
+ * someone stands in the way, round them by the nearest way that turns least
+ * (an eighth of a turn), so a held key never walks into a creature forever.
+ */
 function chooseWay(map: RegionMap, from: TileSpot, want: StepWay, floor: number, among?: Among): StepWay | undefined {
-  const tries: StepWay[] = isDiagonal(want) ? [want, { dx: want.dx, dy: 0 }, { dx: 0, dy: want.dy }] : [want];
-  return tries.find((w) => canStep(map, from, w, 1, floor) && !tileTaken(among, stepped(from, w), floor));
+  const land = (w: StepWay) => canStep(map, from, w, 1, floor);
+  const free = (w: StepWay) => !tileTaken(among, stepped(from, w), floor);
+  const slides: StepWay[] = isDiagonal(want) ? [{ dx: want.dx, dy: 0 }, { dx: 0, dy: want.dy }] : [];
+  if (land(want)) {
+    if (free(want)) return want;
+    const round = isDiagonal(want) ? slides : [turned(want, 1), turned(want, -1)];
+    return round.find((w) => land(w) && free(w));
+  }
+  return slides.find((w) => land(w) && free(w));
+}
+
+/** A way turned an eighth of a turn clockwise (1) or back (-1). */
+function turned(way: StepWay, by: 1 | -1): StepWay {
+  const a = Math.atan2(way.dy, way.dx) + (by * Math.PI) / 4;
+  return { dx: (Math.round(Math.cos(a)) || 0) as StepWay['dx'], dy: (Math.round(Math.sin(a)) || 0) as StepWay['dy'] };
 }
 
 /**
@@ -58,7 +76,8 @@ export function walkTiles(map: RegionMap, at: TileWalker, dx: number, dy: number
   if (pace <= 0) return at;
   let budget = speed * TICK_SECONDS * pace;
   let { x, y } = at;
-  let to = at.to;
+  // A step is never more than a diagonal long: one farther off was left behind by a jump (a teleport, unsticking), not walked.
+  let to = at.to && Math.hypot(at.to.tx + 0.5 - x, at.to.ty + 0.5 - y) <= 1.5 ? at.to : undefined;
   // At most a step to finish and one to start in a tick: steps are longer than a tick.
   for (let i = 0; i < 3 && budget > EPS; i++) {
     if (!to) {
@@ -88,6 +107,7 @@ export function walkTiles(map: RegionMap, at: TileWalker, dx: number, dy: number
     }
   }
   if (x === at.x && y === at.y && to === at.to) return at;
+  if (x === at.x && y === at.y && !to) return { x, y, floor: at.floor };
   return to ? { x, y, floor: at.floor, to } : { x, y, floor: at.floor };
 }
 

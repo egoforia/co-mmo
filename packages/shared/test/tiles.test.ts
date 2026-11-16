@@ -191,7 +191,8 @@ describe('walking on tiles', () => {
   });
 
   it('stops at a tile someone stands on or is stepping onto, unless it may pass them', () => {
-    const map = land();
+    // Trees either side, so there is no way round.
+    const map = land(8, 8, [[2, 0], [2, 2]]);
     const other: HitBody = { x: 2.5, y: 1.5, floor: 0, r: PERSON_RADIUS, kind: 'player' };
     const among = { self: { r: PERSON_RADIUS, kind: 'player' as const, floor: 0 }, bodies: bodyList([other]) };
     const still: TileWalker = { x: 1.5, y: 1.5, floor: 0 };
@@ -200,5 +201,12 @@ describe('walking on tiles', () => {
     // Someone halfway into the next tile holds it, and so does someone just setting off for it.
     const coming: HitBody = { x: 3.4, y: 1.5, floor: 0, r: PERSON_RADIUS, kind: 'player', to: at(2, 1) };
     expect(walkTiles(map, still, 1, 0, 1, { ...among, bodies: bodyList([coming]) })).toBe(still);
+  });
+
+  it('goes round someone in the way by the nearest way that turns least', () => {
+    const map = land(8, 8, [[2, 0]]);
+    const other: HitBody = { x: 2.5, y: 1.5, floor: 0, r: PERSON_RADIUS, kind: 'creature' };
+    const among = { self: { r: PERSON_RADIUS, kind: 'player' as const, floor: 0 }, bodies: bodyList([other]) };
+    expect(walkTiles(map, { x: 1.5, y: 1.5, floor: 0 }, 1, 0, 1, among).to).toEqual(at(2, 2));
   });
 });

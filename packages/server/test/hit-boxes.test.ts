@@ -78,29 +78,34 @@ describe('hit boxes', () => {
   it('stops a player walking into a creature or another player', () => {
     CREATURES['test-biter'] = { ...BITER, behavior: 'wander', speed: 0 };
     const { region, ticks } = setup();
-    const at = openSpot(region.map, region, 4);
+    const spot = openSpot(region.map, region, 4);
+    // On a tile's middle, as everyone stands on tiles.
+    const at = { x: spot.x + 0.5, y: spot.y + 0.5 };
     region.join(info('a'), conn(), none, newCharacter());
     region.join(info('b'), conn(), none, newCharacter());
     region.placePlayer('a', at.x, at.y);
-    region.placePlayer('b', at.x + 1.5, at.y);
+    region.placePlayer('b', at.x + 1, at.y);
     let seq = 0;
-    const walk = (id: string, n: number) => {
+    /** Walks east n ticks and says how near it ever came to `o`, middle to middle. */
+    const walk = (id: string, n: number, o: () => { x: number; y: number }) => {
+      let least = Infinity;
       for (let i = 0; i < n; i++) {
         region.handle(id, { t: 'input', seq: ++seq, dx: 1, dy: 0 });
         ticks(1);
+        const me = region.position(id)!;
+        least = Math.min(least, Math.hypot(me.x - o().x, me.y - o().y));
       }
+      return least;
     };
-    walk('a', 20);
-    // Stopped a tile short of the other player (egoforia, 2026-11-16: players block players).
-    expect(region.position('a')!.x).toBeLessThan(at.x + 1.5);
+    // Never through the other player (egoforia, 2026-11-16: players block players), but round them.
+    const b = region.position('b')!;
+    expect(walk('a', 30, () => b)).toBeGreaterThanOrEqual(PERSON_RADIUS * 2 - 1e-3);
+    expect(region.position('a')!.x).toBeGreaterThan(b.x);
 
     region.placePlayer('a', at.x, at.y + 2);
-    region.addCreatures('test-biter', [{ x: at.x + 1.5, y: at.y + 2 }]);
+    region.addCreatures('test-biter', [{ x: at.x + 1, y: at.y + 2 }]);
     const c = region.creature('test-biter-0')!;
-    walk('a', 20);
-    const me = region.position('a')!;
-    expect(Math.hypot(me.x - c.x, me.y - c.y)).toBeGreaterThanOrEqual(PERSON_RADIUS + creatureRadius() - 1e-3);
-    expect(me.x).toBeLessThan(c.x);
+    expect(walk('a', 30, () => c)).toBeGreaterThanOrEqual(PERSON_RADIUS + creatureRadius() - 1e-3);
   });
 
   it('a person steps out of the way of a player who walks into them', () => {

@@ -124,7 +124,8 @@ describe('Region', () => {
       region.tick();
       const now = region.npc('sister-amala')!;
       moved = Math.max(moved, Math.hypot(now.x - amala.home.x, now.y - amala.home.y));
-      expect(moved).toBeLessThanOrEqual(2.5 + 1e-9);
+      // Within the stroll radius, give or take one step aside when someone stands on their tile.
+      expect(moved).toBeLessThanOrEqual(2.5 + Math.SQRT2 + 1e-9);
       expect(collides(region.map, now.x, now.y)).toBe(false);
     }
     expect(moved).toBeGreaterThan(0.5);

@@ -173,9 +173,11 @@ export function keepStepping(map: RegionMap, w: Stepper, before: Spot, speed: nu
  * Steps off a square someone else holds (several put on one spot, someone
  * arriving on top of it) onto a free one beside it, so nobody stays stacked
  * on another. Creatures and people do it every tick; players are only ever
- * stopped, never pushed.
+ * stopped, never pushed. Given `keep` (where a person strolls about), the
+ * ways that stay nearest it come first, so being made to step aside does
+ * not walk them off from their spot.
  */
-export function standClear(map: RegionMap, w: Stepper, speed: number, among: Among, random: () => number): void {
+export function standClear(map: RegionMap, w: Stepper, speed: number, among: Among, random: () => number, keep?: Spot): void {
   if (w.to) return;
   const width = w.width ?? 1;
   const from = anchorNear(w.x, w.y, width);
@@ -183,6 +185,10 @@ export function standClear(map: RegionMap, w: Stepper, speed: number, among: Amo
   // Straight ways first, from a random one, so a crowd parts every way.
   const turn = Math.floor(random() * 4);
   const ways = [0, 1, 2, 3].map((i) => STEP_WAYS[(i + turn) % 4]!).concat(STEP_WAYS.slice(4));
+  if (keep) {
+    const off = (wy: StepWay) => Math.hypot(w.x + wy.dx - keep.x, w.y + wy.dy - keep.y);
+    ways.sort((a, b) => off(a) - off(b));
+  }
   const way = ways.find((wy) => canTread(map, w, from, wy, among));
   if (!way) return;
   let once = true;
@@ -248,10 +254,12 @@ export function wander(map: RegionMap, w: Walker, speed: number, radius: number,
     for (let tries = 0; tries < 5 && !w.target; tries++) {
       const angle = random() * Math.PI * 2;
       const dist = 1 + random() * Math.max(0, radius - 1);
-      const t = { x: around.x + Math.cos(angle) * dist, y: around.y + Math.sin(angle) * dist };
       const width = w.width ?? 1;
-      const at = anchorNear(t.x, t.y, width);
-      if (!outsideSide(map, t.x, t.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = t;
+      const at = anchorNear(around.x + Math.cos(angle) * dist, around.y + Math.sin(angle) * dist, width);
+      // Walkers stop on tile middles, so the spot is the tile's middle, and that must be inside the radius too.
+      const t = spotMiddle(at, width);
+      const near = Math.hypot(t.x - around.x, t.y - around.y) <= radius;
+      if (near && !outsideSide(map, t.x, t.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = t;
     }
     if (!w.target) w.rest = TICK_RATE;
     return;

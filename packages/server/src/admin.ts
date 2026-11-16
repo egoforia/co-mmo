@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
+  combatRules,
   ITEMS,
   TURNED,
   WishError,
@@ -851,6 +852,21 @@ export async function handleAdmin(
     // A raised limit lets what was held back be painted now.
     ctx.resumeArt?.();
     return json(res, 200, { ok: true }), true;
+  }
+
+  // Combat page (Owner): how fights play, for every region.
+  if (route === 'combat' && method === 'GET') {
+    if (ownerOnly()) return true;
+    return json(res, 200, { rules: ctx.world.combatRules }), true;
+  }
+
+  if (route === 'combat' && method === 'PUT') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const rules = combatRules({ ...ctx.world.combatRules, ...(body?.bodiesBlockShots === undefined ? {} : { bodiesBlockShots: body.bodiesBlockShots === true }) });
+    store.updateSettings({ ...store.settings, combat: rules });
+    ctx.world.combatRules = rules;
+    return json(res, 200, { ok: true, rules }), true;
   }
 
   // API Log (Owner): every request sent to an outside service, filtered.

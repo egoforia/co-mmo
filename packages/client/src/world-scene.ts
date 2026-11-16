@@ -31,6 +31,7 @@ import {
   type Weather,
   type WelcomeMessage,
   type WorldEdit,
+  type WorldMark,
 } from '@co-mmo/shared';
 import { HouseArt } from './kit-house-view.ts';
 import { monsterHomeUnder } from './world-scene/pick.ts';
@@ -61,6 +62,7 @@ import {
   walkAvatar,
 } from './world-scene/avatars.ts';
 import { Marks } from './world-scene/marks.ts';
+import { aimMarks } from './world-scene/aim.ts';
 import { setStatusIcons } from './world-scene/status-icons.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
 import { Targeting } from './world-scene/targeting.ts';
@@ -149,6 +151,10 @@ export class WorldScene extends Phaser.Scene {
   private origin = { x: 0, y: 0 };
   /** What skills left nearby: traps, Echoes, a spirit hawk, a sand double. */
   private marks?: Marks;
+  /** The skill whose key is pointed at, whose tiles we show (world-scene/aim.ts). */
+  private aiming?: string;
+  /** The way we last walked, for aiming a cone or line with nothing chosen. */
+  private facing = { dx: 1, dy: 0 };
   /** The regions drawn around us, by id. */
   private drawn = new Map<string, DrawnRegion>();
   /** Kit art painted since the land was last drawn. */
@@ -459,8 +465,8 @@ export class WorldScene extends Phaser.Scene {
     // Slowed, Rooted or Stunned: predict our steps at the pace the server allows.
     this.predictor.pace = paceFor((snapshot.statuses ?? []).map((s) => s.id));
     // Creatures stand in our way as they stand in the server's (hit-boxes.ts).
-    this.predictor.bodies = bodiesSeen(snapshot.creatures);
-    this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor });
+    this.predictor.bodies = bodiesSeen(snapshot.creatures, snapshot.players);
+    this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor, ...(snapshot.to ? { to: snapshot.to } : {}) });
     // On the server's time: when it was sent, not when it happened to arrive.
     const shift = this.clock.arrived(snapshot.tick, performance.now());
     if (shift) for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) for (const r of group.values()) r.interp.rebase(shift);
@@ -490,7 +496,7 @@ export class WorldScene extends Phaser.Scene {
     }
     setStatusIcons(this, this.me, (snapshot.statuses ?? []).map((s) => s.id));
     this.marks ??= new Marks(this);
-    this.marks.sync(snapshot.marks, (x, y, floor) => {
+    this.marks.sync([...(snapshot.marks ?? []), ...this.aimed(snapshot.creatures ?? [])], (x, y, floor) => {
       const at = PROJECTION.toScreen(this.origin.x + x, this.origin.y + y);
       return { x: at.x, y: at.y - floorLift(floor), depth: floorDepthOffset(floor) + PROJECTION.depth(this.origin.x + x, this.origin.y + y) };
     });
@@ -500,6 +506,21 @@ export class WorldScene extends Phaser.Scene {
     syncAvatars(this, this.bodies, bodies, at, (b) => makeBody(this, this.metrics, b), kept);
     for (const b of bodies) this.bodies.get(b.id)?.label.setText(bodyLabel(b));
     this.targeting.refresh((id) => this.creatures.get(id) ?? this.remotes.get(id));
+  }
+
+  /** Shows the tiles a skill would cover while its key is pointed at; none to stop. */
+  aim(ability: string | undefined): void {
+    this.aiming = ability;
+  }
+
+  /** The marks for the skill being aimed, from where we stand toward whom we chose (or the nearest creature). */
+  private aimed(creatures: { id: string; x: number; y: number }[]): WorldMark[] {
+    if (!this.aiming || !this.predictor) return [];
+    const me = this.predictor.position;
+    const chosen = this.target ? creatures.find((c) => c.id === this.target) : undefined;
+    let nearest: { x: number; y: number } | undefined;
+    for (const c of creatures) if (!nearest || Math.hypot(c.x - me.x, c.y - me.y) < Math.hypot(nearest.x - me.x, nearest.y - me.y)) nearest = c;
+    return aimMarks(this.map, { ability: this.aiming, me, facing: this.facing, ...(chosen ? { target: chosen } : {}), ...(nearest ? { nearest } : {}) });
   }
 
   /** The creature or player we chose, sent with attacks and abilities; the server checks the range. */
@@ -538,14 +559,20 @@ export class WorldScene extends Phaser.Scene {
     while (this.accumulator >= TICK_SECONDS) {
       this.accumulator -= TICK_SECONDS;
       const { dx, dy } = this.readInput();
-      if (dx !== 0 || dy !== 0) {
+      // On tiles a step once begun is finished, so the server hears every tick of it, key held or not.
+      if (dx !== 0 || dy !== 0 || predictor.stepping) {
         const step = PROJECTION.inputToWorld(dx, dy);
+        if (dx !== 0 || dy !== 0) this.facing = { dx: step.dx, dy: step.dy };
         const input = predictor.apply(step.dx, step.dy);
         this.options.send({ t: 'input', ...input });
       }
     }
     const held = this.readInput();
-    walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
+    // A step finishing after the key was let go still walks, the way it goes.
+    const to = predictor.position.to;
+    const going = !held.dx && !held.dy && to ? { dx: to.tx + 0.5 - predictor.position.x, dy: to.ty + 0.5 - predictor.position.y } : undefined;
+    if (going) walkAvatar(this, this.metrics, this.me, going, { dx: 1, dy: 0 });
+    else walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);

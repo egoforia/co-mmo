@@ -7,6 +7,8 @@ export * from './movement.ts';
 export * from './edge-walls.ts';
 export * from './floors.ts';
 export * from './hit-boxes.ts';
+export * from './tiles.ts';
+export * from './combat-rules.ts';
 export * from './names.ts';
 export * from './prediction.ts';
 export * from './snapshot-clock.ts';

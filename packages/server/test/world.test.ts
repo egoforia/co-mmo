@@ -72,14 +72,15 @@ describe('World', () => {
     // A row open on both sides of the Sanctum's west edge, away from the road.
     let y = 2;
     while (collides(home.map, 0.5, y) || collides(woods.map, entry.x, y) || collides(woods.map, woods.map.width - 0.5, y) || Math.abs(y - entry.y) < 3) y++;
-    world.join(info('a', 'Mara'), fakeConn(), { regionId: 'sanctum', x: 0.5, y }, newCharacter());
+    // Standing on a tile's middle, as everyone does on tiles.
+    world.join(info('a', 'Mara'), fakeConn(), { regionId: 'sanctum', x: 0.5, y: y + 0.5 }, newCharacter());
     for (let seq = 1; seq <= 10 && world.regionOf('a') === home; seq++) {
       world.handle('a', { t: 'input', seq, dx: -1, dy: 0 });
       world.tick();
     }
     expect(world.regionOf('a')).toBe(woods);
     const at = woods.position('a')!;
-    expect(at.y).toBe(y);
+    expect(at.y).toBe(y + 0.5);
     expect(at.x).toBeGreaterThan(woods.map.width - 1);
   });
 
@@ -87,17 +88,17 @@ describe('World', () => {
     const world = new World();
     const home = world.home;
     const west = home.map.entries.west!;
-    world.join(info('a', 'Mara'), fakeConn(), { regionId: 'sanctum', x: 0.3, y: west.y }, newCharacter());
+    world.join(info('a', 'Mara'), fakeConn(), { regionId: 'sanctum', x: 0.5, y: Math.floor(west.y) + 0.5 }, newCharacter());
     // Six steps queued at once: the first crosses, the rest follow in the Woods.
     for (let seq = 1; seq <= 6; seq++) world.handle('a', { t: 'input', seq, dx: -1, dy: 0 });
     for (let i = 0; i < 4; i++) world.tick();
     const woods = world.region('woods')!;
     expect(world.regionOf('a')).toBe(woods);
     const steps = PLAYER_SPEED * TICK_SECONDS * 6;
-    expect(woods.position('a')!.x).toBeCloseTo(0.3 + woods.map.width - steps, 5);
+    expect(woods.position('a')!.x).toBeCloseTo(0.5 + woods.map.width - steps, 5);
     world.handle('a', { t: 'input', seq: 3, dx: -1, dy: 0 });
     world.tick();
-    expect(woods.position('a')!.x).toBeCloseTo(0.3 + woods.map.width - steps, 5);
+    expect(woods.position('a')!.x).toBeCloseTo(0.5 + woods.map.width - steps, 5);
   });
 
   it('counts everyone online and shares world chat across regions', () => {

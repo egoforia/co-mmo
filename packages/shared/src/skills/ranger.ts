@@ -9,7 +9,7 @@ export const RANGER_SKILLS: Record<string, AbilityDef> = {
   'aimed-shot': {
     name: 'Aimed Shot',
     description: 'A careful shot at a creature up to 7 steps away. It spends all your Focus, 15% stronger for each pip.',
-    effect: 'bolt', energy: 6, cooldown: 5, range: 7, base: 5, stat: 'agility', factor: 1.2,
+    effect: 'bolt', energy: 6, cooldown: 5, range: 7, base: 4, stat: 'agility', factor: 0.85,
     finisher: true, perPip: 0.15, weapon: true,
   },
   tumble: {
@@ -27,7 +27,7 @@ export const RANGER_SKILLS: Record<string, AbilityDef> = {
   volley: {
     name: 'Volley',
     description: 'Arrows rain within 2 steps of a creature up to 6 steps away (or around you), hitting everything there.',
-    effect: 'area', energy: 12, cooldown: 12, range: 6, base: 6, stat: 'agility', factor: 1.5,
+    effect: 'area', energy: 12, cooldown: 12, range: 6, base: 4, stat: 'agility', factor: 1.05,
     radius: 2, weapon: true,
   },
   'hawk-mark': {

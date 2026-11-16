@@ -21,6 +21,8 @@ export const ECHO_ART = 'fx-echo';
 export const TRAP_ART = 'fx-trap';
 /** The mark hanging over a Marked creature. */
 export const MARK_ART = 'fx-mark';
+/** The glowing marker on each tile a cone, line or area covers (tiles/shapes.ts), as it is aimed and as it lands. */
+export const TILE_MARKER_ART = 'fx-tile-marker';
 /** Hallowed ground, such as a Bellkeeper's Sanctuary. */
 export const HALLOWED_ART = 'fx-hallowed-ground';
 
@@ -33,7 +35,7 @@ export const SAND_DOUBLE_ART = 'sandstorm-double';
 export const HAWK_SKILL = 'call-companion';
 
 /** Every skill effect's art id, for painting and tests. */
-export const EFFECT_ARTS: readonly string[] = [...Object.values(THREAD_ART), BELL_ART, ECHO_ART, TRAP_ART, MARK_ART, HALLOWED_ART];
+export const EFFECT_ARTS: readonly string[] = [...Object.values(THREAD_ART), BELL_ART, ECHO_ART, TRAP_ART, MARK_ART, HALLOWED_ART, TILE_MARKER_ART];
 
 /** A status's icon, shown over name tags and in the HUD. */
 export function statusArt(id: StatusId): string {

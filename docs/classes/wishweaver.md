@@ -47,10 +47,10 @@ All Wishweaver damage is arcane, so Ward reduces it, not Armor.
 
 | Skill | Thread | Level | Effect | Energy | Cooldown | Range | Amount | What it does | Woven |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ember Bolt | Ember | 1 | bolt + Burning | 6 | 2.5 | 6 | 4 + Wit × 1.4 | Burns for 30% more over 3 s | The burn is doubled and spreads to one creature nearby |
-| Tide Lash | Tide | 2 | cone | 8 | 6 | 3 | 3 + Wit × 1.0 | Knocks creatures back 2 tiles and Slows them 30% for 3 s | Roots instead of slowing |
+| Ember Bolt | Ember | 1 | bolt + Burning | 6 | 4 | 6 | 3 + Wit × 0.65 | Burns for 30% more over 3 s | The burn is doubled and spreads to one creature nearby |
+| Tide Lash | Tide | 2 | cone | 8 | 6 | 3 | 2 + Wit × 0.7 | Knocks creatures back 2 tiles and Slows them 30% for 3 s | Roots instead of slowing |
 | Gale Step | Gale | 4 | blink | 8 | 10 | 5 | 2 + Wit × 0.5 | Blink to a spot, leaving a gust that hits creatures where you stood | Blink twice |
-| Chain Spark | Gale | 6 | bolt (chains) | 10 | 6 | 6 | 5 + Wit × 1.3 | Jumps to 3 creatures, 20% weaker each jump | Jumps to 6 |
+| Chain Spark | Gale | 6 | bolt (chains) | 10 | 6 | 6 | 4 + Wit × 0.9 | Jumps to 3 creatures, 20% weaker each jump | Jumps to 6 |
 | Wish Ward | Tide | 8 | shield | 12 | 15 | 6 | 10 + Wit × 2.0 | Shields you or an ally for 8 s | Shields every ally within 3 tiles of the target |
 
 Ember Bolt replaces Firebolt for Wishweavers; Firebolt stays as a common

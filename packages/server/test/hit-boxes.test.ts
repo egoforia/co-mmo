@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CREATURES, DEFAULT_SKY, PERSON_RADIUS, TICK_RATE, collides, creatureRadius, newCharacter, regionDef, type CreatureDef, type PlayerInfo, type RegionMap } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
-import { CREATURE_REACH } from '../src/creature-brain.ts';
+import { CREATURE_REACH, tilesTo } from '../src/creature-brain.ts';
 
 // Hit boxes on the server (shared hit-boxes.ts): creatures crowd round a
 // player without standing in one another, only so many reach them at once,
-// and players are stopped by creatures but walk through each other.
+// and players are stopped by creatures and by each other, on tiles.
 
 const conn = (): Connection => ({ send() {}, close() {} });
 const info = (id: string): PlayerInfo => ({ id, name: id, color: 0xffffff, role: 'player' });
@@ -64,43 +64,47 @@ describe('hit boxes', () => {
 
     const me = region.position('a')!;
     const them = region.creatureIds().filter((id) => id.startsWith('test-biter')).map((id) => region.creature(id)!);
-    const touch = creatureRadius() * 2;
-    for (let i = 0; i < them.length; i++) {
-      expect(Math.hypot(them[i]!.x - me.x, them[i]!.y - me.y)).toBeGreaterThanOrEqual(PERSON_RADIUS + creatureRadius() - 1e-3);
-      for (let j = i + 1; j < them.length; j++) expect(Math.hypot(them[i]!.x - them[j]!.x, them[i]!.y - them[j]!.y)).toBeGreaterThanOrEqual(touch - 1e-3);
-    }
-    const reaching = them.filter((c) => Math.hypot(c.x - me.x, c.y - me.y) <= CREATURE_REACH).length;
-    // They work round the crowd until the ring about the player is full (about seven), and the rest wait behind.
-    expect(reaching).toBeGreaterThanOrEqual(5);
+    // Everyone on a tile of their own (docs/combat.md, Moving on tiles): nobody on the player's, no two on one.
+    const held = new Set(them.map((c) => `${Math.floor(c.x)},${Math.floor(c.y)}`));
+    expect(held.size).toBe(them.length);
+    expect(held.has(`${Math.floor(me.x)},${Math.floor(me.y)}`)).toBe(false);
+    const reaching = them.filter((c) => tilesTo(c, me) <= CREATURE_REACH).length;
+    // They work round the crowd to the free tiles about the player, all eight of them, and the rest wait behind.
+    expect(reaching).toBeGreaterThanOrEqual(7);
     expect(reaching).toBeLessThanOrEqual(8);
   });
 
-  it('stops a player walking into a creature, but not into another player', () => {
+  it('stops a player walking into a creature or another player', () => {
     CREATURES['test-biter'] = { ...BITER, behavior: 'wander', speed: 0 };
     const { region, ticks } = setup();
-    const at = openSpot(region.map, region, 4);
+    const spot = openSpot(region.map, region, 4);
+    // On a tile's middle, as everyone stands on tiles.
+    const at = { x: spot.x + 0.5, y: spot.y + 0.5 };
     region.join(info('a'), conn(), none, newCharacter());
     region.join(info('b'), conn(), none, newCharacter());
     region.placePlayer('a', at.x, at.y);
-    region.placePlayer('b', at.x + 1.5, at.y);
+    region.placePlayer('b', at.x + 1, at.y);
     let seq = 0;
-    const walk = (id: string, n: number) => {
+    /** Walks east n ticks and says how near it ever came to `o`, middle to middle. */
+    const walk = (id: string, n: number, o: () => { x: number; y: number }) => {
+      let least = Infinity;
       for (let i = 0; i < n; i++) {
         region.handle(id, { t: 'input', seq: ++seq, dx: 1, dy: 0 });
         ticks(1);
+        const me = region.position(id)!;
+        least = Math.min(least, Math.hypot(me.x - o().x, me.y - o().y));
       }
+      return least;
     };
-    walk('a', 20);
-    // Walked right through the other player.
-    expect(region.position('a')!.x).toBeGreaterThan(at.x + 2);
+    // Never through the other player (egoforia, 2026-11-16: players block players), but round them.
+    const b = region.position('b')!;
+    expect(walk('a', 30, () => b)).toBeGreaterThanOrEqual(PERSON_RADIUS * 2 - 1e-3);
+    expect(region.position('a')!.x).toBeGreaterThan(b.x);
 
     region.placePlayer('a', at.x, at.y + 2);
-    region.addCreatures('test-biter', [{ x: at.x + 1.5, y: at.y + 2 }]);
+    region.addCreatures('test-biter', [{ x: at.x + 1, y: at.y + 2 }]);
     const c = region.creature('test-biter-0')!;
-    walk('a', 20);
-    const me = region.position('a')!;
-    expect(Math.hypot(me.x - c.x, me.y - c.y)).toBeGreaterThanOrEqual(PERSON_RADIUS + creatureRadius() - 1e-3);
-    expect(me.x).toBeLessThan(c.x);
+    expect(walk('a', 30, () => c)).toBeGreaterThanOrEqual(PERSON_RADIUS + creatureRadius() - 1e-3);
   });
 
   it('a person steps out of the way of a player who walks into them', () => {

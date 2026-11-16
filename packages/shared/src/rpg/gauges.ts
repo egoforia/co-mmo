@@ -25,6 +25,9 @@ export const MOMENTUM_FADE_MS = 6000;
 /** Focus grows one pip per this long standing still and unhit. */
 export const FOCUS_STEP_MS = 1000;
 
+/** Share of a creature's blow each Momentum pip turns aside: a Duelist in full flow takes a quarter less. */
+export const MOMENTUM_GUARD = 0.05;
+
 /** Extra crit chance per Focus pip. */
 export const FOCUS_CRIT = 0.05;
 

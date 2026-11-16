@@ -49,7 +49,7 @@ It gives each Calling a rhythm of its own on top of Energy.
 | Calling | Gauge | Fills when | Spent on |
 | --- | --- | --- | --- |
 | Warden | **Resolve** | You are hit or block (+1). Each pip also gives 2 Energy | Bulwark and other Warden skills; empties slowly out of combat |
-| Duelist | **Momentum** | Your hits land (+1, and 1 Energy each) | Finishers (Whirl, Execute); empties after 6 s without a hit |
+| Duelist | **Momentum** | Your hits land (+1, and 1 Energy each); each pip turns aside 5% of a creature's blow | Finishers (Whirl, Execute); empties after 6 s without a hit |
 | Ranger | **Focus** | You stand still and are not hit (+1 per second, and 1 Energy each); each pip is +5% crit | Aimed Shot and other big shots; moving or being hit empties it |
 | Wishweaver | **Weave** | You cast a spell of a different thread from your last one (+1) | At 3 pips your next spell is **Woven**: its effect is doubled |
 | Bellkeeper | **Echo** | Your heals leave an Echo on the ally (one pip per ally with an Echo) | Toll rings every Echo, repeating half of the heal that left it |

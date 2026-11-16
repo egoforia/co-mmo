@@ -1,4 +1,4 @@
-import { HALLOWED_ART, MARK_ART, ECHO_ART, BELL_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, STATUSES, THREAD_ART, TRAP_ART, statusArt, type CreatureSizeTier, type StatusId } from '@co-mmo/shared';
+import { TILE_MARKER_ART, HALLOWED_ART, MARK_ART, ECHO_ART, BELL_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, STATUSES, THREAD_ART, TRAP_ART, statusArt, type CreatureSizeTier, type StatusId } from '@co-mmo/shared';
 import type { KitAsset } from './kit.ts';
 
 // What skills show (build plan step 10): a burst for each Wishweaver thread
@@ -24,6 +24,7 @@ const EFFECTS: KitAsset[] = [
   effect(ECHO_ART, 'Echo', { silhouetteHook: 'one faint ring of pale gold light with a tiny bell glyph floating in its middle', body: 'a thin hovering halo, mostly empty in the middle, nothing else', colors: { main: 'pale gold', secondary: 'cream', accent: 'soft rose' }, mood: 'gentle, waiting' }),
   effect(TRAP_ART, 'Trap', { silhouetteHook: 'a ring of sharpened stakes and a coiled snare lying flat on the ground', body: 'low flat trap seen from above at an angle, as wide as a tile', colors: { main: 'weathered wood', secondary: 'iron grey', accent: 'ochre rope' }, mood: 'hidden, ready' }),
   effect(MARK_ART, 'Hunter\'s mark', { silhouetteHook: 'a small hovering diamond-shaped hunting sigil with a feather at its tip', body: 'a flat sigil that floats above a head, nothing else', colors: { main: 'falcon yellow', secondary: 'rust red', accent: 'cream feather' }, mood: 'keen, warning' }),
+  effect(TILE_MARKER_ART, 'Tile marker', { silhouetteHook: 'one flat diamond-shaped floor tile of soft glowing light, seen from above at the isometric angle, its four edges a little brighter than its middle', body: 'a single thin glowing outline lying flat on the ground, exactly one tile, mostly see-through in the middle, nothing else', colors: { main: 'pale gold', secondary: 'warm cream', accent: 'soft rose glow' }, mood: 'clear, warning' }),
   effect(HALLOWED_ART, 'Hallowed ground', { silhouetteHook: 'a flat round circle of pale light on the ground with bell glyphs around its rim', body: 'a ring lying flat on the ground seen from above at an angle, about three tiles across, mostly empty inside', colors: { main: 'pale gold', secondary: 'cream', accent: 'soft rose' }, mood: 'holy, safe' }),
 ];
 

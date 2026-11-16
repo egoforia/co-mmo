@@ -16,7 +16,8 @@ import {
   itemCount,
   maxHp,
   regionDef,
-  step,
+  walkOn,
+  type Placed,
   type BodyState,
   type Character,
   type ClientMessage,
@@ -68,6 +69,9 @@ export class Bot {
   x = 0;
   y = 0;
   snapshot: SnapshotMessage | undefined;
+  /** The floor it stands on, and the tile it is stepping onto while it steps (tiles/walker.ts). */
+  floor = 0;
+  stepping: { tx: number; ty: number } | undefined;
   /** Why the server closed the connection, once it has. */
   closed: string | null = null;
   private seq = 0;
@@ -98,9 +102,11 @@ export class Bot {
   }
 
   /** Where the bot will be once the server applies the steps it has sent. */
-  get at(): Point {
-    let p: Point = { x: this.x, y: this.y };
-    for (const input of this.pending) p = step(this.map, p, input.dx, input.dy);
+  get at(): Placed {
+    // Players walk on tiles: replay from the step the server says is under way (tiles/walker.ts).
+    const to = this.stepping;
+    let p: Placed = { x: this.x, y: this.y, floor: this.floor, ...(to ? { to } : {}) };
+    for (const input of this.pending) p = walkOn(this.map, p, input.dx, input.dy);
     return p;
   }
 
@@ -131,7 +137,10 @@ export class Bot {
   /** Waits for the next snapshot (or a close); false when none came. */
   async tick(ms = 2000): Promise<boolean> {
     const since = this.mark();
-    return Boolean(await this.until(() => this.closed !== null || this.log.slice(since).some((m) => m.t === 'snapshot'), ms));
+    const got = Boolean(await this.until(() => this.closed !== null || this.log.slice(since).some((m) => m.t === 'snapshot'), ms));
+    // A step once begun is finished on tiles, as the browser does: keep the server hearing every tick of it.
+    if (got && !this.closed && this.pending.length === 0 && this.at.to) this.input(0, 0);
+    return got;
   }
 
   /** Sends a message and waits for the answer it should bring. */
@@ -379,6 +388,8 @@ export class Bot {
     this.log.push(m);
     switch (m.t) {
       case 'welcome':
+        this.floor = m.floor ?? 0;
+        this.stepping = undefined;
         this.you = m.you;
         this.region = m.region;
         this.map = generateRegion(m.region.def);
@@ -394,6 +405,8 @@ export class Bot {
         this.snapshot = m;
         this.x = m.x;
         this.y = m.y;
+        this.floor = m.floor ?? 0;
+        this.stepping = m.to;
         this.pending = this.pending.filter((p) => p.seq > m.ack);
         if (m.hp > maxHp(this.character) + 0.001 || m.hp < 0) this.problems.push(`${this.name}'s health read ${m.hp}, outside 0 to ${maxHp(this.character)}.`);
         break;

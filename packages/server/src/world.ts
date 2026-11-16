@@ -1,4 +1,6 @@
 import {
+  DEFAULT_COMBAT_RULES,
+  type CombatRules,
   CREATOR_LEVEL_FAVOR,
   CREATOR_REPEAT_MS,
   CREATOR_XP,
@@ -109,6 +111,8 @@ export class World {
   seeAcross = true;
   /** How regions thin their snapshots out (region/far.ts), from the game's network choices; as before when unset. */
   tuning: SnapshotTuning = STEADY;
+  /** The Owner's combat rules (God's View, Combat page), for every region here and on region servers. */
+  private combat: CombatRules = DEFAULT_COMBAT_RULES;
   /** Players per cell before a region splits; a tuning value. */
   cellPlayers = CELL_PLAYERS;
   /** Regions being split or joined up right now. */
@@ -205,7 +209,17 @@ export class World {
       const members = this.parties.members(id);
       if (members.length > 1) parties[id] = members;
     }
-    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky, borders: this.bordering(), tuning: this.tuning };
+    return { defs: this.defs(), online: this.where.size, parties, sky: this.sky, borders: this.bordering(), tuning: this.tuning, combat: this.combat };
+  }
+
+  /** The Owner's combat rules now, and new ones for every region (God's View, Combat page). */
+  get combatRules(): CombatRules {
+    return this.combat;
+  }
+
+  set combatRules(rules: CombatRules) {
+    this.combat = rules;
+    this.stateChanged();
   }
 
   /** Regions with someone in a region beside them, corners too: those whose edges are worth showing. */
@@ -758,6 +772,7 @@ export class World {
         if (!(unit instanceof Region)) continue;
         unit.strain = strain;
         unit.tuning = this.tuning;
+        unit.combatRules = this.combat;
       }
       for (const departure of region.tick()) this.depart(region, departure);
     }

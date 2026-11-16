@@ -44,6 +44,8 @@ const $ = (id: string) => document.getElementById(id)!;
 
 export interface KitActions {
   ability(id: string): void;
+  /** Pointing at a skill's key shows the tiles it would cover; none when the pointer leaves. */
+  aim?(id: string | undefined): void;
   /** Arrange keys 1 to 6: an ability id per key, or '' for none. */
   hotbar(slots: string[]): void;
   /** Make a recipe; `lean` is which of the maker's people's two lifted attributes gets the larger share. */
@@ -89,6 +91,10 @@ export class KitUi {
       (e.target as HTMLElement).closest('button')?.blur();
       if (id) this.use(id);
     });
+    $('abilities').addEventListener('pointerover', (e) => {
+      actions.aim?.((e.target as HTMLElement).closest<HTMLElement>('[data-ability]')?.dataset.ability);
+    });
+    $('abilities').addEventListener('pointerleave', () => actions.aim?.(undefined));
     $('keys').addEventListener('click', (e) => {
       const open = (e.target as HTMLElement).closest<HTMLElement>('[data-open]')?.dataset.open;
       if (open === 'crafting') this.toggleCrafting(true);

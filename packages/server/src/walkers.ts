@@ -1,17 +1,28 @@
-import { TICK_RATE, TICK_SECONDS, collides, wallBetween, pushOut, roomFor, type Among, isBlocking, outsideSide, stairsMiddle, stairsToward, stairwayAt, takeStairs, tileAt, type Placed, type RegionMap, type Tile } from '@co-mmo/shared';
+import { STEP_WAYS, TICK_RATE, TICK_SECONDS, anchorNear, canStep, collides, findTileRoute, openSquare, spotMiddle, stairsMiddle, stairsToward, stairwayAt, stepped, takeStairs, tileTaken, wallBetween, isBlocking, outsideSide, tileAt, type Among, type Placed, type RegionMap, type StepWay, type Tile, type TileSpot } from '@co-mmo/shared';
 
 // How creatures and people move about a region: stepping toward a point,
 // strolling near a spot, running from someone, and finding a way around
 // walls and trees to somewhere farther off. The region decides where each
 // wants to go (creature-brain.ts, townsfolk.ts); this only moves them there.
-// Each walker keeps to its floor (floors.ts) and takes stairs only on purpose,
-// when somewhere it is going is on another floor (goTo). Given `among`, the
-// bodies about it (hit-boxes.ts), it never walks into anyone: blocked by
-// someone, it steps round them, so a crowd closing on a player spreads about
-// them instead of piling onto one spot.
+// Everyone walks on tiles (docs/combat.md, Moving on tiles): a walker stands
+// on a square of tiles `width` wide and steps one tile at a time in one of
+// eight ways, and a step once begun is always finished. Each walker keeps to
+// its floor (floors.ts) and takes stairs only on purpose, when somewhere it is
+// going is on another floor (goTo). Given `among`, the bodies about it
+// (hit-boxes.ts), it never steps onto a tile someone else holds: blocked, it
+// steps round them, so a crowd closing on a player spreads about them.
 
 /** A point, on the ground floor unless it says. */
 type Spot = { x: number; y: number; floor?: number };
+
+/** Something that walks on tiles: where it is, how wide it stands, and the tile it is stepping onto. */
+export type Stepper = Spot & { to?: TileSpot; width?: number; detour?: Detour };
+
+/** The way round something in the way to a square, kept while it is walked so the walker does not turn back halfway. */
+interface Detour {
+  to: TileSpot;
+  ways: StepWay[];
+}
 
 /** Anything that strolls about a home spot: creatures and NPCs. */
 export interface Walker {
@@ -19,6 +30,12 @@ export interface Walker {
   y: number;
   /** The floor it is on (floors.ts). */
   floor: number;
+  /** The square it is stepping onto, while it steps (tiles/walker.ts). */
+  to?: TileSpot;
+  /** How many tiles wide it stands (tiles/grid.ts SIZE_TILES); one when missing. */
+  width?: number;
+  /** The way it is following round a wall or a crowd, if any. */
+  detour?: Detour;
   home: Placed;
   /** Where it is strolling to. */
   target: Spot | null;
@@ -26,81 +43,150 @@ export interface Walker {
   rest: number;
 }
 
-/** Turns tried, either way and in this order, to step round someone in the way (radians). */
-const SIDESTEPS = [0.6, 1.2, 1.7];
+const EPS = 1e-6;
+/** Squares a walker searches round something in the way before it gives up on a step (a short search: hundreds walk each tick). */
+const DETOUR_LIMIT = 400;
 
-/** Steps toward a point, sliding along walls and round anyone in the way. True once it arrives. */
-export function moveToward(map: RegionMap, w: Spot, tx: number, ty: number, speed: number, among?: Among): boolean {
-  const dx = tx - w.x;
-  const dy = ty - w.y;
-  const dist = Math.hypot(dx, dy);
-  const len = speed * TICK_SECONDS;
+const sameTile = (a: TileSpot, b: TileSpot) => a.tx === b.tx && a.ty === b.ty;
+
+/** True when a walker's square stays inside the region. */
+function inside(map: RegionMap, at: TileSpot, width: number): boolean {
+  return at.tx >= 0 && at.ty >= 0 && at.tx + width <= map.width && at.ty + width <= map.height;
+}
+
+/** True when a walker may step `way` from `from`: the land lets it, it stays inside, and nobody holds the square. */
+function canTread(map: RegionMap, w: Stepper, from: TileSpot, way: StepWay, among?: Among): boolean {
+  const width = w.width ?? 1;
   const floor = w.floor ?? 0;
-  const free = (x: number, y: number) => !collides(map, x, y, floor) && (!among || roomFor(among.self, w, { x, y }, among.bodies));
-  if (dist <= len) {
-    if (free(tx, ty)) {
-      w.x = tx;
-      w.y = ty;
-    }
-    return true;
-  }
-  const ux = dx / dist;
-  const uy = dy / dist;
-  const nx = w.x + ux * len;
-  const ny = w.y + uy * len;
-  if (free(nx, ny)) {
-    w.x = nx;
-    w.y = ny;
-    return false;
-  }
-  const before = { x: w.x, y: w.y };
-  if (free(nx, w.y)) w.x = nx;
-  if (free(w.x, ny)) w.y = ny;
-  if (among && w.x === before.x && w.y === before.y) sidestep(w, ux, uy, len, free, (x, y) => Math.hypot(tx - x, ty - y));
-  return false;
+  const next = stepped(from, way);
+  return inside(map, next, width) && canStep(map, from, way, width, floor) && !tileTaken(among, next, floor, width);
 }
 
 /**
- * Someone stands in the way of a step along (ux, uy): step round them instead,
- * turning as little as will do, to whichever side `worse` scores lower.
+ * Moves a walker along tiles for one tick at `speed` tiles a second: finishes
+ * the step it is taking, then starts the steps `pick` chooses from each tile
+ * it arrives at, until the tick's walk is used. One put off a tile's middle
+ * (a spawn, a landing) first settles onto the square it stands on.
+ * `stopsAt` ends the walk on arriving at a tile (stairs it means to take).
  */
-function sidestep(w: Spot, ux: number, uy: number, len: number, free: (x: number, y: number) => boolean, worse: (x: number, y: number) => number): void {
-  for (const turn of SIDESTEPS) {
-    let best: Spot | undefined;
-    let bestScore = Infinity;
-    for (const a of [turn, -turn]) {
-      const sx = w.x + (ux * Math.cos(a) - uy * Math.sin(a)) * len;
-      const sy = w.y + (ux * Math.sin(a) + uy * Math.cos(a)) * len;
-      const score = worse(sx, sy);
-      if (score < bestScore && free(sx, sy)) {
-        best = { x: sx, y: sy };
-        bestScore = score;
+function tread(map: RegionMap, w: Stepper, speed: number, pick: (from: TileSpot) => StepWay | undefined, stopsAt?: (at: TileSpot) => boolean): void {
+  const width = w.width ?? 1;
+  let budget = speed * TICK_SECONDS;
+  // A step is never more than a diagonal long: one farther off was left behind by a jump (a respawn, stairs).
+  if (w.to) {
+    const goal = spotMiddle(w.to, width);
+    if (Math.hypot(goal.x - w.x, goal.y - w.y) > 1.5) delete w.to;
+  }
+  for (let i = 0; i < 3 && budget > EPS; i++) {
+    if (!w.to) {
+      const from = anchorNear(w.x, w.y, width);
+      const mid = spotMiddle(from, width);
+      if (Math.hypot(mid.x - w.x, mid.y - w.y) > EPS && openSquare(map, from, width, w.floor ?? 0)) w.to = from;
+      else {
+        const way = pick(from);
+        if (!way) break;
+        w.to = stepped(from, way);
       }
     }
-    if (best) {
-      w.x = best.x;
-      w.y = best.y;
-      return;
+    const goal = spotMiddle(w.to, width);
+    const left = Math.hypot(goal.x - w.x, goal.y - w.y);
+    if (left <= budget) {
+      budget -= left;
+      w.x = goal.x;
+      w.y = goal.y;
+      const at = w.to;
+      delete w.to;
+      if (stopsAt?.(at)) break;
+    } else {
+      w.x += ((goal.x - w.x) / left) * budget;
+      w.y += ((goal.y - w.y) / left) * budget;
+      budget = 0;
     }
   }
 }
 
 /**
- * Steps out of anyone it stands inside (several put on one spot, someone
- * arriving on top of it), a step's length at most each tick, so nobody stays
- * stacked on another. Creatures and people do it every tick; players are only
- * ever stopped, never pushed.
+ * The step to take from `from` toward a point: on a way round something
+ * that it is already following, the next step of it; else the free way that
+ * brings the walker nearest the point, as long as that is nearer than it
+ * stands; and when nothing nearer is free (a wall, someone in the way), the
+ * first step of a short search round it, which it then keeps to.
  */
-export function standClear(map: RegionMap, w: Spot, speed: number, among: Among, random: () => number): void {
-  const push = pushOut(among.self, w, among.bodies.near(w.x, w.y, among.self.r), random);
-  const len = Math.hypot(push.x, push.y);
-  if (len === 0) return;
-  const step = Math.min(len, speed * TICK_SECONDS);
-  const nx = w.x + (push.x / len) * step;
-  const ny = w.y + (push.y / len) * step;
+function wayToward(map: RegionMap, w: Stepper, from: TileSpot, goal: { x: number; y: number }, among?: Among): StepWay | undefined {
+  const width = w.width ?? 1;
+  const target = anchorNear(goal.x, goal.y, width);
+  const kept = w.detour;
+  if (kept && sameTile(kept.to, target) && kept.ways.length) {
+    const next = kept.ways.shift()!;
+    if (canTread(map, w, from, next, among)) return next;
+  }
+  delete w.detour;
+  const dist = (t: TileSpot) => {
+    const m = spotMiddle(t, width);
+    return Math.hypot(goal.x - m.x, goal.y - m.y);
+  };
+  let best: StepWay | undefined;
+  let bestD = dist(from) - EPS;
+  for (const way of STEP_WAYS) {
+    const d = dist(stepped(from, way));
+    if (d < bestD && canTread(map, w, from, way, among)) {
+      best = way;
+      bestD = d;
+    }
+  }
+  if (best) return best;
   const floor = w.floor ?? 0;
-  if (!outsideSide(map, nx, w.y) && !collides(map, nx, w.y, floor)) w.x = nx;
-  if (!outsideSide(map, w.x, ny) && !collides(map, w.x, ny, floor)) w.y = ny;
+  const route = findTileRoute(map, {
+    from, toward: target, width, floor, limit: DETOUR_LIMIT,
+    arrived: (t) => sameTile(t, target),
+    free: (t) => inside(map, t, width) && !tileTaken(among, t, floor, width),
+  });
+  const first = route?.shift();
+  if (!first || !canTread(map, w, from, first, among)) return undefined;
+  if (route!.length) w.detour = { to: target, ways: route! };
+  return first;
+}
+
+/** True when a walker stands still on the square nearest a point. */
+function standsAt(w: Stepper, x: number, y: number): boolean {
+  const width = w.width ?? 1;
+  const at = spotMiddle(anchorNear(x, y, width), width);
+  return !w.to && Math.abs(w.x - at.x) < EPS && Math.abs(w.y - at.y) < EPS;
+}
+
+/** Steps toward a point, tile by tile, round walls and anyone in the way. True once it stands on the square nearest it. */
+export function moveToward(map: RegionMap, w: Stepper, tx: number, ty: number, speed: number, among?: Among, stopsAt?: (at: TileSpot) => boolean): boolean {
+  if (standsAt(w, tx, ty)) return true;
+  tread(map, w, speed, (from) => wayToward(map, w, from, { x: tx, y: ty }, among), stopsAt);
+  return standsAt(w, tx, ty);
+}
+
+/**
+ * Finishes a step under way, for a walker that took no other step this tick
+ * (resting, talking, striking): a step once begun is always finished.
+ */
+export function keepStepping(map: RegionMap, w: Stepper, before: Spot, speed: number): void {
+  if (w.to && w.x === before.x && w.y === before.y) tread(map, w, speed, () => undefined);
+}
+
+/**
+ * Steps off a square someone else holds (several put on one spot, someone
+ * arriving on top of it) onto a free one beside it, so nobody stays stacked
+ * on another. Creatures and people do it every tick; players are only ever
+ * stopped, never pushed.
+ */
+export function standClear(map: RegionMap, w: Stepper, speed: number, among: Among, random: () => number): void {
+  if (w.to) return;
+  const width = w.width ?? 1;
+  const from = anchorNear(w.x, w.y, width);
+  if (!tileTaken(among, from, w.floor ?? 0, width)) return;
+  // Straight ways first, from a random one, so a crowd parts every way.
+  const turn = Math.floor(random() * 4);
+  const ways = [0, 1, 2, 3].map((i) => STEP_WAYS[(i + turn) % 4]!).concat(STEP_WAYS.slice(4));
+  const way = ways.find((wy) => canTread(map, w, from, wy, among));
+  if (!way) return;
+  let once = true;
+  tread(map, w, speed, () => (once ? ((once = false), way) : undefined));
 }
 
 /**
@@ -114,9 +200,18 @@ export function goTo(map: RegionMap, w: Walker, to: Placed, speed: number, climb
   const way = stairsToward(map, w, to.floor, climbs);
   if (!way) return false;
   const middle = stairsMiddle(way);
-  moveToward(map, w, middle.x, middle.y, speed, among);
   // Only the stairs it set out for: others it crosses on the way are walked over.
-  if (stairwayAt(map, w.x, w.y, w.floor) === way) Object.assign(w, takeStairs(map, w, climbs));
+  moveToward(map, w, middle.x, middle.y, speed, among, (t) => {
+    const m = spotMiddle(t, w.width ?? 1);
+    return stairwayAt(map, m.x, m.y, w.floor) === way;
+  });
+  if (!w.to && stairwayAt(map, w.x, w.y, w.floor) === way) {
+    const landed = takeStairs(map, w, climbs);
+    if (landed) {
+      Object.assign(w, landed);
+      delete w.to;
+    }
+  }
   return false;
 }
 
@@ -125,20 +220,25 @@ export function canReach(map: RegionMap, w: Placed, to: Placed, climbs = false):
   return w.floor === to.floor || Boolean(stairsToward(map, w, to.floor, climbs));
 }
 
-/** Steps straight away from a point, sliding along walls and staying inside the region. */
-export function moveAway(map: RegionMap, w: Spot, fx: number, fy: number, speed: number, among?: Among): void {
-  const dx = w.x - fx;
-  const dy = w.y - fy;
-  const dist = Math.hypot(dx, dy) || 1;
-  const len = speed * TICK_SECONDS;
-  const nx = w.x + (dx / dist) * len;
-  const ny = w.y + (dy / dist) * len;
-  const floor = w.floor ?? 0;
-  const free = (x: number, y: number) => !outsideSide(map, x, y) && !collides(map, x, y, floor) && (!among || roomFor(among.self, w, { x, y }, among.bodies));
-  const before = { x: w.x, y: w.y };
-  if (free(nx, w.y)) w.x = nx;
-  if (free(w.x, ny)) w.y = ny;
-  if (among && w.x === before.x && w.y === before.y) sidestep(w, dx / dist, dy / dist, len, free, (x, y) => -Math.hypot(x - fx, y - fy));
+/** Steps away from a point, tile by tile, staying inside the region; one with nowhere farther to go stands at bay. */
+export function moveAway(map: RegionMap, w: Stepper, fx: number, fy: number, speed: number, among?: Among): void {
+  const width = w.width ?? 1;
+  tread(map, w, speed, (from) => {
+    const dist = (t: TileSpot) => {
+      const m = spotMiddle(t, width);
+      return Math.hypot(m.x - fx, m.y - fy);
+    };
+    let best: StepWay | undefined;
+    let bestD = dist(from) + EPS;
+    for (const way of STEP_WAYS) {
+      const d = dist(stepped(from, way));
+      if (d > bestD && canTread(map, w, from, way, among)) {
+        best = way;
+        bestD = d;
+      }
+    }
+    return best;
+  });
 }
 
 /** Strolls between spots near `around` (home unless said), resting in between. */
@@ -149,7 +249,9 @@ export function wander(map: RegionMap, w: Walker, speed: number, radius: number,
       const angle = random() * Math.PI * 2;
       const dist = 1 + random() * Math.max(0, radius - 1);
       const t = { x: around.x + Math.cos(angle) * dist, y: around.y + Math.sin(angle) * dist };
-      if (!outsideSide(map, t.x, t.y) && !collides(map, t.x, t.y, w.floor)) w.target = t;
+      const width = w.width ?? 1;
+      const at = anchorNear(t.x, t.y, width);
+      if (!outsideSide(map, t.x, t.y) && inside(map, at, width) && openSquare(map, at, width, w.floor)) w.target = t;
     }
     if (!w.target) w.rest = TICK_RATE;
     return;
@@ -224,15 +326,16 @@ export function findPath(map: RegionMap, from: Spot, to: Spot, floor = from.floo
 }
 
 /**
- * Up to `count` walkable spots around a point, nearest first, at least a
- * tile apart, for placing wished things.
+ * Up to `count` walkable spots around a point, nearest first, each on a
+ * tile of its own (its middle), for placing wished things.
  */
 export function findSpots(map: RegionMap, x: number, y: number, count: number, min = 1.5, max = 4, floor = 0): Spot[] {
   const spots: Spot[] = [];
   for (let r = min; r <= max && spots.length < count; r += 0.75) {
     for (let a = 0; a < 12 && spots.length < count; a++) {
       const angle = (a / 12) * Math.PI * 2 + r;
-      const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
+      // On a tile's middle, as everything that walks stands on tiles.
+      const s = { x: Math.floor(x + Math.cos(angle) * r) + 0.5, y: Math.floor(y + Math.sin(angle) * r) + 0.5 };
       if (outsideSide(map, s.x, s.y) || collides(map, s.x, s.y, floor)) continue;
       if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
       spots.push(s);

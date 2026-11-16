@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CREATURE_HEIGHTS, ECHO_ART, EFFECT_ARTS, HALLOWED_ART, HAWK_SKILL, ISO_WAYS, RACES, RACE_IDS, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, STATUSES, TRAP_ART, statusArt, walkArt, type StatusId } from '@co-mmo/shared';
+import { CREATURE_HEIGHTS, ECHO_ART, EFFECT_ARTS, HALLOWED_ART, HAWK_SKILL, ISO_WAYS, RACES, RACE_IDS, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, STATUSES, TILE_MARKER_ART, TRAP_ART, statusArt, walkArt, type StatusId } from '@co-mmo/shared';
 import { ANCHORS } from '../src/assets/anchors.ts';
 import { GeminiImageProvider } from '../src/assets/gemini.ts';
 import { ProviderError } from '../src/assets/provider.ts';
@@ -134,18 +134,21 @@ describe('skill pictures (build plan step 10)', () => {
 });
 
 describe('what skills leave in the world', () => {
-  it('shows traps, hallowed ground, a sand double, the spirit hawk beside its friend, and Echoes on friends, until they go', () => {
+  it('shows traps, hallowed ground, a sand double, the spirit hawk beside its friend, Echoes on friends and the tiles a skill just covered, until they go', () => {
     const now = 1000;
     const player = (id: string, x: number, y: number, gauge?: unknown) => [id, { info: { id }, x, y, floor: 0, gauge }];
     const s = {
       traps: [{ owner: 'a', ability: 'snare', x: 1, y: 2, floor: 0, until: now + 5 }, { owner: 'a', ability: 'snare', x: 9, y: 9, floor: 0, until: now - 1 }],
       zones: [{ owner: 'b', x: 3, y: 3, floor: 1, until: now + 5 }],
+      // A cone's two tiles just now, and a line long gone.
+      shapes: [{ owner: 'a', tiles: [{ tx: 5, ty: 6 }, { tx: 6, ty: 6 }], floor: 0, until: now + 5 }, { owner: 'a', tiles: [{ tx: 1, ty: 1 }], floor: 0, until: now - 1 }],
       doubles: [{ owner: 'a', x: 4, y: 4, floor: 0, until: now + 5 }],
       helpers: [{ owner: 'a', ability: HAWK_SKILL, until: now + 5 }, { owner: 'a', ability: 'wished-wolf', until: now + 5 }],
       players: new Map([player('a', 10, 10), player('b', 20, 20, { echoes: [{ on: 'a', amount: 3, until: now + 5 }] })] as never),
     } as unknown as RegionState;
     const marks = worldMarks(s, now);
-    expect(marks.map((m) => m.asset).sort()).toEqual([ECHO_ART, HALLOWED_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TRAP_ART].sort());
+    expect(marks.map((m) => m.asset).sort()).toEqual([ECHO_ART, HALLOWED_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TILE_MARKER_ART, TILE_MARKER_ART, TRAP_ART].sort());
+    expect(marks.filter((m) => m.asset === TILE_MARKER_ART).map((m) => [m.x, m.y])).toEqual([[5.5, 6.5], [6.5, 6.5]]);
     expect(marks.find((m) => m.asset === ECHO_ART)).toMatchObject({ x: 10, y: 10 });
     expect(marks.find((m) => m.asset === HALLOWED_ART)).toMatchObject({ floor: 1 });
   });

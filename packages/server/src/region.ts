@@ -1,5 +1,8 @@
 import {
   CREATURES,
+  type CombatRules,
+  SIZE_TILES,
+  creatureSize,
   tunedCreature,
   type CreatureTune,
   energyPerSecond,
@@ -17,6 +20,7 @@ import {
   canSeeAcrossFloors,
   storeyAt,
   walkOn,
+  anchorNear,
   wayTaken,
   Tile,
   type BodyState,
@@ -247,6 +251,11 @@ export class Region {
   strain = 0;
   /** How snapshots are thinned out (region/far.ts): set by the world from the game's network choices. */
   tuning: SnapshotTuning = STEADY;
+
+  /** The Owner's combat rules (God's View, Combat page): the world sets them each tick. */
+  set combatRules(rules: CombatRules) {
+    this.s.combatRules = rules;
+  }
   readonly logger: CombatLogger = combatLogger;
   /** Measures the simulation phases of each tick. */
   readonly profiler = new TickProfiler();
@@ -584,13 +593,13 @@ export class Region {
   /** Moves a player, for tests and tools. */
   placePlayer(id: string, x: number, y: number, floor = 0): void {
     const p = this.s.players.get(id);
-    if (p) Object.assign(p, { x, y, floor });
+    if (p) Object.assign(p, { x, y, floor, to: undefined });
   }
 
   /** Moves a creature, for tests and (later) wishes. */
   placeCreature(id: string, x: number, y: number, floor = 0): void {
     const c = this.s.creatures.find((k) => k.id === id);
-    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined });
+    if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined, to: undefined });
   }
 
   /** The floor a creature or NPC is on, for tests and tools. */
@@ -763,7 +772,9 @@ export class Region {
             continue;
           }
           // Slowed walk slower; the Rooted and Stunned stay put (the browser predicts the same pace).
-          // Creatures stand in the way; people make way and players pass through (hit-boxes.ts).
+          // Players walk on tiles: creatures and other players stand in the way, party members let them by, people make way (hit-boxes.ts).
+          // The tile they stand on, or are stepping onto: a step begun from it may leave a fight.
+          const from = p.to ?? anchorNear(p.x, p.y);
           const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now), this.crowd.forPlayer(p));
           if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
           const len = Math.hypot(input.dx, input.dy);
@@ -773,7 +784,10 @@ export class Region {
           p.x = next.x;
           p.y = next.y;
           p.floor = next.floor;
+          p.to = next.to;
           p.ack = input.seq;
+          const onto = next.to ?? anchorNear(next.x, next.y);
+          if (onto.tx !== from.tx || onto.ty !== from.ty) this.minds.leaving(p, from, onto, now);
         }
         const side = outsideSide(this.map, p.x, p.y);
         const cell = this.cell;
@@ -870,7 +884,7 @@ export class Region {
         p.crowd = crowdOf(view, farEvery);
         const marks = allMarks.filter(near);
         p.conn.send({
-          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now),
+          t: 'snapshot', tick: this.s.tickCount, ack: p.ack, x: p.x, y: p.y, ...(p.floor ? { floor: p.floor } : {}), ...(p.to ? { to: p.to } : {}), hp: Math.ceil(p.character.hp), energy: Math.floor(p.character.energy), ...fallenFor(this.fallen.secondsLeft(p, now)), ...statusesFor(p, now),
           players: view.players, creatures: view.creatures, bodies: view.bodies, npcs: view.npcs, ...(view.kept.length ? { kept: view.kept } : {}), ...(marks.length ? { marks } : {}), online,
         });
         this.s.flush(p);
@@ -893,6 +907,7 @@ export class Region {
     if (!free) return;
     p.x = free.x;
     p.y = free.y;
+    p.to = undefined;
     this.s.notice(p, 'You were wedged somewhere you could not move, so the world nudged you free.');
   }
 
@@ -1112,6 +1127,7 @@ export class Region {
         x: cs.x,
         y: cs.y,
         floor: cs.floor ?? 0,
+        width: SIZE_TILES[creatureSize(cs.kind)],
         home: { ...cs.home },
         target: cs.target ? { ...cs.target } : null,
         rest: cs.rest ?? 0,

@@ -6,6 +6,7 @@ import {
   GAUGE_ENERGY,
   GAUGE_MAX,
   MOMENTUM_FADE_MS,
+  MOMENTUM_GUARD,
   POISONED_HEALING,
   RESOLVE_CALM_MS,
   RESOLVE_FADE_MS,
@@ -77,6 +78,12 @@ export class Gauges {
   /** The pips the player holds now. */
   pips(p: PlayerState): number {
     return this.of(p)?.pips ?? 0;
+  }
+
+  /** Share of a creature's blow the player's gauge turns aside: a Duelist's Momentum, 5% a pip. */
+  guard(p: PlayerState): number {
+    const g = this.of(p);
+    return g?.id === 'momentum' ? g.pips * MOMENTUM_GUARD : 0;
   }
 
   /** Adds pips (up to five) to the player's gauge if it is `only` (when given); each new pip gives its Energy. */

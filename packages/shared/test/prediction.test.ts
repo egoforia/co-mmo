@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Interpolator, Predictor, SnapshotClock, WORLD_REGIONS, generateRegion, step } from '../src/index.ts';
+import { Interpolator, Predictor, SnapshotClock, WORLD_REGIONS, generateRegion, walkOn, type Placed } from '../src/index.ts';
+
+/** One tick of walking on tiles, as the server and the browser both take it. */
+const step = (map: Parameters<typeof walkOn>[0], at: { x: number; y: number; floor?: number; to?: Placed['to'] }, dx: number, dy: number) => walkOn(map, { floor: 0, ...at }, dx, dy);
 
 describe('Predictor', () => {
   const map = generateRegion(WORLD_REGIONS[0]!);

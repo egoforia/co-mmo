@@ -178,7 +178,8 @@ export const PERSON: EditKind<'person'> = {
   },
   apply(map, edit) {
     const floor = floorOf(edit);
-    const at = { x: edit.at[0] + 0.5, y: edit.at[1] + 0.5, ...(floor ? { floor } : {}) };
+    // On a tile's middle, as everyone stands on tiles (docs/combat.md).
+    const at = { x: Math.floor(edit.at[0]) + 0.5, y: Math.floor(edit.at[1]) + 0.5, ...(floor ? { floor } : {}) };
     const own = {
       ...(edit.name !== undefined ? { name: edit.name } : {}),
       ...(edit.look !== undefined ? { asset: edit.look } : {}),

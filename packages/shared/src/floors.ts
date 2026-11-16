@@ -1,4 +1,7 @@
-import { collides, step } from './movement.ts';
+import { collides } from './movement.ts';
+import { anchorNear, spotMiddle, type TileSpot } from './tiles/grid.ts';
+import { openTile } from './tiles/steps.ts';
+import { walkTiles } from './tiles/walker.ts';
 import type { Among } from './hit-boxes.ts';
 import { Tile, block, isBlocking, set, storeyAt, tileAt, type RegionMap, type TileArt } from './world.ts';
 
@@ -17,6 +20,8 @@ export interface Placed {
   x: number;
   y: number;
   floor: number;
+  /** The tile it is stepping onto, while it steps (tiles/walker.ts). */
+  to?: TileSpot;
 }
 
 /** A tile rectangle in the region. */
@@ -271,16 +276,20 @@ export function takeStairs(map: RegionMap, at: Placed, climbs = true): Placed | 
 }
 
 /**
- * One tick of a player's input on their floor, taking any stairs they step
- * onto. The server moves players with it and each browser predicts its own
- * player with it, so both change floors on the same step. `among` stops it
- * at other bodies (hit-boxes.ts).
+ * One tick of a player's input on their floor, on tiles (tiles/walker.ts),
+ * taking any stairs they step onto. The server moves players with it and
+ * each browser predicts its own player with it, so both change floors on the
+ * same step. `among` stops it at tiles others stand on (hit-boxes.ts).
  */
 export function walkOn(map: RegionMap, at: Placed, dx: number, dy: number, pace = 1, among?: Among): Placed {
-  const next = step(map, at, dx, dy, at.floor, pace, among);
-  if (next.x === at.x && next.y === at.y) return at;
-  const moved = { x: next.x, y: next.y, floor: at.floor };
-  return takeStairs(map, moved) ?? moved;
+  const next = walkTiles(map, at, dx, dy, pace, among, undefined, (x, y) => stairwayAt(map, x, y, at.floor) !== undefined);
+  if (next === at) return at;
+  // Stairs are taken on arriving at a tile's middle, landing on the middle of a tile on the other floor.
+  if (next.to) return next;
+  const other = takeStairs(map, next);
+  if (!other) return next;
+  const mid = spotMiddle(anchorNear(other.x, other.y));
+  return openTile(map, Math.floor(mid.x), Math.floor(mid.y), other.floor) ? { x: mid.x, y: mid.y, floor: other.floor } : other;
 }
 
 /** The stairs or ladder that took someone from a floor to where they are now, if that is how they got there. */

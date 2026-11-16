@@ -386,6 +386,7 @@ function play(token: string): void {
         connection.send({ t: 'ability', ability, ...(target ? { target } : {}) });
         sound.play('spell');
       },
+      aim: (ability) => scene?.aim(ability),
       hotbar: (slots) => connection.send({ t: 'hotbar', slots }),
       craft: (recipe, lean) => connection.send({ t: 'craft', recipe, ...(lean ? { lean } : {}) }),
       shop: (action, npc, id, qty, replace) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}), ...(replace ? { replace } : {}) }),

@@ -591,9 +591,10 @@ export class WalkPainter {
       labels.push(`${walker.name}'s approved picture, on magenta`);
     }
 
+    const hasGuide = labels.some((l) => l.toLowerCase().includes('guide'));
     const fullPrompt = prompt
-      ? (prompt.includes('Stylised low-poly') ? prompt : `${waysSheetPrompt(walker.name, walker.gear, refs.length)}\n\n${prompt}`)
-      : waysSheetPrompt(walker.name, walker.gear, refs.length);
+      ? (prompt.includes('Stylised low-poly') ? prompt : `${waysSheetPrompt(walker.name, walker.gear, refs.length, undefined, hasGuide)}\n\n${prompt}`)
+      : waysSheetPrompt(walker.name, walker.gear, refs.length, undefined, hasGuide);
 
     return {
       prompt: fullPrompt,

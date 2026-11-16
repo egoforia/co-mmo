@@ -324,7 +324,10 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
           });
           if (resolved) {
             const magentaBuf = await sharp(resolved.data).flatten({ background: KEY_COLOR.hex }).png().toBuffer();
-            customRefBuffers.push({ data: magentaBuf, label: `${resolved.label}'s approved picture, on magenta` });
+            const label = assetId === 'ref-isometric-standing'
+              ? '4-Way Isometric Standing Guide, on magenta'
+              : `${resolved.label}'s approved picture, on magenta`;
+            customRefBuffers.push({ data: magentaBuf, label });
           }
         }
       }

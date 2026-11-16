@@ -7,6 +7,7 @@ import { kitPieces } from './sea-cave-kit.ts';
  * "Old Bramble's cottage: outside". Falls back to its art id.
  */
 export function pictureName(id: string): string {
+  if (id === 'ref-isometric-standing') return '4-Way Isometric Standing Guide';
   const known = ANCHORS.find((a) => a.id === id) ?? kitPieces().find((a) => a.id === id);
   if (known?.name) return known.name;
   const style = Object.values(BUILDING_STYLES).find((s) => id.startsWith(`${s.id}-`));

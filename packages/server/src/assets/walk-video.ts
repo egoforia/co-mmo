@@ -95,13 +95,23 @@ export function viewPrompt(name: string, gear: Carried[], direction: IsoWay, ref
  * back-right, back-left): painted together, the four keep one
  * look (one picture per way drifted in colours and details).
  */
-export function waysSheetPrompt(name: string, gear: Carried[], references = 1, order: readonly IsoWay[] = TURNTABLE_WAYS): string {
-  const from = references > 1 ? `from the ${references} reference images alone (all of them show ${name})` : 'from the reference image alone';
+export function waysSheetPrompt(name: string, gear: Carried[], references = 1, order: readonly IsoWay[] = TURNTABLE_WAYS, hasGuide = false): string {
+  const charRefs = hasGuide ? Math.max(1, references - 1) : references;
+  const from = hasGuide
+    ? (charRefs > 1 ? `from the ${charRefs} character reference images` : 'from their character reference image')
+    : (references > 1 ? `from the ${references} reference images alone (all of them show ${name})` : 'from the reference image alone');
+  const guideInstruction = hasGuide
+    ? 'Use the 4-way isometric standing guide image as the layout and pose reference: it shows the 4 isometric angles, spacing, and turntable rotation (front-left, front-right, back-right, back-left).'
+    : '';
+  const copyInstruction = hasGuide
+    ? `All four are the same ${name}: copy exactly how they look in their character reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes to match each isometric angle.`
+    : `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`;
+
   return [
     STYLE.base,
-    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the same size and standing on the same line, evenly spaced with wide empty gaps so no two touch. From left to right:`,
+    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the same size and standing on the same line, evenly spaced with wide empty gaps so no two touch.${guideInstruction ? ` ${guideInstruction}` : ''} From left to right:`,
     ...order.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
-    `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`,
+    copyInstruction,
     'Paint them in the style described above, even where the reference images are painted in another style.',
     `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
     `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,

@@ -225,6 +225,15 @@ export async function resolveReferenceImage(
             ?? await readArt(`art/${assetId}.png`).catch(() => undefined)
             ?? await readArt(assetId!).catch(() => undefined);
         }
+        if (!data && assetId === 'ref-isometric-standing') {
+          for (const p of [
+            resolve(process.cwd(), 'packages/client/public/art/ref-isometric-standing.png'),
+            resolve(process.cwd(), 'assets/anchors/ref-isometric-standing.png'),
+          ]) {
+            data = await readFile(p).catch(() => undefined);
+            if (data) break;
+          }
+        }
       }
     }
   }

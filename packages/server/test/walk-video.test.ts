@@ -41,6 +41,12 @@ describe('video walks', () => {
     const prompt = waysSheetPrompt('Mara', []);
     const order = ['LOWER-LEFT', 'LOWER-RIGHT', 'UPPER-RIGHT', 'UPPER-LEFT'].map((c) => prompt.indexOf(`facing the ${c} corner`));
     expect(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1]!))).toBe(true);
+
+    const promptWithGuide = waysSheetPrompt('Mara', [], 2, undefined, true);
+    expect(promptWithGuide).toContain('from their character reference image');
+    expect(promptWithGuide).toContain('Use the 4-way isometric standing guide image as the layout and pose reference');
+    expect(promptWithGuide).toContain('copy exactly how they look in their character reference');
+
     // Four figures of different widths, so each cut can be told apart; the sheet is read left to right.
     const sheet = await picture(1200, 300, [150, 450, 750, 1050].map((x, i) => `<rect x="${x - 10 - i * 5}" y="60" width="${20 + i * 10}" height="220" fill="#3060c0"/>`).join(''));
     const ways = await waysFromSheet(sheet);

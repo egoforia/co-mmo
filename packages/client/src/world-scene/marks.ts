@@ -1,10 +1,11 @@
 // What skills leave in the world (snapshot `marks`): traps and hallowed
 // ground on the ground, an Echo floating on a friend, the spirit hawk and the
-// Sandstorm double standing like creatures. Each shows its painted picture,
+// Sandstorm double standing like creatures, and the tile marker on each tile
+// a skill covers or is aimed at. Each shows its painted picture,
 // or nothing until that is painted (build plan step 10).
 
 import type Phaser from 'phaser';
-import { CHARACTER_HEIGHT, ECHO_ART, HALLOWED_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TRAP_ART, type WorldMark } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, ECHO_ART, HALLOWED_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TILE_MARKER_ART, TRAP_ART, type WorldMark } from '@co-mmo/shared';
 import { litFigure } from '../lights.ts';
 import { T } from './types.ts';
 
@@ -14,6 +15,7 @@ export type ToScreen = (x: number, y: number, floor: number) => { x: number; y: 
 /** How each kind of mark sits: lying on the ground, floating on someone, or standing like a creature. */
 const LOOKS: Record<string, { origin: [number, number]; width?: number; rise?: number; depth: number; alpha?: number }> = {
   [TRAP_ART]: { origin: [0.5, 0.5], width: T, depth: -3 },
+  [TILE_MARKER_ART]: { origin: [0.5, 0.5], width: T, depth: -3, alpha: 0.75 },
   [HALLOWED_ART]: { origin: [0.5, 0.5], width: T * 3, depth: -4, alpha: 0.8 },
   [ECHO_ART]: { origin: [0.5, 0.5], width: T * 0.8, rise: CHARACTER_HEIGHT * 0.55, depth: 1, alpha: 0.85 },
   [SPIRIT_HAWK_ART]: { origin: [0.5, 0.97], rise: T * 0.3, depth: 0 },

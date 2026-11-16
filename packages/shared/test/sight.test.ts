@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Tile, clearLine, combatRules, inLine, nearestOf, tilesBetween, tilesFor, type EdgeWall, type RegionMap } from '../src/index.ts';
+import { Tile, clearLine, combatRules, flanks, inLine, nearestOf, tilesBetween, tilesFor, type EdgeWall, type RegionMap } from '../src/index.ts';
 
 // Reach and sight on tiles (docs/combat.md): how far a reach goes in
 // tiles, straight lines for long blades, and clear lines past trees and walls.
@@ -55,5 +55,18 @@ describe('reach and sight on tiles', () => {
   it('fills in rules an older save lacks', () => {
     expect(combatRules(undefined)).toEqual({ bodiesBlockShots: false });
     expect(combatRules({ bodiesBlockShots: true })).toEqual({ bodiesBlockShots: true });
+  });
+});
+
+describe('flanking on tiles', () => {
+  it('flanks across a square, side to side or corner to corner', () => {
+    const c = { tx: 5, ty: 5 };
+    expect(flanks(c, 1, { tx: 4, ty: 5 }, { tx: 6, ty: 5 })).toBe(true);
+    expect(flanks(c, 1, { tx: 4, ty: 4 }, { tx: 6, ty: 6 })).toBe(true);
+    expect(flanks(c, 1, { tx: 4, ty: 5 }, { tx: 6, ty: 4 })).toBe(false);
+    expect(flanks(c, 1, { tx: 4, ty: 5 }, { tx: 7, ty: 5 })).toBe(false);
+    // A big one, two tiles wide: across it from any tile of one side to any of the other.
+    expect(flanks(c, 2, { tx: 4, ty: 5 }, { tx: 7, ty: 6 })).toBe(true);
+    expect(flanks(c, 2, { tx: 5, ty: 4 }, { tx: 6, ty: 7 })).toBe(true);
   });
 });

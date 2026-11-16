@@ -40,6 +40,8 @@ export interface CombatHitTrace {
     raw: number;
     weakenedFactor?: number;
     markedFactor?: number;
+    /** 1 + FLANK_BONUS when the creature was flanked (tiles/tactics.ts). */
+    flankFactor?: number;
     wovenFactor?: number;
     gaugeFactor?: number;
   };

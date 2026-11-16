@@ -1,5 +1,5 @@
-import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, statusOf, type Weather } from '@co-mmo/shared';
-import { forget, think, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
+import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, spotMiddle, statusOf, type TileSpot, type Weather } from '@co-mmo/shared';
+import { CREATURE_REACH, forget, think, tilesTo, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { Combat } from './combat.ts';
 import type { CombatLogger } from './combat-logger.ts';
@@ -67,6 +67,21 @@ export class Minds {
       if (p.character.hp > 0 && p.floor === n.floor && Math.hypot(p.x - n.x, p.y - n.y) <= TALK_RANGE) return true;
     }
     return false;
+  }
+
+  /**
+   * The player stepped off a tile beside creatures fighting them to one out
+   * of their reach: each that can act (not Stunned) takes one free swing as
+   * they go (docs/combat.md, Leaving a fight). A blink or a jump is no step,
+   * so it slips away clean.
+   */
+  leaving(p: PlayerState, from: TileSpot, to: TileSpot, now: number): void {
+    for (const c of this.s.creatures) {
+      if (c.aggro !== p.info.id || c.respawnAt !== null || c.floor !== p.floor || !canAct(c, now)) continue;
+      if (tilesTo(c, spotMiddle(from)) > CREATURE_REACH || tilesTo(c, spotMiddle(to)) <= CREATURE_REACH) continue;
+      this.s.notice(p, `The ${c.def.name} strikes at you as you turn away.`);
+      this.hurt(p, c, now);
+    }
   }
 
   private hurt(p: PlayerState, c: Creature, now: number): void {

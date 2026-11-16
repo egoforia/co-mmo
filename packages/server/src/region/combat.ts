@@ -1,5 +1,7 @@
 import {
+  FLANK_BONUS,
   SIZE_TILES,
+  flanks,
   anchorNear,
   clearLine,
   creatureSize,
@@ -142,6 +144,22 @@ export class Combat implements EffectKit {
       .sort((a, b) => apart(a) - apart(b) || Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
   }
 
+  /**
+   * True when the player striking stands on a tile touching the creature and
+   * another player on their feet stands on the far side of it
+   * (tiles/tactics.ts): flanked, it takes FLANK_BONUS more.
+   */
+  private flanked(p: PlayerState, c: Creature): boolean {
+    const { anchor, width } = squareOf(c);
+    const me = anchorNear(p.x, p.y);
+    if (tilesApart(anchor, width, me, 1) !== 1) return false;
+    for (const o of this.s.players.values()) {
+      if (o === p || o.floor !== c.floor || o.character.hp <= 0) continue;
+      if (flanks(anchor, width, me, anchorNear(o.x, o.y))) return true;
+    }
+    return false;
+  }
+
   /** A heavy blow cancels the creature's next attack: it waits a whole rest from now. */
   private stagger(c: Creature): void {
     const rest = c.def.cooldown * 1000;
@@ -241,7 +259,8 @@ export class Combat implements EffectKit {
     const mark = statusOf(target, 'marked', now);
     const marked = mark?.by && (mark.by === p.info.id || (this.s.hooks.party?.(p.info.id) ?? []).includes(mark.by)) ? 1 + MARK_BONUS : 1;
     const pathBonus = this.paths.dealtTo(p, target, now);
-    const rawBeforeAbsorb = raw * weakened * marked * pathBonus;
+    const flanked = this.flanked(p, target) ? 1 + FLANK_BONUS : 1;
+    const rawBeforeAbsorb = raw * weakened * marked * pathBonus * flanked;
     const afterAbsorb = absorb(target, rawBeforeAbsorb, now);
     const shieldAbsorb = rawBeforeAbsorb - afterAbsorb;
     const defence = how.pierce ? 0 : how.type === 'arcane' ? target.def.ward : target.def.armor;
@@ -299,6 +318,7 @@ export class Combat implements EffectKit {
           raw,
           weakenedFactor: weakened,
           markedFactor: marked,
+          ...(flanked > 1 ? { flankFactor: flanked } : {}),
           wovenFactor: cast?.woven ? WOVEN_FACTOR : traceInfo?.wovenFactor,
           gaugeFactor: traceInfo?.gaugeFactor,
         },

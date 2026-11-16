@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CALLINGS, type CallingId } from '@co-mmo/shared';
-import { balanceTable, fight } from '../src/balance.ts';
+import { balanceProblems, balanceTable, fight } from '../src/balance.ts';
 
 // The balance test (docs/combat.md step 7): real fights on tiles. These are
 // the floors no change should break; the full table (npm run balance,
@@ -20,6 +20,16 @@ describe('balance on tiles', () => {
       const duelist = fight('duelist', level, 'solo');
       expect(warden.hpLost).toBeLessThan(duelist.hpLost);
     }
+  });
+
+  it('keeps the damage Callings within 15% of each other, and crowds deadly', { timeout: 60_000 }, () => {
+    expect(balanceProblems(balanceTable([10, 20], ['steady', 'crowd']))).toEqual([]);
+  });
+
+  it('says when the damage Callings drift apart', () => {
+    const at = (calling: CallingId, dps: number) => ({ calling, level: 10, scene: 'steady' as const, won: true, seconds: 30, hpLost: 0, dps });
+    expect(balanceProblems([at('duelist', 30), at('ranger', 31), at('wishweaver', 40)])[0]).toContain('Wishweaver deals 33% more');
+    expect(balanceProblems([at('duelist', 30), at('ranger', 31), at('wishweaver', 34)])).toEqual([]);
   });
 
   it('fights the same way every time', () => {

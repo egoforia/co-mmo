@@ -9,7 +9,7 @@ export const DUELIST_SKILLS: Record<string, AbilityDef> = {
   lunge: {
     name: 'Lunge',
     description: 'Dash up to 4 steps to a creature and strike it as you land. The hit builds Momentum.',
-    effect: 'dash', energy: 6, cooldown: 6, range: 4, base: 4, stat: 'might', factor: 1,
+    effect: 'dash', energy: 6, cooldown: 6, range: 4, base: 4, stat: 'might', factor: 1.2,
   },
   riposte: {
     name: 'Riposte',
@@ -20,7 +20,7 @@ export const DUELIST_SKILLS: Record<string, AbilityDef> = {
   whirl: {
     name: 'Whirl',
     description: 'Spin with your blade and hit everything within 2 steps. It spends all your Momentum, a quarter stronger for each pip.',
-    effect: 'area', energy: 10, cooldown: 6, range: 0, base: 3, stat: 'might', factor: 0.6,
+    effect: 'area', energy: 10, cooldown: 6, range: 0, base: 3, stat: 'might', factor: 0.8,
     radius: 2, finisher: true, perPip: 0.25, weapon: true,
   },
   rend: {

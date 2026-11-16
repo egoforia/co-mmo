@@ -10,13 +10,13 @@ export const WISHWEAVER_SKILLS: Record<string, AbilityDef> = {
   'ember-bolt': {
     name: 'Ember Bolt',
     description: 'An Ember of wishstuff at a creature up to 6 steps away; it keeps Burning for 3 seconds. Woven, the burn spreads to one creature nearby.',
-    effect: 'bolt', energy: 6, cooldown: 2.5, range: 6, base: 4, stat: 'wit', factor: 1.4,
+    effect: 'bolt', energy: 6, cooldown: 4, range: 6, base: 3, stat: 'wit', factor: 0.65,
     thread: 'ember', status: 'burning', duration: 3, dotShare: 0.1,
   },
   'tide-lash': {
     name: 'Tide Lash',
     description: 'A lash of Tide in front of you: creatures within 3 steps are knocked back and Slowed for 3 seconds. Woven, they are Rooted instead.',
-    effect: 'cone', energy: 8, cooldown: 6, range: 3, base: 3, stat: 'wit', factor: 1,
+    effect: 'cone', energy: 8, cooldown: 6, range: 3, base: 2, stat: 'wit', factor: 0.7,
     thread: 'tide', status: 'slowed', duration: 3, damageType: 'arcane',
   },
   'gale-step': {
@@ -28,7 +28,7 @@ export const WISHWEAVER_SKILLS: Record<string, AbilityDef> = {
   'chain-spark': {
     name: 'Chain Spark',
     description: 'A Gale spark that jumps between up to 3 creatures, a little weaker each jump. Woven, it jumps to 6.',
-    effect: 'bolt', energy: 10, cooldown: 6, range: 6, base: 5, stat: 'wit', factor: 1.3,
+    effect: 'bolt', energy: 10, cooldown: 6, range: 6, base: 4, stat: 'wit', factor: 0.9,
     thread: 'gale', chain: 3,
   },
   'wish-ward': {

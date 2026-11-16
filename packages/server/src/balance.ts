@@ -28,14 +28,18 @@ import { Region, type Connection } from './region.ts';
 // strikes whenever it can and uses its damage skills as they come ready.
 
 /** Who fights what. */
-export type Scene = 'solo' | 'crowd' | 'pair';
+export type Scene = 'solo' | 'crowd' | 'pair' | 'steady';
 
 /** What a scene is, in words for the report. */
 export const SCENES: Record<Scene, string> = {
   solo: 'alone against one creature',
   crowd: 'alone against three',
   pair: 'two of the Calling against one tough creature (twice the health)',
+  steady: 'alone against a training post that never hurts (ten times the health)',
 };
+
+/** Health a scene's creature has, as a multiple of a land creature's. */
+const HEALTH: Record<Scene, number> = { solo: 1, crowd: 1, pair: 2, steady: 10 };
 
 /** How a fight went. */
 export interface FightResult {
@@ -82,12 +86,16 @@ function fighter(calling: CallingId, level: number): Character {
   return c;
 }
 
-/** The creature kind for a level, made like the land's (tough ones have twice the health). */
-function foeKind(level: number, tough: boolean): string {
-  const kind = `balance-foe-${level}${tough ? '-tough' : ''}`;
+/**
+ * The creature kind for a level and scene, made like the land's. A pair's
+ * has twice the health; the steady scene's has ten times, so a short
+ * fight's opening volley and last overkill blow don't sway the rate.
+ */
+function foeKind(level: number, scene: Scene): string {
+  const kind = `balance-foe-${level}-${scene}`;
   if (!CREATURES[kind]) {
     const def = levelledCreature({ name: 'Training Foe', art: 'x', description: '', size: 'medium', behavior: 'chase', level, speed: 3, notice: 12, drops: [] });
-    CREATURES[kind] = tough ? { ...def, hp: def.hp * 2 } : def;
+    CREATURES[kind] = { ...def, hp: def.hp * HEALTH[scene] };
   }
   return kind;
 }
@@ -115,7 +123,7 @@ export function fight(calling: CallingId, level: number, scene: Scene, seed = 1)
   ids.forEach((id, i) => {
     region.join({ id, name: id, color: 0xffffff, role: 'player' }, conns[i]!, { x: null, y: null }, fighter(calling, level));
   });
-  const kind = foeKind(level, scene === 'pair');
+  const kind = foeKind(level, scene);
   const count = scene === 'crowd' ? 3 : 1;
   // The creature starts a few tiles off (more for those who shoot), and walks up.
   const off = ranged ? 5 : 2;
@@ -143,6 +151,8 @@ export function fight(calling: CallingId, level: number, scene: Scene, seed = 1)
     }
     clock.now += 1000 / TICK_RATE;
     region.tick();
+    // The training post never hurts: its taps are healed at once, so the fight runs its whole length.
+    if (scene === 'steady') ids.forEach((id, i) => (region.character(id)!.hp = startHp[i]!));
     // Blows the fighters landed this tick (each fighter is sent every hit near them, so count one fighter's view).
     const c = conns[0]!;
     for (; seen[0]! < c.messages.length; seen[0]!++) {
@@ -163,7 +173,7 @@ export function fight(calling: CallingId, level: number, scene: Scene, seed = 1)
 }
 
 /** Every Calling at each level in each scene. */
-export function balanceTable(levels = [1, 10, 20], scenes: Scene[] = ['solo', 'crowd', 'pair']): FightResult[] {
+export function balanceTable(levels = [1, 10, 20], scenes: Scene[] = ['solo', 'crowd', 'pair', 'steady']): FightResult[] {
   const out: FightResult[] = [];
   for (const scene of scenes) for (const level of levels) for (const calling of Object.keys(CALLINGS) as CallingId[]) out.push(fight(calling, level, scene));
   return out;
@@ -185,4 +195,34 @@ export function balanceReport(results: FightResult[]): string {
     lines.push('');
   }
   return lines.join('\n');
+}
+
+/** The Callings whose job is damage, held to one another's steady damage. */
+export const DAMAGE_CALLINGS: CallingId[] = ['duelist', 'ranger', 'wishweaver'];
+/** How far apart their steady damage may be: the most at most 15% over the least. */
+export const DAMAGE_SPREAD = 1.15;
+
+/**
+ * What the balance pass promised (docs/balance.md), in words: an empty list
+ * when it holds. The damage Callings stay within DAMAGE_SPREAD of each other
+ * against the training post at levels 10 and 20, and a crowd of three of
+ * their level still beats every Calling there. Level 1 fights are over too
+ * quickly to say much, so they are only read.
+ */
+export function balanceProblems(results: FightResult[]): string[] {
+  const problems: string[] = [];
+  for (const level of [10, 20]) {
+    const steady = results.filter((r) => r.scene === 'steady' && r.level === level && DAMAGE_CALLINGS.includes(r.calling));
+    if (steady.length === DAMAGE_CALLINGS.length) {
+      const most = steady.reduce((a, b) => (b.dps > a.dps ? b : a));
+      const least = steady.reduce((a, b) => (b.dps < a.dps ? b : a));
+      if (most.dps > least.dps * DAMAGE_SPREAD) {
+        problems.push(`At level ${level} the ${CALLINGS[most.calling].name} deals ${Math.round((most.dps / least.dps - 1) * 100)}% more steady damage than the ${CALLINGS[least.calling].name} (at most ${Math.round((DAMAGE_SPREAD - 1) * 100)}%).`);
+      }
+    }
+    for (const r of results.filter((r) => r.scene === 'crowd' && r.level === level && r.won)) {
+      problems.push(`At level ${level} a ${CALLINGS[r.calling].name} beat a crowd of three alone; crowds should stay deadly.`);
+    }
+  }
+  return problems;
 }

@@ -96,10 +96,12 @@ describe('hit boxes', () => {
       }
       return least;
     };
-    // Never through the other player (egoforia, 2026-11-16: players block players), but round them.
+    // Never through the other player (egoforia, 2026-11-16: players block players), and not round them
+    // either: walking into someone you stay put, only turning to face them.
     const b = region.position('b')!;
     expect(walk('a', 30, () => b)).toBeGreaterThanOrEqual(PERSON_RADIUS * 2 - 1e-3);
-    expect(region.position('a')!.x).toBeGreaterThan(b.x);
+    expect(region.position('a')!.x).toBeLessThan(b.x);
+    expect(Math.floor(region.position('a')!.y)).toBe(Math.floor(b.y));
 
     region.placePlayer('a', at.x, at.y + 2);
     region.addCreatures('test-biter', [{ x: at.x + 1, y: at.y + 2 }]);

@@ -85,11 +85,13 @@ export function modelsPage(): string {
             <span>
               <select name="imageProvider">
                 <option value="gemini"${s.ai.image.provider === 'gemini' ? ' selected' : ''}>Google AI Studio${s.imageKeySet ? '' : ' (no key)'}</option>
+                <option value="replicate"${s.ai.image.provider === 'replicate' ? ' selected' : ''}>Replicate${s.replicateKeySet ? '' : ' (no key)'}</option>
                 <option value="none"${s.ai.image.provider === 'none' ? ' selected' : ''}>None (placeholder art only)</option>
               </select>
-              <input name="imageModel" list="image-models" value="${esc(s.ai.image.model)}" />
+              <input name="imageModel" list="image-models" value="${esc(s.ai.image.model)}" placeholder="${s.ai.image.provider === 'replicate' ? 'openai/gpt-image-2' : 'gemini-2.5-flash-image'}" />
             </span>
           </label>
+          <p class="note">A model named <code>owner/name</code> (such as <code>openai/gpt-image-2</code>) paints on Replicate with <code>REPLICATE_API_TOKEN</code>, any other name on Google. Each kind of art below can name either, so one kind can try Replicate while the rest stays on Google.</p>
           ${ART_USES.map(
             ([use, name]) =>
               `<label class="sub">${esc(name)}<span><input name="use-${use}" list="image-models" value="${esc(s.ai.image.uses?.[use] ?? '')}" placeholder="same as Pictures" /></span></label>`,
@@ -194,6 +196,7 @@ export function modelsPage(): string {
 }
 
 const VIDEO_DEFAULTS: Record<string, string> = { gemini: 'veo-3.1-lite-generate-preview', replicate: 'alibaba/wan-3' };
+const IMAGE_DEFAULTS: Record<string, string> = { gemini: 'gemini-2.5-flash-image', replicate: 'openai/gpt-image-2' };
 
 export function handleModelsChange(el: HTMLElement): boolean {
   const select = el as HTMLSelectElement;
@@ -201,6 +204,10 @@ export function handleModelsChange(el: HTMLElement): boolean {
   const input = select.parentElement?.querySelector<HTMLInputElement>('input');
   if (input && select.name === 'videoProvider') {
     input.value = VIDEO_DEFAULTS[select.value] ?? '';
+    return true;
+  }
+  if (input && select.name === 'imageProvider') {
+    input.value = IMAGE_DEFAULTS[select.value] ?? '';
     return true;
   }
   if (input && select.name === 'judgeProvider') {

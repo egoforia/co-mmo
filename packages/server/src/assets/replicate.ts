@@ -21,7 +21,7 @@ export const MAX_DATA_URL_BYTES = 256 * 1024;
 const MIN_SECONDS = 2;
 const MAX_SECONDS = 30;
 
-interface Prediction {
+export interface Prediction {
   id?: string;
   status?: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
   output?: string | string[] | null;

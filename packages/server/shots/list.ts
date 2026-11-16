@@ -547,4 +547,11 @@ export const SHOTS: Shot[] = [
     ready: '[data-plan-link]',
     mustSee: ['a short card saying the map editor is in the game now', 'a button-like link "Open the Plan camera in the game"'],
   },
+  {
+    name: 'studio-models',
+    about: "The Art Studio's AI Models tab: which provider and model paint pictures, clips and sounds.",
+    page: '/art-studio.html#art/models',
+    ready: '#studio-models-form',
+    mustSee: ['an image provider list that offers Gemini and Replicate', 'a note that owner/name models paint on Replicate', 'the price table lists openai/gpt-image-2 at about $0.047 a picture'],
+  },
 ];

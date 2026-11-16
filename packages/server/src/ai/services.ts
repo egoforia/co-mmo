@@ -3,6 +3,7 @@ import type { ImageProvider } from '../assets/provider.ts';
 import { ElevenLabsSoundProvider, LyriaMusicProvider, type SoundProvider } from '../assets/sound.ts';
 import { GeminiVideoProvider, type VideoProvider } from '../assets/video.ts';
 import { ReplicateVideoProvider, replicateToken } from '../assets/replicate.ts';
+import { ReplicateImageProvider, isReplicateModel } from '../assets/replicate-image.ts';
 import { queuedImages, queuedSound, queuedVideo, type DailyClips, type PaintQueue } from '../paint-queue.ts';
 import { soundSettings, styleCheckSettings, videoSettings, type ArtUse, type Settings } from '../settings.ts';
 import { createChatModel, type ChatModel } from './chat.ts';
@@ -162,7 +163,7 @@ export class AiServices {
 }
 
 /** Image providers the game can paint with, by their settings id. */
-export const IMAGE_PROVIDERS = ['gemini'] as const;
+export const IMAGE_PROVIDERS = ['gemini', 'replicate'] as const;
 
 /** Video providers the game can make clips with, by their settings id. */
 export const VIDEO_PROVIDERS = ['gemini', 'replicate'] as const;
@@ -172,7 +173,13 @@ export const VIDEO_PROVIDERS = ['gemini', 'replicate'] as const;
  * The art tools use this too, so they paint with what God's View offers.
  */
 export function imageProviderFor(provider: string, model: string | undefined, env: Record<string, string | undefined>): ImageProvider | undefined {
-  if (provider === 'gemini') return env.GEMINI_API_KEY ? new GeminiImageProvider(env.GEMINI_API_KEY, model || undefined) : undefined;
+  // A model named "owner/name" lives on Replicate, whichever provider is chosen,
+  // so one kind of art can be painted there while the rest stays on Gemini.
+  if (isReplicateModel(model) || (provider === 'replicate' && !model?.trim())) {
+    const token = replicateToken(env);
+    return token ? new ReplicateImageProvider(token, model?.trim() || undefined) : undefined;
+  }
+  if (provider === 'gemini' || provider === 'replicate') return env.GEMINI_API_KEY ? new GeminiImageProvider(env.GEMINI_API_KEY, model || undefined) : undefined;
   return undefined;
 }
 

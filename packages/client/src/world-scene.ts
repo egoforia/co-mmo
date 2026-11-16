@@ -33,6 +33,7 @@ import {
   type WorldEdit,
 } from '@co-mmo/shared';
 import { HouseArt } from './kit-house-view.ts';
+import { monsterHomeUnder } from './world-scene/pick.ts';
 import { lightScene, setSkyLight } from './lights.ts';
 import { shadePictures } from './normal-maps.ts';
 import { PROJECTION } from './projection.ts';
@@ -733,6 +734,11 @@ export class WorldScene extends Phaser.Scene {
    * Works through either camera: the projection is turned back from screen
    * to tiles by its own three points.
    */
+  /** The world editor: the home of the land's own monster drawn under a point of the screen, if any. */
+  monsterHomeAt(screenX: number, screenY: number): ReturnType<typeof monsterHomeUnder> {
+    return monsterHomeUnder(this.cameras.main, this.creatures, this.drawn, screenX, screenY);
+  }
+
   tileAt(screenX: number, screenY: number): { region: string; map: RegionMap; x: number; y: number } | undefined {
     const w = this.worldTile(screenX, screenY);
     const [wx, wy] = [Math.floor(w.x), Math.floor(w.y)];

@@ -8,7 +8,7 @@ import { loadToken, rejoinWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
 import { apiLogPage, wireApiLog } from './api-log-ui.ts';
 import { type ArtContext } from './art-ui.ts';
-import { lootClick, lootPage, lootSubmit } from './loot-tab.ts';
+import { lootAfter, lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { GameDown, api, rerender, toast, view, type Tab } from './gods-view/core.ts';
 import { worldTab } from './gods-view/world.ts';
 import { wishesTab } from './gods-view/wishes.ts';
@@ -32,7 +32,7 @@ const TABS: Tab[] = [
   wishesTab,
   modsTab,
   rulesTab,
-  { id: 'loot', label: 'Monsters', page: () => lootPage(artContext) },
+  { id: 'loot', label: 'Monsters', page: () => lootPage(artContext), after: lootAfter },
   reportsTab,
   playersTab,
   aiTab,

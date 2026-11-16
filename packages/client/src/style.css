@@ -560,6 +560,8 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #editor .bookmarks .note { display: block; font-size: 11px; }
 .picked { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .picked .pick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.picked .gods-view-link { display: inline-block; margin-top: 4px; padding: 4px 10px; color: var(--ink); border: 1px solid var(--edge); text-decoration: none; }
+.picked .gods-view-link:hover { border-color: var(--accent); }
 /* The land panel (nothing selected): tabs, the Changes lists, Places and Checks. */
 #editor .land-tabs { display: flex; gap: 2px; margin: 8px 0; border-bottom: 1px solid var(--edge); }
 #editor .land-tabs button { flex: 1; padding: 4px 2px; font-size: 12px; border-radius: 4px 4px 0 0; }

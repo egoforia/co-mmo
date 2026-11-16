@@ -31,6 +31,8 @@ export interface Picked {
   box: Outline;
   /** A few more words about it (size, look, floors joined). */
   details: string[];
+  /** A monster's home: the kind of monster living there, whose size and loot God's View sets. */
+  creature?: string;
 }
 
 /** The thing standing on a tile of a floor, the smallest and nearest first; undefined on bare ground. */
@@ -49,7 +51,7 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number): Picked | u
   if (monster) {
     const spawn = monster.spawn ? map.creatures.filter((c) => c.spawn === monster.spawn).length : 1;
     const ways = [monster.level ? `Level ${monster.level}` : '', monster.behavior ? `ways: ${monster.behavior}` : '', monster.active ? `about: ${monster.active}` : '', monster.route ? `a patrol path of ${monster.route.length} corners` : ''].filter(Boolean);
-    return { kind: 'monster', name: `${monster.name}’s home`, level, box: tile(x, y), details: ['It comes back here after it falls.', ...(spawn > 1 ? [`One of a spawn of ${spawn}: taking it away takes them all.`] : []), ...(ways.length ? [ways.join(', ')] : [])] };
+    return { kind: 'monster', creature: monster.kind, name: `${monster.name}’s home`, level, box: tile(x, y), details: ['It comes back here after it falls.', ...(spawn > 1 ? [`One of a spawn of ${spawn}: taking it away takes them all.`] : []), ...(ways.length ? [ways.join(', ')] : [])] };
   }
   const piece = landmarkAt(map, at, level);
   if (piece) {
@@ -88,6 +90,18 @@ function climbing(s: Stairway): Heading {
   if (s.top.y < s.y) return 'north';
   if (s.top.y >= s.y + s.height) return 'south';
   return s.top.x < s.x ? 'west' : 'east';
+}
+
+/**
+ * The home of a live monster, from its id: the server names a land's own
+ * monsters `<land>-<kind>-<n>`, n being its home's place in the land's list.
+ * Undefined for monsters wished or brought in some other way.
+ */
+export function monsterHome(map: RegionMap, region: string, id: string): { at: TilePoint; level: number } | undefined {
+  const n = Number(id.slice(id.lastIndexOf('-') + 1));
+  const home = Number.isInteger(n) ? map.creatures[n] : undefined;
+  if (!home || id !== `${region}-${home.kind}-${n}`) return undefined;
+  return { at: [Math.floor(home.x), Math.floor(home.y)], level: home.floor ?? 0 };
 }
 
 /** The edit that takes a picked thing away. */

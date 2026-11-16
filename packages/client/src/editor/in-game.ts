@@ -322,7 +322,10 @@ export class EditorUi {
     }
     const spot: TilePoint = [at.x, at.y];
     const level = this.levelIn(at.region);
-    if (kind === 'down' && !this.edits.busy) void this.step(this.core.press(at.region, at.map, spot, level));
+    // Select picks a monster where it wanders, by its home (what the editor changes); not while a move, copy or patrol path waits for its spot.
+    const home = kind === 'down' && this.core.tool === 'select' && !this.core.inspector.picked?.placing && !this.core.inspector.path ? scene.monsterHomeAt(p.x, p.y) : undefined;
+    if (home && !this.edits.busy) void this.step(this.core.press(home.region, home.map, home.at, home.level));
+    else if (kind === 'down' && !this.edits.busy) void this.step(this.core.press(at.region, at.map, spot, level));
     else if (kind === 'drag') this.core.drag(at.region, at.map, spot);
     // A making tool shows what it would make here, and whether it fits, before anything is sent.
     const aim = kind === 'hover' ? this.core.aimAt(at.map, spot, level) : undefined;

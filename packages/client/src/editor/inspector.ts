@@ -185,6 +185,7 @@ export class Inspector {
     return `<div class="picked inspector"><header><strong>${escapeHtml(thing.name)}</strong><span class="kind">${KIND_WORDS[thing.kind]}</span></header>
       ${[...thing.details, `At ${thing.box.x}, ${thing.box.y}${thing.level ? `, floor ${thing.level}` : ''}`].map((d) => `<span class="note">${escapeHtml(d)}</span>`).join('')}
       ${thing.id ? `<span class="note">Name: <code>${escapeHtml(thing.id)}</code></span>` : ''}
+      ${thing.creature && !p.placing ? `<a class="gods-view-link" href="/gods-view.html#loot/${encodeURIComponent(thing.creature)}" target="_blank" rel="noopener" title="Size and loot belong to every monster of its kind">Size and loot in God's View ↗</a>` : ''}
       ${actions}${sections.join('')}</div>`;
   }
 

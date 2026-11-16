@@ -13,7 +13,7 @@ All characters and creatures in co-MMO adhere to strict visual conventions (`FLA
 - **Lighting:** **Unlit flat shading (NO LIGHTING).** Every material facet uses a single flat base color with no specular highlights, no cast shadows, no gradients, and no ambient glow. Facets are delineated only by subtle seam boundaries.
 - **Palette:** Soft, muted warm pastels (sand, terracotta, dusty rose, sage green, teal, cream, brass).
 - **Camera:** Orthographic isometric 3/4 turntable projection (`ISOMETRIC`).
-- **Background:** Solid pure flat magenta (`#FF00FF`) for lossless chroma-keying (characters/creatures ONLY; environmental & architectural wall/floor textures must be 100% full-bleed seamless tiles without magenta backgrounds, see `docs/buildings-and-walls.md`).
+- **Background:** Solid pure flat magenta (`#FF00FF`) for lossless chroma-keying (characters/creatures ONLY; environmental & architectural wall/floor textures must be 100% full-bleed seamless tiles without magenta backgrounds, see `docs/buildings-and-walls.md`). Models paint "magenta" a little differently (lighter, pinker, graded or grainy), so the cut (`assets/postprocess/key-cut.ts`) never needs the exact colour: it fits the backdrop from the picture's border as a smooth colour field, compares pixels with it in CIELAB with a tolerance set by the border's own unevenness, and un-mixes rim pixels into subject colour plus alpha. Spill cleanup follows the backdrop it found when that is one saturated hue, and magenta otherwise.
 
 ### Canonical Height Standards (Players vs. Creature Size Tiers)
 - **Players & Humanoids:** Always normalized to **`CHARACTER_HEIGHT = 168px`** (`1.0×`).

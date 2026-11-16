@@ -110,8 +110,8 @@ export function waysSheetPrompt(name: string, gear: Carried[], references = 1, o
 
 /** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to TURNTABLE_WAYS: Col 0 front-left, Col 1 front-right, Col 2 back-right, Col 3 back-left). */
 export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = TURNTABLE_WAYS): Promise<Record<IsoWay, Buffer>> {
-  const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
-  const clean = await removeKeySpill(png);
+  const { png, key } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
+  const clean = await removeKeySpill(png, undefined, key);
   const count = await countFigures(clean, { dropEdgeBits: true });
   if (count !== order.length) throw new Error(`The sheet shows ${count} figures instead of ${order.length}.`);
   const figures = (await cutFigures(clean, { count: order.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
@@ -159,8 +159,8 @@ export async function soleFigure(painted: Buffer): Promise<Buffer> {
 
 /** The same, with where the figure sat in the picture. */
 async function soleFigureAt(painted: Buffer): Promise<{ png: Buffer; box: Box }> {
-  const { png } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
-  const clean = await removeKeySpill(png);
+  const { png, key } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
+  const clean = await removeKeySpill(png, undefined, key);
   const count = await countFigures(clean, { dropEdgeBits: true });
   if (count !== 1) throw new Error(`The picture shows ${count} figures instead of one.`);
   const [figure] = await cutFigures(clean, { count: 1, dropEdgeBits: true });

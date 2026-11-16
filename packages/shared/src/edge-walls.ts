@@ -12,11 +12,11 @@ export type WallSide = 'north' | 'east' | 'south' | 'west';
 /** The sides, turning clockwise from north (the editor's R key goes round them in this order). */
 export const WALL_SIDES: readonly WallSide[] = ['north', 'east', 'south', 'west'];
 
-/** How tall a wall stands: a full storey, or half of one. */
-export type WallHeight = 'full' | 'half';
+/** How tall a wall stands: a full storey, half of one, or a low cutaway parapet. */
+export type WallHeight = 'full' | 'half' | 'low';
 
 /** The heights a wall may stand, in the editor's words. */
-export const WALL_HEIGHTS: Record<WallHeight, string> = { full: 'A storey high', half: 'Half a storey' };
+export const WALL_HEIGHTS: Record<WallHeight, string> = { full: 'A storey high', half: 'Half a storey', low: 'A knee-high parapet' };
 
 /**
  * A wall standing on one edge of the tile grid: `along` 'h' runs east from

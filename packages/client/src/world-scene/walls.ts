@@ -139,11 +139,10 @@ export function rockWalls(
   };
 
   // Far North/West walls (with no indoor floor to their North/West, and indoor floor to their South/East) stand tall;
-  // near South/East walls and South/East corridor flanks cut low. Open-air terraces always stay low parapets.
+  // near South/East walls and South/East corridor flanks cut low.
   const isFull = (x: number, y: number): boolean =>
-    !openTerrace &&
-    (!cutaway ||
-      (!indoor(x, y - 1) && !indoor(x - 1, y) && !indoor(x - 1, y - 1) && (indoor(x, y + 1) || indoor(x + 1, y) || indoor(x + 1, y + 1))));
+    !cutaway ||
+    (!indoor(x, y - 1) && !indoor(x - 1, y) && !indoor(x - 1, y - 1) && (indoor(x, y + 1) || indoor(x + 1, y) || indoor(x + 1, y + 1)));
 
   const parts: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = [];
   const tilesetKey = registerKitTileset(scene, style, art);

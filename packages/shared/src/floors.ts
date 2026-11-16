@@ -1,3 +1,4 @@
+import { standWall, takeDownWall } from './edge-walls.ts';
 import { collides } from './movement.ts';
 import { anchorNear, spotMiddle, type TileSpot } from './tiles/grid.ts';
 import { openTile } from './tiles/steps.ts';
@@ -78,7 +79,9 @@ export function floorName(floor: number): string {
 
 /**
  * Adds a floor over a rectangle (a building's walls, usually): wall all round
- * its edge and floor inside. Returns it so stairs and furniture can follow.
+ * its edge and floor inside. For an open terrace, its floor spans every tile and
+ * its perimeter is stood as thin edge walls (tall North/West, low South/East).
+ * Returns it so stairs and furniture can follow.
  */
 export function addStorey(map: RegionMap, rect: TileRect, floor: number, style: string, art?: Storey['art'], open?: boolean): Storey {
   if (floor === 0 || !Number.isInteger(floor)) throw new Error(`A storey is a floor above or below the ground, not ${floor}.`);
@@ -90,12 +93,67 @@ export function addStorey(map: RegionMap, rect: TileRect, floor: number, style: 
   for (let ty = 0; ty < height; ty++) {
     for (let tx = 0; tx < width; tx++) {
       const edge = tx === 0 || ty === 0 || tx === width - 1 || ty === height - 1;
-      tiles[ty * width + tx] = edge ? Tile.Wall : Tile.Floor;
+      tiles[ty * width + tx] = edge && !open ? Tile.Wall : Tile.Floor;
     }
   }
   const storey: Storey = { x, y, width, height, floor, tiles, style, ...(art ? { art } : {}), ...(open ? { open: true } : {}) };
   map.storeys.push(storey);
+  if (open) addTerraceEdgeWalls(map, storey);
   return storey;
+}
+
+/**
+ * Stands thin edge walls along the exposed perimeter of an open outdoor terrace:
+ * - Far North and West rims stand at full storey height (160px).
+ * - Near South and East rims stand as low knee-high parapets (20px).
+ * - Passages connecting to adjacent storeys on the same floor stay open.
+ */
+export function addTerraceEdgeWalls(map: RegionMap, storey: Storey): void {
+  const { x, y, width, height, floor, style } = storey;
+  const baseId = storey.id ?? `terrace-${floor}-${x}-${y}`;
+
+  const isFloorOnSameLevel = (tx: number, ty: number) => {
+    const s = storeyAt(map, tx, ty, floor);
+    if (!s) return false;
+    const tile = s.tiles[(ty - s.y) * s.width + (tx - s.x)];
+    return tile === Tile.Floor;
+  };
+
+  const onStairway = (wx: number, wy: number) => {
+    return stairwayAt(map, wx + 0.5, wy + 0.5, floor) !== undefined;
+  };
+
+  // North rim: horizontal edge along y (farthest from camera, full height)
+  for (let tx = 0; tx < width; tx++) {
+    const wx = x + tx;
+    if (!isFloorOnSameLevel(wx, y - 1) && !onStairway(wx, y)) {
+      standWall(map, { id: `${baseId}:n:${tx}`, floor, style, height: 'full' }, wx, y, 'north');
+    }
+  }
+
+  // West rim: vertical edge along x (farthest from camera, full height)
+  for (let ty = 0; ty < height; ty++) {
+    const wy = y + ty;
+    if (!isFloorOnSameLevel(x - 1, wy) && !onStairway(x, wy)) {
+      standWall(map, { id: `${baseId}:w:${ty}`, floor, style, height: 'full' }, x, wy, 'west');
+    }
+  }
+
+  // South rim: horizontal edge along y + height (closest to camera, low parapet)
+  for (let tx = 0; tx < width; tx++) {
+    const wx = x + tx;
+    if (!isFloorOnSameLevel(wx, y + height) && !onStairway(wx, y + height - 1)) {
+      standWall(map, { id: `${baseId}:s:${tx}`, floor, style, height: 'low' }, wx, y + height - 1, 'south');
+    }
+  }
+
+  // East rim: vertical edge along x + width (closest to camera, low parapet)
+  for (let ty = 0; ty < height; ty++) {
+    const wy = y + ty;
+    if (!isFloorOnSameLevel(x + width, wy) && !onStairway(x + width - 1, wy)) {
+      standWall(map, { id: `${baseId}:e:${ty}`, floor, style, height: 'low' }, x + width - 1, wy, 'east');
+    }
+  }
 }
 
 /**
@@ -204,6 +262,15 @@ export function addStairs(map: RegionMap, plan: StairPlan): Stairway {
   for (const floor of [lower, upper]) {
     if (floor === 0) continue;
     for (let ty = y; ty < y + height; ty++) for (let tx = x; tx < x + width; tx++) setOn(map, floor, tx, ty, Tile.Floor);
+    // Remove edge walls across the stairway opening so players can freely step on and off
+    for (let ty = y; ty <= y + height; ty++) {
+      for (let tx = x; tx <= x + width; tx++) {
+        takeDownWall(map, tx, ty, 'north', floor);
+        takeDownWall(map, tx, ty, 'south', floor);
+        takeDownWall(map, tx, ty, 'west', floor);
+        takeDownWall(map, tx, ty, 'east', floor);
+      }
+    }
   }
   const rect = { x, y, width, height };
   const ahead = plan.climbs ?? 'north';

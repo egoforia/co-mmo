@@ -1,8 +1,8 @@
 import type Phaser from 'phaser';
-import { FALLBACK_BUILDING_STYLE, type EdgeWall, type RegionMap } from '@co-mmo/shared';
+import { FALLBACK_BUILDING_STYLE, storeyAt, type EdgeWall, type RegionMap } from '@co-mmo/shared';
 import { PROJECTION } from '../projection.ts';
 import { registerWallCopingCap, registerWallFace } from '../textures.ts';
-import { EAST_WALL_TINT, floorDepthOffset, floorLift } from './types.ts';
+import { EAST_WALL_TINT, WALL_RISE, floorDepthOffset, floorLift } from './types.ts';
 import { wallFaceKey } from './walls.ts';
 
 // Walls on one side of a tile (the world editor's Wall tool, edge-walls.ts in
@@ -26,6 +26,7 @@ const FIGURE = { halfWidth: 28, height: 150 };
 /** How tall a wall stands, in screen pixels. */
 function riseOf(wall: EdgeWall): number {
   const ground = PROJECTION.ground;
+  if (wall.height === 'low') return Math.round(ground.height * WALL_RISE);
   return Math.round(ground.height * (wall.height === 'half' ? 1 : 2));
 }
 
@@ -39,6 +40,12 @@ export function standEdgeWalls(scene: Phaser.Scene, map: RegionMap, ox: number, 
   const ground = PROJECTION.ground;
   const views: EdgeWallView[] = [];
   for (const wall of map.edgeWalls ?? []) {
+    if (wall.height === 'low' && wall.floor) {
+      const across = wall.along === 'h';
+      const tx = across ? wall.x : wall.x - 1;
+      const ty = across ? wall.y - 1 : wall.y;
+      if (storeyAt(map, tx, ty, wall.floor + 1)) continue;
+    }
     const face = wallFaceKey(scene, wall.style) ?? wallFaceKey(scene, FALLBACK_BUILDING_STYLE);
     if (!face) continue;
     const rise = riseOf(wall);

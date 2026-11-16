@@ -265,7 +265,15 @@ const floors: FloorView[] = map.storeys.map((storey) => {
 });
   // Walls on a tile's side: those off the ground show with their floor.
   const edgeWalls = standEdgeWalls(scene, map, ox, oy);
-  for (const { wall, image } of edgeWalls) if (wall.floor) floors.find((f) => f.storey.floor === wall.floor && (within(f.storey, wall.x, wall.y) || within(f.storey, wall.x - (wall.along === 'v' ? 1 : 0), wall.y - (wall.along === 'h' ? 1 : 0))))?.objects.push(image);
+  for (const { wall, image, cap } of edgeWalls) {
+    if (wall.floor) {
+      const floorView = floors.find((f) => f.storey.floor === wall.floor && (within(f.storey, wall.x, wall.y) || within(f.storey, wall.x - (wall.along === 'v' ? 1 : 0), wall.y - (wall.along === 'h' ? 1 : 0))));
+      if (floorView) {
+        floorView.objects.push(image);
+        if (cap) floorView.objects.push(cap);
+      }
+    }
+  }
   placeLandmarks(scene, map, ox, oy, views, floors, art);
   placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);

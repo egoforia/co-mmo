@@ -45,7 +45,11 @@ function setup(weapon?: string) {
     region.handle('a', { t: 'attack', ...(target ? { target } : {}) });
     return hits(conn).slice(before).map((h) => (h as { target: string }).target);
   };
-  return { region, conn, tx, ty, ids, put, attack, shoot, map };
+  const tick = () => {
+    clock.now += 50;
+    region.tick();
+  };
+  return { region, conn, tx, ty, ids, put, attack, shoot, tick, map };
 }
 
 afterEach(() => {
@@ -97,6 +101,42 @@ describe('reach on tiles', () => {
     t.region.combatRules = combatRules({ bodiesBlockShots: true });
     // On: the near one stands in the way, so the shot goes to the one it can reach.
     expect(t.shoot(far)).toEqual([near]);
+  });
+
+  it('a creature flanked by two players takes more from each blow', () => {
+    const t = setup();
+    // Strong enough that rounding hides nothing, and a fresh creature each time.
+    t.region.character('a')!.level = 100;
+    const [one, two] = t.ids;
+    t.put(one!, 1, 0);
+    t.attack();
+    const plain = (hits(t.conn).at(-1) as { amount: number }).amount;
+    t.put(one!, 40, 40);
+    t.put(two!, 1, 0);
+    t.region.join(info('b'), fakeConn(), { x: null, y: null }, newCharacter());
+    t.region.placePlayer('b', t.tx + 2.5, t.ty + 0.5);
+    t.attack();
+    const flanked = (hits(t.conn).at(-1) as { amount: number }).amount;
+    expect(flanked / plain).toBeGreaterThan(1.13);
+    expect(flanked / plain).toBeLessThan(1.17);
+  });
+
+  it('stepping away from a creature fighting you gives it a free swing', () => {
+    const t = setup();
+    const id = t.ids[0]!;
+    t.put(id, 1, 0);
+    // Strike it, so it fights back.
+    t.attack();
+    const swings = () => t.conn.messages.filter((m) => m.t === 'notice' && /as you turn away/.test((m as { text: string }).text)).length;
+    // A step along its side keeps beside it: no swing.
+    t.region.handle('a', { t: 'input', seq: 1, dx: 0, dy: 1 });
+    t.tick();
+    expect(swings()).toBe(0);
+    for (let i = 0; i < 20; i++) {
+      t.region.handle('a', { t: 'input', seq: 2 + i, dx: -1, dy: 0 });
+      t.tick();
+    }
+    expect(swings()).toBe(1);
   });
 
   it("only the Owner sets the Combat page's rules, and they are kept", async () => {

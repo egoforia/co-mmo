@@ -40,7 +40,7 @@ export const LAND: EditKind<'land'> = {
     else map.weather = edit.weather;
     if (edit.arrive) {
       if (isBlocking(tileOf(map, edit.at))) return false;
-      map.spawn = { x: edit.at[0] + 0.5, y: edit.at[1] + 0.5 };
+      map.spawn = { x: Math.floor(edit.at[0]) + 0.5, y: Math.floor(edit.at[1]) + 0.5 };
     }
     return true;
   },

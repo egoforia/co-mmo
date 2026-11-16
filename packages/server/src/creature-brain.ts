@@ -1,4 +1,4 @@
-import { SIZE_TILES, TICK_RATE, anchorNear, awake, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
+import { SIZE_TILES, TICK_RATE, anchorNear, awake, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type TileSpot, type Weather } from '@co-mmo/shared';
 import { addThreat, chooseTarget } from './threat.ts';
 import { canReach, goTo, keepStepping, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
 
@@ -258,11 +258,12 @@ function close(c: Creature, p: Prey, h: Habitat): void {
   if (!c.to) {
     const prey = anchorNear(p.x, p.y);
     const from = anchorNear(c.x, c.y, width);
-    const route = findTileRoute(h.map, {
-      from, toward: prey, width, floor: c.floor, limit: CLOSE_LIMIT,
-      arrived: (t) => tilesApart(t, width, prey, 1) === CREATURE_REACH,
-      free: (t) => !tileTaken(among, t, c.floor, width),
-    });
+    const free = (t: TileSpot) => !tileTaken(among, t, c.floor, width);
+    const search = (arrived: (t: TileSpot) => boolean) => findTileRoute(h.map, { from, toward: prey, width, floor: c.floor, limit: CLOSE_LIMIT, arrived, free });
+    // A pack hunts together: one goes round to the far side of a packmate already at the prey, to flank them.
+    const across = flankSpot(c, p, prey, h);
+    const route = (across && free(across) ? search((t) => t.tx === across.tx && t.ty === across.ty) : undefined)
+      ?? search((t) => tilesApart(t, width, prey, 1) === CREATURE_REACH);
     const first = route?.[0];
     if (first) {
       const m = spotMiddle(stepped(from, first), width);
@@ -271,6 +272,23 @@ function close(c: Creature, p: Prey, h: Habitat): void {
     }
   }
   moveToward(h.map, c, p.x, p.y, speedOf(c), among);
+}
+
+/**
+ * For a pack creature closing in: the tile across the prey from a packmate
+ * already beside them, where it would flank them; none for other creatures,
+ * big ones, or when no packmate stands beside the prey yet.
+ */
+function flankSpot(c: Creature, p: Prey, prey: TileSpot, h: Habitat): TileSpot | undefined {
+  if (c.def.behavior !== 'pack' || widthOf(c) !== 1) return undefined;
+  for (const k of h.creatures) {
+    if (k === c || k.kind !== c.kind || k.aggro !== p.id || k.respawnAt !== null || k.floor !== c.floor || widthOf(k) !== 1) continue;
+    const at = anchorNear(k.x, k.y);
+    if (tilesApart(at, 1, prey, 1) !== 1) continue;
+    const spot = { tx: prey.tx * 2 - at.tx, ty: prey.ty * 2 - at.ty };
+    return spot.tx >= 0 && spot.ty >= 0 && spot.tx < h.map.width && spot.ty < h.map.height ? spot : undefined;
+  }
+  return undefined;
 }
 
 /** Runs from whoever frightened it until it is safe, then heads home. */

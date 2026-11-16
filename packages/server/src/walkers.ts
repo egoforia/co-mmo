@@ -326,15 +326,16 @@ export function findPath(map: RegionMap, from: Spot, to: Spot, floor = from.floo
 }
 
 /**
- * Up to `count` walkable spots around a point, nearest first, at least a
- * tile apart, for placing wished things.
+ * Up to `count` walkable spots around a point, nearest first, each on a
+ * tile of its own (its middle), for placing wished things.
  */
 export function findSpots(map: RegionMap, x: number, y: number, count: number, min = 1.5, max = 4, floor = 0): Spot[] {
   const spots: Spot[] = [];
   for (let r = min; r <= max && spots.length < count; r += 0.75) {
     for (let a = 0; a < 12 && spots.length < count; a++) {
       const angle = (a / 12) * Math.PI * 2 + r;
-      const s = { x: Math.round((x + Math.cos(angle) * r) * 2) / 2, y: Math.round((y + Math.sin(angle) * r) * 2) / 2 };
+      // On a tile's middle, as everything that walks stands on tiles.
+      const s = { x: Math.floor(x + Math.cos(angle) * r) + 0.5, y: Math.floor(y + Math.sin(angle) * r) + 0.5 };
       if (outsideSide(map, s.x, s.y) || collides(map, s.x, s.y, floor)) continue;
       if (spots.some((o) => Math.hypot(o.x - s.x, o.y - s.y) < 1)) continue;
       spots.push(s);

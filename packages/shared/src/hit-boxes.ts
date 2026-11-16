@@ -2,10 +2,13 @@ import { PLAYER_RADIUS } from './constants.ts';
 import type { CreatureSizeTier } from './walk.ts';
 import type { TileSpot } from './tiles/grid.ts';
 
-// Hit boxes: every player, creature and person stands in a round body of
-// their own, so nobody stands where someone else stands. Bodies are what
-// limit how many creatures can reach one player at once: as many as fit in a
-// ring about them, about six of a player's size. Wall boxes (movement.ts
+// Hit boxes: every player, creature and person stands in a body of their
+// own, so nobody stands where someone else stands. Everything walks on tiles
+// (docs/combat.md), where a body holds the tiles of its square
+// (tiles/walker.ts tileTaken); the round radius is still how wide it is for
+// what is not on tiles yet (blows' and shots' reach). Bodies are what limit
+// how many creatures can reach one player at once: as many as find a free
+// tile about them, eight of a player's size. Wall boxes (movement.ts
 // collides) are separate: these are only bodies against bodies.
 //
 // Who blocks whom (the defaults chosen with the first version):
@@ -38,14 +41,17 @@ export interface HitBody {
   of?: object;
   /** The tile it is stepping onto, for something that walks on tiles (tiles/walker.ts): it holds that tile too. */
   to?: TileSpot;
+  /** How many tiles wide its square is (tiles/grid.ts SIZE_TILES); one when missing. */
+  width?: number;
 }
 
 /**
  * The body of something that moves: it reads where it stands from the thing
  * itself, so it stays right as the thing walks during a tick.
  */
-export function bodyOf(of: { x: number; y: number; floor?: number; to?: TileSpot }, r: number, kind: BodyKind): HitBody {
+export function bodyOf(of: { x: number; y: number; floor?: number; to?: TileSpot }, r: number, kind: BodyKind, width = 1): HitBody {
   return {
+    width,
     get x() { return of.x; },
     get y() { return of.y; },
     get floor() { return of.floor ?? 0; },

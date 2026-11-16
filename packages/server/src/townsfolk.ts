@@ -1,5 +1,5 @@
 import { PERSON_RADIUS, TICK_RATE, dayPart, routineOf, routineWords, stairsMiddle, stairsToward, takeStairs, type DayPart, type Among, type Bodies, type NpcPlacement, type Placed, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
-import { findPath, findSpots, moveToward, standClear, wander, type Walker } from './walkers.ts';
+import { findPath, findSpots, keepStepping, moveToward, standClear, wander, type Walker } from './walkers.ts';
 
 // The people of a region going about their day (routines.ts): walking to
 // work at dawn, out to the square at dusk, home to sleep at night, and
@@ -59,6 +59,13 @@ export function makeTownsperson(npc: NpcPlacement, map: RegionMap, random: () =>
 
 /** One tick of a person's day: set off when the part of the day changes, walk there, then stroll or sleep. */
 export function live(n: Townsperson, town: Town): void {
+  const before = { x: n.x, y: n.y };
+  day(n, town);
+  // Whatever they chose (stopping to talk too), a step they began is finished.
+  keepStepping(town.map, n, before, WALK_SPEED);
+}
+
+function day(n: Townsperson, town: Town): void {
   const part = dayPart(town.phase);
   const step = routineOf(n.id, n.routine)[part];
   const spot = n.spots[step.place];
@@ -82,10 +89,11 @@ export function live(n: Townsperson, town: Town): void {
     // Something in the way (a new building, a wished thing) skips to the next bend.
     if (moveToward(town.map, n, next.x, next.y, WALK_SPEED, among) || (n.x === before.x && n.y === before.y)) n.path.shift();
     // At the stairs on the way (the end of this leg): up or down them, then on from the landing.
-    if (n.floor !== spot.floor && !n.path.length) {
+    if (n.floor !== spot.floor && !n.path.length && !n.to) {
       const landed = takeStairs(town.map, n);
       if (landed) {
         Object.assign(n, landed);
+        delete n.to;
         n.path = plan(town.map, n, spot);
       }
     }

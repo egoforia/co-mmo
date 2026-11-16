@@ -1,4 +1,4 @@
-import { BodyGrid, PERSON_RADIUS, bodyOf, creatureRadius, creatureSize, type Among, type Bodies, type BodyKind, type HitBody, type RegionMap } from '@co-mmo/shared';
+import { BodyGrid, PERSON_RADIUS, SIZE_TILES, bodyOf, creatureRadius, creatureSize, type Among, type Bodies, type BodyKind, type HitBody, type RegionMap } from '@co-mmo/shared';
 import type { Ghosts } from '../region.ts';
 import { findSpots } from '../walkers.ts';
 import type { Creature } from '../creature-brain.ts';
@@ -25,11 +25,11 @@ export class Crowd {
   gather(ghosts: Iterable<Ghosts> = []): void {
     const grid = new BodyGrid();
     for (const p of this.s.players.values()) if (!this.unseen(p)) grid.add(bodyOf(p, PERSON_RADIUS, 'player'));
-    for (const c of this.s.creatures) if (c.respawnAt === null) grid.add(bodyOf(c, creatureRadius(creatureSize(c.kind)), 'creature'));
+    for (const c of this.s.creatures) if (c.respawnAt === null) grid.add(bodyOf(c, creatureRadius(creatureSize(c.kind)), 'creature', c.width ?? SIZE_TILES[creatureSize(c.kind)]));
     for (const n of this.s.townsfolk) grid.add(bodyOf(n, PERSON_RADIUS, 'npc'));
     for (const g of ghosts) {
       for (const e of g.players) if (!e.fallen) grid.add(still(e, PERSON_RADIUS, 'player'));
-      for (const e of g.creatures) grid.add(still(e, creatureRadius(e.size), 'creature'));
+      for (const e of g.creatures) grid.add(still(e, creatureRadius(e.size), 'creature', SIZE_TILES[e.size ?? 'medium']));
       for (const e of g.npcs) grid.add(still(e, PERSON_RADIUS, 'npc'));
     }
     this.grid = grid;
@@ -49,8 +49,8 @@ export class Crowd {
 }
 
 /** A body that stays put this tick: one shown from across a cell's border. */
-function still(e: { x: number; y: number; floor?: number }, r: number, kind: BodyKind): HitBody {
-  return { x: e.x, y: e.y, floor: e.floor ?? 0, r, kind };
+function still(e: { x: number; y: number; floor?: number }, r: number, kind: BodyKind, width = 1): HitBody {
+  return { x: e.x, y: e.y, floor: e.floor ?? 0, r, kind, width };
 }
 
 /**

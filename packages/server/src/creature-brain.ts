@@ -1,6 +1,6 @@
-import { TICK_RATE, awake, collides, creatureRadius, creatureSize, noticeScale, sizeReach, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
+import { SIZE_TILES, TICK_RATE, anchorNear, awake, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
 import { addThreat, chooseTarget } from './threat.ts';
-import { canReach, goTo, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
+import { canReach, goTo, keepStepping, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
 
 // How creatures behave, one tick at a time: sleeping out of their hours,
 // noticing players (less in the dark and the fog, more if they carry a
@@ -9,9 +9,10 @@ import { canReach, goTo, moveAway, moveToward, stalled, standClear, wander, type
 // decides what each creature does next. Creatures only notice and strike
 // those on their own floor; one chasing someone follows them up or down
 // stairs (never a ladder) while they stay within its leash. Who it fights
-// is chosen by threat (threat.ts). Each stands in a body (hit-boxes.ts) and
-// walks round the others, so only as many as fit about a player can reach
-// them at once.
+// is chosen by threat (threat.ts). Each walks on tiles (docs/combat.md),
+// standing on a square as wide as its size, and strikes those on a tile
+// beside its square; it never steps onto a tile someone holds, so only as
+// many as find a free tile about a player can reach them at once.
 
 type Spot = { x: number; y: number };
 
@@ -21,9 +22,9 @@ const WANDER_RADIUS = 4;
 /** A chasing creature gives up this far from home and walks back. */
 export const LEASH = 8;
 /**
- * A player-sized creature strikes from this close, middle to middle; bigger
- * ones from as much farther as they are wider (sizeReach). Bodies touch at
- * 0.6, so about six fit in reach of one player at once.
+ * A creature strikes those this many tiles from its square, a diagonal
+ * counting as one: those on a tile touching it, side or corner. A big one
+ * stands wider, so more tiles touch it. Eight fit about one player.
  */
 export const CREATURE_REACH = 1;
 /** Pack creatures this close to one another roam and hunt together. */
@@ -62,8 +63,6 @@ export interface Creature extends Walker {
   stunImmuneUntil?: number;
   /** Share of its speed its statuses allow this tick (paceOf); full when missing. */
   pace?: number;
-  /** While held up by a crowd about the player it fights, how far round them it aims (radians, see close). */
-  flank?: number;
 }
 
 /** A player as creatures see them. */
@@ -98,7 +97,7 @@ export interface Habitat {
 /** A new live creature of a kind, at its home spot. */
 export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number, floor = 0): Creature {
   return {
-    id, kind, def, x, y, floor, home: { x, y, floor }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
+    id, kind, def, x, y, floor, width: SIZE_TILES[creatureSize(kind)], home: { x, y, floor }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
     aggro: null, threat: {}, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0, statuses: [],
   };
 }
@@ -108,8 +107,17 @@ export function think(c: Creature, h: Habitat): void {
   if (c.respawnAt !== null) {
     if (h.now < c.respawnAt) return;
     Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, threat: {}, fleeing: null, asleep: false });
+    delete c.to;
     return;
   }
+  const before = { x: c.x, y: c.y };
+  act(c, h);
+  // Whatever it chose, a step it began is finished.
+  keepStepping(h.map, c, before, speedOf(c));
+}
+
+/** What it does this tick, once alive. */
+function act(c: Creature, h: Habitat): void {
   // Put on one spot with others, or someone came to stand on it: step clear first.
   const among = amid(c, h);
   if (among) standClear(h.map, c, WANDER_SPEED, among, h.random);
@@ -139,9 +147,15 @@ function amid(c: Creature, h: Habitat): Among | undefined {
   return h.bodies && { self: { r: creatureRadius(creatureSize(c.kind)), kind: 'creature', floor: c.floor, of: c }, bodies: h.bodies };
 }
 
-/** How close it must be to strike, middle to middle: farther for a bigger creature. */
-export function reachOf(kind: string): number {
-  return CREATURE_REACH + sizeReach(creatureSize(kind));
+/** How many tiles wide it stands. */
+function widthOf(c: Pick<Creature, 'kind' | 'width'>): number {
+  return c.width ?? SIZE_TILES[creatureSize(c.kind)];
+}
+
+/** Tiles between its square and a player's, a diagonal counting as one: 1 when they touch. */
+export function tilesTo(c: Pick<Creature, 'kind' | 'x' | 'y' | 'width'>, p: { x: number; y: number }): number {
+  const w = widthOf(c);
+  return tilesApart(anchorNear(c.x, c.y, w), w, anchorNear(p.x, p.y), 1);
 }
 
 /** How fast it moves when in a hurry, as its statuses allow (Slowed, Rooted). */
@@ -222,42 +236,41 @@ function fight(c: Creature, h: Habitat): void {
     goTo(h.map, c, p, speedOf(c), false, amid(c, h));
     return;
   }
-  const d = Math.hypot(p.x - c.x, p.y - c.y);
-  const reach = reachOf(c.kind);
-  if (d > reach * 0.8) close(c, p, reach, h);
-  if (Math.hypot(p.x - c.x, p.y - c.y) <= reach && h.now - c.lastAttack >= c.def.cooldown * 1000) {
+  if (tilesTo(c, p) > CREATURE_REACH) close(c, p, h);
+  if (tilesTo(c, p) <= CREATURE_REACH && h.now - c.lastAttack >= c.def.cooldown * 1000) {
     c.lastAttack = h.now;
     h.hurt(c, p.id);
   }
 }
 
-/** How far its way in turns each tick it is held up, while it looks for a gap about a crowded player (radians). */
-const FLANK_TURN = 0.25;
+/** Squares a creature searches for a way to a free tile beside its prey, each tick it closes. */
+const CLOSE_LIMIT = 300;
 
 /**
- * Closes in on a player. Held up by others already about them, it does not
- * wait behind: it works its way round the crowd, aiming for a spot beside
- * the player further round each tick it gets no nearer, until it finds a
- * gap or comes round to the far side.
+ * Closes in on a player: the shortest way to a free square touching them,
+ * round walls and round anyone already about them, so a crowd fans out to
+ * the free sides instead of waiting behind. With no free side within reach
+ * of its search, it walks straight at them and waits its turn.
  */
-function close(c: Creature, p: Prey, reach: number, h: Habitat): void {
+function close(c: Creature, p: Prey, h: Habitat): void {
   const among = amid(c, h);
-  const flank = c.flank ?? 0;
-  let to: Spot = p;
-  if (among && flank !== 0) {
-    const a = Math.atan2(c.y - p.y, c.x - p.x) + flank;
-    to = { x: p.x + Math.cos(a) * reach * 0.7, y: p.y + Math.sin(a) * reach * 0.7 };
+  const width = widthOf(c);
+  if (!c.to) {
+    const prey = anchorNear(p.x, p.y);
+    const from = anchorNear(c.x, c.y, width);
+    const route = findTileRoute(h.map, {
+      from, toward: prey, width, floor: c.floor, limit: CLOSE_LIMIT,
+      arrived: (t) => tilesApart(t, width, prey, 1) === CREATURE_REACH,
+      free: (t) => !tileTaken(among, t, c.floor, width),
+    });
+    const first = route?.[0];
+    if (first) {
+      const m = spotMiddle(stepped(from, first), width);
+      moveToward(h.map, c, m.x, m.y, speedOf(c), among);
+      return;
+    }
   }
-  const before = { x: c.x, y: c.y };
-  moveToward(h.map, c, to.x, to.y, speedOf(c), among);
-  if (!among) return;
-  if (!stalled(before, c, p)) {
-    c.flank = 0;
-    return;
-  }
-  // Each goes round its own way, so a crowd fans out to both sides.
-  const way = c.id.length % 2 === 0 ? 1 : -1;
-  c.flank = Math.abs(flank) >= Math.PI / 2 ? -flank : flank + way * FLANK_TURN;
+  moveToward(h.map, c, p.x, p.y, speedOf(c), among);
 }
 
 /** Runs from whoever frightened it until it is safe, then heads home. */

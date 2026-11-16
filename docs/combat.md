@@ -27,7 +27,7 @@ tile in front of a healer really guards them.
 
 1. Shared tile rules (`packages/shared/src/tiles/`): grid, steps, claims, routes, strides. (Built.)
 2. Players move on tiles: server, browser prediction, smooth tile-to-tile drawing. Players block players except their party. (Built.)
-3. Monsters and NPCs move on tiles; hit boxes become tile claims.
+3. Monsters and NPCs move on tiles (`packages/server/src/walkers.ts`): whole steps, squares as wide as their size, a short route search round walls and crowds that they keep to, and a step begun is always finished. A monster strikes from any tile touching its square, and closes on the nearest free one, so a crowd fans out round a player and only eight player-sized monsters reach them at once. A body holds every tile its square reaches into, plus the square it steps onto. (Built.)
 4. Reach, line of sight and tile shapes for skills and weapons; God's View Combat page.
 5. Tactics: flanking, free swings on leaving, monster tactics; editor snapping.
 6. Balance test and a balance pass.

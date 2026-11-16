@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CREATURES, DEFAULT_SKY, PERSON_RADIUS, TICK_RATE, collides, creatureRadius, newCharacter, regionDef, type CreatureDef, type PlayerInfo, type RegionMap } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
-import { CREATURE_REACH } from '../src/creature-brain.ts';
+import { CREATURE_REACH, tilesTo } from '../src/creature-brain.ts';
 
 // Hit boxes on the server (shared hit-boxes.ts): creatures crowd round a
 // player without standing in one another, only so many reach them at once,
-// and players are stopped by creatures but walk through each other.
+// and players are stopped by creatures and by each other, on tiles.
 
 const conn = (): Connection => ({ send() {}, close() {} });
 const info = (id: string): PlayerInfo => ({ id, name: id, color: 0xffffff, role: 'player' });
@@ -64,14 +64,13 @@ describe('hit boxes', () => {
 
     const me = region.position('a')!;
     const them = region.creatureIds().filter((id) => id.startsWith('test-biter')).map((id) => region.creature(id)!);
-    const touch = creatureRadius() * 2;
-    for (let i = 0; i < them.length; i++) {
-      expect(Math.hypot(them[i]!.x - me.x, them[i]!.y - me.y)).toBeGreaterThanOrEqual(PERSON_RADIUS + creatureRadius() - 1e-3);
-      for (let j = i + 1; j < them.length; j++) expect(Math.hypot(them[i]!.x - them[j]!.x, them[i]!.y - them[j]!.y)).toBeGreaterThanOrEqual(touch - 1e-3);
-    }
-    const reaching = them.filter((c) => Math.hypot(c.x - me.x, c.y - me.y) <= CREATURE_REACH).length;
-    // They work round the crowd until the ring about the player is full (about seven), and the rest wait behind.
-    expect(reaching).toBeGreaterThanOrEqual(5);
+    // Everyone on a tile of their own (docs/combat.md, Moving on tiles): nobody on the player's, no two on one.
+    const held = new Set(them.map((c) => `${Math.floor(c.x)},${Math.floor(c.y)}`));
+    expect(held.size).toBe(them.length);
+    expect(held.has(`${Math.floor(me.x)},${Math.floor(me.y)}`)).toBe(false);
+    const reaching = them.filter((c) => tilesTo(c, me) <= CREATURE_REACH).length;
+    // They work round the crowd to the free tiles about the player, all eight of them, and the rest wait behind.
+    expect(reaching).toBeGreaterThanOrEqual(7);
     expect(reaching).toBeLessThanOrEqual(8);
   });
 

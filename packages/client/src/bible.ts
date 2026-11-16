@@ -34,7 +34,7 @@ function pictureKey(e: ContentEntry): string {
   // A region is shown by the first creature that lives there.
   if (def?.kind === 'region') return regionDef(e.id)?.wild?.creatures[0]?.asset ?? 'sanctum-shrine';
   // Loot is shown by the creature that drops it.
-  if (def?.kind === 'loot') return CREATURES[def.creature]?.art ?? 'woods-mushroom';
+  if (def?.kind === 'loot' || def?.kind === 'size') return CREATURES[def.creature]?.art ?? 'woods-mushroom';
   const first = def?.kind === 'rule' ? Object.keys(def.items)[0] : undefined;
   return wishArtKey(first ? ruleItemId(e.id, first) : e.id);
 }

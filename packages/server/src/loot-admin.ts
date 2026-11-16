@@ -1,4 +1,4 @@
-import { CREATURES, ITEMS, lootTable, type LootWish } from '@co-mmo/shared';
+import { CREATURES, ITEMS, creatureSize, lootTable, type CreatureSizeTier, type LootWish, type SizeWish } from '@co-mmo/shared';
 import type { ContentRecord, Store } from './store.ts';
 
 /** Where a line of loot came from, as the Loot tab says it. */
@@ -18,27 +18,32 @@ export interface CreatureLoot {
   /** Where its picture is served. */
   picture?: string;
   level: number;
+  /** How big every one of its kind stands now (creature-size.ts), and the size it comes with. */
+  size: CreatureSizeTier;
+  ownSize: CreatureSizeTier;
   /** The creature's own wish, for wished creatures. */
   wished?: { by: string; at: number; entry: string };
   lines: { item: string; name: string; chance: number; qty: number; source: LootSource }[];
-  /** Loot wishes and God's View changes, newest first, including undone ones. */
-  changes: { id: string; at: number; by: string; godsView: boolean; status: string; mode: 'add' | 'set'; summary: string }[];
+  /** Loot wishes and God's View loot and size changes, newest first, including undone ones. */
+  changes: { id: string; at: number; by: string; godsView: boolean; status: string; summary: string }[];
 }
 
 /**
- * The Loot tab (God's View): every creature in the world with its loot and
- * where each line came from, plus the items that can go on it.
+ * The Loot tab (God's View, "Monsters"): every creature in the world with its
+ * size and loot and where each line came from, plus the items that can go on it.
  */
 export function lootOverview(store: Store): { creatures: CreatureLoot[]; items: { id: string; name: string; bound: boolean }[] } {
   const byId = new Map(store.content.map((r) => [r.id, r]));
   const creatures = Object.entries(CREATURES).map(([id, def]): CreatureLoot => {
     const own = creatureWish(store.content, id);
-    const changes = store.content.filter((r): r is ContentRecord & { definition: LootWish } => r.definition?.kind === 'loot' && r.definition.creature === id);
+    const changes = store.content.filter((r): r is ContentRecord & { definition: LootWish | SizeWish } => (r.definition?.kind === 'loot' || r.definition?.kind === 'size') && r.definition.creature === id);
     return {
       id,
       name: def.name,
       ...(picture(own, id, def.art) ? { picture: picture(own, id, def.art) } : {}),
       level: def.level,
+      size: creatureSize(id),
+      ownSize: def.size ?? 'medium',
       ...(own ? { wished: { by: own.wisher.name, at: own.at, entry: own.id } } : {}),
       lines: lootTable(id).map((l) => {
         const from = l.from ? byId.get(l.from) : undefined;
@@ -48,7 +53,7 @@ export function lootOverview(store: Store): { creatures: CreatureLoot[]; items: 
         return { item: l.item, name: ITEMS[l.item]!.name, chance: l.chance, qty: l.qty ?? 1, source };
       }),
       changes: changes.reverse().map((r) => ({
-        id: r.id, at: r.at, by: r.wisher.name, godsView: !!r.godsView, status: r.status, mode: r.definition.mode, summary: r.summary,
+        id: r.id, at: r.at, by: r.wisher.name, godsView: !!r.godsView, status: r.status, summary: r.summary,
       })),
     };
   });

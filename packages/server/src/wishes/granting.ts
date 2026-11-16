@@ -9,8 +9,11 @@ import {
   regionFromWish,
   removeContent,
   validateLoot,
+  validateSize,
   wishArtKey,
   type ContentEntry,
+  type LootWish,
+  type SizeWish,
   type RaceId,
 } from '@co-mmo/shared';
 import type { LiveRules } from '../live-rules.ts';
@@ -132,7 +135,18 @@ export class Granting {
    * server and can be rolled back. Throws a WishError.
    */
   setLoot(by: { id: string; name: string }, raw: unknown): ContentRecord {
-    const definition = validateLoot(raw, true);
+    return this.grantFromGodsView(by, validateLoot(raw, true));
+  }
+
+  /** God's View choosing how big every monster of one kind stands (creature-size.ts): saved and undone like a wish. */
+  setSize(by: { id: string; name: string }, raw: unknown): ContentRecord {
+    const definition = validateSize(raw);
+    if (typeof definition === 'string') throw new WishError(definition);
+    return this.grantFromGodsView(by, definition);
+  }
+
+  /** A change made in God's View, granted at once: saved, applied here and sent to every region server and browser. */
+  private grantFromGodsView(by: { id: string; name: string }, definition: LootWish | SizeWish): ContentRecord {
     const record: ContentRecord = {
       id: newWishId(this.now()),
       wisher: { id: by.id, name: by.name },

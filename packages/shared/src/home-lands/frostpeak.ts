@@ -21,7 +21,7 @@ const CREATURES: Record<string, CreatureDef> = {
     behavior: 'timid', level: 3, speed: 3.4, notice: 3.5, drops: [{ item: 'snow-hare-fur', chance: 0.7 }],
   }),
   'crag-ram': levelledCreature({
-    name: 'Crag Ram', art: 'frostpeak-crag-ram', description: 'A shaggy mountain ram with curled stone-grey horns. It guards its patch of cliff and charges anyone who comes too near.',
+    name: 'Crag Ram', art: 'frostpeak-crag-ram', size: 'medium', description: 'A shaggy mountain ram with curled stone-grey horns. It guards its patch of cliff and charges anyone who comes too near.',
     behavior: 'guard', level: 4, speed: 2.6, notice: 3.5, tough: 1.4, drops: [{ item: 'mountain-wool', chance: 0.7 }, { item: 'tonic', chance: 0.1 }],
   }),
   'ice-wisp': levelledCreature({

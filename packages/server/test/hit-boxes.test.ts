@@ -44,7 +44,7 @@ function openSpot(map: RegionMap, region: Region, size: number): { x: number; y:
   throw new Error('no open land');
 }
 
-const BITER: CreatureDef = { ...CREATURES['walking-mushroom']!, name: 'Test Biter', behavior: 'chase', notice: 12, speed: 3, damage: 0, hp: 1000, cooldown: 1000 };
+const BITER: CreatureDef = { ...CREATURES['walking-mushroom']!, name: 'Test Biter', size: 'medium', behavior: 'chase', notice: 12, speed: 3, damage: 0, hp: 1000, cooldown: 1000 };
 
 afterEach(() => {
   delete CREATURES['test-biter'];

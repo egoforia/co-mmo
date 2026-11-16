@@ -21,6 +21,7 @@ export * from './skills/index.ts';
 export * from './kit.ts';
 export * from './content.ts';
 export * from './loot.ts';
+export * from './creature-size.ts';
 export * from './materials.ts';
 export * from './copies.ts';
 export * from './fashion.ts';

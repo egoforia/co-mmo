@@ -4,6 +4,8 @@
 import Phaser from 'phaser';
 import {
   CREATURES,
+  CREATURE_HEIGHTS,
+  creatureHeight,
   heldArts,
   heldSize,
   ITEMS,
@@ -21,6 +23,7 @@ import {
   type ArtPoint,
   type ArtPointsManifest,
   type BodyState,
+  type CreatureSizeTier,
   type CreatureState,
   type NpcState,
   type RaceId,
@@ -117,10 +120,12 @@ export function dress(scene: Phaser.Scene, metrics: FigureMetricsCache, a: Avata
 }
 
 /**
- * Sizes an avatar wearing `key` so its figure stands as tall as the figure
- * in its own picture; with `fitting` false, at its usual size.
+ * Sizes an avatar wearing `key` so its figure stands its `height`, or else
+ * as tall as the figure in its own picture; with `fitting` false, at its usual size.
  */
 export function fitFigure(scene: Phaser.Scene, metrics: FigureMetricsCache, a: Avatar, key: string, fitting: boolean): void {
+  const figure = a.height ? metrics.height(scene.textures, key) : undefined;
+  if (a.height && figure) return void a.body.setScale(a.height / figure);
   const own = fitting && key !== a.art && scene.textures.exists(a.art) ? metrics.height(scene.textures, a.art) : undefined;
   const worn = own ? metrics.height(scene.textures, key) : undefined;
   a.body.setScale(own && worn ? (a.scale * own) / worn : a.scale);
@@ -235,15 +240,25 @@ export function makeCreature(scene: Phaser.Scene, metrics: FigureMetricsCache, c
   // Creatures walk slower than players: their walks play slower so their feet keep up.
   const speed = CREATURES[c.kind]?.speed;
   if (speed) a.pace = speed / PLAYER_SPEED;
-  a.body.setScale(0.8);
+  sizeCreature(scene, metrics, a, c.size);
   return a;
+}
+
+/** Fits a creature's picture to its size's height (walk.ts tiers), whatever height it was painted at; again when its size changes. */
+export function sizeCreature(scene: Phaser.Scene, metrics: FigureMetricsCache, a: Avatar, size: CreatureSizeTier | undefined): void {
+  const height = CREATURE_HEIGHTS[size ?? 'medium'];
+  if (a.height === height) return;
+  a.height = height;
+  fitFigure(scene, metrics, a, a.body.texture.key, true);
 }
 
 /** A body is the creature's own painted picture, laid on its side and faded a little. */
 export function makeBody(scene: Phaser.Scene, metrics: FigureMetricsCache, b: BodyState): Avatar {
   const a = makeAvatar(scene, metrics, b.asset, bodyLabel(b), false, 'woods-mushroom');
   a.label.setColor('#c0cbdc').setFontSize(Math.round(T * 0.18));
-  a.body.setScale(0.8).setOrigin(0.5, 0.5).setAngle(90).setAlpha(0.75);
+  a.height = creatureHeight(b.kind);
+  fitFigure(scene, metrics, a, a.body.texture.key, true);
+  a.body.setOrigin(0.5, 0.5).setAngle(90).setAlpha(0.75);
   return a;
 }
 

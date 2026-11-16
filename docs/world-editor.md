@@ -73,7 +73,9 @@ it is and holds what can be done to it: **Move** (M), **Copy** (Ctrl C),
 **Take away** (Delete), and a fold for each kind of change that fits it
 (look and size, floors above and below, a monster's level and hours, a
 patrol path, a quest). Dragging over bare ground with Select copies that
-area for Copy and paste.
+area for Copy and paste. A monster's size is not changed here: it belongs to
+its whole kind, on God's View's **Monsters** tab, so every monster of a kind
+stays the same size wherever it lives.
 
 ## The land panel
 

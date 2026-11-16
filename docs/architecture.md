@@ -383,6 +383,12 @@ edit's monster level is `monsterLevel`, apart from `level`, its floor.
 
 A spawn (or Change monsters) may also add **loot** of its own (`loot`,
 `lootChance`; on the home as `CreatureTune.loot`, added to the kind's drops).
+A monster's **size** belongs to its kind, not its spawn, so similar monsters
+stay one size: `creatureSize(kind)` (shared `creature-size.ts`) is the newest
+God's View choice that stands (a `size` content entry, set on the Monsters
+tab, undone like loot), else `CreatureDef.size`, else medium. It sets the
+body's width and reach (`hit-boxes.ts`) and the height the browser fits the
+picture to (`sizeCreature` in `avatars.ts`), whatever height it was painted at.
 **Lights** on their own are the `light` kind: a colour, reach and flicker on a
 tile of any floor (`RegionMap.lights`), lit by the game like a lamp's
 (`placeLamps`). **Change building** (`restyle`) gives a building another look,

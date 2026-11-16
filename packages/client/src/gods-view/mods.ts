@@ -13,6 +13,7 @@ const KIND_WORDS: Record<string, string> = {
   player: "A player's look",
   recipe: 'A crafting recipe',
   loot: "A creature's loot",
+  size: "A monster's size",
   region: 'A new region',
   rule: 'A scripted rule',
 };

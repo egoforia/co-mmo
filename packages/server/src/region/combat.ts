@@ -1,4 +1,5 @@
 import {
+  creatureSize,
   sizeReach,
   ABILITIES,
   MARK_BONUS,
@@ -121,7 +122,7 @@ export class Combat implements EffectKit {
   /** Live creatures on the player's floor within `range` of a point (of their edge, for big ones), nearest first. */
   creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[] {
     return this.s.creatures
-      .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) - sizeReach(c.def.size) <= range)
+      .filter((c) => c.respawnAt === null && c.floor === p.floor && Math.hypot(c.x - at.x, c.y - at.y) - sizeReach(creatureSize(c.kind)) <= range)
       .sort((a, b) => Math.hypot(a.x - at.x, a.y - at.y) - Math.hypot(b.x - at.x, b.y - at.y));
   }
 
@@ -141,7 +142,7 @@ export class Combat implements EffectKit {
     let best = range;
     for (const c of this.s.creatures) {
       if (c.respawnAt !== null || c.floor !== p.floor || (id && c.id !== id)) continue;
-      const d = Math.hypot(c.x - p.x, c.y - p.y) - sizeReach(c.def.size);
+      const d = Math.hypot(c.x - p.x, c.y - p.y) - sizeReach(creatureSize(c.kind));
       if (d <= best) {
         best = d;
         target = c;

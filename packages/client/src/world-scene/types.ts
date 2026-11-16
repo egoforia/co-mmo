@@ -43,6 +43,12 @@ export interface Avatar {
    * standing pictures are, and walks are drawn as painted.
    */
   fit?: boolean;
+  /**
+   * How tall its figure stands, in pixels, whatever picture it wears: a
+   * creature's size (creature-size.ts), so a picture painted bigger or
+   * smaller than its size is fitted to it. None: sized by `scale`.
+   */
+  height?: number;
   /** How fast it walks, as a share of a player's speed, so its feet keep up with the ground. */
   pace?: number;
   shadow: Phaser.GameObjects.Ellipse;

@@ -1,4 +1,4 @@
-import { TICK_RATE, awake, collides, creatureRadius, noticeScale, sizeReach, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
+import { TICK_RATE, awake, collides, creatureRadius, creatureSize, noticeScale, sizeReach, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type Weather } from '@co-mmo/shared';
 import { addThreat, chooseTarget } from './threat.ts';
 import { canReach, goTo, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
 
@@ -136,12 +136,12 @@ export function think(c: Creature, h: Habitat): void {
 
 /** The creature's body among everyone else's this tick, when the region keeps bodies. */
 function amid(c: Creature, h: Habitat): Among | undefined {
-  return h.bodies && { self: { r: creatureRadius(c.def.size), kind: 'creature', floor: c.floor, of: c }, bodies: h.bodies };
+  return h.bodies && { self: { r: creatureRadius(creatureSize(c.kind)), kind: 'creature', floor: c.floor, of: c }, bodies: h.bodies };
 }
 
 /** How close it must be to strike, middle to middle: farther for a bigger creature. */
-export function reachOf(def: CreatureDef): number {
-  return CREATURE_REACH + sizeReach(def.size);
+export function reachOf(kind: string): number {
+  return CREATURE_REACH + sizeReach(creatureSize(kind));
 }
 
 /** How fast it moves when in a hurry, as its statuses allow (Slowed, Rooted). */
@@ -223,7 +223,7 @@ function fight(c: Creature, h: Habitat): void {
     return;
   }
   const d = Math.hypot(p.x - c.x, p.y - c.y);
-  const reach = reachOf(c.def);
+  const reach = reachOf(c.kind);
   if (d > reach * 0.8) close(c, p, reach, h);
   if (Math.hypot(p.x - c.x, p.y - c.y) <= reach && h.now - c.lastAttack >= c.def.cooldown * 1000) {
     c.lastAttack = h.now;

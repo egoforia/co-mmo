@@ -32,7 +32,7 @@ const TABS: Tab[] = [
   wishesTab,
   modsTab,
   rulesTab,
-  { id: 'loot', label: 'Loot', page: () => lootPage(artContext) },
+  { id: 'loot', label: 'Monsters', page: () => lootPage(artContext) },
   reportsTab,
   playersTab,
   aiTab,

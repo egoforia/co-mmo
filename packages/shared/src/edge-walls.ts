@@ -35,8 +35,11 @@ export interface EdgeWall {
   height: WallHeight;
 }
 
+/** How thick a wall is, in tiles (fixed at 1/8 of a tile). */
+export const WALL_THICKNESS = 1 / 8;
+
 /** Half how thick a wall is, in tiles: a body is stopped this far from its line. */
-export const WALL_HALF_THICKNESS = 0.08;
+export const WALL_HALF_THICKNESS = WALL_THICKNESS / 2;
 
 /** The box of tiles a wall stops bodies in: its edge, `WALL_HALF_THICKNESS` either side (the editor's Hitboxes draw it). */
 export function wallBox(wall: Pick<EdgeWall, 'x' | 'y' | 'along'>): { x: number; y: number; w: number; h: number } {

@@ -22,6 +22,7 @@ import { askGod } from './god.ts';
 import { knownMusicModels, soundUsd } from './assets/sound.ts';
 import { knownVideoModels, videoUsd } from './assets/video.ts';
 import { DEFAULT_REPLICATE_VIDEO_MODEL, replicateToken } from './assets/replicate.ts';
+import { DEFAULT_REPLICATE_IMAGE_MODEL } from './assets/replicate-image.ts';
 import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
@@ -413,7 +414,7 @@ export async function handleAdmin(
         { name: 'ANTHROPIC_API_KEY', set: Boolean(ctx.env.ANTHROPIC_API_KEY), for: 'Anthropic Claude for the God' },
         { name: 'OPENAI_API_KEY', set: Boolean(ctx.env.OPENAI_API_KEY), for: 'OpenAI or a compatible service for the God' },
         { name: 'ELEVENLABS_API_KEY', set: Boolean(ctx.env.ELEVENLABS_API_KEY), for: 'ElevenLabs sound effects' },
-        { name: 'REPLICATE_API_TOKEN', set: Boolean(replicateToken(ctx.env)), for: 'Replicate: walk videos (Wan); REPLICATE_API_KEY works too' },
+        { name: 'REPLICATE_API_TOKEN', set: Boolean(replicateToken(ctx.env)), for: 'Replicate: pictures (any owner/name model) and walk videos (Wan); REPLICATE_API_KEY works too' },
       ],
       // Models with a known price, offered in each picker; any other name can still be typed.
       catalog: {
@@ -438,7 +439,7 @@ export async function handleAdmin(
       image = store.settings.ai.image ?? { provider: 'none', model: '' };
     } else {
       image = img?.provider && img.provider !== 'none'
-        ? { provider: String(img.provider), model: typeof img.model === 'string' && img.model.trim() ? img.model.trim().slice(0, 80) : 'gemini-2.5-flash-image' }
+        ? { provider: String(img.provider), model: typeof img.model === 'string' && img.model.trim() ? img.model.trim().slice(0, 80) : img.provider === 'replicate' ? DEFAULT_REPLICATE_IMAGE_MODEL : 'gemini-2.5-flash-image' }
         : { provider: 'none', model: '' };
       // Each kind of art may name its own image model; blank uses the main one.
       const uses = (img?.uses ?? {}) as Record<string, unknown>;

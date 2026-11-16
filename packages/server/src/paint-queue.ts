@@ -35,9 +35,12 @@ export const MODEL_LIMITS: [prefix: string, limit: RateLimit][] = [
   ['eleven_', { perMinute: 30, atOnce: 2 }],
 ];
 
+/** Replicate models ("owner/name"): an account with under $5 of credit may start 6 a minute. */
+export const REPLICATE_LIMIT: RateLimit = { perMinute: 6, atOnce: 2 };
+
 /** A model's limit, or undefined when it has none. */
 export function limitFor(model: string): RateLimit | undefined {
-  return MODEL_LIMITS.find(([prefix]) => model.startsWith(prefix))?.[1];
+  return MODEL_LIMITS.find(([prefix]) => model.startsWith(prefix))?.[1] ?? (model.includes('/') ? REPLICATE_LIMIT : undefined);
 }
 
 /** What a request tells the painting log while it waits for its turn and once it starts. */

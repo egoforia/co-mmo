@@ -244,3 +244,26 @@ in `packages/server/src/assets/skill-anchors.ts`):
   anchor with a `tier` to that height.
 
 Until a picture is painted, nothing shows in its place.
+
+## 10. Image Models and Providers
+
+Pictures are painted by Google AI Studio (Gemini image models) or by any
+image model on Replicate. A model named `owner/name` (optionally
+`owner/name:version`) is painted on Replicate with `REPLICATE_API_TOKEN`;
+any other name goes to Google. Each kind of art in the AI Models tab can
+name either, so one kind can try Replicate while the rest stays on Google.
+
+`assets/replicate-image.ts` reads the model's input schema once and fits each
+request to it: the closest allowed aspect ratio or size, the resolution
+(`1K`), `quality: medium` where offered (OpenAI's `auto` picks the ~3x
+pricier high), PNG output, and reference pictures in whichever field the
+model takes them (`input_images`, `image_input`, ...). Settings a model does
+not have are left out, so its own defaults apply.
+
+The image model bake-off of 2026-11-14 compared 27 models against
+gemini-3-pro-image on our prompts. Its pick, `openai/gpt-image-2` at medium
+quality (about $0.047 a picture), is the Replicate default; runner-up is
+`gemini-3.1-flash-lite-image` on Google. Replicate prices are flat per
+picture (`IMAGE_USD_FLAT` in `assets/wish-art.ts`); an unlisted model is
+estimated at $0.08. Accounts with under $5 credit may start only 6 jobs a
+minute, so the paint queue paces every `owner/name` model to that.

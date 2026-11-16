@@ -22,8 +22,37 @@ const IMAGE_USD_PER_MILLION: Record<string, number> = {
   'gemini-3.1-flash-image-preview': 60,
 };
 
+/**
+ * US dollars per picture for models billed by the picture: Replicate's list
+ * prices at about 1024 px (checked 2026-11-14, the bake-off), at the quality
+ * the game asks for (medium for OpenAI's).
+ */
+const IMAGE_USD_FLAT: Record<string, number> = {
+  'openai/gpt-image-2': 0.047,
+  'google/nano-banana-2.1': 0.0336,
+  'google/nano-banana-2': 0.067,
+  'google/nano-banana-pro': 0.15,
+  'black-forest-labs/flux-3-image': 0.048,
+  'bytedance/seedream-5-lite': 0.035,
+  'ideogram-ai/ideogram-4-5': 0.06,
+  'krea/krea-3': 0.03,
+  'wan-video/wan-2.7-image': 0.03,
+  'black-forest-labs/flux-2-klein-9b': 0.015,
+};
+
+/** A guess for a Replicate model with no price listed here, on the high side so the budget is not overrun. */
+const REPLICATE_GUESS_USD = 0.08;
+
+/** The per-picture price of a model billed by the picture; Replicate models not listed get a cautious guess. */
+function flatUsd(model: string): number | undefined {
+  const name = model.split(':')[0]!;
+  return IMAGE_USD_FLAT[name] ?? (name.includes('/') ? REPLICATE_GUESS_USD : undefined);
+}
+
 /** What one generated image cost: from the tokens billed when known, else the 1024 px price. */
 export function imageUsd(model: string, image: GeneratedImage): number {
+  const flat = flatUsd(model);
+  if (flat !== undefined) return flat;
   const rate = IMAGE_USD_PER_MILLION[model];
   if (!rate || !image.outputTokens) return IMAGE_USD;
   return (image.outputTokens * rate) / 1e6;
@@ -31,7 +60,7 @@ export function imageUsd(model: string, image: GeneratedImage): number {
 
 /** Image models with a known price, for God's View to offer. */
 export function knownImageModels(): string[] {
-  return Object.keys(IMAGE_USD_PER_MILLION).filter((m) => !m.endsWith('-preview'));
+  return [...Object.keys(IMAGE_USD_PER_MILLION).filter((m) => !m.endsWith('-preview')), ...Object.keys(IMAGE_USD_FLAT)];
 }
 
 /** Image tokens Gemini bills for a 1024 px picture, used to guess a price before painting. */
@@ -39,6 +68,8 @@ const TOKENS_1K = 1290;
 
 /** About what one 1K picture from this model costs, before it is painted (for previews). */
 export function estimateImageUsd(model: string): number {
+  const flat = flatUsd(model);
+  if (flat !== undefined) return flat;
   const rate = IMAGE_USD_PER_MILLION[model];
   return rate ? (TOKENS_1K * rate) / 1e6 : IMAGE_USD;
 }

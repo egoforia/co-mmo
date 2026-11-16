@@ -44,7 +44,7 @@ export async function toolImageProvider(repoRoot: string, flags: { provider?: st
   }
   const made = imageProviderFor(provider, model, process.env);
   if (!made) {
-    console.error(`No key is set for ${provider}. Put it in .env (for Gemini, GEMINI_API_KEY=...) and run this again.`);
+    console.error(`No key is set for ${provider}. Put it in .env (GEMINI_API_KEY=... for Gemini, REPLICATE_API_TOKEN=... for Replicate) and run this again.`);
     process.exit(1);
   }
   return made;

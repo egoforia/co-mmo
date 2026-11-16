@@ -16,6 +16,7 @@ tile in front of a healer really guards them.
 | Steps | 8 ways. A diagonal step needs both straight ways round the corner open (no slipping between two trees touching at a corner, or past a wall's end). |
 | Sizes | Tiny, small and medium bodies take 1 tile; high monsters 2×2; colossal 3×3 (`SIZE_TILES`). |
 | One per tile | A body claims the tile it steps onto as the step starts (`TileClaims`); first to ask wins. Players block players; party members may swap places. |
+| Walking into someone | Pressing towards a tile someone stands on takes no step: you stay put and turn to face them. Only the land (a wall at a diagonal) slides a step aside. |
 | Melee reach | The 8 touching tiles; spears and greatswords 2 tiles in a straight line. |
 | Ranged reach | Counted in tiles, with a clear line. Whether bodies block shots is a setting on God's View's Combat page. |
 | Skill shapes | Areas are squares of tiles, cones wedges, lines rows; shown before they hit. |

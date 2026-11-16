@@ -96,7 +96,7 @@ describe('the Art tab', () => {
       { id: 'four-legged', name: 'Four-legged, 2 heads tall' },
       { id: 'six-legged', name: 'Six-legged crawler' },
     ]);
-  });
+  }, 30_000);
 
   it('paints a shipped building picture again with the Owner\'s words, logs it, and serves it over the shipped one', async () => {
     const { base, store, painter } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });

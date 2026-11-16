@@ -21,21 +21,32 @@ export interface TileWalker {
 
 const EPS = 1e-6;
 
+/** How far inside its square a body must reach before it holds a tile: a hair's breadth is rounding. */
+const HOLD = 0.05;
+
+/** The tiles, column or row, a body of `width` whose middle is at `at` reaches into. */
+function heldSpan(at: number, width: number): [number, number] {
+  return [Math.floor(at - width / 2 + HOLD), Math.floor(at + width / 2 - HOLD)];
+}
+
 /**
- * True when someone the mover is stopped by stands on a tile, or is stepping
- * onto it. A body stands on every tile its round body reaches into, so one
- * halfway through a step holds both tiles.
+ * True when someone the mover is stopped by stands on any tile of a
+ * `width`-wide square, or is stepping onto one. A body holds every tile its
+ * square reaches into, so one halfway through a step holds both squares.
  */
-export function tileTaken(among: Among | undefined, tile: TileSpot, floor: number): boolean {
+export function tileTaken(among: Among | undefined, anchor: TileSpot, floor: number, width = 1): boolean {
   if (!among) return false;
-  const mid = spotMiddle(tile);
+  const mid = spotMiddle(anchor, width);
   const self = among.self;
-  for (const o of among.bodies.near(mid.x, mid.y, 1)) {
+  const overlaps = (lo: number, hi: number, from: number) => lo <= from + width - 1 && hi >= from;
+  for (const o of among.bodies.near(mid.x, mid.y, width)) {
     if (o === self || (self.of !== undefined && o.of === self.of)) continue;
     if ((o.floor ?? 0) !== floor || !stoppedBy(self.kind, o.kind) || among.passes?.(o)) continue;
-    if (o.to && o.to.tx === tile.tx && o.to.ty === tile.ty) return true;
-    const reach = 0.5 + o.r - 0.05;
-    if (Math.abs(o.x - mid.x) < reach && Math.abs(o.y - mid.y) < reach) return true;
+    const ow = o.width ?? 1;
+    if (o.to && overlaps(o.to.tx, o.to.tx + ow - 1, anchor.tx) && overlaps(o.to.ty, o.to.ty + ow - 1, anchor.ty)) return true;
+    const [x0, x1] = heldSpan(o.x, ow);
+    const [y0, y1] = heldSpan(o.y, ow);
+    if (overlaps(x0, x1, anchor.tx) && overlaps(y0, y1, anchor.ty)) return true;
   }
   return false;
 }

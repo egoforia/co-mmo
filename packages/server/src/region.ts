@@ -1,5 +1,7 @@
 import {
   CREATURES,
+  SIZE_TILES,
+  creatureSize,
   tunedCreature,
   type CreatureTune,
   energyPerSecond,
@@ -1114,6 +1116,7 @@ export class Region {
         x: cs.x,
         y: cs.y,
         floor: cs.floor ?? 0,
+        width: SIZE_TILES[creatureSize(cs.kind)],
         home: { ...cs.home },
         target: cs.target ? { ...cs.target } : null,
         rest: cs.rest ?? 0,

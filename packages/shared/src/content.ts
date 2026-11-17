@@ -20,6 +20,7 @@ import { cleanLight, type Light } from './light.ts';
 import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
 import { WISHED_ABILITY_NUMBERS, wishedEffect, wishedStatus } from './wished-abilities.ts';
 import type { StatusId } from './rpg/statuses.ts';
+import { validMonsterSkills, type MonsterSkill } from './monster-gear.ts';
 import {
   ABILITIES,
   BEHAVIORS,
@@ -124,6 +125,8 @@ export interface CreatureWish {
   active?: 'day' | 'night';
   /** How it breaks off a chase (rpg.ts BreakOff); the way its behaviour fits when missing. */
   breakOff?: BreakOff;
+  /** Up to four skills it uses in a fight (monster-gear.ts), checked by validMonsterSkills. */
+  skills?: MonsterSkill[];
   level: number;
   /** How many appear around the wisher. */
   count: number;
@@ -597,6 +600,7 @@ export function validateDefinition(raw: unknown, opts: { styleOptional?: boolean
     const behavior: Behavior = BEHAVIORS.find((b) => b === d.behavior) ?? 'wander';
     const active = d.active === 'day' || d.active === 'night' ? d.active : undefined;
     const breakOff = BREAK_OFFS.find((b) => b === d.breakOff);
+    const skills = validMonsterSkills(d.skills);
     const drops = Array.isArray(d.drops)
       ? d.drops.filter((i): i is string => typeof i === 'string' && !isCopyId(i) && !!ITEMS[i] && !ITEMS[i]!.bound).slice(0, 3)
       : [];
@@ -607,6 +611,7 @@ export function validateDefinition(raw: unknown, opts: { styleOptional?: boolean
       behavior,
       ...(active ? { active } : {}),
       ...(breakOff ? { breakOff } : {}),
+      ...(skills.length ? { skills } : {}),
       level: clamp(Math.round(Number(d.level) || 1), 1, MAX_WISHED_LEVEL),
       count: clamp(Math.round(Number(d.count) || 3), 1, MAX_WISHED_COUNT),
       drops,
@@ -798,6 +803,8 @@ export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
     behavior: w.behavior,
     ...(w.active ? { active: w.active } : {}),
     ...(w.breakOff ? { breakOff: w.breakOff } : {}),
+    // A skill hits at most twice as hard as its plain blow, whatever the wish said.
+    ...(w.skills?.length ? { skills: w.skills.map((k) => ({ ...k, power: Math.min(k.power, levelStats(l).damage * 2) })) } : {}),
     level: l,
     ...levelStats(l),
     ...creatureDefence(l, UNDEAD_WORDS.test(`${w.name} ${w.description}`) ? 'undead' : undefined),

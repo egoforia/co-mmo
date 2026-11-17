@@ -43,10 +43,11 @@ export function lootChanges(creature: string): LootChange[] {
 /**
  * What a creature may drop now: its own list, then every standing change in
  * order. A wish adds its things (replacing the same item's line); God's View
- * replaces the list. Items that no longer exist are left out.
+ * replaces the list. Items that no longer exist are left out. `own` is the
+ * list to start from: a spawn the world editor gave extra loot passes its own.
  */
-export function lootTable(creature: string): LootLine[] {
-  let lines: LootLine[] = (CREATURES[creature]?.drops ?? []).map((d) => ({ ...d }));
+export function lootTable(creature: string, own: Drop[] | undefined = CREATURES[creature]?.drops): LootLine[] {
+  let lines: LootLine[] = (own ?? []).map((d) => ({ ...d }));
   for (const change of lootChanges(creature)) {
     const added = change.drops.map((d) => ({ ...d, from: change.id }));
     if (change.mode === 'set') lines = added;

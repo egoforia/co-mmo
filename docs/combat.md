@@ -101,3 +101,14 @@ A player who closes the game while a fight is on stays in the world until nothin
 | Calm | Having broken off, it notices no one for `CALM_MS` (8 s), so it does not turn straight back. A blow still provokes it. |
 | Healing | Every monster heals at its own rate (`regenOf`: `regen` per second, 1% of its health when not given), in a fight or out of it. Getting home no longer heals it fully at once. |
 | Safe areas | No monster takes a step into a safe area: it stops at the edge. |
+
+## Monsters with gear and skills (combat decisions, step 7)
+
+| Topic | Rule |
+| --- | --- |
+| Loot at spawn | A monster's loot is rolled when it appears, not when it falls (`rollKit`, `monster-gear.ts`), from its kind's table (God's View and loot wishes) plus its spawn's own extras from the world editor. Each piece of gear is its own found copy. Its body holds exactly what it carried. It comes back with a new roll each time, from dice of its own (`kitDice`), so loot never shifts how fights roll. |
+| Worn gear | The first piece for each slot is worn and adds power: a weapon's damage to its blows and physical skills (`damageOf`), armour and ward to its Armor and Ward (`defenceOf`). |
+| In hand | Its weapon (else its charm) shows in its right hand and an off-hand item in its left, where the Art tab's hand finder found its hands in the picture it already has. Monsters that may carry such gear are looked at; none is painted again. Unfound hands mean the gear is unseen but still counts. |
+| Skills | Tougher kinds have one or two skills (`MONSTER_SKILLS`, `monster-skills.ts`), each one of the players' sixteen effects with plain numbers. A wished monster brings up to four (`skills`), each hitting at most twice its plain blow. On each attack beat a ready skill that reaches goes before its plain blow; one with nothing to do (a heal with no one hurt) is not spent. The one targeted is told "The X uses Y!". |
+| What each does | Strike, bolt (arcane unless said), area, cone and line hurt; dash leaps beside the target and strikes; blink steps away; trap roots and hurts; debuff puts a harmful status on; heal mends the most hurt monster near it; shield, stance (takes up to 60% less) and buff (more on each blow) go on itself; taunt calls every idle monster near it, summon its own kind from farther; cleanse shakes off its harmful statuses. No skill reaches into a safe area. |
+| Not in it | Weapon traits stay data only. |

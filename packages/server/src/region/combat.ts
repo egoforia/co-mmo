@@ -1,6 +1,5 @@
 import {
   GOLD,
-  ownPieces,
   FLANK_BONUS,
   SIZE_TILES,
   flanks,
@@ -19,8 +18,6 @@ import {
   afterArmor,
   canAct,
   statusOf,
-  lootTable,
-  rollDrops,
   BODY_SECONDS,
   VIEW_RADIUS,
   attackCooldown,
@@ -38,7 +35,7 @@ import {
   WOVEN_FACTOR,
   type StatusId,
 } from '@co-mmo/shared';
-import { provoke } from '../creature-brain.ts';
+import { defenceOf, provoke } from '../creature-brain.ts';
 import { addThreat } from '../threat.ts';
 import type { CombatLogger } from './combat-logger.ts';
 import { EFFECTS, endStance, helpersAct, holdStances, springTraps, type Blow, type Cast, type EffectKit } from './effects/index.ts';
@@ -297,8 +294,9 @@ export class Combat implements EffectKit {
     const rawBeforeAbsorb = raw * weakened * marked * pathBonus * flanked;
     const afterAbsorb = absorb(target, rawBeforeAbsorb, now);
     const shieldAbsorb = rawBeforeAbsorb - afterAbsorb;
-    const defence = how.pierce ? 0 : how.type === 'arcane' ? target.def.ward : target.def.armor;
-    const amount = afterArmor(afterAbsorb, defence ?? 0);
+    const defence = how.pierce ? 0 : defenceOf(target, how.type === 'arcane' ? 'arcane' : 'physical');
+    // A monster's stance skill spares it a share of every blow.
+    const amount = afterArmor(afterAbsorb, defence ?? 0) * (1 - (statusOf(target, 'guarded', now)?.amount ?? 0) / 100);
     target.hp = Math.max(0, target.hp - amount);
     const defeated = target.hp === 0;
     const { ability, ranged, type } = how;
@@ -456,10 +454,10 @@ export class Combat implements EffectKit {
     const gained: string[] = [sharers.length > 1 ? `+${xp} XP (shared)` : `+${xp} XP`];
     const [lo, hi] = c.def.gold;
     const gold = lo + Math.floor(this.s.random() * (hi - lo + 1));
-    // What it carried stays on its body for anyone to take (E), its gold too: its loot as set in God's View and by wishes.
+    // What it carried stays on its body for anyone to take (E), its gold too: rolled when it appeared from its loot as set in God's View and by wishes, its worn gear among it.
     this.s.bodies.push({
       id: `body-${++this.s.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y, floor: c.floor,
-      until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: [...(gold > 0 ? [{ item: GOLD, qty: gold }] : []), ...ownPieces(rollDrops(lootTable(c.kind), this.s.random), this.s.random)],
+      until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: [...(gold > 0 ? [{ item: GOLD, qty: gold }] : []), ...c.kit.carried.map((s) => ({ ...s }))],
     });
     discover(ch, c.kind);
     this.s.hooks.event?.('defeat', p.info.id, { creature: c.kind });

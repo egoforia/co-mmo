@@ -10,6 +10,7 @@ import type { CallingId } from './classes.ts';
 import type { RaceId } from './races.ts';
 import type { MaterialInfo } from './materials.ts';
 import type { CopyInfo } from './copies.ts';
+import type { MonsterSkill } from './monster-gear.ts';
 import type { CraftId, CraftProgress, ToolTier } from './crafts.ts';
 import { maxEnergy, maxHp } from './rpg/attributes.ts';
 import { levelUpStats } from './rpg/callings.ts';
@@ -717,6 +718,8 @@ export interface CreatureDef {
   breakOff?: BreakOff;
   /** Health back each second, always (regenOf); 1% of its health when missing. */
   regen?: number;
+  /** Skills it uses in a fight besides its plain blow (monster-gear.ts), each on its own cooldown. */
+  skills?: MonsterSkill[];
 }
 
 /** The server takes at most one item use this often (2 a second): a macro can drink no faster than a hand (combat decisions, step 4). */

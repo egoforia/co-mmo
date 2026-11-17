@@ -1,12 +1,20 @@
-import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, isSafe, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, spotMiddle, statusOf, type TileSpot, type Weather } from '@co-mmo/shared';
-import { CREATURE_REACH, forget, think, tilesTo, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
+import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, isSafe, afterArmor, armor, ward, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, spotMiddle, statusOf, type TileSpot, type Weather } from '@co-mmo/shared';
+import { CREATURE_REACH, damageOf, forget, think, tilesTo, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
+import { useMonsterSkill, type SkillWorld } from './monster-skills.ts';
 import type { Combat } from './combat.ts';
 import type { CombatLogger } from './combat-logger.ts';
 import type { Crowd } from './crowd.ts';
 import type { Gauges } from './gauges.ts';
 import type { Paths } from './paths/index.ts';
 import type { PlayerState, RegionState } from './state.ts';
+
+/** One blow a creature deals: how hard, of what kind, and whether up close (only then can a Poised Duelist turn it aside). */
+export interface MonsterBlow {
+  amount: number;
+  type: 'physical' | 'arcane';
+  close: boolean;
+}
 
 /**
  * Runs the region's creatures and NPCs each tick. How they behave lives in
@@ -58,7 +66,16 @@ export class Minds {
         const p = this.s.players.get(id);
         if (p) this.hurt(p, c, now);
       },
+      skill: (c, skill, id) => {
+        const p = this.s.players.get(id);
+        return !!p && useMonsterSkill(this.skillWorld, c, skill, p, now);
+      },
     };
+  }
+
+  /** The region as monsters' skills reach it. */
+  private get skillWorld(): SkillWorld {
+    return { s: this.s, hurt: (p, c, now, blow) => this.hurt(p, c, now, blow), hidden: (p, now) => this.paths.hidden(p, now) };
   }
 
   /** True while someone stands close enough to talk to this person, so they wait. */
@@ -84,7 +101,12 @@ export class Minds {
     }
   }
 
-  private hurt(p: PlayerState, c: Creature, now: number): void {
+  /**
+   * A creature's blow lands on a player: its plain bite unless `blow` says
+   * otherwise (a skill, monster-skills.ts). An arcane blow cannot be dodged,
+   * blocked or turned aside, and Ward softens it instead of Armor.
+   */
+  hurt(p: PlayerState, c: Creature, now: number, blow: MonsterBlow = { amount: damageOf(c, now), type: 'physical', close: true }): void {
     // A creature's bite is physical: Agility may dodge it (more while
     // Evasive), a Poised Duelist turns it aside and strikes back, a shield
     // may block some of it, Armour (gear and Vigor) softens the rest, being
@@ -93,8 +115,9 @@ export class Minds {
     // Knelled creature hits softer, Rooted Stand adds Armor, and the
     // Unyielding keep their last point of health.
     if (this.paths.hidden(p, now)) return;
-    const dodgeChanceVal = dodgeChance(p.character) + (statusOf(p, 'evasive', now) ? EVASIVE_DODGE : 0);
-    const dodgeRoll = this.s.random();
+    const arcane = blow.type === 'arcane';
+    const dodgeChanceVal = arcane ? 0 : dodgeChance(p.character) + (statusOf(p, 'evasive', now) ? EVASIVE_DODGE : 0);
+    const dodgeRoll = arcane ? 1 : this.s.random();
     const dodged = dodgeRoll < dodgeChanceVal;
     if (dodged) {
       if (this.logger?.active) {
@@ -112,7 +135,7 @@ export class Minds {
             variance: 1,
             dodge: { chance: dodgeChanceVal, rolled: dodgeRoll, dodged: true },
           },
-          factors: { base: c.def.damage, power: c.def.damage, raw: 0 },
+          factors: { base: c.def.damage, power: blow.amount, raw: 0 },
           mitigation: { shieldAbsorb: 0, defenseStat: armor(p.character), afterDefense: 0 },
           finalAmount: 0,
           defeated: false,
@@ -120,7 +143,7 @@ export class Minds {
       }
       return;
     }
-    const poised = statusOf(p, 'poised', now);
+    const poised = blow.close && !arcane ? statusOf(p, 'poised', now) : undefined;
     if (poised) {
       p.statuses.splice(p.statuses.indexOf(poised), 1);
       this.s.notice(p, `You turn the ${c.def.name}'s blow aside and strike back.`);
@@ -128,10 +151,10 @@ export class Minds {
       return;
     }
     const varianceRoll = 0.8 + this.s.random() * 0.4;
-    let raw = c.def.damage * varianceRoll * this.paths.dealtBy(c, now);
+    let raw = blow.amount * varianceRoll * this.paths.dealtBy(c, now);
     const baseRaw = raw;
-    const shield = blocking(p.character);
-    const blockRoll = this.s.random();
+    const shield = arcane ? { chance: 0, amount: 0 } : blocking(p.character);
+    const blockRoll = arcane ? 1 : this.s.random();
     const blocked = Boolean(shield.chance && blockRoll < shield.chance);
     if (blocked) raw = Math.max(0, raw - shield.amount);
     const guard = statusOf(p, 'guarded', now);
@@ -140,7 +163,7 @@ export class Minds {
       const warden = this.s.players.get(guard.by);
       if (warden) this.gauges.add(warden, 1, 'resolve');
     }
-    const targetArmor = armor(p.character) + this.paths.extraArmor(p);
+    const targetArmor = arcane ? ward(p.character) : armor(p.character) + this.paths.extraArmor(p);
     // A Duelist in full flow is hard to catch square: each Momentum pip turns a share aside.
     const afterArmorVal = afterArmor(raw, targetArmor) * (1 - (guard?.amount ?? 0) / 100) * (1 - this.gauges.guard(p));
     const absorbed = absorb(p, afterArmorVal, now);
@@ -152,7 +175,7 @@ export class Minds {
     if (!this.paths.steady(p, now)) this.gauges.struck(p);
     this.paths.struck(p, c, amount, now);
     const defeated = p.character.hp === 0;
-    this.s.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated });
+    this.s.broadcastNear(p, { t: 'hit', by: c.id, target: p.info.id, amount, defeated, ...(arcane ? { damage: 'arcane' as const } : {}), ...(blow.close ? {} : { ranged: true }) });
 
     if (this.logger?.active) {
       this.logger.record({
@@ -163,7 +186,7 @@ export class Minds {
         attacker: { id: c.id, name: c.def.name, kind: 'creature' },
         target: { id: p.info.id, name: p.info.name, kind: 'player' },
         action: { id: 'attack', name: 'Attack', kind: 'attack' },
-        damageType: 'physical',
+        damageType: blow.type,
         pierce: false,
         rolls: {
           variance: varianceRoll,
@@ -172,7 +195,7 @@ export class Minds {
         },
         factors: {
           base: c.def.damage,
-          power: c.def.damage,
+          power: blow.amount,
           raw: baseRaw,
         },
         mitigation: {

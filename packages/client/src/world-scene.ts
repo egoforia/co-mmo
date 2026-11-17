@@ -491,6 +491,11 @@ export class WorldScene extends Phaser.Scene {
     syncAvatars(this, this.creatures, snapshot.creatures ?? [], at, (c) => makeCreature(this, this.metrics, c), kept);
     for (const c of snapshot.creatures ?? []) {
       const creature = this.creatures.get(c.id);
+      // Gear it wears shows in its hands once the hand finder has found them; until then it is unseen but still counts.
+      if (creature) {
+        setHeld(this, creature, c.held, 'right', load);
+        setHeld(this, creature, c.offHeld, 'left', load);
+      }
       creature?.label.setText(creatureLabel(c, painted));
       if (creature) setStatusIcons(this, creature, c.statuses);
       // Its kind's size can change in God's View while it is in view.

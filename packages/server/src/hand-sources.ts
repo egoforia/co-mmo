@@ -1,12 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { HELD_FAMILIES, ITEMS, familyArt, movingArt, WALKING_LOOKS, WALK_FRAMES, ruleItemId, wishArtKey, type ArtManifest } from '@co-mmo/shared';
+import { CREATURES, HELD_FAMILIES, ITEMS, familyArt, lootTable, movingArt, WALKING_LOOKS, WALK_FRAMES, ruleItemId, wishArtKey, type ArtManifest } from '@co-mmo/shared';
 import type { PointSource } from './hand-finder.ts';
 import type { Store } from './store.ts';
 
 // What the hand finder looks at: every picture someone can hold something in
 // (walk strips, walking looks, wished looks, the isometric ways' standing
-// pictures) and every item that can be held
+// pictures, monsters that may carry gear) and every item that can be held
 // (weapons, off-hand items, charms), read from where the client is served them.
 
 /** Reads a picture the client is served: painted here (/wished-art/), or shipped with the game. */
@@ -42,6 +42,8 @@ export function pointSources(store: Store, shipped: ArtManifest, painted: ArtMan
     ...Object.entries(art).flatMap(([id, e]) => (e.kind === 'stand' && movingArt(id) ? source(id, 'hands', e.file) : [])),
     ...WALKING_LOOKS.flatMap((id) => source(id, 'hands', art[id]?.file)),
     ...looks.flatMap((id) => source(id, 'hands', wished.get(id))),
+    // Monsters that may carry something to hold (combat decisions, step 7): their hands are found in the picture they already have, never painted again.
+    ...[...new Set(Object.entries(CREATURES).filter(([kind]) => mayHold(kind)).map(([, def]) => def.art))].flatMap((id) => source(id, 'hands', id.startsWith('wished-') ? wished.get(id) : art[id]?.file)),
     ...[...new Set(
       Object.values(ITEMS)
         .filter((item) => item.slot === 'weapon' || item.slot === 'offhand' || item.slot === 'charm' || item.kind === 'tool')
@@ -50,4 +52,9 @@ export function pointSources(store: Store, shipped: ArtManifest, painted: ArtMan
     // Each family's own picture, which a weapon shows until its own is painted.
     ...HELD_FAMILIES.flatMap((family) => source(familyArt(family), 'grip', art[familyArt(family)]?.file)),
   ];
+}
+
+/** True when a monster kind's loot holds a weapon, off-hand item or charm, which it would wear and show in hand. */
+function mayHold(kind: string): boolean {
+  return lootTable(kind).some((l) => ['weapon', 'offhand', 'charm'].includes(ITEMS[l.item]?.slot ?? ''));
 }

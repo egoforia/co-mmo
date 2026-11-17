@@ -1,4 +1,4 @@
-import { creatureSize, heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type EntityState, type NpcState, type PlayerInfo, type RaceId, type StatusId } from '@co-mmo/shared';
+import { creatureSize, heldItem, maxHp, monsterHeld, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type MonsterKit, type EntityState, type NpcState, type PlayerInfo, type RaceId, type StatusId } from '@co-mmo/shared';
 
 // What players see of each thing in a region, as sent in snapshots and
 // across a split region's cell borders. One builder per kind, so both
@@ -35,10 +35,10 @@ export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: 
 }
 
 /** A living creature, what it is up to when that shows (asleep, running away), and its running statuses. */
-export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number }, mood?: CreatureMood, statuses?: StatusId[]): CreatureState {
+export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number; kit?: MonsterKit }, mood?: CreatureMood, statuses?: StatusId[]): CreatureState {
   const tier = creatureSize(c.kind);
   const size = tier !== 'medium' ? { size: tier } : {};
-  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...size, ...(mood ? { mood } : {}), ...statusesOf(statuses) };
+  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...size, ...(mood ? { mood } : {}), ...statusesOf(statuses), ...(c.kit ? monsterHeld(c.kit.worn) : {}) };
 }
 
 /** A defeated creature's body; `loot` says whether the viewer may search it here. */

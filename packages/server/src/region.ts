@@ -1,5 +1,6 @@
 import {
   CREATURES,
+  rollKit,
   type CombatRules,
   SIZE_TILES,
   creatureSize,
@@ -351,7 +352,7 @@ export class Region {
   private makeCreature(id: string, kind: string, x: number, y: number, floor = 0, tune?: CreatureTune): Creature[] {
     const cdef = CREATURES[kind];
     if (!cdef) return [];
-    const c = makeCreature(id, kind, tunedCreature(cdef, tune), x, y, this.random, floor);
+    const c = makeCreature(id, kind, tunedCreature(cdef, tune), x, y, this.random, floor, this.map.seed);
     if (tune?.route?.length) c.route = tune.route.map((s) => ({ ...s }));
     return [c];
   }
@@ -632,6 +633,12 @@ export class Region {
   placeCreature(id: string, x: number, y: number, floor = 0): void {
     const c = this.s.creatures.find((k) => k.id === id);
     if (c) Object.assign(c, { x, y, floor, home: { x, y, floor }, target: null, route: undefined, to: undefined });
+  }
+
+  /** Rolls again what a creature carries and wears, as when it appears (combat decisions, step 7): for tests and tools. */
+  rearm(id: string): void {
+    const c = this.s.creatures.find((k) => k.id === id);
+    if (c) c.kit = rollKit(c.kind, c.def, this.random);
   }
 
   /** The floor a creature or NPC is on, for tests and tools. */
@@ -1108,6 +1115,12 @@ export class Region {
       statuses: JSON.parse(JSON.stringify(c.statuses)),
       stunImmuneUntil: c.stunImmuneUntil,
       pace: c.pace,
+      chased: c.chased,
+      lostFrom: c.lostFrom ? { ...c.lostFrom } : undefined,
+      calmUntil: c.calmUntil,
+      kit: JSON.parse(JSON.stringify(c.kit)),
+      skillReady: c.skillReady ? [...c.skillReady] : undefined,
+      spawns: c.spawns,
     }));
 
     const bodies: Body[] = this.s.bodies.map((b) => ({
@@ -1205,6 +1218,12 @@ export class Region {
         statuses: cs.statuses ? JSON.parse(JSON.stringify(cs.statuses)) : [],
         stunImmuneUntil: cs.stunImmuneUntil,
         pace: cs.pace,
+        chased: cs.chased,
+        lostFrom: cs.lostFrom ? { ...cs.lostFrom, floor: cs.lostFrom.floor ?? 0 } : undefined,
+        calmUntil: cs.calmUntil,
+        kit: cs.kit ? JSON.parse(JSON.stringify(cs.kit)) : { worn: {}, carried: [] },
+        skillReady: cs.skillReady ? [...cs.skillReady] : undefined,
+        spawns: cs.spawns,
       };
     });
 

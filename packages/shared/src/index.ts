@@ -27,6 +27,8 @@ export * from './creature-size.ts';
 export * from './materials.ts';
 export * from './copies.ts';
 export * from './death.ts';
+export * from './monster-gear.ts';
+export * from './monster-skills.ts';
 export * from './safe-areas.ts';
 export * from './fashion.ts';
 export * from './fashion-wishes.ts';

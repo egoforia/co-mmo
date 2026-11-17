@@ -7,6 +7,7 @@ import type { RoutinePlace } from './routines.ts';
 import type { DayPart } from './sky.ts';
 import type { GaugeId } from './rpg/gauges.ts';
 import type { Thread } from './rpg/abilities.ts';
+import type { MonsterKit } from './monster-gear.ts';
 
 /** One player's gauge state snapshot for replay serialization. */
 export interface GaugeStateSnapshot {
@@ -63,6 +64,14 @@ export interface CreatureStateSnapshot {
   statuses: Status[];
   stunImmuneUntil?: number;
   pace?: number;
+  /** Breaking off (combat decisions, step 6). */
+  chased?: number;
+  lostFrom?: Placed;
+  calmUntil?: number;
+  /** What it wears and carries, and when its skills are ready (step 7). */
+  kit?: MonsterKit;
+  skillReady?: number[];
+  spawns?: number;
 }
 
 /** A fallen creature's body holding loot in a region. */

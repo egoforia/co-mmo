@@ -70,6 +70,8 @@ describe('combat', () => {
     const other = fakeConn();
     region.join(info('b', 'Ilya'), other, { x: null, y: null }, newCharacter());
     const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
+    // What it carries was rolled when it appeared, with its own dice: roll it again with the test's.
+    region.rearm(id);
     const me = region.position('a')!;
     region.placeCreature(id, me.x + 1, me.y);
     while (region.creature(id)!.alive) {
@@ -131,6 +133,8 @@ describe('combat', () => {
     CREATURES['walking-mushroom']!.gold = [0, 0];
     try {
       const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
+      // What it carries is rolled when it appears: roll it again with the new list.
+      region.rearm(id);
       const me = region.position('a')!;
       region.placeCreature(id, me.x + 1, me.y);
       while (region.creature(id)!.alive) {
@@ -184,6 +188,8 @@ describe('combat', () => {
     CREATURES['walking-mushroom']!.gold = [3, 3];
     try {
       const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
+      // What it carries is rolled when it appears: roll it again with the new list.
+      region.rearm(id);
       const me = region.position('a')!;
       region.placeCreature(id, me.x + 1, me.y);
       while (region.creature(id)!.alive) {

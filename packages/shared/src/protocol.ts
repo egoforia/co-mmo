@@ -380,6 +380,9 @@ export interface CreatureState {
   mood?: CreatureMood;
   /** Its running statuses (rpg/statuses.ts), when it has any. */
   statuses?: StatusId[];
+  /** The gear it shows in its right and left hands (monsterHeld), when it wears any: drawn where its hands were found. */
+  held?: string;
+  offHeld?: string;
 }
 
 /** A defeated creature's body, lying where it fell until it fades. */

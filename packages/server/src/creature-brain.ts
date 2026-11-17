@@ -1,4 +1,4 @@
-import { SIZE_TILES, TICK_RATE, anchorNear, awake, breakOffOf, isSafe, regenOf, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type TileSpot, type Weather } from '@co-mmo/shared';
+import { SIZE_TILES, TICK_RATE, hashString, rollKit, skillsOf, wornPower, anchorNear, awake, breakOffOf, isSafe, regenOf, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type MonsterKit, type MonsterSkill, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type TileSpot, type Weather } from '@co-mmo/shared';
 import { addThreat, chooseTarget } from './threat.ts';
 import { canReach, goTo, keepStepping, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
 
@@ -57,6 +57,14 @@ export interface Creature extends Walker {
   chased?: number;
   /** Where it lived before it got lost (a `lost` break-off): it comes back there after it falls. */
   lostFrom?: { x: number; y: number; floor: number };
+  /** What it wears and carries, rolled when it appears (monster-gear.ts): its body holds what it carried. */
+  kit: MonsterKit;
+  /** A buff skill: more on each blow until a time (epoch ms). */
+  empowered?: { amount: number; until: number };
+  /** How many times it has come back after falling: a new roll of its gear each time. */
+  spawns?: number;
+  /** Epoch ms when each of its skills (by place in `def.skills`) can be used again. */
+  skillReady?: number[];
   /** Epoch ms until which it notices no one, having just broken off a chase (a blow still provokes it). */
   calmUntil?: number;
   lastAttack: number;
@@ -102,15 +110,41 @@ export interface Habitat {
   creatures: Creature[];
   /** The creature strikes this player (the region deals the damage). */
   hurt(c: Creature, playerId: string): void;
+  /** The creature uses one of its skills on this player (monster-skills.ts); false when it had nothing to do. */
+  skill?(c: Creature, skill: MonsterSkill, playerId: string): boolean;
   /** Everyone standing in the region (hit-boxes.ts), so creatures walk round each other and the players; none, and they pass through. */
   bodies?: Bodies;
 }
 
+/**
+ * The dice its gear is rolled with each time it appears: its own, from its
+ * id, how many times it has come back and the land's seed, so what monsters
+ * carry never shifts the dice every fight in the land rolls.
+ */
+export function kitDice(id: string, spawns: number, seed: number): () => number {
+  let s = (hashString(`${id}:${spawns}:${seed}`) % 2147483646) + 1;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+
+/** Its plain blow: its own damage, plus its worn weapon's (combat decisions, step 7) and any buff running at `now`. */
+export function damageOf(c: Pick<Creature, 'def' | 'kit' | 'empowered'>, now = 0): number {
+  const buff = c.empowered && c.empowered.until > now ? c.empowered.amount : 0;
+  return c.def.damage + wornPower(c.kit.worn).attack + buff;
+}
+
+/** Its Armor (against physical hits) and Ward (against arcane ones): its own, plus what it wears. */
+export function defenceOf(c: Pick<Creature, 'def' | 'kit'>, type: 'physical' | 'arcane'): number {
+  const worn = wornPower(c.kit.worn);
+  return type === 'arcane' ? (c.def.ward ?? 0) + worn.ward : (c.def.armor ?? 0) + worn.armor;
+}
+
 /** A new live creature of a kind, at its home spot. */
-export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number, floor = 0): Creature {
+export function makeCreature(id: string, kind: string, def: CreatureDef, x: number, y: number, random: () => number, floor = 0, seed = 0): Creature {
   return {
     id, kind, def, x, y, floor, width: SIZE_TILES[creatureSize(kind)], home: { x, y, floor }, hp: def.hp, target: null, rest: Math.floor(random() * TICK_RATE * 3),
     aggro: null, threat: {}, returning: false, lastAttack: 0, respawnAt: null, fleeing: null, fleeUntil: 0, asleep: false, leg: 0, statuses: [],
+    kit: rollKit(kind, def, kitDice(id, 0, seed)),
+    spawns: 0,
   };
 }
 
@@ -122,7 +156,9 @@ export function think(c: Creature, h: Habitat): void {
       c.home = c.lostFrom;
       delete c.lostFrom;
     }
-    Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, threat: {}, fleeing: null, asleep: false });
+    // It comes back with new gear: what it carries is rolled again.
+    c.spawns = (c.spawns ?? 0) + 1;
+    Object.assign(c, { kit: rollKit(c.kind, c.def, kitDice(c.id, c.spawns, h.map.seed)), skillReady: [], respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, threat: {}, fleeing: null, asleep: false });
     delete c.to;
     return;
   }
@@ -290,10 +326,34 @@ function fight(c: Creature, h: Habitat): void {
     return;
   }
   if (tilesTo(c, p) > CREATURE_REACH && !hold) close(c, p, h);
-  if (tilesTo(c, p) <= CREATURE_REACH && h.now - c.lastAttack >= c.def.cooldown * 1000) {
-    c.lastAttack = h.now;
-    h.hurt(c, p.id);
+  if (h.now - c.lastAttack < c.def.cooldown * 1000) return;
+  // On each beat a skill that is ready and reaches goes first; else its plain blow, up close.
+  const skilled = useSkill(c, p, h);
+  if (!skilled && tilesTo(c, p) > CREATURE_REACH) return;
+  c.lastAttack = h.now;
+  if (!skilled) h.hurt(c, p.id);
+}
+
+/** Skills a monster uses on itself or its kin, wherever its target stands. */
+const SELF_EFFECTS = new Set(['heal', 'shield', 'buff', 'stance', 'cleanse', 'taunt', 'summon']);
+
+/**
+ * Uses the first of its skills that is ready and reaches its target (and
+ * has something to do: a heal needs someone hurt). True when one was used.
+ */
+function useSkill(c: Creature, p: Prey, h: Habitat): boolean {
+  const skills = skillsOf(c.kind, c.def);
+  if (!skills.length || !h.skill) return false;
+  c.skillReady ??= [];
+  for (let i = 0; i < skills.length; i++) {
+    const s = skills[i]!;
+    if ((c.skillReady[i] ?? 0) > h.now) continue;
+    if (!SELF_EFFECTS.has(s.effect) && tilesTo(c, p) > s.range) continue;
+    if (!h.skill(c, s, p.id)) continue;
+    c.skillReady[i] = h.now + s.cooldown * 1000;
+    return true;
   }
+  return false;
 }
 
 /** Squares a creature searches for a way to a free tile beside its prey, each tick it closes. */

@@ -56,6 +56,22 @@ describe('video walks', () => {
     await expect(waysFromSheet(await picture(900, 300, [150, 450, 750].map((x) => `<rect x="${x - 10}" y="60" width="20" height="220" fill="#3060c0"/>`).join('')))).rejects.toThrow(/3 figures instead of 4/);
   });
 
+  it('normalizes sliced turnaround figures to identical dimensions on a shared baseline when requested', async () => {
+    // 4 figures at different heights and widths
+    const sheet = await picture(
+      1200,
+      300,
+      [150, 450, 750, 1050].map((x, i) => `<rect x="${x - 10 - i * 5}" y="${60 + i * 10}" width="${20 + i * 10}" height="${200 - i * 10}" fill="#3060c0"/>`).join(''),
+    );
+    const normalized = await waysFromSheet(sheet, undefined, { normalize: true, padding: 10 });
+    const metas = await Promise.all(['front-left', 'front-right', 'back-right', 'back-left'].map(async (w) => sharp(normalized[w as keyof typeof normalized]).metadata()));
+
+    // All slices must have identical width and height
+    const firstW = metas[0]!.width;
+    const firstH = metas[0]!.height;
+    expect(metas.every((m) => m.width === firstW && m.height === firstH)).toBe(true);
+  });
+
   it('verifies that sliced turnaround figures have opposite mirrored headings', async () => {
     // Front-left: flag on left; Front-right: flag on right (mirror)
     const flSvg = '<rect x="120" y="50" width="40" height="100" fill="#3060c0"/><rect x="80" y="60" width="30" height="24" fill="#d02020"/>';

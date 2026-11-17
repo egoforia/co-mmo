@@ -109,12 +109,12 @@ export function waysSheetPrompt(name: string, gear: Carried[], references = 1, o
 
   return [
     STYLE.base,
-    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the same size and standing on the same line, evenly spaced with wide empty gaps so no two touch.${guideInstruction ? ` ${guideInstruction}` : ''} From left to right:`,
+    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the exact same height and scale, standing with feet planted on the same horizontal ground baseline (identical Y coordinate for feet across all four views), evenly spaced with wide empty gaps so no two touch.${guideInstruction ? ` ${guideInstruction}` : ''} From left to right:`,
     ...order.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
     copyInstruction,
     'Paint them in the style described above, even where the reference images are painted in another style.',
     `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
-    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'repeating the same facing angle or pose across adjacent figures', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
+    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'repeating the same facing angle or pose across adjacent figures', 'uneven ground line or floating figures', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
   ].join('\n');
 }
 
@@ -163,13 +163,58 @@ export async function verifySheetDirections(figures: Record<IsoWay, Buffer>): Pr
   };
 }
 
+export interface WaysFromSheetOptions {
+  /**
+   * If true, composites each figure onto a shared transparent canvas frame
+   * with uniform dimensions (width x height) anchored to a common ground baseline.
+   * Prevents aspect-ratio distortion and scale mismatch between directions.
+   */
+  normalize?: boolean;
+  padding?: number;
+}
+
 /** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to TURNTABLE_WAYS: Col 0 front-left, Col 1 front-right, Col 2 back-right, Col 3 back-left). */
-export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = TURNTABLE_WAYS): Promise<Record<IsoWay, Buffer>> {
+export async function waysFromSheet(
+  painted: Buffer,
+  order: readonly IsoWay[] = TURNTABLE_WAYS,
+  options: WaysFromSheetOptions = {},
+): Promise<Record<IsoWay, Buffer>> {
   const { png, key } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
   const clean = await removeKeySpill(png, undefined, key);
   const count = await countFigures(clean, { dropEdgeBits: true });
   if (count !== order.length) throw new Error(`The sheet shows ${count} figures instead of ${order.length}.`);
   const figures = (await cutFigures(clean, { count: order.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
+
+  if (options.normalize) {
+    const pad = options.padding ?? 20;
+    const groundY = Math.max(...figures.map((f) => f.box.bottom));
+    const topY = Math.min(...figures.map((f) => f.box.top));
+    const sharedH = groundY - topY + 2 * pad;
+    const maxW = Math.max(...figures.map((f) => f.box.right - f.box.left + 1));
+    const sharedW = maxW + 2 * pad;
+
+    const normalized = await Promise.all(
+      figures.map(async (f) => {
+        const figW = f.box.right - f.box.left + 1;
+        const leftPad = Math.round((sharedW - figW) / 2);
+        const topPad = groundY - f.box.bottom + pad;
+        return sharp({
+          create: {
+            width: sharedW,
+            height: sharedH,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        })
+          .composite([{ input: f.png, left: leftPad, top: topPad }])
+          .png()
+          .toBuffer();
+      }),
+    );
+
+    return Object.fromEntries(order.map((way, i) => [way, normalized[i]!])) as Record<IsoWay, Buffer>;
+  }
+
   return Object.fromEntries(order.map((way, i) => [way, figures[i]!.png])) as Record<IsoWay, Buffer>;
 }
 

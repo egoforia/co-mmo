@@ -19,6 +19,8 @@ import {
   type CallingId,
   type Character,
   type Stats,
+  goldOf,
+  setGold,
 } from '../src/index.ts';
 
 // Core skills (docs/callings-build-plan.md, step 7a): every Calling's five
@@ -167,9 +169,9 @@ describe('characters saved before core skills', () => {
 
   it('a Bellkeeper or Wishweaver is not sold the technique their skill replaces', () => {
     const bell = startCharacter('cervid', 'bellkeeper');
-    bell.gold = 100;
+    setGold(bell, 100);
     expect(train(bell, 'sister-amala', 'mend')).toMatch(/your own Mend/);
-    expect(bell.gold).toBe(100);
+    expect(goldOf(bell)).toBe(100);
     const weaver = startCharacter('lutran', 'wishweaver');
     weaver.inventory.push({ item: 'scroll-firebolt', qty: 1 });
     expect(readScroll(weaver, 'scroll-firebolt')).toMatch(/your own Ember Bolt/);

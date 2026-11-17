@@ -1,4 +1,4 @@
-import { addItem, applySkillLook, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
+import { addGold, addItem, applySkillLook, fitsAll, takeGold, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
 
 /**
  * A change to a player's character made from outside the simulation: Favor
@@ -39,6 +39,8 @@ export function applyOp(c: Character, op: CharacterOp): OpResult {
       c.favor += op.amount;
       return { ok: true };
     case 'give':
+      // All or nothing: a full bag takes none of it.
+      if (!fitsAll(c, [{ item: op.item, qty: op.qty }])) return { ok: false };
       addItem(c, op.item, op.qty);
       if (op.discover) discover(c, op.item);
       return { ok: true };
@@ -53,9 +55,8 @@ export function applyOp(c: Character, op: CharacterOp): OpResult {
       c.hp = Math.max(1, c.hp - op.amount);
       return { ok: true };
     case 'gold':
-      if (c.gold + op.amount < 0) return { ok: false };
-      c.gold += op.amount;
-      return { ok: true };
+      // Gold is coins in the bag: paying needs enough, being paid needs room.
+      return { ok: op.amount < 0 ? takeGold(c, -op.amount) : addGold(c, op.amount) };
     case 'xp':
       return { ok: true, levels: gainXp(c, op.amount) };
     case 'creatorXp':

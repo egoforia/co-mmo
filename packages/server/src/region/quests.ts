@@ -12,6 +12,7 @@ import {
   QUESTS,
   TALK_RANGE,
   completeQuest,
+  questRewardFits,
   npcName,
   questComplete,
   questOffered,
@@ -71,6 +72,11 @@ export class Quests {
       const def = QUESTS[q.id];
       if (!def || q.done) continue;
       const handIn = questTurnIn(q.id) === npc.id && (def.goal.kind === 'talk' || questComplete(q, ch));
+      if (handIn && !questRewardFits(ch, q)) {
+        this.s.notice(p, `Your bag is full. Make room for your reward from ${def.title}, then come back.`);
+        text = def.waiting;
+        break;
+      }
       if (handIn) {
         const levels = completeQuest(ch, q);
         this.s.notice(p, `Quest complete: ${def.title}. You received ${rewardText(q.id)}.`);

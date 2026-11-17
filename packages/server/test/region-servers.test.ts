@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { goldOf, setGold, newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { MemoryBus } from '../src/bus.ts';
 import type { Connection } from '../src/region.ts';
 import { RegionServer } from '../src/region-server.ts';
@@ -148,14 +148,14 @@ describe('regions on region servers', () => {
     await until(() => world.home.host === 'a');
     const conn = fakeConn();
     const character = newCharacter();
-    character.gold = 42;
+    setGold(character, 42);
     world.join(info('m', 'Mara'), conn, { regionId: 'woods', x: null, y: null }, character);
     await settle();
     await a.stop();
     running.splice(running.indexOf(a), 1);
     await until(() => world.region('woods')!.host === 'gateway');
     expect(world.regionOf('m')!.def.id).toBe('woods');
-    expect(world.local('woods')!.character('m')!.gold).toBe(42);
+    expect(goldOf(world.local('woods')!.character('m')!)).toBe(42);
   });
 
   it('gives up on a server that falls silent, and sets its regions up again from what players were last sent', async () => {

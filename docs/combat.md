@@ -33,3 +33,16 @@ tile in front of a healer really guards them.
 5. Tactics (`packages/shared/src/tiles/tactics.ts`): a monster struck by a player beside it while another player stands across it (side to side or corner to corner) takes `FLANK_BONUS` (+15%); stepping from a tile beside a monster fighting you to one out of its reach gives it a free swing (not when it is Stunned; a blink is no step); a pack member closing in heads for the tile across the prey from a packmate already there. People, the arrival point and wished things stand on tile middles (editor spawns already did). (Built.)
 6. Skill shapes on tiles (`packages/shared/src/tiles/shapes.ts`): a line is the row of tiles straight ahead, a cone the wedge ahead (as wide as it is far; corner-wise, the quarter between), an area the square about its middle; trees, rocks and walls cut a cone or line short. A creature is hit when any tile of its square is covered. Pointing at a skill's key in the hotbar shows its tiles to the caster; as it lands everyone near sees them for a moment. Each tile shows the painted tile marker (`TILE_MARKER_ART`, the Owner's choice on 2026-11-16 over a code-drawn highlight); until it is painted nothing shows. (Built.)
 7. A balance test (`packages/server/src/balance.ts`, `npm run balance`, findings in `docs/balance.md`). (Built.) Balance pass done: the damage Callings are within 15% of each other in steady damage, the Duelist's Momentum turns blows aside, and crowds stay deadly; the balance workflow checks it on pull requests.
+
+## Bag and gold (combat decisions, step 1)
+
+Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").
+
+| Topic | Rule |
+| --- | --- |
+| Bag size | 20 stacks (`BAG_SLOTS`, shared `rpg/bag.ts`). The Bible takes one. Other things stack up to 99 a slot. |
+| Gold | Coins in the bag (`gold` item, kind `coins`), all in one slot however many. `goldOf`, `addGold`, `takeGold` read and change them; nothing keeps gold as a number any more. |
+| Older saves | Gold saved as a number moves into the bag as coins the first time the character loads (`upgradeCharacter`), even past 20 slots. The `characters.gold` column counts both until then. |
+| Monster gold | Lies on the body with the rest of the loot, for whoever takes it first. |
+| A full bag | Looting takes what fits and leaves the rest on the body. Gathering, crafting, buying, selling, taking gear off, trades, quest rewards, scripted rules (`game.give`, `game.gold`) and God's View changes are refused until there is room. Buying may use the slot the last coins free; selling may use the slot the sold stack frees. |
+| Never lost | Gear coming off when its wish is switched off, a people's first tools, and quest rewards checked beforehand go in even past 20. |

@@ -5,7 +5,7 @@
 // Calling Wish at 10 and 20 is counted here too. Re-exported from rpg.ts.
 
 import { CALLINGS, pathOf, type CallingId } from '../classes.ts';
-import { ABILITIES, learnAbility, type Character } from '../rpg.ts';
+import { ABILITIES, goldOf, learnAbility, takeGold, type Character } from '../rpg.ts';
 import { PATH_SKILLS, PATH_SKILLS_BY_CALLING } from '../skills/paths.ts';
 
 /** A skill's new look and name from a Calling Wish (content.ts SkillLookWish): only how it looks and is called. */
@@ -76,7 +76,7 @@ export function pathProblem(c: Character, path: string): string | undefined {
   if (!trialPassed(c)) return 'Finish your trial first. Your mentor in the Sanctum will send you on it.';
   if (c.path === path) return `You already walk the ${def.name} Path.`;
   const cost = pathCost(c, path);
-  if (c.gold < cost) return `Changing Path costs ${cost} gold, and you have ${c.gold}.`;
+  if (goldOf(c) < cost) return `Changing Path costs ${cost} gold, and you have ${goldOf(c)}.`;
   return undefined;
 }
 
@@ -88,7 +88,7 @@ export function pathProblem(c: Character, path: string): string | undefined {
 export function choosePath(c: Character, path: string): string | undefined {
   const why = pathProblem(c, path);
   if (why) return why;
-  c.gold -= pathCost(c, path);
+  takeGold(c, pathCost(c, path));
   c.path = path;
   settlePathSkills(c);
   return undefined;

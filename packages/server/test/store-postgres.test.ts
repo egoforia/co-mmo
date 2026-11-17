@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { newCharacter } from '@co-mmo/shared';
+import { goldOf, newCharacter, upgradeCharacter } from '@co-mmo/shared';
 import { Store } from '../src/store.ts';
 import { defaultSettings } from '../src/settings.ts';
 import { openBuiltInPostgres, type Sql } from '../src/db.ts';
@@ -201,7 +201,7 @@ describe('characters apart from their accounts', () => {
     const { sql, writes } = counting(db);
     const store = await Store.postgres(sql);
     const owner = store.createInvite(null, 'owner');
-    const mara = store.acceptInvite(owner.code, 'Mara', 'sanctum', { ...newCharacter(), gold: 40, inventory: [{ item: 'wooden-sword', qty: 1 }, { item: 'tonic', qty: 3 }], equipment: { head: 'straw-hat' } }).account;
+    const mara = store.acceptInvite(owner.code, 'Mara', 'sanctum', { ...newCharacter(), inventory: [{ item: 'wooden-sword', qty: 1 }, { item: 'tonic', qty: 3 }, { item: 'gold', qty: 40 }], equipment: { head: 'straw-hat' } }).account;
     const ilya = store.acceptInvite(store.createInvite(mara.id).code, 'Ilya', 'sanctum', { ...newCharacter(), inventory: [{ item: 'tonic', qty: 1 }] }).account;
     await store.flush();
 
@@ -218,7 +218,8 @@ describe('characters apart from their accounts', () => {
     expect(writes.filter((w) => w === 'characters')).toHaveLength(1);
 
     const again = await Store.postgres(db);
-    expect(again.accountByName('Mara')!.character).toMatchObject({ gold: 40, equipment: { head: 'straw-hat' } });
+    expect(again.accountByName('Mara')!.character).toMatchObject({ equipment: { head: 'straw-hat' } });
+    expect(goldOf(again.accountByName('Mara')!.character!)).toBe(40);
     expect(again.accountByName('Ilya')!.character!.inventory).toEqual([]);
     expect(await again.holders('tonic')).toHaveLength(1);
   });
@@ -228,13 +229,16 @@ describe('characters apart from their accounts', () => {
     const character = { ...newCharacter(), gold: 7, inventory: [{ item: 'goat-horn', qty: 2 }] };
     await db.query(`INSERT INTO accounts VALUES ('a1', 1, $1)`, [JSON.stringify({ id: 'a1', name: 'Amala', role: 'owner', color: 0, createdAt: 1, invitedBy: null, tokenHash: '', regionId: 'sanctum', x: null, y: null, character })]);
     const store = await Store.postgres(db);
-    expect(store.accountByName('Amala')!.character!.gold).toBe(7);
+    expect(goldOf(upgradeCharacter(store.accountByName('Amala')!.character!))).toBe(7);
     store.savePosition('a1', 3, 4);
     await store.close();
     const { rows } = await db.query<{ data: Record<string, unknown> }>(`SELECT data FROM accounts WHERE key = 'a1'`);
     expect('character' in rows[0]!.data).toBe(false);
     const again = await Store.postgres(db);
-    expect(again.accountByName('Amala')!.character!.gold).toBe(7);
+    expect(goldOf(upgradeCharacter(again.accountByName('Amala')!.character!))).toBe(7);
+    // Until it is moved into the bag, gold saved as a number still counts in the gold column.
+    const { rows: gold } = await db.query<{ gold: string }>(`SELECT gold FROM characters WHERE account_id = 'a1'`);
+    expect(Number(gold[0]!.gold)).toBe(7);
     expect((await again.holders('goat-horn'))[0]).toMatchObject({ accountId: 'a1', qty: 2 });
   });
 });

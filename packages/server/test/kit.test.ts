@@ -15,6 +15,8 @@ import {
   stampEdit,
   type PlayerInfo,
   type ServerMessage,
+  goldOf,
+  setGold,
 } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 import { Store } from '../src/store.ts';
@@ -48,7 +50,7 @@ describe('shops and trainers', () => {
     const { region } = setup('shore');
     const conn = fakeConn();
     const c = newCharacter();
-    c.gold = 30;
+    setGold(c, 30);
     addItem(c, 'crab-shell', 4);
     region.join(info('a', 'Mara'), conn, { x: null, y: null }, c);
     region.placePlayer('a', 10, 10);
@@ -66,15 +68,15 @@ describe('shops and trainers', () => {
     expect(swords).toHaveLength(1);
     expect(ITEMS[swords[0]!.item]!.copy).toMatchObject({ of: 'wooden-sword', quality: 100, maker: { kind: 'npc' } });
     expect(itemCount(ch, 'crab-shell')).toBe(0);
-    expect(ch.gold).toBe(30 - 15 + 4 * 2);
-    expect(of(conn, 'character').at(-1)!.character.gold).toBe(ch.gold);
+    expect(goldOf(ch)).toBe(30 - 15 + 4 * 2);
+    expect(goldOf(of(conn, 'character').at(-1)!.character)).toBe(goldOf(ch));
   });
 
   it('Sister Amala teaches Mend, which heals for Energy and then rests', () => {
     const { region, clock } = setup('sanctum');
     const conn = fakeConn();
     const c = newCharacter();
-    c.gold = 15;
+    setGold(c, 15);
     region.join(info('a', 'Mara'), conn, { x: null, y: null }, c);
     besideNpc(region, 'a', 'sister-amala');
     region.handle('a', { t: 'shop', action: 'learn', npc: 'sister-amala', id: 'mend' });
@@ -203,7 +205,7 @@ describe('trading between players', () => {
     const ca = newCharacter();
     addItem(ca, 'crab-shell', 3);
     const cb = newCharacter();
-    cb.gold = 20;
+    setGold(cb, 20);
     region.join(info('a', 'Mara'), a, { x: null, y: null }, ca);
     region.join(info('b', 'Ilya'), b, { x: null, y: null }, cb);
     return { region, a, b };
@@ -225,8 +227,8 @@ describe('trading between players', () => {
     expect(itemCount(region.character('b')!, 'crab-shell')).toBe(0);
     region.handle('a', { t: 'trade', action: 'confirm' });
     expect(itemCount(region.character('b')!, 'crab-shell')).toBe(3);
-    expect(region.character('a')!.gold).toBe(10);
-    expect(region.character('b')!.gold).toBe(10);
+    expect(goldOf(region.character('a')!)).toBe(10);
+    expect(goldOf(region.character('b')!)).toBe(10);
     expect(of(a, 'trade').at(-1)!.trade).toBeNull();
     expect(notices(b).at(-1)).toMatch(/Trade done/);
   });
@@ -328,7 +330,7 @@ describe('people from the world editor', () => {
     const region = new Region({ ...def, edits: [stampEdit(draft, { id: 'e1', by: 'Ego', made: 0 }, {})] }, undefined, () => 1_000_000, () => 0.5);
     const conn = fakeConn();
     const c = newCharacter();
-    c.gold = 500;
+    setGold(c, 500);
     region.join(info('a', 'Mara'), conn, { x: null, y: null }, c);
     besideNpc(region, 'a', 'e1:person');
     region.handle('a', { t: 'interact' });

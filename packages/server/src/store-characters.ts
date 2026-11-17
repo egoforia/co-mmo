@@ -1,4 +1,4 @@
-import type { Character } from '@co-mmo/shared';
+import { goldOf, type Character } from '@co-mmo/shared';
 import type { Sql, SqlQuery } from './db.ts';
 
 // Characters are kept apart from their accounts, in tables of their own:
@@ -77,7 +77,7 @@ export class PostgresCharacters {
             `INSERT INTO characters (account_id, level, xp, gold, favor, race, calling, path, data) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
              ON CONFLICT (account_id) DO UPDATE SET level = EXCLUDED.level, xp = EXCLUDED.xp, gold = EXCLUDED.gold, favor = EXCLUDED.favor,
                race = EXCLUDED.race, calling = EXCLUDED.calling, path = EXCLUDED.path, data = EXCLUDED.data`,
-            [id, c.level, c.xp, c.gold, c.favor, c.race ?? null, c.calling ?? null, c.path ?? null, clean(json)],
+            [id, c.level, c.xp, goldOf(c) + legacyGold(c), c.favor, c.race ?? null, c.calling ?? null, c.path ?? null, clean(json)],
           );
           await q.query('DELETE FROM holdings WHERE account_id = $1', [id]);
           for (const h of holdingsOf(id, c)) {
@@ -104,6 +104,11 @@ export class PostgresCharacters {
     );
     return rows.map((r) => ({ accountId: r.account_id, place: r.place, slot: r.slot, item: r.item, qty: Number(r.qty) }));
   }
+}
+
+/** Gold an older save still holds as a number, until the character is next loaded and it becomes coins. */
+function legacyGold(c: Character): number {
+  return Math.max(0, Math.floor(Number((c as { gold?: unknown }).gold) || 0));
 }
 
 /** JSON for a jsonb column, which cannot hold the NUL character. */

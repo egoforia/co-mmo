@@ -434,7 +434,7 @@ function anchorMeta(
   else if (spot) category = 'gather-spot';
   else if (item?.unique) category = 'boss-unique';
   else if (item?.style) category = 'garment';
-  else if (item?.kind === 'material') category = 'material';
+  else if (item?.kind === 'material' || item?.kind === 'coins') category = 'material';
   else if (a.kind === 'effect') category = a.id.startsWith('status-') ? 'status-icon' : 'skill-fx';
 
   return {

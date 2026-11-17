@@ -20,6 +20,7 @@ import { settlePathSkills, type SkillLook } from './rpg/paths.ts';
 import { PATH_ABILITIES } from './skills/paths.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
 import { twoHanded } from './weapons.ts';
+import { BAG_FULL, GOLD, addItem, bagRoom, bagWithout, coinsFromSavedGold, fitsAll, putItem } from './rpg/bag.ts';
 
 export * from './rpg/attributes.ts';
 export * from './rpg/callings.ts';
@@ -28,6 +29,7 @@ export * from './rpg/statuses.ts';
 export * from './rpg/gauges.ts';
 export * from './rpg/skills.ts';
 export * from './rpg/paths.ts';
+export * from './rpg/bag.ts';
 export * from './skills/paths.ts';
 
 export interface Stats {
@@ -91,7 +93,6 @@ export interface Character {
   level: number;
   xp: number;
   hp: number;
-  gold: number;
   /** The wish currency (design doc, The God: Favor). */
   favor: number;
   stats: Stats;
@@ -153,7 +154,6 @@ export function newCharacter(): Character {
     level: 1,
     xp: 0,
     hp: 0,
-    gold: 0,
     favor: STARTING_FAVOR_POINTS,
     stats: { ...STARTING_STATS },
     // The Bible is item number one: every character starts with it.
@@ -182,6 +182,10 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   // Vigor came after Might held health: a saved character starts as tough as they were strong.
   if (saved.stats && saved.stats.vigor === undefined) c.stats.vigor = c.stats.might;
   if (!c.inventory.some((s) => s.item === 'bible')) c.inventory.unshift({ item: 'bible', qty: 1 });
+  c.inventory = c.inventory.map((s) => ({ ...s }));
+  // Gold was a number before it was coins in the bag: it moves in once, and the number goes.
+  coinsFromSavedGold(c, saved);
+  delete (c as { gold?: number }).gold;
   c.equipment = { ...c.equipment };
   c.abilities = [...c.abilities];
   forgetVanished(c);
@@ -200,8 +204,8 @@ export function forgetVanished(c: Character): void {
     const worn = c.equipment[slot];
     if (!worn || ITEMS[worn]?.slot === slot) continue;
     delete c.equipment[slot];
-    // Gear whose wish was switched off still exists, asleep: it goes back in the bag.
-    if (ITEMS[worn]) addItem(c, worn);
+    // Gear whose wish was switched off still exists, asleep: it goes back in the bag, full or not.
+    if (ITEMS[worn]) putItem(c, worn);
   }
   c.abilities = c.abilities.filter((a) => ABILITIES[a] || SLEEPING_ABILITIES.has(a));
   if (c.hotbar) c.hotbar = c.hotbar.map((a) => (a && c.abilities.includes(a) ? a : ''));
@@ -309,13 +313,6 @@ export function itemCount(c: Character, item: string): number {
   return c.inventory.find((s) => s.item === item)?.qty ?? 0;
 }
 
-export function addItem(c: Character, item: string, qty = 1): void {
-  const slot = c.inventory.find((s) => s.item === item);
-  if (slot) slot.qty = Math.min(MAX_STACK, slot.qty + qty);
-  else c.inventory.push({ item, qty: Math.min(MAX_STACK, qty) });
-  discover(c, item);
-}
-
 /** Removes items; false (and no change) when there are not enough. */
 export function takeItem(c: Character, item: string, qty = 1): boolean {
   const slot = c.inventory.find((s) => s.item === item);
@@ -336,7 +333,7 @@ export function discover(c: Character, id: string): void {
 
 export interface ItemDef {
   name: string;
-  kind: 'book' | 'consumable' | 'material' | 'equipment' | 'scroll' | 'tool';
+  kind: 'book' | 'consumable' | 'material' | 'equipment' | 'scroll' | 'tool' | 'coins';
   art: string;
   description: string;
   /** Cannot be dropped, sold, traded or destroyed. */
@@ -386,6 +383,13 @@ export const ITEMS: Record<string, ItemDef> = new Proxy<Record<string, ItemDef>>
     art: 'item-bible',
     bound: true,
     description: "A leather-bound tome with brass corners and the God's sigil on its cover. It holds the world's own story and rules.",
+  },
+  gold: {
+    name: 'Gold Coins',
+    kind: 'coins',
+    art: 'item-gold',
+    standIn: 'item-scarab-charm',
+    description: 'Stamped gold coins carried in your bag. Spend them at shops, trade them, or guard them with your life: whoever finds your body may take them.',
   },
   tonic: {
     name: 'Tonic',
@@ -562,6 +566,10 @@ export function equip(c: Character, worn: string, bind?: (item: string) => strin
   const def = ITEMS[worn];
   if (!def?.slot) return 'That is not something you can wear.';
   if (itemCount(c, worn) === 0) return 'That is not in your bag.';
+  // What comes off goes back in the bag: there must be room for it once this piece is out.
+  const freed = def.slot === 'weapon' && twoHanded(worn) ? 'offhand' : def.slot === 'offhand' && twoHanded(c.equipment.weapon) ? 'weapon' : undefined;
+  const back = [c.equipment[def.slot], freed && c.equipment[freed]].filter((id): id is string => !!id).map((id) => ({ item: id, qty: 1 }));
+  if (!fitsAll(bagWithout(c, [{ item: worn, qty: 1 }]), back)) return BAG_FULL;
   // A unique piece may bind to its wearer as it goes on (copies.ts bindOnWear), and is worn as its bound copy.
   const item = bind ? bind(worn) : worn;
   // Out of the bag directly: takeItem keeps bound things in, so they are never dropped or sold.
@@ -570,18 +578,17 @@ export function equip(c: Character, worn: string, bind?: (item: string) => strin
   if (slot.qty === 0) c.inventory.splice(c.inventory.indexOf(slot), 1);
   const old = c.equipment[def.slot];
   c.equipment[def.slot] = item;
-  if (old) addItem(c, old);
+  if (old) putItem(c, old);
   // A two-handed weapon and an off-hand item cannot be held together.
-  const freed = def.slot === 'weapon' && twoHanded(item) ? 'offhand' : def.slot === 'offhand' && twoHanded(c.equipment.weapon) ? 'weapon' : undefined;
   if (freed) unequip(c, freed);
   clampVitals(c);
   return undefined;
 }
 
-/** Takes off what is worn in a slot and puts it in the bag. */
+/** Takes off what is worn in a slot and puts it in the bag; false when nothing is worn there or the bag is full. */
 export function unequip(c: Character, slot: EquipSlot): boolean {
   const old = c.equipment[slot];
-  if (!old) return false;
+  if (!old || bagRoom(c, old) < 1) return false;
   delete c.equipment[slot];
   addItem(c, old);
   clampVitals(c);
@@ -857,14 +864,21 @@ export function questTurnIn(id: string): string {
   return q.goal.kind === 'talk' ? q.goal.npc : q.turnIn ?? q.giver;
 }
 
-/** Gives a quest's rewards and marks it done. Returns levels gained. */
+/** True when a quest's reward (its coins and items) fits in the bag once what it asks for is handed over. */
+export function questRewardFits(c: Character, state: QuestState): boolean {
+  const q = QUESTS[state.id]!;
+  const handed = q.goal.kind === 'gather' ? q.goal.items : [];
+  return fitsAll(bagWithout(c, handed), [...(q.reward.gold ? [{ item: GOLD, qty: q.reward.gold }] : []), ...(q.reward.items ?? [])]);
+}
+
+/** Gives a quest's rewards and marks it done (check questRewardFits first). Returns levels gained. */
 export function completeQuest(c: Character, state: QuestState): number {
   const q = QUESTS[state.id]!;
   if (q.goal.kind === 'gather') for (const i of q.goal.items) takeItem(c, i.item, i.qty);
   state.done = true;
-  c.gold += q.reward.gold;
+  if (q.reward.gold) putItem(c, GOLD, q.reward.gold);
   c.favor += QUEST_FAVOR;
-  for (const r of q.reward.items ?? []) addItem(c, r.item, r.qty);
+  for (const r of q.reward.items ?? []) putItem(c, r.item, r.qty);
   if (q.reward.ability) learnAbility(c, q.reward.ability);
   return gainXp(c, q.reward.xp);
 }

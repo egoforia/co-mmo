@@ -106,9 +106,11 @@ describe('characters from before Callings', () => {
 
     await c.send({ t: 'chooseCalling', race: 'cervid', calling: 'bellkeeper' });
     const welcome = await c.waitFor<WelcomeMessage>((m) => m.t === 'welcome');
-    expect(welcome.character).toMatchObject({ race: 'cervid', calling: 'bellkeeper', level: 5, gold: 42, favor: 7, freePoints: 4, abilities: ['bell-mend', 'chime', 'toll'], hotbar: ['bell-mend', 'chime', 'toll', '', '', ''] });
+    expect(welcome.character).toMatchObject({ race: 'cervid', calling: 'bellkeeper', level: 5, favor: 7, freePoints: 4, abilities: ['bell-mend', 'chime', 'toll'], hotbar: ['bell-mend', 'chime', 'toll', '', '', ''] });
     expect(welcome.character.stats).toEqual(callingStats('cervid', 'bellkeeper', 5));
     expect(welcome.character.inventory).toContainEqual({ item: 'tonic', qty: 3 });
+    // Gold saved as a number comes back as coins in the bag.
+    expect(welcome.character.inventory).toContainEqual({ item: 'gold', qty: 42 });
     expect(store.accountById(mara.id)!.character).toMatchObject({ race: 'cervid', calling: 'bellkeeper' });
     c.socket.close();
 

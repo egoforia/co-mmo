@@ -12,6 +12,8 @@ import {
   regionDef,
   type PlayerInfo,
   type ServerMessage,
+  BAG_SLOTS,
+  goldOf,
 } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 import { World } from '../src/world.ts';
@@ -72,10 +74,12 @@ describe('combat', () => {
       region.handle('a', { t: 'attack' });
       clock.now += 1000;
     }
-    // The dice roll the middle: the cap (60%) drops, the Tonic (25%) does not, and nothing goes straight to the bag.
+    // The dice roll the middle: the cap (60%) drops, the Tonic (25%) does not, and nothing goes straight to the bag,
+    // not even its gold: the coins lie on the body with the rest.
     expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(0);
+    expect(goldOf(region.character('a')!)).toBe(0);
     const [body] = region.bodyList();
-    expect(body).toMatchObject({ kind: 'walking-mushroom', finders: ['a'], loot: [{ item: 'mushroom-cap', qty: 1 }] });
+    expect(body).toMatchObject({ kind: 'walking-mushroom', finders: ['a'], loot: [{ item: 'gold', qty: 1 }, { item: 'mushroom-cap', qty: 1 }] });
     region.tick();
     expect(of(conn, 'snapshot').at(-1)!.bodies).toEqual([expect.objectContaining({ id: body!.id, name: 'Walking Mushroom', loot: true })]);
     // Loot is shared: someone who did not fight for it sees it too.
@@ -84,17 +88,18 @@ describe('combat', () => {
     // E opens the loot window; nothing moves to the bag until it is taken.
     region.placePlayer('b', body!.x, body!.y + 0.5);
     region.handle('b', { t: 'interact' });
-    expect(of(other, 'loot').at(-1)!.loot).toEqual({ id: body!.id, name: 'Walking Mushroom', asset: 'woods-mushroom', items: [{ item: 'mushroom-cap', qty: 1 }] });
+    expect(of(other, 'loot').at(-1)!.loot).toEqual({ id: body!.id, name: 'Walking Mushroom', asset: 'woods-mushroom', items: [{ item: 'gold', qty: 1 }, { item: 'mushroom-cap', qty: 1 }] });
     expect(itemCount(region.character('b')!, 'mushroom-cap')).toBe(0);
     region.placePlayer('a', body!.x + 0.5, body!.y);
     region.handle('a', { t: 'interact' });
-    expect(of(conn, 'loot').at(-1)!.loot!.items).toHaveLength(1);
+    expect(of(conn, 'loot').at(-1)!.loot!.items).toHaveLength(2);
 
-    // Ilya takes the cap; Mara's open window empties and closes, and she hears who took it.
-    region.handle('b', { t: 'loot', action: 'take', body: body!.id, index: 0, item: 'mushroom-cap' });
+    // Ilya takes everything, the gold too; Mara's open window empties and closes, and she hears who took it.
+    region.handle('b', { t: 'loot', action: 'all', body: body!.id });
     expect(itemCount(region.character('b')!, 'mushroom-cap')).toBe(1);
-    expect(of(other, 'notice').at(-1)!.text).toBe('You take a Mushroom Cap from the Walking Mushroom.');
-    expect(of(conn, 'notice').at(-1)!.text).toBe('Ilya took a Mushroom Cap from the Walking Mushroom you defeated.');
+    expect(goldOf(region.character('b')!)).toBe(1);
+    expect(of(other, 'notice').at(-1)!.text).toBe('You take 1 gold, a Mushroom Cap from the Walking Mushroom.');
+    expect(of(conn, 'notice').at(-1)!.text).toBe('Ilya took 1 gold, a Mushroom Cap from the Walking Mushroom you defeated.');
     expect(of(conn, 'loot').at(-1)!.loot).toBeNull();
     expect(of(other, 'loot').at(-1)!.loot).toBeNull();
     // Too late: it is gone.
@@ -118,8 +123,10 @@ describe('combat', () => {
     const conn = fakeConn();
     region.join(info('a', 'Mara'), conn, { x: null, y: null }, newCharacter());
     const saved = CREATURES['walking-mushroom']!.drops;
-    // Three things, all sure to drop.
+    const savedGold = CREATURES['walking-mushroom']!.gold;
+    // Three things, all sure to drop, and no gold.
     CREATURES['walking-mushroom']!.drops = [{ item: 'mushroom-cap', chance: 1, qty: 2 }, { item: 'tonic', chance: 1 }, { item: 'goat-horn', chance: 1 }];
+    CREATURES['walking-mushroom']!.gold = [0, 0];
     try {
       const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
       const me = region.position('a')!;
@@ -157,6 +164,43 @@ describe('combat', () => {
       expect(region.bodyList()[0]!.loot).toEqual([]);
     } finally {
       CREATURES['walking-mushroom']!.drops = saved;
+      CREATURES['walking-mushroom']!.gold = savedGold;
+    }
+  });
+
+  it('leaves on the body what a full bag cannot hold, and says so', () => {
+    const { region, clock } = setup('woods');
+    const conn = fakeConn();
+    const full = newCharacter();
+    const fillers = Object.keys(ITEMS).filter((id) => ITEMS[id]!.kind === 'material' && id !== 'goat-horn' && id !== 'mushroom-cap');
+    while (full.inventory.length < BAG_SLOTS - 1) full.inventory.push({ item: fillers.shift()!, qty: 1 });
+    full.inventory.push({ item: 'mushroom-cap', qty: 1 });
+    region.join(info('a', 'Mara'), conn, { x: null, y: null }, full);
+    const saved = CREATURES['walking-mushroom']!.drops;
+    const savedGold = CREATURES['walking-mushroom']!.gold;
+    CREATURES['walking-mushroom']!.drops = [{ item: 'mushroom-cap', chance: 1 }, { item: 'goat-horn', chance: 1 }];
+    CREATURES['walking-mushroom']!.gold = [3, 3];
+    try {
+      const id = region.creatureIds().find((c) => c.includes('walking-mushroom'))!;
+      const me = region.position('a')!;
+      region.placeCreature(id, me.x + 1, me.y);
+      while (region.creature(id)!.alive) {
+        region.handle('a', { t: 'attack' });
+        clock.now += 1000;
+      }
+      const [body] = region.bodyList();
+      region.placePlayer('a', body!.x + 0.5, body!.y);
+      region.handle('a', { t: 'interact' });
+      region.handle('a', { t: 'loot', action: 'all', body: body!.id });
+      // The cap stacks on the one carried; the coins and the horn need slots the bag does not have.
+      expect(itemCount(region.character('a')!, 'mushroom-cap')).toBe(2);
+      expect(of(conn, 'notice').at(-1)!.text).toBe('You take a Mushroom Cap from the Walking Mushroom. Your bag is full. The rest stays on the body.');
+      expect(region.bodyList()[0]!.loot).toEqual([{ item: 'gold', qty: 3 }, { item: 'goat-horn', qty: 1 }]);
+      region.handle('a', { t: 'loot', action: 'take', body: body!.id, index: 1, item: 'goat-horn' });
+      expect(of(conn, 'notice').at(-1)!.text).toBe('Your bag is full.');
+    } finally {
+      CREATURES['walking-mushroom']!.drops = saved;
+      CREATURES['walking-mushroom']!.gold = savedGold;
     }
   });
 
@@ -345,11 +389,11 @@ describe('quests', () => {
       }
     }
     expect(region.character('a')!.quests[1]).toMatchObject({ id: 'mushroom-trouble', count: 4, done: false });
-    const gold = region.character('a')!.gold;
+    const gold = goldOf(region.character('a')!);
     d = talkTo(region, conn, 'old-bramble');
     expect(d.text).toContain(QUESTS['mushroom-trouble']!.thanks);
     expect(region.character('a')!.quests[1]!.done).toBe(true);
-    expect(region.character('a')!.gold).toBe(gold + 15);
+    expect(goldOf(region.character('a')!)).toBe(gold + 15);
   });
 
   it('will not accept a quest from afar or out of order', () => {

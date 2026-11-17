@@ -16,6 +16,7 @@ import {
   shopMade,
   validateDefinition,
   type CopyInfo,
+  setGold,
 } from '../src/index.ts';
 
 const info = (over: Partial<CopyInfo> = {}): CopyInfo => ({ of: 'wooden-sword', quality: 110, maker: { kind: 'player', name: 'Mara' }, ...over });
@@ -59,7 +60,7 @@ describe('crafted copies', () => {
 
   it('are made by shops at standard quality and by players by their Wit', () => {
     const c = newCharacter();
-    c.gold = 100;
+    setGold(c, 100);
     expect(buy(c, 'marina', 'wooden-sword', shopMade('Marina', () => 0.5))).toBeUndefined();
     const sword = c.inventory.find((s) => isCopyId(s.item))!;
     expect(ITEMS[sword.item]!.copy).toMatchObject({ quality: 100, maker: { kind: 'npc', name: 'Marina' } });

@@ -13,6 +13,7 @@ import {
   gearPlacement,
   soleFigure,
   startFrame,
+  verifySheetDirections,
   walkFromFrames,
   waysFromSheet,
   waysSheetPrompt,
@@ -53,6 +54,33 @@ describe('video walks', () => {
     const widths = await Promise.all(['front-left', 'front-right', 'back-right', 'back-left'].map(async (w) => (await sharp(ways[w as keyof typeof ways]).metadata()).width));
     expect(widths).toEqual([20, 30, 40, 50]);
     await expect(waysFromSheet(await picture(900, 300, [150, 450, 750].map((x) => `<rect x="${x - 10}" y="60" width="20" height="220" fill="#3060c0"/>`).join('')))).rejects.toThrow(/3 figures instead of 4/);
+  });
+
+  it('verifies that sliced turnaround figures have opposite mirrored headings', async () => {
+    // Front-left: flag on left; Front-right: flag on right (mirror)
+    const flSvg = '<rect x="120" y="50" width="40" height="100" fill="#3060c0"/><rect x="80" y="60" width="30" height="24" fill="#d02020"/>';
+    const frSvg = '<rect x="120" y="50" width="40" height="100" fill="#3060c0"/><rect x="170" y="60" width="30" height="24" fill="#d02020"/>';
+    const fl = await picture(280, 200, flSvg);
+    const fr = await picture(280, 200, frSvg);
+    const v = await verifySheetDirections({
+      'front-left': fl,
+      'front-right': fr,
+      'back-right': fr,
+      'back-left': fl,
+    });
+    expect(v.frontsOpposite).toBe(true);
+    expect(v.backsOpposite).toBe(true);
+    expect(v.frontDiffFlop).toBeLessThan(v.frontDiffSame);
+
+    // Duplicate pose (both have flag on left)
+    const vDup = await verifySheetDirections({
+      'front-left': fl,
+      'front-right': fl,
+      'back-right': fr,
+      'back-left': fr,
+    });
+    expect(vDup.frontsOpposite).toBe(false);
+    expect(vDup.backsOpposite).toBe(false);
   });
 
   it('keeps the one figure, drops a neighbour cut off at the edge, and refuses two whole figures', async () => {

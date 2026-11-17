@@ -37,8 +37,8 @@ const SEEN: Record<IsoWay, string> = {
   // "Turned to the left" reads as the figure's own left (the picture's right), so each is named by the
   // picture's corner and the nearer shoulder instead.
   'front-left': "in a three-quarter view from the front, facing the LOWER-LEFT corner of the picture: the nose, chest and toes point towards the viewer's left, exactly halfway between facing the viewer and a profile facing the left edge of the picture; their LEFT shoulder is nearer to us and their right shoulder further away",
-  'front-right': "in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away",
-  'back-left': "in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder is nearer to us",
+  'front-right': "in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the figure MUST turn 90 degrees clockwise from the first figure to face the opposite diagonal; the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away; do not repeat the lower-left heading",
+  'back-left': "in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder is nearer to us; do not repeat the upper-right heading",
   'back-right': "in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us",
 };
 
@@ -114,8 +114,53 @@ export function waysSheetPrompt(name: string, gear: Carried[], references = 1, o
     copyInstruction,
     'Paint them in the style described above, even where the reference images are painted in another style.',
     `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
-    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
+    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'repeating the same facing angle or pose across adjacent figures', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
   ].join('\n');
+}
+
+/**
+ * Directional verification for sliced turnaround figures.
+ * For bilateral/symmetrical characters, opposite angles are horizontal mirrors of each other:
+ * diff(FL, flop(FR)) < diff(FL, FR) confirms genuine opposite diagonals rather than duplicate poses.
+ */
+export async function verifySheetDirections(figures: Record<IsoWay, Buffer>): Promise<{
+  frontsOpposite: boolean;
+  backsOpposite: boolean;
+  frontDiffSame: number;
+  frontDiffFlop: number;
+  backDiffSame: number;
+  backDiffFlop: number;
+}> {
+  const toBuf = async (b: Buffer, flop = false) => {
+    let s = sharp(b);
+    if (flop) s = s.flop();
+    return s.resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).raw().toBuffer();
+  };
+  const diffBufs = (a: Buffer, b: Buffer) => {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += Math.abs(a[i]! - b[i]!);
+    return sum / a.length;
+  };
+  const [fl, fr, frFlop, br, bl, blFlop] = await Promise.all([
+    toBuf(figures['front-left']),
+    toBuf(figures['front-right']),
+    toBuf(figures['front-right'], true),
+    toBuf(figures['back-right']),
+    toBuf(figures['back-left']),
+    toBuf(figures['back-left'], true),
+  ]);
+  const frontDiffSame = diffBufs(fl, fr);
+  const frontDiffFlop = diffBufs(fl, frFlop);
+  const backDiffSame = diffBufs(br, bl);
+  const backDiffFlop = diffBufs(br, blFlop);
+  return {
+    frontsOpposite: frontDiffFlop < frontDiffSame,
+    backsOpposite: backDiffFlop < backDiffSame,
+    frontDiffSame,
+    frontDiffFlop,
+    backDiffSame,
+    backDiffFlop,
+  };
 }
 
 /** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to TURNTABLE_WAYS: Col 0 front-left, Col 1 front-right, Col 2 back-right, Col 3 back-left). */

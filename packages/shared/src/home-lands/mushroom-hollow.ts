@@ -93,7 +93,7 @@ export const MUSHROOM_HOLLOW: HomeLand = {
     'mother-morel': {
       name: 'Mother Morel',
       greeting: 'Hush now, and listen. Can you hear the ground talking? No? It used to. Come, sit under my cap, and I will tell you what it said.',
-      shop: { sells: [{ item: 'tonic', price: 10 }, ...toolOffers('woodcarving')], teaches: [], buys: true, masters: ['woodcarving'] },
+      shop: { sells: [{ item: 'tonic', price: 50 }, ...toolOffers('woodcarving')], teaches: [], buys: true, masters: ['woodcarving'] },
     },
   },
   quests: QUESTS,

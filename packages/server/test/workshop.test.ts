@@ -41,7 +41,7 @@ describe('the Wish Workshop', () => {
     expect(view.draft.fields).not.toHaveProperty('secret');
     expect(view.preview.card).toMatchObject({ tier: 'moderate', cost: 6, instant: true, title: 'Lantern Moth' });
     expect(view.preview.card.where).toMatch(/^Beside you, in /);
-    expect(view.preview.world[0]).toBe('2 appear near you. Each has 22 health and hits for 4.');
+    expect(view.preview.world[0]).toBe('2 appear near you. Each has 23 health and hits for 4.');
     const art = view.preview.art!;
     expect(art).toMatchObject({ model: 'fake-image', placeholder: 'woods-mushroom' });
     expect(art.pictures).toHaveLength(1);

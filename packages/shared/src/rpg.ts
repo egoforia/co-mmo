@@ -269,7 +269,8 @@ type Gear = Pick<Character, 'level' | 'stats'> & Partial<Pick<Character, 'equipm
 
 /** XP needed to go from this level to the next. */
 export function xpToNext(level: number): number {
-  return Math.round(20 * level ** 1.5);
+  // Doubles every 5 levels on top of 20 × level^1.5 (combat decisions, step 4): about 2,200 XP for level 10, 25,000 for 20.
+  return Math.round(20 * level ** 1.5 * 2 ** ((level - 1) / 5));
 }
 
 /** A party's tuning default, not a server limit (design doc, Social play). */
@@ -689,6 +690,11 @@ export interface CreatureDef {
   /** How big it stands (walk.ts tiers): its body's width (hit-boxes.ts) and reach. Medium, a player's size, unless said. */
   size?: CreatureSizeTier;
 }
+
+/** The server takes at most one item use this often (2 a second): a macro can drink no faster than a hand (combat decisions, step 4). */
+export const ITEM_USE_MS = 500;
+/** How near another player must be to use a Tonic on them, in tiles. */
+export const ITEM_REACH = 4;
 
 /** A defeated creature's body stays this long, in seconds, for its finders to search. */
 export const BODY_SECONDS = 300;

@@ -51,6 +51,8 @@ export interface PlayerState {
   ack: number;
   chatTimes: number[];
   lastAttack: number;
+  /** Epoch ms of their last item use, for the cap of two a second (ITEM_USE_MS). */
+  lastUse?: number;
   lastHurt: number;
   /** When each ability can be used again, epoch ms. */
   readyAt: Map<string, number>;

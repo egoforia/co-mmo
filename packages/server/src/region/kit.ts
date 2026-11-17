@@ -1,4 +1,6 @@
 import {
+  ITEM_REACH,
+  ITEM_USE_MS,
   goldOf,
   ABILITIES,
   ITEMS,
@@ -133,10 +135,15 @@ export class Kit {
   }
 
   /** Uses a thing from the bag: wears gear, reads a scroll, drinks a potion, or tells scripted rules. */
-  useItem(p: PlayerState, item: string): void {
+  useItem(p: PlayerState, item: string, target?: string): void {
     const def = ITEMS[item];
     const ch = p.character;
     if (!def || itemCount(ch, item) === 0 || ch.hp <= 0) return;
+    // Two a second at most, however fast the keys go.
+    const now = this.s.now();
+    if (p.lastUse !== undefined && now - p.lastUse < ITEM_USE_MS) return;
+    p.lastUse = now;
+    if (target !== undefined && target !== p.info.id) return this.useOn(p, item, target);
     if (def.slot) return this.wear(p, item);
     if (def.teaches) {
       const why = readScroll(ch, item);
@@ -161,5 +168,23 @@ export class Kit {
     this.s.notice(p, `You drink a ${def.name}.`);
     this.s.credit(item, p, 'use');
     p.dirty = true;
+  }
+
+  /** Gives a healing item to another player close by, who drinks it at once (combat decisions, step 4). */
+  private useOn(p: PlayerState, item: string, target: string): void {
+    const def = ITEMS[item]!;
+    if (!def.heal) return this.s.notice(p, `You can only use a ${def.name} yourself.`);
+    const m = this.s.players.get(target);
+    if (!m || m.floor !== p.floor || Math.hypot(m.x - p.x, m.y - p.y) > ITEM_REACH) return this.s.notice(p, 'Step closer to them first.');
+    if (m.character.hp <= 0) return this.s.notice(p, `${m.info.name} has fallen. A ${def.name} cannot help them now.`);
+    const max = maxHp(m.character);
+    if (m.character.hp >= max) return this.s.notice(p, `${m.info.name} is already at full health.`);
+    takeItem(p.character, item);
+    m.character.hp = Math.min(max, m.character.hp + def.heal);
+    this.s.notice(p, `You give ${m.info.name} a ${def.name}.`);
+    this.s.notice(m, `${p.info.name} gives you a ${def.name}.`);
+    this.s.credit(item, p, 'use');
+    p.dirty = true;
+    m.dirty = true;
   }
 }

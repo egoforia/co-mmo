@@ -71,3 +71,13 @@ Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").
 ## Quitting mid-fight (combat decisions, step 3)
 
 A player who closes the game while a fight is on stays in the world until nothing has hurt them for 15 seconds (`QUIT_FIGHT_MS`) and no creature is after them. A Fallen player counts as in a fight. Monsters keep attacking them, and if they fall they pay the price of death and wake at the shrine next time they play. Coming back before the fight is over takes up where they stand. Once it is over, the region sends a `quit` departure, and the world saves where they ended up (`World.onQuit`). On region servers the `remove` command carries `quit`, and the answer says `staying`.
+
+## Healing and XP (combat decisions, step 4)
+
+| Topic | Rule |
+| --- | --- |
+| Tonic prices | Healing items in shops cost 5 times what they did (Tonic 8 → 40 gold; Pilgrim Bread too). There is still no cooldown. |
+| Use cap | The server takes at most one item use every `ITEM_USE_MS` (500 ms, two a second), so a macro drinks no faster than a hand. |
+| Healing others | With another player chosen as target, clicking a healing item gives it to them if they are within `ITEM_REACH` tiles on the same floor. It cannot help someone who has fallen. Healing skills already reach others. |
+| Level curve | `xpToNext(L) = 20 × L^1.5 × 2^((L−1)/5)`: it doubles every 5 levels, about 2,200 XP for level 10 and 25,000 for 20. `npm run balance` ends with a "Time per level" table. |
+| Wished monsters | Health, damage, XP and gold come from the land formula (`levelStats` in `creature-tune.ts`), the same as land monsters. |

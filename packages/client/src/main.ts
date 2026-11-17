@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, offHandItem, sensesSpots } from '@co-mmo/shared';
+import { ITEMS, MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, offHandItem, sensesSpots } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
@@ -371,7 +371,11 @@ function play(token: string): void {
         scene?.swing();
       },
       interact: () => connection.send({ t: 'interact' }),
-      use: (item) => connection.send({ t: 'use', item }),
+      use: (item) => {
+        // A healing item goes to the player chosen as target, when there is one (the server checks they are near).
+        const target = ITEMS[item]?.heal ? scene?.playerTarget : undefined;
+        connection.send({ t: 'use', item, ...(target ? { target } : {}) });
+      },
       unequip: (slot) => connection.send({ t: 'equip', slot }),
       openShop: (npc) => kit?.openShop(npc),
       accept: (quest) => connection.send({ t: 'accept', quest }),

@@ -116,6 +116,8 @@ export interface LootActionMessage {
 export interface UseItemMessage {
   t: 'use';
   item: string;
+  /** Another player nearby to use it on (a Tonic for a friend); yourself when missing. */
+  target?: string;
 }
 
 export interface AcceptQuestMessage {
@@ -752,7 +754,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       (m.index === undefined || (Number.isInteger(m.index) && (m.index as number) >= 0 && (m.index as number) < 100)) &&
       (m.item === undefined || isItemId(m.item));
   }
-  if (m.t === 'use') return isItemId(m.item);
+  if (m.t === 'use') return isItemId(m.item) && (m.target === undefined || (typeof m.target === 'string' && m.target.length <= 64));
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   if (m.t === 'pray') return typeof m.text === 'string';
   if (m.t === 'report') {

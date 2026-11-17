@@ -26,6 +26,15 @@ const hpAt = (l: number) => 14 + l * 9;
 const damageAt = (l: number) => 2 + l * 1.6;
 const xpAt = (l: number) => 5 + l * 5;
 
+/**
+ * The land formula: a monster's health, harm, XP and gold from its level.
+ * Land monsters (lands.ts) and wished ones (content.ts) both use it, so no
+ * monster is a cheap XP farm or an unfair spike (combat decisions, step 4).
+ */
+export function levelStats(l: number, tough = 1): Pick<CreatureDef, 'hp' | 'damage' | 'xp' | 'gold'> {
+  return { hp: Math.round(hpAt(l) * tough), damage: Math.round(damageAt(l) * Math.sqrt(tough)), xp: Math.round(xpAt(l) * tough), gold: [l, l * 3] };
+}
+
 /** A monster kind as a spawn's changes make it; the kind itself when nothing changed. */
 export function tunedCreature(def: CreatureDef, tune: CreatureTune | undefined): CreatureDef {
   if (!tune || (tune.level === undefined && tune.behavior === undefined && tune.active === undefined && !tune.loot?.length)) return def;

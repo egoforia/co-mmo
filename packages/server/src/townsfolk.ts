@@ -77,7 +77,7 @@ function day(n: Townsperson, town: Town): void {
   }
   // Someone walked into them: they step aside first, even while stopped to talk.
   const among: Among | undefined = town.bodies && { self: { r: PERSON_RADIUS, kind: 'npc', floor: n.floor, of: n }, bodies: town.bodies };
-  if (among) standClear(town.map, n, STROLL_SPEED, among, town.random);
+  if (among) standClear(town.map, n, STROLL_SPEED, among, town.random, spot.floor === n.floor ? spot : undefined);
   if (town.listening) {
     n.target = null;
     n.rest = TICK_RATE;

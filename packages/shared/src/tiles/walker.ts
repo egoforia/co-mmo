@@ -52,27 +52,18 @@ export function tileTaken(among: Among | undefined, anchor: TileSpot, floor: num
 }
 
 /**
- * The way to step for an input, from a tile: straight on; for a diagonal
- * blocked by the land, along one side of it (sliding along a wall); and when
- * someone stands in the way, round them by the nearest way that turns least
- * (an eighth of a turn), so a held key never walks into a creature forever.
+ * The way to step for an input, from a tile: straight on, and for a diagonal
+ * blocked by the land, along one side of it (sliding along a wall). When
+ * someone stands on the tile asked for, no step: the walker stays put and
+ * only turns to face them (egoforia, 2026-11-16), so pressing towards a
+ * monster never slips you past it to a tile you did not choose.
  */
 function chooseWay(map: RegionMap, from: TileSpot, want: StepWay, floor: number, among?: Among): StepWay | undefined {
   const land = (w: StepWay) => canStep(map, from, w, 1, floor);
   const free = (w: StepWay) => !tileTaken(among, stepped(from, w), floor);
+  if (land(want)) return free(want) ? want : undefined;
   const slides: StepWay[] = isDiagonal(want) ? [{ dx: want.dx, dy: 0 }, { dx: 0, dy: want.dy }] : [];
-  if (land(want)) {
-    if (free(want)) return want;
-    const round = isDiagonal(want) ? slides : [turned(want, 1), turned(want, -1)];
-    return round.find((w) => land(w) && free(w));
-  }
   return slides.find((w) => land(w) && free(w));
-}
-
-/** A way turned an eighth of a turn clockwise (1) or back (-1). */
-function turned(way: StepWay, by: 1 | -1): StepWay {
-  const a = Math.atan2(way.dy, way.dx) + (by * Math.PI) / 4;
-  return { dx: (Math.round(Math.cos(a)) || 0) as StepWay['dx'], dy: (Math.round(Math.sin(a)) || 0) as StepWay['dy'] };
 }
 
 /**

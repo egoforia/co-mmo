@@ -203,10 +203,16 @@ describe('walking on tiles', () => {
     expect(walkTiles(map, still, 1, 0, 1, { ...among, bodies: bodyList([coming]) })).toBe(still);
   });
 
-  it('goes round someone in the way by the nearest way that turns least', () => {
-    const map = land(8, 8, [[2, 0]]);
-    const other: HitBody = { x: 2.5, y: 1.5, floor: 0, r: PERSON_RADIUS, kind: 'creature' };
+  it('stays put when someone stands on the tile asked for, straight or diagonal, never slipping round them', () => {
+    const map = land(8, 8, []);
+    const other: HitBody = { x: 2.5, y: 2.5, floor: 0, r: PERSON_RADIUS, kind: 'creature' };
     const among = { self: { r: PERSON_RADIUS, kind: 'player' as const, floor: 0 }, bodies: bodyList([other]) };
-    expect(walkTiles(map, { x: 1.5, y: 1.5, floor: 0 }, 1, 0, 1, among).to).toEqual(at(2, 2));
+    const west: TileWalker = { x: 1.5, y: 2.5, floor: 0 };
+    expect(walkTiles(map, west, 1, 0, 1, among)).toBe(west);
+    const corner: TileWalker = { x: 1.5, y: 1.5, floor: 0 };
+    expect(walkTiles(map, corner, 1, 1, 1, among)).toBe(corner);
+    // A diagonal the land blocks still slides along the wall, round no one.
+    const walled = land(8, 8, [[2, 1]]);
+    expect(walkTiles(walled, corner, 1, 1, 1, { ...among, bodies: bodyList([]) }).to).toEqual(at(1, 2));
   });
 });

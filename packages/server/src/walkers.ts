@@ -173,9 +173,11 @@ export function keepStepping(map: RegionMap, w: Stepper, before: Spot, speed: nu
  * Steps off a square someone else holds (several put on one spot, someone
  * arriving on top of it) onto a free one beside it, so nobody stays stacked
  * on another. Creatures and people do it every tick; players are only ever
- * stopped, never pushed.
+ * stopped, never pushed. Given `keep` (where a person strolls about), the
+ * ways that stay nearest it come first, so being made to step aside does
+ * not walk them off from their spot.
  */
-export function standClear(map: RegionMap, w: Stepper, speed: number, among: Among, random: () => number): void {
+export function standClear(map: RegionMap, w: Stepper, speed: number, among: Among, random: () => number, keep?: Spot): void {
   if (w.to) return;
   const width = w.width ?? 1;
   const from = anchorNear(w.x, w.y, width);
@@ -183,6 +185,10 @@ export function standClear(map: RegionMap, w: Stepper, speed: number, among: Amo
   // Straight ways first, from a random one, so a crowd parts every way.
   const turn = Math.floor(random() * 4);
   const ways = [0, 1, 2, 3].map((i) => STEP_WAYS[(i + turn) % 4]!).concat(STEP_WAYS.slice(4));
+  if (keep) {
+    const off = (wy: StepWay) => Math.hypot(w.x + wy.dx - keep.x, w.y + wy.dy - keep.y);
+    ways.sort((a, b) => off(a) - off(b));
+  }
   const way = ways.find((wy) => canTread(map, w, from, wy, among));
   if (!way) return;
   let once = true;

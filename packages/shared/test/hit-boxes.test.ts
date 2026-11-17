@@ -82,7 +82,7 @@ describe('a player among bodies', () => {
     const middle = { x: Math.floor(start.x) + 0.5, y: Math.floor(start.y) + 0.5 };
     const predictor = new Predictor(map, middle);
     predictor.bodies = bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: middle.x + 1, y: middle.y, health: 1 }]);
-    // Never into it: round it, a tile away at least, as the server walks us.
+    // Never into it, nor round it: we stay put facing it, as the server keeps us.
     const apart = (o: { x: number; y: number }) => {
       let least = Infinity;
       for (let i = 0; i < 20; i++) {
@@ -92,7 +92,7 @@ describe('a player among bodies', () => {
       return least;
     };
     expect(apart({ x: middle.x + 1, y: middle.y })).toBeGreaterThanOrEqual(PERSON_RADIUS * 2);
-    expect(predictor.position.x).toBeGreaterThan(middle.x + 1);
+    expect(predictor.position).toMatchObject({ x: middle.x, y: middle.y });
     // Another player stands in the way too.
     const there = { x: Math.floor(predictor.position.x) + 1.5, y: Math.floor(predictor.position.y) + 0.5 };
     predictor.bodies = bodiesSeen([], [there]);

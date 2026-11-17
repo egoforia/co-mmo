@@ -155,6 +155,8 @@ export class WorldScene extends Phaser.Scene {
   private aiming?: string;
   /** The way we last walked, for aiming a cone or line with nothing chosen. */
   private facing = { dx: 1, dy: 0 };
+  /** The last key pressed asked for a tile someone stands on: the avatar faces that way but does not walk. */
+  private blocked = false;
   /** The regions drawn around us, by id. */
   private drawn = new Map<string, DrawnRegion>();
   /** Kit art painted since the land was last drawn. */
@@ -563,16 +565,19 @@ export class WorldScene extends Phaser.Scene {
       if (dx !== 0 || dy !== 0 || predictor.stepping) {
         const step = PROJECTION.inputToWorld(dx, dy);
         if (dx !== 0 || dy !== 0) this.facing = { dx: step.dx, dy: step.dy };
+        const before = predictor.position;
         const input = predictor.apply(step.dx, step.dy);
+        // Pressing towards a taken tile takes no step (the walker hands back the same place): only turn to face it.
+        this.blocked = (dx !== 0 || dy !== 0) && predictor.position === before;
         this.options.send({ t: 'input', ...input });
-      }
+      } else this.blocked = false;
     }
     const held = this.readInput();
     // A step finishing after the key was let go still walks, the way it goes.
     const to = predictor.position.to;
     const going = !held.dx && !held.dy && to ? { dx: to.tx + 0.5 - predictor.position.x, dy: to.ty + 0.5 - predictor.position.y } : undefined;
     if (going) walkAvatar(this, this.metrics, this.me, going, { dx: 1, dy: 0 });
-    else walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), held);
+    else walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), this.blocked ? { dx: 0, dy: 0 } : held);
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);

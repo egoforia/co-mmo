@@ -70,11 +70,11 @@ describe('the bag', () => {
 describe('a full bag', () => {
   it('cannot buy, unless paying frees the coin slot', () => {
     const c = newCharacter();
-    setGold(c, 20);
+    setGold(c, 100);
     fill(c);
     expect(buy(c, 'marina', 'tonic')).toBe(BAG_FULL);
-    expect(goldOf(c)).toBe(20);
-    setGold(c, 8);
+    expect(goldOf(c)).toBe(100);
+    setGold(c, 40);
     expect(buy(c, 'marina', 'tonic')).toBeUndefined();
     expect(goldOf(c)).toBe(0);
     expect(itemCount(c, 'tonic')).toBe(1);

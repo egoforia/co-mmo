@@ -15,6 +15,7 @@ import { RACES, isRace, type RaceId } from './races.ts';
 import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
 import { applySize, removeSize, type SizeWish } from './creature-size.ts';
+import { levelStats } from './creature-tune.ts';
 import { cleanLight, type Light } from './light.ts';
 import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
 import { WISHED_ABILITY_NUMBERS, wishedEffect, wishedStatus } from './wished-abilities.ts';
@@ -791,15 +792,12 @@ export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
     behavior: w.behavior,
     ...(w.active ? { active: w.active } : {}),
     level: l,
-    hp: 14 + l * 8,
-    damage: Math.round(2 + l * 1.5),
+    ...levelStats(l),
     ...creatureDefence(l, UNDEAD_WORDS.test(`${w.name} ${w.description}`) ? 'undead' : undefined),
     cooldown: 1.3,
     // Hunters are quicker, and the timid quickest of all at running away.
     speed: w.behavior === 'chase' || w.behavior === 'pack' ? 2.8 : w.behavior === 'timid' ? 3 : 2.2,
     notice: BEHAVIOR_NOTICE[w.behavior] ?? 0,
-    xp: 5 + l * 4,
-    gold: [0, l * 2],
     drops: (w.drops ?? []).map((item) => ({ item, chance: 0.25 })),
     respawnSeconds: 25,
   };

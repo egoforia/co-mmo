@@ -232,7 +232,7 @@ export interface ShopDef {
 /** NPC shops and trainers (design doc, Gold: spent at NPC shops). */
 export const SHOPS: Record<string, ShopDef> = {
   marina: {
-    sells: [{ item: 'tonic', price: 8 }, { item: 'wooden-sword', price: 15 }, { item: 'traveller-coat', price: 20 }, ...toolOffers('fletching')],
+    sells: [{ item: 'tonic', price: 40 }, { item: 'wooden-sword', price: 15 }, { item: 'traveller-coat', price: 20 }, ...toolOffers('fletching')],
     teaches: [],
     buys: true,
     // Gull feathers come in with every tide.
@@ -241,7 +241,7 @@ export const SHOPS: Record<string, ShopDef> = {
   // The Woods' herbalist.
   'old-bramble': { sells: toolOffers('herbalism'), teaches: [], buys: false, masters: ['herbalism'] },
   'cactus-elder': {
-    sells: [{ item: 'scroll-firebolt', price: 40 }, { item: 'tonic', price: 10 }],
+    sells: [{ item: 'scroll-firebolt', price: 40 }, { item: 'tonic', price: 50 }],
     teaches: [],
     buys: true,
   },

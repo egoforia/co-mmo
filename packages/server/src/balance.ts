@@ -1,5 +1,7 @@
 import {
   ABILITIES,
+  levelStats,
+  xpToNext,
   CALLINGS,
   CREATURES,
   DAMAGE_EFFECTS,
@@ -195,6 +197,30 @@ export function balanceReport(results: FightResult[]): string {
     lines.push('');
   }
   return lines.join('\n');
+}
+
+/** Seconds between one fight and the next while levelling: walking to the next monster and catching breath. */
+export const BETWEEN_FIGHTS_S = 20;
+
+/**
+ * Roughly how long each level takes (combat decisions, step 4): monsters of
+ * the player's own level needed (land formula XP), and minutes at the solo
+ * fights' average length plus BETWEEN_FIGHTS_S. A guide, not a promise.
+ */
+export function levelTimes(results: FightResult[], levels = [1, 5, 10, 15, 20]): string {
+  const solo = results.filter((r) => r.scene === 'solo');
+  const fightSeconds = (level: number): number => {
+    // The nearest level fought alone stands in for the ones between.
+    const near = [...new Set(solo.map((r) => r.level))].sort((a, b) => Math.abs(a - level) - Math.abs(b - level))[0];
+    const rows = solo.filter((r) => r.level === near);
+    return rows.length ? rows.reduce((n, r) => n + r.seconds, 0) / rows.length : 5;
+  };
+  const lines = ['### Time per level', '', '| Level | XP to next | Monsters of that level | Minutes, about |', '| --- | --- | --- | --- |'];
+  for (const level of levels) {
+    const kills = Math.ceil(xpToNext(level) / levelStats(level).xp);
+    lines.push(`| ${level} | ${xpToNext(level).toLocaleString('en')} | ${kills} | ${Math.round((kills * (fightSeconds(level) + BETWEEN_FIGHTS_S)) / 60)} |`);
+  }
+  return [...lines, ''].join('\n');
 }
 
 /** The Callings whose job is damage, held to one another's steady damage. */

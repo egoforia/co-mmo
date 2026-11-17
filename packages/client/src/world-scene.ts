@@ -530,6 +530,12 @@ export class WorldScene extends Phaser.Scene {
     return this.targeting.id ?? undefined;
   }
 
+  /** The chosen target when it is another player, for giving them a Tonic. */
+  get playerTarget(): string | undefined {
+    const id = this.targeting.id;
+    return id && this.remotes.has(id) ? id : undefined;
+  }
+
   /** Clicking a creature or player chooses them (clicking the ground lets go); Tab goes through the creatures near us. */
   private listenForTargets(): void {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {

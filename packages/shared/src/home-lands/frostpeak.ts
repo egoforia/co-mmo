@@ -613,22 +613,22 @@ export const FROSTPEAK: HomeLand = {
     ysolde: {
       name: 'Ysolde',
       greeting: 'You climbed all this way? Then you have the legs of a Falcon, whatever your feathers. Sit by the fire, and mind the edge.',
-      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('leatherwork')], teaches: [], buys: true, masters: ['leatherwork'] },
+      shop: { sells: [{ item: 'tonic', price: 55 }, ...toolOffers('leatherwork')], teaches: [], buys: true, masters: ['leatherwork'] },
     },
     kaen: {
       name: 'Talon-Mason Kaen',
       greeting: 'Mind the marble dust, traveler. On Mount Zephyr we do not build with clay; we release what the stone was already dreaming.',
-      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('smithing')], teaches: [], buys: true },
+      shop: { sells: [{ item: 'tonic', price: 55 }, ...toolOffers('smithing')], teaches: [], buys: true },
     },
     kip: {
       name: 'Kip the Spelunker',
       greeting: 'Keep your footing! The wind pulls up from the depths like a living breath. Four floors down, there is a whole forgotten world waiting.',
-      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('smithing')], teaches: [], buys: true },
+      shop: { sells: [{ item: 'tonic', price: 55 }, ...toolOffers('smithing')], teaches: [], buys: true },
     },
     sula: {
       name: 'Sula the Feather-Weaver',
       greeting: 'Welcome to the Loom-Terraces. The high wind sings through the warp, and mountain wool remembers the snow.',
-      shop: { sells: [{ item: 'tonic', price: 11 }, ...toolOffers('tailoring'), ...toolOffers('fletching')], teaches: [], buys: true },
+      shop: { sells: [{ item: 'tonic', price: 55 }, ...toolOffers('tailoring'), ...toolOffers('fletching')], teaches: [], buys: true },
     },
     aurius: {
       name: 'Elder Aurius the Keen',

@@ -750,7 +750,7 @@ export class Region {
         this.quests.accept(p, message.quest);
         break;
       case 'use':
-        this.kit.useItem(p, message.item);
+        this.kit.useItem(p, message.item, message.target);
         break;
       case 'equip':
         this.kit.wear(p, message.item, message.slot);

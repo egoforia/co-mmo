@@ -1,3 +1,4 @@
+import type { RaceId } from './races.ts';
 import type { ClientMessage, PlayerInfo } from './protocol.ts';
 import type { RegionDef, NpcPlacement, Side } from './world.ts';
 import type { Character, CreatureDef, InventorySlot, Status } from './rpg.ts';
@@ -68,7 +69,10 @@ export interface CreatureStateSnapshot {
 export interface Body {
   id: string;
   kind: string;
-  def: CreatureDef;
+  /** A player's body has only a name and no picture of its own. */
+  def: Pick<CreatureDef, 'name' | 'art'>;
+  /** Whose body it is, on a player's body. */
+  owner?: { id: string; name: string; race?: RaceId };
   x: number;
   y: number;
   floor: number;

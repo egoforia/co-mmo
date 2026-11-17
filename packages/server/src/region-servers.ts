@@ -226,6 +226,10 @@ export class RegionServers implements Hosting {
         return this.world.onJournal?.(m.text, m.player);
       case 'owner':
         return this.world.onOwner?.(m.item, m.name, m.how);
+      case 'playerBody':
+        return this.world.onPlayerBody?.(m.body, m.gone);
+      case 'tellAnywhere':
+        return this.world.sendTo(m.player, { t: 'notice', text: m.text });
       case 'regionChat':
         return this.world.region(region.def.id)?.broadcast(m.m);
     }

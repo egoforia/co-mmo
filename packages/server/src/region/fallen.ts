@@ -2,7 +2,7 @@ import { FALLEN_MS, maxHp } from '@co-mmo/shared';
 import type { PlayerState, RegionState } from './state.ts';
 
 /** What a player reads when they fall (docs/callings-build-plan.md, step 8). */
-export const FALLEN_WORDS = 'You have fallen. A friend may still ring you back, or you can wake at the shrine.';
+export const FALLEN_WORDS = 'You have fallen. A friend may still ring you back. Waking at the shrine costs some XP and all the gold you carry, and you may drop gear where you fell.';
 
 /**
  * Players at 0 HP lie Fallen where they fell for up to FALLEN_MS

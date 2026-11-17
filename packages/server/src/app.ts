@@ -149,8 +149,11 @@ export function createApp(options: AppOptions): App {
   world.combatRules = combatRules(store.settings.combat);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
   world.onOwner = (item, name, how) => store.addOwner(item, name, how);
+  // Players' bodies outlast a restart (combat decisions, step 3).
+  world.onPlayerBody = (body, gone) => store.savePlayerBody(body, gone);
   // The workshop lands the Owner and Stewards made in the editor.
   for (const land of store.workshopLands()) world.addRegion(workshopDef(land));
+  world.restoreBodies(store.playerBodies(now()));
   const env = options.wishes.env ?? process.env;
   // Before anything that sends requests is made, so every one of them is logged.
   const apiLog = options.apiLog ?? ApiLog.memory({ env });

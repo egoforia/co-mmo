@@ -87,6 +87,9 @@ export class Bodies {
     for (const id of body.finders) {
       if (id !== p.info.id) this.s.tell(id, `${p.info.name} took ${names} from the ${body.def.name} you defeated.`);
     }
+    // The one who fell hears who took their things, wherever they are.
+    if (body.owner && body.owner.id !== p.info.id) this.s.tellAnywhere(body.owner.id, `${p.info.name} took ${names} from your body.`);
+    this.s.bodyChanged(body);
     this.showLoot(body);
   }
 

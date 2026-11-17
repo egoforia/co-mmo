@@ -254,7 +254,8 @@ export function sizeCreature(scene: Phaser.Scene, metrics: FigureMetricsCache, a
 
 /** A body is the creature's own painted picture, laid on its side and faded a little. */
 export function makeBody(scene: Phaser.Scene, metrics: FigureMetricsCache, b: BodyState): Avatar {
-  const a = makeAvatar(scene, metrics, b.asset, bodyLabel(b), false, 'woods-mushroom');
+  // A player's body is drawn as the player, lying down.
+  const a = makeAvatar(scene, metrics, b.owner ? playerTexture(b.owner, b.race) : b.asset, bodyLabel(b), false, b.owner ? undefined : 'woods-mushroom');
   a.label.setColor('#c0cbdc').setFontSize(Math.round(T * 0.18));
   a.height = creatureHeight(b.kind);
   fitFigure(scene, metrics, a, a.body.texture.key, true);

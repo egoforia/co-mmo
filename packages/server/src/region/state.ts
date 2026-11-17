@@ -15,6 +15,7 @@ import { DEFAULT_COMBAT_RULES, type CombatRules,
   type CreatureDef,
   type InventorySlot,
   type PlayerInfo,
+  type RaceId,
   type RegionMap,
   type ServerMessage,
   type Status,
@@ -126,11 +127,33 @@ export interface SandDouble {
   until: number;
 }
 
-/** A defeated creature's body: what it dropped waits there for anyone to take. */
+/** Whose body a player's body is (combat decisions, step 3). */
+export interface BodyOwner {
+  id: string;
+  name: string;
+  race?: RaceId;
+}
+
+/** A player's body as the store keeps it, so it outlasts a restart. */
+export interface SavedBody {
+  id: string;
+  region: string;
+  x: number;
+  y: number;
+  floor: number;
+  until: number;
+  owner: BodyOwner;
+  loot: InventorySlot[];
+}
+
+/** A defeated creature's body, or a player's: what it dropped waits there for anyone to take. */
 export interface Body {
   id: string;
   kind: string;
-  def: CreatureDef;
+  /** Its name and picture: the creature's, or for a player's body "body of <name>" and no picture (the client draws the player). */
+  def: Pick<CreatureDef, 'name' | 'art'>;
+  /** Set on a player's body: whose it was. They hear who takes their things. */
+  owner?: BodyOwner;
   x: number;
   y: number;
   floor: number;
@@ -191,6 +214,18 @@ export class RegionState {
     // A crafted copy of a wished thing counts as the thing.
     const id = copyBase(thing);
     if (wisherOf(id)) this.hooks.creator?.(id, p.info.id, credit);
+  }
+
+  /** Tells a player something, here or wherever they are. */
+  tellAnywhere(id: string, text: string): void {
+    if (this.players.has(id)) this.tell(id, text);
+    else this.hooks.tellAnywhere?.(id, text);
+  }
+
+  /** Saves a player's body as it is now, or that it is gone; creatures' bodies are not kept. */
+  bodyChanged(b: Body, gone = false): void {
+    if (!b.owner) return;
+    this.hooks.playerBody?.({ id: b.id, region: this.map.def.id, x: b.x, y: b.y, floor: b.floor, until: b.until, owner: { ...b.owner }, loot: b.loot.map((s) => ({ ...s })) }, gone);
   }
 
   /** Records that pieces of gear came to a player, for each piece's owner history; other items are skipped. */

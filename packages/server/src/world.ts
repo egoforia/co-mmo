@@ -42,6 +42,7 @@ import {
 } from '@co-mmo/shared';
 import { Parties } from './parties.ts';
 import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
+import type { SavedBody } from './region/state.ts';
 import { SplitRegion, cellsFor, placementsFor } from './split-region.ts';
 import { across } from './region/beyond.ts';
 import { STEADY, type SnapshotTuning } from './region/far.ts';
@@ -177,6 +178,8 @@ export class World {
       party: (playerId) => this.parties.members(playerId),
       journal: (text, playerId) => this.onJournal?.(text, playerId),
       owner: (item, name, how) => this.onOwner?.(item, name, how),
+      playerBody: (body, gone) => this.onPlayerBody?.(body, gone),
+      tellAnywhere: (id, text) => this.sendTo(id, { t: 'notice', text }),
       // Every region around this one, corners too, so the world is drawn as one map.
       neighbours: () => this.neighbours(region.def),
       sky: () => this.sky,
@@ -421,6 +424,20 @@ export class World {
 
   /** A piece of gear came to a new owner (set by the app, which keeps its history). */
   onOwner?: (item: string, name: string, how: AcquiredHow) => void;
+
+  /** A player's body was laid, taken from or faded (set by the app, which saves it so a restart keeps it). */
+  onPlayerBody?: (body: SavedBody, gone?: boolean) => void;
+
+  /**
+   * Lays the player bodies saved before a restart back in their regions.
+   * Called once at start, while every region still runs in this process;
+   * a region moved to a region server later carries its bodies with it.
+   */
+  restoreBodies(saved: SavedBody[]): void {
+    for (const def of new Set(saved.map((b) => b.region))) {
+      this.local(def)?.addPlayerBodies(saved.filter((b) => b.region === def));
+    }
+  }
 
   /** Events for scripted rules: set by whoever runs them (the app, or a rule's test run). */
   onEvent?: (type: 'use' | 'interact' | 'defeat' | 'enter' | 'join', playerId: string, data: Record<string, string | number>) => void;
@@ -930,7 +947,7 @@ export class World {
       return taken;
     };
     if (departure.died) {
-      // The Fallen wake at the shrine, Weakened for a while; nothing is lost.
+      // The Fallen wake at the shrine, Weakened for a while; the region already took the price (region/deaths.ts).
       this.moving.add(id);
       this.track(settle(take(`${name} fell in ${region.def.name}.`), (fallen) => {
         this.moving.delete(id);

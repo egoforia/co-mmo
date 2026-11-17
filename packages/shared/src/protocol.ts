@@ -392,6 +392,9 @@ export interface BodyState {
   floor?: number;
   /** Something is still on it to take (anyone may). */
   loot: boolean;
+  /** On a player's body: whose it is (and their people), so it is drawn as them. */
+  owner?: string;
+  race?: RaceId;
 }
 
 /** A person of the town (an NPC), where they are strolling now. */

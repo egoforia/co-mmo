@@ -75,6 +75,7 @@ import { worldMarks } from './region/world-marks.ts';
 import { Combat } from './region/combat.ts';
 import { CombatLogger, combatLogger } from './region/combat-logger.ts';
 import { Fallen } from './region/fallen.ts';
+import { Deaths } from './region/deaths.ts';
 import { Paths } from './region/paths/index.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
 import { inspectEntity } from './region/inspect.ts';
@@ -85,7 +86,7 @@ import { Crowd, spreadHomes } from './region/crowd.ts';
 import { Beyond, nearEdge } from './region/beyond.ts';
 import { STEADY, crowdOf, thinOut, type SnapshotTuning } from './region/far.ts';
 import { Quests } from './region/quests.ts';
-import { RegionState, type Body, type PlayerState } from './region/state.ts';
+import { RegionState, type Body, type PlayerState, type SavedBody } from './region/state.ts';
 import { afflictCreature, afflictPlayer, type StatusFrom } from './region/statuses.ts';
 
 export { findSpots, nearestTile } from './walkers.ts';
@@ -139,6 +140,10 @@ export interface RegionHooks {
   journal?(text: string, playerId: string): void;
   /** A piece of gear came to a new owner, for its history (combat decisions, step 2). */
   owner?(item: string, name: string, how: AcquiredHow): void;
+  /** A player's body was laid, taken from, or faded (`gone`): saved so it outlasts a restart (combat decisions, step 3). */
+  playerBody?(body: SavedBody, gone?: boolean): void;
+  /** A word for a player wherever they are, or nowhere when they are offline. */
+  tellAnywhere?(playerId: string, text: string): void;
   /** The regions beyond this one's open edges, for players to see beside it. */
   neighbours?(): RegionDef[];
   /** Delivers a Region-channel line to every cell of a region that was split (see Cell). */
@@ -241,6 +246,7 @@ export class Region {
   private readonly looting: Bodies;
   private readonly talk: Chat;
   private readonly fallen: Fallen;
+  private readonly deaths: Deaths;
   private readonly paths: Paths;
   /** Who stands where this tick (hit-boxes.ts): nobody walks into anyone. */
   private readonly crowd: Crowd;
@@ -284,6 +290,7 @@ export class Region {
     this.quests = new Quests(this.s, this.looting, () => this.sky().phase, (p) => this.gathering.start(p));
     this.gauges = new Gauges(this.s);
     this.fallen = new Fallen(this.s);
+    this.deaths = new Deaths(this.s);
     this.paths = new Paths(this.s, this.gauges, () => this.combat);
     this.combat = new Combat(this.s, this.quests, this.gauges, this.fallen, this.paths);
     this.combat.logger = this.logger;
@@ -357,6 +364,11 @@ export class Region {
   }
 
   /** Places a wished NPC, who strolls about that spot. */
+  /** Lays player bodies the store kept back where they fell (combat decisions, step 3). */
+  addPlayerBodies(saved: SavedBody[]): void {
+    this.deaths.restore(saved);
+  }
+
   addNpc(npc: NpcPlacement): void {
     this.s.townsfolk = this.s.townsfolk.filter((n) => n.id !== npc.id);
     this.s.townsfolk.push(makeTownsperson({ ...npc }, this.map, this.random));
@@ -827,7 +839,12 @@ export class Region {
     phase('minds_think', () => this.minds.think(now, skyPhase, weather));
 
     phase('bodies', () => {
-      this.s.bodies = this.s.bodies.filter((b) => now < b.until);
+      // A player's body goes as soon as nothing is left on it.
+      this.s.bodies = this.s.bodies.filter((b) => {
+        const keep = now < b.until && !(b.owner && !b.loot.length);
+        if (!keep) this.s.bodyChanged(b, true);
+        return keep;
+      });
       this.s.doubles = this.s.doubles.filter((d) => now < d.until);
       // A loot window closes when its body fades or its looter walks away.
       for (const p of this.s.players.values()) if (p.looting && !this.looting.lootable(p, p.looting)) this.looting.closeLoot(p);
@@ -838,6 +855,9 @@ export class Region {
     phase('fallen', () => {
       // The Fallen lie where they fell until a friend raises them or they wake at the shrine.
       for (const id of this.fallen.tick(now)) {
+        // Waking at the shrine has a price; being raised by a friend does not.
+        const p = this.s.players.get(id);
+        if (p) this.deaths.die(p);
         const i = departures.findIndex((d) => d.id === id);
         if (i >= 0) departures.splice(i, 1);
         departures.push({ id, died: true });
@@ -1061,6 +1081,7 @@ export class Region {
       id: b.id,
       kind: b.kind,
       def: b.def,
+      ...(b.owner ? { owner: { ...b.owner } } : {}),
       x: b.x,
       y: b.y,
       floor: b.floor,
@@ -1157,7 +1178,8 @@ export class Region {
     this.s.bodies = initialState.bodies.map((bs) => ({
       id: bs.id,
       kind: bs.kind,
-      def: bs.def ?? CREATURES[bs.kind],
+      def: bs.def ?? CREATURES[bs.kind]!,
+      ...(bs.owner ? { owner: { ...bs.owner } } : {}),
       x: bs.x,
       y: bs.y,
       floor: bs.floor ?? 0,

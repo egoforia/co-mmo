@@ -3,7 +3,10 @@ import { DEFAULT_COMBAT_RULES, type CombatRules,
   coreSkillsAt,
   keyWords,
   wisherOf,
+  ITEMS,
   copyBase,
+  makesCopies,
+  type AcquiredHow,
   VIEW_RADIUS,
   Tile,
   type Character,
@@ -188,6 +191,16 @@ export class RegionState {
     // A crafted copy of a wished thing counts as the thing.
     const id = copyBase(thing);
     if (wisherOf(id)) this.hooks.creator?.(id, p.info.id, credit);
+  }
+
+  /** Records that pieces of gear came to a player, for each piece's owner history; other items are skipped. */
+  owned(p: PlayerState, items: readonly string[], how: AcquiredHow): void {
+    for (const item of items) if (makesCopies(ITEMS[item])) this.hooks.owner?.(item, p.info.name, how);
+  }
+
+  /** Records the gear that came into a player's bag since it held `before` (its item ids then) as theirs. */
+  ownedSince(p: PlayerState, before: ReadonlySet<string>, how: AcquiredHow): void {
+    this.owned(p, p.character.inventory.map((s) => s.item).filter((id) => !before.has(id)), how);
   }
 
   /** Tells the player, the region and the feed about levels gained. */

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { goldOf, newCharacter, upgradeCharacter } from '@co-mmo/shared';
+import { foundCopy, goldOf, newCharacter, upgradeCharacter } from '@co-mmo/shared';
 import { Store } from '../src/store.ts';
 import { defaultSettings } from '../src/settings.ts';
 import { openBuiltInPostgres, type Sql } from '../src/db.ts';
@@ -240,5 +240,28 @@ describe('characters apart from their accounts', () => {
     const { rows: gold } = await db.query<{ gold: string }>(`SELECT gold FROM characters WHERE account_id = 'a1'`);
     expect(Number(gold[0]!.gold)).toBe(7);
     expect((await again.holders('goat-horn'))[0]).toMatchObject({ accountId: 'a1', qty: 2 });
+  });
+});
+
+describe('gear history', () => {
+  it('keeps every owner of a piece, oldest first, through binding and a restart', async () => {
+    const store = await Store.postgres(db);
+    const piece = foundCopy('wooden-sword');
+    const other = foundCopy('wooden-sword');
+    store.addOwner(piece, 'Mara', 'crafted', 1);
+    store.addOwner(piece, 'Ilya', 'given', 2);
+    store.addOwner(other, 'Tam', 'bought', 3);
+    // Things that are not gear keep no history.
+    store.addOwner('tonic', 'Mara', 'bought', 4);
+    expect(await store.owners([piece, other, 'tonic'])).toEqual({
+      [piece]: [{ name: 'Mara', how: 'crafted', at: 1 }, { name: 'Ilya', how: 'given', at: 2 }],
+      [other]: [{ name: 'Tam', how: 'bought', at: 3 }],
+      tonic: [],
+    });
+    await store.close();
+    const again = await Store.postgres(db);
+    // The same piece, asked for by another form of its id, has the same history.
+    const bound = piece.replace('~c~', '~b~');
+    expect((await again.owners([bound]))[bound]).toHaveLength(2);
   });
 });

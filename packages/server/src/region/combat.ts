@@ -1,5 +1,6 @@
 import {
   GOLD,
+  ownPieces,
   FLANK_BONUS,
   SIZE_TILES,
   flanks,
@@ -426,7 +427,7 @@ export class Combat implements EffectKit {
     // What it carried stays on its body for anyone to take (E), its gold too: its loot as set in God's View and by wishes.
     this.s.bodies.push({
       id: `body-${++this.s.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y, floor: c.floor,
-      until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: [...(gold > 0 ? [{ item: GOLD, qty: gold }] : []), ...rollDrops(lootTable(c.kind), this.s.random)],
+      until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: [...(gold > 0 ? [{ item: GOLD, qty: gold }] : []), ...ownPieces(rollDrops(lootTable(c.kind), this.s.random), this.s.random)],
     });
     discover(ch, c.kind);
     this.s.hooks.event?.('defeat', p.info.id, { creature: c.kind });

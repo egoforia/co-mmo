@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { PLAYER_COLORS, gainCreatorXp, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type BiomeId, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
+import { ITEMS, PLAYER_COLORS, gainCreatorXp, makesCopies, pieceKey, type AcquiredHow, type OwnerEntry, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type BiomeId, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
 import { defaultSettings, type Settings } from './settings.ts';
 import type { RuleTestReport } from './rule-test.ts';
@@ -179,6 +179,8 @@ export interface StoreBackend {
   spendBetween(since: number, until: number): Promise<SpendRecord[]>;
   /** Everyone holding an item, as last saved. */
   holders(item: string): Promise<Holding[]>;
+  /** Each piece's owners, oldest first, by piece key (copies.ts pieceKey). */
+  owners(pieces: string[]): Promise<Map<string, OwnerEntry[]>>;
   close(): Promise<void>;
   /** Shown in the console at start-up: where the world is kept. */
   readonly label: string;
@@ -585,6 +587,36 @@ export class Store {
     return this.data.accounts.flatMap((a) => (a.character ? holdingsOf(a.id, a.character) : [])).filter((h) => h.item === item);
   }
 
+  // --- Gear history (combat decisions, step 2) -------------------------------------------
+
+  /** Owner histories kept only in memory, for a store without a database (tests). */
+  private readonly memoryOwners = new Map<string, OwnerEntry[]>();
+
+  /** Records that a piece of gear came to `name`; other items have no history. */
+  addOwner(item: string, name: string, how: AcquiredHow, at = Date.now()): void {
+    if (!makesCopies(ITEMS[item])) return;
+    const piece = pieceKey(item);
+    const entry: OwnerEntry = { name, how, at };
+    if (!this.backend) {
+      const list = this.memoryOwners.get(piece) ?? [];
+      list.push(entry);
+      this.memoryOwners.set(piece, list);
+      return;
+    }
+    this.log({ t: 'owner', piece, entry });
+  }
+
+  /** The owner histories of pieces of gear, oldest first, by the ids asked about. */
+  async owners(items: string[]): Promise<Record<string, OwnerEntry[]>> {
+    const keys = items.map(pieceKey);
+    let found: Map<string, OwnerEntry[]>;
+    if (this.backend) {
+      await this.flush();
+      found = await this.backend.owners([...new Set(keys)]);
+    } else found = this.memoryOwners;
+    return Object.fromEntries(items.map((id, i) => [id, [...(found.get(keys[i]!) ?? [])]]));
+  }
+
   /** Lets go of spending from before last month: the database keeps it, the budget no longer needs it. */
   private forgetOldSpend(now: number): void {
     if (!this.backend) return;
@@ -747,6 +779,10 @@ class PostgresBackend implements StoreBackend {
 
   holders(item: string): Promise<Holding[]> {
     return this.characters.holders(item);
+  }
+
+  owners(pieces: string[]): Promise<Map<string, OwnerEntry[]>> {
+    return this.logs.owners(pieces);
   }
 
   spendBetween(since: number, until: number): Promise<SpendRecord[]> {

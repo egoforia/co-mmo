@@ -78,7 +78,9 @@ export class Quests {
         break;
       }
       if (handIn) {
+        const before = new Set(ch.inventory.map((s) => s.item));
         const levels = completeQuest(ch, q);
+        this.s.ownedSince(p, before, 'found');
         this.s.notice(p, `Quest complete: ${def.title}. You received ${rewardText(q.id)}.`);
         this.s.levelUps(p, levels);
         p.dirty = true;

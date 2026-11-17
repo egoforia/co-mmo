@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { CREATURES, ITEMS, type GodMessage } from '@co-mmo/shared';
+import { CREATURES, ITEMS, copyBase, type GodMessage } from '@co-mmo/shared';
 import type { ChatModel } from '../src/ai/chat.ts';
 import { OfflineGod, parseGodReply, systemPrompt, workshopPrompt } from '../src/god.ts';
 import { account, api, app, connect, joined, pray, start, stop, wish } from './helpers.ts';
@@ -53,7 +53,8 @@ describe('the God', () => {
     const record = store.content[0]!;
     expect(record).toMatchObject({ status: 'granted', tier: 'minor', title: 'Glowing Blue Hat' });
     expect(character.character.favor).toBe(8);
-    expect(character.character.inventory.map((s: any) => s.item)).toContain(record.id);
+    // Gear comes as a piece of its own: a copy of the wished item.
+    expect(character.character.inventory.map((s: any) => copyBase(s.item))).toContain(record.id);
     expect(ITEMS[record.id]?.name).toBe('Glowing Blue Hat');
     await c.waitFor((m) => m.t === 'system' && m.text.includes("Mara's wish"));
 

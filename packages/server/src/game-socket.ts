@@ -149,6 +149,12 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
       } else if (parsed.t === 'ping') {
         // Answered here, before any region: the overlay times the network and this server, not the queue behind it.
         socket.send(JSON.stringify({ t: 'pong', n: parsed.n }));
+      } else if (parsed.t === 'history') {
+        // Owner histories live with the saved world here, not in any region.
+        void store.owners(parsed.items).then(
+          (histories) => socket.send(JSON.stringify({ t: 'history', histories })),
+          (err) => console.error('Could not read gear history:', err),
+        );
       } else if (parsed.t === 'pray') {
         // The role may have changed since sign-in (a Steward was appointed).
         const current = store.accountById(account.id) ?? account;

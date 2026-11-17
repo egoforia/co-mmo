@@ -1,7 +1,7 @@
 import { addBonus, canLean, peopleLean, traitBonus } from './fashion.ts';
 import { MATERIAL_TRAITS, type MaterialTrait } from './material-traits.ts';
 import { RACES, isRace, type RaceId } from './races.ts';
-import { ITEMS, RARITIES, bonusText, resolveCopiesWith, type Bonus, type ItemDef, type Rarity, type Stats } from './rpg.ts';
+import { ITEMS, RARITIES, bonusText, ownPiecesWith, resolveCopiesWith, type Bonus, type ItemDef, type Rarity, type Stats } from './rpg.ts';
 
 // Crafted copies (gather and craft plan, step 3). Every copy of a piece of
 // gear looks the same, but a crafted one is its own copy: who made it
@@ -11,8 +11,10 @@ import { ITEMS, RARITIES, bonusText, resolveCopiesWith, type Bonus, type ItemDef
 // A copy is an item id that carries all of that, `<base>~c~<quality>~...`, so
 // bags, equipment, trades, shops, saves and every server and browser handle it
 // as any other item without being told about it: ITEMS works its ItemDef out
-// from the id. Materials, tonics and scrolls keep stacking under their own ids;
-// gear held from before copies is a standard copy with no maker.
+// from the id. Materials, tonics and scrolls keep stacking under their own ids.
+// Every piece of gear is its own copy (combat decisions, step 2): gear found as
+// loot, given as a reward or held from before copies is a standard copy whose
+// maker is unknown (`world`), so each piece can keep a history of its owners.
 
 /** Quality is a percentage of the base item's bonus and value. */
 export const QUALITY_MIN = 80;
@@ -25,8 +27,8 @@ export interface CopyInfo {
   of: string;
   /** 80 to 130: the share of the base item's bonus and value it has. */
   quality: number;
-  /** Who made it: a player or a shopkeeper. */
-  maker: { kind: 'player' | 'npc'; name: string };
+  /** Who made it: a player, a shopkeeper, or nobody known (`world`: found, rewarded, or older than copies). */
+  maker: { kind: 'player' | 'npc' | 'world'; name: string };
   /** The maker's people, which sets the attribute lean (Region fashion plan). */
   people?: RaceId;
   /** Which of the people's two lifted attributes the maker gave the larger share; the first when not said. */
@@ -37,12 +39,17 @@ export interface CopyInfo {
   material?: string;
   /** A unique piece once worn: bound to its wearer, never traded or sold. */
   bound?: true;
+  /** A bound piece that rolled to drop on a death and lost its binding instead; it never binds again. */
+  unbound?: true;
 }
 
 const MARK = '~';
 const TAG = 'c';
 /** The tag of a unique piece that has been worn and is bound. */
 const BOUND_TAG = 'b';
+/** The tag of a piece that was bound and lost its binding on a death. */
+const UNBOUND_TAG = 'u';
+const TAGS = [TAG, BOUND_TAG, UNBOUND_TAG];
 /** From this quality a copy is one rarity finer than its base item (common to uncommon, rare to epic). */
 export const FINER_QUALITY = 115;
 const PARTS = 8;
@@ -105,10 +112,10 @@ function makerPart(name: string): string {
 
 /** The id of a new copy; `nonce` keeps two copies made alike apart. */
 export function copyId(info: CopyInfo, nonce: string): string {
-  const maker = `${info.maker.kind === 'npc' ? 'n' : 'p'}${makerPart(info.maker.name)}`;
+  const maker = info.maker.kind === 'world' ? 'w' : `${info.maker.kind === 'npc' ? 'n' : 'p'}${makerPart(info.maker.name)}`;
   // The people part is "<people>" or "<people>-<leading attribute>" when the maker chose their second one.
   const people = info.people ? `${info.people}${info.lean && canLean(info.people, info.lean) && info.lean !== peopleLeanDefault(info.people) ? `-${info.lean}` : ''}` : '';
-  return [copyBase(info.of), info.bound ? BOUND_TAG : TAG, clampQuality(info.quality), maker, people, info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
+  return [copyBase(info.of), info.bound ? BOUND_TAG : info.unbound ? UNBOUND_TAG : TAG, clampQuality(info.quality), maker, people, info.trait ?? '', info.material ? copyBase(info.material) : '', nonce.replace(/[^a-z0-9]/g, '')].join(MARK);
 }
 
 /** A new copy's id, with a random nonce. */
@@ -120,19 +127,20 @@ export function newCopy(info: CopyInfo, random: () => number = Math.random): str
 /** What a copy's id says, or undefined when it is not a well-formed copy. */
 export function parseCopy(id: string): CopyInfo | undefined {
   const p = id.split(MARK);
-  if (p.length !== PARTS || (p[1] !== TAG && p[1] !== BOUND_TAG)) return undefined;
+  if (p.length !== PARTS || !TAGS.includes(p[1]!)) return undefined;
   const [of, , quality, maker, peoplePart, trait, material] = p as [string, string, string, string, string, string, string];
   const [people, lean] = peoplePart.split('-');
   const q = Number(quality);
-  if (!of || !Number.isInteger(q) || q !== clampQuality(q) || !/^[np]/.test(maker)) return undefined;
+  if (!of || !Number.isInteger(q) || q !== clampQuality(q) || !/^[npw]/.test(maker)) return undefined;
   return {
     of,
     quality: q,
-    maker: { kind: maker[0] === 'n' ? 'npc' : 'player', name: decode(maker.slice(1)) },
+    maker: { kind: maker[0] === 'n' ? 'npc' : maker[0] === 'w' ? 'world' : 'player', name: decode(maker.slice(1)) },
     ...(isRace(people) ? { people, ...(canLean(people, lean) ? { lean } : {}) } : {}),
     ...(MATERIAL_TRAITS.includes(trait as MaterialTrait) ? { trait: trait as MaterialTrait } : {}),
     ...(material ? { material } : {}),
     ...(p[1] === BOUND_TAG ? { bound: true as const } : {}),
+    ...(p[1] === UNBOUND_TAG ? { unbound: true as const } : {}),
   };
 }
 
@@ -154,7 +162,10 @@ const made = new Map<string, { base: ItemDef; def: ItemDef }>();
 export function copyDef(items: Record<string, ItemDef>, id: string): ItemDef | undefined {
   const info = parseCopy(id);
   const base = info && Object.hasOwn(items, info.of) ? items[info.of] : undefined;
-  if (!info || !base || !makesCopies(base)) return undefined;
+  if (!info || !base) return undefined;
+  // Gear whose wish is switched off sleeps as its base does, so the piece is kept and wakes with it.
+  // (A sleeping wish item is a bound material: see asleep() in content.ts.)
+  if (!makesCopies(base)) return base.kind === 'material' && base.bound ? { ...base, copy: info } : undefined;
   const kept = made.get(id);
   if (kept?.base === base) return kept.def;
   const rarity = info.quality >= FINER_QUALITY ? RARITIES[Math.min(RARITIES.length - 1, RARITIES.indexOf(base.rarity ?? 'common') + 1)] : base.rarity;
@@ -174,6 +185,7 @@ export function copyDef(items: Record<string, ItemDef>, id: string): ItemDef | u
 }
 
 resolveCopiesWith(copyDef);
+ownPiecesWith((slots) => ownPieces(slots));
 
 /** One part of a copy's bonus and where it comes from, for its card. */
 export interface BonusPart {
@@ -208,11 +220,11 @@ export function copyWords(def: ItemDef | undefined): string {
   if (!def || !makesCopies(def)) return '';
   const c = def.copy;
   if (!c) return 'Tailored by unknown.';
-  const binding = c.bound ? ' Bound to you.' : def.unique ? ' One of a kind: it binds to whoever first wears it.' : '';
+  const binding = c.bound ? ' Bound to you.' : c.unbound ? ' No longer bound.' : def.unique ? ' One of a kind: it binds to whoever first wears it.' : '';
   const base = Object.hasOwn(ITEMS, c.of) ? ITEMS[c.of] : undefined;
   const parts = copyParts(base?.bonus, c, def.rarity ?? 'common').filter((p) => bonusText(p.bonus));
   const sources = parts.length > 1 ? ` ${parts.map((p) => `${p.from}: ${bonusText(p.bonus)}.`).join(' ')}` : '';
-  return `Tailored by ${c.maker.name}. Quality ${c.quality}%.${sources}${binding}`;
+  return `Tailored by ${c.maker.kind === 'world' ? 'unknown' : c.maker.name}. Quality ${c.quality}%.${sources}${binding}`;
 }
 
 /**
@@ -222,7 +234,7 @@ export function copyWords(def: ItemDef | undefined): string {
 export function bindOnWear(c: { inventory: { item: string; qty: number }[] }, item: string): string {
   const def = ITEMS[item];
   const info = def?.copy;
-  if (!def?.unique || !info || info.bound) return item;
+  if (!def?.unique || !info || info.bound || info.unbound) return item;
   const p = item.split(MARK);
   p[1] = BOUND_TAG;
   const bound = p.join(MARK);
@@ -239,4 +251,39 @@ export function copiesOf(inventory: { item: string; qty: number }[], base: strin
 /** True when an id is a copy that ITEMS can work out. */
 export function knownCopy(id: string): boolean {
   return isCopyId(id) && Boolean(ITEMS[id]);
+}
+
+/** A piece of gear nobody known made (loot, a reward, older saves): a standard copy of its own. */
+export function foundCopy(base: string, random: () => number = Math.random): string {
+  return newCopy({ of: base, quality: QUALITY_STANDARD, maker: { kind: 'world', name: '' } }, random);
+}
+
+/** Gear given as its base id becomes a piece of its own; any other id is returned as it is. */
+export function ownPiece(id: string, random: () => number = Math.random): string {
+  return makesCopies(ITEMS[id]) && !isCopyId(id) ? foundCopy(id, random) : id;
+}
+
+/** Stacks where every piece of gear is its own copy, one to a slot; other things are left as they are. */
+export function ownPieces(slots: { item: string; qty: number }[], random: () => number = Math.random): { item: string; qty: number }[] {
+  return slots.flatMap((s) => (makesCopies(ITEMS[s.item]) && !isCopyId(s.item) ? Array.from({ length: s.qty }, () => ({ item: foundCopy(s.item, random), qty: 1 })) : [s]));
+}
+
+/**
+ * A bound piece that rolled to drop on a death keeps its place instead and
+ * loses its binding: the same piece under its unbound id. Anything else is
+ * returned as it is.
+ */
+export function unbindCopy(id: string): string {
+  if (!parseCopy(id)?.bound) return id;
+  const p = id.split(MARK);
+  p[1] = UNBOUND_TAG;
+  return p.join(MARK);
+}
+
+/** The same for every form of a piece (bound, unbound or neither), so its owner history follows it. */
+export function pieceKey(id: string): string {
+  const p = id.split(MARK);
+  if (p.length !== PARTS || !TAGS.includes(p[1]!)) return id;
+  p[1] = TAG;
+  return p.join(MARK);
 }

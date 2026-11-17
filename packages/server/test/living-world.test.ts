@@ -12,6 +12,7 @@ import {
   type CreatureDef,
   type PlayerInfo,
   type ServerMessage,
+  copyBase,
 } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 import { findPath } from '../src/walkers.ts';
@@ -146,7 +147,8 @@ describe('creatures', () => {
     expect(region.creatureMood(id!)!.aggro).toBeNull();
     ITEMS['test-torch'] = { ...ITEMS['crab-lance']!, name: 'Test Torch', light: FLAME_LIGHT };
     region.change('a', { op: 'give', item: 'test-torch', qty: 1 });
-    region.handle('a', { t: 'equip', item: 'test-torch' });
+    const torch = region.character('a')!.inventory.find((s) => copyBase(s.item) === 'test-torch')!.item;
+    region.handle('a', { t: 'equip', item: torch });
     region.placeCreature(id!, me.x + 2.4, me.y);
     ticks(region, clock, 1);
     expect(region.creatureMood(id!)!.aggro).toBe('a');

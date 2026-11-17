@@ -182,11 +182,12 @@ export function upgradeCharacter(saved: Partial<Character> | undefined): Charact
   // Vigor came after Might held health: a saved character starts as tough as they were strong.
   if (saved.stats && saved.stats.vigor === undefined) c.stats.vigor = c.stats.might;
   if (!c.inventory.some((s) => s.item === 'bible')) c.inventory.unshift({ item: 'bible', qty: 1 });
-  c.inventory = c.inventory.map((s) => ({ ...s }));
+  // Every piece of gear is its own copy: gear held from before copies is split into pieces.
+  c.inventory = gearPieces(c.inventory.map((s) => ({ ...s })));
   // Gold was a number before it was coins in the bag: it moves in once, and the number goes.
   coinsFromSavedGold(c, saved);
   delete (c as { gold?: number }).gold;
-  c.equipment = { ...c.equipment };
+  c.equipment = Object.fromEntries(Object.entries(c.equipment ?? {}).map(([slot, id]) => [slot, id ? gearPieces([{ item: id, qty: 1 }])[0]!.item : id]));
   c.abilities = [...c.abilities];
   forgetVanished(c);
   upgradeHotbar(c, saved);
@@ -508,6 +509,14 @@ export const ITEMS: Record<string, ItemDef> = new Proxy<Record<string, ItemDef>>
 
 /** Works out a crafted copy's ItemDef from its id (copies.ts registers it as the game loads). */
 let copyResolver: ((items: Record<string, ItemDef>, id: string) => ItemDef | undefined) | undefined;
+
+/** Turns gear given by its base id into pieces of its own (copies.ts ownPieces); as they are until copies.ts loads. */
+let gearPieces: (slots: InventorySlot[]) => InventorySlot[] = (slots) => slots;
+
+/** Lets copies.ts make every piece of gear its own copy where gear comes in by its base id. */
+export function ownPiecesWith(own: (slots: InventorySlot[]) => InventorySlot[]): void {
+  gearPieces = own;
+}
 
 /** Lets copies.ts teach ITEMS how to read a copy's id. */
 export function resolveCopiesWith(resolve: (items: Record<string, ItemDef>, id: string) => ItemDef | undefined): void {
@@ -868,7 +877,7 @@ export function questTurnIn(id: string): string {
 export function questRewardFits(c: Character, state: QuestState): boolean {
   const q = QUESTS[state.id]!;
   const handed = q.goal.kind === 'gather' ? q.goal.items : [];
-  return fitsAll(bagWithout(c, handed), [...(q.reward.gold ? [{ item: GOLD, qty: q.reward.gold }] : []), ...(q.reward.items ?? [])]);
+  return fitsAll(bagWithout(c, handed), [...(q.reward.gold ? [{ item: GOLD, qty: q.reward.gold }] : []), ...gearPieces(q.reward.items ?? [])]);
 }
 
 /** Gives a quest's rewards and marks it done (check questRewardFits first). Returns levels gained. */
@@ -878,7 +887,8 @@ export function completeQuest(c: Character, state: QuestState): number {
   state.done = true;
   if (q.reward.gold) putItem(c, GOLD, q.reward.gold);
   c.favor += QUEST_FAVOR;
-  for (const r of q.reward.items ?? []) putItem(c, r.item, r.qty);
+  // Gear comes as pieces of its own, each in its own slot.
+  for (const r of gearPieces(q.reward.items ?? [])) putItem(c, r.item, r.qty);
   if (q.reward.ability) learnAbility(c, q.reward.ability);
   return gainXp(c, q.reward.xp);
 }

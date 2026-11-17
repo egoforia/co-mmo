@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ABILITIES, ITEMS, LIGHT_MOD, equip, modOn } from '@co-mmo/shared';
+import { ABILITIES, ITEMS, LIGHT_MOD, copyBase, equip, modOn } from '@co-mmo/shared';
 import { Store, type ContentRecord } from '../src/store.ts';
 import { account, api, app, joined, start, stop, wish } from './helpers.ts';
 
@@ -42,7 +42,7 @@ describe('wishes as mods', () => {
     const full = ITEMS[record.id]!;
     expect(full.slot).toBeDefined();
     const region = app!.world.local('sanctum')!;
-    region.updateCharacter(owner.id, (ch) => expect(equip(ch, record.id)).toBeUndefined());
+    region.updateCharacter(owner.id, (ch) => expect(equip(ch, ch.inventory.find((s) => copyBase(s.item) === record.id)!.item)).toBeUndefined());
 
     expect((await api(base, `/api/admin/content/${record.id}/off`, player.token, 'POST')).status).toBe(403);
     expect((await api(base, `/api/admin/content/${record.id}/off`, steward.token, 'POST')).status).toBe(200);
@@ -52,8 +52,8 @@ describe('wishes as mods', () => {
     expect(ITEMS[record.id]!.slot).toBeUndefined();
     await new Promise((r) => setTimeout(r, 20));
     const ch = region.character(owner.id)!;
-    expect(Object.values(ch.equipment)).not.toContain(record.id);
-    expect(ch.inventory.map((s) => s.item)).toContain(record.id);
+    expect(Object.values(ch.equipment).map((id) => id && copyBase(id))).not.toContain(record.id);
+    expect(ch.inventory.map((s) => copyBase(s.item))).toContain(record.id);
     const told = await c.waitFor<any>((m) => m.t === 'content' && m.entries.some((e: any) => e.id === record.id && e.off));
     expect(told.entries[0].progress).toMatchObject({ state: 'closed', label: 'Switched off' });
     expect((await api(base, `/api/admin/content/${record.id}/off`, steward.token, 'POST')).status).toBe(409);
@@ -61,7 +61,7 @@ describe('wishes as mods', () => {
     expect((await api(base, `/api/admin/content/${record.id}/on`, steward.token, 'POST')).status).toBe(200);
     expect(ITEMS[record.id]).toEqual(full);
     expect(store.contentById(record.id)!.off).toBeUndefined();
-    expect(region.character(owner.id)!.inventory.map((s) => s.item)).toContain(record.id);
+    expect(region.character(owner.id)!.inventory.map((s) => copyBase(s.item))).toContain(record.id);
   });
 
   it('takes creatures out of the world while off, also after a restart', async () => {

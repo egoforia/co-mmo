@@ -1,5 +1,8 @@
 import {
   BAG_SLOTS,
+  MAX_HISTORY_ASK,
+  makesCopies,
+  type OwnerEntry,
   GOLD,
   goldOf,
   ABILITIES,
@@ -73,6 +76,8 @@ export interface RpgActions {
   prayer(): void;
   /** Places a free attribute point. */
   spendPoint(stat: keyof Stats): void;
+  /** Asks the server who owned these pieces of gear before. */
+  askHistory?(items: string[]): void;
 }
 
 /** Health, XP, quests, dialogue, the bag and the Bible: everything in DOM. */
@@ -81,6 +86,10 @@ export class RpgUi {
   private hp: number;
   private energy: number;
   private chapter = CHAPTERS[0]!.id;
+  /** Owner histories of pieces of gear, by item id, as the server told them. */
+  private readonly histories = new Map<string, OwnerEntry[]>();
+  /** Pieces whose history was asked for already. */
+  private readonly askedHistory = new Set<string>();
   /** The shop of the person last spoken to, when the world editor gave them one. */
   private wares: ShopDef | undefined;
   private lastAttack = 0;
@@ -256,8 +265,32 @@ export class RpgUi {
       .join('');
   }
 
+  /** Owner histories the server sent: the bag shows them on each piece's card. */
+  setHistories(histories: Record<string, OwnerEntry[]>): void {
+    for (const [id, list] of Object.entries(histories)) this.histories.set(id, list);
+    if (!$('inventory').hidden) this.renderInventory();
+  }
+
+  /** A piece's owners in plain words for its card, or '' when none are known yet. */
+  private historyWords(id: string): string {
+    const list = this.histories.get(id);
+    if (!list?.length) return '';
+    const day = (at: number) => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const how: Record<OwnerEntry['how'], string> = { crafted: 'made by', bought: 'bought by', looted: 'looted by', given: 'given to', found: 'found by' };
+    return ` Owners: ${list.map((o) => `${how[o.how]} ${o.name} (${day(o.at)})`).join(', ')}.`;
+  }
+
   private renderInventory(): void {
     const c = this.character;
+    // Each piece of gear's history is asked for once; the card shows it when it comes.
+    const held = [...c.inventory.map((s) => s.item), ...Object.values(c.equipment).filter((id): id is string => !!id)];
+    // A piece that left the bag is asked about again if it comes back: it has a new owner since.
+    for (const id of this.askedHistory) if (!held.includes(id)) this.askedHistory.delete(id);
+    const gear = held.filter((id) => makesCopies(ITEMS[id]) && !this.askedHistory.has(id));
+    if (gear.length && this.actions.askHistory) {
+      for (const id of gear) this.askedHistory.add(id);
+      this.actions.askHistory(gear.slice(0, MAX_HISTORY_ASK));
+    }
     const slots = c.inventory
       .map((s) => {
         const def = ITEMS[s.item];
@@ -268,7 +301,7 @@ export class RpgUi {
             : def.slot ? `Wear: ${[familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · ') || SLOT_NAMES[def.slot]}`
               : def.teaches ? 'Click to read and learn'
                 : ruled ? 'Click to use' : s.item === GOLD ? 'Spend at shops, or trade' : 'For crafting and trade';
-        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}${copyWords(def) ? ` ${copyWords(def)}` : ''}${def.style ? ` ${styleWords(def, regionName)}` : ''}${def.tool ? ` ${toolWords(def)}` : ''}`)}">
+        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}${copyWords(def) ? ` ${copyWords(def)}` : ''}${def.style ? ` ${styleWords(def, regionName)}` : ''}${def.tool ? ` ${toolWords(def)}` : ''}${this.historyWords(s.item)}`)}">
           <img src="${escapeHtml(itemIcon(def))}" alt="">
           ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
           <span class="name rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}</span><span class="hint">${escapeHtml(hint)}</span></button>`;
@@ -278,7 +311,7 @@ export class RpgUi {
       const id = c.equipment[slot];
       const def = id ? ITEMS[id] : undefined;
       return def
-        ? `<button type="button" class="slot worn" data-slot="${slot}" title="Click to take it off">${itemLabel(id!)}<span class="hint">${escapeHtml([familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · '))}</span></button>`
+        ? `<button type="button" class="slot worn" data-slot="${slot}" title="${escapeHtml(`Click to take it off.${copyWords(def) ? ` ${copyWords(def)}` : ''}${this.historyWords(id!)}`)}">${itemLabel(id!)}<span class="hint">${escapeHtml([familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · '))}</span></button>`
         : `<div class="slot empty"><span class="name">${SLOT_NAMES[slot]}</span><span class="hint">Nothing worn</span></div>`;
     }).join('');
     const s = c.stats;

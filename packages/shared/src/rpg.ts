@@ -655,6 +655,30 @@ export type Behavior = 'wander' | 'guard' | 'chase' | 'patrol' | 'timid' | 'pack
 /** Every behaviour, for checking wishes. */
 export const BEHAVIORS: Behavior[] = ['wander', 'guard', 'chase', 'patrol', 'timid', 'pack'];
 
+/**
+ * How a monster breaks off a chase (combat decisions, step 6): `timed` gives
+ * up after a while, sooner the farther it is from home; `lost` follows until
+ * dragged too far, then stays and wanders where it ends up; `edge` chases to
+ * the edge of its reach and keeps watch there.
+ */
+export type BreakOff = 'timed' | 'lost' | 'edge';
+
+/** Every way of breaking off, for checking wishes and the editor. */
+export const BREAK_OFFS: BreakOff[] = ['timed', 'lost', 'edge'];
+
+/** The way that fits each behaviour, for a kind that does not say. */
+export const BEHAVIOR_BREAK_OFF: Record<Behavior, BreakOff> = { wander: 'lost', guard: 'edge', chase: 'timed', patrol: 'edge', timid: 'timed', pack: 'timed' };
+
+/** How a monster breaks off a chase: its own way, or the one its behaviour fits. */
+export function breakOffOf(def: Pick<CreatureDef, 'breakOff' | 'behavior'>): BreakOff {
+  return def.breakOff ?? BEHAVIOR_BREAK_OFF[def.behavior];
+}
+
+/** A monster's health back each second, in a fight or out of it, when its kind does not say: 1% of its health. */
+export function regenOf(def: Pick<CreatureDef, 'regen' | 'hp'>): number {
+  return def.regen ?? Math.max(0.2, def.hp / 100);
+}
+
 /** How close a player must come before a creature of each behaviour notices them, unless its kind says. */
 export const BEHAVIOR_NOTICE: Record<Behavior, number> = { wander: 0, guard: 2.5, chase: 4, patrol: 3, timid: 3.5, pack: 4 };
 
@@ -689,6 +713,10 @@ export interface CreatureDef {
   respawnSeconds: number;
   /** How big it stands (walk.ts tiers): its body's width (hit-boxes.ts) and reach. Medium, a player's size, unless said. */
   size?: CreatureSizeTier;
+  /** How it breaks off a chase (breakOffOf); the way its behaviour fits when missing. */
+  breakOff?: BreakOff;
+  /** Health back each second, always (regenOf); 1% of its health when missing. */
+  regen?: number;
 }
 
 /** The server takes at most one item use this often (2 a second): a macro can drink no faster than a hand (combat decisions, step 4). */

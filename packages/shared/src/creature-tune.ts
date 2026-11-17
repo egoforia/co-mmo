@@ -1,4 +1,4 @@
-import { BEHAVIOR_NOTICE, type Behavior, type CreatureDef, type Drop } from './rpg.ts';
+import { BEHAVIOR_NOTICE, type Behavior, type BreakOff, type CreatureDef, type Drop } from './rpg.ts';
 import type { Active } from './sky.ts';
 import { creatureDefence } from './weapons.ts';
 
@@ -12,6 +12,8 @@ export interface CreatureTune {
   level?: number;
   behavior?: Behavior;
   active?: Active;
+  /** How it breaks off a chase (rpg.ts breakOffOf). */
+  breakOff?: BreakOff;
   /** What it may leave besides its kind's drops. */
   loot?: Drop[];
   /** Where a patrol walks, tile middles in order, round and round. */
@@ -37,7 +39,7 @@ export function levelStats(l: number, tough = 1): Pick<CreatureDef, 'hp' | 'dama
 
 /** A monster kind as a spawn's changes make it; the kind itself when nothing changed. */
 export function tunedCreature(def: CreatureDef, tune: CreatureTune | undefined): CreatureDef {
-  if (!tune || (tune.level === undefined && tune.behavior === undefined && tune.active === undefined && !tune.loot?.length)) return def;
+  if (!tune || (tune.level === undefined && tune.behavior === undefined && tune.active === undefined && tune.breakOff === undefined && !tune.loot?.length)) return def;
   const out: CreatureDef = { ...def };
   const level = tune.level;
   if (level !== undefined && level !== def.level) {
@@ -53,6 +55,7 @@ export function tunedCreature(def: CreatureDef, tune: CreatureTune | undefined):
     out.armor = Math.max(0, (def.armor ?? 0) + after.armor! - before.armor!);
     out.ward = Math.max(0, (def.ward ?? 0) + after.ward! - before.ward!);
   }
+  if (tune.breakOff) out.breakOff = tune.breakOff;
   if (tune.behavior) {
     out.behavior = tune.behavior;
     // One that never noticed anyone needs eyes for its new ways.

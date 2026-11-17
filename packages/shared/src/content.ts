@@ -23,6 +23,8 @@ import type { StatusId } from './rpg/statuses.ts';
 import {
   ABILITIES,
   BEHAVIORS,
+  BREAK_OFFS,
+  type BreakOff,
   BEHAVIOR_NOTICE,
   CREATURES,
   EQUIP_SLOTS,
@@ -120,6 +122,8 @@ export interface CreatureWish {
   behavior: Behavior;
   /** Up only by day or only by night, asleep the rest; about at all hours when missing. */
   active?: 'day' | 'night';
+  /** How it breaks off a chase (rpg.ts BreakOff); the way its behaviour fits when missing. */
+  breakOff?: BreakOff;
   level: number;
   /** How many appear around the wisher. */
   count: number;
@@ -592,6 +596,7 @@ export function validateDefinition(raw: unknown, opts: { styleOptional?: boolean
   if (d.kind === 'creature') {
     const behavior: Behavior = BEHAVIORS.find((b) => b === d.behavior) ?? 'wander';
     const active = d.active === 'day' || d.active === 'night' ? d.active : undefined;
+    const breakOff = BREAK_OFFS.find((b) => b === d.breakOff);
     const drops = Array.isArray(d.drops)
       ? d.drops.filter((i): i is string => typeof i === 'string' && !isCopyId(i) && !!ITEMS[i] && !ITEMS[i]!.bound).slice(0, 3)
       : [];
@@ -601,6 +606,7 @@ export function validateDefinition(raw: unknown, opts: { styleOptional?: boolean
       description,
       behavior,
       ...(active ? { active } : {}),
+      ...(breakOff ? { breakOff } : {}),
       level: clamp(Math.round(Number(d.level) || 1), 1, MAX_WISHED_LEVEL),
       count: clamp(Math.round(Number(d.count) || 3), 1, MAX_WISHED_COUNT),
       drops,
@@ -791,6 +797,7 @@ export function creatureFromWish(id: string, w: CreatureWish): CreatureDef {
     description: w.description,
     behavior: w.behavior,
     ...(w.active ? { active: w.active } : {}),
+    ...(w.breakOff ? { breakOff: w.breakOff } : {}),
     level: l,
     ...levelStats(l),
     ...creatureDefence(l, UNDEAD_WORDS.test(`${w.name} ${w.description}`) ? 'undead' : undefined),

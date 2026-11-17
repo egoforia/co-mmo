@@ -91,3 +91,13 @@ A player who closes the game while a fight is on stays in the world until nothin
 | Parties | Party members cannot hurt each other. To attack one, leave the party first; the party is told at once. |
 | Being attacked | The one attacked is told who attacks them (once every 15 s per attacker). A player struck down falls as usual, and step 3's death rules apply in full. |
 | Not in it | Morality, warnings for attacking first, and bounties. |
+
+## Breaking off (combat decisions, step 6)
+
+| Topic | Rule |
+| --- | --- |
+| Ways | Each monster breaks off a chase its own way (`breakOffOf`, `creature-brain.ts`). **Timed**: gives up after `CHASE_SECONDS` (20) of chasing, each second counting for more the farther it is from home. **Lost**: led more than `LOST_DISTANCE` (16) tiles from home, it forgets the fight and makes its home where it stands; it comes back at its old home when it falls. **Edge**: chases to the edge of its reach (`LEASH`, 8 tiles), keeps watch there striking whoever comes close, and gives up once they are well beyond. |
+| Who picks | Each behaviour has a fitting way (`BEHAVIOR_BREAK_OFF`: wanderers get lost, guards and patrols hold the edge, chasers, packs and the timid tire). A wish's creature may name one (`breakOff`), and the world editor's **Monsters** and **Change monsters** tools set it for the monsters they place or change. |
+| Calm | Having broken off, it notices no one for `CALM_MS` (8 s), so it does not turn straight back. A blow still provokes it. |
+| Healing | Every monster heals at its own rate (`regenOf`: `regen` per second, 1% of its health when not given), in a fight or out of it. Getting home no longer heals it fully at once. |
+| Safe areas | No monster takes a step into a safe area: it stops at the edge. |

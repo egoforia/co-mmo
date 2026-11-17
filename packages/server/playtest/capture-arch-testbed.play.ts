@@ -1,12 +1,13 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser } from 'playwright';
-import { newCharacter, ARCH_TESTBED_REGION } from '@co-mmo/shared';
+import { newCharacter } from '@co-mmo/shared';
 import { ARCH_TESTBED_WAYPOINTS } from '../../../packages/shared/src/testbed/arch-testbed.ts';
 import { account, app } from '../test/helpers.ts';
-import { playWorld } from './harness.ts';
+import { playWorld, settleWaypointAndStabilize, warmUpSceneLighting } from './harness.ts';
 
 // Skip font readiness polling in Playwright so screenshots capture fast & reliably
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = '1';
@@ -15,13 +16,18 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const clientDir = resolve(root, 'packages/client/dist');
 const kitSheets = resolve(root, 'assets/kit-sheets');
 const shippedArt = resolve(root, 'packages/client/public/art/manifest.json');
-const outDir = '/home/egoforia/.gemini/antigravity/brain/b689939a-5e8e-4cba-90e5-8a38d8dc89f5';
+const defaultOutDir = '/home/egoforia/.gemini/antigravity/brain/b689939a-5e8e-4cba-90e5-8a38d8dc89f5';
+const outDir = process.env.SHOTS_DIR ? resolve(process.env.SHOTS_DIR) : defaultOutDir;
+const shotsFilter = process.env.SHOTS_FILTER?.trim();
 
 let browser: Browser;
 
 beforeAll(() => {
+  if (!existsSync(resolve(clientDir, 'index.html'))) {
+    execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit' });
+  }
   mkdirSync(outDir, { recursive: true });
-});
+}, 180_000);
 
 beforeAll(async () => {
   browser = await chromium.launch({
@@ -81,6 +87,20 @@ const testbedShots: ShotSpec[] = [
   { id: 'G6-E', name: 'clean_G6_E_terrace_stairs_f1_to_f2', ...ARCH_TESTBED_WAYPOINTS['G6-E']! },
 ];
 
+function filterShots(shots: ShotSpec[], filterRaw: string | undefined): ShotSpec[] {
+  if (!filterRaw) return shots;
+  const tokens = filterRaw
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  if (!tokens.length) return shots;
+  return shots.filter((s) => {
+    const id = s.id.toLowerCase();
+    const name = s.name.toLowerCase();
+    return tokens.some((tok) => id === tok || id.startsWith(tok) || name.includes(tok));
+  });
+}
+
 describe('clean-room architectural testbed captures', () => {
   it('captures all 25 clean-room combinations in arch-testbed', async () => {
     // High noon daylight at 12:00:00 (phase 0.5), 24-hour cycle, zero darkness, clear skies
@@ -93,7 +113,10 @@ describe('clean-room architectural testbed captures', () => {
       now: () => NOON_MS,
       sky,
     });
-    const totalShots = testbedShots.length;
+
+    const selectedShots = filterShots(testbedShots, shotsFilter);
+    const totalShots = selectedShots.length;
+    expect(totalShots, `No shots matched SHOTS_FILTER=${shotsFilter ?? ''}`).toBeGreaterThan(0);
 
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const { id, token } = account(world.store, 'TestbedArchitect', 'owner');
@@ -107,10 +130,6 @@ describe('clean-room architectural testbed captures', () => {
     await page.goto(`${world.base}/`);
     await page.waitForSelector('#game canvas', { timeout: 30_000 });
 
-    console.log('Waiting for arch-testbed scene to initialize...');
-    console.log('app.world regions:', app ? [...app.world.regions.keys()] : 'app is null');
-    await page.waitForTimeout(6000);
-
     // Hide all HUD overlays, minimap, chat, bars, dialogue, forms so screenshots capture pristine architecture
     await page.addStyleTag({
       content: `
@@ -120,60 +139,51 @@ describe('clean-room architectural testbed captures', () => {
       `,
     });
 
+    console.log('Pre-warming arch-testbed LitPipeline shaders and high-noon lighting...');
+    const warmStats = await warmUpSceneLighting(page, {
+      minFrames: 4,
+      consecutiveStableFrames: 1,
+      minLuminance: 120,
+      maxDiffPct: 1.0,
+      timeoutMs: 45_000,
+    });
+    console.log('Shader & lighting warm-up complete:', JSON.stringify(warmStats));
+
     const testbed = app!.world.local('arch-testbed');
-    console.log('testbed instance:', testbed ? 'found' : 'NOT FOUND');
     if (!testbed) {
       throw new Error(`arch-testbed region not found in app.world! Available regions: ${[...app!.world.regions.keys()].join(', ')}`);
     }
 
     let shotIndex = 1;
-    for (const s of testbedShots) {
+    for (const s of selectedShots) {
       const shotPath = resolve(outDir, `${s.name}.png`);
 
       console.log(`[${shotIndex}/${totalShots}] Placing at ${s.id} (${s.x}, ${s.y}, floor ${s.floor})...`);
       testbed.placePlayer(id, s.x, s.y, s.floor);
 
-      // Wait until the client receives the snapshot and updates its avatar position & floor
-      await page.waitForFunction(
-        (target) => {
-          const scene = (window as any).scene;
-          if (!scene?.shown) return false;
-          const dx = Math.abs(scene.shown.x - target.x);
-          const dy = Math.abs(scene.shown.y - target.y);
-          return dx < 0.2 && dy < 0.2 && scene.floor === target.floor;
+      const stats = await settleWaypointAndStabilize(
+        page,
+        { x: s.x, y: s.y, floor: s.floor, regionId: 'arch-testbed' },
+        {
+          minFrames: 2,
+          consecutiveStableFrames: 1,
+          minLuminance: 120,
+          maxDiffPct: 1.0,
+          timeoutMs: 30_000,
         },
-        { x: s.x, y: s.y, floor: s.floor },
-        { timeout: 15_000 }
       );
-
-      // Center camera directly onto avatar body now that it is placed at the target coordinates
-      const camInfo = await page.evaluate(() => {
-        const scene = (window as any).scene;
-        if (!scene) return 'No scene';
-        const cam = scene.cameras?.main;
-        const me = scene.me;
-        if (me?.body && cam) {
-          cam.startFollow(me.body, true, 0.2, 0.2);
-          cam.centerOn(me.body.x, me.body.y);
-        }
-        return {
-          cam: cam ? { scrollX: Math.round(cam.scrollX), scrollY: Math.round(cam.scrollY), midX: Math.round(cam.midPoint?.x), midY: Math.round(cam.midPoint?.y) } : null,
-          shown: scene.shown,
-          floor: scene.floor,
-          meBody: me?.body ? { x: Math.round(me.body.x), y: Math.round(me.body.y) } : null,
-        };
-      });
-      console.log(`[${shotIndex}/${totalShots}] Cam info:`, JSON.stringify(camInfo));
-
-      // Allow rendering to settle, textures to draw, and cutaways to apply
-      await page.waitForTimeout(600);
+      const effectiveLum = s.floor >= 0 ? stats.canvasLum : stats.litLum;
+      expect(effectiveLum, `${s.id} should meet high-noon daylight luminance >= 120`).toBeGreaterThanOrEqual(120);
+      expect(stats.pixelDiffPct, `${s.id} frame pixel diff should be < 1%`).toBeLessThan(1.0);
 
       await page.screenshot({ path: shotPath, timeout: 60_000 });
       const sizeKb = (statSync(shotPath).size / 1024).toFixed(0);
-      console.log(`[${shotIndex}/${totalShots}] Captured ${s.id} -> ${s.name}.png (${sizeKb} KB)`);
+      console.log(
+        `[${shotIndex}/${totalShots}] Captured ${s.id} -> ${s.name}.png (${sizeKb} KB, lum=${stats.canvasLum}/${stats.litLum}, diff=${stats.pixelDiffPct}%, chunks=${stats.chunksLoaded}, frames=${stats.settledFrames})`,
+      );
       shotIndex++;
     }
 
     await context.close();
-  }, 600_000);
+  }, 1_200_000);
 });

@@ -148,6 +148,7 @@ export function createApp(options: AppOptions): App {
   world.tuning = tuningFor(options.net ?? { compress: true });
   world.combatRules = combatRules(store.settings.combat);
   world.onJournal = (text, playerId) => store.addJournal(text, playerId);
+  world.onOwner = (item, name, how) => store.addOwner(item, name, how);
   // The workshop lands the Owner and Stewards made in the editor.
   for (const land of store.workshopLands()) world.addRegion(workshopDef(land));
   const env = options.wishes.env ?? process.env;

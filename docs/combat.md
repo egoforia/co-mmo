@@ -46,3 +46,13 @@ Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").
 | Monster gold | Lies on the body with the rest of the loot, for whoever takes it first. |
 | A full bag | Looting takes what fits and leaves the rest on the body. Gathering, crafting, buying, selling, taking gear off, trades, quest rewards, scripted rules (`game.give`, `game.gold`) and God's View changes are refused until there is room. Buying may use the slot the last coins free; selling may use the slot the sold stack frees. |
 | Never lost | Gear coming off when its wish is switched off, a people's first tools, and quest rewards checked beforehand go in even past 20. |
+
+## Gear history and binding (combat decisions, step 2)
+
+| Topic | Rule |
+| --- | --- |
+| Every piece is its own | Each piece of gear is a copy with its own id (`copies.ts`), not a stack of a plain item id. Gear found, looted, bought, given by God's View or rules, or handed over as a quest reward becomes a copy with a world maker (`w`, shown "Tailored by unknown"); crafted gear keeps its maker. Older saves turn their gear into copies once, in `upgradeCharacter`. |
+| Owners | Each time a piece changes hands the server writes a row in the `gear_owners` table (piece, name, how, when). How is one of crafted, bought, looted, given (trades) or found (quest rewards). History is kept by `pieceKey`, so binding or unbinding a piece keeps its history. |
+| Seeing it | The client asks with `{t:'history'}` for the pieces it holds (at most 40 at once) and shows "Owners: made by Mara (17 Nov), given to Tam (…)." on bag and worn item cards. |
+| Unbinding | `unbindCopy` turns a bound piece (`b`) into an unbound one (`u`): it reads "No longer bound." and does not bind again when worn. Step 3 (death) uses it for pieces that drop. |
+| Switched-off wishes | A copy whose base item sleeps sleeps with it and wakes when the wish is switched on again. |

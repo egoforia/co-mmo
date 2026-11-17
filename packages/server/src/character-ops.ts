@@ -1,4 +1,4 @@
-import { addGold, addItem, applySkillLook, fitsAll, takeGold, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
+import { addGold, addItem, ownPieces, applySkillLook, fitsAll, takeGold, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
 
 /**
  * A change to a player's character made from outside the simulation: Favor
@@ -39,9 +39,10 @@ export function applyOp(c: Character, op: CharacterOp): OpResult {
       c.favor += op.amount;
       return { ok: true };
     case 'give':
-      // All or nothing: a full bag takes none of it.
-      if (!fitsAll(c, [{ item: op.item, qty: op.qty }])) return { ok: false };
-      addItem(c, op.item, op.qty);
+      // All or nothing: a full bag takes none of it. Gear comes as pieces of its own.
+      const pieces = ownPieces([{ item: op.item, qty: op.qty }]);
+      if (!fitsAll(c, pieces)) return { ok: false };
+      for (const s of pieces) addItem(c, s.item, s.qty);
       if (op.discover) discover(c, op.item);
       return { ok: true };
     case 'take':

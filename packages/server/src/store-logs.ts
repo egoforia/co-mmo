@@ -1,3 +1,4 @@
+import type { OwnerEntry } from '@co-mmo/shared';
 import type { Sql, SqlQuery } from './db.ts';
 import type { JournalEntry, SpendRecord } from './store.ts';
 
@@ -12,7 +13,9 @@ export type LogOp =
   | { t: 'spend'; record: SpendRecord }
   /** A guessed charge taken back when the real figure arrives. */
   | { t: 'unspend'; ref: string }
-  | { t: 'journal'; entry: JournalEntry };
+  | { t: 'journal'; entry: JournalEntry }
+  /** A piece of gear (by copies.ts pieceKey) came to a new owner (combat decisions, step 2). */
+  | { t: 'owner'; piece: string; entry: OwnerEntry };
 
 /**
  * Makes the log tables and, from an older database, moves the spending and
@@ -24,6 +27,8 @@ export async function migrateLogs(q: SqlQuery): Promise<void> {
   await q.query('CREATE INDEX IF NOT EXISTS spend_log_ref ON spend_log (ref)');
   await q.query('CREATE TABLE IF NOT EXISTS journal_log (id bigserial PRIMARY KEY, at bigint NOT NULL, player_id text, data jsonb NOT NULL)');
   await q.query('CREATE INDEX IF NOT EXISTS journal_log_at ON journal_log (at)');
+  await q.query('CREATE TABLE IF NOT EXISTS gear_owners (id bigserial PRIMARY KEY, piece text NOT NULL, at bigint NOT NULL, name text NOT NULL, how text NOT NULL)');
+  await q.query('CREATE INDEX IF NOT EXISTS gear_owners_piece ON gear_owners (piece)');
   for (const [old, insert] of [
     ['spend', `INSERT INTO spend_log (at, ref, estimate, usd, data)
        SELECT (data->>'at')::bigint, data->>'ref', COALESCE((data->>'estimate')::boolean, false), (data->>'usd')::double precision, data FROM spend ORDER BY n`],
@@ -66,6 +71,18 @@ export class PostgresLogs {
     return rows.map((r) => r.data);
   }
 
+  /** Every owner of each piece asked about, oldest first, by piece key. */
+  async owners(pieces: string[]): Promise<Map<string, OwnerEntry[]>> {
+    const out = new Map<string, OwnerEntry[]>(pieces.map((p) => [p, []]));
+    if (!pieces.length) return out;
+    const { rows } = await this.sql.query<{ piece: string; at: string; name: string; how: OwnerEntry['how'] }>(
+      'SELECT piece, at, name, how FROM gear_owners WHERE piece = ANY($1) ORDER BY id',
+      [pieces],
+    );
+    for (const r of rows) out.get(r.piece)?.push({ name: r.name, how: r.how, at: Number(r.at) });
+    return out;
+  }
+
   /** Applies `ops` in order, inside the save's transaction. */
   async write(q: SqlQuery, ops: readonly LogOp[]): Promise<void> {
     for (const op of ops) {
@@ -74,6 +91,8 @@ export class PostgresLogs {
         await q.query('INSERT INTO spend_log (at, ref, estimate, usd, data) VALUES ($1, $2, $3, $4, $5::jsonb)', [r.at, r.ref ?? null, Boolean(r.estimate), r.usd, json(r)]);
       } else if (op.t === 'unspend') {
         await q.query('DELETE FROM spend_log WHERE ref = $1 AND estimate', [op.ref]);
+      } else if (op.t === 'owner') {
+        await q.query('INSERT INTO gear_owners (piece, at, name, how) VALUES ($1, $2, $3, $4)', [op.piece, op.entry.at, op.entry.name, op.entry.how]);
       } else {
         await q.query('INSERT INTO journal_log (at, player_id, data) VALUES ($1, $2, $3::jsonb)', [op.entry.at, op.entry.playerId, json(op.entry)]);
       }

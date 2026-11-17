@@ -60,6 +60,7 @@ import {
   type EntityInspection,
   giveHomeTools,
   ITEMS,
+  type AcquiredHow,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
 import { applyOp, type CharacterOp, type OpResult } from './character-ops.ts';
@@ -136,6 +137,8 @@ export interface RegionHooks {
   party?(playerId: string): string[];
   /** Something worth a line in the "While you were away" feed. */
   journal?(text: string, playerId: string): void;
+  /** A piece of gear came to a new owner, for its history (combat decisions, step 2). */
+  owner?(item: string, name: string, how: AcquiredHow): void;
   /** The regions beyond this one's open edges, for players to see beside it. */
   neighbours?(): RegionDef[];
   /** Delivers a Region-channel line to every cell of a region that was split (see Cell). */
@@ -305,6 +308,10 @@ export class Region {
       changed: (id) => {
         const p = this.s.players.get(id);
         if (p) p.dirty = true;
+      },
+      received: (id, items) => {
+        const p = this.s.players.get(id);
+        if (p) this.s.owned(p, items, 'given');
       },
       now: this.now,
     });

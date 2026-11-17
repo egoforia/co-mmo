@@ -276,6 +276,9 @@ function play(token: string): void {
       case 'loot':
         loot?.show(message.loot);
         break;
+      case 'history':
+        rpg?.setHistories(message.histories);
+        break;
       case 'dialogue':
         sound.play('talk');
         rpg?.showDialogue(message);
@@ -377,6 +380,7 @@ function play(token: string): void {
       typing: () => isTyping() || isEditing(),
       prayer: () => prayer?.toggle(true),
       spendPoint: (stat) => connection.send({ t: 'spendPoint', stat }),
+      askHistory: (items) => connection.send({ t: 'history', items }),
     });
     rpg.statusIcon = statusIcon;
     loot = new LootUi({ send: (m) => connection.send(m), typing: () => isTyping() || isEditing() });

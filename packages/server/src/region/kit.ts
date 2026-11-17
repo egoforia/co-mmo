@@ -88,6 +88,7 @@ export class Kit {
     const why = craft(p.character, recipe, crafted(p.character, p.info.name, recipe, this.s.random, lean));
     if (why) return this.s.notice(p, why);
     const r = RECIPES[recipe]!;
+    this.s.ownedSince(p, before, 'crafted');
     // A crafted piece of gear says how well it came out.
     const copy = p.character.inventory.find((s) => !before.has(s.item) && ITEMS[s.item]?.copy);
     const done = practise(p.character, recipe, this.s.random);
@@ -118,8 +119,10 @@ export class Kit {
     if (m.action === 'master') return this.master(p, m, keeper);
     const ch = p.character;
     const before = goldOf(ch);
+    const held = new Set(ch.inventory.map((s) => s.item));
     const why = m.action === 'buy' ? buy(ch, keeper, m.id, shopMade(called(keeper), this.s.random, m.npc)) : m.action === 'sell' ? sell(ch, keeper, m.id, m.qty ?? 1) : train(ch, keeper, m.id);
     if (why) return this.s.notice(p, why);
+    if (m.action === 'buy') this.s.ownedSince(p, held, 'bought');
     const name = m.action === 'learn' ? ABILITIES[m.id]!.name : ITEMS[m.id]?.name ?? m.id;
     this.s.notice(p, m.action === 'buy'
       ? `You bought a ${name} for ${before - goldOf(ch)} gold.`

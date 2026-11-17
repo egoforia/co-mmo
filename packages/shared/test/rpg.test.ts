@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREATURES, EQUIP_SLOTS, GARMENT_SLOTS, addItem, equip, equipmentBonus, gainXp, maxHp, newCharacter, questOffered, rollDrops, takeItem, upgradeCharacter, xpToNext } from '../src/index.ts';
+import { CREATURES, EQUIP_SLOTS, copyBase, GARMENT_SLOTS, addItem, equip, equipmentBonus, gainXp, maxHp, newCharacter, questOffered, rollDrops, takeItem, upgradeCharacter, xpToNext } from '../src/index.ts';
 
 describe('drops', () => {
   it('roll each item on a creature’s list against its own chance', () => {
@@ -70,7 +70,7 @@ describe('cloak and feet slots', () => {
   it('send a cloak saved in the body slot back to the bag', () => {
     const c = upgradeCharacter({ ...newCharacter(), equipment: { body: 'pelt-cloak' } });
     expect(c.equipment.body).toBeUndefined();
-    expect(c.inventory.some((s) => s.item === 'pelt-cloak')).toBe(true);
+    expect(c.inventory.some((s) => copyBase(s.item) === 'pelt-cloak')).toBe(true);
   });
 
   it('give wished cloaks and boots armour like a hat', () => {

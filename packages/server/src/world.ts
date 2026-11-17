@@ -38,6 +38,7 @@ import {
   type SkyConfig,
   type Weather,
   type WorldEdit,
+  type AcquiredHow,
 } from '@co-mmo/shared';
 import { Parties } from './parties.ts';
 import { Region, type Cell, type Connection, type Departure, type Ghosts, type Leaving } from './region.ts';
@@ -175,6 +176,7 @@ export class World {
       route: (message, to) => this.route(message, to),
       party: (playerId) => this.parties.members(playerId),
       journal: (text, playerId) => this.onJournal?.(text, playerId),
+      owner: (item, name, how) => this.onOwner?.(item, name, how),
       // Every region around this one, corners too, so the world is drawn as one map.
       neighbours: () => this.neighbours(region.def),
       sky: () => this.sky,
@@ -416,6 +418,9 @@ export class World {
 
   /** Something worth a line in the "While you were away" feed (set by the app, which stores it). */
   onJournal?: (text: string, playerId: string) => void;
+
+  /** A piece of gear came to a new owner (set by the app, which keeps its history). */
+  onOwner?: (item: string, name: string, how: AcquiredHow) => void;
 
   /** Events for scripted rules: set by whoever runs them (the app, or a rule's test run). */
   onEvent?: (type: 'use' | 'interact' | 'defeat' | 'enter' | 'join', playerId: string, data: Record<string, string | number>) => void;

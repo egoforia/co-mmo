@@ -57,6 +57,32 @@ export interface PingMessage {
   n: number;
 }
 
+/** How a piece of gear came to an owner (combat decisions, step 2). */
+export type AcquiredHow = 'crafted' | 'bought' | 'looted' | 'given' | 'found';
+
+/** One owner in a piece of gear's history, oldest first. */
+export interface OwnerEntry {
+  name: string;
+  how: AcquiredHow;
+  /** Epoch ms. */
+  at: number;
+}
+
+/** Most pieces a history request may ask about at once. */
+export const MAX_HISTORY_ASK = 40;
+
+/** Asks for the owner history of pieces of gear (the item card shows it). */
+export interface HistoryAskMessage {
+  t: 'history';
+  items: string[];
+}
+
+/** The owner histories asked for, by item id; a piece nobody recorded has an empty list. */
+export interface HistoryMessage {
+  t: 'history';
+  histories: Record<string, OwnerEntry[]>;
+}
+
 /** Strike the nearest creature in reach. */
 export interface AttackMessage {
   t: 'attack';
@@ -232,6 +258,7 @@ export interface PartyActionMessage {
 }
 
 export type ClientMessage =
+  | HistoryAskMessage
   | LootActionMessage
   | DraftMessage
   | EquipMessage
@@ -667,6 +694,7 @@ export interface ContentMessage {
 }
 
 export type ServerMessage =
+  | HistoryMessage
   | GatherMessage
   | SkyMessage
   | LootMessage
@@ -714,6 +742,7 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'attack') return m.target === undefined || isId(m.target);
   if (m.t === 'interact' || m.t === 'wake') return true;
   if (m.t === 'ping') return Number.isSafeInteger(m.n);
+  if (m.t === 'history') return Array.isArray(m.items) && m.items.length <= MAX_HISTORY_ASK && m.items.every(isItemId);
   if (m.t === 'seen') return Number.isSafeInteger(m.tick) && (m.tick as number) >= 0;
   if (m.t === 'loot') {
     return ['take', 'all', 'close'].includes(m.action as string) && isId(m.body) &&

@@ -223,6 +223,7 @@ export type ToGateway =
   | { t: 'hook'; server: string; region: string; hook: 'event'; type: 'use' | 'interact' | 'defeat'; player: string; data: Record<string, string | number> }
   | { t: 'hook'; server: string; region: string; hook: 'route'; m: import('@co-mmo/shared').ChatMessage; to?: string }
   | { t: 'hook'; server: string; region: string; hook: 'journal'; text: string; player: string }
+  | { t: 'hook'; server: string; region: string; hook: 'owner'; item: string; name: string; how: import('@co-mmo/shared').AcquiredHow }
   | { t: 'hook'; server: string; region: string; hook: 'regionChat'; m: ServerMessage }
   /** A cell's border, each tick, for the cells beside it. */
   | { t: 'edge'; server: string; region: string; ghosts: Ghosts }

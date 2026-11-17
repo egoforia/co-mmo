@@ -81,6 +81,7 @@ export class Bodies {
       return this.showLoot(body);
     }
     p.dirty = true;
+    this.s.owned(p, taken.map((s) => s.item), 'looted');
     const names = taken.map((s) => (s.item === GOLD ? `${s.qty} gold` : `${s.qty > 1 ? `${s.qty} × ` : 'a '}${ITEMS[s.item]?.name ?? s.item}`)).join(', ');
     this.s.notice(p, `You take ${names} from the ${body.def.name}.${full ? ` ${BAG_FULL} The rest stays on the body.` : ''}`);
     for (const id of body.finders) {

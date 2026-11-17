@@ -15,6 +15,8 @@ export interface TradeHost {
   send(id: string, message: ServerMessage): void;
   /** A character changed (gold and items swapped): send it to its player. */
   changed(id: string): void;
+  /** What a player was given in a trade, by item id: gear records them as its new owner. */
+  received?(id: string, items: string[]): void;
   now(): number;
 }
 
@@ -119,6 +121,8 @@ export class TradeDesk {
     if (why) return this.end(trade, `The trade did not happen: ${why}`);
     this.host.changed(a);
     this.host.changed(b);
+    this.host.received?.(a, trade.offers.get(b)!.items.map((s) => s.item));
+    this.host.received?.(b, trade.offers.get(a)!.items.map((s) => s.item));
     this.end(trade, 'Trade done. Shake on it!');
   }
 

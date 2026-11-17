@@ -3,7 +3,7 @@
 // playtest never pays for anything. Bots join it as real players would.
 
 import { afterEach } from 'vitest';
-import { generateRegion, newCharacter, regionDef, type Character, type Role } from '@co-mmo/shared';
+import { generateRegion, newCharacter, upgradeCharacter, regionDef, type Character, type Role } from '@co-mmo/shared';
 import { account, start } from '../test/helpers.ts';
 import { Bot } from './bot.ts';
 
@@ -22,8 +22,8 @@ export interface BotOptions {
   role?: Exclude<Role, 'player'> | 'player';
   /** Where it starts: a region id (its spawn point) or the Sanctum. */
   region?: string;
-  /** Changes to a new character: more Favor for wishes, a level for fights. */
-  character?: Partial<Character>;
+  /** Changes to a new character: more Favor for wishes, a level for fights; `gold` becomes coins in the bag. */
+  character?: Partial<Character> & { gold?: number };
 }
 
 /** Starts the game with fake AI. Options go to the test server as they are. */
@@ -51,7 +51,7 @@ export async function playWorld(options: Parameters<typeof start>[0] = {}) {
         const def = regionDef(regionId);
         if (!def) throw new Error(`There is no region ${regionId}.`);
         const spawn = generateRegion(def).spawn;
-        world.store.savePosition(id, spawn.x, spawn.y, regionId, { ...newCharacter(), ...opts.character });
+        world.store.savePosition(id, spawn.x, spawn.y, regionId, upgradeCharacter({ ...newCharacter(), ...opts.character }));
       }
       const bot = await Bot.join(world.ws, token, name);
       bots.push(bot);

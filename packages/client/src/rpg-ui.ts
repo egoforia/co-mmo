@@ -1,4 +1,7 @@
 import {
+  BAG_SLOTS,
+  GOLD,
+  goldOf,
   ABILITIES,
   CALLINGS,
   EQUIP_SLOTS,
@@ -241,7 +244,7 @@ export class RpgUi {
     // Weakened comes in the snapshot's statuses with the rest; before the first one, the character says.
     const shown = this.statusText || (this.weakened ? 'Weakened' : '');
     const weak = shown ? ` · <span class="weak">${this.statusText ? shown : escapeHtml(shown)}</span>` : '';
-    $('stats-line').innerHTML = `Level ${c.level} · ${c.gold} gold · <span class="favor">✦ ${c.favor} Favor</span>${weak}`;
+    $('stats-line').innerHTML = `Level ${c.level} · ${goldOf(c)} gold · <span class="favor">✦ ${c.favor} Favor</span>${weak}`;
   }
 
   private renderQuests(): void {
@@ -264,7 +267,7 @@ export class RpgUi {
           : def.heal ? 'Click to drink'
             : def.slot ? `Wear: ${[familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · ') || SLOT_NAMES[def.slot]}`
               : def.teaches ? 'Click to read and learn'
-                : ruled ? 'Click to use' : 'For crafting and trade';
+                : ruled ? 'Click to use' : s.item === GOLD ? 'Spend at shops, or trade' : 'For crafting and trade';
         return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}${copyWords(def) ? ` ${copyWords(def)}` : ''}${def.style ? ` ${styleWords(def, regionName)}` : ''}${def.tool ? ` ${toolWords(def)}` : ''}`)}">
           <img src="${escapeHtml(itemIcon(def))}" alt="">
           ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
@@ -293,7 +296,7 @@ export class RpgUi {
       <h2>Your bag <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <h3>Worn</h3>
       <div class="slots gear">${worn}</div>
-      <h3>Carried</h3>
+      <h3>Carried <small>${c.inventory.length} of ${BAG_SLOTS} slots</small></h3>
       <div class="slots">${slots}</div>
       ${calling}
       ${fullStyles(c).map((st) => `<p class="calling">Full ${escapeHtml(STYLES[st]!.name)} style: ${escapeHtml(styleBonusWords(st))}</p>`).join('')}

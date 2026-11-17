@@ -39,6 +39,8 @@ import {
   type CallingId,
   type Character,
   type Stats,
+  goldOf,
+  setGold,
 } from '../src/index.ts';
 
 // Build plan step 7b: the Path skills, choosing a Path after the trial, and
@@ -199,11 +201,11 @@ describe('choosing a Path', () => {
     passTrial(c);
     choosePath(c, 'dawnbell');
     expect(c.abilities).toEqual(expect.arrayContaining(['grace', 'great-bell-of-waking']));
-    c.gold = 999;
+    setGold(c, 999);
     expect(choosePath(c, 'dirgebell')).toMatch(/1000 gold/);
-    c.gold = 1000;
+    setGold(c, 1000);
     expect(choosePath(c, 'dirgebell')).toBeUndefined();
-    expect(c.gold).toBe(0);
+    expect(goldOf(c)).toBe(0);
     expect(c.abilities).not.toContain('grace');
     expect(c.abilities).toEqual(expect.arrayContaining(['knell', 'final-knell']));
     expect(knowsPassive(c, 'iron-psalm')).toBe(true);

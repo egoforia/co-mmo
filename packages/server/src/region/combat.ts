@@ -1,4 +1,5 @@
 import {
+  GOLD,
   FLANK_BONUS,
   SIZE_TILES,
   flanks,
@@ -422,14 +423,10 @@ export class Combat implements EffectKit {
     const gained: string[] = [sharers.length > 1 ? `+${xp} XP (shared)` : `+${xp} XP`];
     const [lo, hi] = c.def.gold;
     const gold = lo + Math.floor(this.s.random() * (hi - lo + 1));
-    if (gold) {
-      ch.gold += gold;
-      gained.push(`${gold} gold`);
-    }
-    // What it carried stays on its body for anyone to take (E): its loot as set in God's View and by wishes.
+    // What it carried stays on its body for anyone to take (E), its gold too: its loot as set in God's View and by wishes.
     this.s.bodies.push({
       id: `body-${++this.s.bodyCount}`, kind: c.kind, def: c.def, x: c.x, y: c.y, floor: c.floor,
-      until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: rollDrops(lootTable(c.kind), this.s.random),
+      until: this.s.now() + BODY_SECONDS * 1000, finders: sharers.map((m) => m.info.id), loot: [...(gold > 0 ? [{ item: GOLD, qty: gold }] : []), ...rollDrops(lootTable(c.kind), this.s.random)],
     });
     discover(ch, c.kind);
     this.s.hooks.event?.('defeat', p.info.id, { creature: c.kind });

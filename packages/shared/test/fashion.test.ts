@@ -19,6 +19,7 @@ import {
   shopMade,
   traitBonus,
   type CopyInfo,
+  setGold,
 } from '../src/index.ts';
 
 const coat = (over: Partial<CopyInfo> = {}): CopyInfo => ({ of: 'shell-mail', quality: 110, maker: { kind: 'player', name: 'Bruna' }, ...over });
@@ -74,7 +75,7 @@ describe('garment attributes', () => {
 
   it('come from shopkeepers with their people, at standard quality', () => {
     const c = newCharacter();
-    c.gold = 100;
+    setGold(c, 100);
     buy(c, 'marina', 'traveller-coat', shopMade('Marina', () => 0.5, 'marina'));
     const made = ITEMS[c.inventory.find((s) => s.item.startsWith('traveller-coat~'))!.item]!;
     expect(made.copy).toMatchObject({ quality: 100, people: 'lutran' });

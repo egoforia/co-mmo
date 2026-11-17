@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, heldItem, offHandItem, sensesSpots } from '@co-mmo/shared';
+import { MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, offHandItem, sensesSpots } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
@@ -455,7 +455,7 @@ function play(token: string): void {
 function characterSound(before: Character, after: Character): SoundId | undefined {
   if (after.level > before.level) return 'level-up';
   if (after.favor > before.favor) return 'favor';
-  if (after.gold !== before.gold) return 'coin';
+  if (goldOf(after) !== goldOf(before)) return 'coin';
   const count = (c: Character) => c.inventory.reduce((n, slot) => n + slot.qty, 0);
   if (count(after) > count(before)) return 'pickup';
   return undefined;

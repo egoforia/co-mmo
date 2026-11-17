@@ -1,4 +1,4 @@
-import { CREATURES, ITEMS, RARITIES, REGION_WISH_COST, bonusText, regionDef, ruleItemId, standing, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
+import { BAG_SLOTS, CREATURES, ITEMS, RARITIES, REGION_WISH_COST, bonusText, regionDef, ruleItemId, standing, wishArtKey, type Character, type ContentEntry } from '@co-mmo/shared';
 import { escapeHtml } from './ui.ts';
 import { artSrc, contentEntries } from './wished.ts';
 import { LORE_CHAPTERS } from './bible/lore.ts';
@@ -69,7 +69,7 @@ export const CHAPTERS: Chapter[] = [
       </ul>
       <h3>Your things</h3>
       <ul>
-        <li><b>I</b> opens your bag. Click a Tonic to drink it, a weapon, hat, coat, cloak, boots or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off.</li>
+        <li><b>I</b> opens your bag. Click a Tonic to drink it, a weapon, hat, coat, cloak, boots or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off. Your bag holds ${BAG_SLOTS} stacks, and your gold is coins in it: monsters drop their gold on their bodies, and a full bag leaves the rest behind.</li>
         <li><b>E</b> beside a defeated creature searches its body, which lies there for five minutes. Each kind carries its own finds, each with its own chance, kept for whoever won the fight and their party.</li>
         <li><b>C</b> opens the crafting book. Creatures drop materials (mushroom caps, crab shells, scarab wing cases) that become Tonics and gear. Finer things need more Wit.</li>
         <li><b>Trade</b> with Marina on the Shore or the Cactus Elder in the desert to buy, and to sell what you found. Sister Amala gives lessons.</li>

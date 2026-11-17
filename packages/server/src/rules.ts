@@ -6,7 +6,7 @@
 // limits. A rule that keeps failing or hits its limits is paused on its own.
 
 import { getQuickJS, shouldInterruptAfterDeadline, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime, type QuickJSWASMModule } from 'quickjs-emscripten';
-import { ITEMS, addItem, isCopyId, dayPart, discover, gameHour, itemCount, maxHp, ruleItemId, takeItem, type DayPart, type RuleWish, type Weather } from '@co-mmo/shared';
+import { ITEMS, addItem, goldOf, isCopyId, dayPart, discover, gameHour, itemCount, maxHp, ruleItemId, takeItem, type DayPart, type RuleWish, type Weather } from '@co-mmo/shared';
 import { TILE_NAMES } from './region.ts';
 import type { World } from './world.ts';
 import type { CharacterOp } from './character-ops.ts';
@@ -509,7 +509,7 @@ export function worldHost(world: World): RuleHost {
     hurt: (p, n) => change(p, { op: 'hurt', amount: n }),
     gold: (p, n) => {
       const c = at(p)?.character(p);
-      if (!c || c.gold + n < 0) return false;
+      if (!c || goldOf(c) + n < 0) return false;
       return change(p, { op: 'gold', amount: n });
     },
     xp: (p, n) => change(p, { op: 'xp', amount: n }),

@@ -1,4 +1,6 @@
 import {
+  BAG_FULL,
+  GOLD,
   ITEMS,
   SEARCH_RANGE,
   addItem,
@@ -53,8 +55,8 @@ export class Bodies {
     }
     if (p.character.hp <= 0) return;
     p.looting = body.id;
-    let taken: InventorySlot[];
-    if (m.action === 'all') taken = body.loot.splice(0);
+    let wanted: InventorySlot[];
+    if (m.action === 'all') wanted = [...body.loot];
     else {
       // Someone may have taken something since this window was drawn: find the same thing again.
       const at = m.index !== undefined && body.loot[m.index]?.item === m.item ? m.index : body.loot.findIndex((s) => s.item === m.item);
@@ -62,12 +64,25 @@ export class Bodies {
         this.s.notice(p, 'Someone else took that already.');
         return this.showLoot(body);
       }
-      taken = body.loot.splice(at, 1);
+      wanted = [body.loot[at]!];
     }
-    for (const s of taken) addItem(p.character, s.item, s.qty);
+    // As much as the bag holds comes away; the rest stays on the body.
+    const taken: InventorySlot[] = [];
+    for (const s of wanted) {
+      const n = addItem(p.character, s.item, s.qty);
+      if (!n) continue;
+      taken.push({ item: s.item, qty: n });
+      s.qty -= n;
+    }
+    body.loot = body.loot.filter((s) => s.qty > 0);
+    const full = taken.length < wanted.length || wanted.some((s) => s.qty > 0);
+    if (!taken.length) {
+      this.s.notice(p, BAG_FULL);
+      return this.showLoot(body);
+    }
     p.dirty = true;
-    const names = taken.map((s) => `${s.qty > 1 ? `${s.qty} × ` : 'a '}${ITEMS[s.item]?.name ?? s.item}`).join(', ');
-    this.s.notice(p, `You take ${names} from the ${body.def.name}.`);
+    const names = taken.map((s) => (s.item === GOLD ? `${s.qty} gold` : `${s.qty > 1 ? `${s.qty} × ` : 'a '}${ITEMS[s.item]?.name ?? s.item}`)).join(', ');
+    this.s.notice(p, `You take ${names} from the ${body.def.name}.${full ? ` ${BAG_FULL} The rest stays on the body.` : ''}`);
     for (const id of body.finders) {
       if (id !== p.info.id) this.s.tell(id, `${p.info.name} took ${names} from the ${body.def.name} you defeated.`);
     }

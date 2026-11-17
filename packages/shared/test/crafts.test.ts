@@ -27,6 +27,8 @@ import {
   toolId,
   toolWords,
   upgradeCharacter,
+  goldOf,
+  setGold,
 } from '../src/index.ts';
 
 describe('crafts', () => {
@@ -87,18 +89,18 @@ describe('crafts', () => {
     expect(chooseMastery(c, 'tailoring')).toMatch(/Give one up/);
     c.crafts = { smithing: { level: 17, xp: 40 } };
     expect(chooseMastery(c, 'tailoring', 'smithing')).toMatch(new RegExp(`costs ${MASTERY_CHANGE_GOLD} gold`));
-    c.gold = MASTERY_CHANGE_GOLD + 5;
+    setGold(c, MASTERY_CHANGE_GOLD + 5);
     expect(chooseMastery(c, 'tailoring', 'smithing')).toBeUndefined();
     expect(c.masteries).toEqual(['fletching', 'tailoring']);
     expect(c.crafts.smithing).toEqual({ level: 10, xp: 0 });
-    expect(c.gold).toBe(5);
+    expect(goldOf(c)).toBe(5);
   });
 
   it('need the tool, raise the craft, and wear the tool out now and then', () => {
     const c = newCharacter();
     addItem(c, 'mushroom-cap', 4);
     expect(craft(c, 'tonic')).toMatch(/sickle/);
-    c.gold = 25;
+    setGold(c, 25);
     expect(buy(c, 'old-bramble', 'tool-herbalism-1')).toBeUndefined();
     expect(bestTool(c, 'herbalism')).toEqual({ id: 'tool-herbalism-1', tier: 1 });
     expect(craft(c, 'tonic')).toBeUndefined();

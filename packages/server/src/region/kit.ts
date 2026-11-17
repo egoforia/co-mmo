@@ -1,4 +1,5 @@
 import {
+  goldOf,
   ABILITIES,
   ITEMS,
   RECIPES,
@@ -116,14 +117,14 @@ export class Kit {
     }
     if (m.action === 'master') return this.master(p, m, keeper);
     const ch = p.character;
-    const before = ch.gold;
+    const before = goldOf(ch);
     const why = m.action === 'buy' ? buy(ch, keeper, m.id, shopMade(called(keeper), this.s.random, m.npc)) : m.action === 'sell' ? sell(ch, keeper, m.id, m.qty ?? 1) : train(ch, keeper, m.id);
     if (why) return this.s.notice(p, why);
     const name = m.action === 'learn' ? ABILITIES[m.id]!.name : ITEMS[m.id]?.name ?? m.id;
     this.s.notice(p, m.action === 'buy'
-      ? `You bought a ${name} for ${before - ch.gold} gold.`
+      ? `You bought a ${name} for ${before - goldOf(ch)} gold.`
       : m.action === 'sell'
-        ? `You sold ${m.qty && m.qty > 1 ? `${m.qty} × ` : 'a '}${name} for ${ch.gold - before} gold.`
+        ? `You sold ${m.qty && m.qty > 1 ? `${m.qty} × ` : 'a '}${name} for ${goldOf(ch) - before} gold.`
         : `${called(keeper)} teaches you ${name}. ${keyWords(ch, m.id)}`);
     p.dirty = true;
   }

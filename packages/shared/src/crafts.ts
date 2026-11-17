@@ -1,6 +1,6 @@
 import type { MaterialFamily } from './materials.ts';
 import type { RaceId } from './races.ts';
-import { ITEMS, addItem, itemCount, takeItem, type Character, type ItemDef } from './rpg.ts';
+import { ITEMS, goldOf, itemCount, putItem, takeGold, takeItem, type Character, type ItemDef } from './rpg.ts';
 
 // Crafts, levels and tools (gather and craft plan, step 4). Seven crafts, each
 // with a level from 1 to 20 that grows by doing it. Anyone can practise any
@@ -134,8 +134,7 @@ export function chooseMastery(c: Character, craft: CraftId, replace?: CraftId): 
     return undefined;
   }
   if (!held.includes(replace)) return `You are not a master of ${CRAFTS[replace].name}.`;
-  if (c.gold < MASTERY_CHANGE_GOLD) return `Changing a mastery costs ${MASTERY_CHANGE_GOLD} gold; you have ${c.gold}.`;
-  c.gold -= MASTERY_CHANGE_GOLD;
+  if (!takeGold(c, MASTERY_CHANGE_GOLD)) return `Changing a mastery costs ${MASTERY_CHANGE_GOLD} gold; you have ${goldOf(c)}.`;
   c.masteries = held.map((k) => (k === replace ? craft : k));
   const old = c.crafts?.[replace];
   const level = Math.min(craftLevel(c, replace), OPEN_CRAFT_LEVEL);
@@ -197,6 +196,7 @@ export function giveHomeTools(c: Character): string[] {
   if (!c.race || c.homeTools) return [];
   c.homeTools = true;
   const given = CRAFT_IDS.filter((k) => isHomeCraft(c, k)).map((k) => toolId(k, 1));
-  for (const id of given) addItem(c, id);
+  // A gift that is the player's from the start: it goes in even when the bag is full.
+  for (const id of given) putItem(c, id);
   return given;
 }

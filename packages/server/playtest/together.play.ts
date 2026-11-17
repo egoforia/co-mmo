@@ -2,7 +2,7 @@
 // side by side, and trade.
 
 import { describe, expect, it } from 'vitest';
-import { itemCount, type ServerMessage } from '@co-mmo/shared';
+import { goldOf, itemCount, type ServerMessage } from '@co-mmo/shared';
 import { playWorld } from './harness.ts';
 
 describe('robots play together', () => {
@@ -53,7 +53,7 @@ describe('robots play together', () => {
     mara.send({ t: 'trade', action: 'offer', offer: { items: [], gold: 5 } });
     await mara.waitFor((m) => m.t === 'trade' && m.trade?.theirs.items.length === 1 && m.trade.mine.gold === 5, { since: asked, what: 'both offers to show' });
     const tonics = itemCount(mara.character, 'tonic');
-    const gold = ilya.character.gold;
+    const gold = goldOf(ilya.character);
     const done = mara.mark();
     mara.send({ t: 'trade', action: 'confirm' });
     ilya.send({ t: 'trade', action: 'confirm' });
@@ -61,7 +61,7 @@ describe('robots play together', () => {
     await mara.waitFor((m) => m.t === 'character', { since: done, what: 'the bag to change after the trade' }).catch(() => undefined);
     await ilya.tick();
     expect.soft(itemCount(mara.character, 'tonic'), 'Mara got the Tonic').toBe(tonics + 1);
-    expect.soft(ilya.character.gold, 'Ilya got the gold').toBe(gold + 5);
+    expect.soft(goldOf(ilya.character), 'Ilya got the gold').toBe(gold + 5);
 
     expect(world.problems()).toEqual([]);
   });

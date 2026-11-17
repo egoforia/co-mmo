@@ -1,4 +1,5 @@
 import {
+  goldOf,
   skillName,
   ABILITIES,
   HOTBAR_SIZE,
@@ -301,7 +302,7 @@ export class KitUi {
       const info = `<span class="info">Rise past level 10 in ${name}, work the rarest materials and make the finest pieces.</span>`;
       if (isMastered(c, k)) return `<li><b>${name}</b>${info}<button type="button" disabled>You are a master</button></li>`;
       if (held.length < MAX_MASTERIES) return `<li><b>${name}</b>${info}<button type="button" data-action="master" data-id="${k}">Become a master</button></li>`;
-      return `<li><b>${name}</b>${info}${held.map((old) => `<button type="button" data-action="master" data-id="${k}" data-replace="${old}"${c.gold < MASTERY_CHANGE_GOLD ? ' disabled' : ''}
+      return `<li><b>${name}</b>${info}${held.map((old) => `<button type="button" data-action="master" data-id="${k}" data-replace="${old}"${goldOf(c) < MASTERY_CHANGE_GOLD ? ' disabled' : ''}
         title="${escapeHtml(`Your ${CRAFTS[old].name} drops back to level 10.`)}">Give up ${escapeHtml(CRAFTS[old].name)} · ${MASTERY_CHANGE_GOLD} gold</button>`).join('')}</li>`;
     });
   }
@@ -315,13 +316,13 @@ export class KitUi {
       const def = ITEMS[s.item]!;
       const bonus = bonusText(def.bonus);
       return `<li>${itemLabel(s.item)}<span class="info">${escapeHtml(bonus || def.description)}</span>
-        <button type="button" data-action="buy" data-id="${escapeHtml(s.item)}"${c.gold < s.price ? ' disabled' : ''}>Buy · ${s.price} gold</button></li>`;
+        <button type="button" data-action="buy" data-id="${escapeHtml(s.item)}"${goldOf(c) < s.price ? ' disabled' : ''}>Buy · ${s.price} gold</button></li>`;
     });
     const teaches = shop.teaches.filter((t) => ABILITIES[t.ability]).map((t) => {
       const a = ABILITIES[t.ability]!;
       const known = c.abilities.includes(t.ability);
       return `<li><b>${escapeHtml(a.name)}</b><span class="info">${escapeHtml(a.description)} ${a.energy} Energy.</span>
-        <button type="button" data-action="learn" data-id="${escapeHtml(t.ability)}"${known || c.gold < t.price ? ' disabled' : ''}>${known ? 'Known' : `Learn · ${t.price} gold`}</button></li>`;
+        <button type="button" data-action="learn" data-id="${escapeHtml(t.ability)}"${known || goldOf(c) < t.price ? ' disabled' : ''}>${known ? 'Known' : `Learn · ${t.price} gold`}</button></li>`;
     });
     const buys = shop.buys
       ? c.inventory.filter((s) => sellPrice(s.item) > 0).map((s) => {
@@ -332,7 +333,7 @@ export class KitUi {
       })
       : [];
     $('shop').innerHTML = `
-      <h2>${escapeHtml(npc.name)} <small>${c.gold} gold</small> <button type="button" class="close" data-close aria-label="Close">×</button></h2>
+      <h2>${escapeHtml(npc.name)} <small>${goldOf(c)} gold</small> <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       ${sells.length ? `<h3>For sale</h3><ul class="rows">${sells.join('')}</ul>` : ''}
       ${teaches.length ? `<h3>Lessons</h3><ul class="rows">${teaches.join('')}</ul>` : ''}
       ${shop.masters?.length ? `<h3>Mastery</h3><ul class="rows">${this.masteryRows(shop.masters).join('')}</ul>` : ''}
@@ -369,7 +370,7 @@ export class KitUi {
     if (!t) return;
     const list = (o: TradeOffer, mine: boolean) => `
       <ul class="rows">${o.items.map((s) => `<li>${itemLabel(s.item)} × ${s.qty}${mine ? ` <button type="button" class="quiet" data-remove="${escapeHtml(s.item)}">Take back</button>` : ''}</li>`).join('') || '<li class="note">Nothing yet.</li>'}</ul>
-      ${mine ? `<label>Gold <input name="gold" type="number" min="0" max="${this.character.gold}" value="${o.gold}"></label>` : `<p><b>${o.gold}</b> gold</p>`}`;
+      ${mine ? `<label>Gold <input name="gold" type="number" min="0" max="${goldOf(this.character)}" value="${o.gold}"></label>` : `<p><b>${o.gold}</b> gold</p>`}`;
     const bag = this.character.inventory
       .filter((s) => !ITEMS[s.item]?.bound && ITEMS[s.item])
       .map((s) => `<button type="button" class="slot" data-add="${escapeHtml(s.item)}" title="Add one to your side">

@@ -27,6 +27,8 @@ import {
   wisherOf,
   type ContentEntry,
   type WishDefinition,
+  goldOf,
+  setGold,
 } from '../src/index.ts';
 
 const look = { hook: 'a glint', body: 'small', color: '#b13e53', mood: 'bold' };
@@ -104,18 +106,18 @@ describe('shops, trainers and scrolls', () => {
   it('buys and sells at the shop prices', () => {
     const c = newCharacter();
     expect(buy(c, 'marina', 'wooden-sword')).toMatch(/costs 15 gold/);
-    c.gold = 20;
+    setGold(c, 20);
     expect(buy(c, 'marina', 'wooden-sword')).toBeUndefined();
-    expect(c.gold).toBe(5);
+    expect(goldOf(c)).toBe(5);
     expect(sell(c, 'marina', 'wooden-sword')).toBeUndefined();
-    expect(c.gold).toBe(5 + Math.floor(ITEMS['wooden-sword']!.value! / 2));
+    expect(goldOf(c)).toBe(5 + Math.floor(ITEMS['wooden-sword']!.value! / 2));
     expect(sell(c, 'marina', 'bible')).toMatch(/cannot be sold/);
     expect(buy(c, 'marina', 'scarab-charm')).toMatch(/not for sale/);
   });
 
   it('trainers teach for gold, scrolls teach once and are used up', () => {
     const c = newCharacter();
-    c.gold = 15;
+    setGold(c, 15);
     expect(train(c, 'sister-amala', 'mend')).toBeUndefined();
     expect(c.abilities).toEqual(['mend']);
     expect(train(c, 'sister-amala', 'mend')).toMatch(/know that already/);
@@ -132,11 +134,11 @@ describe('trading', () => {
     const a = newCharacter();
     const b = newCharacter();
     a.inventory.push({ item: 'crab-shell', qty: 3 });
-    b.gold = 10;
+    setGold(b, 10);
     expect(swap(a, b, { items: [{ item: 'crab-shell', qty: 2 }], gold: 0 }, { items: [], gold: 10 })).toBeUndefined();
     expect(itemCount(a, 'crab-shell')).toBe(1);
     expect(itemCount(b, 'crab-shell')).toBe(2);
-    expect([a.gold, b.gold]).toEqual([10, 0]);
+    expect([goldOf(a), goldOf(b)]).toEqual([10, 0]);
     expect(swap(a, b, { items: [{ item: 'crab-shell', qty: 5 }], gold: 0 }, { items: [], gold: 0 })).toMatch(/no longer has/);
     expect(itemCount(a, 'crab-shell')).toBe(1);
   });

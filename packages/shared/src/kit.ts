@@ -4,10 +4,17 @@
 
 import {
   ABILITIES,
+  BAG_FULL,
+  GOLD,
   ITEMS,
   MAX_STACK,
   addItem,
+  bagWithout,
+  fitsAll,
+  goldOf,
   itemCount,
+  putItem,
+  takeGold,
   learnAbility,
   replacedWords,
   takeItem,
@@ -100,7 +107,11 @@ export function cannotCraft(c: Character, id: string): string | undefined {
   }
   const missing = r.materials.filter((m) => itemCount(c, m.item) < m.qty).map((m) => ITEMS[m.item]!.name);
   if (missing.length) return `You need more ${missing.join(' and ')}.`;
-  if (itemCount(c, r.result.item) + r.result.qty > MAX_STACK) return 'Your bag cannot hold any more of those.';
+  // Gear comes out as copies, each on its own slot; anything else stacks.
+  const made = makesCopies(ITEMS[r.result.item])
+    ? Array.from({ length: r.result.qty }, (_, i) => ({ item: `${r.result.item}~new${i}`, qty: 1 }))
+    : [r.result];
+  if (!fitsAll(bagWithout(c, r.materials), made)) return itemCount(c, r.result.item) + r.result.qty > MAX_STACK ? 'Your bag cannot hold any more of those.' : BAG_FULL;
   return undefined;
 }
 
@@ -257,7 +268,7 @@ export function shopOf(keeper: Shopkeeper): ShopDef | undefined {
 /** Gold a shop pays for one of an item; 0 when it cannot be sold. */
 export function sellPrice(item: string): number {
   const def = ITEMS[item];
-  if (!def || def.bound) return 0;
+  if (!def || def.bound || item === GOLD) return 0;
   return Math.max(1, Math.floor((def.value ?? 2) / 2));
 }
 
@@ -265,10 +276,13 @@ export function sellPrice(item: string): number {
 export function buy(c: Character, npc: Shopkeeper, item: string, mint?: Mint): string | undefined {
   const offer = shopOf(npc)?.sells.find((s) => s.item === item);
   if (!offer || !ITEMS[item]) return 'That is not for sale here.';
-  if (c.gold < offer.price) return `That costs ${offer.price} gold; you have ${c.gold}.`;
+  if (goldOf(c) < offer.price) return `That costs ${offer.price} gold; you have ${goldOf(c)}.`;
   if (itemCount(c, item) >= MAX_STACK) return 'Your bag cannot hold any more of those.';
-  c.gold -= offer.price;
-  addItem(c, mint && makesCopies(ITEMS[item]) ? mint(item) : item);
+  // Paying may empty the coin slot, which makes room for what was bought.
+  const copy = makesCopies(ITEMS[item]);
+  if (!fitsAll(bagWithout(c, [{ item: GOLD, qty: offer.price }]), [{ item: copy ? `${item}~new` : item, qty: 1 }])) return BAG_FULL;
+  takeGold(c, offer.price);
+  addItem(c, mint && copy ? mint(item) : item);
   return undefined;
 }
 
@@ -278,8 +292,9 @@ export function sell(c: Character, npc: Shopkeeper, item: string, qty = 1): stri
   const price = sellPrice(item);
   if (!price) return 'That cannot be sold.';
   if (!Number.isInteger(qty) || qty < 1 || itemCount(c, item) < qty) return 'You do not have that many.';
+  if (!fitsAll(bagWithout(c, [{ item, qty }]), [{ item: GOLD, qty: price * qty }])) return BAG_FULL;
   takeItem(c, item, qty);
-  c.gold += price * qty;
+  putItem(c, GOLD, price * qty);
   return undefined;
 }
 
@@ -290,8 +305,7 @@ export function train(c: Character, npc: Shopkeeper, ability: string): string | 
   if (c.abilities.includes(ability)) return 'You know that already.';
   const replaced = replacedWords(c, ability);
   if (replaced) return replaced;
-  if (c.gold < offer.price) return `Lessons cost ${offer.price} gold; you have ${c.gold}.`;
-  c.gold -= offer.price;
+  if (!takeGold(c, offer.price)) return `Lessons cost ${offer.price} gold; you have ${goldOf(c)}.`;
   learnAbility(c, ability);
   return undefined;
 }
@@ -331,7 +345,8 @@ export function cleanOffer(raw: unknown): TradeOffer {
   for (const s of Array.isArray(o.items) ? o.items : []) {
     const item = typeof s?.item === 'string' ? s.item : '';
     const qty = Math.floor(Number(s?.qty));
-    if (!ITEMS[item] || ITEMS[item]!.bound || !(qty > 0) || items.some((i) => i.item === item)) continue;
+    // Coins change hands as the offer's gold, not as an item.
+    if (!ITEMS[item] || ITEMS[item]!.bound || item === GOLD || !(qty > 0) || items.some((i) => i.item === item)) continue;
     items.push({ item, qty: Math.min(qty, MAX_STACK) });
     if (items.length >= MAX_TRADE_SLOTS) break;
   }
@@ -341,7 +356,7 @@ export function cleanOffer(raw: unknown): TradeOffer {
 
 /** True when the character holds everything they offer. */
 export function canGive(c: Character, offer: TradeOffer): boolean {
-  return c.gold >= offer.gold && offer.items.every((s) => !ITEMS[s.item]?.bound && itemCount(c, s.item) >= s.qty);
+  return goldOf(c) >= offer.gold && offer.items.every((s) => !ITEMS[s.item]?.bound && itemCount(c, s.item) >= s.qty);
 }
 
 /**
@@ -350,12 +365,15 @@ export function canGive(c: Character, offer: TradeOffer): boolean {
  */
 export function swap(a: Character, b: Character, fromA: TradeOffer, fromB: TradeOffer): string | undefined {
   if (!canGive(a, fromA) || !canGive(b, fromB)) return 'Someone no longer has what they offered.';
+  const stacks = (o: TradeOffer) => [...o.items, ...(o.gold ? [{ item: GOLD, qty: o.gold }] : [])];
+  const room = (who: Character, gives: TradeOffer, gets: TradeOffer) => fitsAll(bagWithout(who, stacks(gives)), stacks(gets));
+  if (!room(a, fromA, fromB) || !room(b, fromB, fromA)) return "Someone's bag does not have room for that trade.";
   const give = (from: Character, to: Character, offer: TradeOffer) => {
-    from.gold -= offer.gold;
-    to.gold += offer.gold;
+    takeGold(from, offer.gold);
+    putItem(to, GOLD, offer.gold);
     for (const s of offer.items) {
       takeItem(from, s.item, s.qty);
-      addItem(to, s.item, s.qty);
+      putItem(to, s.item, s.qty);
     }
   };
   give(a, b, fromA);

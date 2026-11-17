@@ -3,7 +3,7 @@
 // fights, loots bodies, learns a power and uses it, and trades at a shop.
 
 import { describe, expect, it } from 'vitest';
-import { QUESTS, itemCount, type Character } from '@co-mmo/shared';
+import { QUESTS, goldOf, itemCount, type Character } from '@co-mmo/shared';
 import type { Bot, FightResult } from './bot.ts';
 import { playWorld } from './harness.ts';
 
@@ -39,9 +39,9 @@ describe('the robot plays the first quests', () => {
     await bot.ask({ t: 'accept', quest: 'meet-bramble' }, (m) => m.t === 'character' && Boolean(quest(m.character, 'meet-bramble')), 'the quest to be taken');
 
     // Learning Mend from her costs gold.
-    const gold = bot.character.gold;
+    const gold = goldOf(bot.character);
     await bot.ask({ t: 'shop', action: 'learn', npc: 'sister-amala', id: 'mend' }, (m) => m.t === 'character' && m.character.abilities.includes('mend'), 'Mend to be learned').catch(() => undefined);
-    expect.soft(bot.character.gold, 'Mend costs 15 gold').toBe(gold - 15);
+    expect.soft(goldOf(bot.character), 'Mend costs 15 gold').toBe(gold - 15);
 
     // Old Bramble, in her cottage in the Woods.
     expect(await bot.travelTo('woods')).toBe(true);
@@ -84,14 +84,14 @@ describe('the robot plays the first quests', () => {
     const marina = await bot.talkTo('marina');
     expect.soft(marina?.shop, 'Marina keeps a shop').toBe(true);
     const tonics = itemCount(bot.character, 'tonic');
-    if (bot.character.gold >= 8) {
+    if (goldOf(bot.character) >= 8) {
       await bot.ask({ t: 'shop', action: 'buy', npc: 'marina', id: 'tonic' }, (m) => m.t === 'character' && itemCount(m.character, 'tonic') === tonics + 1, 'a Tonic to be bought');
     }
     const caps = itemCount(bot.character, 'mushroom-cap');
     if (caps > 0) {
-      const before = bot.character.gold;
+      const before = goldOf(bot.character);
       await bot.ask({ t: 'shop', action: 'sell', npc: 'marina', id: 'mushroom-cap' }, (m) => m.t === 'character' && itemCount(m.character, 'mushroom-cap') === caps - 1, 'a Mushroom Cap to be sold');
-      expect.soft(bot.character.gold, 'selling pays gold').toBeGreaterThan(before);
+      expect.soft(goldOf(bot.character), 'selling pays gold').toBeGreaterThan(before);
     }
     expect.soft(mushrooms.looted, 'a body was looted along the way').toBeGreaterThan(0);
 

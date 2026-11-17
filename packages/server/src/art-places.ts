@@ -33,7 +33,7 @@ export function shippedItemPage(artId: string): (typeof ITEM_PAGES)[number] {
   if (!item) return 'Other';
   if (item.kind === 'tool') return 'Craft tools';
   if (item.kind === 'consumable') return 'Consumables';
-  if (item.kind === 'material') return 'Materials';
+  if (item.kind === 'material' || item.kind === 'coins') return 'Materials';
   if (item.kind === 'book' || item.kind === 'scroll') return 'Books and scrolls';
   return item.slot === 'weapon' ? 'Weapons' : item.slot === 'offhand' ? 'Shields' : item.slot === 'charm' ? 'Charms' : 'Armour';
 }

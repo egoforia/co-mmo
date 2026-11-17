@@ -5,7 +5,9 @@ import {
   REGROW_MS,
   SPOTS,
   CRAFTS,
+  BAG_FULL,
   addItem,
+  bagRoom,
   bestTool,
   cannotGather,
   gainCraftXp,
@@ -37,7 +39,7 @@ export class Gathering {
     if (!spot) return false;
     if (p.gathering || p.character.hp <= 0) return true;
     const def = SPOTS[spot.kind]!;
-    const why = cannotGather(p.character, spot.kind);
+    const why = cannotGather(p.character, spot.kind) ?? (bagRoom(p.character, def.material) < 1 ? BAG_FULL : undefined);
     if (why) {
       this.s.notice(p, why);
       return true;
@@ -84,8 +86,9 @@ export class Gathering {
     const def = SPOTS[spot.kind]!;
     const needs = spotNeeds(spot.kind)!;
     const ch = p.character;
-    const qty = gatherYield(this.s.random);
-    addItem(ch, def.material, qty);
+    // What the bag cannot hold is left behind; with no room at all, nothing is gathered.
+    const qty = addItem(ch, def.material, gatherYield(this.s.random));
+    if (!qty) return this.stop(p, BAG_FULL);
     const level = gainCraftXp(ch, needs.craft, gatherPractice(spot.kind));
     const tool = bestTool(ch, needs.craft);
     const broke = tool ? wearTool(ch, tool, this.s.random) : undefined;

@@ -26,7 +26,7 @@ export const GROUPS: readonly ToolGroup[] = [
   { id: 'build', name: 'Build', key: 'b', tools: ['kit', 'house', 'wall', 'storey', 'stairs'] },
   { id: 'furnish', name: 'Furnish', key: 'f', tools: ['furniture', 'piece', 'light'] },
   { id: 'life', name: 'Life', key: 'l', tools: ['person', 'spawn', 'spot'] },
-  { id: 'places', name: 'Places', key: 'p', tools: ['bookmark', 'land'] },
+  { id: 'places', name: 'Places', key: 'p', tools: ['bookmark', 'land', 'safe'] },
 ];
 /**
  * Tools folded into Select's inspector (inspector.ts): they change a thing

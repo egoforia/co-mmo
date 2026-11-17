@@ -309,6 +309,15 @@ export interface RegionMap {
   lights?: PlacedLight[];
   /** Walls standing on one side of a tile (edge-walls.ts), laid by wall edits. */
   edgeWalls?: EdgeWall[];
+  /** Safe areas laid by the world editor (safe-areas.ts); the land's defaults when missing. */
+  safe?: SafeArea[];
+}
+
+/** A round place where no player can hurt another, and monsters do not follow (safe-areas.ts). */
+export interface SafeArea {
+  x: number;
+  y: number;
+  radius: number;
 }
 
 /** A light standing on its own on a floor (light.ts): a glow with no picture of its own. */

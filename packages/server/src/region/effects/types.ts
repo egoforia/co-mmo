@@ -37,6 +37,12 @@ export interface EffectKit {
   creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined;
   /** Party members in the region within `radius` of the player and on their feet, the player first. */
   partyNear(p: PlayerState, radius: number): PlayerState[];
+  /** A rival player chosen as target within `range`, whom the player may hurt (region/pvp.ts). */
+  rivalInReach(p: PlayerState, range: number, id?: string): PlayerState | undefined;
+  /** Rival players within `range` of a point whom the player may hurt: area skills hit them as they hit monsters. */
+  rivalsNear(p: PlayerState, at: { x: number; y: number }, range: number): PlayerState[];
+  /** Hurts a rival player as a monster's blow would. */
+  hurtPlayer(p: PlayerState, v: PlayerState, raw: number, how: Blow): void;
   /** Raises a Fallen player where they lie with `share` of their health (region/fallen.ts); false if they were not Fallen. */
   raise(p: PlayerState, share: number, by: PlayerState): boolean;
 }
@@ -79,6 +85,15 @@ export function hitWith(kit: EffectKit, cast: Cast, c: Creature, share = 1): voi
   // A finisher's own hits do not build the gauge it spends.
   if (!a.finisher) kit.gauges.landed(p);
   if (a.status && c.respawnAt === null) addStatus(kit, cast, c, amount);
+}
+
+/** A skill's hit on a rival player: the same amount, crit and damage type as on a monster (statuses stay for monsters in PvP version 1). */
+export function hitPlayerWith(kit: EffectKit, cast: Cast, v: PlayerState, share = 1): void {
+  const { p, a, id } = cast;
+  const plain = cast.amount * share;
+  const amount = kit.critical(p, plain);
+  kit.hurtPlayer(p, v, amount, { type: abilityDamageType(a), ability: id, ...(amount > plain ? { crit: true } : {}) });
+  if (!a.finisher) kit.gauges.landed(p);
 }
 
 /** Puts the ability's status on a creature; damage statuses hurt each second for a share of the hit. */

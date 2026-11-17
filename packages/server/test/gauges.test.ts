@@ -60,6 +60,8 @@ function setup(calling: CallingId | undefined, regionId = 'woods', abilities: st
   const clock = { now: 1_000_000 };
   const dice = { v: 0.5 };
   const region = new Region(regionDef(regionId)!, undefined, () => clock.now, () => dice.v);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   const conn = fakeConn();
   const character = calling ? startCharacter('ursine', calling) : newCharacter();
   character.abilities.push(...abilities);

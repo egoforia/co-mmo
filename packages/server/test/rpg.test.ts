@@ -32,6 +32,8 @@ const of = <T extends ServerMessage['t']>(c: { messages: ServerMessage[] }, t: T
 function setup(id: string) {
   const clock = { now: 1_000_000 };
   const region = new Region(regionDef(id)!, undefined, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   return { region, clock };
 }
 
@@ -295,6 +297,8 @@ describe('combat', () => {
   it('a player who falls wakes at the Sanctum shrine, Weakened, with nothing lost, once no friend raises them', () => {
     let now = 5_000_000;
     const world = new World(() => now, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of world.units()) r.map.safe = [];
     const conn = fakeConn();
     const ch = newCharacter();
     ch.hp = 1;
@@ -344,6 +348,8 @@ describe('quests', () => {
   it('Sister Amala sends you to Old Bramble, who rewards you and offers the next quest', () => {
     let now = 0;
     const world = new World(() => now, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of world.units()) r.map.safe = [];
     const conn = fakeConn();
     world.join(info('a', 'Mara'), conn, { regionId: 'sanctum', x: null, y: null }, newCharacter());
     const sanctum = world.local('sanctum')!;

@@ -58,6 +58,8 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'restyle'; at: TilePoint; style: string; floor?: [width: number, height: number] }
   /** Trees and rocks over a round patch, each as thick as 0 (cleared away) to 3, drawn in the land's own look. */
   | { kind: 'scenery'; at: TilePoint; radius: number; trees: number; rocks: number }
+  /** A safe area of `radius` tiles round `at` (safe-areas.ts); radius 0 takes away the safe areas over `at`. */
+  | { kind: 'safe'; at: TilePoint; radius: number }
   /** The land's weather ('sky' turns with the sky), and where players arrive (`at`) when `arrive`. */
   | { kind: 'land'; at: TilePoint; weather: Weather | 'sky'; arrive?: boolean }
   /** A quest the person named by `target` gives: defeat so many of a monster, or bring so many of one thing, for experience and gold. */

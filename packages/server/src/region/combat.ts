@@ -47,6 +47,7 @@ import type { Gauges } from './gauges.ts';
 import { PATH_RULES, type Paths } from './paths/index.ts';
 import { SKILL_RULES, tendSanctuaries } from './skills/index.ts';
 import type { Quests } from './quests.ts';
+import { Pvp } from './pvp.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 import { tickStatuses } from './statuses.ts';
 
@@ -79,7 +80,24 @@ export class Combat implements EffectKit {
     readonly gauges: Gauges,
     private readonly fallen: Fallen,
     readonly paths: Paths,
-  ) {}
+  ) {
+    this.pvp = new Pvp(s, paths);
+  }
+
+  /** Players fighting players (region/pvp.ts). */
+  readonly pvp: Pvp;
+
+  rivalInReach(p: PlayerState, range: number, id?: string): PlayerState | undefined {
+    return this.pvp.rivalInReach(p, range, id);
+  }
+
+  rivalsNear(p: PlayerState, at: { x: number; y: number }, range: number): PlayerState[] {
+    return this.pvp.rivalsNear(p, at, range);
+  }
+
+  hurtPlayer(p: PlayerState, v: PlayerState, raw: number, how: Blow): void {
+    this.pvp.hurt(p, v, raw, how);
+  }
 
   /** Raises a Fallen player where they lie (Peal of Waking). */
   raise(p: PlayerState, share: number, by: PlayerState): boolean {
@@ -101,6 +119,20 @@ export class Combat implements EffectKit {
     const family = wieldedFamily(ch);
     // Spears, greatswords and censers reach a second tile, but only straight ahead.
     const straight = !family.ranged && tilesFor(reach) > 1;
+    // Another player is struck only when chosen as the target (region/pvp.ts).
+    const rival = targetId && this.s.players.has(targetId) ? this.pvp.rivalInReach(p, reach, targetId) : undefined;
+    if (targetId && this.s.players.has(targetId) && !rival) {
+      const v = this.s.players.get(targetId)!;
+      const why = this.pvp.why(p, v);
+      if (why && v !== p) this.s.notice(p, why);
+    }
+    if (rival) {
+      const plain = attackPower(ch) * (0.9 + this.s.random() * 0.2);
+      const hit = this.critical(p, plain);
+      this.pvp.hurt(p, rival, hit, { type: family.damageType, ranged: family.ranged, ...(hit > plain ? { crit: true } : {}) });
+      this.gauges.landed(p);
+      return;
+    }
     const target = (targetId && this.creatureInReach(p, reach, targetId, straight)) || this.creatureInReach(p, reach, undefined, straight);
     if (!target) return;
     const trained = wieldsTrained(ch);

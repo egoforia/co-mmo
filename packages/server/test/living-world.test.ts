@@ -34,6 +34,8 @@ const hour = (h: number) => DAY * 10 + (h / 24) * DAY;
 function setup(id: string, h: number) {
   const clock = { now: hour(h) };
   const region = new Region(regionDef(id)!, undefined, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   return { region, clock };
 }
 
@@ -223,6 +225,8 @@ describe('weather', () => {
 
   it('follows the world’s settings, on every server alike', () => {
     const world = new World(() => hour(12), () => 0.5, { dayMinutes: 10, weatherMinutes: 5, weather: false });
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of world.units()) r.map.safe = [];
     expect(world.state().sky).toEqual({ dayMinutes: 10, weatherMinutes: 5, weather: false });
     expect(world.skyOver(regionDef('desert')!).weather).toBe('clear');
     const conn = fakeConn();

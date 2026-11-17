@@ -36,6 +36,8 @@ const notices = (c: { messages: ServerMessage[] }) => of(c, 'notice').map((m) =>
 function setup(id: string) {
   const clock = { now: 1_000_000 };
   const region = new Region(regionDef(id)!, undefined, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   return { region, clock };
 }
 
@@ -328,6 +330,8 @@ describe('people from the world editor', () => {
     })();
     const draft = EDIT_KINDS.person.make({ at }, { name: 'Hesper', look: 'shore-trader', greeting: 'Mind the forge.', wares: 'tools:smithing', buys: true, teaches: 'none', masters: 'smithing', day: 'tireless' });
     const region = new Region({ ...def, edits: [stampEdit(draft, { id: 'e1', by: 'Ego', made: 0 }, {})] }, undefined, () => 1_000_000, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    region.map.safe = [];
     const conn = fakeConn();
     const c = newCharacter();
     setGold(c, 500);
@@ -353,6 +357,8 @@ describe('people from the world editor', () => {
     const snow = EDIT_KINDS.land.make({ at }, { weather: 'snow', arrive: false });
     const edits = [person, quest, snow].map((d, i) => stampEdit(d, { id: `e${i + 1}`, by: 'Ego', made: 0 }, {}));
     const region = new Region({ ...def, edits }, undefined, () => 1_000_000, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    region.map.safe = [];
     expect(region.sky().weather).toBe('snow');
     const conn = fakeConn();
     region.join(info('a', 'Mara'), conn, { x: null, y: null }, newCharacter());

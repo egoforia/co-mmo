@@ -110,6 +110,8 @@ describe('Headless Record and Replay', () => {
       () => clock.now,
       mulberry32(seed),
     );
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    region.map.safe = [];
 
     const conns = { p1: fakeConn(), p2: fakeConn() };
     for (const id of ['p1', 'p2'] as const) {
@@ -239,6 +241,8 @@ describe('Dev pause, step, and resume simulation controls', () => {
   it('controls world ticking via World.pause, World.step, and World.resume', () => {
     let now = 100_000;
     const world = new World(() => now);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of world.units()) r.map.safe = [];
     const startTicks = (world as any).ticks;
 
     // Running normally: tick advances
@@ -272,6 +276,8 @@ describe('Dev pause, step, and resume simulation controls', () => {
       process.env.NODE_ENV = 'production';
 
       const world = new World();
+      // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+      for (const r of world.units()) r.map.safe = [];
       const mockRes: any = {
         statusCode: 200,
         headers: {},
@@ -319,6 +325,8 @@ describe('Dev pause, step, and resume simulation controls', () => {
       process.env.NODE_ENV = 'development';
 
       const world = new World();
+      // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+      for (const r of world.units()) r.map.safe = [];
       const createReqRes = (action: string) => {
         const res: any = {
           statusCode: 200,
@@ -376,6 +384,8 @@ describe('Dev pause, step, and resume simulation controls', () => {
 
   it('allows owner to start and stop region replay recording via admin API', async () => {
     const world = new World();
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of world.units()) r.map.safe = [];
     const ctx: any = {
       world,
       json: (res: any, status: number, body: any) => {

@@ -535,6 +535,11 @@ export class World {
     // A second window replaces the first wherever it was, keeping its progress.
     const previous = this.regionOf(info.id);
     character = previous?.character(info.id) ?? character;
+    // Back before a fight they quit was over: they take up where they stand.
+    if (previous && this.quitting.delete(info.id)) {
+      const at = previous.position(info.id);
+      if (at) saved = { regionId: previous.def.id, x: at.x, y: at.y, ...(at.floor ? { floor: at.floor } : {}) };
+    }
     if (previous && previous.def.id !== saved.regionId) {
       void settle(previous.remove(info.id, `${info.name} left.`), (left) => left?.conn.close('Signed in from another window.'));
     }
@@ -550,13 +555,25 @@ export class World {
   leave(playerId: string): Place | undefined | Promise<Place | undefined> {
     const region = this.regionOf(playerId);
     if (!region) return undefined;
-    this.where.delete(playerId);
     this.moving.delete(playerId);
-    const left = settle(region.remove(playerId), (l) => l && { id: playerId, regionId: region.def.id, x: l.x, y: l.y, ...(l.carry.floor ? { floor: l.carry.floor } : {}), character: l.character });
-    this.partyChanged(playerId);
-    this.stateChanged();
-    return left;
+    // Quitting mid-fight is no escape: the region keeps them until it is over, then says so (a `quit` departure).
+    return settle(region.remove(playerId, undefined, true), (l) => {
+      if (l?.staying) {
+        this.quitting.add(playerId);
+        return undefined;
+      }
+      if (this.where.get(playerId) === region.def.id) this.where.delete(playerId);
+      this.partyChanged(playerId);
+      this.stateChanged();
+      return l && { id: playerId, regionId: region.def.id, x: l.x, y: l.y, ...(l.carry.floor ? { floor: l.carry.floor } : {}), character: l.character };
+    });
   }
+
+  /** Players who quit mid-fight and are still in the world until it is over. */
+  private readonly quitting = new Set<string>();
+
+  /** Where a player who quit mid-fight ended up, once they are out of the world (set by the app, which saves it). */
+  onQuit?: (place: Place) => void;
 
   handle(playerId: string, message: ClientMessage): void {
     if (message.t === 'party') return this.partyAction(playerId, message);
@@ -946,6 +963,16 @@ export class World {
       region.announce(announce);
       return taken;
     };
+    if ('quit' in departure) {
+      this.quitting.delete(id);
+      this.where.delete(id);
+      this.track(settle(take(`${name} left.`), (left) => {
+        if (left) this.onQuit?.({ id, regionId: region.def.id, x: left.x, y: left.y, ...(left.carry.floor ? { floor: left.carry.floor } : {}), character: left.character });
+        this.partyChanged(id);
+        this.stateChanged();
+      }));
+      return;
+    }
     if (departure.died) {
       // The Fallen wake at the shrine, Weakened for a while; the region already took the price (region/deaths.ts).
       this.moving.add(id);
@@ -955,6 +982,14 @@ export class World {
         const home = this.home;
         fallen.character.hp = maxHp(fallen.character);
         fallen.character.weakenedUntil = this.now() + WEAKENED_MS;
+        // One who quit mid-fight and fell wakes at the shrine next time they come back.
+        if (this.quitting.delete(id)) {
+          this.where.delete(id);
+          this.onQuit?.({ id, regionId: home.def.id, x: home.map.spawn.x, y: home.map.spawn.y, character: fallen.character });
+          this.partyChanged(id);
+          this.stateChanged();
+          return;
+        }
         this.where.set(id, home.def.id);
         home.join(fallen.info, fallen.conn, home.map.spawn, fallen.character, `${name} woke at the shrine of ${home.def.name}.`);
         this.partyChanged(id);

@@ -148,13 +148,18 @@ export class RemoteRegion implements RegionHandle {
     this.command({ t: 'join', region: this.key, info, at, character, ...(announce !== undefined ? { announce } : {}), ...(carry ? { carry: carryData(carry) } : {}), ...(handoff ? { handoff } : {}) });
   }
 
-  async remove(id: string, announce?: string): Promise<Leaving | undefined> {
+  async remove(id: string, announce?: string, quit?: boolean): Promise<Leaving | undefined> {
     const mirror = this.players.get(id);
     if (!mirror) return undefined;
     // Nothing more for this player passes through here, whatever the server says.
     this.players.delete(id);
-    const left = await this.requests.ask<LeavingData | null>(this.channel, { t: 'remove', region: this.key, id, ...(announce !== undefined ? { announce } : {}) })
+    const left = await this.requests.ask<LeavingData | null>(this.channel, { t: 'remove', region: this.key, id, ...(announce !== undefined ? { announce } : {}), ...(quit ? { quit } : {}) })
       .catch(() => null);
+    // Quit mid-fight: still there until it is over.
+    if (left?.staying) {
+      this.players.set(id, mirror);
+      return { info: left.info, conn: mirror.conn, character: left.character, x: left.x, y: left.y, carry: carryFrom(left.carry), staying: true };
+    }
     // A server that did not answer is taken to have lost the player where they were last seen.
     if (!left) return { info: mirror.info, conn: mirror.conn, character: mirror.character, x: mirror.x, y: mirror.y, carry: lostCarry(mirror) };
     return { info: left.info, conn: mirror.conn, character: left.character, x: left.x, y: left.y, carry: carryFrom(left.carry) };

@@ -151,6 +151,8 @@ export function createApp(options: AppOptions): App {
   world.onOwner = (item, name, how) => store.addOwner(item, name, how);
   // Players' bodies outlast a restart (combat decisions, step 3).
   world.onPlayerBody = (body, gone) => store.savePlayerBody(body, gone);
+  // One who quit mid-fight is saved where they were once it was over.
+  world.onQuit = (place) => store.savePosition(place.id, place.x, place.y, place.regionId, place.character, place.floor);
   // The workshop lands the Owner and Stewards made in the editor.
   for (const land of store.workshopLands()) world.addRegion(workshopDef(land));
   world.restoreBodies(store.playerBodies(now()));

@@ -67,3 +67,7 @@ Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").
 | Drops (`rollDeathDrops`) | All the gold carried. Each worn piece with a 15% chance. With another 15% chance the bag, with everything in it. The Bible and sleeping wish items never drop; bound gear that drops comes off unbound. |
 | The body | What drops lies on a player's body where they fell, drawn as the player, for an hour (`PLAYER_BODY_MS`), or until it is empty. Anyone may take from it, and the one who fell hears who took what, wherever they are. |
 | Restarts | Player bodies are saved in the `player_bodies` table as they change and laid back in their regions at start (`World.restoreBodies`). Region servers send the changes through the region link. |
+
+## Quitting mid-fight (combat decisions, step 3)
+
+A player who closes the game while a fight is on stays in the world until nothing has hurt them for 15 seconds (`QUIT_FIGHT_MS`) and no creature is after them. A Fallen player counts as in a fight. Monsters keep attacking them, and if they fall they pay the price of death and wake at the shrine next time they play. Coming back before the fight is over takes up where they stand. Once it is over, the region sends a `quit` departure, and the world saves where they ended up (`World.onQuit`). On region servers the `remove` command carries `quit`, and the answer says `staying`.

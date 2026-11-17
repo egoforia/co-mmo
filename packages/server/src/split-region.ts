@@ -172,11 +172,11 @@ export class SplitRegion implements RegionHandle {
     this.at(at.x ?? this.map.spawn.x).join(info, conn, at, character, announce, carry, handoff);
   }
 
-  remove(id: string, announce?: string): Leaving | undefined | Promise<Leaving | undefined> {
+  remove(id: string, announce?: string, quit?: boolean): Leaving | undefined | Promise<Leaving | undefined> {
     const crossing = this.crossing.get(id);
     // Halfway between two cells: let them arrive, then take them out.
-    if (crossing) return crossing.done.then(() => this.remove(id, announce));
-    return this.of(id)?.remove(id, announce);
+    if (crossing) return crossing.done.then(() => this.remove(id, announce, quit));
+    return this.of(id)?.remove(id, announce, quit);
   }
 
   handle(id: string, message: ClientMessage): void {

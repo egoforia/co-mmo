@@ -186,7 +186,9 @@ export type Departure =
   | { id: string; side: Side; died?: undefined; cell?: undefined }
   | { id: string; died: true; side?: undefined; cell?: undefined }
   /** Walked over a border into the next cell of a split region. */
-  | { id: string; cell: number; side?: undefined; died?: undefined };
+  | { id: string; cell: number; side?: undefined; died?: undefined }
+  /** Quit mid-fight, and the fight is over: out of the world now (QUIT_FIGHT_MS). */
+  | { id: string; quit: true; side?: undefined; died?: undefined; cell?: undefined };
 
 /** Interface for recording inputs and ticks on a Region. */
 export interface RegionRecorderInterface {
@@ -202,7 +204,16 @@ export interface Leaving {
   y: number;
   /** What carries over into the next region, so walking on feels like one more step. */
   carry: Carry;
+  /** Set when they asked to leave mid-fight: they are still here, and leave once it is over. */
+  staying?: true;
 }
+
+/**
+ * A player who quits while something is attacking them stays in the world,
+ * defenceless, until nothing has hurt them for this long (combat decisions,
+ * step 3): quitting is no escape from a fight.
+ */
+export const QUIT_FIGHT_MS = 15_000;
 
 /**
  * A player's movement and timers as they cross into the next region: the
@@ -224,6 +235,8 @@ export interface Carry {
   stunImmuneUntil?: number;
   /** Their signature gauge, which goes with them too. */
   gauge?: GaugeState;
+  /** They quit mid-fight and stay in the world until it is over (QUIT_FIGHT_MS). */
+  quitting?: boolean;
 }
 
 /**
@@ -689,15 +702,25 @@ export class Region {
   }
 
   /** Removes a player, announcing why; returns what the world needs to move them on. */
-  remove(id: string, announce?: string): Leaving | undefined {
+  remove(id: string, announce?: string, quit = false): Leaving | undefined {
     const p = this.s.players.get(id);
     if (!p) return undefined;
+    if (quit && this.inFight(p)) {
+      p.quitting = true;
+      return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry: { ack: p.ack, inputs: [], lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, quitting: true }, staying: true };
+    }
     this.trades.leave(id);
     this.s.players.delete(id);
     this.minds.forgetPlayer(id, this.now());
     if (announce !== '') this.s.broadcastSystem(announce ?? `${p.info.name} left.`);
-    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}), statuses: p.statuses, ...(p.stunImmuneUntil ? { stunImmuneUntil: p.stunImmuneUntil } : {}), ...(p.gauge ? { gauge: p.gauge } : {}) };
+    const carry: Carry = { ack: p.ack, inputs: p.inputs, lastAttack: p.lastAttack, lastHurt: p.lastHurt, readyAt: p.readyAt, ...(p.floor ? { floor: p.floor } : {}), ...(p.fallenUntil !== undefined ? { fallenUntil: p.fallenUntil } : {}), statuses: p.statuses, ...(p.stunImmuneUntil ? { stunImmuneUntil: p.stunImmuneUntil } : {}), ...(p.gauge ? { gauge: p.gauge } : {}), ...(p.quitting ? { quitting: true } : {}) };
     return { info: p.info, conn: p.conn, character: p.character, x: p.x, y: p.y, carry };
+  }
+
+  /** True while something hurt the player lately, a creature is after them, or they lie Fallen. */
+  private inFight(p: PlayerState): boolean {
+    if (this.fallen.is(p) || this.now() - p.lastHurt < QUIT_FIGHT_MS) return true;
+    return this.s.creatures.some((c) => c.respawnAt === null && c.aggro === p.info.id);
   }
 
   handle(id: string, message: ClientMessage): void {
@@ -851,6 +874,13 @@ export class Region {
     });
 
     phase('minds_live', () => this.minds.live(skyPhase));
+
+    phase('quitting', () => {
+      // Those who quit mid-fight leave once it is over (a Fallen one wakes at the shrine first).
+      for (const p of this.s.players.values()) {
+        if (p.quitting && !this.inFight(p) && !departures.some((d) => d.id === p.info.id)) departures.push({ id: p.info.id, quit: true });
+      }
+    });
 
     phase('fallen', () => {
       // The Fallen lie where they fell until a friend raises them or they wake at the shrine.

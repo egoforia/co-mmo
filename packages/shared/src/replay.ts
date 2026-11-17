@@ -101,7 +101,8 @@ export type TownspersonSnapshot = Townsperson;
 export type Departure =
   | { id: string; side: Side; died?: undefined; cell?: undefined }
   | { id: string; died: true; side?: undefined; cell?: undefined }
-  | { id: string; cell: number; side?: undefined; died?: undefined };
+  | { id: string; cell: number; side?: undefined; died?: undefined }
+  | { id: string; quit: true; side?: undefined; died?: undefined; cell?: undefined };
 
 /** Header metadata for a recorded region replay trace. */
 export interface ReplayHeader {

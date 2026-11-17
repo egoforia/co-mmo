@@ -263,7 +263,7 @@ export class RegionServer {
         region.join(m.info, this.relay(m.region, m.info.id), m.at, m.character, m.announce, m.carry && carryFrom(m.carry), m.handoff);
         return;
       case 'remove': {
-        const left = region.remove(m.id, m.announce);
+        const left = region.remove(m.id, m.announce, m.quit);
         answer(this.bus, m, left ? leavingData(left) : null);
         return;
       }
@@ -419,5 +419,5 @@ export function place(region: Pick<Region, 'addCreatures' | 'addNpc'>, p: Placem
 }
 
 function leavingData(left: Leaving): LeavingData {
-  return { info: left.info, character: left.character, x: left.x, y: left.y, carry: carryData(left.carry) };
+  return { info: left.info, character: left.character, x: left.x, y: left.y, carry: carryData(left.carry), ...(left.staying ? { staying: true as const } : {}) };
 }

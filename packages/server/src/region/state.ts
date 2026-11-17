@@ -64,6 +64,8 @@ export interface PlayerState {
   looting?: string;
   /** While Fallen at 0 HP (region/fallen.ts): when they wake at the shrine, epoch ms. */
   fallenUntil?: number;
+  /** Quit mid-fight: still here, with no one at the keys, until the fight is over (region.ts, QUIT_FIGHT_MS). */
+  quitting?: boolean;
   /** Running statuses (region/statuses.ts) and when a new stun can take again. */
   statuses: Status[];
   stunImmuneUntil?: number;

@@ -52,8 +52,8 @@ export interface RegionHandle {
   welcomeAll(): void;
   /** `handoff`: the player walked in from the next cell of the same land, so they are not welcomed again. */
   join(info: PlayerInfo, conn: Connection, at: { x: number | null; y: number | null; floor?: number }, character: Character, announce?: string, carry?: Carry, handoff?: boolean): void;
-  /** Takes a player out; a region on another server answers a moment later. */
-  remove(id: string, announce?: string): Leaving | undefined | Promise<Leaving | undefined>;
+  /** Takes a player out; a region on another server answers a moment later. `quit`: they quit, and stay while in a fight (Leaving.staying). */
+  remove(id: string, announce?: string, quit?: boolean): Leaving | undefined | Promise<Leaving | undefined>;
   handle(id: string, message: ClientMessage): void;
   /** Runs one tick here; a region on another server ticks there and reports departures itself. */
   tick(): Departure[];
@@ -78,6 +78,7 @@ export interface CarryData {
   readyAt: [string, number][];
   floor?: number;
   fallenUntil?: number;
+  quitting?: boolean;
 }
 
 export function carryData(carry: Carry): CarryData {
@@ -95,6 +96,7 @@ export interface LeavingData {
   x: number;
   y: number;
   carry: CarryData;
+  staying?: true;
 }
 
 /** A wished thing placed in a region, kept so the region can be set up again on another server. */
@@ -160,7 +162,7 @@ export type ToServer =
   | { t: 'host'; region: RegionDef; placements: Placement[]; cell?: Cell }
   | { t: 'drop'; region: string; ask?: number; replyTo?: string }
   | { t: 'join'; region: string; info: PlayerInfo; at: { x: number | null; y: number | null; floor?: number }; character: Character; announce?: string; carry?: CarryData; handoff?: boolean }
-  | { t: 'remove'; region: string; id: string; announce?: string; ask?: number; replyTo?: string }
+  | { t: 'remove'; region: string; id: string; announce?: string; quit?: boolean; ask?: number; replyTo?: string }
   | { t: 'input'; region: string; id: string; m: ClientMessage }
   /** Players' steps and other inputs for this server, gathered for a few ms and sent together (InputBatch). */
   | { t: 'inputs'; list: [region: string, id: string, m: ClientMessage][] }

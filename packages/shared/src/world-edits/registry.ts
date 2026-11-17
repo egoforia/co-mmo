@@ -18,6 +18,7 @@ import { PERSON } from './kinds/person.ts';
 import { QUEST } from './kinds/quest.ts';
 import { PIECE } from './kinds/piece.ts';
 import { REMOVE } from './kinds/remove.ts';
+import { SAFE } from './kinds/safe.ts';
 import { SCENERY } from './kinds/scenery.ts';
 import { RESTYLE } from './kinds/restyle.ts';
 import { ROAD } from './kinds/road.ts';
@@ -60,6 +61,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   remove: REMOVE,
   bookmark: BOOKMARK,
   land: LAND,
+  safe: SAFE,
 };
 
 /** A kind by its name, when there is one. */

@@ -68,6 +68,7 @@ export class RegionRecorder implements RegionRecorderInterface {
       recordedAt: Date.now(),
       seed,
       startClock,
+      ...(region.map.safe ? { safe: structuredClone(region.map.safe) } : {}),
       initialState: region.captureInitialState(),
     };
 

@@ -112,6 +112,8 @@ export interface ReplayHeader {
   recordedAt: number;
   seed: number;
   startClock: number;
+  /** The land's safe areas as recorded, when they differ from what its def lays (safe-areas.ts). */
+  safe?: { x: number; y: number; radius: number }[];
   initialState: {
     players: PlayerStateSnapshot[];
     creatures: CreatureStateSnapshot[];

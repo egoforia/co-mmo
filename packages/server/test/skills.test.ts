@@ -50,6 +50,8 @@ function hero(calling: CallingId, level: number): Character {
 function setup(calling: CallingId, level: number, regionId = 'woods') {
   const clock = { now: 1_000_000 };
   const region = new Region(regionDef(regionId)!, { worldChat: () => undefined, online: () => 2, party: () => ['a', 'b'] }, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   const conn = fakeConn();
   region.join(info('a', 'Mara'), conn, { x: null, y: null }, hero(calling, level));
   const me = () => region.character('a')!;

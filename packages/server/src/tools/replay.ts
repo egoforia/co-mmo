@@ -41,6 +41,7 @@ export async function replayTrace(trace: ReplayTrace, options: ReplayOptions = {
 
   // Bare region without network sockets or storage
   const region = new Region(trace.header.regionDef, undefined, clock, prng);
+  if (trace.header.safe) region.map.safe = structuredClone(trace.header.safe);
 
   const startTick = trace.ticks[0]?.tick ? trace.ticks[0].tick - 1 : 0;
   region.restoreInitialState(trace.header.initialState, startTick);

@@ -18,6 +18,8 @@ function fall() {
   const clock = { now: 5_000_000 };
   const dice = { v: 0.5 };
   const world = new World(() => clock.now, () => dice.v);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  for (const r of world.units()) r.map.safe = [];
   const saved = new Map<string, SavedBody>();
   world.onPlayerBody = (b, gone) => (gone ? saved.delete(b.id) : saved.set(b.id, b));
   const conn = fakeConn();
@@ -99,9 +101,13 @@ describe('death', () => {
     const body = [...saved.values()][0]!;
     const clock = { now: body.until - 1000 };
     const again = new World(() => clock.now, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of again.units()) r.map.safe = [];
     again.restoreBodies([body]);
     expect(again.local('desert')!.allBodies().map((b) => b.id)).toContain(body.id);
     const late = new World(() => body.until + 1, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of late.units()) r.map.safe = [];
     late.restoreBodies([body]);
     expect(late.local('desert')!.allBodies().map((b) => b.id)).not.toContain(body.id);
   });

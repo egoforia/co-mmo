@@ -18,6 +18,8 @@ const of = <T extends ServerMessage['t']>(c: { messages: ServerMessage[] }, t: T
 function setup(id: string) {
   const clock = { now: 1_000_000 };
   const region = new Region(regionDef(id)!, undefined, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   return { region, clock };
 }
 
@@ -25,6 +27,8 @@ function setup(id: string) {
 function fallInDesert() {
   const clock = { now: 5_000_000 };
   const world = new World(() => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  for (const r of world.units()) r.map.safe = [];
   const conn = fakeConn();
   const ch = newCharacter();
   ch.hp = 1;

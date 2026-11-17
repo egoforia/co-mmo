@@ -1,4 +1,4 @@
-import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, spotMiddle, statusOf, type TileSpot, type Weather } from '@co-mmo/shared';
+import { EVASIVE_DODGE, ITEMS, TALK_RANGE, absorb, isSafe, afterArmor, armor, blocking, canAct, dodgeChance, heldItem, offHandItem, paceOf, spotMiddle, statusOf, type TileSpot, type Weather } from '@co-mmo/shared';
 import { CREATURE_REACH, forget, think, tilesTo, type Creature, type Habitat, type Prey } from '../creature-brain.ts';
 import { live, type Townsperson } from '../townsfolk.ts';
 import type { Combat } from './combat.ts';
@@ -50,7 +50,7 @@ export class Minds {
     for (const p of this.s.players.values()) {
       const lit = [heldItem(p.character), offHandItem(p.character)].some((item) => item && ITEMS[item]?.light);
       // The Hidden (Mirage, Sunfall Dance) are as good as gone to creatures.
-      players.push({ id: p.info.id, x: p.x, y: p.y, floor: p.floor, alive: p.character.hp > 0 && !this.paths.hidden(p, now), lit });
+      players.push({ id: p.info.id, x: p.x, y: p.y, floor: p.floor, alive: p.character.hp > 0 && !this.paths.hidden(p, now) && !isSafe(this.s.map, p.x, p.y), lit });
     }
     return {
       map: this.s.map, now, tick: this.s.tickCount, random: this.s.random, phase, weather, players, creatures: this.s.creatures, bodies: this.crowd?.bodies,

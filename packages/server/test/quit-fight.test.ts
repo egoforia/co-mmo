@@ -15,6 +15,8 @@ const info = (id: string, name = id): PlayerInfo => ({ id, name, color: 0xffffff
 function inFight() {
   const clock = { now: 5_000_000 };
   const world = new World(() => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  for (const r of world.units()) r.map.safe = [];
   const quits: Place[] = [];
   world.onQuit = (p) => quits.push(p);
   const ch = newCharacter();
@@ -36,6 +38,8 @@ describe('quitting mid-fight', () => {
   it('leaves at once when nothing is fighting them', () => {
     const clock = { now: 5_000_000 };
     const world = new World(() => clock.now, () => 0.5);
+    // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+    for (const r of world.units()) r.map.safe = [];
     world.join(info('a'), fakeConn(), { regionId: 'sanctum', x: null, y: null }, newCharacter());
     const place = world.leave('a') as Place | undefined;
     expect(place?.regionId).toBe('sanctum');

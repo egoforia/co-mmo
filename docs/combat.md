@@ -81,3 +81,13 @@ A player who closes the game while a fight is on stays in the world until nothin
 | Healing others | With another player chosen as target, clicking a healing item gives it to them if they are within `ITEM_REACH` tiles on the same floor. It cannot help someone who has fallen. Healing skills already reach others. |
 | Level curve | `xpToNext(L) = 20 × L^1.5 × 2^((L−1)/5)`: it doubles every 5 levels, about 2,200 XP for level 10 and 25,000 for 20. `npm run balance` ends with a "Time per level" table. |
 | Wished monsters | Health, damage, XP and gold come from the land formula (`levelStats` in `creature-tune.ts`), the same as land monsters. |
+
+## PvP version 1 (combat decisions, step 5)
+
+| Topic | Rule |
+| --- | --- |
+| Safe areas | `safe-areas.ts`: the whole Sanctum, and `SAFE_RADIUS` (8) tiles round the square where each land's travellers arrive. The world editor's **Safe area** tool (Places) lays more, or takes them away with reach 0, as land data (`RegionMap.safe`). No player is hurt in one, and monsters give up a chase when their prey steps in. Stepping in or out says so. |
+| Fighting | Out of safe areas any player may hurt another with the same attacks, reach, Armor, Ward, dodge and shields as against a monster (`region/pvp.ts`). A plain attack hits a player only when they are the chosen target. Strike and bolt skills aimed at a player hit them. Area, cone and line skills hit every rival they cover, bystanders included. Statuses from skills stay for monsters in this version. |
+| Parties | Party members cannot hurt each other. To attack one, leave the party first; the party is told at once. |
+| Being attacked | The one attacked is told who attacks them (once every 15 s per attacker). A player struck down falls as usual, and step 3's death rules apply in full. |
+| Not in it | Morality, warnings for attacking first, and bounties. |

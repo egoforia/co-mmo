@@ -48,6 +48,8 @@ function ability(effect: AbilityDef['effect'], more: Partial<AbilityDef> = {}): 
 function setup(abilities: string[] = []) {
   const clock = { now: 1_000_000 };
   const region = new Region(regionDef('shore')!, { worldChat: () => undefined, online: () => 2, party: () => ['a', 'b'] }, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   const conns = { a: fakeConn(), b: fakeConn() };
   for (const id of ['a', 'b'] as const) {
     const ch = newCharacter();

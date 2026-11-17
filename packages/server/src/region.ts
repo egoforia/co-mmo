@@ -875,6 +875,9 @@ export class Region {
 
     phase('minds_live', () => this.minds.live(skyPhase));
 
+    // Stepping into or out of a safe area is said plainly (region/pvp.ts).
+    phase('safe', () => this.combat.pvp.tick());
+
     phase('quitting', () => {
       // Those who quit mid-fight leave once it is over (a Fallen one wakes at the shrine first).
       for (const p of this.s.players.values()) {

@@ -19,6 +19,8 @@ const hits = (c: { messages: ServerMessage[] }) => c.messages.filter((m) => m.t 
 function setup(weapon?: string) {
   const clock = { now: 1_000_000 };
   const region = new Region(regionDef('woods')!, undefined, () => clock.now, () => 0.5);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   const conn = fakeConn();
   const ch = newCharacter();
   if (weapon) ch.equipment.weapon = weapon;

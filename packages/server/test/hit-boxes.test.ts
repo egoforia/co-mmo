@@ -18,6 +18,8 @@ function setup(id = 'sanctum') {
   let seed = 1;
   const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const region = new Region(regionDef(id)!, undefined, () => clock.now, random);
+  // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
+  region.map.safe = [];
   const ticks = (n: number) => {
     for (let i = 0; i < n; i++) {
       clock.now += 1000 / TICK_RATE;

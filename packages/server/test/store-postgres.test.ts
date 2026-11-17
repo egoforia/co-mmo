@@ -265,3 +265,18 @@ describe('gear history', () => {
     expect((await again.owners([bound]))[bound]).toHaveLength(2);
   });
 });
+
+describe('player bodies', () => {
+  it('outlast a restart until they are gone or their hour is up', async () => {
+    const store = await Store.postgres(db);
+    const body = { id: 'pb-a-1', region: 'desert', x: 3, y: 4, floor: 0, until: 10_000, owner: { id: 'a', name: 'Mara' }, loot: [{ item: 'gold', qty: 40 }] };
+    store.savePlayerBody(body);
+    store.savePlayerBody({ ...body, id: 'pb-a-2' });
+    store.savePlayerBody({ ...body, id: 'pb-a-2' }, true);
+    await store.close();
+    const again = await Store.postgres(db);
+    expect(again.playerBodies(5_000)).toEqual([body]);
+    expect(again.playerBodies(10_000)).toEqual([]);
+    await again.close();
+  });
+});

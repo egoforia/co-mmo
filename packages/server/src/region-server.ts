@@ -330,6 +330,8 @@ export class RegionServer {
       party: (player) => this.world.parties[player] ?? [player],
       journal: (text, player) => this.hook(id, { hook: 'journal', text, player }),
       owner: (item, name, how) => this.hook(id, { hook: 'owner', item, name, how }),
+      playerBody: (body, gone) => this.hook(id, { hook: 'playerBody', body, ...(gone ? { gone } : {}) }),
+      tellAnywhere: (player, text) => this.hook(id, { hook: 'tellAnywhere', player, text }),
       // A cell's Region channel reaches the cells beside it through the gateway.
       ...(cell ? { regionChat: (m: ServerMessage) => this.hook(id, { hook: 'regionChat', m }) } : {}),
       sky: () => this.world.sky ?? DEFAULT_SKY,

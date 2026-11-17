@@ -10,7 +10,7 @@ import { migrateCharacters } from './store-characters.ts';
  * and writes only what changed. Spending and the journal, which only grow,
  * are append-only logs instead (store-logs.ts).
  */
-export const TABLES = ['accounts', 'invites', 'content', 'reports', 'drafts', 'rule_data', 'world_edits', 'settings'] as const;
+export const TABLES = ['accounts', 'invites', 'content', 'reports', 'drafts', 'rule_data', 'world_edits', 'player_bodies', 'settings'] as const;
 export type Table = (typeof TABLES)[number];
 
 /** One saved thing: its key, its place in the order, and its JSON. */

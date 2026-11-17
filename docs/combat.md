@@ -56,3 +56,14 @@ Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").
 | Seeing it | The client asks with `{t:'history'}` for the pieces it holds (at most 40 at once) and shows "Owners: made by Mara (17 Nov), given to Tam (…)." on bag and worn item cards. |
 | Unbinding | `unbindCopy` turns a bound piece (`b`) into an unbound one (`u`): it reads "No longer bound." and does not bind again when worn. Step 3 (death) uses it for pieces that drop. |
 | Switched-off wishes | A copy whose base item sleeps sleeps with it and wakes when the wish is switched on again. |
+
+## Death (combat decisions, step 3)
+
+| Topic | Rule |
+| --- | --- |
+| When it costs | Only when a Fallen player wakes at the shrine (on their own or with the button). Being raised by a friend costs nothing (`region/deaths.ts`). |
+| XP | A quarter of the XP to the next level (`deathXp`). Below 0 they drop a level, never below 1 (`loseXp`). |
+| A level lost | The Calling's pair comes off, then an unplaced point, or else the point placed last (`Character.placed` records where each point went; `levelDownStats`). Points placed before the record was kept come off the Calling's first attribute. Skills already learned stay. |
+| Drops (`rollDeathDrops`) | All the gold carried. Each worn piece with a 15% chance. With another 15% chance the bag, with everything in it. The Bible and sleeping wish items never drop; bound gear that drops comes off unbound. |
+| The body | What drops lies on a player's body where they fell, drawn as the player, for an hour (`PLAYER_BODY_MS`), or until it is empty. Anyone may take from it, and the one who fell hears who took what, wherever they are. |
+| Restarts | Player bodies are saved in the `player_bodies` table as they change and laid back in their regions at start (`World.restoreBodies`). Region servers send the changes through the region link. |

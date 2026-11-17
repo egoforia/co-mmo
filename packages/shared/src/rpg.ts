@@ -125,6 +125,8 @@ export interface Character {
   skillLooks?: Record<string, SkillLook>;
   /** Attribute points gained by levelling and not yet placed. */
   freePoints: number;
+  /** Where each placed point went, oldest first, so a level lost on death takes back the last one (death.ts). */
+  placed?: (keyof Stats)[];
   /** Levels in each craft practised so far; others are at their starting level (crafts.ts). */
   crafts?: Partial<Record<CraftId, CraftProgress>>;
   /** Up to two crafts mastered. */

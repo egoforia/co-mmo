@@ -1,4 +1,4 @@
-import { creatureSize, heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type EntityState, type NpcState, type PlayerInfo, type StatusId } from '@co-mmo/shared';
+import { creatureSize, heldItem, maxHp, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type EntityState, type NpcState, type PlayerInfo, type RaceId, type StatusId } from '@co-mmo/shared';
 
 // What players see of each thing in a region, as sent in snapshots and
 // across a split region's cell borders. One builder per kind, so both
@@ -42,8 +42,9 @@ export function creatureView(c: { id: string; kind: string; def: CreatureDef; x:
 }
 
 /** A defeated creature's body; `loot` says whether the viewer may search it here. */
-export function bodyView(b: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number }, loot: boolean): BodyState {
-  return { id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), ...floorOf(b.floor), loot };
+export function bodyView(b: { id: string; kind: string; def: Pick<CreatureDef, 'name' | 'art'>; owner?: { id: string; race?: RaceId }; x: number; y: number; floor?: number }, loot: boolean): BodyState {
+  const owner = b.owner ? { owner: b.owner.id, ...(b.owner.race ? { race: b.owner.race } : {}) } : {};
+  return { id: b.id, kind: b.kind, asset: b.def.art, name: b.def.name, x: round(b.x), y: round(b.y), ...floorOf(b.floor), loot, ...owner };
 }
 
 /** A person of the region. */

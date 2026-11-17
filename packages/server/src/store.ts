@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ITEMS, PLAYER_COLORS, gainCreatorXp, makesCopies, pieceKey, type AcquiredHow, type OwnerEntry, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type BiomeId, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
+import type { SavedBody } from './region/state.ts';
 import { defaultSettings, type Settings } from './settings.ts';
 import type { RuleTestReport } from './rule-test.ts';
 import type { Sql, SqlQuery } from './db.ts';
@@ -142,6 +143,8 @@ interface Data {
   journal: JournalEntry[];
   /** Wish Workshop drafts, by player id (missing in older saves). */
   drafts?: Record<string, WishDraft>;
+  /** Players' bodies lying where they fell, by body id, until they fade (combat decisions, step 3). */
+  playerBodies?: Record<string, SavedBody>;
   /** The world editor's changes to each land, by region id (missing in older saves). */
   worldEdits?: Record<string, WorldEditLog>;
 }
@@ -593,6 +596,20 @@ export class Store {
   private readonly memoryOwners = new Map<string, OwnerEntry[]>();
 
   /** Records that a piece of gear came to `name`; other items have no history. */
+  /** Every player's body still lying somewhere, for laying them back after a restart. */
+  playerBodies(now = Date.now()): SavedBody[] {
+    return Object.values(this.data.playerBodies ?? {}).filter((b) => b.until > now);
+  }
+
+  /** Saves a player's body as it is now, or forgets it once it is gone. */
+  savePlayerBody(body: SavedBody, gone = false): void {
+    const all = { ...this.data.playerBodies };
+    if (gone) delete all[body.id];
+    else all[body.id] = body;
+    this.data.playerBodies = all;
+    this.persistSoon();
+  }
+
   addOwner(item: string, name: string, how: AcquiredHow, at = Date.now()): void {
     if (!makesCopies(ITEMS[item])) return;
     const piece = pieceKey(item);
@@ -752,6 +769,7 @@ class PostgresBackend implements StoreBackend {
       drafts: Object.fromEntries(t.drafts.map((r) => [r.key, r.data as WishDraft])),
       ruleData: Object.fromEntries(t.rule_data.map((r) => [r.key, r.data as Record<string, Record<string, unknown>>])),
       worldEdits: Object.fromEntries(t.world_edits.map((r) => [r.key, r.data as WorldEditLog])),
+      playerBodies: Object.fromEntries(t.player_bodies.map((r) => [r.key, r.data as SavedBody])),
       ...(settings ? { settings } : {}),
     };
   }
@@ -772,6 +790,7 @@ class PostgresBackend implements StoreBackend {
       drafts: Object.entries(data.drafts ?? {}).map(([key, d]) => ({ key, data: d })),
       rule_data: Object.entries(data.ruleData).map(([key, d]) => ({ key, data: d })),
       world_edits: Object.entries(data.worldEdits ?? {}).map(([key, d]) => ({ key, data: d })),
+      player_bodies: Object.entries(data.playerBodies ?? {}).map(([key, d]) => ({ key, data: d })),
       settings: [{ key: 'settings', data: data.settings }],
     }, also);
     chars?.done();

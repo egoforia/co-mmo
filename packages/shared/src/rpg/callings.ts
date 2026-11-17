@@ -57,6 +57,7 @@ export function chooseCalling(c: Character, race: RaceId, calling: CallingId): v
   settlePathSkills(c);
   c.stats = callingStats(race, calling, c.level);
   c.freePoints = c.level - 1;
+  c.placed = [];
   settleSkills(c);
   settle(c);
 }
@@ -108,6 +109,7 @@ export function spendPoint(c: Character, stat: keyof Stats): string | undefined 
   if (!(c.freePoints > 0)) return 'You have no free points to place. You get one each time you gain a level.';
   c.freePoints--;
   c.stats[stat]++;
+  (c.placed ??= []).push(stat);
   return undefined;
 }
 
@@ -121,6 +123,27 @@ export function levelUpStats(c: Character): void {
   c.stats[primary]++;
   c.stats[secondary]++;
   c.freePoints = (c.freePoints ?? 0) + 1;
+}
+
+/**
+ * Takes back what the last level-up gave (death.ts): the Calling's pair and
+ * a free point. A point still unplaced goes first; otherwise the one placed
+ * last comes out of the attribute it went into (the Calling's first
+ * attribute for points placed before this was recorded).
+ */
+export function levelDownStats(c: Character): void {
+  if (!c.calling) {
+    for (const k of STAT_KEYS) c.stats[k] = Math.max(1, c.stats[k] - 1);
+    return;
+  }
+  const { primary, secondary } = CALLINGS[c.calling];
+  c.stats[primary]--;
+  c.stats[secondary]--;
+  if (c.freePoints > 0) c.freePoints--;
+  else {
+    const stat = c.placed?.pop() ?? primary;
+    c.stats[stat] = Math.max(1, c.stats[stat] - 1);
+  }
 }
 
 /**

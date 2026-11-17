@@ -26,6 +26,7 @@ export * from './loot.ts';
 export * from './creature-size.ts';
 export * from './materials.ts';
 export * from './copies.ts';
+export * from './death.ts';
 export * from './fashion.ts';
 export * from './fashion-wishes.ts';
 export * from './gathering.ts';

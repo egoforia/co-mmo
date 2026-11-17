@@ -1,4 +1,4 @@
-import { SIZE_TILES, TICK_RATE, anchorNear, awake, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type TileSpot, type Weather } from '@co-mmo/shared';
+import { SIZE_TILES, TICK_RATE, anchorNear, awake, breakOffOf, isSafe, regenOf, collides, creatureRadius, creatureSize, findTileRoute, noticeScale, spotMiddle, stepped, tileTaken, tilesApart, type Among, type Bodies, type CreatureDef, type CreatureMood, type RegionMap, type Status, type TileSpot, type Weather } from '@co-mmo/shared';
 import { addThreat, chooseTarget } from './threat.ts';
 import { canReach, goTo, keepStepping, moveAway, moveToward, stalled, standClear, wander, type Walker } from './walkers.ts';
 
@@ -21,6 +21,12 @@ const WANDER_SPEED = 1.5;
 const WANDER_RADIUS = 4;
 /** A chasing creature gives up this far from home and walks back. */
 export const LEASH = 8;
+/** A `timed` monster gives up once its chase adds up to this many seconds (each counts for more far from home). */
+export const CHASE_SECONDS = 20;
+/** A `lost` monster led farther than this from home stays where it ends up, and wanders there. */
+export const LOST_DISTANCE = LEASH * 2;
+/** After breaking off, it looks for no one for this long (ms), so it does not turn straight back to the fight. */
+export const CALM_MS = 8000;
 /**
  * A creature strikes those this many tiles from its square, a diagonal
  * counting as one: those on a tile touching it, side or corner. A big one
@@ -47,6 +53,12 @@ export interface Creature extends Walker {
   /** Who has threatened it while it fights, by player id (threat.ts); cleared when it gives up. */
   threat: Record<string, number>;
   returning: boolean;
+  /** How long it has chased, in seconds, each counting for more the farther it is from home (a `timed` break-off). */
+  chased?: number;
+  /** Where it lived before it got lost (a `lost` break-off): it comes back there after it falls. */
+  lostFrom?: { x: number; y: number; floor: number };
+  /** Epoch ms until which it notices no one, having just broken off a chase (a blow still provokes it). */
+  calmUntil?: number;
   lastAttack: number;
   /** Epoch ms when a defeated creature comes back; null while alive. */
   respawnAt: number | null;
@@ -106,10 +118,16 @@ export function makeCreature(id: string, kind: string, def: CreatureDef, x: numb
 export function think(c: Creature, h: Habitat): void {
   if (c.respawnAt !== null) {
     if (h.now < c.respawnAt) return;
+    if (c.lostFrom) {
+      c.home = c.lostFrom;
+      delete c.lostFrom;
+    }
     Object.assign(c, { respawnAt: null, statuses: [], hp: c.def.hp, x: c.home.x, y: c.home.y, floor: c.home.floor, target: null, returning: false, aggro: null, threat: {}, fleeing: null, asleep: false });
     delete c.to;
     return;
   }
+  // Each monster heals at its own rate, always: in a fight or out of it (combat decisions, step 6).
+  if (c.hp < c.def.hp) c.hp = Math.min(c.def.hp, c.hp + regenOf(c.def) / TICK_RATE);
   const before = { x: c.x, y: c.y };
   act(c, h);
   // Whatever it chose, a step it began is finished.
@@ -122,14 +140,12 @@ function act(c: Creature, h: Habitat): void {
   const among = amid(c, h);
   if (among) standClear(h.map, c, WANDER_SPEED, among, h.random);
   const up = awake(c.def.active, h.phase);
-  if (up && !c.aggro && !c.fleeing && !c.returning) notice(c, h);
+  if (up && !c.aggro && !c.fleeing && !c.returning && h.now >= (c.calmUntil ?? 0)) notice(c, h);
   if (c.fleeing) return run(c, h);
   if (c.aggro) return fight(c, h);
   if (c.returning) {
-    if (goTo(h.map, c, c.home, speedOf(c), false, amid(c, h)) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) {
-      c.returning = false;
-      c.hp = c.def.hp;
-    }
+    // Home again: no instant full heal, only its own healing rate.
+    if (goTo(h.map, c, c.home, speedOf(c), false, amid(c, h)) || (c.floor === c.home.floor && h.tick % (TICK_RATE * 5) === 0)) c.returning = false;
     return;
   }
   if (!up) return sleep(c, h);
@@ -174,6 +190,7 @@ export function provoke(c: Creature, playerId: string, h: Pick<Habitat, 'creatur
   if (shouldFlee(c)) return flee(c, playerId, h.now);
   if (c.aggro) return;
   c.aggro = playerId;
+  c.chased = 0;
   c.returning = false;
   c.target = null;
   if (c.def.behavior === 'pack') rally(c, playerId, h.creatures);
@@ -186,6 +203,22 @@ export function giveUp(c: Creature): void {
   c.fleeing = null;
   c.returning = true;
   c.target = null;
+  c.chased = 0;
+}
+
+/** Breaks off a chase one way, then notices no one for a while. */
+function calm(c: Creature, now: number, way: (c: Creature) => void): void {
+  way(c);
+  c.calmUntil = now + CALM_MS;
+}
+
+/** Led too far (a `lost` break-off): it forgets the fight and makes its home where it stands. */
+function getLost(c: Creature): void {
+  giveUp(c);
+  c.returning = false;
+  c.lostFrom ??= { ...c.home };
+  c.home = { x: c.x, y: c.y, floor: c.floor };
+  delete c.route;
 }
 
 /**
@@ -217,6 +250,7 @@ function notice(c: Creature, h: Habitat): void {
     if (!p.alive || p.floor !== c.floor || Math.hypot(p.x - from.x, p.y - from.y) > def.notice * noticeScale(def.active, h.phase, h.weather, p.lit)) continue;
     if (def.behavior === 'timid') return flee(c, p.id, h.now);
     c.aggro = p.id;
+    c.chased = 0;
     addThreat(c, p.id, 0);
     c.asleep = false;
     if (def.behavior === 'pack') rally(c, p.id, h.creatures);
@@ -228,15 +262,34 @@ function fight(c: Creature, h: Habitat): void {
   const standing = (id: string) => h.players.some((x) => x.id === id && x.alive);
   c.aggro = chooseTarget(c, standing, h.now);
   const p = h.players.find((x) => x.id === c.aggro);
-  if (!p || Math.hypot(c.x - c.home.x, c.y - c.home.y) > LEASH) return giveUp(c);
+  if (!p) return giveUp(c);
+  // Each kind breaks off its own way (combat decisions, step 6).
+  const away = Math.hypot(c.x - c.home.x, c.y - c.home.y);
+  const way = breakOffOf(c.def);
+  let hold = false;
+  if (way === 'timed') {
+    c.chased = (c.chased ?? 0) + (1 + away / LEASH) / TICK_RATE;
+    if (c.chased > CHASE_SECONDS) return calm(c, h.now, giveUp);
+  } else if (way === 'lost') {
+    if (away > LOST_DISTANCE) return calm(c, h.now, getLost);
+  } else {
+    // At the edge of its reach it keeps watch, striking whoever comes close; it gives up once they are well beyond.
+    if (Math.hypot(p.x - c.home.x, p.y - c.home.y) > LEASH + Math.max(c.def.notice, 2) * 2) return calm(c, h.now, giveUp);
+    hold = away >= LEASH && Math.hypot(p.x - c.home.x, p.y - c.home.y) > away;
+  }
   if (shouldFlee(c)) return flee(c, p.id, h.now);
+  // Never into a safe area: it stops at the edge (safe-areas.ts).
+  if (!hold) {
+    const d = Math.hypot(p.x - c.x, p.y - c.y) || 1;
+    hold = isSafe(h.map, c.x + (p.x - c.x) / d, c.y + (p.y - c.y) / d);
+  }
   // Gone up or down: after them by the stairs, or give up if only a ladder leads there.
   if (p.floor !== c.floor) {
     if (!canReach(h.map, c, p)) return giveUp(c);
     goTo(h.map, c, p, speedOf(c), false, amid(c, h));
     return;
   }
-  if (tilesTo(c, p) > CREATURE_REACH) close(c, p, h);
+  if (tilesTo(c, p) > CREATURE_REACH && !hold) close(c, p, h);
   if (tilesTo(c, p) <= CREATURE_REACH && h.now - c.lastAttack >= c.def.cooldown * 1000) {
     c.lastAttack = h.now;
     h.hurt(c, p.id);

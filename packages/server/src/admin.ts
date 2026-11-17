@@ -537,7 +537,7 @@ export async function handleAdmin(
       'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
       'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
-      'art/ways': () => ({ kind: 'ways', ...(walker ? { walker } : {}) }),
+      'art/ways': () => ({ kind: 'ways', ...(walker ? { walker } : {}), ...(note ? { note } : {}), ...(prompt ? { prompt } : {}), ...(references ? { references } : {}) }),
       'art/clip': () => ({ kind: 'clip', walker: String(body?.walker ?? ''), body: String(body?.body ?? 'two-legged'), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}) }),
       'art/normal': () => ({ kind: 'normal', asset: String(body?.asset ?? ''), ...(prompt ? { prompt } : {}) }),
       'art/sheet': () => ({ kind: 'sheet', look: String(body?.look ?? ''), textures, note }),
@@ -590,7 +590,7 @@ export async function handleAdmin(
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/ways' && method === 'POST') {
-        const done = await ctx.art.paintWays(walker);
+        const done = await ctx.art.paintWays(walker, note, references);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/clip' && method === 'POST') {

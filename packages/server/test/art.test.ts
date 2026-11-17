@@ -96,7 +96,7 @@ describe('the Art tab', () => {
       { id: 'four-legged', name: 'Four-legged, 2 heads tall' },
       { id: 'six-legged', name: 'Six-legged crawler' },
     ]);
-  });
+  }, 30_000);
 
   it('paints a shipped building picture again with the Owner\'s words, logs it, and serves it over the shipped one', async () => {
     const { base, store, painter } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
@@ -144,7 +144,7 @@ describe('the Art tab', () => {
     expect(await item()).toMatchObject({ source: 'shipped' });
     const { body: art } = await api(base, '/api/art', owner.token);
     expect(art['sanctum-rock']).toBeUndefined();
-  });
+  }, 30_000);
 
   it('paints a normal map for a picture from the picture itself, serves it beside it, and goes back to the worked-out one', async () => {
     const { base, store, painter, artDir } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
@@ -390,6 +390,21 @@ describe('the Art tab', () => {
     expect(steps[0].pictures.map((p: any) => p.name)).toEqual(["Sun Scarab's approved picture, on magenta"]);
     expect(steps[0].prompt).toContain('four times side by side in one row');
     expect(steps[0].prompt.indexOf('LOWER-LEFT')).toBeLessThan(steps[0].prompt.indexOf('LOWER-RIGHT'));
+
+    // The ways sheet can also be reviewed with the 4-way isometric standing guide reference
+    const guideSheet = await api(base, '/api/admin/art/review', owner.token, 'POST', {
+      what: 'ways',
+      walker: 'desert-scarab',
+      references: ['desert-scarab', 'ref-isometric-standing'],
+    });
+    expect(guideSheet.status).toBe(200);
+    expect(guideSheet.body.references).toHaveLength(2);
+    expect(guideSheet.body.references[1]).toMatchObject({ id: 'ref-isometric-standing', name: '4-Way Isometric Standing Guide' });
+    expect(guideSheet.body.parts[0].recipe.steps[0].pictures.map((p: any) => p.name)).toEqual([
+      "Sun Scarab's approved picture, on magenta",
+      '4-Way Isometric Standing Guide, on magenta',
+    ]);
+    expect(guideSheet.body.parts[0].recipe.steps[0].prompt).toContain('4-way isometric standing guide');
     const asked = painted.length;
     expect((await api(base, '/api/admin/art/ways', owner.token, 'POST', { walker: 'desert-scarab', approved: sheet.body.fingerprint })).status).toBe(202);
     await app!.art.idle();

@@ -95,26 +95,144 @@ export function viewPrompt(name: string, gear: Carried[], direction: IsoWay, ref
  * back-right, back-left): painted together, the four keep one
  * look (one picture per way drifted in colours and details).
  */
-export function waysSheetPrompt(name: string, gear: Carried[], references = 1, order: readonly IsoWay[] = TURNTABLE_WAYS): string {
-  const from = references > 1 ? `from the ${references} reference images alone (all of them show ${name})` : 'from the reference image alone';
+export function waysSheetPrompt(name: string, gear: Carried[], references = 1, order: readonly IsoWay[] = TURNTABLE_WAYS, hasGuide = false): string {
+  const charRefs = hasGuide ? Math.max(1, references - 1) : references;
+  const from = hasGuide
+    ? (charRefs > 1 ? `from the ${charRefs} character reference images` : 'from their character reference image')
+    : (references > 1 ? `from the ${references} reference images alone (all of them show ${name})` : 'from the reference image alone');
+  const guideInstruction = hasGuide
+    ? 'Use the 4-way isometric standing guide image as the layout and pose reference: it shows the 4 isometric angles, spacing, and turntable rotation (front-left, front-right, back-right, back-left).'
+    : '';
+  const copyInstruction = hasGuide
+    ? `All four are the same ${name}: copy exactly how they look in their character reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes to match each isometric angle.`
+    : `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`;
+  const sizeAndLine = hasGuide
+    ? 'all four the exact same height and scale, standing with feet planted on the same horizontal ground baseline (identical Y coordinate for feet across all four views)'
+    : 'all four the same size and standing on the same line';
+  const avoidList = hasGuide
+    ? [...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'repeating the same facing angle or pose across adjacent figures', 'uneven ground line or floating figures', 'labels', 'numbers', 'cast shadow']
+    : [...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'labels', 'numbers', 'cast shadow'];
+
   return [
     STYLE.base,
-    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the same size and standing on the same line, evenly spaced with wide empty gaps so no two touch. From left to right:`,
+    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, ${sizeAndLine}, evenly spaced with wide empty gaps so no two touch.${guideInstruction ? ` ${guideInstruction}` : ''} From left to right:`,
     ...order.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
-    `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`,
+    copyInstruction,
     'Paint them in the style described above, even where the reference images are painted in another style.',
     `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
-    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
+    `Avoid: ${avoidList.join(', ')}.`,
   ].join('\n');
 }
 
+/**
+ * Directional verification for sliced turnaround figures.
+ * For bilateral/symmetrical characters, opposite angles are horizontal mirrors of each other:
+ * diff(FL, flop(FR)) < diff(FL, FR) confirms genuine opposite diagonals rather than duplicate poses.
+ */
+export async function verifySheetDirections(figures: Record<IsoWay, Buffer>): Promise<{
+  frontsOpposite: boolean;
+  backsOpposite: boolean;
+  frontDiffSame: number;
+  frontDiffFlop: number;
+  backDiffSame: number;
+  backDiffFlop: number;
+}> {
+  const toBuf = async (b: Buffer, flop = false) => {
+    let s = sharp(b);
+    if (flop) s = s.flop();
+    return s.resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).raw().toBuffer();
+  };
+  const diffBufs = (a: Buffer, b: Buffer) => {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += Math.abs(a[i]! - b[i]!);
+    return sum / a.length;
+  };
+  const [fl, fr, frFlop, br, bl, blFlop] = await Promise.all([
+    toBuf(figures['front-left']),
+    toBuf(figures['front-right']),
+    toBuf(figures['front-right'], true),
+    toBuf(figures['back-right']),
+    toBuf(figures['back-left']),
+    toBuf(figures['back-left'], true),
+  ]);
+  const frontDiffSame = diffBufs(fl, fr);
+  const frontDiffFlop = diffBufs(fl, frFlop);
+  const backDiffSame = diffBufs(br, bl);
+  const backDiffFlop = diffBufs(br, blFlop);
+  return {
+    frontsOpposite: frontDiffFlop < frontDiffSame,
+    backsOpposite: backDiffFlop < backDiffSame,
+    frontDiffSame,
+    frontDiffFlop,
+    backDiffSame,
+    backDiffFlop,
+  };
+}
+
+export interface WaysFromSheetOptions {
+  /**
+   * If true, scales each figure proportionally to a shared uniform character height
+   * and composites them onto a shared canvas frame anchored to an identical ground baseline.
+   * Completely eliminates height differences, aspect-ratio distortion, and foot jitter.
+   */
+  normalize?: boolean;
+  padding?: number;
+  bodyHeight?: number;
+}
+
 /** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to TURNTABLE_WAYS: Col 0 front-left, Col 1 front-right, Col 2 back-right, Col 3 back-left). */
-export async function waysFromSheet(painted: Buffer, order: readonly IsoWay[] = TURNTABLE_WAYS): Promise<Record<IsoWay, Buffer>> {
+export async function waysFromSheet(
+  painted: Buffer,
+  order: readonly IsoWay[] = TURNTABLE_WAYS,
+  options: WaysFromSheetOptions = {},
+): Promise<Record<IsoWay, Buffer>> {
   const { png, key } = await removeKeyBackground(await sharp(painted).png().toBuffer(), undefined, { holes: true });
   const clean = await removeKeySpill(png, undefined, key);
   const count = await countFigures(clean, { dropEdgeBits: true });
   if (count !== order.length) throw new Error(`The sheet shows ${count} figures instead of ${order.length}.`);
   const figures = (await cutFigures(clean, { count: order.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
+
+  if (options.normalize) {
+    const pad = options.padding ?? 24;
+    const heights = figures.map((f) => f.box.bottom - f.box.top + 1);
+    const targetH = options.bodyHeight ?? Math.round(heights.reduce((a, b) => a + b, 0) / heights.length);
+
+    const scaled = await Promise.all(
+      figures.map(async (f) => {
+        const rawW = f.box.right - f.box.left + 1;
+        const rawH = f.box.bottom - f.box.top + 1;
+        const scale = targetH / rawH;
+        const newW = Math.max(1, Math.round(rawW * scale));
+        const newH = targetH;
+        const resized = await sharp(f.png).resize(newW, newH).png().toBuffer();
+        return { png: resized, w: newW, h: newH };
+      }),
+    );
+
+    const canvasW = Math.max(...scaled.map((s) => s.w)) + 2 * pad;
+    const canvasH = targetH + 2 * pad;
+
+    const normalized = await Promise.all(
+      scaled.map(async (s) => {
+        const left = Math.round((canvasW - s.w) / 2);
+        const top = pad;
+        return sharp({
+          create: {
+            width: canvasW,
+            height: canvasH,
+            channels: 4,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        })
+          .composite([{ input: s.png, left, top }])
+          .png()
+          .toBuffer();
+      }),
+    );
+
+    return Object.fromEntries(order.map((way, i) => [way, normalized[i]!])) as Record<IsoWay, Buffer>;
+  }
+
   return Object.fromEntries(order.map((way, i) => [way, figures[i]!.png])) as Record<IsoWay, Buffer>;
 }
 

@@ -66,6 +66,9 @@ export function dialog(): HTMLDialogElement {
 
 /** Asks the server what a request will send, and shows it for approval; `note` lets the Owner add words first. */
 export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promise<void> {
+  if (ask.what === 'ways' && ask.walker && ask.references === undefined) {
+    ask = { ...ask, references: [ask.walker, 'ref-isometric-standing'] };
+  }
   const ctx = artState.ctx;
   const d = dialog();
   d.innerHTML = '<p class="note">Working out exactly what will be sent…</p>';
@@ -87,6 +90,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       <p class="note">This is everything that will be sent to the AI model${many ? 's' : ''}. Nothing is painted until you approve it.</p>
       ${ask.what === 'view' ? sourcesHtml(ask) : ''}
       ${review.references ? referencesHtml(review) : ''}
+      ${ask.what === 'ways' ? waysGuideHtml() : ''}
       ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
         <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button><button type="button" class="quiet director-btn" data-harmonize-prompt>✦ Harmonize with Art Director</button>${'walker' in ask ? '<button type="button" class="quiet" data-angle-turnaround-review>✦ Turn from another angle</button>' : ''}${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
       ${takesNote ? `<form class="form review-note"><label>Anything to change? (optional; added to the prompt)<span><textarea name="note" rows="2" maxlength="1000" placeholder="warmer light, a mossier roof">${esc(note)}</textarea></span></label><div class="card-actions"><button type="submit" class="quiet">Show with these words</button><button type="button" class="quiet director-btn" data-harmonize-note>✦ Harmonize with Art Director</button></div></form>` : ''}
@@ -105,6 +109,16 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       const cur = (review.references ?? []).map((r) => r.id);
       const next = cur.filter((x) => x !== id);
       void openReview(withRefs(next), takesNote, note);
+    });
+  }
+  for (const b of d.querySelectorAll<HTMLButtonElement>('[data-add-ref]')) {
+    b.addEventListener('click', () => {
+      const id = b.getAttribute('data-add-ref');
+      if (!id) return;
+      const cur = (review.references ?? []).map((r) => r.id);
+      if (!cur.includes(id)) {
+        void openReview(withRefs([...cur, id]), takesNote, note);
+      }
     });
   }
   for (const sel of d.querySelectorAll<HTMLSelectElement>('.ref-version-select')) {
@@ -278,6 +292,8 @@ export function referencesHtml(review: Review): string {
   creatures.sort((a, b) => a.name.localeCompare(b.name));
   gameItems.sort((a, b) => a.name.localeCompare(b.name));
 
+  const hasGuide = existingIds.has('ref-isometric-standing');
+
   const renderPickerOption = (id: string, name: string) => {
     const item = items.find((it) => it.id === id);
     const versions = item?.versions ?? [];
@@ -319,8 +335,14 @@ export function referencesHtml(review: Review): string {
         `).join('') : '<p class="note">No references currently selected.</p>'}
       </div>
       <div class="ref-actions">
+        ${!hasGuide ? `
+          <button type="button" class="quiet button ref-guide-btn" data-add-ref="ref-isometric-standing" title="Add generic 4-way isometric standing reference sheet">
+            <span>✦ Add 4-Way Standing Guide</span>
+          </button>
+        ` : ''}
         <select class="ref-picker">
           <option value="">+ Add game art as reference…</option>
+          ${!hasGuide ? `<optgroup label="Guides & Templates"><option value="ref-isometric-standing">4-Way Isometric Standing Guide</option></optgroup>` : ''}
           ${characters.length ? `<optgroup label="Characters & Walkers">${characters.map((w) => renderPickerOption(w.id, w.name)).join('')}</optgroup>` : ''}
           ${creatures.length ? `<optgroup label="NPCs & Creatures">${creatures.map((w) => renderPickerOption(w.id, w.name)).join('')}</optgroup>` : ''}
           ${gameItems.length ? `<optgroup label="Items & Equipment">${gameItems.map((i) => renderPickerOption(i.id, i.name)).join('')}</optgroup>` : ''}
@@ -335,6 +357,22 @@ export function referencesHtml(review: Review): string {
         </div>
       </div>
     </div>`;
+}
+
+/** Visual reference card showing the 4 isometric standing angles and turntable order. */
+export function waysGuideHtml(): string {
+  return `
+    <details class="ways-guide-preview" style="margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 6px 12px; background: rgba(0,0,0,0.25);">
+      <summary style="cursor: pointer; font-size: 0.85rem; color: var(--fg-muted, #aaa); user-select: none;">
+        <b>Isometric 4-Way Standing Reference</b> · Preview angles (Front-Left, Front-Right, Back-Right, Back-Left)
+      </summary>
+      <div style="margin-top: 8px;">
+        <img src="/art/ref-isometric-standing.png" alt="4-Way Isometric Standing Reference Guide" style="width: 100%; max-height: 180px; object-fit: contain; border-radius: 4px; background: #ff00ff;">
+        <p class="note" style="margin: 6px 0 0 0; font-size: 0.8rem; line-height: 1.35;">
+          Generic reference sheet showing four isometric standing views in turntable order (clockwise: 1. Front-Left, 2. Front-Right, 3. Back-Right, 4. Back-Left) on magenta. Included as a reference to guide angle alignment, spacing, and clean isometric poses.
+        </p>
+      </div>
+    </details>`;
 }
 
 /** Which pictures a standing picture is painted from: the approved picture and any standing pictures already kept. */

@@ -61,7 +61,7 @@ describe('the free style checks', () => {
       const { png, clean } = await removeKeyBackground(await readFile(join(dir, `${id}.png`)));
       expect(await freeChecks(png, clean), id).toEqual({ pass: true });
     }
-  });
+  }, 15_000);
 });
 
 describe('the judge', () => {

@@ -2766,5 +2766,11 @@
     "height": 187,
     "frames": 12,
     "cycleSeconds": 0.9
+  },
+  "ref-isometric-standing": {
+    "file": "art/ref-isometric-standing.png",
+    "kind": "prop",
+    "width": 1376,
+    "height": 768
   }
 }

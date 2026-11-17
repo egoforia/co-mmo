@@ -366,7 +366,10 @@ export class ArtStudio {
             });
             if (resolved) {
               const magentaBuf = await sharp(resolved.data).flatten({ background: KEY_COLOR.hex }).png().toBuffer();
-              customRefBuffers.push({ data: magentaBuf, label: `${resolved.label}'s approved picture, on magenta` });
+              const label = ref === 'ref-isometric-standing'
+                ? '4-Way Isometric Standing Guide, on magenta'
+                : `${resolved.label}'s approved picture, on magenta`;
+              customRefBuffers.push({ data: magentaBuf, label });
             }
           }
         }

@@ -18,7 +18,9 @@ import {
   stairwayAt,
   takeStairs,
   tileAt,
+  touchesEdgeWall,
   walkOn,
+  wallOn,
   wayTaken,
   type Placed,
   type RegionMap,
@@ -179,5 +181,60 @@ describe('a building given floors', () => {
     const tiny = land();
     tiny.buildings = [building(tiny, 20, 20, 2, 2, 'sanctum-arcanum')];
     expect(checkEdit(tiny, { ...edit, at: [21, 21] }, {})).toMatch(/no room for the stairs/);
+  });
+});
+
+describe('open outdoor terraces', () => {
+  it('use 100% walkable floor and native thin cutaway edge walls along perimeter', () => {
+    const map = land();
+    const terrace = addStorey(map, { x: 10, y: 10, width: 6, height: 6 }, 1, 'sanctum-arcanum', undefined, true);
+    expect(terrace.open).toBe(true);
+
+    // All tiles inside an open terrace are Floor (0 perimeter Tile.Wall)
+    for (let ty = 10; ty < 16; ty++) {
+      for (let tx = 10; tx < 16; tx++) {
+        expect(tileAt(map, tx, ty, 1)).toBe(Tile.Floor);
+      }
+    }
+
+    // North rim: full height edge walls along y=10
+    for (let tx = 10; tx < 16; tx++) {
+      const wall = wallOn(map, tx, 10, 'north', 1);
+      expect(wall).toBeDefined();
+      expect(wall!.height).toBe('full');
+      expect(wall!.along).toBe('h');
+      expect(wall!.y).toBe(10);
+    }
+
+    // West rim: full height edge walls along x=10
+    for (let ty = 10; ty < 16; ty++) {
+      const wall = wallOn(map, 10, ty, 'west', 1);
+      expect(wall).toBeDefined();
+      expect(wall!.height).toBe('full');
+      expect(wall!.along).toBe('v');
+      expect(wall!.x).toBe(10);
+    }
+
+    // South rim: low parapet edge walls along y=16
+    for (let tx = 10; tx < 16; tx++) {
+      const wall = wallOn(map, tx, 15, 'south', 1);
+      expect(wall).toBeDefined();
+      expect(wall!.height).toBe('low');
+      expect(wall!.along).toBe('h');
+      expect(wall!.y).toBe(16);
+    }
+
+    // East rim: low parapet edge walls along x=16
+    for (let ty = 10; ty < 16; ty++) {
+      const wall = wallOn(map, 15, ty, 'east', 1);
+      expect(wall).toBeDefined();
+      expect(wall!.height).toBe('low');
+      expect(wall!.along).toBe('v');
+      expect(wall!.x).toBe(16);
+    }
+
+    // Movement: player at (10.5, 10.5) is on floor, touching north/west edge walls stops them stepping off
+    expect(collides(map, 10.5, 10.5, 1)).toBe(false);
+    expect(touchesEdgeWall(map, 10.5, 10.05, 1, 0.4)).toBe(true);
   });
 });

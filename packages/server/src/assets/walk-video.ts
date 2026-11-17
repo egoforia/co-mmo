@@ -37,9 +37,9 @@ const SEEN: Record<IsoWay, string> = {
   // "Turned to the left" reads as the figure's own left (the picture's right), so each is named by the
   // picture's corner and the nearer shoulder instead.
   'front-left': "in a three-quarter view from the front, facing the LOWER-LEFT corner of the picture: the nose, chest and toes point towards the viewer's left, exactly halfway between facing the viewer and a profile facing the left edge of the picture; their LEFT shoulder is nearer to us and their right shoulder further away",
-  'front-right': "in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the figure MUST turn 90 degrees clockwise from the first figure to face the opposite diagonal; the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away; do not repeat the lower-left heading",
-  'back-left': "in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: the figure MUST turn 90 degrees clockwise from the third figure to face the opposite rear diagonal; turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder and left arm are nearer to us; do not repeat the upper-right heading",
-  'back-right': "in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder and right arm are nearer to us",
+  'front-right': "in a three-quarter view from the front, facing the LOWER-RIGHT corner of the picture: the nose, chest and toes point towards the viewer's right, exactly halfway between facing the viewer and a profile facing the right edge of the picture; their RIGHT shoulder is nearer to us and their left shoulder further away",
+  'back-left': "in a three-quarter view from behind, facing the UPPER-LEFT corner of the picture: turned away from us and towards the viewer's left, exactly halfway between seen from behind and a profile facing the left edge of the picture; we see their back and the back of the head, the face hidden; their LEFT shoulder is nearer to us",
+  'back-right': "in a three-quarter view from behind, facing the UPPER-RIGHT corner of the picture: turned away from us and towards the viewer's right, exactly halfway between seen from behind and a profile facing the right edge of the picture; we see their back and the back of the head, the face hidden; their RIGHT shoulder is nearer to us",
 };
 
 /** Direction descriptions tailored to four-legged animals and mounts, using quadruped anatomy. */
@@ -106,15 +106,21 @@ export function waysSheetPrompt(name: string, gear: Carried[], references = 1, o
   const copyInstruction = hasGuide
     ? `All four are the same ${name}: copy exactly how they look in their character reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes to match each isometric angle.`
     : `All four are the same ${name}: copy exactly how they look in the reference (face, hair, clothes, colours, proportions and what they carry), the same in every view; only the way they face changes.`;
+  const sizeAndLine = hasGuide
+    ? 'all four the exact same height and scale, standing with feet planted on the same horizontal ground baseline (identical Y coordinate for feet across all four views)'
+    : 'all four the same size and standing on the same line';
+  const avoidList = hasGuide
+    ? [...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'repeating the same facing angle or pose across adjacent figures', 'uneven ground line or floating figures', 'labels', 'numbers', 'cast shadow']
+    : [...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'labels', 'numbers', 'cast shadow'];
 
   return [
     STYLE.base,
-    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, all four the exact same height and scale, standing with feet planted on the same horizontal ground baseline (identical Y coordinate for feet across all four views), evenly spaced with wide empty gaps so no two touch.${guideInstruction ? ` ${guideInstruction}` : ''} From left to right:`,
+    `Paint ${name} ${from}, four times side by side in one row, full body, standing in a relaxed pose, ${sizeAndLine}, evenly spaced with wide empty gaps so no two touch.${guideInstruction ? ` ${guideInstruction}` : ''} From left to right:`,
     ...order.map((way, i) => `${i + 1}. ${SEEN[way]}.${gear.length ? ` ${gearPlacement(gear, way)}` : ''}`),
     copyInstruction,
     'Paint them in the style described above, even where the reference images are painted in another style.',
     `Background: one flat pure magenta (${STYLE.keyColor.hex}) behind all four, with no floor, shadow, labels or numbers. No magenta in the character.`,
-    `Avoid: ${[...STYLE.negatives, 'a fifth figure', 'figures touching or overlapping', 'repeating the same facing angle or pose across adjacent figures', 'uneven ground line or floating figures', 'labels', 'numbers', 'cast shadow'].join(', ')}.`,
+    `Avoid: ${avoidList.join(', ')}.`,
   ].join('\n');
 }
 

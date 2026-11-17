@@ -165,12 +165,13 @@ export async function verifySheetDirections(figures: Record<IsoWay, Buffer>): Pr
 
 export interface WaysFromSheetOptions {
   /**
-   * If true, composites each figure onto a shared transparent canvas frame
-   * with uniform dimensions (width x height) anchored to a common ground baseline.
-   * Prevents aspect-ratio distortion and scale mismatch between directions.
+   * If true, scales each figure proportionally to a shared uniform character height
+   * and composites them onto a shared canvas frame anchored to an identical ground baseline.
+   * Completely eliminates height differences, aspect-ratio distortion, and foot jitter.
    */
   normalize?: boolean;
   padding?: number;
+  bodyHeight?: number;
 }
 
 /** The four figures of a painted ways sheet, cut out, by the way each faces (defaults to TURNTABLE_WAYS: Col 0 front-left, Col 1 front-right, Col 2 back-right, Col 3 back-left). */
@@ -186,27 +187,38 @@ export async function waysFromSheet(
   const figures = (await cutFigures(clean, { count: order.length, dropEdgeBits: true })).sort((a, b) => a.box.left - b.box.left);
 
   if (options.normalize) {
-    const pad = options.padding ?? 20;
-    const groundY = Math.max(...figures.map((f) => f.box.bottom));
-    const topY = Math.min(...figures.map((f) => f.box.top));
-    const sharedH = groundY - topY + 2 * pad;
-    const maxW = Math.max(...figures.map((f) => f.box.right - f.box.left + 1));
-    const sharedW = maxW + 2 * pad;
+    const pad = options.padding ?? 24;
+    const heights = figures.map((f) => f.box.bottom - f.box.top + 1);
+    const targetH = options.bodyHeight ?? Math.round(heights.reduce((a, b) => a + b, 0) / heights.length);
+
+    const scaled = await Promise.all(
+      figures.map(async (f) => {
+        const rawW = f.box.right - f.box.left + 1;
+        const rawH = f.box.bottom - f.box.top + 1;
+        const scale = targetH / rawH;
+        const newW = Math.max(1, Math.round(rawW * scale));
+        const newH = targetH;
+        const resized = await sharp(f.png).resize(newW, newH).png().toBuffer();
+        return { png: resized, w: newW, h: newH };
+      }),
+    );
+
+    const canvasW = Math.max(...scaled.map((s) => s.w)) + 2 * pad;
+    const canvasH = targetH + 2 * pad;
 
     const normalized = await Promise.all(
-      figures.map(async (f) => {
-        const figW = f.box.right - f.box.left + 1;
-        const leftPad = Math.round((sharedW - figW) / 2);
-        const topPad = groundY - f.box.bottom + pad;
+      scaled.map(async (s) => {
+        const left = Math.round((canvasW - s.w) / 2);
+        const top = pad;
         return sharp({
           create: {
-            width: sharedW,
-            height: sharedH,
+            width: canvasW,
+            height: canvasH,
             channels: 4,
             background: { r: 0, g: 0, b: 0, alpha: 0 },
           },
         })
-          .composite([{ input: f.png, left: leftPad, top: topPad }])
+          .composite([{ input: s.png, left, top }])
           .png()
           .toBuffer();
       }),

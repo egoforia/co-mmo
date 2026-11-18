@@ -13,11 +13,12 @@ import {
   type OwnerEntry,
   type ShopDef,
   type EquipSlot,
+  type RaceId,
   type Stats,
   type StatusView,
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
-import { InventoryWindow } from './inventory-ui.ts';
+import { InventoryWindow, type InventoryTab } from './inventory-ui.ts';
 import { ItemCard } from './inventory/item-card.ts';
 import { pathChoicesHtml } from './path-ui.ts';
 import { escapeHtml } from './ui.ts';
@@ -46,6 +47,8 @@ export interface RpgActions {
   spendPoint(stat: keyof Stats): void;
   /** Asks the server who owned these pieces of gear before. */
   askHistory?(items: string[]): void;
+  /** The URL of the player's standing picture, for the bag's paper doll. */
+  figure?(race?: RaceId): string;
 }
 
 /** Health, XP, quests, dialogue, the bag and the Bible: everything in DOM. */
@@ -70,7 +73,7 @@ export class RpgUi {
     this.character = character;
     this.hp = character.hp;
     this.energy = character.energy;
-    this.bag = new InventoryWindow(actions.askHistory ? (items) => actions.askHistory!(items) : undefined);
+    this.bag = new InventoryWindow(actions.askHistory ? (items) => actions.askHistory!(items) : undefined, actions.figure);
     this.card = new ItemCard(() => this.character, (id) => this.bag.historyWords(id));
     for (const id of ['stats', 'quests', 'keys']) $(id).hidden = false;
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -79,7 +82,11 @@ export class RpgUi {
       const item = target.closest<HTMLElement>('[data-item]')?.dataset.item;
       const slot = target.closest<HTMLElement>('[data-slot]')?.dataset.slot as EquipSlot | undefined;
       const stat = target.closest<HTMLElement>('[data-stat]')?.dataset.stat as keyof Stats | undefined;
-      if (stat) actions.spendPoint(stat);
+      const tab = target.closest<HTMLElement>('[data-tab]')?.dataset.tab as InventoryTab | undefined;
+      if (tab) {
+        this.bag.tab = tab;
+        this.renderInventory();
+      } else if (stat) actions.spendPoint(stat);
       else if (item === 'bible') this.toggle('bible', true);
       else if (item) actions.use(item);
       else if (slot) actions.unequip(slot);
@@ -189,7 +196,10 @@ export class RpgUi {
 
   private toggle(id: string, open?: boolean): void {
     const el = $(id);
+    const opening = el.hidden && open !== false;
     el.hidden = !(open ?? el.hidden);
+    // The Character window opens on its Bag tab.
+    if (opening && id === 'inventory') this.bag.tab = 'bag';
     if (!el.hidden) {
       if (id === 'bible') $('inventory').hidden = true;
       this.render();

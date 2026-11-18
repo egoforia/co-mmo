@@ -16,3 +16,4 @@
 #item-card .loss { color: var(--error); }
 #item-card .more { color: var(--muted); }
 #item-card .risk { color: var(--error); }
+#item-card .hint { color: var(--accent); }

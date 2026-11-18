@@ -11,7 +11,7 @@ import { RpgUi } from './rpg-ui.ts';
 import { KitUi } from './kit-ui.ts';
 import { LootUi } from './loot-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
-import { knowArt, onContent, updateContent } from './wished.ts';
+import { artSrc, knowArt, lookArt, onContent, playerArt, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
 import { WorldScene } from './world-scene.ts';
 import { EditorUi } from './editor/in-game.ts';
@@ -377,6 +377,7 @@ function play(token: string): void {
         connection.send({ t: 'use', item, ...(target ? { target } : {}) });
       },
       unequip: (slot) => connection.send({ t: 'equip', slot }),
+      figure: (race) => artSrc(lookArt(myId) ?? playerArt(myId, race)),
       openShop: (npc) => kit?.openShop(npc),
       accept: (quest) => connection.send({ t: 'accept', quest }),
       choosePath: (npc, path) => connection.send({ t: 'choosePath', npc, path }),

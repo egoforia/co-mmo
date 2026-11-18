@@ -45,9 +45,10 @@ function kindWords(item: string): string {
 
 /**
  * The card's HTML for `item`. `worn` marks a piece the character wears now:
- * it shows its drop chance instead of a comparison. `qty` is the stack size.
+ * it shows its drop chance instead of a comparison. `qty` is the stack size,
+ * `hint` what a click on it does.
  */
-export function itemCardHtml(c: Pick<Character, 'equipment'>, item: string, opts: { worn?: boolean; qty?: number; history?: HistoryWords } = {}): string {
+export function itemCardHtml(c: Pick<Character, 'equipment'>, item: string, opts: { worn?: boolean; qty?: number; hint?: string; history?: HistoryWords } = {}): string {
   const def = ITEMS[item];
   if (!def) return '';
   const lines = [
@@ -63,6 +64,7 @@ export function itemCardHtml(c: Pick<Character, 'equipment'>, item: string, opts
       ? changes.map((ch) => `<span class="${ch.delta > 0 ? 'gain' : 'loss'}">${escapeHtml(changeWords(ch))}</span>`).join('')
       : '<span>No change</span>'}</div>`
     : '';
+  const hint = opts.worn ? 'Click to take it off.' : opts.hint;
   const risk = opts.worn ? `<p class="risk">If you fall: ${Math.round(DEATH_DROP_CHANCE * 100)}% chance it drops.</p>` : '';
   return `<div class="card-head"><img src="${escapeHtml(itemIcon(def))}" alt=""><div>
       <b class="rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}${opts.qty && opts.qty > 1 ? ` × ${opts.qty}` : ''}</b>
@@ -71,6 +73,7 @@ export function itemCardHtml(c: Pick<Character, 'equipment'>, item: string, opts
     <p>${escapeHtml(def.description)}</p>
     ${compare}
     ${lines.map((l) => `<p class="more">${escapeHtml(l)}</p>`).join('')}
+    ${hint ? `<p class="hint">${escapeHtml(hint)}</p>` : ''}
     ${risk}`;
 }
 
@@ -115,7 +118,7 @@ export class ItemCard {
     const item = target.dataset.card!;
     const c = this.character();
     const worn = target.dataset.cardWorn !== undefined && isWorn(c, item);
-    const html = itemCardHtml(c, item, { worn, qty: Number(target.dataset.cardQty) || undefined, history: this.history });
+    const html = itemCardHtml(c, item, { worn, qty: Number(target.dataset.cardQty) || undefined, hint: target.dataset.cardHint, history: this.history });
     if (!html) {
       this.el.hidden = true;
       return;

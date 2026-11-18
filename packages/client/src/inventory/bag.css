@@ -1,0 +1,44 @@
+/* The Character window (inventory-ui.ts): Bag tab with the doll and 20 cells, and the Sheet tab. */
+/* Above the chat box, which comes later in the page and would cover the grid on a phone. */
+#inventory { width: min(600px, calc(100vw - 32px)); z-index: 2; background: var(--bg); }
+#inventory .tabs { display: flex; gap: 4px; margin: 0 0 12px; border-bottom: 1px solid var(--edge); }
+#inventory .tabs button {
+  background: transparent; color: var(--muted); border: 1px solid transparent; border-bottom: 0;
+  padding: 5px 14px; font: inherit; font-weight: 400; cursor: pointer; margin-bottom: -1px;
+}
+#inventory .tabs button.on { color: var(--ink); border-color: var(--edge); background: var(--panel); font-weight: 700; }
+#inventory .bag-body { display: flex; gap: 16px; align-items: flex-start; }
+#inventory .keys { color: var(--muted); font-size: 11px; margin: 12px 0 0; }
+
+/* One square: a worn slot, a bag cell or an empty place. Rarity shows on the edge. */
+#inventory .cell {
+  position: relative; width: 52px; height: 52px; padding: 2px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--edge); color: var(--ink); font: inherit; cursor: pointer;
+}
+#inventory button.cell:hover, #inventory button.cell:focus-visible { border-color: var(--accent); outline: none; background: rgba(255, 255, 255, 0.1); }
+#inventory .cell img { width: 44px; height: 44px; object-fit: contain; }
+#inventory .cell .qty { position: absolute; right: 2px; bottom: 1px; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px #000; }
+#inventory .cell.empty { border-style: dashed; opacity: 0.55; cursor: default; }
+#inventory .rarity-edge-uncommon { border-color: #6fd08c; }
+#inventory .rarity-edge-rare { border-color: #73b7f7; }
+#inventory .rarity-edge-epic { border-color: #c08ef0; }
+#inventory .rarity-edge-legendary { border-color: #feae34; }
+
+/* The paper doll: worn slots down both sides of the standing picture. */
+#inventory .doll { display: grid; grid-template-columns: 52px 1fr 52px; gap: 6px; flex: 0 0 220px; }
+#inventory .doll-side { display: flex; flex-direction: column; gap: 6px; }
+#inventory .doll-slot.empty span, #inventory .bag-slot span { font-size: 10px; color: var(--muted); text-align: center; }
+#inventory .doll-figure { display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--edge); }
+#inventory .doll-figure img { width: 100%; max-height: 226px; object-fit: contain; object-position: bottom; }
+#inventory .bag-slot { flex-direction: column; cursor: help; border-color: var(--error); border-style: dotted; }
+#inventory .bag-slot small { font-size: 9px; color: var(--error); }
+
+/* All 20 cells, five across. */
+#inventory .bag-grid { display: grid; grid-template-columns: repeat(5, 52px); gap: 6px; }
+
+/* Phone width: the doll above the grid. */
+@media (max-width: 560px) {
+  #inventory .bag-body { flex-direction: column; align-items: center; }
+  #inventory .doll { flex-basis: auto; width: 220px; }
+  #inventory .doll-figure img { max-height: 170px; }
+}

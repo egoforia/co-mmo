@@ -6,15 +6,28 @@ import { gridStep } from '../src/inventory/grid.ts';
 // The bag window's contents, and the grid keys it shares with the loot window.
 
 describe('the bag window', () => {
-  it('shows what is worn, what is carried and the count of slots', () => {
+  it('shows the doll, all 20 cells, the coins and the count of slots', () => {
     const c = newCharacter();
     putItem(c, 'wooden-sword');
     c.equipment.weapon = 'crab-lance';
-    const html = new InventoryWindow().html(c);
+    const html = new InventoryWindow(undefined, () => 'art/me.png').html(c);
     expect(html).toContain('Wooden Sword');
     expect(html).toContain('data-slot="weapon"');
+    expect(html).toContain('data-empty-slot="head"');
+    expect(html).toContain('src="art/me.png"');
+    expect(html).toContain('15% chance to drop with all it holds');
     expect(html).toContain(`${c.inventory.length} of ${BAG_SLOTS} slots`);
-    expect(html).toContain('Nothing worn');
+    expect(html.match(/class="cell (?:rarity-edge|empty)/g)).toHaveLength(BAG_SLOTS);
+    expect(html).not.toContain('<dl class="sheet">');
+  });
+
+  it('shows the stats on the Sheet tab', () => {
+    const bag = new InventoryWindow();
+    bag.tab = 'sheet';
+    const html = bag.html(newCharacter());
+    expect(html).toContain('<dl class="sheet">');
+    expect(html).not.toContain('bag-grid');
+    expect(html).toContain('aria-selected="true"');
   });
 
   it('asks about each piece of gear once while it is held, and shows its owners', () => {

@@ -1,5 +1,6 @@
 @import './editor/asset-picker.css';
 @import './inventory/item-card.css';
+@import './inventory/bag.css';
 :root {
   --ink: #ffffff;
   --muted: #c0cbdc;
@@ -452,10 +453,6 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 }
 .window button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; }
 .window button:disabled { opacity: 0.45; cursor: default; }
-.slots.gear { grid-template-columns: repeat(4, 1fr); }
-.slot.worn { grid-template-columns: 32px 1fr; }
-.slot.worn img { width: 32px; height: 32px; grid-row: span 2; }
-.slot.empty { display: flex; flex-direction: column; justify-content: center; cursor: default; opacity: 0.6; min-height: 46px; }
 .sheet small { display: block; font-size: 10px; color: #6fd08c; font-weight: 400; }
 .sheet .wide { grid-column: span 2; }
 .sheet .place { margin-left: 6px; padding: 0 6px; font: inherit; font-size: 14px; cursor: pointer; background: var(--accent); color: var(--bg); border: 0; }

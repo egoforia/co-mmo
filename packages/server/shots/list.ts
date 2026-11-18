@@ -171,7 +171,18 @@ export const SHOTS: Shot[] = [
       await page.keyboard.press('i');
       await page.waitForSelector('#inventory:not([hidden])');
     },
-    mustSee: ['the bag window is whole on screen, its slots and words readable'],
+    mustSee: ['the bag window is whole on screen, its slots and words readable', 'the player stands in the doll with worn slots down both sides and the Bag slot marked', 'all 20 cells drawn, five across, empty ones dashed'],
+  },
+  {
+    name: 'sanctum-bag-phone',
+    about: 'The bag on a phone-sized screen: the doll above the grid.',
+    region: 'sanctum',
+    screen: 'phone',
+    open: async (page) => {
+      await page.keyboard.press('i');
+      await page.waitForSelector('#inventory:not([hidden])');
+    },
+    mustSee: ['the doll sits above the grid', 'nothing runs off the screen sideways'],
   },
   {
     name: 'sanctum-bag-card',

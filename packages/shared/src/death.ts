@@ -18,6 +18,11 @@ export function deathXp(level: number): number {
   return Math.round(xpToNext(level) * DEATH_XP_SHARE);
 }
 
+/** XP a death would cost this character: at level 1 there is no level to lose, so only the XP they have goes. */
+export function deathXpFor(c: Pick<Character, 'level' | 'xp'>): number {
+  return c.level > 1 ? deathXp(c.level) : Math.min(deathXp(c.level), c.xp);
+}
+
 /**
  * Takes XP away; below 0 the character drops a level (never below 1) and
  * what that level gave comes back off (levelDownStats). Returns the levels lost.
@@ -76,4 +81,34 @@ export function deathWords(xp: number, levels: number, drops: InventorySlot[]): 
   const parts = [`You lost ${xp} XP${levels ? ` and ${levels === 1 ? 'a level' : `${levels} levels`}` : ''}.`];
   if (drops.length) parts.push('What you dropped lies where you fell for an hour. Go back for it before someone else finds it.');
   return parts.join(' ');
+}
+
+/** What falling would cost right now, for the bag's "If you fall here" line (inventory refactor, step 7). */
+export interface DeathRisk {
+  /** In a safe area, where no one can hurt you. */
+  safe: boolean;
+  /** All the gold carried goes. */
+  gold: number;
+  /** XP lost (never more than there is at level 1). */
+  xp: number;
+  /** Worn pieces that could drop, each with `chance`. */
+  worn: number;
+  /** The chance for each worn piece, and for the bag with all in it. */
+  chance: number;
+}
+
+/** What a death would cost `c` now, from the same numbers die() uses; `safe` when standing in a safe area. */
+export function deathRisk(c: Character, safe: boolean): DeathRisk {
+  const xp = deathXpFor(c);
+  const worn = EQUIP_SLOTS.filter((s) => c.equipment[s] && !staysWithOwner(c.equipment[s]!)).length;
+  return { safe, gold: goldOf(c), xp, worn, chance: DEATH_DROP_CHANCE };
+}
+
+/** The risk in one plain line: what falling here costs, or that this place is safe. */
+export function deathRiskWords(r: DeathRisk): string {
+  if (r.safe) return 'Safe here: no one can hurt you.';
+  const pct = `${Math.round(r.chance * 100)}%`;
+  const lose = [`${r.xp} XP`, ...(r.gold > 0 ? [`all ${r.gold} gold`] : [])].join(' and ');
+  const drops = [...(r.worn ? [`each worn piece ${pct}`] : []), `the bag with all in it ${pct}`].join(', ');
+  return `If you fall here: you lose ${lose}. Chance to drop: ${drops}.`;
 }

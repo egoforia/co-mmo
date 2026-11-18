@@ -1,4 +1,4 @@
-import { PLAYER_BODY_MS, deathWords, deathXp, loseXp, rollDeathDrops } from '@co-mmo/shared';
+import { PLAYER_BODY_MS, deathWords, deathXpFor, loseXp, rollDeathDrops } from '@co-mmo/shared';
 import type { Body, PlayerState, RegionState, SavedBody } from './state.ts';
 
 /**
@@ -14,8 +14,7 @@ export class Deaths {
   /** Takes the price of dying from a player who is about to wake at the shrine. */
   die(p: PlayerState): void {
     const c = p.character;
-    // At level 1 there is no level to lose: only the XP they have goes.
-    const xp = c.level > 1 ? deathXp(c.level) : Math.min(deathXp(c.level), c.xp);
+    const xp = deathXpFor(c);
     const levels = loseXp(c, xp);
     const drops = rollDeathDrops(c, this.s.random);
     p.dirty = true;

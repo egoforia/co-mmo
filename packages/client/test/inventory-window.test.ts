@@ -19,6 +19,8 @@ describe('the bag window', () => {
     expect(html).toContain(`${c.inventory.length} of ${BAG_SLOTS} slots`);
     expect(html.match(/class="cell (?:rarity-edge|empty)/g)).toHaveLength(BAG_SLOTS);
     expect(html).not.toContain('<dl class="sheet">');
+    expect(html).toContain('If you fall here');
+    expect(new InventoryWindow().html(c, true)).toContain('Safe here');
   });
 
   it('shows the stats on the Sheet tab', () => {

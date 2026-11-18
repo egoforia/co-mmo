@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { ITEMS, MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, offHandItem, sensesSpots } from '@co-mmo/shared';
+import { ITEMS, MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, isSafe, offHandItem, sensesSpots } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
@@ -199,6 +199,8 @@ function play(token: string): void {
       case 'snapshot':
         scene?.onSnapshot(message);
         rpg?.setVitals(message.hp, message.energy);
+        // The map is there once the scene has been made.
+        if (scene?.currentMap) rpg?.setSafe(isSafe(scene.currentMap, scene.playerPosition.x, scene.playerPosition.y));
         rpg?.setStatuses(message.statuses);
         kit?.setEnergy(message.energy);
         scene?.setWeakened(rpg?.weakened ?? false, message.fallen !== undefined);

@@ -7,7 +7,7 @@
   padding: 5px 14px; font: inherit; font-weight: 400; cursor: pointer; margin-bottom: -1px;
 }
 #inventory .tabs button.on { color: var(--ink); border-color: var(--edge); background: var(--panel); font-weight: 700; }
-#inventory .bag-body { display: flex; gap: 16px; align-items: flex-start; }
+#inventory .bag-body { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 #inventory .keys { color: var(--muted); font-size: 11px; margin: 12px 0 0; }
 
 /* One square: a worn slot, a bag cell or an empty place. Rarity shows on the edge. */
@@ -73,3 +73,9 @@
 #inventory .risk-line { margin: 0 0 10px; padding: 6px 8px; border: 1px solid var(--error); color: var(--error); font-size: 12px; line-height: 1.4; }
 #inventory .risk-line.safe { border-color: #6fd08c; color: #6fd08c; }
 #inventory .risk-line .why { background: none; border: 0; padding: 0 0 0 4px; color: var(--ink); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* Docked (inventory/docking.ts): the bag on the left of the middle, the loot, shop or trade window on the right. */
+body[data-dock] #inventory { right: auto; left: calc(50% - min(600px, 50vw - 24px) - 8px); width: min(600px, 50vw - 24px); }
+body[data-dock="loot"] #loot, body[data-dock="shop"] #shop, body[data-dock="trade"] #trade {
+  right: auto; left: calc(50% + 8px); width: min(460px, 50vw - 24px); z-index: 2;
+}

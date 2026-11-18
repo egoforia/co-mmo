@@ -21,6 +21,7 @@ import {
 import { CHAPTERS } from './bible.ts';
 import { InventoryWindow, type InventoryTab } from './inventory-ui.ts';
 import { BagInput } from './inventory/bag-input.ts';
+import { Docking } from './inventory/docking.ts';
 import { ItemCard } from './inventory/item-card.ts';
 import { pathChoicesHtml } from './path-ui.ts';
 import { escapeHtml } from './ui.ts';
@@ -51,6 +52,8 @@ export interface RpgActions {
   askHistory?(items: string[]): void;
   /** Moves, splits or sorts the bag (the server decides). */
   bag?(m: BagMessage): void;
+  /** Sells one to the open shop or offers one in the open trade (Shift-click in the bag); false when neither takes it. */
+  fromBag?(item: string): boolean;
   /** The URL of the player's standing picture, for the bag's paper doll. */
   figure?(race?: RaceId): string;
 }
@@ -88,7 +91,9 @@ export class RpgUi {
       unequip: (slot) => actions.unequip(slot),
       bag: (m) => actions.bag?.(m),
       typing: () => actions.typing(),
+      toOther: (item) => actions.fromBag?.(item) ?? false,
     });
+    new Docking({ bagOpen: () => !$('inventory').hidden, setBag: (open) => this.toggle('inventory', open) });
     this.card = new ItemCard(() => this.character, (id) => this.bag.historyWords(id));
     for (const id of ['stats', 'quests', 'keys']) $(id).hidden = false;
     window.addEventListener('keydown', (e) => this.onKey(e));

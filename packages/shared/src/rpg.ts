@@ -33,6 +33,7 @@ export * from './rpg/skills.ts';
 export * from './rpg/paths.ts';
 export * from './rpg/bag.ts';
 export * from './rpg/bag-order.ts';
+export * from './rpg/piles.ts';
 export * from './skills/paths.ts';
 
 export interface Stats {

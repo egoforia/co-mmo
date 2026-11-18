@@ -123,11 +123,12 @@ export interface UseItemMessage {
 /**
  * Arranges the bag (inventory refactor, step 4): `move` a stack from cell
  * `from` to cell `to` (merging onto the same thing, else swapping), `split`
- * `qty` off the stack in cell `from`, or `sort` the whole bag.
+ * `qty` off the stack in cell `from`, `sort` the whole bag, or `drop` `qty`
+ * (the whole stack when missing) from cell `from` on the ground as a pile.
  */
 export interface BagMessage {
   t: 'bag';
-  action: 'move' | 'split' | 'sort';
+  action: 'move' | 'split' | 'sort' | 'drop';
   from?: number;
   to?: number;
   qty?: number;
@@ -774,8 +775,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'use') return isItemId(m.item) && (m.target === undefined || (typeof m.target === 'string' && m.target.length <= 64));
   if (m.t === 'bag') {
     const cell = (n: unknown) => n === undefined || (Number.isInteger(n) && (n as number) >= 0 && (n as number) < BAG_SLOTS);
-    return ['move', 'split', 'sort'].includes(m.action as string) && cell(m.from) && cell(m.to) &&
-      (m.qty === undefined || (Number.isInteger(m.qty) && (m.qty as number) > 0 && (m.qty as number) <= MAX_STACK));
+    return ['move', 'split', 'sort', 'drop'].includes(m.action as string) && cell(m.from) && cell(m.to) &&
+      (m.qty === undefined || (Number.isSafeInteger(m.qty) && (m.qty as number) > 0));
   }
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   if (m.t === 'pray') return typeof m.text === 'string';

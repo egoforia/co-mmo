@@ -33,6 +33,8 @@ export interface Shot {
   weather?: Weather;
   /** Screen size: desktop 1280x800 (default) or a phone. */
   screen?: 'desktop' | 'phone';
+  /** Things the player carries besides the Bible, for shots of the bag and what it does. */
+  carry?: { item: string; qty: number }[];
   /** Hide the HUD and windows, for shots of the world itself (buildings, floors). */
   hideUi?: boolean;
   /** Done after the page has settled and before the picture: open a window, click a tab. */
@@ -183,6 +185,20 @@ export const SHOTS: Shot[] = [
       await page.waitForSelector('#item-menu:not([hidden])');
     },
     mustSee: ['the menu stands beside the cell with the thing\'s name and its actions', 'no item card covers the menu'],
+  },
+  {
+    name: 'sanctum-pile',
+    about: 'Shells dropped from the bag, lying as a pile anyone may take.',
+    region: 'sanctum',
+    carry: [{ item: 'wooden-sword', qty: 1 }, { item: 'crab-shell', qty: 5 }],
+    open: async (page) => {
+      await page.keyboard.press('i');
+      await page.click('#inventory .bag-grid [data-item="crab-shell"]', { button: 'right' });
+      await page.click('#item-menu button:has-text("Drop all 5")');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.querySelector('#chat-log')?.textContent?.includes('Anyone may take it'));
+    },
+    mustSee: ['a small shell picture stands at the player\'s feet with the name "Dropped Crab Shell (E for loot)"', 'the chat says anyone may take it for ten minutes'],
   },
   {
     name: 'sanctum-bag-phone',

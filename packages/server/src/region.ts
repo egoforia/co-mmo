@@ -61,6 +61,7 @@ import {
   type EntityInspection,
   giveHomeTools,
   ITEMS,
+  PILE_KIND,
   type AcquiredHow,
 } from '@co-mmo/shared';
 import { TradeDesk } from './trades.ts';
@@ -314,7 +315,7 @@ export class Region {
     this.minds = new Minds(this.s, this.gauges, this.combat, this.paths, this.crowd);
     this.minds.logger = this.logger;
     this.kit = new Kit(this.s);
-    this.bagOrder = new BagOrder(this.s);
+    this.bagOrder = new BagOrder(this.s, (p, index, qty) => this.looting.drop(p, index, qty));
     this.talk = new Chat(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor, c) : []));
     spreadHomes(this.map, this.s.creatures);
@@ -875,9 +876,9 @@ export class Region {
     phase('minds_think', () => this.minds.think(now, skyPhase, weather));
 
     phase('bodies', () => {
-      // A player's body goes as soon as nothing is left on it.
+      // A player's body or a pile goes as soon as nothing is left on it.
       this.s.bodies = this.s.bodies.filter((b) => {
-        const keep = now < b.until && !(b.owner && !b.loot.length);
+        const keep = now < b.until && !((b.owner || b.kind === PILE_KIND) && !b.loot.length);
         if (!keep) this.s.bodyChanged(b, true);
         return keep;
       });

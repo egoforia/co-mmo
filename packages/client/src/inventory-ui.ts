@@ -44,7 +44,7 @@ export class InventoryWindow {
       ? sheetHtml(c)
       : `<div class="bag-tools"><button type="button" data-bag-action="sort">Sort</button></div>
         <div class="bag-body">${dollHtml(c, this.figure(c.race))}${bagGridHtml(c)}</div>
-        <p class="keys"><kbd>Click</kbd> use or wear · <kbd>Drag</kbd> move, wear or take off · <kbd>Right-click</kbd>, hold or <kbd>M</kbd> more · <kbd>S</kbd> split · arrows choose</p>`;
+        <p class="keys"><kbd>Click</kbd> use or wear · <kbd>Drag</kbd> move, wear, take off, or out to drop · <kbd>Right-click</kbd>, hold or <kbd>M</kbd> more · <kbd>S</kbd> split · <kbd>Delete</kbd> drop · arrows choose</p>`;
     return `
       <h2>Your bag <small>${goldOf(c)} gold · ${escapeHtml(slotCount(c))}</small> <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <div class="tabs" role="tablist">${tab('bag', 'Bag')}${tab('sheet', 'Sheet')}</div>

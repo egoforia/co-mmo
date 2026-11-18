@@ -292,7 +292,12 @@ export function sell(c: Character, npc: Shopkeeper, item: string, qty = 1): stri
   const price = sellPrice(item);
   if (!price) return 'That cannot be sold.';
   if (!Number.isInteger(qty) || qty < 1 || itemCount(c, item) < qty) return 'You do not have that many.';
-  if (!fitsAll(bagWithout(c, [{ item, qty }]), [{ item: GOLD, qty: price * qty }])) return BAG_FULL;
+  // Selling never leaves the bag fuller than it was: a bag already over its
+  // slots (an older save, gear back from a switched-off wish) can still sell
+  // a whole stack, since the coins take no more room than the stack did.
+  const after = bagWithout(c, [{ item, qty }]);
+  const coinSlot = after.inventory.some((s) => s.item === GOLD) ? 0 : 1;
+  if (!fitsAll(after, [{ item: GOLD, qty: price * qty }]) && after.inventory.length + coinSlot > c.inventory.length) return BAG_FULL;
   takeItem(c, item, qty);
   putItem(c, GOLD, price * qty);
   return undefined;

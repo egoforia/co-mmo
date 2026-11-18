@@ -18,6 +18,7 @@ import {
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
 import { InventoryWindow } from './inventory-ui.ts';
+import { ItemCard } from './inventory/item-card.ts';
 import { pathChoicesHtml } from './path-ui.ts';
 import { escapeHtml } from './ui.ts';
 import { artSrc } from './wished.ts';
@@ -55,6 +56,8 @@ export class RpgUi {
   private chapter = CHAPTERS[0]!.id;
   /** The bag window's contents (inventory-ui.ts). */
   private readonly bag: InventoryWindow;
+  /** The card beside any item the pointer or focus is on (inventory/item-card.ts). */
+  private readonly card: ItemCard;
   /** The shop of the person last spoken to, when the world editor gave them one. */
   private wares: ShopDef | undefined;
   private lastAttack = 0;
@@ -68,6 +71,7 @@ export class RpgUi {
     this.hp = character.hp;
     this.energy = character.energy;
     this.bag = new InventoryWindow(actions.askHistory ? (items) => actions.askHistory!(items) : undefined);
+    this.card = new ItemCard(() => this.character, (id) => this.bag.historyWords(id));
     for (const id of ['stats', 'quests', 'keys']) $(id).hidden = false;
     window.addEventListener('keydown', (e) => this.onKey(e));
     $('inventory').addEventListener('click', (e) => {
@@ -121,6 +125,7 @@ export class RpgUi {
     this.hp = character.hp;
     this.energy = character.energy;
     this.render();
+    this.card.refresh();
   }
 
   setVitals(hp: number, energy: number): void {
@@ -234,6 +239,7 @@ export class RpgUi {
   /** Owner histories the server sent: the bag shows them on each piece's card. */
   setHistories(histories: Record<string, OwnerEntry[]>): void {
     this.bag.setHistories(histories);
+    this.card.refresh();
     if (!$('inventory').hidden) this.renderInventory();
   }
 

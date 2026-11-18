@@ -26,7 +26,7 @@ describe('the bag window', () => {
     bag.html(c);
     expect(asked).toEqual([['wooden-sword']]);
     bag.setHistories({ 'wooden-sword': [{ name: 'Mara', how: 'crafted', at: Date.UTC(2026, 10, 18) }] });
-    expect(bag.html(c)).toContain('made by Mara');
+    expect(bag.historyWords('wooden-sword')).toContain('made by Mara');
     c.inventory = c.inventory.filter((s) => s.item !== 'wooden-sword');
     bag.html(c);
     putItem(c, 'wooden-sword');

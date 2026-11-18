@@ -27,6 +27,7 @@ export * from './rpg/attributes.ts';
 export * from './rpg/callings.ts';
 export * from './rpg/abilities.ts';
 export * from './rpg/statuses.ts';
+export * from './rpg/compare.ts';
 export * from './rpg/gauges.ts';
 export * from './rpg/skills.ts';
 export * from './rpg/paths.ts';
@@ -614,12 +615,14 @@ function clampVitals(c: Character): void {
   c.energy = Math.min(c.energy, maxEnergy(c));
 }
 
-const BONUS_NAMES: Record<string, string> = {
+/** Each bonus's name in the words items' cards use. */
+export const BONUS_NAMES: Record<string, string> = {
   attack: 'damage', armor: 'armour', ward: 'ward', might: 'Might', agility: 'Agility', wit: 'Wit', spirit: 'Spirit', vigor: 'Vigor',
   dodge: 'dodge', haste: 'attack speed', regen: 'health regeneration', energyRegen: 'Energy regeneration',
   healing: 'healing received', shorter: 'shorter harmful statuses',
 };
-const PERCENT_KEYS = new Set(['dodge', 'haste', 'regen', 'energyRegen', 'healing', 'shorter']);
+/** Bonuses counted in percent. */
+export const PERCENT_KEYS = new Set(['dodge', 'haste', 'regen', 'energyRegen', 'healing', 'shorter']);
 
 /** A short line of what an item adds, e.g. "+2 damage, +1 Spirit, +5% health regeneration". */
 export function bonusText(bonus: Bonus | undefined): string {

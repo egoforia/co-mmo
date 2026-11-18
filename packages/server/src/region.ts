@@ -80,6 +80,7 @@ import { Deaths } from './region/deaths.ts';
 import { Paths } from './region/paths/index.ts';
 import { Gauges, type GaugeState } from './region/gauges.ts';
 import { inspectEntity } from './region/inspect.ts';
+import { BagOrder } from './region/bag-order.ts';
 import { Kit } from './region/kit.ts';
 import { Gathering } from './region/gathering.ts';
 import { Minds } from './region/minds.ts';
@@ -255,6 +256,7 @@ export class Region {
   private readonly minds: Minds;
   private readonly gauges: Gauges;
   private readonly kit: Kit;
+  private readonly bagOrder: BagOrder;
   private readonly gathering: Gathering;
   private readonly quests: Quests;
   private readonly looting: Bodies;
@@ -312,6 +314,7 @@ export class Region {
     this.minds = new Minds(this.s, this.gauges, this.combat, this.paths, this.crowd);
     this.minds.logger = this.logger;
     this.kit = new Kit(this.s);
+    this.bagOrder = new BagOrder(this.s);
     this.talk = new Chat(this.s);
     this.s.creatures = this.map.creatures.flatMap((c, i) => (this.inCell(c.x) ? this.makeCreature(`${def.id}-${c.kind}-${i}`, c.kind, c.x, c.y, c.floor, c) : []));
     spreadHomes(this.map, this.s.creatures);
@@ -761,6 +764,9 @@ export class Region {
         break;
       case 'equip':
         this.kit.wear(p, message.item, message.slot);
+        break;
+      case 'bag':
+        this.bagOrder.handle(p, message);
         break;
       case 'choosePath':
         this.quests.choosePath(p, message.npc, message.path);

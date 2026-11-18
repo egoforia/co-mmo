@@ -53,6 +53,8 @@ export interface PlayerState {
   lastAttack: number;
   /** Epoch ms of their last item use, for the cap of two a second (ITEM_USE_MS). */
   lastUse?: number;
+  /** When the player last sorted their bag, to keep sorting to the item-use pace. */
+  lastSort?: number;
   lastHurt: number;
   /** When each ability can be used again, epoch ms. */
   readyAt: Map<string, number>;

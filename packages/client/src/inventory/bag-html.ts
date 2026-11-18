@@ -26,10 +26,10 @@ function hintFor(item: string): string {
 
 /** The carried stacks as a grid of all BAG_SLOTS cells, empty ones drawn, so a full bag is a full picture. */
 export function bagGridHtml(c: Pick<Character, 'inventory'>): string {
-  const cells = c.inventory.map((s) => {
+  const cells = c.inventory.map((s, i) => {
     const def = ITEMS[s.item];
     if (!def) return '<div class="cell empty"></div>';
-    return `<button type="button" class="cell rarity-edge-${def.rarity ?? 'common'}" data-item="${escapeHtml(s.item)}" data-card="${escapeHtml(s.item)}" data-card-qty="${s.qty}" data-card-hint="${escapeHtml(hintFor(s.item))}"
+    return `<button type="button" class="cell rarity-edge-${def.rarity ?? 'common'}" data-item="${escapeHtml(s.item)}" data-index="${i}" data-card="${escapeHtml(s.item)}" data-card-qty="${s.qty}" data-card-hint="${escapeHtml(hintFor(s.item))}"
       aria-label="${escapeHtml(`${def.name}${s.qty > 1 ? `, ${s.qty}` : ''}. ${hintFor(s.item)}`)}"><img src="${escapeHtml(itemIcon(def))}" alt="">${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}</button>`;
   });
   for (let i = cells.length; i < BAG_SLOTS; i++) cells.push('<div class="cell empty"></div>');

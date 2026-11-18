@@ -13,6 +13,7 @@ import {
   type OwnerEntry,
   type ShopDef,
   type EquipSlot,
+  type BagMessage,
   type RaceId,
   type Stats,
   type StatusView,
@@ -47,6 +48,8 @@ export interface RpgActions {
   spendPoint(stat: keyof Stats): void;
   /** Asks the server who owned these pieces of gear before. */
   askHistory?(items: string[]): void;
+  /** Moves, splits or sorts the bag (the server decides). */
+  bag?(m: BagMessage): void;
   /** The URL of the player's standing picture, for the bag's paper doll. */
   figure?(race?: RaceId): string;
 }
@@ -83,8 +86,21 @@ export class RpgUi {
       const slot = target.closest<HTMLElement>('[data-slot]')?.dataset.slot as EquipSlot | undefined;
       const stat = target.closest<HTMLElement>('[data-stat]')?.dataset.stat as keyof Stats | undefined;
       const tab = target.closest<HTMLElement>('[data-tab]')?.dataset.tab as InventoryTab | undefined;
+      const bagAction = target.closest<HTMLElement>('[data-bag-action]')?.dataset.bagAction;
+      const index = Number(target.closest<HTMLElement>('[data-index]')?.dataset.index);
       if (tab) {
         this.bag.tab = tab;
+        this.bag.splitting = false;
+        this.renderInventory();
+      } else if (bagAction === 'sort') actions.bag?.({ t: 'bag', action: 'sort' });
+      else if (bagAction === 'split') {
+        this.bag.splitting = !this.bag.splitting;
+        this.renderInventory();
+      } else if (this.bag.splitting && item) {
+        // Half, rounded down; the server refuses a stack of one or a full bag, and says why.
+        const qty = Math.floor((this.character.inventory[index]?.qty ?? 0) / 2);
+        actions.bag?.({ t: 'bag', action: 'split', from: index, ...(qty ? { qty } : {}) });
+        this.bag.splitting = false;
         this.renderInventory();
       } else if (stat) actions.spendPoint(stat);
       else if (item === 'bible') this.toggle('bible', true);
@@ -199,7 +215,10 @@ export class RpgUi {
     const opening = el.hidden && open !== false;
     el.hidden = !(open ?? el.hidden);
     // The Character window opens on its Bag tab.
-    if (opening && id === 'inventory') this.bag.tab = 'bag';
+    if (opening && id === 'inventory') {
+      this.bag.tab = 'bag';
+      this.bag.splitting = false;
+    }
     if (!el.hidden) {
       if (id === 'bible') $('inventory').hidden = true;
       this.render();

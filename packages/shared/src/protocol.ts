@@ -8,7 +8,7 @@ import type { ShopDef, TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
 import type { SkyConfig, Weather } from './sky.ts';
-import { EQUIP_SLOTS, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
+import { BAG_SLOTS, EQUIP_SLOTS, MAX_STACK, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
 import type { DamageType } from './weapons.ts';
 import type { StatusId, StatusView } from './rpg/statuses.ts';
 import type { GaugeId } from './rpg/gauges.ts';
@@ -118,6 +118,19 @@ export interface UseItemMessage {
   item: string;
   /** Another player nearby to use it on (a Tonic for a friend); yourself when missing. */
   target?: string;
+}
+
+/**
+ * Arranges the bag (inventory refactor, step 4): `move` a stack from cell
+ * `from` to cell `to` (merging onto the same thing, else swapping), `split`
+ * `qty` off the stack in cell `from`, or `sort` the whole bag.
+ */
+export interface BagMessage {
+  t: 'bag';
+  action: 'move' | 'split' | 'sort';
+  from?: number;
+  to?: number;
+  qty?: number;
 }
 
 export interface AcceptQuestMessage {
@@ -279,6 +292,7 @@ export type ClientMessage =
   | WakeMessage
   | InteractMessage
   | UseItemMessage
+  | BagMessage
   | AcceptQuestMessage
   | PrayMessage
   | WishAnswerMessage
@@ -758,6 +772,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       (m.item === undefined || isItemId(m.item));
   }
   if (m.t === 'use') return isItemId(m.item) && (m.target === undefined || (typeof m.target === 'string' && m.target.length <= 64));
+  if (m.t === 'bag') {
+    const cell = (n: unknown) => n === undefined || (Number.isInteger(n) && (n as number) >= 0 && (n as number) < BAG_SLOTS);
+    return ['move', 'split', 'sort'].includes(m.action as string) && cell(m.from) && cell(m.to) &&
+      (m.qty === undefined || (Number.isInteger(m.qty) && (m.qty as number) > 0 && (m.qty as number) <= MAX_STACK));
+  }
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;
   if (m.t === 'pray') return typeof m.text === 'string';
   if (m.t === 'report') {

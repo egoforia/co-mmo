@@ -42,3 +42,10 @@
   #inventory .doll { flex-basis: auto; width: 220px; }
   #inventory .doll-figure img { max-height: 170px; }
 }
+
+/* Sort and Split above the grid; while splitting, stacks show they can be clicked. */
+#inventory .bag-tools { display: flex; gap: 6px; justify-content: flex-end; margin: -4px 0 8px; }
+#inventory .bag-tools button { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; padding: 3px 10px; }
+#inventory .bag-tools button:hover { border-color: var(--accent); }
+#inventory .bag-tools button.on { border-color: var(--accent); color: var(--accent); }
+#inventory .splitting .bag-grid button.cell { cursor: copy; border-style: solid; border-color: var(--accent); }

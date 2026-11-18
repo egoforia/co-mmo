@@ -18,6 +18,8 @@ export class InventoryWindow {
   private readonly histories = new GearHistories();
   /** The tab showing; the Bag tab when the window first opens. */
   tab: InventoryTab = 'bag';
+  /** True after Split is pressed: the next stack clicked is split in half. */
+  splitting = false;
 
   /**
    * `askHistory` asks the server who owned pieces of gear before; `figure`
@@ -42,8 +44,14 @@ export class InventoryWindow {
       `<button type="button" role="tab" data-tab="${id}" aria-selected="${this.tab === id}"${this.tab === id ? ' class="on"' : ''}>${name}</button>`;
     const body = this.tab === 'sheet'
       ? sheetHtml(c)
-      : `<div class="bag-body">${dollHtml(c, this.figure(c.race))}${bagGridHtml(c)}</div>
-        <p class="keys">Click to use, drink, wear or read. Click worn gear to take it off.</p>`;
+      : `<div class="bag-tools">
+          <button type="button" class="quiet" data-bag-action="sort">Sort</button>
+          <button type="button" class="quiet${this.splitting ? ' on' : ''}" data-bag-action="split" aria-pressed="${this.splitting}">Split</button>
+        </div>
+        <div class="bag-body${this.splitting ? ' splitting' : ''}">${dollHtml(c, this.figure(c.race))}${bagGridHtml(c)}</div>
+        <p class="keys">${this.splitting
+          ? 'Click a stack to split it in half. It needs a free slot.'
+          : 'Click to use, drink, wear or read. Click worn gear to take it off.'}</p>`;
     return `
       <h2>Your bag <small>${goldOf(c)} gold · ${escapeHtml(slotCount(c))}</small> <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <div class="tabs" role="tablist">${tab('bag', 'Bag')}${tab('sheet', 'Sheet')}</div>

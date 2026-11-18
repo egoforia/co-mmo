@@ -21,7 +21,7 @@ import { settlePathSkills, type SkillLook } from './rpg/paths.ts';
 import { PATH_ABILITIES } from './skills/paths.ts';
 import type { OffhandFamily, WeaponFamily } from './weapons.ts';
 import { twoHanded } from './weapons.ts';
-import { BAG_FULL, GOLD, addItem, bagRoom, bagWithout, coinsFromSavedGold, fitsAll, putItem } from './rpg/bag.ts';
+import { BAG_FULL, GOLD, addItem, bagRoom, bagWithout, coinsFromSavedGold, fitsAll, putItem, removeFromStacks } from './rpg/bag.ts';
 
 export * from './rpg/attributes.ts';
 export * from './rpg/callings.ts';
@@ -32,6 +32,7 @@ export * from './rpg/gauges.ts';
 export * from './rpg/skills.ts';
 export * from './rpg/paths.ts';
 export * from './rpg/bag.ts';
+export * from './rpg/bag-order.ts';
 export * from './skills/paths.ts';
 
 export interface Stats {
@@ -315,17 +316,15 @@ export function gainXp(c: Character, amount: number): number {
   return levels;
 }
 
-export function itemCount(c: Character, item: string): number {
-  return c.inventory.find((s) => s.item === item)?.qty ?? 0;
+/** How many of an item the bag holds, over all its stacks. */
+export function itemCount(c: Pick<Character, 'inventory'>, item: string): number {
+  return c.inventory.reduce((n, s) => (s.item === item ? n + s.qty : n), 0);
 }
 
 /** Removes items; false (and no change) when there are not enough. */
 export function takeItem(c: Character, item: string, qty = 1): boolean {
-  const slot = c.inventory.find((s) => s.item === item);
-  if (!slot || slot.qty < qty || ITEMS[item]?.bound) return false;
-  slot.qty -= qty;
-  if (slot.qty === 0) c.inventory.splice(c.inventory.indexOf(slot), 1);
-  return true;
+  if (ITEMS[item]?.bound) return false;
+  return removeFromStacks(c, item, qty);
 }
 
 export function discover(c: Character, id: string): void {
@@ -587,9 +586,7 @@ export function equip(c: Character, worn: string, bind?: (item: string) => strin
   // A unique piece may bind to its wearer as it goes on (copies.ts bindOnWear), and is worn as its bound copy.
   const item = bind ? bind(worn) : worn;
   // Out of the bag directly: takeItem keeps bound things in, so they are never dropped or sold.
-  const slot = c.inventory.find((s) => s.item === item)!;
-  slot.qty -= 1;
-  if (slot.qty === 0) c.inventory.splice(c.inventory.indexOf(slot), 1);
+  removeFromStacks(c, item, 1);
   const old = c.equipment[def.slot];
   c.equipment[def.slot] = item;
   if (old) putItem(c, old);

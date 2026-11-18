@@ -519,8 +519,10 @@ button: your floor centred on you, turned as the camera turns, put together
 from the land's painted tiles, trees, set pieces and people's pictures
 shrunk, with zoom and a look at the other floors where you stand;
 minimized or closed it draws nothing; the
-scene hands it `miniMapView()`), and one `*-ui.ts`
-per panel. God's View is
+scene hands it `miniMapView()`), `inventory-ui.ts` + `inventory/` (the bag:
+paper doll, 20-cell grid, Sheet tab, item card, drag and drop, item menu,
+risk line and docking beside loot, shop and trade; `docs/inventory.md`), and
+one `*-ui.ts` per panel. God's View is
 `gods-view.ts` (shell) plus `gods-view/*.ts`, `art-ui.ts` (Art tab shell and
 `BUTTON_ACTIONS` dispatch table) + `art-ui/` (`state.ts` shared `artState`,
 `pages.ts` sub-tab renderers, `walkers.ts` character/ways/hand-point editors,

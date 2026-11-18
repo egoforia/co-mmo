@@ -64,12 +64,16 @@ export const CHAPTERS: Chapter[] = [
         <li>The great places have creatures of their own: Thorn Wolves and Dune Jackals hunt in packs at night, Bark Golems and the Sand Wyrm guard their ground, Mummy Guards and Drowned Deckhands walk their rounds after dark, and Lantern Moths and Hermit Crabs only run away.</li>
         <li>In the dark, in fog and in sandstorms, most creatures only notice you up close. Carry a torch or anything else that glows and they see you coming.</li>
         <li>Health returns slowly once you are out of the fight. A <b>Tonic</b> restores it at once.</li>
-        <li>If you fall, you wake at the Sanctum shrine with everything you carried, Weakened for a short while.</li>
+        <li>If you fall and wake at the Sanctum shrine, you are Weakened for a short while, and a fall has a price: see Your things below.</li>
         <li><b>1</b> to <b>6</b> use your abilities; <b>K</b> opens your spellbook to choose which. Your Calling teaches you a skill at levels 1, 2, 4, 6 and 8. Each costs <b>Energy</b> (the blue bar), which comes back by itself, and rests a few seconds after use. Old Bramble teaches Power Strike when you help her, Sister Amala teaches Mend for a little gold, and the Cactus Elder sells the Scroll of Firebolt.</li>
       </ul>
       <h3>Your things</h3>
       <ul>
-        <li><b>I</b> opens your bag. Click a Tonic to drink it, a weapon, hat, coat, cloak, boots or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off. Your bag holds ${BAG_SLOTS} stacks, and your gold is coins in it: monsters drop their gold on their bodies, and a full bag leaves the rest behind.</li>
+        <li><b>I</b> opens your bag: what you wear round your figure, and ${BAG_SLOTS} cells for what you carry. Click a Tonic to drink it, a weapon, hat, coat, cloak, boots or charm to wear it, and a scroll to learn what it teaches. Click what you wear to take it off. Your gold is coins in one cell: monsters drop their gold on their bodies, and a full bag leaves the rest behind.</li>
+        <li>Point at anything to see its card. For gear it shows what wearing it would change, green for what you gain and red for what you lose.</li>
+        <li>Drag things to move them, onto each other to join a stack, onto where they are worn to put them on. Right-click (or hold on a phone, or press <b>M</b>) for more: split a stack, drop it, or sort the bag. Dropped things lie on the ground for ten minutes for anyone to take.</li>
+        <li>The red line at the top of the bag says what a fall would cost you where you stand. In a safe area it turns green.</li>
+        <li>With a shop or a trade open, the bag opens beside it. Shift-click a thing to sell one, or to put one on the table.</li>
         <li>Choose another player as your target (click them) and click a Tonic to give it to them, if they stand close by. Items can be used at most twice a second.</li>
         <li>Outside safe areas any player may attack you, and you them: click a player to choose them, then strike. Area skills hurt every player they cover, except your party. Party members cannot hurt each other; leave the party first. The Sanctum and the square where each land's travellers arrive are safe: no one is hurt there, and monsters give up the chase at the edge.</li>
         <li>If you fall, a friend may ring you back where you lie. Waking at the shrine instead costs a quarter of the XP to your next level (you can drop a level), all the gold you carry, and now and then a piece you wear or your whole bag. What you drop lies on your body where you fell for an hour: go back for it before someone else does.</li>

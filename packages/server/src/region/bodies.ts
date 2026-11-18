@@ -2,6 +2,14 @@ import {
   BAG_FULL,
   GOLD,
   ITEMS,
+  PILE_JOIN,
+  PILE_KIND,
+  PILE_MS,
+  PILE_STACKS,
+  pileName,
+  collides,
+  isBlocking,
+  tileAt,
   SEARCH_RANGE,
   addItem,
   type InventorySlot,
@@ -10,9 +18,13 @@ import {
 } from '@co-mmo/shared';
 import type { Body, PlayerState, RegionState } from './state.ts';
 
+/** How far beside the player a new pile lies, in tiles along each axis. */
+const PILE_SIDE = 0.45;
+
 /**
- * Bodies of defeated creatures and their loot windows: anyone may take what
- * a body holds, and everyone with its window open sees it change.
+ * Bodies of defeated creatures, piles of dropped things, and their loot
+ * windows: anyone may take what a body or pile holds, and everyone with its
+ * window open sees it change.
  */
 export class Bodies {
   constructor(
@@ -91,6 +103,52 @@ export class Bodies {
     if (body.owner && body.owner.id !== p.info.id) this.s.tellAnywhere(body.owner.id, `${p.info.name} took ${names} from your body.`);
     this.s.bodyChanged(body);
     this.showLoot(body);
+  }
+
+  /**
+   * Drops `qty` from the stack in bag cell `index` (all of it when missing)
+   * at the player's feet: it joins a pile close by, or starts one, which
+   * anyone may take for PILE_MS. Bound things stay in the bag.
+   */
+  drop(p: PlayerState, index: number, qty?: number): void {
+    const c = p.character;
+    const slot = c.inventory[index];
+    if (!slot || c.hp <= 0) return;
+    const def = ITEMS[slot.item];
+    if (def?.bound) return this.s.notice(p, `The ${def.name} stays with you; it cannot be dropped.`);
+    const n = Math.min(qty ?? slot.qty, slot.qty);
+    slot.qty -= n;
+    if (slot.qty === 0) c.inventory.splice(index, 1);
+    p.dirty = true;
+    const now = this.s.now();
+    const floor = p.floor ?? 0;
+    let pile = this.s.bodies.find((b) => b.kind === PILE_KIND && b.floor === floor && b.loot.length < PILE_STACKS && Math.hypot(b.x - p.x, b.y - p.y) <= PILE_JOIN);
+    if (!pile) {
+      const at = this.beside(p.x, p.y, floor);
+      pile = { id: `pile-${p.info.id}-${now}-${this.s.bodyCount++}`, kind: PILE_KIND, def: { name: '', art: '' }, x: at.x, y: at.y, floor, until: 0, finders: [], loot: [] };
+      this.s.bodies.push(pile);
+    }
+    const same = pile.loot.find((s) => s.item === slot.item);
+    if (same) same.qty += n;
+    else pile.loot.push({ item: slot.item, qty: n });
+    // Each drop starts its ten minutes again; the pile's look is the first thing on it.
+    pile.until = now + PILE_MS;
+    pile.def = { name: pileName(pile.loot), art: ITEMS[pile.loot[0]!.item]?.art ?? '' };
+    const what = slot.item === GOLD ? `${n} gold` : `${n > 1 ? `${n} × ` : 'the '}${def?.name ?? slot.item}`;
+    this.s.notice(p, `You drop ${what}. Anyone may take it for ten minutes.`);
+    this.showLoot(pile);
+  }
+
+  /**
+   * Where a new pile lies: a step to the player's right on screen (half a
+   * tile along x, back along y, at the same depth), so it doesn't stand in
+   * front of them; at their feet when that spot is in a wall.
+   */
+  private beside(x: number, y: number, floor: number): { x: number; y: number } {
+    const to = { x: x + PILE_SIDE, y: y - PILE_SIDE };
+    const map = this.s.map;
+    const open = !isBlocking(tileAt(map, Math.floor(to.x), Math.floor(to.y), floor)) && !collides(map, to.x, to.y, floor);
+    return open ? to : { x, y };
   }
 
   /** Shows a body's loot again to everyone who has its window open, closing it once nothing is left. */

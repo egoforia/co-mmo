@@ -10,6 +10,7 @@ import {
   heldSize,
   ITEMS,
   Interpolator,
+  PILE_KIND,
   PLAYER_SPEED,
   WALK_FRAMES,
   facingSide,
@@ -254,6 +255,14 @@ export function sizeCreature(scene: Phaser.Scene, metrics: FigureMetricsCache, a
 
 /** A body is the creature's own painted picture, laid on its side and faded a little. */
 export function makeBody(scene: Phaser.Scene, metrics: FigureMetricsCache, b: BodyState): Avatar {
+  // A pile of dropped things is the first thing's own picture, standing on the ground at a tiny thing's size.
+  if (b.kind === PILE_KIND) {
+    const pile = makeAvatar(scene, metrics, b.asset, bodyLabel(b), false, 'item-goat-horn');
+    pile.label.setColor('#c0cbdc').setFontSize(Math.round(T * 0.18));
+    pile.height = CREATURE_HEIGHTS.tiny;
+    fitFigure(scene, metrics, pile, pile.body.texture.key, true);
+    return pile;
+  }
   // A player's body is drawn as the player, lying down.
   const a = makeAvatar(scene, metrics, b.owner ? playerTexture(b.owner, b.race) : b.asset, bodyLabel(b), false, b.owner ? undefined : 'woods-mushroom');
   a.label.setColor('#c0cbdc').setFontSize(Math.round(T * 0.18));

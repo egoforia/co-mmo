@@ -177,6 +177,7 @@ async function take(shot: Shot): Promise<Taken> {
     if (!spot) throw new Error(`The shot ${shot.name} puts the player inside a wall at ${wanted.x}, ${wanted.y}, with no free tile near.`);
     // Tough, so the land's creatures can't knock the player back to a shrine before the picture.
     const hardy = { ...newCharacter(), level: 30 };
+    for (const s of shot.carry ?? []) hardy.inventory.push({ ...s });
     world.store.savePosition(id, spot.x, spot.y, regionId, { ...hardy, hp: maxHp(hardy) }, spot.floor ?? 0);
 
     const context = await windowFor(shot, token);

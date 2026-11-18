@@ -6,7 +6,8 @@ import { ItemMenu, type MenuEntry, type MenuSplit } from './item-menu.ts';
 
 // How a player handles things in the bag (inventory refactor, step 5): drag
 // and drop, the item menu (right-click, a long touch, or M), and keys: the
-// arrows choose a cell, Enter uses it, M opens its menu and S splits it.
+// arrows choose a cell, Enter uses it, M opens its menu, S splits it and
+// Delete drops it on the ground.
 // The server decides every change; this only asks.
 
 /** What the bag's handling needs from the game. */
@@ -36,6 +37,7 @@ export class BagInput {
     new BagDrag(root, {
       accepts: (from, to) => this.accepts(from, to),
       drop: (from, to) => this.drop(from, to),
+      dropOut: (index) => this.dropStack(index),
       longPress: (el) => this.openMenu(el),
     });
     root.addEventListener('contextmenu', (e) => {
@@ -100,11 +102,18 @@ export class BagInput {
     const entries: MenuEntry[] = [];
     const use = useWord(stack.item);
     if (use) entries.push({ label: use, run: () => this.actions.use(stack.item) });
+    if (!ITEMS[stack.item]?.bound) entries.push({ label: stack.qty > 1 ? `Drop all ${stack.qty}` : 'Drop', run: () => this.dropStack(index) });
     entries.push({ label: 'Sort the bag', run: () => this.actions.bag({ t: 'bag', action: 'sort' }) });
     const split: MenuSplit | undefined = stack.qty > 1 && stack.item !== GOLD
       ? { qty: stack.qty, run: (qty) => this.actions.bag({ t: 'bag', action: 'split', from: index, qty }) }
       : undefined;
     this.menu.show(el.getBoundingClientRect(), ITEMS[stack.item]?.name ?? stack.item, entries, split, splitFirst && !!split);
+  }
+
+  /** Drops the whole stack in a cell at the player's feet, as a pile anyone may take for ten minutes. */
+  private dropStack(index: number): void {
+    const stack = this.actions.character().inventory[index];
+    if (stack) this.actions.bag({ t: 'bag', action: 'drop', from: index });
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -123,7 +132,11 @@ export class BagInput {
     }
     if (!inBag || chosen.tagName !== 'BUTTON') return;
     const key = e.key.toLowerCase();
-    if (key === 'm' || key === 's') {
+    if (key === 'delete' && chosen.dataset.index !== undefined) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.dropStack(Number(chosen.dataset.index));
+    } else if (key === 'm' || key === 's') {
       e.preventDefault();
       e.stopPropagation();
       this.openMenu(chosen, key === 's');

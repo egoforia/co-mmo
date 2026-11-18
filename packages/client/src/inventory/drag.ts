@@ -3,7 +3,7 @@ import type { EquipSlot } from '@co-mmo/shared';
 // Dragging in the bag (inventory refactor, step 5), with pointer events so a
 // mouse, a pen and a finger all work: drag a stack to another cell (move,
 // merge or swap), onto a worn slot (wear), or a worn piece onto the grid
-// (take off). A touch held still opens the item menu instead. The window is
+// (take off), or out of the window (drop on the ground). A touch held still opens the item menu instead. The window is
 // redrawn whenever the character changes, so everything listens on the
 // window's root, which stays.
 
@@ -30,6 +30,8 @@ export interface DragActions {
   drop(from: DragEnd, to: DragEnd): void;
   /** True when `from` may be let go over `to`, to light the cell up. */
   accepts(from: DragEnd, to: DragEnd): boolean;
+  /** A stack from the grid let go outside the window: drop it on the ground. */
+  dropOut(index: number): void;
   /** A touch held still on a cell or worn slot. */
   longPress(el: HTMLElement): void;
 }
@@ -111,6 +113,7 @@ export class BagDrag {
       const to = over ? dragEnd(over) : undefined;
       this.swallowUntil = performance.now() + 300;
       if (to) this.actions.drop(p.from, to);
+      else if ('index' in p.from && !this.root.contains(document.elementFromPoint(e.clientX, e.clientY))) this.actions.dropOut(p.from.index);
     }
     this.reset();
   }

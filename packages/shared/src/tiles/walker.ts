@@ -56,12 +56,15 @@ export function tileTaken(among: Among | undefined, anchor: TileSpot, floor: num
  * blocked by the land, along one side of it (sliding along a wall). When
  * someone stands on the tile asked for, no step: the walker stays put and
  * only turns to face them (egoforia, 2026-11-16), so pressing towards a
- * monster never slips you past it to a tile you did not choose.
+ * monster never slips you past it to a tile you did not choose. That holds
+ * even when the land also blocks the diagonal (a tree on its corner): the
+ * monster is what was walked at, so there is no sliding round it.
  */
 function chooseWay(map: RegionMap, from: TileSpot, want: StepWay, floor: number, among?: Among): StepWay | undefined {
   const land = (w: StepWay) => canStep(map, from, w, 1, floor);
   const free = (w: StepWay) => !tileTaken(among, stepped(from, w), floor);
-  if (land(want)) return free(want) ? want : undefined;
+  if (!free(want)) return undefined;
+  if (land(want)) return want;
   const slides: StepWay[] = isDiagonal(want) ? [{ dx: want.dx, dy: 0 }, { dx: 0, dy: want.dy }] : [];
   return slides.find((w) => land(w) && free(w));
 }

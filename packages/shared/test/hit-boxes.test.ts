@@ -99,5 +99,7 @@ describe('a player among bodies', () => {
     expect(apart(there)).toBeGreaterThanOrEqual(PERSON_RADIUS * 2);
     // Big creatures stand wider.
     expect(bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: 0, y: 0, health: 1, size: 'colossal' }])[0]!.r).toBe(creatureRadius('colossal'));
+    // A big monster holds every tile of its square in the browser too, as it does on the server.
+    expect(bodiesSeen([{ id: 'c', kind: 'k', asset: 'a', name: 'C', x: 0, y: 0, health: 1, size: 'high' }])[0]!.width).toBe(2);
   });
 });

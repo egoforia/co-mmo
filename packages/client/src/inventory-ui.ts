@@ -1,6 +1,7 @@
 import { goldOf, type Character, type OwnerEntry, type RaceId } from '@co-mmo/shared';
 import { bagGridHtml, slotCount } from './inventory/bag-html.ts';
 import { dollHtml } from './inventory/doll.ts';
+import { riskLineHtml } from './inventory/risk-line.ts';
 import { GearHistories } from './inventory/history.ts';
 import { sheetHtml } from './inventory/sheet-html.ts';
 import { escapeHtml } from './ui.ts';
@@ -35,14 +36,18 @@ export class InventoryWindow {
     return this.histories.words(id);
   }
 
-  /** The window's HTML; asks about gear whose history is not known yet. */
-  html(c: Character): string {
+  /**
+   * The window's HTML; asks about gear whose history is not known yet.
+   * `safe` is true while the player stands in a safe area, for the risk line.
+   */
+  html(c: Character, safe = false): string {
     this.histories.askFor(c, this.askHistory);
     const tab = (id: InventoryTab, name: string) =>
       `<button type="button" role="tab" data-tab="${id}" aria-selected="${this.tab === id}"${this.tab === id ? ' class="on"' : ''}>${name}</button>`;
     const body = this.tab === 'sheet'
       ? sheetHtml(c)
-      : `<div class="bag-tools"><button type="button" data-bag-action="sort">Sort</button></div>
+      : `${riskLineHtml(c, safe)}
+        <div class="bag-tools"><button type="button" data-bag-action="sort">Sort</button></div>
         <div class="bag-body">${dollHtml(c, this.figure(c.race))}${bagGridHtml(c)}</div>
         <p class="keys"><kbd>Click</kbd> use or wear · <kbd>Drag</kbd> move, wear, take off, or out to drop · <kbd>Right-click</kbd>, hold or <kbd>M</kbd> more · <kbd>S</kbd> split · <kbd>Delete</kbd> drop · arrows choose</p>`;
     return `

@@ -67,6 +67,8 @@ export class RpgUi {
   private readonly card: ItemCard;
   /** Dragging, the item menu and keys in the bag (inventory/bag-input.ts). */
   private readonly bagInput: BagInput;
+  /** In a safe area, for the bag's risk line (set from each snapshot). */
+  private safe = false;
   /** The shop of the person last spoken to, when the world editor gave them one. */
   private wares: ShopDef | undefined;
   private lastAttack = 0;
@@ -97,7 +99,11 @@ export class RpgUi {
       const stat = target.closest<HTMLElement>('[data-stat]')?.dataset.stat as keyof Stats | undefined;
       const tab = target.closest<HTMLElement>('[data-tab]')?.dataset.tab as InventoryTab | undefined;
       const bagAction = target.closest<HTMLElement>('[data-bag-action]')?.dataset.bagAction;
-      if (tab) {
+      const chapter = target.closest<HTMLElement>('[data-chapter]')?.dataset.chapter;
+      if (chapter) {
+        this.chapter = chapter;
+        this.toggle('bible', true);
+      } else if (tab) {
         this.bag.tab = tab;
         this.renderInventory();
       } else if (bagAction === 'sort') actions.bag?.({ t: 'bag', action: 'sort' });
@@ -148,6 +154,13 @@ export class RpgUi {
     this.energy = character.energy;
     this.render();
     this.card.refresh();
+  }
+
+  /** Whether the player stands in a safe area now; the bag's risk line changes when it does. */
+  setSafe(safe: boolean): void {
+    if (safe === this.safe) return;
+    this.safe = safe;
+    if (!$('inventory').hidden) this.renderInventory();
   }
 
   setVitals(hp: number, energy: number): void {
@@ -270,7 +283,7 @@ export class RpgUi {
 
   private renderInventory(): void {
     this.bagInput.keepFocus(() => {
-      $('inventory').innerHTML = this.bag.html(this.character);
+      $('inventory').innerHTML = this.bag.html(this.character, this.safe);
     });
   }
 

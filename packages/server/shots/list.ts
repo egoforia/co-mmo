@@ -201,6 +201,18 @@ export const SHOTS: Shot[] = [
     mustSee: ['a small shell picture stands at the player\'s feet with the name "Dropped Crab Shell (E for loot)"', 'the chat says anyone may take it for ten minutes'],
   },
   {
+    name: 'woods-bag-risk',
+    about: 'The bag outside a safe area: the "If you fall here" line names what a death costs.',
+    region: 'woods',
+    at: (map) => ({ x: map.spawn.x + 12, y: map.spawn.y }),
+    carry: [{ item: 'gold', qty: 340 }],
+    open: async (page) => {
+      await page.keyboard.press('i');
+      await page.waitForSelector('#inventory .risk-line:not(.safe)');
+    },
+    mustSee: ['a red line at the top of the bag: the XP and all 340 gold lost, and the 15% chances', 'a Why? link at its end'],
+  },
+  {
     name: 'sanctum-bag-phone',
     about: 'The bag on a phone-sized screen: the doll above the grid.',
     region: 'sanctum',

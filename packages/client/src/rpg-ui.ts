@@ -1,59 +1,26 @@
 import {
-  BAG_SLOTS,
-  MAX_HISTORY_ASK,
-  makesCopies,
-  type OwnerEntry,
-  GOLD,
-  goldOf,
-  ABILITIES,
-  CALLINGS,
-  EQUIP_SLOTS,
-  ITEMS,
   QUESTS,
-  RACES,
-  SLOT_NAMES,
   STATUSES,
   statusArt,
   attackCooldown,
-  armor,
-  attackPower,
-  attackReach,
-  familyText,
-  bonusText,
-  creatorXpToNext,
-  critChance,
-  dodgeChance,
+  goldOf,
   maxEnergy,
   maxHp,
   questProgressText,
-  materialWords,
-  copyWords,
-  fullStyles,
-  regionDef,
-  styleBonusWords,
-  styleWords,
-  STYLES,
-  toolWords,
-  totalStats,
-  ward,
   xpToNext,
   type Character,
   type DialogueMessage,
+  type OwnerEntry,
   type ShopDef,
   type EquipSlot,
   type Stats,
   type StatusView,
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
-import { itemLabel } from './kit-ui.ts';
-import { pathChoicesHtml, pathSheetHtml } from './path-ui.ts';
+import { InventoryWindow } from './inventory-ui.ts';
+import { pathChoicesHtml } from './path-ui.ts';
 import { escapeHtml } from './ui.ts';
-import { artSrc, contentEntries, itemIcon } from './wished.ts';
-
-/** A defence value with at most one decimal (half of Vigor can be 1.5). */
-const one = (n: number): string => String(Math.round(n * 10) / 10);
-/** A chance as a whole percent. */
-const percent = (n: number): string => `${Math.round(n * 100)}%`;
+import { artSrc } from './wished.ts';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -86,10 +53,8 @@ export class RpgUi {
   private hp: number;
   private energy: number;
   private chapter = CHAPTERS[0]!.id;
-  /** Owner histories of pieces of gear, by item id, as the server told them. */
-  private readonly histories = new Map<string, OwnerEntry[]>();
-  /** Pieces whose history was asked for already. */
-  private readonly askedHistory = new Set<string>();
+  /** The bag window's contents (inventory-ui.ts). */
+  private readonly bag: InventoryWindow;
   /** The shop of the person last spoken to, when the world editor gave them one. */
   private wares: ShopDef | undefined;
   private lastAttack = 0;
@@ -102,6 +67,7 @@ export class RpgUi {
     this.character = character;
     this.hp = character.hp;
     this.energy = character.energy;
+    this.bag = new InventoryWindow(actions.askHistory ? (items) => actions.askHistory!(items) : undefined);
     for (const id of ['stats', 'quests', 'keys']) $(id).hidden = false;
     window.addEventListener('keydown', (e) => this.onKey(e));
     $('inventory').addEventListener('click', (e) => {
@@ -267,80 +233,12 @@ export class RpgUi {
 
   /** Owner histories the server sent: the bag shows them on each piece's card. */
   setHistories(histories: Record<string, OwnerEntry[]>): void {
-    for (const [id, list] of Object.entries(histories)) this.histories.set(id, list);
+    this.bag.setHistories(histories);
     if (!$('inventory').hidden) this.renderInventory();
   }
 
-  /** A piece's owners in plain words for its card, or '' when none are known yet. */
-  private historyWords(id: string): string {
-    const list = this.histories.get(id);
-    if (!list?.length) return '';
-    const day = (at: number) => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-    const how: Record<OwnerEntry['how'], string> = { crafted: 'made by', bought: 'bought by', looted: 'looted by', given: 'given to', found: 'found by' };
-    return ` Owners: ${list.map((o) => `${how[o.how]} ${o.name} (${day(o.at)})`).join(', ')}.`;
-  }
-
   private renderInventory(): void {
-    const c = this.character;
-    // Each piece of gear's history is asked for once; the card shows it when it comes.
-    const held = [...c.inventory.map((s) => s.item), ...Object.values(c.equipment).filter((id): id is string => !!id)];
-    // A piece that left the bag is asked about again if it comes back: it has a new owner since.
-    for (const id of this.askedHistory) if (!held.includes(id)) this.askedHistory.delete(id);
-    const gear = held.filter((id) => makesCopies(ITEMS[id]) && !this.askedHistory.has(id));
-    if (gear.length && this.actions.askHistory) {
-      for (const id of gear) this.askedHistory.add(id);
-      this.actions.askHistory(gear.slice(0, MAX_HISTORY_ASK));
-    }
-    const slots = c.inventory
-      .map((s) => {
-        const def = ITEMS[s.item];
-        if (!def) return '';
-        const ruled = contentEntries().some((e) => e.definition?.kind === 'rule' && s.item.startsWith(`${e.id}-`));
-        const hint = def.kind === 'book' ? 'Click to read'
-          : def.heal ? 'Click to drink'
-            : def.slot ? `Wear: ${[familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · ') || SLOT_NAMES[def.slot]}`
-              : def.teaches ? 'Click to read and learn'
-                : ruled ? 'Click to use' : s.item === GOLD ? 'Spend at shops, or trade' : 'For crafting and trade';
-        return `<button type="button" class="slot" data-item="${escapeHtml(s.item)}" title="${escapeHtml(`${def.name}: ${def.description}${def.material ? ` ${materialWords(def)}` : ''}${copyWords(def) ? ` ${copyWords(def)}` : ''}${def.style ? ` ${styleWords(def, regionName)}` : ''}${def.tool ? ` ${toolWords(def)}` : ''}${this.historyWords(s.item)}`)}">
-          <img src="${escapeHtml(itemIcon(def))}" alt="">
-          ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
-          <span class="name rarity-${def.rarity ?? 'common'}">${escapeHtml(def.name)}</span><span class="hint">${escapeHtml(hint)}</span></button>`;
-      })
-      .join('');
-    const worn = EQUIP_SLOTS.map((slot) => {
-      const id = c.equipment[slot];
-      const def = id ? ITEMS[id] : undefined;
-      return def
-        ? `<button type="button" class="slot worn" data-slot="${slot}" title="${escapeHtml(`Click to take it off.${copyWords(def) ? ` ${copyWords(def)}` : ''}${this.historyWords(id!)}`)}">${itemLabel(id!)}<span class="hint">${escapeHtml([familyText(def), bonusText(def.bonus)].filter(Boolean).join(' · '))}</span></button>`
-        : `<div class="slot empty"><span class="name">${SLOT_NAMES[slot]}</span><span class="hint">Nothing worn</span></div>`;
-    }).join('');
-    const s = c.stats;
-    const t = totalStats(c);
-    const free = c.calling ? c.freePoints : 0;
-    const place = (k: keyof Stats) => free > 0 ? `<button type="button" class="place" data-stat="${k}" title="Place a free point here">+</button>` : '';
-    const stat = (name: string, k: keyof typeof s) => `<div><dt>${name}</dt><dd>${t[k]}${t[k] > s[k] ? `<small>+${t[k] - s[k]}</small>` : ''}${place(k)}</dd></div>`;
-    const who = c.race && c.calling ? `${RACES[c.race].name} ${CALLINGS[c.calling].name}` : '';
-    const calling = who ? `<p class="calling">${escapeHtml(who)}${free > 0 ? ` · <b>${free} free point${free > 1 ? 's' : ''}</b> to place with +` : ''}</p>` : '';
-    const abilities = c.abilities.filter((a) => ABILITIES[a]).map((a) => {
-      const key = c.hotbar.indexOf(a) + 1;
-      return `<li>${key ? `<kbd>${key}</kbd> ` : ''}<b>${escapeHtml(ABILITIES[a]!.name)}</b> ${escapeHtml(ABILITIES[a]!.description)}</li>`;
-    }).join('');
-    $('inventory').innerHTML = `
-      <h2>Your bag <button type="button" class="close" data-close aria-label="Close">×</button></h2>
-      <h3>Worn</h3>
-      <div class="slots gear">${worn}</div>
-      <h3>Carried <small>${c.inventory.length} of ${BAG_SLOTS} slots</small></h3>
-      <div class="slots">${slots}</div>
-      ${calling}
-      ${fullStyles(c).map((st) => `<p class="calling">Full ${escapeHtml(STYLES[st]!.name)} style: ${escapeHtml(styleBonusWords(st))}</p>`).join('')}
-      <dl class="sheet">
-        ${stat('Might', 'might')}${stat('Agility', 'agility')}${stat('Wit', 'wit')}${stat('Spirit', 'spirit')}${stat('Vigor', 'vigor')}
-        <div><dt>Damage</dt><dd>${attackPower(c)}</dd></div><div><dt>Reach</dt><dd>${one(attackReach(c))}<small>steps</small></dd></div><div><dt>Attack every</dt><dd>${attackCooldown(c).toFixed(2)}<small>s</small></dd></div><div><dt>Armour</dt><dd>${one(armor(c))}</dd></div><div><dt>Ward</dt><dd>${one(ward(c))}</dd></div>
-        <div><dt>Critical hit</dt><dd>${percent(critChance(c))}</dd></div><div><dt>Dodge</dt><dd>${percent(dodgeChance(c))}</dd></div>
-        <div class="wide"><dt>Creator level</dt><dd>${c.creatorLevel}<small>${c.creatorXp} / ${creatorXpToNext(c.creatorLevel)}</small></dd></div>
-      </dl>
-      ${pathSheetHtml(c)}
-      ${abilities ? `<h3>Abilities</h3><ul class="abilities">${abilities}</ul>` : '<p class="note">No abilities yet. Trainers, scrolls and quests teach them.</p>'}`;
+    $('inventory').innerHTML = this.bag.html(this.character);
   }
 
   private renderBible(): void {
@@ -353,9 +251,4 @@ export class RpgUi {
       <article>${chapter.html(this.character)}</article>
       <button type="button" class="close" data-close aria-label="Close">×</button>`;
   }
-}
-
-/** A region's name for a style's card. */
-function regionName(id: string): string {
-  return regionDef(id)?.name ?? id;
 }

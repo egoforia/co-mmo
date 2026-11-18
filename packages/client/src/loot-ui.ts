@@ -1,4 +1,5 @@
 import { ITEMS, type LootActionMessage, type LootView } from '@co-mmo/shared';
+import { GRID_KEYS, gridStep, type GridMove } from './inventory/grid.ts';
 import { escapeHtml } from './ui.ts';
 import { artSrc, itemIcon } from './wished.ts';
 
@@ -71,10 +72,7 @@ export class LootUi {
   private onKey(e: KeyboardEvent): void {
     if (!this.view || this.actions.typing() || e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
-    const moves: Record<string, 'left' | 'right' | 'up' | 'down'> = {
-      arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right', arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down',
-    };
-    if (moves[key]) this.move(moves[key]!);
+    if (GRID_KEYS[key]) this.move(GRID_KEYS[key]!);
     else if (key === 'enter' || key === ' ') this.take(this.selected);
     else if (key === 't') this.takeAll();
     else if (key === 'escape' || key === 'e') this.close();
@@ -84,15 +82,10 @@ export class LootUi {
   }
 
   /** Moves the choice through the grid, row by row as the window lays it out. */
-  private move(to: 'left' | 'right' | 'up' | 'down'): void {
-    const count = this.view?.items.length ?? 0;
-    if (!count) return;
-    const slots = [...$('loot').querySelectorAll<HTMLElement>('[data-index]')];
-    const top = slots[0]?.offsetTop;
-    const columns = Math.max(1, slots.filter((s) => s.offsetTop === top).length);
-    const step = to === 'left' ? -1 : to === 'right' ? 1 : to === 'up' ? -columns : columns;
-    const next = this.selected + step;
-    if (next < 0 || next >= count) return;
+  private move(to: GridMove): void {
+    const tops = [...$('loot').querySelectorAll<HTMLElement>('[data-index]')].map((s) => s.offsetTop);
+    const next = gridStep(tops, this.selected, to);
+    if (next === this.selected) return;
     this.selected = next;
     this.render();
   }

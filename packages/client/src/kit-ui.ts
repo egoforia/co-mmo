@@ -3,6 +3,7 @@ import {
   skillName,
   ABILITIES,
   HOTBAR_SIZE,
+  GOLD,
   ITEMS,
   RECIPES,
   SHOPS,
@@ -347,11 +348,7 @@ export class KitUi {
     const add = target.closest<HTMLElement>('[data-add]')?.dataset.add;
     const remove = target.closest<HTMLElement>('[data-remove]')?.dataset.remove;
     if (add) {
-      const items = t.mine.items.map((s) => ({ ...s }));
-      const slot = items.find((s) => s.item === add);
-      if (slot) slot.qty = Math.min(slot.qty + 1, itemCount(this.character, add));
-      else items.push({ item: add, qty: 1 });
-      this.offer({ ...t.mine, items });
+      this.offerOne(add);
     } else if (remove) {
       this.offer({ ...t.mine, items: t.mine.items.filter((s) => s.item !== remove) });
     } else if (target.closest('[data-confirm]')) {
@@ -359,6 +356,32 @@ export class KitUi {
     } else if (target.closest('[data-cancel]')) {
       this.actions.trade({ t: 'trade', action: 'cancel' });
     }
+  }
+
+  /**
+   * Shift-click in the docked bag (inventory refactor, step 8): sells one to
+   * the open shop, or adds one to your side of the open trade. False when
+   * neither window is open or it takes no such thing.
+   */
+  fromBag(item: string): boolean {
+    const shop = this.shopNpc && !$('shop').hidden ? (this.shopNpc.shop ?? SHOPS[this.shopNpc.id]) : undefined;
+    if (shop?.buys && sellPrice(item) > 0) {
+      this.actions.shop('sell', this.shopNpc!.id, item);
+      return true;
+    }
+    return this.offerOne(item);
+  }
+
+  /** Adds one more of `item` to your side of the open trade; false when no trade is open or it can't be traded. */
+  private offerOne(item: string): boolean {
+    const t = this.trade;
+    if (!t || ITEMS[item]?.bound || item === GOLD) return false;
+    const items = t.mine.items.map((s) => ({ ...s }));
+    const slot = items.find((s) => s.item === item);
+    if (slot) slot.qty = Math.min(slot.qty + 1, itemCount(this.character, item));
+    else items.push({ item, qty: 1 });
+    this.offer({ ...t.mine, items });
+    return true;
   }
 
   private offer(offer: TradeOffer): void {

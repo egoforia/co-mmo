@@ -7,7 +7,8 @@ import { ItemMenu, type MenuEntry, type MenuSplit } from './item-menu.ts';
 // How a player handles things in the bag (inventory refactor, step 5): drag
 // and drop, the item menu (right-click, a long touch, or M), and keys: the
 // arrows choose a cell, Enter uses it, M opens its menu, S splits it and
-// Delete drops it on the ground.
+// Delete drops it on the ground; Shift-click or T sends it to a docked
+// shop or trade window.
 // The server decides every change; this only asks.
 
 /** What the bag's handling needs from the game. */
@@ -19,6 +20,8 @@ export interface BagInputActions {
   bag(m: BagMessage): void;
   /** True while typing in chat, so letters are not shortcuts. */
   typing(): boolean;
+  /** Moves one to the docked window: sells it to the shop or offers it in the trade; false when none takes it. */
+  toOther?(item: string): boolean;
 }
 
 /** Arrow keys as grid moves; the bag leaves WASD to walking, and S to splitting. */
@@ -46,6 +49,14 @@ export class BagInput {
       e.preventDefault();
       this.openMenu(el);
     });
+    // Shift-click sends a thing to the docked window instead of using it.
+    root.addEventListener('click', (e) => {
+      const item = e.shiftKey ? (e.target as HTMLElement).closest<HTMLElement>('[data-item]')?.dataset.item : undefined;
+      if (item && this.actions.toOther?.(item)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
     // Capturing first, so the keys the bag uses don't also walk the player.
     window.addEventListener('keydown', (e) => this.onKey(e), true);
   }
@@ -132,7 +143,11 @@ export class BagInput {
     }
     if (!inBag || chosen.tagName !== 'BUTTON') return;
     const key = e.key.toLowerCase();
-    if (key === 'delete' && chosen.dataset.index !== undefined) {
+    if (key === 't' && chosen.dataset.item) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.actions.toOther?.(chosen.dataset.item);
+    } else if (key === 'delete' && chosen.dataset.index !== undefined) {
       e.preventDefault();
       e.stopPropagation();
       this.dropStack(Number(chosen.dataset.index));

@@ -380,6 +380,7 @@ function play(token: string): void {
       },
       unequip: (slot) => connection.send({ t: 'equip', slot }),
       bag: (m) => connection.send(m),
+      fromBag: (item) => kit?.fromBag(item) ?? false,
       figure: (race) => artSrc(lookArt(myId) ?? playerArt(myId, race)),
       openShop: (npc) => kit?.openShop(npc),
       accept: (quest) => connection.send({ t: 'accept', quest }),

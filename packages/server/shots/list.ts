@@ -213,6 +213,27 @@ export const SHOTS: Shot[] = [
     mustSee: ['a red line at the top of the bag: the XP and all 340 gold lost, and the 15% chances', 'a Why? link at its end'],
   },
   {
+    name: 'shore-shop-docked',
+    about: "Marina's shop open with the bag docked beside it, after one shell was Shift-clicked across.",
+    region: 'shore',
+    at: (map) => {
+      const n = map.npcs.find((x) => x.id === 'marina');
+      if (!n) throw new Error('Marina is not on the shore.');
+      return { x: Math.floor(n.x) + 1, y: Math.floor(n.y) };
+    },
+    carry: [{ item: 'crab-shell', qty: 4 }, { item: 'gold', qty: 30 }],
+    open: async (page) => {
+      await page.keyboard.press('e');
+      await page.click('#dialogue [data-shop]');
+      await page.waitForSelector('#shop:not([hidden])');
+      await page.waitForSelector('#inventory:not([hidden])');
+      // Shift-click sells one shell across.
+      await page.click('#inventory [data-item="crab-shell"]', { modifiers: ['Shift'] });
+      await page.waitForSelector('#inventory [data-item="crab-shell"] .qty:text("3")');
+    },
+    mustSee: ['the bag on the left and the shop on the right, side by side, neither covering the other', 'three shells left in the bag after one was Shift-clicked across, and more gold'],
+  },
+  {
     name: 'sanctum-bag-phone',
     about: 'The bag on a phone-sized screen: the doll above the grid.',
     region: 'sanctum',

@@ -92,6 +92,23 @@ describe('a full bag', () => {
     expect(itemCount(c, b!)).toBe(0);
   });
 
+  it('sells a whole stack from a bag already past its slots', () => {
+    const c = newCharacter();
+    fill(c);
+    c.inventory.push({ item: 'tonic', qty: 3 }, { item: 'bread', qty: 1 });
+    expect(c.inventory.length).toBe(BAG_SLOTS + 2);
+    expect(sell(c, 'marina', 'tonic', 3)).toBeUndefined();
+    expect(itemCount(c, 'tonic')).toBe(0);
+    expect(goldOf(c)).toBeGreaterThan(0);
+    expect(c.inventory.length).toBe(BAG_SLOTS + 2);
+    // Selling one of a stack would need a new slot for the coins: still refused.
+    const d = newCharacter();
+    fill(d);
+    d.inventory.push({ item: 'tonic', qty: 3 });
+    expect(sell(d, 'marina', 'tonic', 1)).toBe(BAG_FULL);
+    expect(itemCount(d, 'tonic')).toBe(3);
+  });
+
   it('cannot take off gear, but can swap it for gear from the bag', () => {
     const c = newCharacter();
     c.inventory.push({ item: 'wooden-sword', qty: 1 });

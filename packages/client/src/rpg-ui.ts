@@ -20,6 +20,7 @@ import {
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
 import { InventoryWindow, type InventoryTab } from './inventory-ui.ts';
+import { BagInput } from './inventory/bag-input.ts';
 import { ItemCard } from './inventory/item-card.ts';
 import { pathChoicesHtml } from './path-ui.ts';
 import { escapeHtml } from './ui.ts';
@@ -64,6 +65,8 @@ export class RpgUi {
   private readonly bag: InventoryWindow;
   /** The card beside any item the pointer or focus is on (inventory/item-card.ts). */
   private readonly card: ItemCard;
+  /** Dragging, the item menu and keys in the bag (inventory/bag-input.ts). */
+  private readonly bagInput: BagInput;
   /** The shop of the person last spoken to, when the world editor gave them one. */
   private wares: ShopDef | undefined;
   private lastAttack = 0;
@@ -77,6 +80,13 @@ export class RpgUi {
     this.hp = character.hp;
     this.energy = character.energy;
     this.bag = new InventoryWindow(actions.askHistory ? (items) => actions.askHistory!(items) : undefined, actions.figure);
+    this.bagInput = new BagInput($('inventory'), {
+      character: () => this.character,
+      use: (item) => (item === 'bible' ? this.toggle('bible', true) : actions.use(item)),
+      unequip: (slot) => actions.unequip(slot),
+      bag: (m) => actions.bag?.(m),
+      typing: () => actions.typing(),
+    });
     this.card = new ItemCard(() => this.character, (id) => this.bag.historyWords(id));
     for (const id of ['stats', 'quests', 'keys']) $(id).hidden = false;
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -87,22 +97,11 @@ export class RpgUi {
       const stat = target.closest<HTMLElement>('[data-stat]')?.dataset.stat as keyof Stats | undefined;
       const tab = target.closest<HTMLElement>('[data-tab]')?.dataset.tab as InventoryTab | undefined;
       const bagAction = target.closest<HTMLElement>('[data-bag-action]')?.dataset.bagAction;
-      const index = Number(target.closest<HTMLElement>('[data-index]')?.dataset.index);
       if (tab) {
         this.bag.tab = tab;
-        this.bag.splitting = false;
         this.renderInventory();
       } else if (bagAction === 'sort') actions.bag?.({ t: 'bag', action: 'sort' });
-      else if (bagAction === 'split') {
-        this.bag.splitting = !this.bag.splitting;
-        this.renderInventory();
-      } else if (this.bag.splitting && item) {
-        // Half, rounded down; the server refuses a stack of one or a full bag, and says why.
-        const qty = Math.floor((this.character.inventory[index]?.qty ?? 0) / 2);
-        actions.bag?.({ t: 'bag', action: 'split', from: index, ...(qty ? { qty } : {}) });
-        this.bag.splitting = false;
-        this.renderInventory();
-      } else if (stat) actions.spendPoint(stat);
+      else if (stat) actions.spendPoint(stat);
       else if (item === 'bible') this.toggle('bible', true);
       else if (item) actions.use(item);
       else if (slot) actions.unequip(slot);
@@ -215,10 +214,7 @@ export class RpgUi {
     const opening = el.hidden && open !== false;
     el.hidden = !(open ?? el.hidden);
     // The Character window opens on its Bag tab.
-    if (opening && id === 'inventory') {
-      this.bag.tab = 'bag';
-      this.bag.splitting = false;
-    }
+    if (opening && id === 'inventory') this.bag.tab = 'bag';
     if (!el.hidden) {
       if (id === 'bible') $('inventory').hidden = true;
       this.render();
@@ -273,7 +269,9 @@ export class RpgUi {
   }
 
   private renderInventory(): void {
-    $('inventory').innerHTML = this.bag.html(this.character);
+    this.bagInput.keepFocus(() => {
+      $('inventory').innerHTML = this.bag.html(this.character);
+    });
   }
 
   private renderBible(): void {

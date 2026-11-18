@@ -111,7 +111,9 @@ export class ItemCard {
   show(target: HTMLElement | null): void {
     if (target === this.showing && target) return;
     this.showing = target;
-    if (!target || !target.isConnected) {
+    // Not over a drag on its way, or over the item menu.
+    const busy = document.querySelector('.drag-ghost, #item-menu:not([hidden])');
+    if (!target || !target.isConnected || busy) {
       this.el.hidden = true;
       return;
     }

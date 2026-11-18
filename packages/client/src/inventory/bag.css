@@ -43,9 +43,28 @@
   #inventory .doll-figure img { max-height: 170px; }
 }
 
-/* Sort and Split above the grid; while splitting, stacks show they can be clicked. */
+/* Sort above the grid. */
 #inventory .bag-tools { display: flex; gap: 6px; justify-content: flex-end; margin: -4px 0 8px; }
 #inventory .bag-tools button { background: transparent; color: var(--ink); border: 1px solid var(--edge); font-weight: 400; padding: 3px 10px; }
 #inventory .bag-tools button:hover { border-color: var(--accent); }
-#inventory .bag-tools button.on { border-color: var(--accent); color: var(--accent); }
-#inventory .splitting .bag-grid button.cell { cursor: copy; border-style: solid; border-color: var(--accent); }
+#inventory .keys kbd { font: inherit; color: var(--ink); }
+
+/* Dragging: the picture follows the pointer, the cell it left fades, the cell that would take it lights up. */
+#inventory .bag-grid button.cell, #inventory button.doll-slot { touch-action: none; }
+#inventory .cell.dragging { opacity: 0.35; }
+#inventory .cell.drop-here { border: 1px solid var(--accent); background: rgba(254, 174, 52, 0.18); opacity: 1; }
+#inventory .cell.empty:focus { outline: 1px solid var(--accent); opacity: 1; }
+.drag-ghost { position: fixed; z-index: 1002; width: 44px; height: 44px; margin: -22px 0 0 -22px; pointer-events: none; }
+.drag-ghost img { width: 44px; height: 44px; object-fit: contain; }
+
+/* The item menu (inventory/item-menu.ts). */
+#item-menu {
+  position: fixed; z-index: 1003; min-width: 160px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--bg); border: 1px solid var(--accent); font-size: 13px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+#item-menu[hidden] { display: none; }
+#item-menu .menu-title { margin: 0 0 4px; padding: 0 4px; color: var(--muted); font-size: 11px; }
+#item-menu button { text-align: left; padding: 5px 8px; background: transparent; color: var(--ink); border: 0; font: inherit; cursor: pointer; }
+#item-menu button:hover, #item-menu button:focus { background: rgba(255, 255, 255, 0.1); outline: none; color: var(--accent); }
+#item-menu .split { display: flex; gap: 6px; align-items: center; padding: 4px; border-top: 1px solid var(--edge); margin-top: 4px; }
+#item-menu .split input { width: 4em; font: inherit; background: var(--panel); color: var(--ink); border: 1px solid var(--edge); padding: 2px 4px; }

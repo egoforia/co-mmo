@@ -315,7 +315,7 @@ export class KitUi {
     const sells = shop.sells.filter((s) => ITEMS[s.item]).map((s) => {
       const def = ITEMS[s.item]!;
       const bonus = bonusText(def.bonus);
-      return `<li>${itemLabel(s.item)}<span class="info">${escapeHtml(bonus || def.description)}</span>
+      return `<li data-card="${escapeHtml(s.item)}">${itemLabel(s.item)}<span class="info">${escapeHtml(bonus || def.description)}</span>
         <button type="button" data-action="buy" data-id="${escapeHtml(s.item)}"${goldOf(c) < s.price ? ' disabled' : ''}>Buy · ${s.price} gold</button></li>`;
     });
     const teaches = shop.teaches.filter((t) => ABILITIES[t.ability]).map((t) => {
@@ -327,7 +327,7 @@ export class KitUi {
     const buys = shop.buys
       ? c.inventory.filter((s) => sellPrice(s.item) > 0).map((s) => {
         const price = sellPrice(s.item);
-        return `<li>${itemLabel(s.item)}${s.qty > 1 ? ` × ${s.qty}` : ''}<span class="info">${price} gold each</span>
+        return `<li data-card="${escapeHtml(s.item)}" data-card-qty="${s.qty}">${itemLabel(s.item)}${s.qty > 1 ? ` × ${s.qty}` : ''}<span class="info">${price} gold each</span>
           <button type="button" data-action="sell" data-id="${escapeHtml(s.item)}">Sell one</button>
           ${s.qty > 1 ? `<button type="button" class="quiet" data-action="sell" data-id="${escapeHtml(s.item)}" data-qty="${s.qty}">Sell all</button>` : ''}</li>`;
       })

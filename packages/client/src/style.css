@@ -1,4 +1,5 @@
 @import './editor/asset-picker.css';
+@import './inventory/item-card.css';
 :root {
   --ink: #ffffff;
   --muted: #c0cbdc;

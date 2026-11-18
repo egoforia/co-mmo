@@ -95,7 +95,7 @@ export class LootUi {
     const slots = view.items.map((s, i) => {
       const def = ITEMS[s.item];
       const name = def?.name ?? s.item;
-      return `<button type="button" class="slot${i === this.selected ? ' chosen' : ''}" data-index="${i}" title="${escapeHtml(def ? `${def.name}: ${def.description}` : name)}">
+      return `<button type="button" class="slot${i === this.selected ? ' chosen' : ''}" data-index="${i}"${def ? ` data-card="${escapeHtml(s.item)}" data-card-qty="${s.qty}"` : ''}>
         <img src="${escapeHtml(def ? itemIcon(def) : artSrc('item-goat-horn', true))}" alt="">
         ${s.qty > 1 ? `<span class="qty">${s.qty}</span>` : ''}
         <span class="name rarity-${def?.rarity ?? 'common'}">${escapeHtml(name)}</span><span class="hint">${i === this.selected ? 'Enter to take' : 'Click to take'}</span></button>`;

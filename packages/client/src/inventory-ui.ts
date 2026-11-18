@@ -19,16 +19,20 @@ export class InventoryWindow {
     this.histories.set(histories);
   }
 
+  /** A piece's owners in words for its item card, or ''. */
+  historyWords(id: string): string {
+    return this.histories.words(id);
+  }
+
   /** The window's HTML; asks about gear whose history is not known yet. */
   html(c: Character): string {
     this.histories.askFor(c, this.askHistory);
-    const words = (id: string) => this.histories.words(id);
     return `
       <h2>Your bag <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <h3>Worn</h3>
-      <div class="slots gear">${wornHtml(c, words)}</div>
+      <div class="slots gear">${wornHtml(c)}</div>
       <h3>Carried <small>${slotCount(c)}</small></h3>
-      <div class="slots">${carriedHtml(c, words)}</div>
+      <div class="slots">${carriedHtml(c)}</div>
       ${sheetHtml(c)}`;
   }
 }

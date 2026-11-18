@@ -174,6 +174,17 @@ export const SHOTS: Shot[] = [
     mustSee: ['the bag window is whole on screen, its slots and words readable'],
   },
   {
+    name: 'sanctum-bag-card',
+    about: 'The item card beside a carried thing in the bag.',
+    region: 'sanctum',
+    open: async (page) => {
+      await page.keyboard.press('i');
+      await page.hover('#inventory [data-card]');
+      await page.waitForSelector('#item-card:not([hidden])');
+    },
+    mustSee: ['the card stands beside the slot, not over it, and inside the screen', 'its name, kind and description are readable'],
+  },
+  {
     name: 'sanctum-phone',
     about: 'The game on a phone-sized screen.',
     region: 'sanctum',

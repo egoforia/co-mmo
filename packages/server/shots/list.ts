@@ -174,6 +174,17 @@ export const SHOTS: Shot[] = [
     mustSee: ['the bag window is whole on screen, its slots and words readable', 'the player stands in the doll with worn slots down both sides and the Bag slot marked', 'all 20 cells drawn, five across, empty ones dashed'],
   },
   {
+    name: 'sanctum-bag-menu',
+    about: 'The item menu, opened with a right-click on a carried thing.',
+    region: 'sanctum',
+    open: async (page) => {
+      await page.keyboard.press('i');
+      await page.click('#inventory .bag-grid [data-index="0"]', { button: 'right' });
+      await page.waitForSelector('#item-menu:not([hidden])');
+    },
+    mustSee: ['the menu stands beside the cell with the thing\'s name and its actions', 'no item card covers the menu'],
+  },
+  {
     name: 'sanctum-bag-phone',
     about: 'The bag on a phone-sized screen: the doll above the grid.',
     region: 'sanctum',

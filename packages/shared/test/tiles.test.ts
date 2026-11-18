@@ -215,4 +215,18 @@ describe('walking on tiles', () => {
     const walled = land(8, 8, [[2, 1]]);
     expect(walkTiles(walled, corner, 1, 1, 1, { ...among, bodies: bodyList([]) }).to).toEqual(at(1, 2));
   });
+
+  it('turns to face a monster on the diagonal asked for even when a tree on its corner blocks the diagonal', () => {
+    // A tree east of the walker: the diagonal south-east is cut by it, and the monster stands at its end.
+    const walled = land(8, 8, [[2, 1]]);
+    const other: HitBody = { x: 2.5, y: 2.5, floor: 0, r: PERSON_RADIUS, kind: 'creature' };
+    const among = { self: { r: PERSON_RADIUS, kind: 'player' as const, floor: 0 }, bodies: bodyList([other]) };
+    const corner: TileWalker = { x: 1.5, y: 1.5, floor: 0 };
+    // No slide south along the tree towards the monster's side: the walker stays put.
+    expect(walkTiles(walled, corner, 1, 1, 1, among)).toBe(corner);
+    // Walking for many ticks never moves them either.
+    let w = corner;
+    for (let i = 0; i < 30; i++) w = walkTiles(walled, w, 1, 1, 1, among);
+    expect(w).toBe(corner);
+  });
 });

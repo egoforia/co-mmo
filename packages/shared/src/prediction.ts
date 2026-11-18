@@ -3,7 +3,7 @@ import { PERSON_RADIUS, bodyList, creatureRadius, type Among, type HitBody } fro
 import type { CreatureState } from './protocol.ts';
 import type { Vec2 } from './movement.ts';
 import type { RegionMap } from './world.ts';
-import type { TileSpot } from './tiles/grid.ts';
+import { SIZE_TILES, type TileSpot } from './tiles/grid.ts';
 
 export interface PendingInput {
   seq: number;
@@ -91,7 +91,7 @@ export class Predictor {
  */
 export function bodiesSeen(creatures: CreatureState[] = [], players: { x: number; y: number; floor?: number; fallen?: boolean }[] = []): HitBody[] {
   return [
-    ...creatures.map((c): HitBody => ({ x: c.x, y: c.y, floor: c.floor ?? 0, r: creatureRadius(c.size), kind: 'creature' })),
+    ...creatures.map((c): HitBody => ({ x: c.x, y: c.y, floor: c.floor ?? 0, r: creatureRadius(c.size), kind: 'creature', width: SIZE_TILES[c.size ?? 'medium'] })),
     ...players.filter((p) => !p.fallen).map((p): HitBody => ({ x: p.x, y: p.y, floor: p.floor ?? 0, r: PERSON_RADIUS, kind: 'player' })),
   ];
 }

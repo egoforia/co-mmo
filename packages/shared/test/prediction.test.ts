@@ -121,8 +121,8 @@ describe('SnapshotClock', () => {
     expect(b - a).toBeCloseTo(16, 0);
     // Server time = local - 40 ms delay - 90 ms drawn behind.
     expect(clock.renderAt(4000)).toBeCloseTo(4000 - 40 - 90 + 100 * 50, -1);
-    // Beside us things are drawn one gap behind the quickest arrival: the wobble's margin left out.
-    expect(clock.present(4000)).toBeCloseTo(4000 - 40 - 50 + 100 * 50, -1);
+    // Beside us things are drawn one gap and half the wobble behind the quickest arrival.
+    expect(clock.present(4000)).toBeCloseTo(4000 - 40 - 50 - 15 + 100 * 50, -1);
   });
 
   it('follows a busy server whose ticks fall behind real time, slowing others a little instead of stopping them', () => {

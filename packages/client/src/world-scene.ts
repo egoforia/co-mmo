@@ -65,7 +65,8 @@ import { Marks } from './world-scene/marks.ts';
 import { aimMarks } from './world-scene/aim.ts';
 import { setStatusIcons } from './world-scene/status-icons.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
-import { creatureSpot, drawnSpot, settleJump, type DrawTimes } from './world-scene/near-present.ts';
+import { creatureSpot, drawnSpot, nearness, settleJump, type DrawTimes } from './world-scene/near-present.ts';
+import { HeldHurt, holdFor } from './world-scene/hit-timing.ts';
 import { Targeting } from './world-scene/targeting.ts';
 import { cullOffscreen } from './world-scene/cull.ts';
 import { seeThroughWalls } from './world-scene/edge-walls.ts';
@@ -716,10 +717,32 @@ export class WorldScene extends Phaser.Scene {
     return { past: this.clock.renderAt(now), present: this.clock.present(now) };
   }
 
-  /** A strike landed: number, flash and recoil, or a defeat. */
-  onHit(hit: HitMessage): void {
+  /** Health taken from us by strikes not shown yet (hit-timing.ts): what we show waits for them to land. */
+  readonly heldHurt = new HeldHurt();
+
+  /**
+   * A strike landed: number, flash and recoil, or a defeat, shown once its
+   * striker is drawn where it struck from (hit-timing.ts); `landed` then.
+   */
+  onHit(hit: HitMessage, landed?: () => void): void {
     if (!this.predictor) return;
-    showHit(this, hit, this.welcome.you.id, this.me, this.remotes, this.creatures, () => this.sky.darkness());
+    const times = this.drawTimes();
+    const creature = this.creatures.get(hit.by);
+    const drawnAt = hit.by === this.welcome.you.id ? undefined
+      : creature?.at ? times.past + (times.present - times.past) * nearness(this.shown, creature.at)
+      : this.remotes.has(hit.by) ? times.past : undefined;
+    const hold = holdFor(times.present + this.clock.gap, drawnAt);
+    const onMe = hit.target === this.welcome.you.id;
+    const show = () => {
+      if (!this.sys.isActive()) return;
+      showHit(this, hit, this.welcome.you.id, this.me, this.remotes, this.creatures, () => this.sky.darkness(), () => {
+        if (onMe) this.heldHurt.land(hit.amount);
+        landed?.();
+      });
+    };
+    if (onMe) this.heldHurt.hold(hit.amount);
+    if (hold > 0) this.time.delayedCall(hold, show);
+    else show();
   }
 
   /** Our own strike: a lunge and a slash, whether or not it lands. */

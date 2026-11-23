@@ -20,7 +20,12 @@ import {
   wayOnScreen,
 } from './types.ts';
 
-/** A strike landed: number, flash and recoil, or a defeat. */
+/**
+ * A strike landed: number, flash and recoil, or a defeat. A bolt flies
+ * first and all of that shows when it arrives; `landed` is called then (or
+ * at once for a blow), for what waits on the strike landing (its sound, our
+ * health).
+ */
 export function showHit(
   scene: Phaser.Scene,
   hit: HitMessage,
@@ -29,16 +34,26 @@ export function showHit(
   remotes: Map<string, Remote>,
   creatures: Map<string, Remote>,
   darkness: () => number,
+  landed?: () => void,
 ): void {
   const target = hit.target === myId ? me : remotes.get(hit.target) ?? creatures.get(hit.target);
   const attacker = hit.by === myId ? me : remotes.get(hit.by) ?? creatures.get(hit.by);
   // Firebolt, and plain attacks of wands, staves and bells, fly as a painted spark.
   const isBolt = (hit.ability && ABILITIES[hit.ability]?.effect === 'bolt') || (hit.ranged && hit.damage === 'arcane');
-  if (attacker && target && isBolt) fireBolt(scene, attacker, target, darkness);
-  else if (attacker && attacker !== me && target) lunge(scene, attacker, toward(attacker, target));
-  if (!target) return;
+  const land = () => {
+    if (target) strike(scene, hit, target, target === me, !remotes.has(hit.target) && target !== me);
+    landed?.();
+  };
+  if (attacker && target && isBolt) return fireBolt(scene, attacker, target, darkness, land);
+  if (attacker && attacker !== me && target) lunge(scene, attacker, toward(attacker, target));
+  land();
+}
+
+/** What a strike does where it lands: a burst, the number, a flash, a shake if it is us, and a creature sinking away when defeated. */
+function strike(scene: Phaser.Scene, hit: HitMessage, target: Avatar, hurtMe: boolean, fades: boolean): void {
+  // Gone from view while the bolt flew.
+  if (!target.body.active) return;
   burst(scene, target, hitArt(hit.ability));
-  const hurtMe = target === me;
   const number = scene.add
     .text(target.body.x + (Math.random() - 0.5) * T * 0.3, target.body.y - target.body.displayHeight * 0.8, `${hit.amount}`, {
       fontFamily: 'Georgia, "Times New Roman", serif',
@@ -55,7 +70,7 @@ export function showHit(
   scene.time.delayedCall(80, () => target.body.active && target.body.clearTint());
   if (hurtMe) scene.cameras.main.shake(120, 0.004);
   // Fallen players lie where they fell; only creatures sink away.
-  if (hit.defeated && target !== me && !remotes.has(hit.target)) fadeOut(scene, target);
+  if (hit.defeated && fades) fadeOut(scene, target);
 }
 
 /** Our own strike: a lunge and a slash, whether or not it lands (no slash for bows, wands and other ranged weapons). */
@@ -82,9 +97,12 @@ export function toward(a: Avatar, target: Avatar): { x: number; y: number } {
   return wayOnScreen(a.facing);
 }
 
-/** The painted Firebolt spark flies from the caster to the target. */
-export function fireBolt(scene: Phaser.Scene, from: Avatar, to: Avatar, darkness: () => number): void {
-  if (!scene.textures.exists('item-firebolt')) return;
+/** How long a bolt flies, ms. */
+const BOLT_FLIGHT_MS = 180;
+
+/** A painted spark flies from one to the other; `landed` is called as it arrives (at once while its picture is not painted). */
+export function fireBolt(scene: Phaser.Scene, from: Avatar, to: Avatar, darkness: () => number, landed?: () => void): void {
+  if (!scene.textures.exists('item-firebolt')) return landed?.();
   const y = (a: Avatar) => a.body.y - a.body.displayHeight * 0.5;
   const angle = Math.atan2(y(to) - y(from), to.body.x - from.body.x);
   const spark = scene.add.image(from.body.x, y(from), 'item-firebolt').setDisplaySize(T * 0.6, T * 0.6).setRotation(angle).setDepth(LABEL_DEPTH);
@@ -93,11 +111,11 @@ export function fireBolt(scene: Phaser.Scene, from: Avatar, to: Avatar, darkness
   const follow = () => lit && placeLight(lit, spark.x, spark.y, scene.time.now, spark.alpha > 0.2, darkness());
   follow();
   scene.tweens.add({
-    targets: spark, x: to.body.x, y: y(to), duration: 180, ease: 'Quad.easeIn', onUpdate: follow,
-    onComplete: () => scene.tweens.add({
+    targets: spark, x: to.body.x, y: y(to), duration: BOLT_FLIGHT_MS, ease: 'Quad.easeIn', onUpdate: follow,
+    onComplete: () => (landed?.(), scene.tweens.add({
       targets: spark, scale: spark.scale * 1.8, alpha: 0, duration: 160, onUpdate: follow,
       onComplete: () => { spark.destroy(); dropLight(scene, lit); },
-    }),
+    })),
   });
 }
 

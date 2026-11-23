@@ -112,14 +112,16 @@ export class SnapshotClock {
 
   /**
    * The server's present as nearly as it can be drawn at local time `now`,
-   * ms: one gap between snapshots short of what a snapshot arriving now as
-   * quickly as any has would carry, so the newest is nearly always already
-   * here. Things right beside our own player are drawn at it
-   * (Interpolator.ahead), so what strikes us stands where it strikes from.
-   * It leaves out the wobble's margin the smooth past keeps (`delay`).
+   * ms: one gap between snapshots, and half the network's wobble, short of
+   * what a snapshot arriving now as quickly as any has would carry, so the
+   * newest is mostly already here. Things right beside our own player are
+   * drawn at it (Interpolator.ahead), so what strikes us stands where it
+   * strikes from. It keeps only half the wobble's margin the smooth past
+   * keeps (`delay`): on a steady line that is nearly the present, and on a
+   * wobbly one late snapshots still seldom make them falter.
    */
   present(now: number): number {
-    return (this.base === undefined ? now : now - this.base) - this.gap;
+    return (this.base === undefined ? now : now - this.base) - this.gap - this.jitter / 2;
   }
 
   /** How far behind the server's newest snapshot others are drawn, ms. */

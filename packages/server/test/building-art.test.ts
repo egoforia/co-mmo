@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES, LAND_ITEMS, isoSpan, PIXEL_ART_SCALE, SEA_CAVE_PIECES, TILE_PIXELS, WORLD_REGIONS, buildingArtIds, generateRegion, type ArtManifest } from '@co-mmo/shared';
+import { BUILDING_STYLES, LAND_ITEMS, isoSpan, PIXEL_ART_SCALE, GALLEON_PIECES, SEA_CAVE_PIECES, TILE_PIXELS, WORLD_REGIONS, buildingArtIds, generateRegion, type ArtManifest } from '@co-mmo/shared';
 import { buildingArtJobs, processBuildingArt } from '../src/assets/building-art.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from '../src/assets/provider.ts';
 import { BuildingPainter } from '../src/building-painter.ts';
@@ -135,8 +135,9 @@ describe('the shipped art', () => {
     for (const def of WORLD_REGIONS) {
       const map = generateRegion(def);
       for (const b of map.buildings) expect(BUILDING_STYLES).toHaveProperty([b.style]);
-      // The sea cave's kit props are painted in the Art tab, like all of a kit's pieces.
-      for (const l of map.landmarks) expect(l.asset in manifest || painted.has(l.asset) || SEA_CAVE_PIECES.some((p) => p.id === l.asset)).toBe(true);
+      // The sea cave's and the galleon's kit props are painted in the Art tab, like all of a kit's pieces.
+      const kitProp = (id: string) => SEA_CAVE_PIECES.some((p) => p.id === id) || Object.values(GALLEON_PIECES).some((p) => p.id === id);
+      for (const l of map.landmarks) expect(l.asset in manifest || painted.has(l.asset) || kitProp(l.asset)).toBe(true);
     }
     expect(manifest).toHaveProperty(['fx-slash']);
   });

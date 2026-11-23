@@ -1,6 +1,7 @@
 import type { BiomeId } from './biomes.ts';
 import { block, building, creatures, disc, placer, road, Tile, type RegionMap } from './world.ts';
 import { SEA_CAVE_SIZE, buildSeaCave, seaCaveBuilt } from './sea-cave.ts';
+import { layGalleon } from './galleon.ts';
 
 // The great places of each launch land: temples, caves, castles, palaces,
 // tombs and wonders out in the wilds, each joined to the middle by a road
@@ -161,6 +162,8 @@ export function layPlaces(map: RegionMap, c: number): void {
       if (place.den) around(map, x, y, place.clearing + 3, place.den);
     }
   }
+  // The Sunken Galleon Dungeon (wish #273), while its wish is on.
+  if (map.def.biome === 'sunlit-shore') layGalleon(map, c);
   for (const den of ROAMERS[map.def.biome] ?? []) creatures(map, den.creature, den.name, den.asset, den.count);
 }
 

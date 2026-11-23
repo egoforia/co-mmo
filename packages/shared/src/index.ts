@@ -55,6 +55,8 @@ export * from './places.ts';
 export * from './world-edits.ts';
 export * from './sea-cave-kit.ts';
 export * from './sea-cave.ts';
+export * from './kit-floors.ts';
+export * from './galleon.ts';
 // The building kit uses short geometry names (box, rect, add), so it gets its own namespace.
 export * as buildingKit from './building-kit/index.ts';
 export * from './testbed/arch-testbed.ts';

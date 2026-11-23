@@ -13,6 +13,7 @@ import type { SheetGuide } from '../assets/building-kit/sheet.ts';
 import { pictureName } from '../assets/names.ts';
 import type { ImageProvider, ImageRequest } from '../assets/provider.ts';
 import { seaCaveBox } from '../assets/sea-cave-kit.ts';
+import { galleonBox } from '../assets/galleon-kit.ts';
 import { homeLandBox } from '../assets/home-land-art.ts';
 import { KEY_COLOR } from '../assets/style.ts';
 import { paintKitAsset, resolveReferenceImage } from '../assets/wild-kit.ts';
@@ -53,7 +54,7 @@ export async function previewPaint(
   const kit = catalog.kitAsset(asset);
   if (!kit) throw new ArtRequestError('There is no picture by that name.');
   // A sea cave or home land piece is painted the first time at its kit's size.
-  const box = (await options.shipped())[asset] ?? seaCaveBox(asset) ?? homeLandBox(asset);
+  const box = (await options.shipped())[asset] ?? seaCaveBox(asset) ?? galleonBox(asset) ?? homeLandBox(asset);
   if (!box) throw new ArtRequestError('That picture is not part of the game yet.');
   const provider = options.ai.image(useOf(kit));
   if (!provider) throw new ArtRequestError('No image model is set. Choose one on the AI models tab first.');

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { ARCH_TESTBED_REGION, Tile, WORLD_REGIONS, generateRegion, hashString, type RegionDef, type RegionMap, type TilePoint, type WorldEdit, type WorldEditDraft } from '../src/index.ts';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ARCH_TESTBED_REGION, GALLEON_MOD, Tile, WORLD_REGIONS, generateRegion, hashString, switchMod, type RegionDef, type RegionMap, type TilePoint, type WorldEdit, type WorldEditDraft } from '../src/index.ts';
 
 // Every kind of edit, laid on every shipped land: the maps must come out the
 // same as they did before the editor's code was reorganised, tile for tile.
@@ -67,6 +67,9 @@ const EXPECTED: Record<string, number> = {
 };
 
 describe('world edits replay', () => {
+  // With the galleon (wish #273) off, every land is laid exactly as before it.
+  beforeAll(() => switchMod(GALLEON_MOD, false));
+  afterAll(() => switchMod(GALLEON_MOD, true));
   for (const def of LANDS) {
     it(`lays every kind of edit on ${def.name} as before`, () => {
       const plain = generateRegion(def);

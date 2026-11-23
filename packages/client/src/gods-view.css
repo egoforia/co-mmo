@@ -141,6 +141,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .progress.needs-input { border-color: var(--gold); color: var(--gold); }
 .progress.error { border-color: var(--bad); color: var(--bad); }
 .progress.done { border-color: var(--good); color: var(--good); }
+/* What went wrong while a wish was built */
+.build-problem { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--bad); border-radius: 6px; }
+.build-problem > b { color: var(--bad); }
+.build-problem p { margin: 4px 0; overflow-wrap: anywhere; }
+.build-problem.past { border-color: var(--edge); }
+.build-problem.past > b { color: var(--muted); }
+.build-problem ul { margin: 4px 0; padding-left: 18px; }
+.build-problem a { color: inherit; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .form label.check { display: flex; align-items: center; gap: 8px; }
 .form label.sub { padding-left: 16px; }

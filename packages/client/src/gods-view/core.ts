@@ -77,6 +77,8 @@ export interface Build {
   pr?: { number: number; url: string };
   message?: string;
   tries?: number;
+  /** What went wrong on this and earlier tries, newest last. */
+  problems?: { at: number; message: string; issue?: { number: number; url: string }; run?: string }[];
 }
 
 /** Who is looking and which tab is open; the shell keeps it current. */

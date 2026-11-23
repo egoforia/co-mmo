@@ -1,0 +1,77 @@
+# Checks once a week that the Anthropic API key the wish builds use still
+# works, so a dead key is found before a player's wish fails. It asks the
+# API for its list of models, which costs nothing. When the key is refused,
+# it opens an issue for the Owner (once); when the key works again, it
+# closes that issue. Run it by hand from the Actions tab after changing the key.
+name: Check the build key
+
+on:
+  schedule:
+    - cron: '17 12 * * 1' # Mondays, 12:17 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: check-keys
+  cancel-in-progress: false
+
+jobs:
+  anthropic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: "The wish builder's Anthropic API key stopped working"
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Ask the API whether the key works
+        id: key
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "state=bad" >> "$GITHUB_OUTPUT"
+            echo "why=The repository has no ANTHROPIC_API_KEY secret." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          code=$(curl -sS -o answer.json -w '%{http_code}' --max-time 30 \
+            -H "x-api-key: $KEY" -H 'anthropic-version: 2023-06-01' \
+            https://api.anthropic.com/v1/models || echo 000)
+          message=$(jq -r '.error.message // empty' answer.json 2>/dev/null | tr -d '<>\n' | cut -c1-300)
+          echo "The API answered $code. $message"
+          case "$code" in
+            200) echo "state=ok" >> "$GITHUB_OUTPUT" ;;
+            401|403)
+              echo "state=bad" >> "$GITHUB_OUTPUT"
+              echo "why=The API refused the key ($code${message:+: $message})." >> "$GITHUB_OUTPUT" ;;
+            # Busy or down: say nothing to the Owner and look again next week.
+            *) echo "state=unknown" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Tell the Owner
+        if: steps.key.outputs.state == 'bad'
+        env:
+          WHY: ${{ steps.key.outputs.why }}
+        run: |
+          open=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title --jq "map(select(.title == env.TITLE)) | .[0].number // empty")
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "Still refused this week: $WHY [See the run]($RUN_URL)."
+          else
+            gh issue create --title "$TITLE" --body "$WHY
+
+          Wish builds and their automatic fixes stop at once until it works again.
+
+          To fix it: make a new key at https://console.anthropic.com/settings/keys in the workspace that holds the credits, paste it into this repository's Settings > Secrets and variables > Actions as \`ANTHROPIC_API_KEY\`, then run **Check the build key** from the Actions tab. It closes this issue when the key works.
+
+          [See the run]($RUN_URL)."
+          fi
+
+      - name: Close the issue once the key works
+        if: steps.key.outputs.state == 'ok'
+        run: |
+          for n in $(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title --jq "map(select(.title == env.TITLE)) | .[].number"); do
+            gh issue close "$n" --comment "The key works again. [See the run]($RUN_URL)."
+          done

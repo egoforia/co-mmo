@@ -243,6 +243,7 @@ describe('building Engine wishes', () => {
     const record = engineWish(store, mara.id);
     await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true });
     expect(store.contentById(record.id)!.build).toMatchObject({ state: 'queued', held: true, message: expect.stringMatching(/GitHub refused the issue/) });
+    expect(store.contentById(record.id)!.build!.problems).toEqual([{ at: expect.any(Number), message: expect.stringMatching(/GitHub refused the issue/) }]);
   });
 
   it('lets the Owner try a failed build again, or give up', async () => {
@@ -250,18 +251,26 @@ describe('building Engine wishes', () => {
     const record = engineWish(store, mara.id);
     await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: true, allowCore: true });
     expect(github.issues.get(1)!.body).toContain('<!-- co-mmo-allow-core: yes -->');
-    github.report(1, { state: 'failed', reason: 'Tests still failed after three tries.' });
+    github.report(1, { state: 'failed', reason: 'Tests still failed after three tries.', run: 'https://github.com/egoforia/co-mmo/actions/runs/9' });
+    await api(base, '/api/admin/builds/sync', owner.token, 'POST');
     await api(base, '/api/admin/builds/sync', owner.token, 'POST');
     expect(wishProgress(store.contentById(record.id)!)).toMatchObject({ state: 'error', label: 'Build failed' });
+    // The Wishes page shows what went wrong, once, with the run to read.
+    expect(store.contentById(record.id)!.build!.problems).toEqual([
+      { at: expect.any(Number), message: 'Tests still failed after three tries.', issue: { number: 1, url: 'https://github.com/egoforia/co-mmo/issues/1' }, run: 'https://github.com/egoforia/co-mmo/actions/runs/9' },
+    ]);
 
     const retried = await api(base, `/api/admin/content/${record.id}/build`, owner.token, 'POST', {});
     expect(retried.body).toMatchObject({ ok: true, build: 'building' });
     expect(github.issues.get(1)!.closed).toBe(true);
     expect(github.issues.get(2)!.body).toContain('<!-- co-mmo-allow-core: yes -->');
     expect(store.contentById(record.id)!.build!.tries).toBe(2);
+    // Trying again keeps the earlier problem readable.
+    expect(store.contentById(record.id)!.build!.problems).toHaveLength(1);
 
     github.report(2, { state: 'failed', reason: 'Still failing.' });
     await api(base, '/api/admin/builds/sync', owner.token, 'POST');
+    expect(store.contentById(record.id)!.build!.problems!.map((p) => [p.issue?.number, p.message])).toEqual([[1, 'Tests still failed after three tries.'], [2, 'Still failing.']]);
     const gaveUp = await api(base, `/api/admin/content/${record.id}/review`, owner.token, 'POST', { approve: false });
     expect(gaveUp.status).toBe(200);
     expect(store.contentById(record.id)!.status).toBe('rejected');

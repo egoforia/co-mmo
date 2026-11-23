@@ -70,6 +70,8 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Print Claude Code's own output, so a run that stops early shows why. The repository is private.
+          show_full_output: true
           prompt: |
             You are the coding agent for co-MMO, a browser MMORPG whose players change the game by making wishes to an in-game God.
             The Owner approved a player's Engine wish. It is in .wish/issue.md (GitHub issue #${{ github.event.issue.number }} in ${{ github.repository }}).
@@ -95,8 +97,17 @@ jobs:
         if: always()
         env:
           OUT: ${{ steps.claude.outputs.structured_output }}
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
         run: |
-          [ -n "$OUT" ] || OUT='{}'
+          mkdir -p .wish
+          if [ -z "$OUT" ]; then
+            # No answer: Claude Code stopped early (often the API refused the call:
+            # credits, key or model access). The action hides its output, so pull the
+            # error text out of the execution log and pass it on as the reason.
+            why=$(jq -r '[.[]? | select(.type == "result")] | last | select(.is_error == true) | (.result // (.errors // [] | join(" ")) // empty) | tostring' "$EXECUTION_FILE" 2>/dev/null | tr -d '<>' | tr '\n' ' ' | cut -c1-300)
+            [ -z "$why" ] || echo "::error::Claude Code stopped early: $why"
+            OUT=$(jq -nc --arg why "$why" 'if $why == "" then {} else {result:"failed",reason:("The coding agent could not start: " + $why)} end')
+          fi
           printf '%s' "$OUT" > .wish/answer.json
           echo "result=$(jq -r '.result // "failed"' .wish/answer.json)" >> "$GITHUB_OUTPUT"
 

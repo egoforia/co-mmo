@@ -1,4 +1,4 @@
-import { creatureSize, heldItem, maxHp, monsterHeld, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type MonsterKit, type EntityState, type NpcState, type PlayerInfo, type RaceId, type StatusId } from '@co-mmo/shared';
+import { SIZE_TILES, creatureSize, heldItem, spotMiddle, type TileSpot, maxHp, monsterHeld, offHandItem, type BodyState, type Character, type CreatureDef, type CreatureMood, type CreatureState, type MonsterKit, type EntityState, type NpcState, type PlayerInfo, type RaceId, type StatusId } from '@co-mmo/shared';
 
 // What players see of each thing in a region, as sent in snapshots and
 // across a split region's cell borders. One builder per kind, so both
@@ -35,10 +35,17 @@ export function playerView(p: { info: PlayerInfo; x: number; y: number; floor?: 
 }
 
 /** A living creature, what it is up to when that shows (asleep, running away), and its running statuses. */
-export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number; kit?: MonsterKit }, mood?: CreatureMood, statuses?: StatusId[]): CreatureState {
+export function creatureView(c: { id: string; kind: string; def: CreatureDef; x: number; y: number; floor?: number; hp: number; kit?: MonsterKit; to?: TileSpot; width?: number }, mood?: CreatureMood, statuses?: StatusId[]): CreatureState {
   const tier = creatureSize(c.kind);
   const size = tier !== 'medium' ? { size: tier } : {};
-  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...size, ...(mood ? { mood } : {}), ...statusesOf(statuses), ...(c.kit ? monsterHeld(c.kit.worn) : {}) };
+  return { id: c.id, kind: c.kind, asset: c.def.art, name: c.def.name, x: round(c.x), y: round(c.y), ...floorOf(c.floor), health: round(c.hp / c.def.hp), ...size, ...(mood ? { mood } : {}), ...statusesOf(statuses), ...(c.kit ? monsterHeld(c.kit.worn) : {}), ...stepOf(c, tier) };
+}
+
+/** The middle of the tile a creature is stepping onto, while it steps, so the browser can draw it on the server's present (CreatureState.to). */
+function stepOf(c: { to?: TileSpot; width?: number }, tier: ReturnType<typeof creatureSize>): { to?: { x: number; y: number } } {
+  if (!c.to) return {};
+  const m = spotMiddle(c.to, c.width ?? SIZE_TILES[tier]);
+  return { to: { x: round(m.x), y: round(m.y) } };
 }
 
 /** A defeated creature's body; `loot` says whether the viewer may search it here. */

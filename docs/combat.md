@@ -34,6 +34,26 @@ tile in front of a healer really guards them.
 6. Skill shapes on tiles (`packages/shared/src/tiles/shapes.ts`): a line is the row of tiles straight ahead, a cone the wedge ahead (as wide as it is far; corner-wise, the quarter between), an area the square about its middle; trees, rocks and walls cut a cone or line short. A creature is hit when any tile of its square is covered. Pointing at a skill's key in the hotbar shows its tiles to the caster; as it lands everyone near sees them for a moment. Each tile shows the painted tile marker (`TILE_MARKER_ART`, the Owner's choice on 2026-11-16 over a code-drawn highlight); until it is painted nothing shows. (Built.)
 7. A balance test (`packages/server/src/balance.ts`, `npm run balance`, findings in `docs/balance.md`). (Built.) Balance pass done: the damage Callings are within 15% of each other in steady damage, the Duelist's Momentum turns blows aside, and crowds stay deadly; the balance workflow checks it on pull requests.
 
+## Seeing a strike land
+
+The server settles every move and strike the moment it happens. The browser
+draws others a little in the past (`SnapshotClock`), so they walk smoothly
+however unevenly snapshots arrive, while our own player is predicted in the
+present. Two things keep a fight looking the way it is decided:
+
+- **Monsters beside us are drawn on the present.** Snapshots name the tile
+  each creature is stepping onto (`CreatureState.to`). Within three tiles of
+  our player a creature is carried on along that step to the server's present
+  (`Interpolator.ahead`), never past the step's end, blending into the smooth
+  past by seven tiles (`client/src/world-scene/near-present.ts`). A monster
+  strikes from the tile it is seen on, and we bump into it where it is seen.
+- **A strike shows when its striker is seen to strike.** A blow, a bolt or a
+  skill's burst from someone drawn in the past is held back until they are
+  drawn at that moment, at most a quarter second; our own strikes show at
+  once. A bolt shows its number, flash and sound when it arrives, not when it
+  leaves, and the health a strike on us takes comes off the health shown as
+  it lands (`client/src/world-scene/hit-timing.ts`).
+
 ## Bag and gold (combat decisions, step 1)
 
 Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").

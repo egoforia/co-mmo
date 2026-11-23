@@ -39,8 +39,9 @@ export function across(g: Ghosts, from: RegionDef, to: RegionDef, size: number):
     const y = e.y + dy;
     return x >= -BORDER && y >= -BORDER && x < size + BORDER && y < size + BORDER;
   };
-  const move = <E extends { id: string; x: number; y: number }>(list: E[], rename: (id: string) => string): E[] =>
-    list.filter(inSight).map((e) => ({ ...e, id: rename(e.id), x: round(e.x + dx), y: round(e.y + dy) }));
+  // A creature's step end moves with it (CreatureState.to).
+  const move = <E extends { id: string; x: number; y: number; to?: { x: number; y: number } }>(list: E[], rename: (id: string) => string): E[] =>
+    list.filter(inSight).map((e) => ({ ...e, id: rename(e.id), x: round(e.x + dx), y: round(e.y + dy), ...(e.to ? { to: { x: round(e.to.x + dx), y: round(e.to.y + dy) } } : {}) }));
   const own = (id: string) => id;
   const theirs = (id: string) => `${from.id}:${id}`;
   return {

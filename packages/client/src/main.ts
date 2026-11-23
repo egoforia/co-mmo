@@ -106,6 +106,8 @@ function play(token: string): void {
   const gauge = new GaugeUi();
   let perf: PerfOverlay | null = null;
   let myId = '';
+  /** Our health and Energy as the last snapshot said, before strikes not yet seen to land are added back. */
+  let vitals: { hp: number; energy: number } | undefined;
   const sound = new GameSound();
   soundControls(sound);
   void sound.refresh(true);
@@ -198,7 +200,9 @@ function play(token: string): void {
         break;
       case 'snapshot':
         scene?.onSnapshot(message);
-        rpg?.setVitals(message.hp, message.energy);
+        vitals = { hp: message.hp, energy: message.energy };
+        // Strikes on us not yet seen to land are not taken off yet.
+        rpg?.setVitals(message.hp + (scene?.heldHurt.amount ?? 0), message.energy);
         // The map is there once the scene has been made.
         if (scene?.currentMap) rpg?.setSafe(isSafe(scene.currentMap, scene.playerPosition.x, scene.playerPosition.y));
         rpg?.setStatuses(message.statuses);
@@ -228,11 +232,16 @@ function play(token: string): void {
       case 'system':
         chat?.add({ kind: 'system', text: message.text });
         break;
-      case 'hit':
-        if (message.target === myId) sound.play('hurt');
-        else if (message.by === myId) sound.play(message.defeated ? 'defeat' : 'hit');
-        scene?.onHit(message);
+      case 'hit': {
+        // Its sound and our health change as it is seen to land (world-scene/hit-timing.ts).
+        const hit = message;
+        scene?.onHit(hit, () => {
+          if (hit.target === myId) sound.play('hurt');
+          else if (hit.by === myId) sound.play(hit.defeated ? 'defeat' : 'hit');
+          if (hit.target === myId && vitals) rpg?.setVitals(vitals.hp + (scene?.heldHurt.amount ?? 0), vitals.energy);
+        });
         break;
+      }
       case 'character':
         if (character) {
           const change = characterSound(character, message.character);

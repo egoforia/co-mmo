@@ -77,6 +77,8 @@ export type Hand = 'right' | 'left';
 
 export interface Remote extends Avatar {
   interp: Interpolator;
+  /** What is still being smoothed away of a jump a new snapshot made, tiles (near-present.ts). */
+  settle?: { x: number; y: number };
 }
 
 /** A building drawn as its exterior art until we come close, then its inside. */

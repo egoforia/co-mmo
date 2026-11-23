@@ -398,6 +398,12 @@ export interface CreatureState {
   /** The gear it shows in its right and left hands (monsterHeld), when it wears any: drawn where its hands were found. */
   held?: string;
   offHeld?: string;
+  /**
+   * The middle of the tile it is stepping onto, while it steps: the browser
+   * draws a creature near its player on the server's present along this
+   * step, never past its end (Interpolator.ahead).
+   */
+  to?: { x: number; y: number };
 }
 
 /** A defeated creature's body, lying where it fell until it fades. */

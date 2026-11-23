@@ -313,7 +313,7 @@ export function setHealth(scene: Phaser.Scene, a: Avatar, health: number): void 
   a.bar.fill.setFillStyle(health > 0.5 ? 0x63c74d : health > 0.25 ? 0xfeae34 : 0xf6757a);
 }
 
-export function syncAvatars<E extends { id: string; x: number; y: number; health?: number; floor?: number }>(
+export function syncAvatars<E extends { id: string; x: number; y: number; health?: number; floor?: number; to?: { x: number; y: number } }>(
   scene: Phaser.Scene,
   group: Map<string, Remote>,
   entities: E[],
@@ -332,7 +332,7 @@ export function syncAvatars<E extends { id: string; x: number; y: number; health
       group.set(entity.id, remote);
     }
     remote.floor = entity.floor ?? 0;
-    remote.interp.push(at, entity.x, entity.y);
+    remote.interp.push(at, entity.x, entity.y, entity.to);
     if (entity.health !== undefined) setHealth(scene, remote, entity.health);
   }
   for (const [id, remote] of group) {

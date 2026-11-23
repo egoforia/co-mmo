@@ -67,6 +67,38 @@ describe('Interpolator', () => {
     i.shift(256, 0);
     expect(i.sample(1025)).toEqual({ x: 259, y: 7 });
   });
+
+  it('carries a walker on along the step it is taking to the present, never past its end', () => {
+    const i = new Interpolator();
+    // Two tiles a second east, stepping onto the tile whose middle is (11.5, 4.5).
+    i.push(1000, 10.6, 4.5, { x: 11.5, y: 4.5 });
+    i.push(1050, 10.7, 4.5, { x: 11.5, y: 4.5 });
+    expect(i.ahead(1150)!.x).toBeCloseTo(10.9);
+    // No further than a quarter second past the newest word, however late the next.
+    expect(i.ahead(1400)!.x).toBeCloseTo(11.2);
+    // It stops on the step's end: no overshoot to snap back from.
+    i.push(1150, 10.9, 4.5, { x: 11.5, y: 4.5 });
+    i.push(1200, 11.0, 4.5, { x: 11.5, y: 4.5 });
+    expect(i.ahead(1500)).toEqual({ x: 11.5, y: 4.5 });
+  });
+
+  it('does not carry on a walker that is not stepping, nor one asked for an earlier time', () => {
+    const i = new Interpolator();
+    i.push(1000, 3.5, 3.5);
+    i.push(1050, 3.5, 3.5);
+    expect(i.ahead(1300)).toEqual({ x: 3.5, y: 3.5 });
+    i.push(1100, 3.6, 3.5, { x: 4.5, y: 3.5 });
+    expect(i.ahead(1075)).toEqual(i.sample(1075));
+  });
+
+  it('moves the end of a step with it after we cross an edge', () => {
+    const i = new Interpolator();
+    i.push(1000, 2.4, 7.5, { x: 3.5, y: 7.5 });
+    i.push(1050, 2.5, 7.5, { x: 3.5, y: 7.5 });
+    i.shift(256, 0);
+    expect(i.ahead(1100)!.x).toBeCloseTo(258.6);
+    expect(i.ahead(5000)!.x).toBeCloseTo(259.0);
+  });
 });
 
 describe('SnapshotClock', () => {
@@ -89,6 +121,8 @@ describe('SnapshotClock', () => {
     expect(b - a).toBeCloseTo(16, 0);
     // Server time = local - 40 ms delay - 90 ms drawn behind.
     expect(clock.renderAt(4000)).toBeCloseTo(4000 - 40 - 90 + 100 * 50, -1);
+    // Beside us things are drawn one gap and half the wobble behind the quickest arrival.
+    expect(clock.present(4000)).toBeCloseTo(4000 - 40 - 50 - 15 + 100 * 50, -1);
   });
 
   it('follows a busy server whose ticks fall behind real time, slowing others a little instead of stopping them', () => {

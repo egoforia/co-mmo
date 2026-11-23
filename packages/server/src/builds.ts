@@ -1,4 +1,4 @@
-import type { BuildTrack } from '@co-mmo/shared';
+import { withProblem, type BuildProblem, type BuildTrack } from '@co-mmo/shared';
 import { type ContentRecord, type Store } from './store.ts';
 import { DEFAULT_BUILDS, type BuildSettings } from './settings.ts';
 import { GitHubIssues, repoFromRemote } from './builds/github.ts';
@@ -246,6 +246,8 @@ export class Builds {
       ...(note?.trim() ? { note: note.trim().slice(0, 1000) } : {}),
       ...(allowCore ? { allowCore: true } : {}),
       tries: record.build?.tries ?? 0,
+      // What went wrong on earlier tries stays readable after Try again.
+      ...(record.build?.problems?.length ? { problems: record.build.problems } : {}),
     };
     this.store.updateContent(id, { status: 'approved', build });
     this.hooks.changed(id);
@@ -282,7 +284,8 @@ export class Builds {
       this.lastError = undefined;
     } catch (err) {
       this.lastError = (err as Error).message;
-      this.store.updateContent(record.id, { build: { ...build, message: `GitHub refused the issue: ${this.lastError}`, held: true } });
+      const message = `GitHub refused the issue: ${this.lastError}`;
+      this.store.updateContent(record.id, { build: { ...build, message, held: true, problems: withProblem(build.problems, { at: this.now(), message }) } });
       this.hooks.changed(record.id);
       this.hooks.notifyOwner(`Could not open a GitHub issue for "${record.title}": ${this.lastError}`);
       return;
@@ -368,7 +371,7 @@ export class Builds {
         return;
       case 'fixing':
         if (build.state === 'fixing' && build.message === report.reason) return;
-        set({ state: 'fixing', pr: { number: report.pr, url: report.url }, message: report.reason });
+        set({ state: 'fixing', pr: { number: report.pr, url: report.url }, message: report.reason, problems: this.problem(build, report.reason, report.run) });
         return;
       case 'review':
         if (build.state === 'review' && build.pr?.number === report.pr) return;
@@ -380,7 +383,7 @@ export class Builds {
       case 'failed':
         // A failed build with a pull request is still followed, so its report comes back every sync.
         if (build.state === 'failed' && build.message === report.reason) return;
-        set({ state: 'failed', message: report.reason });
+        set({ state: 'failed', message: report.reason, problems: this.problem(build, report.reason, report.run) });
         this.hooks.notifyOwner(`Building "${record.title}" failed: ${report.reason}`);
         return;
       case 'merged':
@@ -400,6 +403,11 @@ export class Builds {
         return;
       }
     }
+  }
+
+  /** The build's problems with this one added, tied to the try's issue and run. */
+  private problem(build: BuildTrack, message: string, run?: string): BuildProblem[] {
+    return withProblem(build.problems, { at: this.now(), message, ...(build.issue ? { issue: build.issue } : {}), ...(run ? { run } : {}) });
   }
 
   /** Merged wishes whose commit the server now runs go live and are announced. */

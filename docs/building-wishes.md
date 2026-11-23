@@ -28,6 +28,11 @@ request, so CI runs on it like on any other pull request.
 Only the build workflows can read it; the game server never sees it, and
 the coding agent is never given any other secret.
 
+Every Monday the "Check the build key" workflow asks the API whether the key
+still works (this costs nothing). If the key is refused, it opens an issue
+saying so; it closes that issue once the key works again. Run it by hand from
+the Actions tab after changing the key.
+
 ## 3. Give the game server an issue-only token
 
 1. Open https://github.com/settings/personal-access-tokens/new (a
@@ -81,8 +86,11 @@ changed. Meanwhile the wish shows "Fixing failed checks"; it goes back to
 **Secrets and variables**, **Actions**, **Variables** to change that), and
 each try's cost is counted in the budget.
 
-If a build fails, the wish shows "Build failed" with the reason, and you can
-try again (a fresh issue) or give up on it. A pull request whose automatic
+If a build fails, the wish shows "Build failed", and the Wishes page shows
+"What went wrong" in the run's own words (for example "Invalid API key"),
+with links to the issue and the run log. You can try again (a fresh issue) or
+give up on it; the last few problems stay on the wish after Try again, under
+"An earlier try went wrong". A pull request whose automatic
 fixes ran out stays open: you can still ask `@claude` for changes and merge
 it, and the game follows it.
 

@@ -43,7 +43,8 @@ async function wishes(): Promise<string> {
     ? active.map((e) => `
       <article class="wish">
         <header><span class="tier ${e.tier}">${e.tier}</span><b>${escapeHtml(e.title)}</b>${progress(e)}<small>${escapeHtml(e.wisher.name)} · ${when(e.at)}</small></header>
-        ${e.progress?.detail ? `<p>${escapeHtml(e.progress.detail)}</p>` : ''}
+        ${e.progress?.detail && !(e.build!.state === 'failed' && e.build!.problems?.length) ? `<p>${escapeHtml(e.progress.detail)}</p>` : ''}
+        ${buildProblems(e)}
         <p class="links">${e.build!.issue ? `<a href="${escapeHtml(e.build!.issue.url)}" target="_blank" rel="noopener">Issue #${e.build!.issue.number}</a>` : ''}${e.build!.pr ? ` · <a href="${escapeHtml(e.build!.pr.url)}" target="_blank" rel="noopener">Pull request #${e.build!.pr.number}</a>` : ''}${e.build!.tries && e.build!.tries > 1 ? ` · try ${e.build!.tries}` : ''}</p>
         ${view.owner && e.build!.state === 'failed' ? `<div class="actions"><button type="button" data-build="${e.id}">Try again</button><button type="button" class="quiet" data-reject-built="${e.id}">Give up</button></div>` : ''}
         ${e.build!.state === 'merged' ? '<p class="actions"><a class="button" href="#updates">Open Updates to release it</a></p>' : ''}
@@ -66,6 +67,31 @@ export function progress(e: Entry): string {
   if (!p) return `<span class="progress">${escapeHtml(e.status)}</span>`;
   const badge = `<span class="progress ${p.state}" title="${escapeHtml(p.detail ?? '')}">${PROGRESS_ICON[p.state]} ${escapeHtml(p.label)}</span>`;
   return p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener">${badge}</a>` : badge;
+}
+
+/**
+ * What went wrong while the wish was built, in the words of the run or GitHub,
+ * with links to read more. The newest problem is shown in full; earlier tries
+ * fold away. It stays after Try again, so the Owner can still see why.
+ */
+function buildProblems(e: Entry): string {
+  const list = [...(e.build?.problems ?? [])].reverse();
+  if (!list.length) return '';
+  const now = e.build!.state === 'failed' || e.build!.state === 'fixing';
+  const line = (p: (typeof list)[number]) => {
+    const links = [
+      p.issue ? `<a href="${escapeHtml(p.issue.url)}" target="_blank" rel="noopener">Issue #${p.issue.number}</a>` : '',
+      p.run ? `<a href="${escapeHtml(p.run)}" target="_blank" rel="noopener">Run log</a>` : '',
+    ].filter(Boolean).join(' · ');
+    return `${escapeHtml(p.message)}<br><small>${when(p.at)}${links ? ` · ${links}` : ''}</small>`;
+  };
+  const [latest, ...earlier] = list;
+  return `
+    <div class="build-problem${now ? '' : ' past'}">
+      <b>${now ? 'What went wrong' : 'An earlier try went wrong'}</b>
+      <p>${line(latest!)}</p>
+      ${earlier.length ? `<details><summary>Earlier problems (${earlier.length})</summary><ul>${earlier.map((p) => `<li>${line(p)}</li>`).join('')}</ul></details>` : ''}
+    </div>`;
 }
 
 /** Approving an Engine wish hands it to the coding agent, with the Owner's note. */

@@ -21,6 +21,7 @@ import { SLEEPING_ABILITIES, switchMod, type ModSwitch } from './mods.ts';
 import { WISHED_ABILITY_NUMBERS, wishedEffect, wishedStatus } from './wished-abilities.ts';
 import type { StatusId } from './rpg/statuses.ts';
 import { validMonsterSkills, type MonsterSkill } from './monster-gear.ts';
+import type { BuildProblem } from './build-problems.ts';
 import {
   ABILITIES,
   BEHAVIORS,
@@ -351,6 +352,8 @@ export interface BuildTrack {
   tries?: number;
   /** The wisher heard that it went live. */
   told?: boolean;
+  /** What went wrong on this and earlier tries, newest last, for the Wishes page. */
+  problems?: BuildProblem[];
 }
 
 /** The parts of a content record (beyond the entry) that decide its progress. */

@@ -22,6 +22,7 @@ export * from './classes.ts';
 export * from './skills/index.ts';
 export * from './kit.ts';
 export * from './content.ts';
+export * from './build-problems.ts';
 export * from './loot.ts';
 export * from './creature-size.ts';
 export * from './materials.ts';

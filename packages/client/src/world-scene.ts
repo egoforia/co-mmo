@@ -65,6 +65,7 @@ import { Marks } from './world-scene/marks.ts';
 import { aimMarks } from './world-scene/aim.ts';
 import { setStatusIcons } from './world-scene/status-icons.ts';
 import { showHit, swingSlash } from './world-scene/combat.ts';
+import { creatureSpot, drawnSpot, settleJump, type DrawTimes } from './world-scene/near-present.ts';
 import { Targeting } from './world-scene/targeting.ts';
 import { cullOffscreen } from './world-scene/cull.ts';
 import { seeThroughWalls } from './world-scene/edge-walls.ts';
@@ -469,6 +470,9 @@ export class WorldScene extends Phaser.Scene {
     // Creatures stand in our way as they stand in the server's (hit-boxes.ts).
     this.predictor.bodies = bodiesSeen(snapshot.creatures, snapshot.players);
     this.predictor.reconcile(snapshot.ack, { x: snapshot.x, y: snapshot.y, floor: snapshot.floor, ...(snapshot.to ? { to: snapshot.to } : {}) });
+    // Where each creature stood just before this word, so a jump it makes is smoothed away (near-present.ts).
+    const before = this.drawTimes();
+    const was = new Map([...this.creatures].map(([id, r]) => [id, creatureSpot(r, this.shown, before)]));
     // On the server's time: when it was sent, not when it happened to arrive.
     const shift = this.clock.arrived(snapshot.tick, performance.now());
     if (shift) for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) for (const r of group.values()) r.interp.rebase(shift);
@@ -489,6 +493,8 @@ export class WorldScene extends Phaser.Scene {
       remote.body.setAlpha(p.fallen ? FALLEN_ALPHA : 1);
     }
     syncAvatars(this, this.creatures, snapshot.creatures ?? [], at, (c) => makeCreature(this, this.metrics, c), kept);
+    const after = this.drawTimes();
+    for (const [id, r] of this.creatures) if (was.has(id)) settleJump(r, was.get(id)!, creatureSpot(r, this.shown, after));
     for (const c of snapshot.creatures ?? []) {
       const creature = this.creatures.get(c.id);
       // Gear it wears shows in its hands once the hand finder has found them; until then it is unseen but still counts.
@@ -605,10 +611,12 @@ export class WorldScene extends Phaser.Scene {
     this.revealBuildings(false);
     this.drawNear();
 
-    const drawAt = this.clock.renderAt(performance.now());
+    const times = this.drawTimes();
+    const drawAt = times.past;
     for (const group of [this.remotes, this.creatures, this.bodies, this.npcs]) {
       for (const remote of group.values()) {
-        const pos = remote.interp.sample(drawAt);
+        // Creatures beside us on the server's present, so what strikes us stands where it strikes from (near-present.ts).
+        const pos = group === this.creatures ? drawnSpot(remote, this.shown, times, deltaMs) : remote.interp.sample(drawAt);
         if (!pos) continue;
         // Measured without the lunge nudge, so a strike is not a step.
         const before = { x: remote.body.x - remote.nudge.x, y: remote.body.y - remote.nudge.y };
@@ -700,6 +708,12 @@ export class WorldScene extends Phaser.Scene {
       if (a.art === key && (shown === key || !shown.startsWith(`${key}-`))) dress(this, this.metrics, a, key);
       else if (shown === key) dress(this, this.metrics, a, key);
     }
+  }
+
+  /** The server times others are drawn at now: the smooth past, and the present for those beside us. */
+  private drawTimes(): DrawTimes {
+    const now = performance.now();
+    return { past: this.clock.renderAt(now), present: this.clock.present(now) };
   }
 
   /** A strike landed: number, flash and recoil, or a defeat. */

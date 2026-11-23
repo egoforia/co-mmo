@@ -100,10 +100,14 @@ interface Sample {
   at: number;
   x: number;
   y: number;
+  /** Where the step it was taking ends, when the snapshot said. */
+  to?: Vec2;
 }
 
 /** How far past the newest snapshot a walker is carried on, ms, when the next one is late. */
 const CARRY_ON_MS = 75;
+/** How far past the newest snapshot a walker on a known step is drawn at most, ms (Interpolator.ahead). */
+export const AHEAD_MS = 250;
 
 /**
  * Smooths another player's (or a creature's) movement: positions are kept
@@ -116,16 +120,41 @@ const CARRY_ON_MS = 75;
 export class Interpolator {
   private samples: Sample[] = [];
 
-  /** A position at server time `at`, ms. */
-  push(at: number, x: number, y: number): void {
+  /** Positions taken in so far: grows by one with each new word, so the drawing can tell when one came. */
+  heard = 0;
+
+  /** A position at server time `at`, ms, and where the step it is taking ends (`to`), when known. */
+  push(at: number, x: number, y: number, to?: Vec2): void {
     const last = this.samples[this.samples.length - 1];
     if (last && at <= last.at) {
       // The same tick again (or an older one): the newest word wins.
-      if (at === last.at) Object.assign(last, { x, y });
+      if (at === last.at) {
+        Object.assign(last, { x, y, to });
+        this.heard++;
+      }
       return;
     }
-    this.samples.push({ at, x, y });
+    this.samples.push({ at, x, y, ...(to ? { to } : {}) });
+    this.heard++;
     if (this.samples.length > 20) this.samples.shift();
+  }
+
+  /**
+   * Where it is at server time `t` when that is past the newest snapshot
+   * (the server's present, for something near our own player): carried on
+   * along the step the newest snapshot named, at the pace it was going,
+   * and never past that step's end, so it neither overshoots a stop nor
+   * snaps back. Not stepping, or `t` not past the newest: as `sample`.
+   */
+  ahead(t: number): Vec2 | null {
+    const last = this.samples[this.samples.length - 1];
+    const before = this.samples[this.samples.length - 2];
+    if (!last || !before || !last.to || t <= last.at) return this.sample(t);
+    const pace = Math.hypot(last.x - before.x, last.y - before.y) / (last.at - before.at);
+    const left = Math.hypot(last.to.x - last.x, last.to.y - last.y);
+    const go = pace * Math.min(t - last.at, AHEAD_MS);
+    if (go >= left - 1e-9) return { x: last.to.x, y: last.to.y };
+    return { x: last.x + ((last.to.x - last.x) / left) * go, y: last.y + ((last.to.y - last.y) / left) * go };
   }
 
   /** The server's ticks started over (SnapshotClock.arrived): keep what we have on the new timeline. */
@@ -138,6 +167,7 @@ export class Interpolator {
     for (const s of this.samples) {
       s.x += dx;
       s.y += dy;
+      if (s.to) s.to = { x: s.to.x + dx, y: s.to.y + dy };
     }
   }
 

@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { RegionServer } from '../src/region-server.ts';
+import type { Creature } from '../src/creature-brain.ts';
 import { netFromEnv } from '../src/socket-net.ts';
 import { account, app, start } from '../test/helpers.ts';
 import { BenchBot, smoothness } from './bench-bot.ts';
@@ -32,12 +33,15 @@ interface Scenario {
   extra?: Link;
   /** Run the Sanctum on a region server this many ms away from the game server. */
   regionServerMs?: number;
+  /** Bring this many monsters to the robots and set them chasing the watching ones, for the monsters' wobble. */
+  monsters?: number;
 }
 
 const SCENARIOS: Scenario[] = [
   { name: '10 players, same machine', players: 10, link: LAN },
   { name: '10 players, home Wi-Fi', players: 10, link: WIFI },
   { name: '10 players, mobile', players: 10, link: MOBILE },
+  { name: '10 players chased by 6 monsters, home Wi-Fi', players: 10, link: WIFI, monsters: 6 },
   { name: '40 players, home Wi-Fi', players: 40, link: WIFI },
   { name: '60 players, home Wi-Fi', players: 60, link: WIFI },
   { name: '20 players + one on a weak link', players: 20, link: WIFI, extra: WEAK },
@@ -65,6 +69,8 @@ interface Row {
   /** The same for the server's own positions, tick to tick: uneven steps that start before the network (a robot's late steps, two in one tick). */
   serverWobblePct: number;
   stallPct: number;
+  /** How unevenly creatures walked on screen while the server walked them steadily: the spread of their speed, % of the server's. */
+  monsterWobblePct: number;
   leapPct: number;
   tickMs: number;
   /** Snapshots the server skipped a second for each robot, because it had fallen behind. */
@@ -123,11 +129,12 @@ async function run(scenario: Scenario): Promise<Row[]> {
       const proxy = extra ? proxies[1]! : proxies[0]!;
       bots.push(await BenchBot.join(`ws://127.0.0.1:${proxy.port}/ws`, token, i, i < WATCHERS || !!extra, turned));
     }
+    if (scenario.monsters) bringMonsters(scenario.monsters, bots.slice(0, WATCHERS).map((b) => b.id));
     const startedAt = performance.now();
     for (const bot of bots) bot.start(startedAt, (id, at) => turns.set(id, at));
     await pause(WARM_UP_MS);
     // Measure from here: the warm-up's numbers are thrown away.
-    for (const bot of bots) Object.assign(bot.numbers, { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0, skipped: 0 });
+    for (const bot of bots) Object.assign(bot.numbers, { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0, skipped: 0, monsterPaces: [] });
     const before = proxies.map((p) => ({ ...p.counts }));
     const cpuBefore = process.cpuUsage();
     await pause(SECONDS * 1000);
@@ -147,6 +154,27 @@ async function run(scenario: Scenario): Promise<Row[]> {
   }
 }
 
+/**
+ * Brings `n` of the Sanctum's monsters round the robots and sets each
+ * chasing one of `prey`, its safe ground lifted for the bench, so robots
+ * see monsters walk at them as players do.
+ */
+function bringMonsters(n: number, prey: string[]): void {
+  const s = (app!.world.home as unknown as { s: { map: { safe: unknown[] }; players: Map<string, { x: number; y: number }>; creatures: Creature[] } }).s;
+  s.map.safe = [];
+  const spawn = s.players.get(prey[0]!)!;
+  s.creatures.filter((c) => c.respawnAt === null).slice(0, n).forEach((c, i) => {
+    const a = (i / n) * Math.PI * 2;
+    const x = Math.floor(spawn.x + Math.cos(a) * 6) + 0.5;
+    const y = Math.floor(spawn.y + Math.sin(a) * 6) + 0.5;
+    const target = prey[i % prey.length]!;
+    Object.assign(c, { x, y, floor: 0, home: { x, y, floor: 0 }, aggro: target, threat: { [target]: 1 }, chased: 0, returning: false, asleep: false, fleeing: null, calmUntil: 0 });
+    // Harmless and never tiring of it, so the chase lasts the whole bench.
+    c.def = { ...c.def, behavior: 'chase', breakOff: 'edge', damage: 0, active: 'always' };
+    delete c.to;
+  });
+}
+
 /** A report line from the robots that share one link. */
 function row(scenario: string, link: string, players: number, bots: BenchBot[], bytes: number, tickMs: number, cpuPct: number): Row {
   const n = bots.map((b) => b.numbers);
@@ -164,6 +192,7 @@ function row(scenario: string, link: string, players: number, bots: BenchBot[], 
     answeredP50: round(pct(answered, 0.5)), answeredP95: round(pct(answered, 0.95)), answeredAtEnd: round(pct(atEnd, 0.5)),
     wobblePct: round(smooth.wobble * 100),
     serverWobblePct: round(smoothness(n.flatMap((x) => x.sourceSpeeds)).wobble * 100), stallPct: round(smooth.stalls * 100), leapPct: round(smooth.leaps * 100),
+    monsterWobblePct: round(spread(n.flatMap((x) => x.monsterPaces)) * 100),
     tickMs: round(tickMs, 2),
     cpuPct: round(cpuPct),
     skippedPerSecond: round(n.reduce((a, x) => a + x.skipped, 0) / bots.length / SECONDS),
@@ -172,11 +201,18 @@ function row(scenario: string, link: string, players: number, bots: BenchBot[], 
 
 /** The report as a plain text table. */
 function table(list: Row[]): string {
-  const head = ['scenario', 'snaps/s', 'KB/s each', 'host MB/s', 'gap p50/p95 ms', 'step answered p50/p95/end ms', 'others wobble % (server)', 'stalls %', 'leaps %', 'tick ms', 'cpu %', 'skipped/s'];
-  const lines = list.map((r) => [r.scenario, r.snapshotsPerSecond, r.kbPerPlayer, r.hostMbPerSecond, `${r.gapP50}/${r.gapP95}`, `${r.answeredP50}/${r.answeredP95}/${r.answeredAtEnd}`, `${r.wobblePct} (${r.serverWobblePct})`, r.stallPct, r.leapPct, r.tickMs, r.cpuPct, r.skippedPerSecond].map(String));
+  const head = ['scenario', 'snaps/s', 'KB/s each', 'host MB/s', 'gap p50/p95 ms', 'step answered p50/p95/end ms', 'others wobble % (server)', 'stalls %', 'leaps %', 'monsters wobble %', 'tick ms', 'cpu %', 'skipped/s'];
+  const lines = list.map((r) => [r.scenario, r.snapshotsPerSecond, r.kbPerPlayer, r.hostMbPerSecond, `${r.gapP50}/${r.gapP95}`, `${r.answeredP50}/${r.answeredP95}/${r.answeredAtEnd}`, `${r.wobblePct} (${r.serverWobblePct})`, r.stallPct, r.leapPct, r.monsterWobblePct, r.tickMs, r.cpuPct, r.skippedPerSecond].map(String));
   const widths = head.map((h, i) => Math.max(h.length, ...lines.map((l) => l[i]!.length)));
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join('  ');
   return [fmt(head), fmt(widths.map((w) => '-'.repeat(w))), ...lines.map(fmt)].join('\n');
+}
+
+/** The spread of shares of 1 (the standard deviation): 0 when every one is the same. */
+function spread(list: number[]): number {
+  if (!list.length) return 0;
+  const mean = list.reduce((a, b) => a + b, 0) / list.length;
+  return Math.sqrt(list.reduce((a, b) => a + (b - mean) ** 2, 0) / list.length);
 }
 
 function pct(list: number[], p: number): number {

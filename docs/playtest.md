@@ -99,12 +99,14 @@ change with `main`. Each run is also saved to `netbench-results/`.
 | others wobble % | How unevenly other players move on a robot's screen, drawn by the same smoothing as the browser (`netbench/remote-motion.ts`): the spread of their speed as a share of walking speed. Turning is left out. Around 2% is the bench's own noise. |
 | (server) | The same wobble in the server's own positions, tick to tick, before any network or drawing: when it is as high as the first number, the stutter started on the server (a robot's steps arriving bunched, two taken in one tick), not on the way. |
 | stalls %, leaps % | Frames where a walking player stood still, or moved over twice their speed. |
+| monsters wobble % | How unevenly creatures move on a robot's screen while the server walks them steadily, drawn as the browser draws them (beside us on the present, docs/combat.md, Seeing a strike land): the spread of their speed as a share of the server's. Only scenarios with monsters in view fill it in. |
 | tick ms | How long a tick of their region took. |
 | skipped/s | Snapshots the game server skipped a second for each robot because its line had fallen behind. |
 | cpu % | Processor time the whole bench used (game server, robots and proxies together), as a share of one core. |
 
 Scenarios: 10 players on the same machine, on home Wi-Fi (20 ms, up to 40 ms
-of wobble) and on mobile (50 ms, up to 120 ms); 40 and 60 players on Wi-Fi; one
+of wobble) and on mobile (50 ms, up to 120 ms); 10 on Wi-Fi chased by six
+monsters; 40 and 60 players on Wi-Fi; one
 player on a weak 3 KB/s link among 20; and 10 players with their region on a
 region server 20 ms from the game server (and 40 the same way). A second
 bench, `crossing.net.ts`, walks one player back and forth over the road

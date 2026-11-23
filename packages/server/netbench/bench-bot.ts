@@ -33,11 +33,13 @@ export interface BotNumbers {
   chars: number;
   /** Snapshots the server skipped because this robot had fallen behind. */
   skipped: number;
+  /** Creatures' speed on screen as a share of the server's, one per frame while the server walked them steadily. */
+  monsterPaces: number[];
 }
 
 /** A bench robot: a socket, its walk and its measurements. */
 export class BenchBot {
-  readonly numbers: BotNumbers = { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0, skipped: 0 };
+  readonly numbers: BotNumbers = { snapshots: 0, gaps: [], answered: [], speeds: [], sourceSpeeds: [], chars: 0, skipped: 0, monsterPaces: [] };
   id = '';
   private seq = 0;
   private sent = new Map<number, number>();
@@ -48,6 +50,8 @@ export class BenchBot {
   private measuring = false;
   private readonly motion = new RemoteMotion();
   private readonly seenAt = new Map<string, { x: number; y: number; at: number }>();
+  private readonly creatureAt = new Map<string, { x: number; y: number; at: number }>();
+  private lastFrame = 0;
   /** Each other player's place in the last snapshot, and its tick. */
   private readonly lastSeen = new Map<string, { x: number; y: number; tick: number }>();
 
@@ -144,9 +148,17 @@ export class BenchBot {
     }
   }
 
-  /** One frame on the robot's screen: where each other player is drawn, and how fast they moved since the last frame. */
+  /** One frame on the robot's screen: where each other player and creature is drawn, and how fast they moved since the last frame. */
   private frame(): void {
     const now = performance.now();
+    const dtMs = this.lastFrame ? now - this.lastFrame : 0;
+    this.lastFrame = now;
+    for (const [id, pos, pace] of this.motion.creaturePositions(now, dtMs)) {
+      const before = this.creatureAt.get(id);
+      this.creatureAt.set(id, { ...pos, at: now });
+      if (!before || pace === undefined || now <= before.at) continue;
+      this.numbers.monsterPaces.push(Math.hypot(pos.x - before.x, pos.y - before.y) / ((now - before.at) / 1000) / pace);
+    }
     for (const [id, pos] of this.motion.positions(now)) {
       const before = this.seenAt.get(id);
       this.seenAt.set(id, { ...pos, at: now });

@@ -114,7 +114,7 @@ export const BUILDING_STYLES: Record<string, BuildingStyle> = {
  * Every other style, a wished building's too, is built by the kit, so it
  * needs a kit look and a floor of whole bays (tests check both).
  */
-export const WALLED_STYLES: readonly string[] = ['bramble-cottage', 'woods-cave', 'shore-sea-cave', 'desert-tomb'];
+export const WALLED_STYLES: readonly string[] = ['bramble-cottage', 'woods-cave', 'shore-sea-cave', 'shore-sunken-galleon', 'desert-tomb'];
 
 /** The style whose inside tiles stand in for a building whose own are not painted yet. */
 export const FALLBACK_BUILDING_STYLE = 'bramble-cottage';

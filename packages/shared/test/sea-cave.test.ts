@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  GALLEON_MOD,
   SEA_CAVE_ART,
   SEA_CAVE_FLOORS,
   SEA_CAVE_MOD,
@@ -36,7 +37,12 @@ function reach(map: RegionMap, from: { x: number; y: number }, floor: number): S
   return seen;
 }
 
-afterEach(() => switchMod(SEA_CAVE_MOD, true));
+// The galleon (wish #273) shares the shore; these look at the cave alone.
+beforeEach(() => switchMod(GALLEON_MOD, false));
+afterEach(() => {
+  switchMod(SEA_CAVE_MOD, true);
+  switchMod(GALLEON_MOD, true);
+});
 
 describe('the Smugglers\' Sea Cave', () => {
   it('has plans the size of its walls, with every way down matched by a way up below it', () => {

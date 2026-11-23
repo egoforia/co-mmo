@@ -186,6 +186,21 @@ export const LAND_BUILDING_STYLES: Record<string, BuildingStyle> = {
       'ship-lantern': { name: 'ship lantern', look: 'a brass ship lantern on a post with a warm orange flame', width: 1 },
     },
   },
+  // The Sunken Galleon Dungeon (wish #273, galleon.ts): built from its kit's
+  // pieces, so it shows no outside; its own tiles stand in until those are painted.
+  'shore-sunken-galleon': {
+    id: 'shore-sunken-galleon',
+    name: 'The Sunken Galleon',
+    biome: 'sunlit-shore',
+    references: ['shore-shipwreck'],
+    exterior:
+      'a huge old three-masted galleon run aground and half buried in golden sand, tilted, its dark wooden hull cracked open, ' +
+      'broken masts with torn sails, barnacles and seaweed on its planks, a gangway of planks down to the beach',
+    floor: 'old salt-bleached ship deck planks running left to right, worn grey-brown, with sand in the gaps',
+    wall: 'the top of a thick dark wooden ship hull rail with iron bolts and barnacles along it',
+    door: 'a gangway of old wooden planks running left to right, lighter than the deck',
+    furniture: {},
+  },
   'desert-palace': {
     id: 'desert-palace',
     name: "Sultana Zahra's Palace",

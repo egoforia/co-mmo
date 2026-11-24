@@ -18,6 +18,8 @@ export interface Link {
   jitterMs: number;
   /** Bytes a second toward the player; unlimited when missing. A slower link queues, as a weak connection does. */
   bytesPerSecond?: number;
+  /** Extra delay toward the server, from 0 up to this, ms: a player's keys arrive unevenly too. None when missing. */
+  upJitterMs?: number;
 }
 
 /** Bytes that went through the proxy toward the players, on the wire (after any compression). */
@@ -44,7 +46,7 @@ export async function lagProxy(target: number, link: Link, random: () => number 
     open.add(player);
     open.add(game);
     pipe(game, player, link.delayMs, link.jitterMs, link.bytesPerSecond, random, (n) => (counts.down += n));
-    pipe(player, game, link.delayMs, 0, undefined, random, (n) => (counts.up += n));
+    pipe(player, game, link.delayMs, link.upJitterMs ?? 0, undefined, random, (n) => (counts.up += n));
     const end = () => {
       player.destroy();
       game.destroy();

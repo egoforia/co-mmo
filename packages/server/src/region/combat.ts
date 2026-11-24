@@ -45,6 +45,7 @@ import { PATH_RULES, type Paths } from './paths/index.ts';
 import { SKILL_RULES, tendSanctuaries } from './skills/index.ts';
 import type { Quests } from './quests.ts';
 import { Pvp } from './pvp.ts';
+import { doHeld, holdEarly } from './held-actions.ts';
 import type { Creature, PlayerState, RegionState } from './state.ts';
 import { tickStatuses } from './statuses.ts';
 
@@ -107,11 +108,14 @@ export class Combat implements EffectKit {
    * greatsword also hits the next creature in reach, a censer everything
    * close to its target, and a heavy weapon may stagger what it hits.
    */
-  attack(p: PlayerState, targetId?: string): void {
+  attack(p: PlayerState, targetId?: string, at = this.s.now()): void {
     const now = this.s.now();
     const ch = p.character;
-    if (ch.hp <= 0 || !canAct(p, now) || now - p.lastAttack < attackCooldown(ch) * 1000 - 1) return;
-    p.lastAttack = now;
+    if (ch.hp <= 0 || !canAct(p, now)) return;
+    // A swing that came a little early is done when it is ready, not lost (held-actions.ts); `at` is then when it was ready.
+    if (holdEarly(this.s, this, p, 'heldAttack', at, p.lastAttack + attackCooldown(ch) * 1000, targetId)) return;
+    p.heldAttack = undefined;
+    p.lastAttack = at;
     const reach = attackReach(ch);
     const family = wieldedFamily(ch);
     // Spears, greatswords and censers reach a second tile, but only straight ahead.
@@ -396,7 +400,7 @@ export class Combat implements EffectKit {
     // A Path skill used again while what it made is out ends it, like leaving a stance (the spirit hawk).
     const ended = PATH_RULES[id]?.again?.(this, p, id);
     if (ended) return this.s.notice(p, ended);
-    if (now < (p.readyAt.get(id) ?? 0) - 1) return;
+    if (holdEarly(this.s, this, p, 'heldAbility', now, p.readyAt.get(id) ?? 0, targetId, id)) return;
     if (ch.energy < a.energy) return this.s.notice(p, `Not enough Energy for ${a.name}.`);
     const effect = EFFECTS[a.effect];
     // A Calling skill or Path skill may check and do more than its effect's data says (skills/, paths/).
@@ -432,8 +436,9 @@ export class Combat implements EffectKit {
     this.s.credit(id, p, 'use');
   }
 
-  /** Each tick: statuses wear off and hurt, traps spring, helpers strike, Sanctuaries heal, stances drain Energy and gauges move. */
+  /** Each tick: kept swings come due, statuses wear off and hurt, traps spring, helpers strike, Sanctuaries heal, stances drain Energy and gauges move. */
   tick(now: number): void {
+    doHeld(this.s.players.values(), now, this);
     tickStatuses(this.s, now, (by, c, amount, id) => this.strike(by, c, amount, statusBlow(id), { actionKind: 'status', actionId: id }));
     springTraps(this, now);
     helpersAct(this, now);

@@ -26,6 +26,7 @@ import type { GaugeState } from './gauges.ts';
 import { levelWords } from './paths/words.ts';
 import type { Townsperson } from '../townsfolk.ts';
 import { nearestTile } from '../walkers.ts';
+import type { HeldAction } from './held-actions.ts';
 
 export type { Creature } from '../creature-brain.ts';
 export type { Townsperson } from '../townsfolk.ts';
@@ -51,6 +52,9 @@ export interface PlayerState {
   ack: number;
   chatTimes: number[];
   lastAttack: number;
+  /** An attack, or a skill, that came a little before it was ready, done when it is (region/held-actions.ts). */
+  heldAttack?: HeldAction;
+  heldAbility?: HeldAction;
   /** Epoch ms of their last item use, for the cap of two a second (ITEM_USE_MS). */
   lastUse?: number;
   /** When the player last sorted their bag, to keep sorting to the item-use pace. */

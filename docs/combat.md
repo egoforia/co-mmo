@@ -54,6 +54,24 @@ present. Two things keep a fight looking the way it is decided:
   leaves, and the health a strike on us takes comes off the health shown as
   it lands (`client/src/world-scene/hit-timing.ts`).
 
+## Holding Space
+
+Holding Space keeps striking at the pace the server allows, timed by the
+browser's own clock (`client/src/held-strike.ts`), not by the keyboard's
+repeat, which starts after about half a second and then comes unevenly. A
+press within 150 ms of the next swing being ready still counts: it swings the
+moment the cooldown ends, as fighting games keep a press.
+
+A home or mobile line delivers messages unevenly, so a swing sent as the
+last one ended can reach the server a few milliseconds early. The server used
+to drop it, which lost a third of held swings on Wi-Fi after the browser had
+already shown them. Now an attack or skill up to 150 ms early is kept and
+done the moment it is ready, by a timer, or by the next tick if that comes
+first (`server/src/region/held-actions.ts`). A kept attack counts its
+cooldown from when it was ready, so a held key keeps the Calling's full pace.
+Anything earlier is still dropped, so nothing ever strikes faster than its
+cooldown.
+
 ## Bag and gold (combat decisions, step 1)
 
 Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").

@@ -6,6 +6,7 @@
 // building logic that shows and hides things.
 
 import type Phaser from 'phaser';
+import { PARK_MARGIN, Parking, isScenery } from './park.ts';
 
 // Phaser is only a type here, so the box sums can be tested without a browser.
 const PRE_RENDER = 'prerender';
@@ -71,46 +72,88 @@ export function cullSlice(start: number, count: number): { from: number; to: num
   return { from, to: Math.min(count, from + Math.ceil(count / CULL_SLICES)) };
 }
 
+/** True when a plain world picture lies outside `view`; undefined for what is not one (rotated, fixed to the screen). */
+function outside(pic: Phaser.GameObjects.Image, view: Box): boolean | undefined {
+  if (pic.type !== 'Image' || pic.scrollFactorX !== 1 || pic.scrollFactorY !== 1 || pic.rotation !== 0) return undefined;
+  // pictureBox and apart, without making a box for every picture.
+  const width = Math.abs(pic.displayWidth);
+  const height = Math.abs(pic.displayHeight);
+  const left = pic.x - pic.originX * width;
+  const top = pic.y - pic.originY * height;
+  return left + width < view.left || left > view.right || top + height < view.top || top > view.bottom;
+}
+
+const parkings = new WeakMap<Phaser.Scene, Parking>();
+
+/** How many objects a scene has set aside off its display list (park.ts), for the performance overlay. */
+export function setAside(scene: Phaser.Scene): number {
+  return parkings.get(scene)?.count ?? 0;
+}
+
 /**
  * Before each frame is drawn, keeps the main camera from drawing the plain
  * world images that lie well off screen. Only unrotated images that scroll
  * with the world are judged; tile layers cull their own tiles, and
  * characters, containers and screen-fixed overlays are always drawn.
+ * Scenery that is hidden, or far beyond the view, is set aside off the
+ * display list altogether (park.ts) and put back as it comes near or is shown.
  * A slice is judged each frame (cullSlice), all of them after a jump (cullAll).
  */
 export function cullOffscreen(scene: Phaser.Scene): void {
   let last: Culled | undefined;
   let next = 0;
+  let phase = 0;
+  const parking = new Parking(scene.children);
+  parkings.set(scene, parking);
   const draw = () => {
     const cam = scene.cameras.main;
     const seen = { x: cam.worldView.x, y: cam.worldView.y, width: cam.worldView.width, height: cam.worldView.height };
-    const list = scene.children.list;
     const all = cullAll(last, seen);
     if (all) last = seen;
-    const { from, to } = all ? { from: 0, to: list.length } : cullSlice(next, list.length);
-    next = to;
     // Measured from where the camera looks now, so each slice is judged right.
     const view = grownView(cam.worldView);
+    // Set aside beyond the outer margin, back within three quarters of it, so nothing flickers in and out at the edge.
+    const away = grownView(cam.worldView, PARK_MARGIN);
+    const comeBack = grownView(cam.worldView, PARK_MARGIN * 0.75);
     const bit = cam.id;
+    // Only our own bit: another camera may still draw it.
+    const judge = (pic: Phaser.GameObjects.Image) => {
+      const off = outside(pic, view);
+      if (off !== undefined) pic.cameraFilter = off ? pic.cameraFilter | bit : pic.cameraFilter & ~bit;
+    };
+    phase = (phase + 1) % CULL_SLICES;
+    parking.review(
+      (o) => {
+        const pic = o as Phaser.GameObjects.Image;
+        if (outside(pic, comeBack)) return false;
+        judge(pic);
+        return true;
+      },
+      (i) => all || i % CULL_SLICES === phase,
+    );
+    const list = scene.children.list;
+    const { from, to } = all ? { from: 0, to: list.length } : cullSlice(next, list.length);
+    next = to;
     for (let i = from; i < to; i++) {
       const o = list[i]!;
-      if (o.type !== 'Image') continue;
-      const pic = o as Phaser.GameObjects.Image;
-      // Hidden ones cost nothing to draw: only take our bit off, so they show when shown.
-      if (!pic.visible) {
-        if (pic.cameraFilter & bit) pic.cameraFilter &= ~bit;
+      const scenery = isScenery(o);
+      if (o.type === 'TilemapLayer') {
+        if (scenery && !(o as Phaser.Tilemaps.TilemapLayer).visible) parking.park(o, false);
         continue;
       }
-      if (pic.parentContainer || pic.scrollFactorX !== 1 || pic.scrollFactorY !== 1 || pic.rotation !== 0) continue;
-      // pictureBox and apart, without making a box for every picture.
-      const width = Math.abs(pic.displayWidth);
-      const height = Math.abs(pic.displayHeight);
-      const left = pic.x - pic.originX * width;
-      const top = pic.y - pic.originY * height;
-      const off = left + width < view.left || left > view.right || top + height < view.top || top > view.bottom;
-      // Only our own bit: another camera may still draw it.
-      pic.cameraFilter = off ? pic.cameraFilter | bit : pic.cameraFilter & ~bit;
+      if (o.type !== 'Image') continue;
+      const pic = o as Phaser.GameObjects.Image;
+      // Hidden ones cost nothing to draw: set scenery aside, and only take our bit off the rest, so they show when shown.
+      if (!pic.visible) {
+        if (scenery) parking.park(pic, false);
+        else if (pic.cameraFilter & bit) pic.cameraFilter &= ~bit;
+        continue;
+      }
+      if (pic.parentContainer) continue;
+      if (scenery && outside(pic, away)) parking.park(pic, true);
+      else judge(pic);
     }
+    parking.settle();
     // Each slice is judged from the camera's place now; a jump is measured from the last full judging.
     if (!all && to >= list.length) last = seen;
   };

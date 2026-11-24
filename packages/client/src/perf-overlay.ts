@@ -3,6 +3,7 @@ import type { PerfView } from '@co-mmo/shared';
 import { biggestTextures, chartPoints, FrameStats, LONG_FRAME_MS, middle, Rate, textureMemory, whereTimeGoes, type TextureSize } from './perf-stats.ts';
 import type { SceneCounts } from './world-scene.ts';
 import { escapeHtml } from './ui.ts';
+import { setAside } from './world-scene/cull.ts';
 
 // The performance overlay (egoforia's ask of 2026-10-20): frame rate,
 // memory, what is drawn, the network and the server running your part of
@@ -261,7 +262,7 @@ export class PerfOverlay {
       f.fps && f.fps < 30 ? 'bad' : f.fps && f.fps < 50 ? 'warn' : '');
     row('Work', `${f.workMs.toFixed(1)} ms a frame working and drawing · ${f.longFrames} stutter${f.longFrames === 1 ? '' : 's'} over ${LONG_FRAME_MS} ms lately`,
       f.longFrames > 5 ? 'warn' : '');
-    row('Drawing', `${webgl ? `WebGL · ${this.lastDrawCalls} draw calls` : 'Canvas'} · ${objects.all} objects, ${objects.onScreen} on screen${lights ? ` · ${lights.all} lights, ${lights.lit} of ${lights.max} lit` : ''}`,
+    row('Drawing', `${webgl ? `WebGL · ${this.lastDrawCalls} draw calls` : 'Canvas'} · ${objects.all} objects, ${objects.onScreen} on screen${scene && setAside(scene) ? `, ${setAside(scene)} set aside` : ''}${lights ? ` · ${lights.all} lights, ${lights.lit} of ${lights.max} lit` : ''}`,
       this.lastDrawCalls > 500 ? 'warn' : '');
     const hint = whereTimeGoes(f.fps, f.frameMs, f.workMs);
     if (hint) row('Hint', hint);

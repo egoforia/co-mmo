@@ -14,6 +14,7 @@ import { PROJECTION } from '../projection.ts';
 import {
   type Avatar,
   BOLT_LIGHT,
+  forgetShade,
   LABEL_DEPTH,
   type Remote,
   T,
@@ -67,7 +68,12 @@ function strike(scene: Phaser.Scene, hit: HitMessage, target: Avatar, hurtMe: bo
     .setDepth(LABEL_DEPTH + 1);
   scene.tweens.add({ targets: number, y: number.y - T * 0.6, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => number.destroy() });
   target.body.setTintFill(0xffffff);
-  scene.time.delayedCall(80, () => target.body.active && target.body.clearTint());
+  scene.time.delayedCall(80, () => {
+    if (!target.body.active) return;
+    target.body.clearTint();
+    // Its floor's shade goes back on next frame.
+    forgetShade(target.body);
+  });
   if (hurtMe) scene.cameras.main.shake(120, 0.004);
   // Fallen players lie where they fell; only creatures sink away.
   if (hit.defeated && fades) fadeOut(scene, target);

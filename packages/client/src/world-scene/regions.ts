@@ -50,6 +50,7 @@ import {
   floorLift,
   landmarkFeet,
   overlaps,
+  forgetShade,
   setDepthShade,
   setShown,
   within,
@@ -346,7 +347,10 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
         img.setDepth(depthOff + PROJECTION.depth(feet.x, feet.y) - 1);
         img.setInteractive({ useHandCursor: true });
         img.on('pointerover', () => img.setTint(0xfff8d0));
-        img.on('pointerout', () => img.clearTint());
+        img.on('pointerout', () => {
+          img.clearTint();
+          forgetShade(img);
+        });
         parts.push(img);
       }
       const arrow = isUp ? '▲' : '▼';

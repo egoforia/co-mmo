@@ -42,6 +42,7 @@ import {
   T,
   floorDepthOffset,
   floorLift,
+  keepDepth,
 } from './types.ts';
 
 /**
@@ -364,13 +365,13 @@ export function placeAvatar(
   const top = py + T / 10 - a.body.displayHeight * a.body.originY;
   a.label.setPosition(px, top - 4);
   if (a.bar) {
-    a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
-    a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3).setDepth(LABEL_DEPTH);
+    keepDepth(a.bar.bg.setPosition(px - T * 0.3, top - T * 0.3), LABEL_DEPTH);
+    keepDepth(a.bar.fill.setPosition(px - T * 0.3, top - T * 0.3), LABEL_DEPTH);
   }
-  // Lower on screen draws in front.
-  a.shadow.setDepth(depth - 2);
-  a.body.setDepth(depth);
-  a.label.setDepth(LABEL_DEPTH);
+  // Lower on screen draws in front; set only when it changes, so a still crowd sorts nothing.
+  keepDepth(a.shadow, depth - 2);
+  keepDepth(a.body, depth);
+  keepDepth(a.label, LABEL_DEPTH);
   placeStatusIcons(a);
   // After the body's depth is set, or the item lags a step behind it and slips behind the body while walking down.
   placeHeld(scene, a, 'right', points, darkness);
@@ -450,8 +451,8 @@ export function placeHeld(
     .setOrigin(flip ? 1 - grip[0] : grip[0], grip[1])
     .setScale((b.displayHeight * heldSize(held.item)) / Math.max(image.width, image.height))
     .setPosition(x, y)
-    .setDepth(b.depth + (a.worn && heldBehind(a.worn, side) ? -1 : 1))
     .setVisible(b.visible);
+  keepDepth(image, b.depth + (a.worn && heldBehind(a.worn, side) ? -1 : 1));
 }
 
 /**

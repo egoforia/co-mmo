@@ -256,6 +256,12 @@ export function setShown(o: Phaser.GameObjects.GameObject, shown: boolean): void
   (o as Partial<Phaser.GameObjects.Components.Visible>).setVisible?.(shown);
 }
 
+/** Sets a depth only when it differs: setting one, even the same, sorts every object drawn before the next frame. */
+export function keepDepth<T extends Phaser.GameObjects.Components.Depth>(o: T, depth: number): T {
+  if (o.depth !== depth) o.setDepth(depth);
+  return o;
+}
+
 /**
  * The shade each object was last given. The floor view asks again every frame,
  * and tinting a tile layer walks every one of its tiles, so a shade already

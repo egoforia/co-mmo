@@ -56,7 +56,7 @@ describe('weapon families', () => {
     expect(attackPower(wielding('sword'))).toBe(7);
     // A greatsword scales harder: 6 + 1 + 3 × 1.1 + 3 × 0.3 = 11.2.
     expect(attackPower(wielding('greatsword'))).toBe(11);
-    // A staff scales with Wit: 3 + 1 + 3 × 0.8 + 3 × 0.2 = 7.
+    // A staff scales with Wit: 3 + 1 + 3 × 0.74 + 3 × 0.2 = 6.8.
     expect(attackPower(wielding('staff'))).toBe(7);
     // The item's own damage adds on top.
     const c = wielding('sword');

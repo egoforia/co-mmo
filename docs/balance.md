@@ -64,6 +64,20 @@ first shots land while the creature walks up. At level 20, alone against one
 creature, the Wishweaver deals 58 a second against the Duelist's 42. Level 1
 fights are over in a volley or two, so they are read, not held.
 
+## Staff trim (2026-11-24, with held swings)
+
+Held swings now keep a Calling's full pace (docs/combat.md, Holding Space),
+which moved the test's one fight enough to show what six fights show on
+`main` too: at level 20 the Wishweaver was 17% ahead of the Ranger. The
+staff's Wit scaling went from 0.8 to 0.74.
+
+Steady damage over six fights (seeds 1 to 6), damage Callings:
+
+| Level | `main` (Duelist / Ranger / Wishweaver) | After |
+| --- | --- | --- |
+| 10 | 21.5 / 19.8 / 21.3 (9% apart) | 21.7 / 21.4 / 20.7 (5% apart) |
+| 20 | 23.1 / 21.3 / 24.9 (17% apart) | 23.9 / 22.3 / 24.7 (11% apart) |
+
 ## Findings before the pass
 
 1. **Shooters out-damage the Duelist by far.** At level 10 the Ranger dealt

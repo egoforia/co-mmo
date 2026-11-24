@@ -75,7 +75,7 @@ outside your training it deals 30% less damage and its extra does not work.
 | Bow | Ranger | Both | 1.0 | 6 | 3 | Agility 0.8, Wit 0.3 | Long range |
 | Sling | Ranger | One | 0.7 | 5 | 2 | Agility 0.5, Wit 0.2 | Off hand stays free |
 | Javelins | Ranger | One | 1.3 | 4.5 | 5 | Agility 0.9, Wit 0.3 | Slows 20% for 2 s |
-| Staff | Wishweaver | Both | 1.1 | 5 | 3 | Wit 0.8, Spirit 0.2 | Arcane bolt |
+| Staff | Wishweaver | Both | 1.1 | 5 | 3 | Wit 0.74, Spirit 0.2 | Arcane bolt |
 | Wand | Wishweaver | One | 0.8 | 5.5 | 2 | Wit 0.55, Spirit 0.1 | Arcane bolt; off hand stays free |
 | Bell-mace | Bellkeeper | One | 1.1 | 1.6 | 3 | Spirit 0.45, Vigor 0.25 | Each hit heals the most hurt ally within 4 tiles for 30% of the damage |
 | Censer | Bellkeeper | Both | 1.0 | 2.5 | 2 | Spirit 0.4, Vigor 0.15 | Arcane; hits everything within 1 tile of the target |

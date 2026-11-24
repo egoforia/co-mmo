@@ -19,6 +19,7 @@ import {
   type StatusView,
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
+import { HeldStrike } from './held-strike.ts';
 import { InventoryWindow, type InventoryTab } from './inventory-ui.ts';
 import { BagInput } from './inventory/bag-input.ts';
 import { Docking } from './inventory/docking.ts';
@@ -74,7 +75,8 @@ export class RpgUi {
   private safe = false;
   /** The shop of the person last spoken to, when the world editor gave them one. */
   private wares: ShopDef | undefined;
-  private lastAttack = 0;
+  /** Space held: strikes at the pace the server allows (held-strike.ts). */
+  private readonly strike: HeldStrike;
   /** Our statuses as the stats line shows them (HTML), as the last snapshot told them. */
   private statusText = '';
   /** A painted status icon's picture, once it ships with the game (skill-art.ts); words stand in until then. */
@@ -96,7 +98,17 @@ export class RpgUi {
     new Docking({ bagOpen: () => !$('inventory').hidden, setBag: (open) => this.toggle('inventory', open) });
     this.card = new ItemCard(() => this.character, (id) => this.bag.historyWords(id));
     for (const id of ['stats', 'quests', 'keys']) $(id).hidden = false;
+    this.strike = new HeldStrike({
+      cooldownMs: () => attackCooldown(this.character) * 1000,
+      swing: () => {
+        if (!this.actions.typing()) this.actions.attack();
+      },
+    });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    window.addEventListener('keyup', (e) => {
+      if (e.key === ' ') this.strike.release();
+    });
+    window.addEventListener('blur', () => this.strike.release());
     $('inventory').addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       const item = target.closest<HTMLElement>('[data-item]')?.dataset.item;
@@ -212,10 +224,7 @@ export class RpgUi {
     if (key === ' ') {
       e.preventDefault();
       // Holding Space keeps striking, at the speed the server allows.
-      const now = performance.now();
-      if (now - this.lastAttack < attackCooldown(this.character) * 1000) return;
-      this.lastAttack = now;
-      this.actions.attack();
+      this.strike.press();
     } else if (key === 'e') {
       this.actions.interact();
     } else if (key === 'i') {

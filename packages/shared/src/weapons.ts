@@ -62,7 +62,7 @@ export const WEAPON_FAMILIES: Record<WeaponFamily, WeaponFamilyDef> = {
   bow: { name: 'Bow', hands: 2, speed: 1.0, reach: 6, ranged: true, damage: 3, scale: { agility: 0.8, wit: 0.3 }, damageType: 'physical', held: 1.1, extra: 'Long range' },
   sling: { name: 'Sling', hands: 1, speed: 0.7, reach: 5, ranged: true, damage: 2, scale: { agility: 0.5, wit: 0.2 }, damageType: 'physical', held: 0.7, extra: 'Off hand stays free' },
   javelins: { name: 'Javelins', hands: 1, speed: 1.3, reach: 4.5, ranged: true, damage: 5, scale: { agility: 0.9, wit: 0.3 }, damageType: 'physical', heavy: true, slow: 0.2, held: 1.1, extra: 'Slows the creature hit' },
-  staff: { name: 'Staff', hands: 2, speed: 1.1, reach: 5, ranged: true, damage: 3, scale: { wit: 0.8, spirit: 0.2 }, damageType: 'arcane', held: 1.25, extra: 'Arcane bolt' },
+  staff: { name: 'Staff', hands: 2, speed: 1.1, reach: 5, ranged: true, damage: 3, scale: { wit: 0.74, spirit: 0.2 }, damageType: 'arcane', held: 1.25, extra: 'Arcane bolt' },
   wand: { name: 'Wand', hands: 1, speed: 0.8, reach: 5.5, ranged: true, damage: 2, scale: { wit: 0.55, spirit: 0.1 }, damageType: 'arcane', held: 0.6, extra: 'Arcane bolt; off hand stays free' },
   'bell-mace': { name: 'Bell-mace', hands: 1, speed: 1.1, reach: 1.6, damage: 3, scale: { spirit: 0.45, vigor: 0.25 }, damageType: 'physical', heavy: true, allyHeal: 0.3, held: 1, extra: 'Each hit heals the most hurt ally nearby' },
   censer: { name: 'Censer', hands: 2, speed: 1.0, reach: 2.5, damage: 2, scale: { spirit: 0.4, vigor: 0.15 }, damageType: 'arcane', splash: 1, held: 1, extra: 'Arcane; hits everything close to the target' },

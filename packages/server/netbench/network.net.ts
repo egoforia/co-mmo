@@ -85,8 +85,9 @@ const rows: Row[] = [];
 const ONLY = process.env.NETBENCH_ONLY?.toLowerCase();
 
 describe('network bench', () => {
-  for (const scenario of SCENARIOS.filter((s) => !ONLY || s.name.toLowerCase().includes(ONLY))) {
-    it(scenario.name, async () => {
+  // Skipped rather than left out, so a word that names none of these (`combat`) leaves the suite not empty.
+  for (const scenario of SCENARIOS) {
+    it.skipIf(Boolean(ONLY && !scenario.name.toLowerCase().includes(ONLY)))(scenario.name, async () => {
       const result = await run(scenario);
       rows.push(...result);
       expect(result[0]!.snapshotsPerSecond).toBeGreaterThan(0);

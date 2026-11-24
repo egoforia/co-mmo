@@ -455,7 +455,7 @@ export const SHOTS: Shot[] = [
       await page.click('#editor [data-tools~="wall"]');
       await page.click('#editor [data-tool="wall"]');
       await page.selectOption('#editor select[name="shape"]', 'line');
-      // Tiles are 80 by 40 pixels on screen here: a line east along the north sides, then R and a line south along the east sides.
+      // Tiles are 96 by 48 pixels on screen here: a line east along the north sides, then R and a line south along the east sides.
       const line = async (from: [number, number], to: [number, number]) => {
         await page.mouse.move(...from);
         await page.mouse.down();
@@ -464,10 +464,10 @@ export const SHOTS: Shot[] = [
         // The editor takes no press while a change is saving: wait for the save (Undo comes back), so the next line is not lost.
         await page.waitForSelector('[data-undo]:not([disabled])', { timeout: 15_000 });
       };
-      await line([440, 300], [600, 380]);
+      await line([400, 280], [592, 376]);
       await page.keyboard.press('r');
-      await line([600, 380], [440, 460]);
-      await page.mouse.move(380, 520);
+      await line([592, 376], [400, 472]);
+      await page.mouse.move(328, 544);
       await page.waitForTimeout(1200);
     },
     mustSee: [
@@ -496,11 +496,11 @@ export const SHOTS: Shot[] = [
         // The editor takes no press while a change is saving: wait for the save (Undo comes back), so the next line is not lost.
         await page.waitForSelector('[data-undo]:not([disabled])', { timeout: 15_000 });
       };
-      await line([440, 300], [600, 380]);
+      await line([400, 280], [592, 376]);
       await page.keyboard.press('r');
-      await line([600, 380], [440, 460]);
+      await line([592, 376], [400, 472]);
       await page.click('#editor input[name="hitboxes"]');
-      await page.mouse.move(380, 520);
+      await page.mouse.move(328, 544);
       await page.waitForTimeout(1200);
     },
     mustSee: [

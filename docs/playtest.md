@@ -112,7 +112,11 @@ region server 20 ms from the game server (and 40 the same way). A second
 bench, `crossing.net.ts`, walks one player back and forth over the road
 between two regions on two region servers 20 ms away and reports how long
 each crossing went without a snapshot and whether a step was lost
-(`NETBENCH_ONLY=crossing`). `NETBENCH_SECONDS` sets how long
+(`NETBENCH_ONLY=crossing`). A third, `combat.net.ts`, has one robot
+beside a creature that neither dies nor strikes back hold Space as the
+browser does, on the same three lines with the wobble on its keys too, and
+reports how many of the swings it showed never landed and how long a strike
+took to be answered (`NETBENCH_ONLY=combat`). `NETBENCH_SECONDS` sets how long
 each one runs (10 by default), `NETBENCH_ONLY=wi-fi` runs only the scenarios
 whose names hold those words, and the game's network switches in `.env`
 (`NET_COMPRESS=off`, `NET_SKIP_STALE=off`, `NET_SEE_ACROSS=off`,

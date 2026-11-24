@@ -86,6 +86,8 @@ async function holdSpace(scenario: string, link: Link): Promise<CombatResult> {
   Object.assign(c, { x: Math.floor(p.x) + 1.5, y: Math.floor(p.y) + 0.5, floor: 0, rest: 1e9, hp: 1e9 });
   c.home = { x: c.x, y: c.y, floor: 0 };
   delete c.to;
+  // Facing it: a blow lands only on the tile ahead (tiles/facing.ts).
+  p.facing = { dx: 1, dy: 0 };
   await pause(300);
 
   // Space held: a swing each time our own clock says the cooldown is over.

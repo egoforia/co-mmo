@@ -1,4 +1,4 @@
-import { SAFE_IN, SAFE_OUT, absorb, afterArmor, armor, dodgeChance, isSafe, tilesFor, ward } from '@co-mmo/shared';
+import { SAFE_IN, SAFE_OUT, absorb, afterArmor, anchorNear, armor, dodgeChance, facesSquare, isSafe, tilesFor, ward } from '@co-mmo/shared';
 import type { Blow } from './effects/index.ts';
 import type { Paths } from './paths/index.ts';
 import type { PlayerState, RegionState } from './state.ts';
@@ -31,10 +31,19 @@ export class Pvp {
     return undefined;
   }
 
-  /** The player chosen as target, when they are a rival within `range` (tiles, like a weapon's reach). */
-  rivalInReach(p: PlayerState, range: number, id?: string): PlayerState | undefined {
+  /**
+   * The player chosen as target, when they are a rival within `range` (tiles,
+   * like a weapon's reach); for a melee blow (`ahead`), only on the tiles
+   * straight ahead of the way `p` faces (tiles/facing.ts).
+   */
+  rivalInReach(p: PlayerState, range: number, id?: string, ahead = false): PlayerState | undefined {
     const v = id ? this.s.players.get(id) : undefined;
     if (!v || this.why(p, v)) return undefined;
+    if (ahead) {
+      const [from, to] = [anchorNear(p.x, p.y), anchorNear(v.x, v.y)];
+      const here = from.tx === to.tx && from.ty === to.ty;
+      return here || facesSquare(from, p.facing, to, 1, tilesFor(range)) ? v : undefined;
+    }
     return Math.max(Math.abs(v.x - p.x), Math.abs(v.y - p.y)) <= tilesFor(range) + 0.5 ? v : undefined;
   }
 

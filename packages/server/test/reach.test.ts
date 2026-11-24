@@ -3,8 +3,8 @@ import { ITEMS, Tile, combatRules, newCharacter, regionDef, type PlayerInfo, typ
 import { Region, type Connection } from '../src/region.ts';
 import { account, api, start } from './helpers.ts';
 
-// Reach and sight on tiles (docs/combat.md, Rules): blows reach the eight
-// touching tiles, long blades a second tile straight ahead, shots as far as
+// Reach and sight on tiles (docs/combat.md, Rules): blows reach the touching
+// tile the player faces, long blades a second tile straight ahead, shots as far as
 // they say along a clear line, and bodies block shots when the Owner says so.
 
 function fakeConn() {
@@ -35,6 +35,7 @@ function setup(weapon?: string) {
   const ids = region.creatureIds();
   for (const id of ids) region.placeCreature(id, tx + 40, ty + 40);
   const put = (id: string, dx: number, dy: number) => region.placeCreature(id, tx + dx + 0.5, ty + dy + 0.5);
+  const face = (dx: number, dy: number) => region.facePlayer('a', dx, dy);
   const attack = () => {
     clock.now += 3000;
     region.handle('a', { t: 'attack' });
@@ -51,7 +52,7 @@ function setup(weapon?: string) {
     clock.now += 50;
     region.tick();
   };
-  return { region, conn, tx, ty, ids, put, attack, shoot, tick, map };
+  return { region, conn, tx, ty, ids, put, face, attack, shoot, tick, map };
 }
 
 afterEach(() => {
@@ -63,9 +64,60 @@ describe('reach on tiles', () => {
   it('bare hands reach a corner tile but not two tiles off', () => {
     const t = setup();
     t.put(t.ids[0]!, 1, 1);
+    t.face(1, 1);
     expect(t.attack()).toBe(1);
     t.put(t.ids[0]!, 2, 0);
+    t.face(1, 0);
     expect(t.attack()).toBe(1);
+  });
+
+  it('a blow lands only on the tile the player faces', () => {
+    const t = setup();
+    const [ahead, beside] = t.ids;
+    t.put(ahead!, 0, 1);
+    t.put(beside!, 1, 0);
+    // Facing south: the one to the east is in reach but not struck.
+    t.face(0, 1);
+    expect(t.shoot()).toEqual([ahead]);
+    // Asking for the one beside does not turn them: nothing is struck.
+    expect(t.shoot(beside)).toEqual([ahead]);
+    t.put(ahead!, 40, 40);
+    expect(t.shoot(beside)).toEqual([]);
+    t.face(1, 0);
+    expect(t.shoot(beside)).toEqual([beside]);
+  });
+
+  it('a turn pressed just before a blow counts for it', () => {
+    const t = setup();
+    t.put(t.ids[0]!, 0, 1);
+    t.face(1, 0);
+    // Pressing towards the creature (a taken tile turns, no step), then Space at once.
+    t.region.handle('a', { t: 'input', seq: 1, dx: 0, dy: 1 });
+    t.region.handle('a', { t: 'attack' });
+    expect(hits(t.conn).length).toBe(0);
+    t.tick();
+    expect(hits(t.conn).filter((h) => (h as { by: string }).by === 'a').map((h) => (h as { target: string }).target)).toEqual([t.ids[0]]);
+    expect(t.region.position('a')!.y).toBe(t.ty + 0.5);
+  });
+
+  it('a step under way keeps the player facing its way, and they turn once it is done', () => {
+    const t = setup();
+    const facing = () => (t.region as unknown as { s: { players: Map<string, { facing?: { dx: number; dy: number } }> } }).s.players.get('a')!.facing;
+    let seq = 0;
+    t.region.handle('a', { t: 'input', seq: ++seq, dx: 1, dy: 0 });
+    t.tick();
+    expect(facing()).toEqual({ dx: 1, dy: 0 });
+    // Halfway there, pressing south: still facing east.
+    t.region.handle('a', { t: 'input', seq: ++seq, dx: 0, dy: 1 });
+    t.tick();
+    expect(facing()).toEqual({ dx: 1, dy: 0 });
+    // Held on, the step ends and the next begins south: now facing south.
+    for (let i = 0; i < 10 && facing()!.dy === 0; i++) {
+      t.region.handle('a', { t: 'input', seq: ++seq, dx: 0, dy: 1 });
+      t.tick();
+    }
+    expect(facing()).toEqual({ dx: 0, dy: 1 });
+    expect(t.region.position('a')!.x).toBe(t.tx + 1.5);
   });
 
   it('a spear reaches a second tile straight ahead, not a crooked one', () => {
@@ -73,9 +125,14 @@ describe('reach on tiles', () => {
     const t = setup('test-spear');
     t.put(t.ids[0]!, 2, 1);
     expect(t.attack()).toBe(0);
+    t.face(1, 0);
     t.put(t.ids[0]!, 2, 2);
+    // Straight, but not the way they face.
+    expect(t.attack()).toBe(0);
+    t.face(1, 1);
     expect(t.attack()).toBe(1);
     t.put(t.ids[0]!, 0, -2);
+    t.face(0, -1);
     expect(t.attack()).toBe(2);
   });
 

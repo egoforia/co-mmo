@@ -8,8 +8,12 @@ import {
   ITEMS,
   RACES,
   TICK_RATE,
+  SIZE_TILES,
   Tile,
+  anchorNear,
   callingStats,
+  creatureSize,
+  nearestOf,
   levelledCreature,
   maxEnergy,
   maxHp,
@@ -107,6 +111,17 @@ const quiet = (): Connection & { messages: ServerMessage[] } => {
   return { messages, send: (m) => messages.push(m), close() {} };
 };
 
+/** Turns a fighter towards the nearest tile of a creature's square. */
+function faceTowards(region: Region, id: string, creatureId: string): void {
+  const c = region.creature(creatureId);
+  const me = region.position(id);
+  if (!c || !me) return;
+  const width = SIZE_TILES[creatureSize(c.kind)];
+  const from = anchorNear(me.x, me.y);
+  const to = nearestOf(anchorNear(c.x, c.y, width), width, from);
+  if (to.tx !== from.tx || to.ty !== from.ty) region.facePlayer(id, to.tx - from.tx, to.ty - from.ty);
+}
+
 /** One fight, start to finish. */
 export function fight(calling: CallingId, level: number, scene: Scene, seed = 1): FightResult {
   const clock = { now: 1_000_000_000 };
@@ -147,6 +162,8 @@ export function fight(calling: CallingId, level: number, scene: Scene, seed = 1)
     for (const id of ids) {
       if (!standing(id)) continue;
       const target = foes.find(alive);
+      // A blow lands only straight ahead (tiles/facing.ts): the fighter turns to the creature it fights, as a player pressing towards it does.
+      if (target) faceTowards(region, id, target);
       // Strike when ready (the server says no otherwise), and use each damage skill as it comes ready.
       region.handle(id, { t: 'attack', ...(target ? { target } : {}) });
       for (const a of skills(id)) region.handle(id, { t: 'ability', ability: a, ...(target ? { target } : {}) });

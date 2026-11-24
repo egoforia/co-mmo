@@ -256,7 +256,7 @@ describe('combat', () => {
     }
   });
 
-  it('a greatsword swing hits the two nearest creatures in reach', () => {
+  it('a greatsword swing hits the two creatures straight ahead, not one beside', () => {
     ITEMS['test-greatsword'] = { name: 'Test Greatsword', kind: 'equipment', art: 'x', description: '', slot: 'weapon', weapon: 'greatsword' };
     try {
       const { region } = setup('woods');
@@ -267,8 +267,9 @@ describe('combat', () => {
       const me = region.position('a')!;
       const [one, two, three] = region.creatureIds();
       region.placeCreature(one!, me.x + 1, me.y);
-      region.placeCreature(two!, me.x, me.y + 1.5);
-      region.placeCreature(three!, me.x + 5, me.y);
+      region.placeCreature(two!, me.x + 2, me.y);
+      region.placeCreature(three!, me.x, me.y + 1);
+      region.facePlayer('a', 1, 0);
       region.handle('a', { t: 'attack' });
       expect(of(conn, 'hit').map((h) => h.target).sort()).toEqual([one, two].sort());
     } finally {

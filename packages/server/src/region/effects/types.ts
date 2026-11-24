@@ -33,12 +33,12 @@ export interface EffectKit {
   critical(p: PlayerState, amount: number): number;
   /** Live creatures on the player's floor within `range` of a point, nearest first. */
   creaturesNear(p: PlayerState, at: { x: number; y: number }, range: number): Creature[];
-  /** The nearest live creature within reach, or the one asked for if it is in reach. */
-  creatureInReach(p: PlayerState, range: number, id?: string): Creature | undefined;
+  /** The nearest live creature within reach, or the one asked for if it is in reach; `ahead`, only straight ahead of the way the player faces. */
+  creatureInReach(p: PlayerState, range: number, id?: string, ahead?: boolean): Creature | undefined;
   /** Party members in the region within `radius` of the player and on their feet, the player first. */
   partyNear(p: PlayerState, radius: number): PlayerState[];
-  /** A rival player chosen as target within `range`, whom the player may hurt (region/pvp.ts). */
-  rivalInReach(p: PlayerState, range: number, id?: string): PlayerState | undefined;
+  /** A rival player chosen as target within `range`, whom the player may hurt (region/pvp.ts); `ahead`, only straight ahead. */
+  rivalInReach(p: PlayerState, range: number, id?: string, ahead?: boolean): PlayerState | undefined;
   /** Rival players within `range` of a point whom the player may hurt: area skills hit them as they hit monsters. */
   rivalsNear(p: PlayerState, at: { x: number; y: number }, range: number): PlayerState[];
   /** Hurts a rival player as a monster's blow would. */
@@ -104,10 +104,10 @@ export function addStatus(kit: EffectKit, cast: Cast, c: Creature, hit = cast.am
   return afflictCreature(kit.s, c, status, slowLength(cast.p, status, cast.a.duration), { by: cast.p.info.id, ...(amount ? { amount } : {}) });
 }
 
-/** The chosen creature in reach, else the nearest; sets it on the cast. */
-export function aimAt(kit: EffectKit, cast: Cast, range = cast.a.range): Creature | undefined {
+/** The chosen creature in reach, else the nearest; sets it on the cast. A melee blow (`ahead`) looks only straight ahead of the way the player faces. */
+export function aimAt(kit: EffectKit, cast: Cast, range = cast.a.range, ahead = false): Creature | undefined {
   const { p, targetId } = cast;
-  cast.target = kit.creatureInReach(p, range, targetId) ?? (targetId ? kit.creatureInReach(p, range) : undefined);
+  cast.target = kit.creatureInReach(p, range, targetId, ahead) ?? (targetId ? kit.creatureInReach(p, range, undefined, ahead) : undefined);
   return cast.target;
 }
 

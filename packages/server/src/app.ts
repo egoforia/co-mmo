@@ -46,6 +46,7 @@ import { RegionServers } from './region-servers.ts';
 import { ApiLog, watchFetch } from './api-log.ts';
 import { bearer, json, readJson, serveStatic } from './http.ts';
 import { handleAccount } from './account-routes.ts';
+import { handleCharacters } from './character-routes.ts';
 import { serveArtFile } from './art-files.ts';
 import { openGameSocket } from './game-socket.ts';
 import type { NetOptions } from './socket-net.ts';
@@ -388,6 +389,7 @@ export function createApp(options: AppOptions): App {
     const path = url.pathname;
 
     if (await handleAccount(req, res, path, { store, auth, wishes, homeRegion: () => world.home.def.id, publicUrl: options.publicUrl, commit: options.commit, updater: options.updater, authenticate })) return;
+    if (await handleCharacters(req, res, path, { store, wishes, world, homeRegion: () => world.home.def.id, authenticate })) return;
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 

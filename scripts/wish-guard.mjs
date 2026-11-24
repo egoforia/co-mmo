@@ -33,6 +33,7 @@ export const FORBIDDEN = [
 export const CORE = [
   { pattern: /^packages\/server\/src\/store(-postgres)?\.ts$/, what: 'accounts, roles and saved settings' },
   { pattern: /^packages\/server\/src\/account-routes\.ts$/, what: 'accounts, invites and sign-in routes' },
+  { pattern: /^packages\/server\/src\/(store-roster|character-routes)\.ts$/, what: 'the characters on an account and who may play them' },
   { pattern: /^packages\/server\/src\/auth\.ts$/, what: 'sign-in by email, Google and GitHub' },
   { pattern: /^packages\/server\/src\/settings\.ts$/, what: 'saved settings, AI model choices and budget limits' },
   { pattern: /^packages\/server\/src\/budget\.ts$/, what: 'the budget' },

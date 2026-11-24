@@ -57,6 +57,26 @@ describe('the world in Postgres', () => {
     expect(again.settings.budget.monthlyUsd).toBe(55);
   });
 
+  it('keeps every character on an account across a restart', async () => {
+    const store = await Store.postgres(db);
+    const { account, token } = store.acceptInvite(store.createInvite(null).code, 'Mara', 'sanctum');
+    const ilya = store.addCharacter(account, 'Ilya', 'sanctum', newCharacter(), 5);
+    store.choose(account, ilya.id);
+    await store.close();
+
+    const again = await Store.postgres(db);
+    const main = again.accountByToken(token)!;
+    expect(again.charactersOf(main).map((a) => a.name)).toEqual(['Mara', 'Ilya']);
+    expect(again.playingOf(main).id).toBe(ilya.id);
+    again.deleteCharacter(main, main.id);
+    await again.close();
+
+    const last = await Store.postgres(db);
+    expect(last.accountByToken(token)?.name).toBe('Ilya');
+    expect(last.accounts).toHaveLength(1);
+    await last.close();
+  });
+
   it('writes only what changed, and removes what went away', async () => {
     const { sql, writes } = counting(db);
     const store = await Store.postgres(sql);

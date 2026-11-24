@@ -88,7 +88,7 @@ export async function handleAccount(req: IncomingMessage, res: ServerResponse, p
     const account = ctx.authenticate(req);
     if (!account) return json(res, 401, { error: 'unauthorized' }), true;
     if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) }), true;
-    return json(res, 200, { player: publicInfo(account) }), true;
+    return json(res, 200, { player: publicInfo(store.playingOf(account)) }), true;
   }
 
   if (path === '/api/invites' && method === 'POST') {
@@ -102,9 +102,12 @@ export async function handleAccount(req: IncomingMessage, res: ServerResponse, p
   if (path === '/api/account' && method === 'GET') {
     const account = ctx.authenticate(req);
     if (!account) return json(res, 401, { error: 'unauthorized' }), true;
-    const look = wishes.lookOf(account.id);
+    // The sign-in is the account's; the name and look are the character's being played.
+    const playing = store.playingOf(account);
+    const look = wishes.lookOf(playing.id);
     return json(res, 200, {
-      name: account.name,
+      name: playing.name,
+      characters: store.charactersOf(account).length,
       email: account.email ?? null,
       logins: (account.logins ?? []).map((l) => l.provider),
       providers: auth.providers(),
@@ -117,8 +120,9 @@ export async function handleAccount(req: IncomingMessage, res: ServerResponse, p
     if (!account) return json(res, 401, { error: 'unauthorized' }), true;
     if (account.suspended) return json(res, 403, { error: 'suspended', message: suspendedText(account) }), true;
     const body = await readJson(req);
+    const playing = store.playingOf(account);
     try {
-      wishes.grantLook(account, typeof body?.look === 'string' ? body.look : '', account.character?.race);
+      wishes.grantLook(playing, typeof body?.look === 'string' ? body.look : '', playing.character?.race);
     } catch (err) {
       if (err instanceof WishError) return json(res, 400, { error: 'look_invalid', message: err.message }), true;
       throw err;

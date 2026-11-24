@@ -101,6 +101,18 @@ html, body {
 .panel .button:hover { border-color: var(--accent); }
 .panel .error { color: var(--error); min-height: 1.5em; margin: 8px 0 0; }
 .panel .note, #account .note, #away .note { color: var(--region); }
+.panel button.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
+.panel button.danger { background: var(--error); }
+
+/* The character screen (character-select.ts). */
+.panel .characters { list-style: none; margin: 0; padding: 0; }
+.panel .character { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--edge); }
+.panel .character.last .about b { color: var(--accent); }
+.panel .character img, .panel .character .no-art { width: 40px; height: 60px; object-fit: contain; flex: none; }
+.panel .character .about { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.panel .character .about b, .panel .character .about span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel .character .actions { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.panel .character .actions button { margin: 0; width: auto; padding: 6px 12px; }
 #account .error { color: var(--error); }
 
 /* --- Account, party, while you were away --------------------------------- */

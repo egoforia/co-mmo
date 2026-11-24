@@ -38,7 +38,7 @@ export async function showSignIn(message = ''): Promise<void> {
   });
 }
 
-/** The Account window: sign-in email, linked Google and GitHub, your look, signing out, and for Stewards and the Owner the performance overlay. */
+/** The Account window: sign-in email, linked Google and GitHub, your look, switching character, signing out, and for Stewards and the Owner the performance overlay. */
 export class AccountWindow {
   private readonly el = document.getElementById('account')!;
 
@@ -82,6 +82,9 @@ export class AccountWindow {
       <h2>${escapeHtml(info.name)} <button type="button" class="close" aria-label="Close">×</button></h2>
       <h3>Your look</h3>
       ${lookHtml}
+      <h3>Characters</h3>
+      <p>${(info.characters ?? 1) > 1 ? `You have ${info.characters} characters on this account.` : 'Make another character to play on this account.'}</p>
+      <button type="button" class="quiet" id="switch-character">Switch character</button>
       <h3>Signing in</h3>
       <p>${info.email ? `Sign-in links go to <b>${escapeHtml(info.email)}</b>.` : 'Add an email to sign in from any device.'}</p>
       <form id="email-form" class="row">
@@ -133,6 +136,10 @@ export class AccountWindow {
       if (!overlay) return;
       overlay.show(!overlay.open);
       (event.currentTarget as HTMLButtonElement).textContent = overlay.open ? 'Hide the performance numbers' : 'Show the performance numbers';
+    });
+    // The character screen is outside the world: leaving the page takes this character out first.
+    this.el.querySelector('#switch-character')!.addEventListener('click', () => {
+      location.href = '/?characters';
     });
     this.el.querySelector('#sign-out')!.addEventListener('click', async () => {
       await signOut(this.token);

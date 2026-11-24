@@ -35,6 +35,8 @@ export interface Shot {
   screen?: 'desktop' | 'phone';
   /** Things the player carries besides the Bible, for shots of the bag and what it does. */
   carry?: { item: string; qty: number }[];
+  /** More characters on the player's account, by name, for shots of the character screen (docs/characters.md). */
+  characters?: string[];
   /** Hide the HUD and windows, for shots of the world itself (buildings, floors). */
   hideUi?: boolean;
   /** Done after the page has settled and before the picture: open a window, click a tab. */
@@ -261,6 +263,36 @@ export const SHOTS: Shot[] = [
     region: 'sanctum',
     screen: 'phone',
     mustSee: ['the player is on screen', 'HUD parts do not overlap each other or run off the edge'],
+  },
+  {
+    name: 'character-screen',
+    about: 'The character screen after sign-in, for an account with three characters.',
+    page: '/',
+    ready: '.panel .characters',
+    characters: ['Ilya', 'Petra'],
+    mustSee: ['the title Your characters and a line saying each has their own Favor and things', 'three lines: Owner (played last), Ilya and Petra, each with level, people and Calling, the land and Play and Delete buttons', 'a New character button under the list'],
+  },
+  {
+    name: 'character-new',
+    about: 'Making a new character from the character screen.',
+    page: '/',
+    ready: '.panel .characters',
+    characters: ['Ilya'],
+    open: async (page) => {
+      await page.click('#new-character');
+      await page.waitForSelector('#character-form');
+    },
+    mustSee: ['the title New character', 'a name box, the people and Calling choosers and a box for how they look', 'Make this character and Back to your characters buttons'],
+  },
+  {
+    name: 'sanctum-account',
+    about: 'The Account window in the Sanctum, with Switch character.',
+    region: 'sanctum',
+    open: async (page) => {
+      await page.click('#account-button');
+      await page.waitForSelector('#switch-character');
+    },
+    mustSee: ['the Account window with Your look, then Characters with a Switch character button, then Signing in', 'nothing in the window cut off or overlapping'],
   },
   {
     name: 'gods-view',

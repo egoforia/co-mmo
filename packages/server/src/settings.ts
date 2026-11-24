@@ -53,6 +53,18 @@ export interface Settings {
   workshop?: WorkshopSettings;
   /** How fights play (God's View, Combat page; missing in older saves: shared combatRules fills it in). */
   combat?: import('@co-mmo/shared').CombatRules;
+  /** Characters one account may have (God's View, Players tab; missing in older saves: DEFAULT_MAX_CHARACTERS). */
+  characters?: { max: number };
+}
+
+/** Characters one account may have unless the Owner sets another number. */
+export const DEFAULT_MAX_CHARACTERS = 5;
+/** The most the Owner may allow, so one account cannot crowd the world. */
+export const MOST_CHARACTERS = 20;
+
+/** How many characters one account may have, as set on the Players tab. */
+export function maxCharacters(settings: Settings): number {
+  return settings.characters?.max ?? DEFAULT_MAX_CHARACTERS;
 }
 
 /** The daily spending cap unless the Owner sets one: a busy day's painting, well under the month. */

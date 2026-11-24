@@ -240,6 +240,8 @@ describe('Path signature skills', () => {
     const first = of(conn, 'hit').at(-1)!.amount;
     tick(11);
     c.hp = 2_000;
+    // Back in front of them: a blow lands only on the tile they face.
+    region.placeCreature(foe, at.x + 1, at.y);
     use('execute', foe);
     const second = of(conn, 'hit').at(-1)!.amount;
     expect(second).toBeGreaterThanOrEqual(first * 1.8);

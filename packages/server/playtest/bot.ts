@@ -277,6 +277,8 @@ export class Bot {
       if (Math.hypot(last.x - p.x, last.y - p.y) <= attackReach(this.character) * 0.9) {
         if (Date.now() - this.lastAttack >= attackCooldown(this.character) * 1000 + 30) {
           this.lastAttack = Date.now();
+          // A blow lands only on the tile ahead (tiles/facing.ts): press towards it first, which only turns us when it stands there.
+          this.input(Math.sign(Math.floor(last.x) - Math.floor(p.x)), Math.sign(Math.floor(last.y) - Math.floor(p.y)));
           this.send({ t: 'attack' });
         }
         continue;

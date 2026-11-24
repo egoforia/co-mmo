@@ -22,6 +22,7 @@ import {
   storeyAt,
   walkOn,
   anchorNear,
+  faceAfterTick,
   wayTaken,
   Tile,
   type BodyState,
@@ -633,6 +634,13 @@ export class Region {
     if (p) Object.assign(p, { x, y, floor, to: undefined });
   }
 
+  /** Turns a player to face a way along the grid, as pressing towards a taken tile does: for tests and the balance test. */
+  facePlayer(id: string, dx: number, dy: number): void {
+    const p = this.s.players.get(id);
+    const len = Math.hypot(dx, dy);
+    if (p && len > 0) p.facing = { dx: dx / len, dy: dy / len };
+  }
+
   /** Moves a creature, for tests and (later) wishes. */
   placeCreature(id: string, x: number, y: number, floor = 0): void {
     const c = this.s.creatures.find((k) => k.id === id);
@@ -833,8 +841,8 @@ export class Region {
           const from = p.to ?? anchorNear(p.x, p.y);
           const next = walkOn(this.map, p, input.dx, input.dy, paceOf(p, now), this.crowd.forPlayer(p));
           if (next.x !== p.x || next.y !== p.y) this.gauges.moved(p);
-          const len = Math.hypot(input.dx, input.dy);
-          if (len > 0) p.facing = { dx: input.dx / len, dy: input.dy / len };
+          // They turn as a step begins and not again until it is done (tiles/facing.ts).
+          p.facing = faceAfterTick(p.facing, from, p.to, next.to, input.dx, input.dy);
           const way = wayTaken(this.map, p.floor, next);
           if (way) this.s.notice(p, climbWords(way, p.floor));
           p.x = next.x;

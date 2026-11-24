@@ -17,7 +17,8 @@ tile in front of a healer really guards them.
 | Sizes | Tiny, small and medium bodies take 1 tile; high monsters 2×2; colossal 3×3 (`SIZE_TILES`). |
 | One per tile | A body claims the tile it steps onto as the step starts (`TileClaims`); first to ask wins. Players block players; party members may swap places. |
 | Walking into someone | Pressing towards a tile someone stands on takes no step: you stay put and turn to face them. Only the land (a wall at a diagonal) slides a step aside. |
-| Melee reach | The 8 touching tiles; spears and greatswords 2 tiles in a straight line. |
+| Facing | You turn as a step begins, to the way of that step, and keep facing it until you stand on the next tile; a new way pressed mid-step waits for the tile (`tiles/facing.ts`). Standing, pressing a way turns you (towards someone, that is all it does). |
+| Melee reach | Only the touching tile you face, of the 8 (egoforia, 2026-11-24); spears, greatswords and censers also the tile behind it, straight ahead. Melee skills that strike one foe (`strike`) follow the same rule. A trained greatsword's second foe must be ahead too; a censer's splash still falls round its target. |
 | Ranged reach | Counted in tiles, with a clear line. Whether bodies block shots is a setting on God's View's Combat page. |
 | Skill shapes | Areas are squares of tiles, cones wedges, lines rows; shown before they hit. |
 | Flanking | A monster hit while a player stands on the opposite tile takes +15%. |

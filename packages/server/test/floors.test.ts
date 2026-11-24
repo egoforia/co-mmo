@@ -92,6 +92,7 @@ describe('floors in a building', () => {
     const { region, tick, stairs, ladder } = cottage();
     const [mushroom] = region.creatureIds();
     region.placeCreature(mushroom!, 110.5, 128.5);
+    region.facePlayer('a', 0, 1);
     region.handle('a', { t: 'attack' });
     expect(region.creatureMood(mushroom!)?.aggro).toBe('a');
     region.placePlayer('a', stairs.top.x, stairs.top.y - 1, 1);

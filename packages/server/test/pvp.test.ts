@@ -153,6 +153,7 @@ describe('players fighting players', () => {
     const s = setup();
     const foe = s.region.creatureIds().find((id) => s.region.creature(id)!.kind !== 'lantern-moth')!;
     s.region.placeCreature(foe, s.at.x - 1, s.at.y);
+    s.region.facePlayer('a', -1, 0);
     s.region.handle('a', { t: 'attack', target: foe });
     s.tick(0.5);
     expect(s.region.creatureMood(foe)!.aggro).toBe('a');

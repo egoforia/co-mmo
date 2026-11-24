@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ABILITIES,
   CREATURES,
+  ITEMS,
   TICK_SECONDS,
   collides,
   maxHp,
@@ -184,8 +185,15 @@ describe('targeting', () => {
   it('a plain attack goes to the chosen creature in reach, else falls back to the nearest', () => {
     const s = setup();
     const far = s.others[0]!;
-    s.region.placeCreature(far, s.at.x + 1, s.at.y + 0.6);
+    // A blow lands only ahead (tiles/facing.ts): a spear reaches the second tile straight ahead of the way they face.
+    const spear = 'test-threat-spear';
+    ITEMS[spear] = { name: 'Test Spear', kind: 'equipment', art: 'x', description: '', slot: 'weapon', weapon: 'spear' };
+    s.ch('a').equipment.weapon = spear;
+    s.region.placeCreature(far, s.at.x + 2, s.at.y);
+    s.region.facePlayer('a', 1, 0);
     s.region.handle('a', { t: 'attack', target: far });
+    delete ITEMS[spear];
+    delete s.ch('a').equipment.weapon;
     expect(hits(s.conns.a).at(-1)?.target).toBe(far);
     s.region.placeCreature(far, s.at.x + 6, s.at.y);
     s.clock.now += 5000;

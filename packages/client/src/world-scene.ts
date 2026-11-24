@@ -13,6 +13,8 @@ import {
   SnapshotClock,
   bodiesSeen,
   TICK_SECONDS,
+  anchorNear,
+  faceAfterTick,
   WALK_FRAMES,
   generateRegion,
   heldItem,
@@ -593,20 +595,21 @@ export class WorldScene extends Phaser.Scene {
       // On tiles a step once begun is finished, so the server hears every tick of it, key held or not.
       if (dx !== 0 || dy !== 0 || predictor.stepping) {
         const step = PROJECTION.inputToWorld(dx, dy);
-        if (dx !== 0 || dy !== 0) this.facing = { dx: step.dx, dy: step.dy };
         const before = predictor.position;
         const input = predictor.apply(step.dx, step.dy);
+        // Turned as a step begins, never halfway through one: the server faces us the same way (tiles/facing.ts).
+        const after = predictor.position;
+        const from = before.to ?? anchorNear(before.x, before.y);
+        this.facing = faceAfterTick(this.facing, from, before.to, after.to, step.dx, step.dy) ?? this.facing;
         // Pressing towards a taken tile takes no step (the walker hands back the same place): only turn to face it.
         this.blocked = (dx !== 0 || dy !== 0) && predictor.position === before;
         this.options.send({ t: 'input', ...input });
       } else this.blocked = false;
     }
     const held = this.readInput();
-    // A step finishing after the key was let go still walks, the way it goes.
-    const to = predictor.position.to;
-    const going = !held.dx && !held.dy && to ? { dx: to.tx + 0.5 - predictor.position.x, dy: to.ty + 0.5 - predictor.position.y } : undefined;
-    if (going) walkAvatar(this, this.metrics, this.me, going, { dx: 1, dy: 0 });
-    else walkAvatar(this, this.metrics, this.me, PROJECTION.inputToWorld(held.dx, held.dy), this.blocked ? { dx: 0, dy: 0 } : held);
+    // Drawn facing the way the step under way goes, whatever is pressed, until it is done; a step finishing after the key was let go still walks.
+    const walking = !!predictor.position.to || ((held.dx !== 0 || held.dy !== 0) && !this.blocked);
+    walkAvatar(this, this.metrics, this.me, this.facing, walking ? { dx: 1, dy: 0 } : { dx: 0, dy: 0 });
 
     const target = predictor.position;
     const gap = Math.hypot(target.x - this.shown.x, target.y - this.shown.y);

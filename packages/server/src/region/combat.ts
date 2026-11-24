@@ -6,7 +6,7 @@ import {
   anchorNear,
   clearLine,
   creatureSize,
-  inLine,
+  facesSquare,
   nearestOf,
   tilesApart,
   tilesFor,
@@ -85,8 +85,8 @@ export class Combat implements EffectKit {
   /** Players fighting players (region/pvp.ts). */
   readonly pvp: Pvp;
 
-  rivalInReach(p: PlayerState, range: number, id?: string): PlayerState | undefined {
-    return this.pvp.rivalInReach(p, range, id);
+  rivalInReach(p: PlayerState, range: number, id?: string, ahead = false): PlayerState | undefined {
+    return this.pvp.rivalInReach(p, range, id, ahead);
   }
 
   rivalsNear(p: PlayerState, at: { x: number; y: number }, range: number): PlayerState[] {
@@ -104,8 +104,10 @@ export class Combat implements EffectKit {
 
   /**
    * A plain attack (Space) on the chosen creature, or the nearest when it is
-   * out of the weapon's reach, once it is ready: bows, wands and the like fire across the room. A trained
-   * greatsword also hits the next creature in reach, a censer everything
+   * out of the weapon's reach, once it is ready: bows, wands and the like fire across the room.
+   * A melee blow lands only on what stands on the tiles straight ahead of the
+   * way the player faces (tiles/facing.ts, egoforia 2026-11-24). A trained
+   * greatsword also hits the next creature ahead, a censer everything
    * close to its target, and a heavy weapon may stagger what it hits.
    */
   attack(p: PlayerState, targetId?: string, at = this.s.now()): void {
@@ -114,14 +116,19 @@ export class Combat implements EffectKit {
     if (ch.hp <= 0 || !canAct(p, now)) return;
     // A swing that came a little early is done when it is ready, not lost (held-actions.ts); `at` is then when it was ready.
     if (holdEarly(this.s, this, p, 'heldAttack', at, p.lastAttack + attackCooldown(ch) * 1000, targetId)) return;
-    p.heldAttack = undefined;
-    p.lastAttack = at;
     const reach = attackReach(ch);
     const family = wieldedFamily(ch);
-    // Spears, greatswords and censers reach a second tile, but only straight ahead.
-    const straight = !family.ranged && tilesFor(reach) > 1;
+    // A blow goes the way they face, so a turn pressed just before it counts: steps sent first are taken first, and the blow waits for them on this tick (doHeld).
+    if (!family.ranged && p.inputs.length > 0) {
+      p.heldAttack = { at, ...(targetId !== undefined ? { target: targetId } : {}) };
+      return;
+    }
+    p.heldAttack = undefined;
+    p.lastAttack = at;
+    // A melee blow strikes the tiles ahead of the way they face (spears, greatswords and censers reach a second); shots go any way.
+    const ahead = !family.ranged;
     // Another player is struck only when chosen as the target (region/pvp.ts).
-    const rival = targetId && this.s.players.has(targetId) ? this.pvp.rivalInReach(p, reach, targetId) : undefined;
+    const rival = targetId && this.s.players.has(targetId) ? this.pvp.rivalInReach(p, reach, targetId, ahead) : undefined;
     if (targetId && this.s.players.has(targetId) && !rival) {
       const v = this.s.players.get(targetId)!;
       const why = this.pvp.why(p, v);
@@ -134,12 +141,12 @@ export class Combat implements EffectKit {
       this.gauges.landed(p);
       return;
     }
-    const target = (targetId && this.creatureInReach(p, reach, targetId, straight)) || this.creatureInReach(p, reach, undefined, straight);
+    const target = (targetId && this.creatureInReach(p, reach, targetId, ahead)) || this.creatureInReach(p, reach, undefined, ahead);
     if (!target) return;
     const trained = wieldsTrained(ch);
     const hits = [target];
     if (trained && family.targets) {
-      for (const c of this.creaturesNear(p, p, reach)) if (hits.length < family.targets && !hits.includes(c)) hits.push(c);
+      for (const c of this.creaturesNear(p, p, reach)) if (hits.length < family.targets && !hits.includes(c) && (!ahead || this.ahead(p, c, reach))) hits.push(c);
     }
     if (trained && family.splash) {
       for (const c of this.creaturesNear(p, target, family.splash)) if (!hits.includes(c)) hits.push(c);
@@ -206,10 +213,10 @@ export class Combat implements EffectKit {
    * reach, counted in tiles from the player's tile to the nearest tile of its
    * square (a big creature is reached at its edge). Past the touching tiles a
    * blow or a shot needs a clear line (tiles/sight.ts): trees, rocks and walls
-   * stop it, and bodies too when the Combat page says so. A long blade
-   * (`straight`) reaches its second tile only in a straight line.
+   * stop it, and bodies too when the Combat page says so. A melee blow
+   * (`ahead`) reaches only the tiles straight ahead of the way the player faces.
    */
-  creatureInReach(p: PlayerState, range: number, id?: string, straight = false): Creature | undefined {
+  creatureInReach(p: PlayerState, range: number, id?: string, ahead = false): Creature | undefined {
     const tiles = tilesFor(range);
     const from = anchorNear(p.x, p.y);
     let target: Creature | undefined;
@@ -221,12 +228,20 @@ export class Combat implements EffectKit {
       if (d > tiles) continue;
       const far = Math.hypot(c.x - p.x, c.y - p.y);
       if (d * 1000 + far >= best) continue;
-      if (d > 1 && straight && !inLine(from, anchor, width)) continue;
+      // One standing on the player's own tile (put there, never walked) is struck whichever way they face.
+      if (ahead && d > 0 && !facesSquare(from, p.facing, anchor, width, tiles)) continue;
       if (d > 1 && !this.inSight(p, from, c, nearestOf(anchor, width, from))) continue;
       best = d * 1000 + far;
       target = c;
     }
     return target;
+  }
+
+  /** True when the creature stands on one of the tiles straight ahead of the way the player faces, within `range`. */
+  private ahead(p: PlayerState, c: Creature, range: number): boolean {
+    const { anchor, width } = squareOf(c);
+    const from = anchorNear(p.x, p.y);
+    return tilesApart(from, 1, anchor, width) === 0 || facesSquare(from, p.facing, anchor, width, tilesFor(range));
   }
 
   /**
@@ -401,6 +416,11 @@ export class Combat implements EffectKit {
     const ended = PATH_RULES[id]?.again?.(this, p, id);
     if (ended) return this.s.notice(p, ended);
     if (holdEarly(this.s, this, p, 'heldAbility', now, p.readyAt.get(id) ?? 0, targetId, id)) return;
+    // A blow (strike) goes the way they face: it waits for steps and turns sent before it, as a plain attack does.
+    if (a.effect === 'strike' && p.inputs.length > 0) {
+      p.heldAbility = { at: now, ability: id, ...(targetId !== undefined ? { target: targetId } : {}) };
+      return;
+    }
     if (ch.energy < a.energy) return this.s.notice(p, `Not enough Energy for ${a.name}.`);
     const effect = EFFECTS[a.effect];
     // A Calling skill or Path skill may check and do more than its effect's data says (skills/, paths/).

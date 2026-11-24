@@ -25,6 +25,8 @@ export class SnapshotGate {
   /** The quickest a snapshot has lately taken there and a report back, ms. */
   private usual?: number;
   private behind = 0;
+  /** How late the last report was, past the usual. */
+  private lastLate = 0;
   private lastSent = 0;
   private skippedSince = 0;
   /** Snapshots skipped in all, for the network bench and tests. */
@@ -39,6 +41,7 @@ export class SnapshotGate {
       // A new region counts its ticks afresh.
       this.sentAt.clear();
       this.behind = 0;
+      this.lastLate = 0;
       return message;
     }
     if (message.t !== 'snapshot') return message;
@@ -74,13 +77,21 @@ export class SnapshotGate {
     return skipped;
   }
 
-  /** The browser has seen the snapshot of `tick` (SeenMessage) by `now`. */
+  /**
+   * The browser has seen the snapshot of `tick` (SeenMessage) by `now`. The
+   * line counts as behind only when two reports in a row came late: one late
+   * report is most often the browser busy with a slow frame, which delays
+   * the report but leaves nothing queued, and skipping then only made
+   * everyone jump. A queue on the line keeps every report late.
+   */
   seen(tick: number, now: number): void {
     const at = this.sentAt.get(tick);
     if (at === undefined) return;
     const took = now - at;
     if (this.usual === undefined || took < this.usual) this.usual = took;
     else this.usual += (took - this.usual) * DRIFT;
-    this.behind = took - this.usual;
+    const late = took - this.usual;
+    this.behind = Math.min(late, this.lastLate);
+    this.lastLate = late;
   }
 }

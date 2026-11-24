@@ -69,9 +69,9 @@ import { creatureSpot, drawnSpot, nearness, settleJump, type DrawTimes } from '.
 import { HeldHurt, holdFor } from './world-scene/hit-timing.ts';
 import { Targeting } from './world-scene/targeting.ts';
 import { cullOffscreen } from './world-scene/cull.ts';
+import { applyFloorView, floorViewKey } from './world-scene/floor-view.ts';
 import { seeThroughWalls } from './world-scene/edge-walls.ts';
 import {
-  applyFloorView,
   drawNearChunks,
   drawRegion,
   isAvatarVisible,
@@ -135,6 +135,8 @@ export class WorldScene extends Phaser.Scene {
   private floor = 0;
   /** The floor the world editor looks at instead of ours, while it is open on another floor. */
   private viewed?: number;
+  /** What the floor view was last worked out from (floor-view.ts floorViewKey). */
+  private floorKey = '';
   /** A land's edits drafts and all, laid here instead of the published ones while the world editor shows drafts. */
   private preview?: { region: string; edits: WorldEdit[] };
   private tint?: Phaser.GameObjects.Rectangle;
@@ -399,7 +401,16 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.fadeIn(200, 24, 20, 37);
   }
 
-  private applyFloor(): void {
+  /**
+   * Shows what can be seen from our floor. Every frame asks with `whenChanged`,
+   * and then it only works when something the view depends on changed
+   * (floor-view.ts floorViewKey): walking every drawn object each frame was
+   * most of a frame's work.
+   */
+  private applyFloor(whenChanged = false): void {
+    const key = floorViewKey(this.drawn, this.welcome.region.def.id, this.map, this.shown, this.shownFloor);
+    if (whenChanged && key === this.floorKey) return;
+    this.floorKey = key;
     applyFloorView(this, this.drawn, this.welcome.region.def.id, this.map, this.shown, this.shownFloor);
   }
 
@@ -791,7 +802,7 @@ export class WorldScene extends Phaser.Scene {
   /** Near a building, fade its exterior away to show the inside; farther off, fade it back. */
   private revealBuildings(instant: boolean): void {
     revealBuildings(this, this.buildings(), this.origin.x + this.shown.x, this.origin.y + this.shown.y, instant, this.shownFloor);
-    this.applyFloor();
+    this.applyFloor(!instant);
     // After the floor view, which sets every picture solid again.
     seeThroughWalls([...this.drawn.values()].flatMap((r) => r.edgeWalls), this.origin.x + this.shown.x, this.origin.y + this.shown.y, this.shownFloor);
   }

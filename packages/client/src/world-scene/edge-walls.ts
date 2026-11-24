@@ -89,12 +89,12 @@ export function seeThroughWalls(walls: EdgeWallView[], x: number, y: number, flo
   const myDepth = PROJECTION.depth(x, y);
   const meY = me.y - floorLift(floor);
   for (const { wall, image, cap } of walls) {
-    const box = image.getBounds();
     // In front means drawn after us on our floor, and over any of the space our figure stands in (about a storey tall above our feet, a body wide).
-    const front = wall.floor === floor && image.depth - floorDepthOffset(floor) > myDepth
-      && me.x + FIGURE.halfWidth > box.left && me.x - FIGURE.halfWidth < box.right && meY > box.top && meY - FIGURE.height < box.bottom;
+    // Its box is measured only for walls on our floor and in front: this runs every frame for every wall.
+    const box = wall.floor === floor && image.depth - floorDepthOffset(floor) > myDepth ? image.getBounds() : undefined;
+    const front = Boolean(box) && me.x + FIGURE.halfWidth > box!.left && me.x - FIGURE.halfWidth < box!.right && meY > box!.top && meY - FIGURE.height < box!.bottom;
     const alpha = front ? SEE_THROUGH : 1;
-    image.setAlpha(alpha);
-    if (cap) cap.setAlpha(alpha);
+    if (image.alpha !== alpha) image.setAlpha(alpha);
+    if (cap && cap.alpha !== alpha) cap.setAlpha(alpha);
   }
 }

@@ -7,7 +7,7 @@
 import type Phaser from 'phaser';
 import { CHARACTER_HEIGHT, ECHO_ART, HALLOWED_ART, SAND_DOUBLE_ART, SPIRIT_HAWK_ART, TILE_MARKER_ART, TRAP_ART, type WorldMark } from '@co-mmo/shared';
 import { litFigure } from '../lights.ts';
-import { T } from './types.ts';
+import { T, keepDepth } from './types.ts';
 
 /** Where a point in our region is drawn, and how deep. */
 export type ToScreen = (x: number, y: number, floor: number) => { x: number; y: number; depth: number };
@@ -47,7 +47,7 @@ export class Marks {
         // A hawk follows its friend between snapshots rather than hopping.
         this.scene.tweens.add({ targets: image, x: at.x, y, duration: 100 });
       }
-      image.setDepth(at.depth + look.depth);
+      keepDepth(image, at.depth + look.depth);
     }
     for (const [id, image] of this.shown) {
       if (seen.has(id)) continue;

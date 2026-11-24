@@ -4,7 +4,7 @@ import type Phaser from 'phaser';
 // No real tile layers here: every object is a plain picture.
 vi.mock('phaser', () => ({ default: { Tilemaps: { TilemapLayer: class {} } } }));
 
-const { forgetShade, setDepthShade } = await import('../src/world-scene/types.ts');
+const { forgetShade, keepDepth, setDepthShade } = await import('../src/world-scene/types.ts');
 
 /** A picture that counts how often it is tinted and made solid. */
 function picture(baseTint?: number) {
@@ -50,5 +50,16 @@ describe('floor shade', () => {
     forgetShade(o);
     setDepthShade(o, 0);
     expect(calls.clear).toBe(2);
+  });
+});
+
+describe('depth', () => {
+  it('is set only when it changes, so a still crowd sorts nothing', () => {
+    let sets = 0;
+    const o = { depth: 0, setDepth(d: number) { sets++; this.depth = d; return this; } };
+    keepDepth(o as never, 5);
+    keepDepth(o as never, 5);
+    keepDepth(o as never, 6);
+    expect(sets).toBe(2);
   });
 });

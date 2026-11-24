@@ -461,7 +461,8 @@ export const SHOTS: Shot[] = [
         await page.mouse.down();
         await page.mouse.move(...to, { steps: 6 });
         await page.mouse.up();
-        await page.waitForTimeout(800);
+        // The editor takes no press while a change is saving: wait for the save (Undo comes back), so the next line is not lost.
+        await page.waitForSelector('[data-undo]:not([disabled])', { timeout: 15_000 });
       };
       await line([440, 300], [600, 380]);
       await page.keyboard.press('r');
@@ -492,7 +493,8 @@ export const SHOTS: Shot[] = [
         await page.mouse.down();
         await page.mouse.move(...to, { steps: 6 });
         await page.mouse.up();
-        await page.waitForTimeout(800);
+        // The editor takes no press while a change is saving: wait for the save (Undo comes back), so the next line is not lost.
+        await page.waitForSelector('[data-undo]:not([disabled])', { timeout: 15_000 });
       };
       await line([440, 300], [600, 380]);
       await page.keyboard.press('r');

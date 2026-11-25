@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   combatRules,
+  DEFAULT_SKY,
+  type SkyConfig,
   ITEMS,
   TURNED,
   WishError,
@@ -28,6 +30,7 @@ import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
 import { type Account, type Store } from './store.ts';
+import { handleSky } from './sky-settings.ts';
 import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, MOST_CHARACTERS, dailyClips, DEFAULT_WORKSHOP, maxCharacters, soundSettings, styleCheckSettings, videoSettings, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings } from './settings.ts';
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
@@ -91,6 +94,10 @@ export interface AdminContext {
   apiLog?: ApiLog;
   /** CPU profiler and heap snapshot manager (Owner). */
   profiler?: ProfilerManager;
+  /** The sky `.env` asked for, under what the Sky tab saves. */
+  sky?: SkyConfig;
+  /** The server clock. */
+  now?: () => number;
   json(res: ServerResponse, status: number, body: unknown): void;
   readJson(req: IncomingMessage): Promise<Record<string, unknown> | null>;
 }
@@ -865,6 +872,9 @@ export async function handleAdmin(
     ctx.resumeArt?.();
     return json(res, 200, { ok: true }), true;
   }
+
+  // Sky tab: the Owner sets how the sky turns; the Owner and Stewards set the hour or a land's weather now.
+  if (await handleSky(req, res, route, account, { store, world, env: ctx.sky ?? DEFAULT_SKY, now: ctx.now ?? Date.now, json, readJson: ctx.readJson })) return true;
 
   // Combat page (Owner): how fights play, for every region.
   if (route === 'combat' && method === 'GET') {

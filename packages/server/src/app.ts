@@ -394,7 +394,7 @@ export function createApp(options: AppOptions): App {
 
     if (await auth.handle(req, res, url, json, readJson, authenticate(req))) return;
 
-    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, houses: kitHouses, resumeArt, clips, kick, updater: options.updater, restarting, env, json, readJson, meter, slowTicks, apiLog, profiler, ...(regionServers ? { regionServers } : {}) };
+    const admin = { store, world, wishes, ai, budget, rules, reports, builds, art: artStudio, hands: handFinder, houses: kitHouses, resumeArt, clips, kick, updater: options.updater, restarting, env, sky: options.sky, now, json, readJson, meter, slowTicks, apiLog, profiler, ...(regionServers ? { regionServers } : {}) };
     if (await handleAdmin(req, res, path, authenticate(req), admin)) return;
 
     if (await handleKitHouses(req, res, url, authenticate(req), { world, houses: kitHouses })) return;

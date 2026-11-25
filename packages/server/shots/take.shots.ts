@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, devices, type Browser, type BrowserContext, type Page } from 'playwright';
-import { collides, generateRegion, hashString, maxHp, newCharacter, regionDef, type RegionMap } from '@co-mmo/shared';
+import { CALLING_IDS, RACE_IDS, collides, generateRegion, hashString, maxHp, newCharacter, regionDef, startCharacter, type RegionMap } from '@co-mmo/shared';
 import { SHOTS, type Shot, type Spot } from './list.ts';
 import { pinnedSky } from './sky.ts';
 import { drawKitHouses, newArtDir, owner, seedRandom, shotWorld } from './world.ts';
@@ -179,6 +179,10 @@ async function take(shot: Shot): Promise<Taken> {
     const hardy = { ...newCharacter(), level: 30 };
     for (const s of shot.carry ?? []) hardy.inventory.push({ ...s });
     world.store.savePosition(id, spot.x, spot.y, regionId, { ...hardy, hp: maxHp(hardy) }, spot.floor ?? 0);
+    // Older characters first, so the screen lists them in a steady order.
+    for (const [i, name] of (shot.characters ?? []).entries()) {
+      world.store.addCharacter(world.store.accountById(id)!, name, regionId, { ...startCharacter(RACE_IDS[(i + 1) % RACE_IDS.length]!, CALLING_IDS[(i + 1) % CALLING_IDS.length]!), level: 3 + i * 4 }, 20);
+    }
 
     const context = await windowFor(shot, token);
     const page = await context.newPage();

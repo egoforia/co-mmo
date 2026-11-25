@@ -66,7 +66,8 @@ God's View's Server health tab shows every host, and `perf.ts` gives the
 performance overlay the host running a player's region.
 
 **HTTP and the socket.** `http.ts` (JSON, files, bearer tokens),
-`account-routes.ts`, `auth.ts`, `admin.ts` (God's View API; `art-buildings.ts` lists
+`account-routes.ts`, `character-routes.ts` and `store-roster.ts` (several
+characters on one account, `docs/characters.md`), `auth.ts`, `admin.ts` (God's View API; `art-buildings.ts` lists
 every building for the Art tab's Buildings page), `art-files.ts`
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
 

@@ -21,6 +21,8 @@ export function saveToken(token: string): void {
 export function clearToken(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
+    // Whoever signs in next chooses their own character.
+    sessionStorage.removeItem('co-mmo.chosen');
   } catch {
     // Nothing stored.
   }
@@ -140,6 +142,8 @@ export interface AccountInfo {
   logins: ('google' | 'github')[];
   providers: SignInOptions;
   look: { description: string; art?: string } | null;
+  /** How many characters are on the account. */
+  characters?: number;
 }
 
 export async function accountInfo(token: string): Promise<AccountInfo> {
@@ -164,6 +168,58 @@ export async function linkUrl(token: string, provider: 'google' | 'github'): Pro
   const body = await res.json();
   if (!res.ok) throw new Error(body.message ?? 'Could not link that account.');
   return body.url as string;
+}
+
+/** One of your characters, as the character screen shows it. */
+export interface CharacterCard {
+  id: string;
+  name: string;
+  level: number;
+  race: string | null;
+  calling: string | null;
+  region: string | null;
+  online: boolean;
+  lastSeen: number | null;
+  art: string | null;
+}
+
+/** Your characters, the one played last, and how many you may have. */
+export interface Roster {
+  characters: CharacterCard[];
+  playing: string;
+  max: number;
+}
+
+/** Calls a character route; throws a sentence for the player when it fails. */
+async function characters<T>(token: string, path = '', method = 'GET', body?: unknown): Promise<T> {
+  const res = await fetch(`/api/characters${path}`, {
+    method,
+    headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const answer = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(answer.message ?? 'Something went wrong. Try again.'), { status: res.status });
+  return answer as T;
+}
+
+/** The characters on your account. */
+export function listCharacters(token: string): Promise<Roster> {
+  return characters<Roster>(token);
+}
+
+/** Makes a new character, who is played next; `notes` are things to tell the player. */
+export function createCharacter(token: string, joining: Omit<Joining, 'adult' | 'email'>): Promise<{ id: string; notes: string[] }> {
+  return characters(token, '', 'POST', joining);
+}
+
+/** Chooses which character enters the world next. */
+export async function chooseCharacter(token: string, id: string): Promise<void> {
+  await characters(token, `/${encodeURIComponent(id)}/play`, 'POST');
+}
+
+/** Deletes a character for good; `name` is what the player typed to confirm. */
+export async function deleteCharacter(token: string, id: string, name: string): Promise<void> {
+  await characters(token, `/${encodeURIComponent(id)}`, 'DELETE', { name });
 }
 
 async function post(path: string, body: unknown, token?: string): Promise<string> {

@@ -50,7 +50,9 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
   const { store, world, wishes, workshop, reports, rules, builds } = options;
   const net = options.net ?? { compress: true, skipStale: true };
   const wss = new WebSocketServer({ server: options.server, path: '/ws', maxPayload: 4096, perMessageDeflate: net.compress ? deflateOptions() : false });
-  const sockets = new Map<string, WebSocket>();
+  // One connection per account, by the id of the record that signs in, with the character it plays:
+  // entering with another character takes the first one out of the world (docs/characters.md).
+  const sockets = new Map<string, { socket: WebSocket; playing: string }>();
   // Heartbeat: ping every client so idle connections stay open through proxies,
   // and drop any that stopped answering (a sleeping laptop, a dead network).
   const alive = new WeakSet<WebSocket>();
@@ -67,6 +69,8 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
 
   wss.on('connection', (socket: WebSocket) => {
     let account: Account | undefined;
+    /** The id of the record that signs in for this character. */
+    let mainId = '';
     // Signed in but still choosing a people and Calling: not in the world yet.
     let choosing = false;
     let entered = false;
@@ -109,9 +113,11 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
         return;
       }
       if (!account) {
-        const token = (parsed as { t?: string; token?: unknown })?.t === 'hello' ? (parsed as { token?: unknown }).token : undefined;
-        account = typeof token === 'string' ? store.accountByToken(token) : undefined;
+        const hello = (parsed as { t?: string; token?: unknown; character?: unknown })?.t === 'hello' ? parsed as { token?: unknown; character?: unknown } : undefined;
+        const main = typeof hello?.token === 'string' ? store.accountByToken(hello.token) : undefined;
         clearTimeout(authTimer);
+        // The character chosen on the character screen, or the one played last.
+        account = main ? store.choose(main, typeof hello?.character === 'string' ? hello.character : store.playingOf(main).id) : undefined;
         if (!account) {
           socket.send(JSON.stringify({ t: 'error', code: 'unauthorized', message: 'Please sign in again.' }));
           socket.close(4001, 'Unauthorized');
@@ -124,7 +130,11 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
           account = undefined;
           return;
         }
-        sockets.set(account.id, socket);
+        mainId = store.mainOf(account).id;
+        const before = sockets.get(mainId);
+        sockets.set(mainId, { socket, playing: account.id });
+        // The same character in a newer window replaces the older one in the world; another character sends it out.
+        if (before && before.playing !== account.id) before.socket.close(4000, 'You entered the world with another character in another window.');
         // A character from before Callings chooses a people and Calling before entering (docs/classes.md, Migration).
         if (needsCalling(account.character)) {
           choosing = true;
@@ -182,9 +192,10 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
     socket.on('close', () => {
       clearTimeout(authTimer);
       if (!account) return;
-      // A replaced connection must not remove the newer session.
-      if (sockets.get(account.id) !== socket) return;
-      sockets.delete(account.id);
+      const current = sockets.get(mainId);
+      if (current?.socket === socket) sockets.delete(mainId);
+      // A connection replaced by the same character in a newer window must not take it out of the world.
+      else if (current?.playing === account.id) return;
       if (!entered) return;
       const id = account.id;
       void settle(world.leave(id), (place) => {
@@ -195,13 +206,14 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
 
   return {
     kick(id, reason) {
-      const socket = sockets.get(id);
+      const who = store.accountById(id);
+      const socket = who ? sockets.get(store.mainOf(who).id)?.socket : undefined;
       if (!socket) return;
       socket.send(JSON.stringify({ t: 'error', code: 'suspended', message: reason }));
       socket.close(4003, reason.slice(0, 120));
     },
     closeAll(code, reason) {
-      for (const socket of sockets.values()) socket.close(code, reason);
+      for (const { socket } of sockets.values()) socket.close(code, reason);
     },
     async close() {
       clearInterval(heartbeatTimer);

@@ -10,6 +10,7 @@ import { PostgresTables, migrate } from './store-postgres.ts';
 import { PostgresLogs, keptSpendFrom, type LogOp } from './store-logs.ts';
 import { MemoryKept, PostgresKept, type Kept } from './kept.ts';
 import { PostgresCharacters, holdingsOf, type Holding } from './store-characters.ts';
+import { charactersOf, mainOf, playingOf, removeCharacter } from './store-roster.ts';
 
 /** Days a Workshop draft is kept after its last change. */
 const DRAFT_DAYS = 7;
@@ -40,6 +41,14 @@ export interface Account {
   sessions?: string[];
   /** When the player was last in the world, for the "While you were away" feed. */
   lastSeen?: number;
+  /**
+   * Set on an account's second and later characters: the record that signs in
+   * for them (store-roster.ts). Missing on the first character, which holds
+   * the sign-in itself.
+   */
+  mainId?: string;
+  /** On the record that signs in: the character chosen last, played next time. */
+  playing?: string;
 }
 
 export type LoginProvider = 'google' | 'github';
@@ -253,6 +262,70 @@ export class Store {
     return this.data.accounts.length;
   }
 
+  // --- Characters on one account (store-roster.ts) ---------------------------------
+
+  /** The record that signs in for this character (itself for an account's first character). */
+  mainOf(account: Account): Account {
+    return mainOf(this.data.accounts, account);
+  }
+
+  /** Every character of the account `main` signs in for, oldest first. */
+  charactersOf(main: Account): Account[] {
+    return charactersOf(this.data.accounts, this.mainOf(main));
+  }
+
+  /** The character a signed-in account plays: `wanted` if it is theirs, else the one chosen last. */
+  playingOf(main: Account, wanted?: string): Account {
+    return playingOf(this.data.accounts, this.mainOf(main), wanted);
+  }
+
+  /** Remembers which character an account plays next. */
+  choose(main: Account, id: string): Account {
+    const root = this.mainOf(main);
+    const chosen = playingOf(this.data.accounts, root, id);
+    if (root.playing !== chosen.id) {
+      if (chosen.id === root.id) delete root.playing;
+      else root.playing = chosen.id;
+      this.persist();
+    }
+    return chosen;
+  }
+
+  /** Makes another character on an account, up to `max` of them; throws a StoreError a player can read. */
+  addCharacter(main: Account, name: string, regionId: string, character: Character, max: number): Account {
+    const root = this.mainOf(main);
+    if (this.charactersOf(root).length >= max) throw new StoreError('too_many', `An account can have ${max} characters. Delete one to make room.`);
+    if (this.nameTaken(name)) throw new StoreError('name_taken', 'That name is already taken.');
+    const account: Account = {
+      id: randomUUID(),
+      name,
+      role: root.role,
+      color: PLAYER_COLORS[hashString(name) % PLAYER_COLORS.length],
+      createdAt: Math.max(Date.now(), ...this.charactersOf(root).map((a) => a.createdAt + 1)),
+      invitedBy: root.invitedBy,
+      tokenHash: '',
+      regionId,
+      x: null,
+      y: null,
+      character: structuredClone(character),
+      mainId: root.id,
+      ...(root.suspended ? { suspended: root.suspended } : {}),
+    };
+    this.data.accounts.push(account);
+    this.persist();
+    return account;
+  }
+
+  /** Deletes one of an account's characters for good; the last one stays. Returns the record that signs in afterwards. */
+  deleteCharacter(main: Account, id: string): Account {
+    const root = this.mainOf(main);
+    if (this.charactersOf(root).length <= 1) throw new StoreError('last_character', 'This is your only character, so it cannot be deleted.');
+    const next = removeCharacter(this.data.accounts, root, id);
+    if (this.data.drafts?.[id]) this.saveDraft(id, null);
+    this.persist();
+    return next;
+  }
+
   createInvite(createdBy: string | null, role: Role = 'player'): Invite {
     const invite: Invite = {
       code: randomBytes(9).toString('base64url'),
@@ -402,11 +475,14 @@ export class Store {
     return this.data.accounts.find((a) => a.name.toLowerCase() === lower);
   }
 
+  /** Suspends or lifts it for the whole account: every character on it. */
   setSuspended(id: string, suspended: Account['suspended'] | null): void {
     const account = this.accountById(id);
     if (!account || account.role === 'owner') return;
-    if (suspended) account.suspended = suspended;
-    else delete account.suspended;
+    for (const a of this.charactersOf(account)) {
+      if (suspended) a.suspended = suspended;
+      else delete a.suspended;
+    }
     this.persist();
   }
 
@@ -435,10 +511,11 @@ export class Store {
     return this.data.accounts;
   }
 
+  /** Sets the role of the whole account: every character on it. */
   setRole(id: string, role: Role): void {
     const account = this.accountById(id);
     if (!account || account.role === 'owner') return;
-    account.role = role;
+    for (const a of this.charactersOf(account)) a.role = role;
     this.persist();
   }
 

@@ -28,7 +28,7 @@ import { estimateImageUsd, knownImageModels } from './assets/wish-art.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
 import { type Account, type Store } from './store.ts';
-import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, dailyClips, DEFAULT_WORKSHOP, soundSettings, styleCheckSettings, videoSettings, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings } from './settings.ts';
+import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, MOST_CHARACTERS, dailyClips, DEFAULT_WORKSHOP, maxCharacters, soundSettings, styleCheckSettings, videoSettings, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings } from './settings.ts';
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
@@ -329,10 +329,22 @@ export async function handleAdmin(
         favor: c?.favor ?? null,
         createdAt: a.createdAt,
         invitedBy: a.invitedBy ? store.accountById(a.invitedBy)?.name ?? null : null,
+        // A second or later character on someone's account: whose sign-in plays it.
+        characterOf: a.mainId ? store.mainOf(a).name : null,
         suspended: a.suspended ? { ...a.suspended, by: store.accountById(a.suspended.by)?.name ?? 'someone' } : null,
       };
     });
-    return json(res, 200, { players, you: account.id }), true;
+    return json(res, 200, { players, you: account.id, yours: store.charactersOf(account).map((a) => a.id), maxCharacters: maxCharacters(store.settings) }), true;
+  }
+
+  // How many characters one account may have (docs/characters.md).
+  if (route === 'players/limit' && method === 'POST') {
+    if (ownerOnly()) return true;
+    const body = await ctx.readJson(req);
+    const max = Math.floor(Number(body?.maxCharacters));
+    if (!(max >= 1 && max <= MOST_CHARACTERS)) return json(res, 400, { error: 'invalid', message: `Choose a number from 1 to ${MOST_CHARACTERS}.` }), true;
+    store.updateSettings({ ...store.settings, characters: { max } });
+    return json(res, 200, { ok: true, maxCharacters: max }), true;
   }
 
   const suspend = route.match(/^players\/([\w-]+)\/suspend$/);
@@ -340,7 +352,7 @@ export async function handleAdmin(
     const target = store.accountById(suspend[1]!);
     if (!target) return json(res, 404, { error: 'not_found' }), true;
     // Stewards can suspend players; only the Owner can suspend a Steward. Nobody suspends the Owner.
-    if (target.role === 'owner' || target.id === account.id || (target.role === 'steward' && !owner)) {
+    if (target.role === 'owner' || store.mainOf(target).id === store.mainOf(account).id || (target.role === 'steward' && !owner)) {
       return json(res, 403, { error: 'forbidden', message: target.role === 'steward' ? 'Only the Owner can suspend a Steward.' : 'You cannot suspend this account.' }), true;
     }
     const body = await ctx.readJson(req);

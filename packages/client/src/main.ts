@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
 import { ITEMS, MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, isSafe, offHandItem, sensesSpots } from '@co-mmo/shared';
-import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
+import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, listCharacters, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
+import { showCharacters } from './character-select.ts';
 import { callingPickerHtml, pickedCalling, showCallingChoice, wireCallingPicker } from './calling-picker.ts';
 import { GameConnection } from './net.ts';
 import { PartyUi, showAway } from './social-ui.ts';
@@ -28,7 +29,9 @@ async function boot(): Promise<void> {
   const login = params.get('login');
   const signInError = params.get('signin_error');
   const linked = params.get('linked');
-  if (invite || login || signInError || linked) history.replaceState(null, '', location.pathname);
+  // Account > Switch character comes back here with ?characters.
+  const switching = params.has('characters');
+  if (invite || login || signInError || linked || switching) history.replaceState(null, '', location.pathname);
 
   // A sign-in link from an email, or the way back from Google or GitHub.
   if (login) {
@@ -44,7 +47,7 @@ async function boot(): Promise<void> {
   if (token) {
     if (linked) toast(`${linked === 'google' ? 'Google' : 'GitHub'} is linked. You can sign in with it from now on.`);
     if (signInError) toast(signInError, 10000);
-    return play(token);
+    return enterOrChoose(token, switching);
   }
   return showSignIn(signInError ?? '');
 }
@@ -90,6 +93,37 @@ async function showInvite(code: string): Promise<void> {
       error.textContent = (err as Error).message;
     }
   });
+}
+
+/** This tab already chose a character: a reload or reconnect goes straight back in. */
+const CHOSEN_KEY = 'co-mmo.chosen';
+
+/**
+ * Enters the world, first showing the character screen when the account has
+ * more than one character (or the player asked to switch) and this tab has
+ * not chosen yet.
+ */
+async function enterOrChoose(token: string, switching: boolean): Promise<void> {
+  const enter = () => {
+    try {
+      sessionStorage.setItem(CHOSEN_KEY, '1');
+    } catch {
+      // No session storage: the screen shows again after a reload.
+    }
+    play(token);
+  };
+  let chosen = false;
+  try {
+    chosen = sessionStorage.getItem(CHOSEN_KEY) === '1';
+  } catch {
+    // As above.
+  }
+  if (switching) return showCharacters(token, enter);
+  if (chosen) return play(token);
+  // When the list cannot be read, entering shows why (signed out, suspended).
+  const roster = await listCharacters(token).catch(() => null);
+  if (roster && roster.characters.length > 1) return showCharacters(token, enter);
+  enter();
 }
 
 function play(token: string): void {

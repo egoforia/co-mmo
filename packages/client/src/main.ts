@@ -230,6 +230,7 @@ function play(token: string): void {
         if (!scene) void Promise.all([art, artPoints]).then(([manifest, found]) => start(message, manifest, found));
         break;
       case 'sky':
+        if (message.config && message.now !== undefined) scene?.setSkyConfig(message.config, message.now);
         scene?.setWeather(message.weather);
         break;
       case 'snapshot':

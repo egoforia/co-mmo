@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   CREATURES,
   DEFAULT_SKY,
+  WEATHER_SOON,
+  WEATHER_SOON_MS,
+  nextHour,
+  nextWeather,
   FLAME_LIGHT,
   ITEMS,
   TICK_RATE,
@@ -28,7 +32,8 @@ const info = (id: string, name = id): PlayerInfo => ({ id, name, color: 0xffffff
 const none = { x: null, y: null };
 const DAY = DEFAULT_SKY.dayMinutes * 60_000;
 /** Epoch ms at a game hour, some days in. */
-const hour = (h: number) => DAY * 10 + (h / 24) * DAY;
+/** The clock at game hour `h` of the eleventh day. */
+const hour = (h: number) => nextHour(h, DAY * 10, DEFAULT_SKY);
 
 /** A region with a controllable clock and dice that always roll the middle. */
 function setup(id: string, h: number) {
@@ -221,6 +226,26 @@ describe('weather', () => {
       turned = conn.messages.find((m) => m.t === 'sky');
     }
     expect(turned).toMatchObject({ t: 'sky', weather: weatherAt('shore', 'sunlit-shore', clock.now, DEFAULT_SKY) });
+  });
+
+  it('gives players a heads-up a little before the weather turns', () => {
+    const { region, clock } = setup('shore', 12);
+    const conn = fakeConn();
+    region.join(info('a'), conn, none, newCharacter());
+    region.tick();
+    // Walk on, spell by spell, to just before a spell whose weather differs from the one before it.
+    const soon = (m: ServerMessage) => m.t === 'notice' && Object.values(WEATHER_SOON).includes(m.text);
+    for (let i = 0; i < 50 && !conn.messages.some(soon); i++) {
+      const next = nextWeather('shore', 'sunlit-shore', clock.now, DEFAULT_SKY);
+      clock.now = next.at - WEATHER_SOON_MS + 1000;
+      region.tick();
+      if (next.weather === weatherAt('shore', 'sunlit-shore', clock.now, DEFAULT_SKY)) expect(conn.messages.some(soon)).toBe(false);
+      clock.now = next.at;
+      region.tick();
+    }
+    expect(conn.messages.some(soon)).toBe(true);
+    // Told once per turn of the weather.
+    expect(conn.messages.filter(soon)).toHaveLength(1);
   });
 
   it('follows the world’s settings, on every server alike', () => {

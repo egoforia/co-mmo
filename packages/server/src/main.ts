@@ -71,6 +71,7 @@ const apiLog = await ApiLog.open({
 const app = createApp({
   store,
   // A game day of DAY_MINUTES, weather that changes every WEATHER_MINUTES; WEATHER=off keeps skies clear.
+  // God's View's Sky tab saves its own sky, which wins over these (except WEATHER=off).
   sky: cleanSky({
     dayMinutes: positive('DAY_MINUTES', DEFAULT_SKY.dayMinutes),
     weatherMinutes: positive('WEATHER_MINUTES', DEFAULT_SKY.weatherMinutes),

@@ -130,8 +130,8 @@ export class World {
   constructor(
     private readonly now: () => number = Date.now,
     private readonly random: () => number = Math.random,
-    /** How the sky turns over every region (DAY_MINUTES, WEATHER_MINUTES, WEATHER in .env). */
-    readonly sky: SkyConfig = DEFAULT_SKY,
+    /** How the sky turns over every region (God's View's Sky tab, else DAY_MINUTES, WEATHER_MINUTES, WEATHER in .env); setSky changes it. */
+    private skyConfig: SkyConfig = DEFAULT_SKY,
     /** The world editor's changes to a land, saved in the store; laid over it every time it is set up. */
     private readonly edits: (regionId: string) => WorldEdit[] = () => [],
   ) {
@@ -199,6 +199,17 @@ export class World {
   skyOver(def: RegionDef): { phase: number; weather: Weather } {
     const now = this.now();
     return { phase: dayPhase(now, this.sky), weather: this.region(def.id)?.map.weather ?? weatherAt(def.id, def.biome, now, this.sky) };
+  }
+
+  /** How the sky turns over every region now. */
+  get sky(): SkyConfig {
+    return this.skyConfig;
+  }
+
+  /** A new way for the sky to turn, for every region here and on region servers; their players' hours move at once. */
+  setSky(sky: SkyConfig): void {
+    this.skyConfig = sky;
+    this.stateChanged();
   }
 
   /** The regions around one, corners too. */

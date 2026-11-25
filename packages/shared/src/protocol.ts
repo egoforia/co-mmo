@@ -349,10 +349,14 @@ export interface SkyView {
   weather: Weather;
 }
 
-/** The weather over the player's land changed. */
+/** The weather over the player's land changed, or how the sky turns did (God's View, Sky tab). */
 export interface SkyMessage {
   t: 'sky';
   weather: Weather;
+  /** How the sky turns now, when it changed. */
+  config?: SkyConfig;
+  /** The server's clock (epoch ms) when this was sent, with `config`. */
+  now?: number;
 }
 
 /** What a creature is doing, when it is more than going about its business. */

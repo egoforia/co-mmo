@@ -24,6 +24,9 @@ export function stairTexture(
   const explicit = isUp ? s.art?.up : s.art?.down;
   if (explicit && scene.textures.exists(explicit)) return explicit;
 
+  // A ramp has pictures of its own (ramps.ts rampArt), or only its label.
+  if (s.kind === 'ramp') return undefined;
+
   const heading = stairHeading(s);
   const dir = isUp ? 'up' : 'down';
 

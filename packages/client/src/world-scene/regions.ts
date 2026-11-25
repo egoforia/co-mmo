@@ -12,6 +12,7 @@ import {
   glowOf,
   nearBuilding,
   rand2,
+  stairsEntry,
   stairsLabel,
   storeyAt,
   type ArtManifest,
@@ -341,7 +342,9 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
       const parts: Phaser.GameObjects.GameObject[] = [];
       const isUp = floor === s.lower;
       const art = stairTexture(scene, map.def.biome, s, isUp);
-      const feet = PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
+      // A ramp is taken at its foot below and its head above: its label stands there.
+      const entry = s.ramp ? stairsEntry(s, floor) : undefined;
+      const feet = entry ? { x: ox + entry.x, y: oy + entry.y } : PROJECTION.stand(ox + s.x, oy + s.y, s.width, s.height);
       const at = PROJECTION.toScreen(feet.x, feet.y);
       const lift = floorLift(floor);
       const depthOff = floorDepthOffset(floor);
@@ -368,7 +371,8 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
         padding: { x: 8, y: 4 },
       });
       parts.push(label.setOrigin(0.5, 1).setDepth(LABEL_DEPTH - 2));
-      const [tx, ty] = [s.x, s.y];
+      // A ramp's head has no floor under it: it shows with the floor of its top landing.
+      const [tx, ty] = s.ramp && floor === s.upper ? [Math.floor(s.top.x), Math.floor(s.top.y)] : [s.x, s.y];
       if (floor) floorAt(floors, tx, ty, floor)?.objects.push(...parts);
       else {
         const inside = views.find((v) => within(v.building, tx, ty));

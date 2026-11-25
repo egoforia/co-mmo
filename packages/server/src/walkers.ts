@@ -1,4 +1,4 @@
-import { STEP_WAYS, TICK_RATE, TICK_SECONDS, anchorNear, canStep, collides, findTileRoute, openSquare, spotMiddle, stairsMiddle, stairsToward, stairwayAt, stepped, takeStairs, tileTaken, wallBetween, isBlocking, outsideSide, tileAt, type Among, type Placed, type RegionMap, type StepWay, type Tile, type TileSpot } from '@co-mmo/shared';
+import { STEP_WAYS, TICK_RATE, TICK_SECONDS, anchorNear, canStep, collides, findTileRoute, openSquare, spotMiddle, stairsEntry, stairsToward, stairwayAt, stepped, takeStairs, tileTaken, wallBetween, isBlocking, outsideSide, tileAt, type Among, type Placed, type RegionMap, type StepWay, type Tile, type TileSpot } from '@co-mmo/shared';
 
 // How creatures and people move about a region: stepping toward a point,
 // strolling near a spot, running from someone, and finding a way around
@@ -205,7 +205,7 @@ export function goTo(map: RegionMap, w: Walker, to: Placed, speed: number, climb
   if (w.floor === to.floor) return moveToward(map, w, to.x, to.y, speed, among);
   const way = stairsToward(map, w, to.floor, climbs);
   if (!way) return false;
-  const middle = stairsMiddle(way);
+  const middle = stairsEntry(way, w.floor);
   // Only the stairs it set out for: others it crosses on the way are walked over.
   moveToward(map, w, middle.x, middle.y, speed, among, (t) => {
     const m = spotMiddle(t, w.width ?? 1);

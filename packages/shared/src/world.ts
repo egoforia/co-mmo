@@ -245,6 +245,8 @@ export interface Building {
   art?: TileArt;
   /** Built to this kit spec (the world editor's kit building designer) instead of the one its style gives. */
   kit?: BuildingSpec;
+  /** Wall tiles drawn in a look of their own ("x,y" → a key of BUILDING_STYLES; wall-looks.ts). */
+  wallLooks?: Record<string, string>;
 }
 
 /** Kit pictures drawn for a building's or a storey's tiles: its floor, its walls, and planks or paths across it. */

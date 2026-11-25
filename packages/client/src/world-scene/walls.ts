@@ -63,6 +63,12 @@ export function groundLayer(
   return diamondLayer(scene, tiles, at, registerDiamondTileset(scene, key, ground.width, ground.height), ground).setDepth(depth);
 }
 
+/** A building's or storey's wall tiles in looks of their own (wall-looks.ts), by world tile; undefined when it has none. */
+export function ownLooks(owner: { wallLooks?: Record<string, string> }, ox: number, oy: number): ((wx: number, wy: number) => string | undefined) | undefined {
+  const looks = owner.wallLooks;
+  return looks ? (wx, wy) => looks[`${wx - ox},${wy - oy}`] : undefined;
+}
+
 /** Resolves the single seamless wall texture key for a building style or kit art override. */
 export function wallFaceKey(scene: Phaser.Scene, style: string, art?: TileArt): string | undefined {
   const key = art?.face ?? art?.wall ?? buildingArt(style, 'wall');
@@ -95,6 +101,8 @@ export function rockWalls(
   neighbourTile?: (wx: number, wy: number) => number | undefined,
   cliffDrops?: (wx: number, wy: number) => number,
   hasUpperTile?: (wx: number, wy: number) => boolean,
+  /** A wall tile's own look (wall-looks.ts), by world tile, when it has one. */
+  lookAt?: (wx: number, wy: number) => string | undefined,
 ): (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] {
   const ground = PROJECTION.ground;
   const face = wallFaceKey(scene, style, art);
@@ -217,13 +225,31 @@ export function rockWalls(
     if (cutaway) makeWallCap(false, cutRise, wallCapDepth(left, top, floor, false));
   }
 
+  // Faces in a wall tile's own look, registered once per look.
+  const looks = new Map<string, { south: string; east: string; lowSouth: string; lowEast: string } | undefined>();
+  const facesOf = (look: string) => {
+    if (!looks.has(look)) {
+      const key = wallFaceKey(scene, look);
+      const made = key && {
+        south: registerWallFace(scene, key, 'south', ground.width, ground.height, storeyRise),
+        east: registerWallFace(scene, key, 'east', ground.width, ground.height, storeyRise),
+        lowSouth: registerWallFace(scene, key, 'south', ground.width, ground.height, cutRise),
+        lowEast: registerWallFace(scene, key, 'east', ground.width, ground.height, cutRise),
+      };
+      looks.set(look, made && made.south && made.east && made.lowSouth && made.lowEast ? (made as { south: string; east: string; lowSouth: string; lowEast: string }) : undefined);
+    }
+    return looks.get(look);
+  };
+
   rows.forEach((row, y) => row.forEach((_, x) => {
     if (!exposedWall(x, y)) return;
     const [tx, ty] = [left + x, top + y];
     const full = isFull(x, y);
     const rise = full ? storeyRise : cutRise;
-    const southKey = full ? fullSouth : lowSouth;
-    const eastKey = full ? fullEast : lowEast;
+    const own = lookAt?.(tx, ty);
+    const faces = own ? facesOf(own) : undefined;
+    const southKey = faces ? (full || !cutaway ? faces.south : faces.lowSouth) : full ? fullSouth : lowSouth;
+    const eastKey = faces ? (full || !cutaway ? faces.east : faces.lowEast) : full ? fullEast : lowEast;
     if (open(x, y + 1) || (full && exposedWall(x, y + 1) && !isFull(x, y + 1))) {
       const at = PROJECTION.toScreen(tx, ty + 1);
       const img = scene.add.image(at.x, at.y - lift - rise, southKey).setOrigin(0, 0).setDepth(depthOff + PROJECTION.depth(tx + 0.5, ty + 1)).setData('shell', true);

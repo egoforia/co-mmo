@@ -40,8 +40,12 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'paint'; tile: PaintTile; tiles: TilePoint[] }
   /** Stands a wall on one side of each tile, in a building look and a height, on the edit's floor; `down` takes those walls away instead. */
   | { kind: 'wall'; side: WallSide; tiles: TilePoint[]; style: string; height: WallHeight; down?: boolean }
-  /** Gives the Wall-tool wall on one side of a tile of the edit's floor another look and height; `run` changes every wall stood with it. */
+  /**
+   * Gives the Wall-tool wall on one side of a tile of the edit's floor another look and height; `run` changes every wall stood with it.
+   * With no side, gives the wall tile of a walled building or storey at `at` a look of its own.
+   */
   | { kind: 'wall-look'; at: TilePoint; side: WallSide; style: string; height: WallHeight; run?: boolean }
+  | { kind: 'wall-look'; at: TilePoint; side?: undefined; style: string; height?: undefined; run?: undefined }
   /** Picks up the set piece, tree or rock at `from` and puts it down at `to`, or takes it away when `to` is null. */
   | { kind: 'move'; from: TilePoint; to: TilePoint | null }
   /** A two-tile road from one tile to another, across then down, bridging water. */

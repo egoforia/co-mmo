@@ -53,7 +53,7 @@ import {
   setDepthShade,
   within,
 } from './types.ts';
-import { groundLayer, rockWalls, wallFaceKey } from './walls.ts';
+import { groundLayer, ownLooks, rockWalls, wallFaceKey } from './walls.ts';
 import { markScenery } from './park.ts';
 
 export function dropChunk(chunk: Chunk): void {
@@ -181,14 +181,14 @@ export function drawRegion(scene: Phaser.Scene, map: RegionMap, layout: string, 
   // Modular buildings stand as a full-height closed shell from afar and cut low on South/East walls when approached.
   const closedUpper = map.storeys.filter((s) => s.floor > 0 && !s.open && overlaps(s, b)).sort((a, s) => a.floor - s.floor);
   const outside: (Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer)[] = hasWall
-    ? rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0)
+    ? rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, false, closedUpper.length === 0, 0, false, undefined, undefined, undefined, ownLooks(b, ox, oy))
     : [];
   const view: BuildingView = {
     building: b,
     ox,
     oy,
     outside,
-    inside: [floor, ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, true, false, 0)],
+    inside: [floor, ...rockWalls(scene, inside, ox + b.x, oy + b.y, b.style, b.art, tilemaps, true, true, false, 0, false, undefined, undefined, undefined, ownLooks(b, ox, oy))],
     open: !outside.length,
   };
   return view;
@@ -237,6 +237,7 @@ const floors: FloorView[] = map.storeys.map((storey) => {
     (wx, wy) => neighbourTile(wx - ox, wy - oy),
     cliffDrops,
     (wx, wy) => Boolean(storeyAt(map, wx - ox, wy - oy, storey.floor + 1)),
+    ownLooks(storey, ox, oy),
   );
   const upperShellWalls =
     storey.floor > 0 && !storey.open
@@ -255,6 +256,8 @@ const floors: FloorView[] = map.storeys.map((storey) => {
           false,
           (wx, wy) => neighbourTile(wx - ox, wy - oy),
           () => 0,
+          undefined,
+          ownLooks(storey, ox, oy),
         ).map((o) => o.setData('upperShell', true))
       : [];
   return {

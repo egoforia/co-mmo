@@ -74,6 +74,12 @@ through drafts and Publish, and undoes like any edit). Move, Copy and Take
 away work on a picked wall too. **Alt-click** a wall with the Wall tool to
 copy its look and height into the tool (an eyedropper).
 
+**One wall tile of a building or storey.** Select on a wall tile of a walled
+building or storey (a cave, a tomb, any floor off the ground) picks that
+tile ("Cave rock wall tile"); its **Look and height** fold gives it a look
+of its own. A kit house's walls change together, so Select picks the whole
+house there and says so; change its look in **Look and size**.
+
 ## Select first, then change
 
 Select (V) picks the smallest thing on a tile: a bookmark, spot, person,

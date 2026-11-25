@@ -524,6 +524,7 @@ export async function handleAdmin(
   if (route.startsWith('art') && ctx.art) {
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
+    if (route === 'art/assets' && method === 'GET') return json(res, 200, { assets: await ctx.art.assets() }), true;
     if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [], mirrored: (await ctx.hands?.mirrored()) ?? {} }), true;
     // What the hand finder is doing, for the Art tab's "Finding hands" line.
     if (route === 'art/hands/status' && method === 'GET') return json(res, 200, (await ctx.hands?.status()) ?? { running: false, done: 0, total: 0, waiting: 0 }), true;

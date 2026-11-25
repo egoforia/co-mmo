@@ -1,0 +1,396 @@
+/* The Art Studio's window (art-studio/shell.ts): top bar, docks, page, strip.
+   The pages' own look stays in art-studio.css. */
+
+.studio-body {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.studio-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--edge);
+  flex-wrap: wrap;
+}
+
+.studio-top h1 {
+  font-size: 18px;
+  white-space: nowrap;
+}
+
+.studio-top nav {
+  border: 0;
+  margin: 0;
+  gap: 2px;
+}
+
+.studio-top nav a {
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 3px;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.studio-top nav a:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.studio-top nav a[aria-current] {
+  color: var(--bg);
+  background: var(--gold);
+  font-weight: 600;
+}
+
+.studio-top kbd {
+  font: 11px ui-monospace, monospace;
+  opacity: 0.7;
+}
+
+.studio-top .top-pages {
+  padding-left: 12px;
+  border-left: 1px solid var(--edge);
+}
+
+.studio-top .header-links {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.studio-top .header-links a {
+  margin: 0;
+}
+
+.studio-top .pane-tabs {
+  display: none;
+}
+
+.studio-frame {
+  --dock-left: 280px;
+  --dock-right: 300px;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--dock-left) 6px minmax(0, 1fr) 6px var(--dock-right);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'left lgrip page rgrip right'
+    'strip strip strip strip strip';
+}
+
+.studio-frame > main {
+  grid-area: page;
+  max-width: none;
+  overflow: auto;
+  padding: 12px 20px 32px;
+}
+
+.dock {
+  overflow: auto;
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+.dock-left {
+  grid-area: left;
+  border-right: 1px solid var(--edge);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dock-right {
+  grid-area: right;
+  border-left: 1px solid var(--edge);
+}
+
+.dock-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.grip {
+  cursor: col-resize;
+  background: transparent;
+}
+
+.grip[data-grip='left'] { grid-area: lgrip; }
+.grip[data-grip='right'] { grid-area: rgrip; }
+
+.grip:hover,
+.grip.dragging {
+  background: var(--edge);
+}
+
+/* The asset browser. */
+.asset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.asset-chips .chip {
+  padding: 2px 8px;
+  font-weight: 400;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+
+.asset-chips .chip.on {
+  color: var(--bg);
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.asset-chips small {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.dock-left input[type='search'],
+.asset-selects select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.asset-selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.asset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+}
+
+.asset-list button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 4px 6px;
+  text-align: left;
+  font-weight: 400;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 3px;
+}
+
+.asset-list button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.asset-list button.selected {
+  background: rgba(254, 174, 52, 0.18);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.asset-list img,
+.asset-list .no-thumb {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+
+.asset-list span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.asset-list b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-list small.missing { color: var(--bad); }
+.asset-list small.stand-in { color: var(--gold); }
+
+.asset-more {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* The Inspector. */
+.inspector-picture {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  margin: 4px auto 10px;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.props {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.props th,
+.props td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(90, 105, 136, 0.5);
+  vertical-align: top;
+  text-align: left;
+}
+
+.props th {
+  width: 38%;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.props code {
+  word-break: break-all;
+}
+
+.dock-right a.button {
+  display: inline-block;
+  padding: 6px 12px;
+  background: var(--gold);
+  color: var(--bg);
+  border-radius: 3px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* The strip. */
+.strip {
+  grid-area: strip;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--edge);
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.strip-title {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+}
+
+.strip-jobs {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.strip-jobs li > * {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.strip-jobs li.painting > * { border-color: var(--accent); }
+.strip-jobs li.failed > * { border-color: var(--bad); }
+
+.strip-queue {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--accent);
+}
+
+/* Narrow screens: one pane at a time, chosen with the tabs in the top bar. */
+@media (max-width: 900px) {
+  .studio-top {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .studio-top .header-links {
+    margin-left: 0;
+    font-size: 13px;
+  }
+
+  .studio-top #you {
+    display: none;
+  }
+
+  .studio-top .top-pages {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .studio-top .pane-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .studio-top .pane-tabs button {
+    flex: 1;
+    padding: 6px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--edge);
+    font-weight: 400;
+  }
+
+  .studio-top .pane-tabs button[aria-pressed='true'] {
+    color: var(--bg);
+    background: var(--gold);
+  }
+
+  .studio-frame {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'pane' 'strip';
+  }
+
+  .grip { display: none; }
+
+  .studio-frame > main,
+  .studio-frame > .dock {
+    grid-area: pane;
+    display: none;
+    border: 0;
+  }
+
+  .studio-frame > main { padding: 12px 16px 32px; }
+
+  .studio-frame[data-pane='assets'] > .dock-left { display: flex; }
+  .studio-frame[data-pane='page'] > main { display: block; }
+  .studio-frame[data-pane='inspector'] > .dock-right { display: block; }
+}

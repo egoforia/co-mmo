@@ -18,7 +18,8 @@ describe('SnapshotGate', () => {
     const gate = new SnapshotGate();
     for (let t = 1; t <= 10; t++) gate.pass(snap(t), t * 50, 0);
     gate.seen(1, 50 + 80);
-    // Reports start taking far longer: snapshots are waiting in a queue somewhere.
+    // Reports start taking far longer, one after another: snapshots are waiting in a queue somewhere.
+    gate.seen(5, 250 + 700);
     gate.seen(10, 500 + 900);
     const sent: (ServerMessage | undefined)[] = [];
     for (let t = 11; t <= 30; t++) sent.push(gate.pass(snap(t), 1400 + (t - 11) * 50, 0));
@@ -30,6 +31,18 @@ describe('SnapshotGate', () => {
     gate.seen(second.tick, 1900 + 90);
     expect(gate.pass(snap(31), 2410, 0)).toBeDefined();
     expect(gate.pass(snap(32), 2460, 0)).toBeDefined();
+  });
+
+  it('skips nothing for one late report, as when the browser was busy with a slow frame', () => {
+    const gate = new SnapshotGate();
+    for (let t = 1; t <= 10; t++) gate.pass(snap(t), t * 50, 0);
+    gate.seen(1, 50 + 80);
+    gate.seen(10, 500 + 900);
+    for (let t = 11; t <= 20; t++) expect(gate.pass(snap(t), 1400 + (t - 11) * 50, 0)).toBeDefined();
+    // The next report is quick again: still nothing skipped.
+    gate.seen(15, 1600 + 85);
+    expect(gate.pass(snap(21), 1900, 0)).toBeDefined();
+    expect(gate.skipped).toBe(0);
   });
 
   it('skips while the socket itself still holds a lot, and never holds back other messages', () => {

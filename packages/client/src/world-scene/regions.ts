@@ -54,6 +54,7 @@ import {
   within,
 } from './types.ts';
 import { groundLayer, rockWalls, wallFaceKey } from './walls.ts';
+import { markScenery } from './park.ts';
 
 export function dropChunk(chunk: Chunk): void {
   for (const o of chunk.objects) o.destroy();
@@ -100,6 +101,7 @@ export function drawChunk(scene: Phaser.Scene, region: DrawnRegion, x0: number, 
       objects.push(img.setVisible(currentFloor >= 0));
     }
   }
+  markScenery([layer, ...objects]);
   return { tilemap, layer, objects };
 }
 
@@ -276,6 +278,7 @@ const floors: FloorView[] = map.storeys.map((storey) => {
   placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);
   const objects = scene.children.list.filter((o) => !before.has(o));
+  markScenery(objects);
   const lamps = placeLamps(scene, map, ox, oy, views);
   return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls };
 }
@@ -448,6 +451,7 @@ export function standKitHouse(
   v.kit = true;
   v.kitOutside = { texture: outside, frame, floor, storeys: house.spec.storeys.length };
   region.objects.push(...v.outside, ...cutaway);
+  markScenery([...v.outside, ...cutaway]);
   onPlaced();
 }
 

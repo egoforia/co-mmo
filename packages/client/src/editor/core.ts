@@ -60,7 +60,7 @@ export interface EditList {
   unlaid?: string[];
 }
 
-const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see and change it. Drag over bare ground to copy an area.' };
+const SELECT = { id: 'select' as const, name: 'Select', hint: 'Click a building, storey, stairs, piece, spot, person, monster, light or bookmark to see and change it; point near a wall on the side of a tile to pick the wall. Drag over bare ground to copy an area.' };
 const AREA = { id: 'area' as const, name: 'Copy and paste', hint: 'Click two corners to copy an area: its ground and everything standing in it. Then each click pastes it, all or none. Keep a copy as a prefab to paste in any land.' };
 
 const TILE_NAMES: Partial<Record<Tile, string>> = {
@@ -265,7 +265,7 @@ export class EditorCore {
   }
 
   /** The Select tool on a tile: the patrol path being drawn starts, or the inspector picks. */
-  private select(region: string, map: RegionMap, at: TilePoint, level: number): ToolStep {
+  private select(region: string, map: RegionMap, at: TilePoint, level: number, within?: [number, number]): ToolStep {
     const p = this.inspector.picked;
     if (this.inspector.path && p) {
       if (p.region !== region) return { say: 'Draw the path in the land its monsters live in.' };
@@ -274,12 +274,12 @@ export class EditorCore {
       this.drag(region, map, at);
       return {};
     }
-    return this.inspector.press(region, map, at, level);
+    return this.inspector.press(region, map, at, level, within);
   }
 
   /** A press on a tile of a land, on a floor of it. */
-  press(region: string, map: RegionMap, at: TilePoint, level: number): ToolStep {
-    if (this.tool === 'select') return this.select(region, map, at, level);
+  press(region: string, map: RegionMap, at: TilePoint, level: number, within?: [number, number]): ToolStep {
+    if (this.tool === 'select') return this.select(region, map, at, level, within);
     if (this.tool === 'area') return this.area.press(region, map, at);
     const kind = this.kind();
     if (!kind) return { say: `${describe(map, at, level)} at ${at[0]}, ${at[1]} in ${map.def.name}.` };
@@ -379,9 +379,9 @@ export class EditorCore {
   }
 
   /** What to outline under the pointer on a land: the stroke so far, then what the tool would touch. */
-  outlines(region: string, map: RegionMap, at: TilePoint, level: number): Outline[] {
+  outlines(region: string, map: RegionMap, at: TilePoint, level: number, within?: [number, number]): Outline[] {
     if (this.tool === 'select' && this.stroke?.region === region) return [...this.stroke.tiles.values()].map(([x, y]) => ({ x, y, w: 1, h: 1, tone: 'held' as const }));
-    if (this.tool === 'select') return this.inspector.outlines(region, map, at, level);
+    if (this.tool === 'select') return this.inspector.outlines(region, map, at, level, within);
     if (this.tool === 'area') return this.area.outlines(region, at);
     const kind = this.kind();
     if (!kind) return [{ x: at[0], y: at[1], w: 1, h: 1 }];

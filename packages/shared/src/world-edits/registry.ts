@@ -27,6 +27,7 @@ import { SPOT } from './kinds/spot.ts';
 import { STAIRS } from './kinds/stairs.ts';
 import { STOREY } from './kinds/storey.ts';
 import { WALL } from './kinds/wall.ts';
+import { WALL_LOOK } from './kinds/wall-look.ts';
 import { nameThings } from './names.ts';
 import type { EditKindId, EditStamp, WorldEdit, WorldEditDraft } from './types.ts';
 
@@ -38,6 +39,7 @@ import type { EditKindId, EditStamp, WorldEdit, WorldEditDraft } from './types.t
 export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   paint: PAINT,
   wall: WALL,
+  'wall-look': WALL_LOOK,
   scenery: SCENERY,
   move: MOVE,
   road: ROAD,

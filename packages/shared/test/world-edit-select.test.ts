@@ -109,3 +109,53 @@ describe('bookmarks', () => {
     expect(gone.bookmarks?.some((b) => b.name === 'Doorway')).toBe(false);
   });
 });
+
+describe('picking one wall', () => {
+  /** The testbed with a run of three grey stone walls on the north side of (30..32, 30), and one on the east side of (30, 30). */
+  function walled() {
+    return lay(testbed(), [
+      { kind: 'wall', side: 'north', tiles: [[30, 30], [31, 30], [32, 30]], style: 'woods-castle', height: 'full' },
+      { kind: 'wall', side: 'east', tiles: [[30, 30]], style: 'woods-castle', height: 'half' },
+    ]);
+  }
+
+  it('picks the wall on the side the pointer is near, and the tile when it is not near one', () => {
+    const map = walled();
+    expect(pickAt(map, [31, 30], 0, [0.5, 0.05])).toMatchObject({ kind: 'wall', box: { x: 31, y: 30 }, wall: { side: 'north', height: 'full', run: 3 } });
+    // The south side of the tile above is the same wall.
+    expect(pickAt(map, [31, 29], 0, [0.5, 0.95])).toMatchObject({ kind: 'wall', box: { x: 31, y: 30 } });
+    // In the middle of the tile, or near a side with no wall: nothing to pick here.
+    expect(pickAt(map, [31, 30], 0, [0.5, 0.5])).toBeUndefined();
+    expect(pickAt(map, [31, 30], 0, [0.95, 0.5])).toBeUndefined();
+    // Without knowing where in the tile, Select picks as it always did.
+    expect(pickAt(map, [31, 30], 0)).toBeUndefined();
+  });
+
+  it('picks the nearer of two walls at a corner', () => {
+    const map = walled();
+    expect(pickAt(map, [30, 30], 0, [0.9, 0.15])).toMatchObject({ wall: { side: 'west', height: 'half' }, box: { x: 31, y: 30 } });
+    expect(pickAt(map, [30, 30], 0, [0.85, 0.02])).toMatchObject({ wall: { side: 'north', height: 'full' }, box: { x: 30, y: 30 } });
+  });
+
+  it('changes one wall or its whole run, and the change survives laying the land again', () => {
+    const map = walled();
+    const one = lay(map, [{ kind: 'wall-look', at: [31, 30], side: 'north', style: 'sanctum-inn', height: 'low' }]);
+    const mine = (m: RegionMap) => m.edgeWalls!.filter((w) => w.x >= 30 && w.x <= 32 && w.y === 30);
+    const looks = (m: RegionMap) => mine(m).filter((w) => w.along === 'h').sort((a, b) => a.x - b.x).map((w) => `${w.style}/${w.height}`);
+    expect(looks(one)).toEqual(['woods-castle/full', 'sanctum-inn/low', 'woods-castle/full']);
+    const run = lay(map, [{ kind: 'wall-look', at: [31, 29], side: 'south', style: 'sanctum-inn', height: 'half', run: true }]);
+    expect(looks(run)).toEqual(['sanctum-inn/half', 'sanctum-inn/half', 'sanctum-inn/half']);
+    // The east wall was stood in another go, so it keeps its look.
+    expect(mine(run).find((w) => w.along === 'v')).toMatchObject({ style: 'woods-castle', height: 'half' });
+    expect(checkEdit(map, { kind: 'wall-look', at: [40, 40], side: 'north', style: 'sanctum-inn', height: 'full' }, {})).toMatch(/no wall/);
+  });
+
+  it('takes a picked wall away, and copies it to another tile', () => {
+    const map = walled();
+    const picked = pickAt(map, [31, 30], 0, [0.5, 0.05])!;
+    const gone = lay(map, [removeDraft(picked)]);
+    expect(gone.edgeWalls!.filter((w) => w.along === 'h' && w.y === 30 && w.x >= 30 && w.x <= 32).map((w) => w.x).sort()).toEqual([30, 32]);
+    const copied = lay(map, [copyDraft(map, picked, [35, 35])!]);
+    expect(copied.edgeWalls!.find((w) => w.x === 35 && w.y === 35)).toMatchObject({ along: 'h', style: 'woods-castle', height: 'full' });
+  });
+});

@@ -30,7 +30,7 @@ import { fieldsHtml, filled, hasRules, readField } from './fields.ts';
 /** What each kind of picked thing is called above its card. */
 const KIND_WORDS: Record<PickKind, string> = {
   building: 'Building', storey: 'Storey', stairway: 'Stairs', landmark: 'Piece', spot: 'Gathering spot',
-  monster: 'Monster’s home', person: 'Person', bookmark: 'Bookmark', light: 'Light',
+  monster: 'Monster’s home', person: 'Person', bookmark: 'Bookmark', light: 'Light', wall: 'Wall',
 };
 
 /** Where inspector inputs' names start. */
@@ -63,7 +63,7 @@ export class Inspector {
   }
 
   /** A press on a tile: a copy or move lands there, or the thing there is picked, or an area starts. */
-  press(region: string, map: RegionMap, at: TilePoint, level: number): ToolStep {
+  press(region: string, map: RegionMap, at: TilePoint, level: number, within?: [number, number]): ToolStep {
     const p = this.picked;
     if (p?.placing) {
       if (p.region !== region) return { say: 'Keep it in the land it came from.' };
@@ -76,7 +76,7 @@ export class Inspector {
       this.picked = p.placing === 'copy' ? { region, thing: p.thing, placing: 'copy' } : undefined;
       return drafts.length === 1 ? { draft: drafts[0]!, region } : { drafts, region };
     }
-    const thing = pickAt(map, at, level);
+    const thing = pickAt(map, at, level, within);
     this.path = false;
     if (!thing) {
       this.picked = undefined;
@@ -190,12 +190,12 @@ export class Inspector {
   }
 
   /** The pick held, where a copy or move would land, the area dragged, or what a click would pick. */
-  outlines(region: string, map: RegionMap, at: TilePoint, level: number): Outline[] {
+  outlines(region: string, map: RegionMap, at: TilePoint, level: number, within?: [number, number]): Outline[] {
     if (this.box?.region === region) {
       const [a, b] = [this.box.from, this.box.to];
       return [{ x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]) + 1, h: Math.abs(a[1] - b[1]) + 1, tone: 'held' }];
     }
-    const hover = pickAt(map, at, level)?.box ?? { x: at[0], y: at[1], w: 1, h: 1 };
+    const hover = pickAt(map, at, level, within)?.box ?? { x: at[0], y: at[1], w: 1, h: 1 };
     const p = this.picked?.region === region ? this.picked : undefined;
     if (!p) return [hover];
     const held: Outline = { ...p.thing.box, tone: 'held' };

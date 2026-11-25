@@ -548,6 +548,40 @@ export const SHOTS: Shot[] = [
     ],
   },
   {
+    name: 'editor-wall-picked',
+    about: 'Select picks one wall of the L from editor-wall (pointer near its side of the tile): the inspector names the wall and offers its look and height for this wall or its whole run.',
+    region: 'arch-testbed',
+    at: () => ({ x: 50, y: 52 }),
+    open: async (page) => {
+      await page.click('#edit-world-button');
+      await page.waitForSelector('#editor:not([hidden])');
+      await page.click('#editor [data-tools~="wall"]');
+      await page.click('#editor [data-tool="wall"]');
+      await page.selectOption('#editor select[name="shape"]', 'line');
+      const line = async (from: [number, number], to: [number, number]) => {
+        await page.mouse.move(...from);
+        await page.mouse.down();
+        await page.mouse.move(...to, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForSelector('[data-undo]:not([disabled])', { timeout: 15_000 });
+      };
+      await line([400, 280], [592, 376]);
+      await page.keyboard.press('r');
+      await line([592, 376], [400, 472]);
+      await page.click('#editor [data-group="select"]');
+      // On the first wall's line, halfway along it.
+      await page.mouse.click(496, 328);
+      await page.waitForSelector('#editor details[data-section="wall-look"]');
+      await page.mouse.move(328, 544);
+      await page.waitForTimeout(600);
+    },
+    mustSee: [
+      'one wall of the L outlined in green along its foot, not a whole tile',
+      'the inspector: "Mossgate Castle wall" with "Wall" beside it, "A storey high, running east to west", "Stood with 4 more in one go", and Move, Copy and Take away',
+      'a "Look and height" section open with a Look picture button, Height, and Change (This wall only)',
+    ],
+  },
+  {
     name: 'editor-inspector',
     about: 'The world editor with the shop the player stands in selected: its inspector, with the Floors section unfolded.',
     region: 'sanctum',

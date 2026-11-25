@@ -839,14 +839,14 @@ export class WorldScene extends Phaser.Scene {
     return monsterHomeUnder(this.cameras.main, this.creatures, this.drawn, screenX, screenY);
   }
 
-  tileAt(screenX: number, screenY: number): { region: string; map: RegionMap; x: number; y: number } | undefined {
+  tileAt(screenX: number, screenY: number): { region: string; map: RegionMap; x: number; y: number; within: [number, number] } | undefined {
     const w = this.worldTile(screenX, screenY);
     const [wx, wy] = [Math.floor(w.x), Math.floor(w.y)];
     for (const [region, drawn] of this.drawn) {
       const { at: cell } = drawn.map.def;
       const x = wx - cell.x * drawn.map.width;
       const y = wy - cell.y * drawn.map.height;
-      if (x >= 0 && y >= 0 && x < drawn.map.width && y < drawn.map.height) return { region, map: drawn.map, x, y };
+      if (x >= 0 && y >= 0 && x < drawn.map.width && y < drawn.map.height) return { region, map: drawn.map, x, y, within: [w.x - wx, w.y - wy] };
     }
     return undefined;
   }

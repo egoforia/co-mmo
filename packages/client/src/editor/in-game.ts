@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { MAX_FLOORS, type Bookmark, type RegionMap, type TilePoint } from '@co-mmo/shared';
+import { MAX_FLOORS, pickAt, type Bookmark, type RegionMap, type TilePoint } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 import type { WorldScene } from '../world-scene.ts';
 import { CameraKeys } from './camera-keys.ts';
@@ -325,16 +325,26 @@ export class EditorUi {
     // Select picks a monster where it wanders, by its home (what the editor changes); not while a move, copy or patrol path waits for its spot.
     const home = kind === 'down' && this.core.tool === 'select' && !this.core.inspector.picked?.placing && !this.core.inspector.path ? scene.monsterHomeAt(p.x, p.y) : undefined;
     if (home && !this.edits.busy) void this.step(this.core.press(home.region, home.map, home.at, home.level));
-    else if (kind === 'down' && !this.edits.busy) void this.step(this.core.press(at.region, at.map, spot, level));
+    else if (kind === 'down' && this.core.tool === 'wall' && p.event instanceof MouseEvent && p.event.altKey) this.eyedrop(at.map, spot, level, at.within);
+    else if (kind === 'down' && !this.edits.busy) void this.step(this.core.press(at.region, at.map, spot, level, at.within));
     else if (kind === 'drag') this.core.drag(at.region, at.map, spot);
     // A making tool shows what it would make here, and whether it fits, before anything is sent.
     const aim = kind === 'hover' ? this.core.aimAt(at.map, spot, level) : undefined;
-    const outlines = this.core.outlines(at.region, at.map, spot, level).map((o) => (aim?.problem && o.tone !== 'held' ? { ...o, tone: 'warn' as const } : o));
+    const outlines = this.core.outlines(at.region, at.map, spot, level, at.within).map((o) => (aim?.problem && o.tone !== 'held' ? { ...o, tone: 'warn' as const } : o));
     strokeOutlines(this.outline, scene, at.map, outlines);
     const box = outlines.at(-1);
     if (aim && box) this.ghost.show(scene, at.map, box, aim.art, aim.character);
     else this.ghost.hide();
     this.readOut(aimWords(aim, at.map, spot, level));
+  }
+
+  /** Alt-click with the Wall tool: the wall there lends the tool its look and height. */
+  private eyedrop(map: RegionMap, at: TilePoint, level: number, within: [number, number]): void {
+    const picked = pickAt(map, at, level, within);
+    if (!picked?.wall) return this.render('Alt-click near a wall to copy its look and height.');
+    this.core.set('style', picked.wall.style);
+    this.core.set('height', picked.wall.height);
+    this.render(`Copied the look and height of this ${picked.name} into the Wall tool.`);
   }
 
   /** Says what is under the pointer in the status strip, without drawing the rest again. */

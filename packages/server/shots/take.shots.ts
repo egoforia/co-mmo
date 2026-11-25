@@ -178,6 +178,10 @@ async function take(shot: Shot): Promise<Taken> {
     // Tough, so the land's creatures can't knock the player back to a shrine before the picture.
     const hardy = { ...newCharacter(), level: 30 };
     for (const s of shot.carry ?? []) hardy.inventory.push({ ...s });
+    for (const [i, skill] of (shot.skills ?? []).entries()) {
+      hardy.abilities.push(skill);
+      hardy.hotbar[i] = skill;
+    }
     world.store.savePosition(id, spot.x, spot.y, regionId, { ...hardy, hp: maxHp(hardy) }, spot.floor ?? 0);
     // Older characters first, so the screen lists them in a steady order.
     for (const [i, name] of (shot.characters ?? []).entries()) {

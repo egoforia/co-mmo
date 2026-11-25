@@ -972,11 +972,43 @@ export function road(map: RegionMap, x0: number, y0: number, x1: number, y1: num
   }
 }
 
+/** A tile rectangle: its top-left tile and its size in tiles. */
+export interface TileBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The whole tiles a piece standing with its bottom row centred under (x, y)
+ * blocks: from the tile under its left edge, as many tiles as its width
+ * rounded up (a width of 1.5 blocks 2, 2.6 blocks 3).
+ */
+export function pieceBox(l: Pick<Landmark, 'x' | 'y' | 'footprint'>): TileBox {
+  const left = Math.floor(l.x - l.footprint.width / 2);
+  const bottom = Math.floor(l.y - 0.01);
+  const width = Math.max(1, Math.ceil(l.footprint.width - 1e-6));
+  const height = Math.max(1, Math.ceil(l.footprint.height - 1e-6));
+  return { left, top: bottom - height + 1, width, height };
+}
+
+/**
+ * Where a piece's picture stands, in tiles: its painted width, centred on the
+ * tiles it blocks (pieceBox), its feet on their bottom row. A piece once
+ * stood at (x, y) itself, and 108 built-in pieces stood up to half a tile off
+ * the tiles they block, so players walked into what looked like open ground.
+ */
+export function piecePicture(l: Pick<Landmark, 'x' | 'y' | 'footprint'>): TileBox {
+  const t = pieceBox(l);
+  const width = l.footprint.width;
+  return { left: t.left + t.width / 2 - width / 2, top: t.top, width, height: t.height };
+}
+
 /** Blocks the footprint whose bottom row is centred under (x, y). */
 export function block(map: RegionMap, x: number, y: number, w: number, h: number): void {
-  const left = Math.floor(x - w / 2);
-  const bottom = Math.floor(y - 0.01);
-  for (let ty = bottom - h + 1; ty <= bottom; ty++) for (let tx = left; tx < left + w; tx++) set(map, tx, ty, Tile.Blocked);
+  const t = pieceBox({ x, y, footprint: { width: w, height: h } });
+  for (let ty = t.top; ty < t.top + t.height; ty++) for (let tx = t.left; tx < t.left + t.width; tx++) set(map, tx, ty, Tile.Blocked);
 }
 
 /** Where a road meets an edge, `along` tiles from its west or north end. */

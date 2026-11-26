@@ -1,10 +1,10 @@
 // The Studio's keys. 1 to 5 open the workspaces, / searches the assets, Esc
 // puts the selected asset down, the arrows nudge a picture being fitted by a
 // pixel (Shift: 10), C centres it on its tiles, B chooses the tiles it blocks
-// and Ctrl Z steps back. H (hands) comes with its tool.
+// and Ctrl Z steps back. H opens a walker's hand workbench on its page.
 
 /** What a key press does in the Studio, if anything. */
-export type StudioKey = { workspace: number } | { search: true } | { deselect: true } | { nudge: [number, number] } | { undo: true } | { centre: true } | { hitbox: true };
+export type StudioKey = { workspace: number } | { search: true } | { deselect: true } | { nudge: [number, number] } | { undo: true } | { centre: true } | { hitbox: true } | { hands: true };
 
 const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
@@ -19,6 +19,7 @@ export function studioKey(e: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'altKey' | 
   if (e.key === '/') return { search: true };
   if (e.key === 'c' || e.key === 'C') return { centre: true };
   if (e.key === 'b' || e.key === 'B') return { hitbox: true };
+  if (e.key === 'h' || e.key === 'H') return { hands: true };
   if (e.key === 'Escape') return { deselect: true };
   return undefined;
 }

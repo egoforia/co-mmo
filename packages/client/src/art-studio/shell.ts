@@ -212,6 +212,7 @@ export class StudioShell {
     e.preventDefault();
     if ('centre' in k) return void this.centreOne();
     if ('hitbox' in k) return this.toggleHitbox();
+    if ('hands' in k) return void $('dock-right').querySelector<HTMLAnchorElement>('a[data-hands-to]')?.click();
     if ('nudge' in k || 'undo' in k) {
       if (!this.draft || !this.canvas) return;
       if ('nudge' in k) this.draft.nudge(k.nudge[0], k.nudge[1]);
@@ -416,6 +417,8 @@ export class StudioShell {
   private versionClick(target: HTMLElement): void {
     // Create with AI opens the same review as the pages (art-ui/dialogs.ts).
     if (target.closest('[data-art-review]')) return void artClick(target);
+    // Hands and gear leads to the walker's page and opens its hand workbench there.
+    if (target.closest('a[data-art-go]')) return void artClick(target);
     if (target.closest('[data-fit-centre]')) return void this.centreOne();
     if (target.closest('[data-hitbox-edit]')) return this.toggleHitbox();
     const lit = this.draft && lightButton(target, this.draft.state);

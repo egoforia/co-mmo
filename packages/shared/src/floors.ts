@@ -4,7 +4,7 @@ import { anchorNear, spotMiddle, type TileSpot } from './tiles/grid.ts';
 import { openTile } from './tiles/steps.ts';
 import { walkTiles } from './tiles/walker.ts';
 import type { Among } from './hit-boxes.ts';
-import { Tile, block, isBlocking, pieceBox, set, storeyAt, tileAt, type RegionMap, type TileArt } from './world.ts';
+import { Tile, block, blockedTiles, isBlocking, pieceBox, set, storeyAt, tileAt, type RegionMap, type TileArt } from './world.ts';
 
 // Floors above and below the ground. The ground is floor 0; a building's
 // upper floors are 1, 2... and the floors under it -1, -2... Each floor off
@@ -223,10 +223,9 @@ export function setOn(map: RegionMap, floor: number, x: number, y: number, tile:
 }
 
 /** Blocks a footprint on a floor whose bottom row is centred under (x, y), as `block` does on the ground. */
-export function blockOn(map: RegionMap, floor: number, x: number, y: number, w: number, h: number): void {
-  if (floor === 0) return block(map, x, y, w, h);
-  const t = pieceBox({ x, y, footprint: { width: w, height: h } });
-  for (let ty = t.top; ty < t.top + t.height; ty++) for (let tx = t.left; tx < t.left + t.width; tx++) setOn(map, floor, tx, ty, Tile.Blocked);
+export function blockOn(map: RegionMap, floor: number, x: number, y: number, w: number, h: number, asset?: string): void {
+  if (floor === 0) return block(map, x, y, w, h, asset);
+  for (const [tx, ty] of blockedTiles(pieceBox({ x, y, footprint: { width: w, height: h } }), asset)) setOn(map, floor, tx, ty, Tile.Blocked);
 }
 
 /** A way across the land: north is up the map. */

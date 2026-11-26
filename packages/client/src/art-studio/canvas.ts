@@ -2,8 +2,9 @@
 // stands it (standing() in tile-stand.ts), on its land's own painted ground,
 // with a painted player beside it for size, lit at the hour chosen with the
 // game's own sums (light-preview.ts). Zoom 50 to 400 %, drag to pan, and the
-// pixel under the pointer read out. The tile outlines are an editor overlay,
-// as the world editor's Hitboxes layer: only the Owner sees them.
+// pixel under the pointer read out. The tile outlines, and the red tiles a
+// piece blocks while its hitbox is chosen (hitbox-tool.ts), are an editor
+// overlay, as the world editor's Hitboxes layer: only the Owner sees them.
 
 import { CHARACTER_HEIGHT, PREVIEW_HOURS, biomeLook, type ArtManifest, type AssetFit, type BiomeId } from '@co-mmo/shared';
 import { groundLight, litPicture } from '../light-preview.ts';
@@ -13,6 +14,7 @@ import { fittedAt, standing, type Floor } from '../tile-stand.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
 import type { FitDraft } from './fit-tool.ts';
+import { blockedOf, tileUnder, toggleTile } from './hitbox-tool.ts';
 
 /** Groups the canvas can stand on tiles. */
 export const CANVAS_GROUPS = ['pieces', 'spots', 'stairs', 'scenery', 'characters', 'monsters'];
@@ -77,6 +79,8 @@ export class StudioCanvas {
   private zoom = 100;
   private pan = { x: 0, y: 0 };
   private hour: number | undefined;
+  /** True while the Hitbox tool is on: clicking a tile blocks or opens it. */
+  private hitbox = false;
   private canvas!: HTMLCanvasElement;
   private readout!: HTMLElement;
   private box: ReturnType<typeof pictureBox> | undefined;
@@ -107,6 +111,13 @@ export class StudioCanvas {
     this.readout = this.el.querySelector('.canvas-readout')!;
     this.wire();
     await this.load();
+    this.draw();
+  }
+
+  /** Turns the Hitbox tool on or off. */
+  setHitbox(on: boolean): void {
+    this.hitbox = on;
+    this.canvas.dataset.hitbox = String(on);
     this.draw();
   }
 
@@ -145,6 +156,16 @@ export class StudioCanvas {
     // Dragging the picture moves it (the Offset tool); dragging anywhere else pans.
     let drag: { x: number; y: number; move?: { offset: [number, number] } } | undefined;
     this.canvas.addEventListener('pointerdown', (e) => {
+      if (this.hitbox && this.draft) {
+        const floor = canvasFloor(this.asset);
+        const tile = tileUnder(this.world(e));
+        if (tile[0] >= 0 && tile[1] >= 0 && tile[0] < floor.right && tile[1] < floor.bottom) {
+          this.draft.set(toggleTile(this.draft.state, tile, floor.right, floor.bottom));
+          this.changed();
+          this.draw();
+          return;
+        }
+      }
       const onPicture = this.draft && this.box && this.inside(this.world(e), this.box);
       if (onPicture) this.draft!.mark();
       drag = onPicture ? { x: e.clientX, y: e.clientY, move: { offset: [...this.draft!.state.offset] } } : { x: e.clientX - this.pan.x, y: e.clientY - this.pan.y };
@@ -237,11 +258,12 @@ export class StudioCanvas {
       g.restore();
     }
     // The asset's own tiles, outlined (editor overlay).
-    const diamond = (tx: number, ty: number) => {
+    const diamond = (tx: number, ty: number, fill = false) => {
       const pts = [[tx, ty], [tx + 1, ty], [tx + 1, ty + 1], [tx, ty + 1]].map(([x, y]) => PROJECTION.toScreen(x!, y!));
       g.beginPath();
       pts.forEach((p, i) => (i ? g.lineTo(o.x + p.x * o.s, o.y + p.y * o.s) : g.moveTo(o.x + p.x * o.s, o.y + p.y * o.s)));
       g.closePath();
+      if (fill) g.fill();
       g.stroke();
     };
     g.strokeStyle = 'rgba(242, 220, 107, 0.85)';
@@ -274,6 +296,19 @@ export class StudioCanvas {
       : pictureBox(floor, size, this.manifest[this.asset.id]?.view === 'isometric', this.draft?.fit);
     this.box = box;
     g.drawImage(art, o.x + box.x * o.s, o.y + box.y * o.s, box.width * o.s, box.height * o.s);
+    // The tiles it blocks, red, while they are chosen (editor overlay).
+    if (this.hitbox && this.draft) {
+      const blocked = blockedOf(this.draft.state, floor.right, floor.bottom);
+      g.save();
+      g.strokeStyle = 'rgba(242, 220, 107, 0.95)';
+      for (let ty = floor.top; ty < floor.bottom; ty++) {
+        for (let tx = floor.left; tx < floor.right; tx++) {
+          g.fillStyle = blocked.some(([x, y]) => x === tx && y === ty) ? 'rgba(229, 72, 77, 0.5)' : 'rgba(80, 200, 120, 0.25)';
+          diamond(tx, ty, true);
+        }
+      }
+      g.restore();
+    }
     // The picture's anchor, the point it stands on (editor overlay).
     if (this.draft) {
       const [ax, ay] = [o.x + box.anchor.x * o.s, o.y + box.anchor.y * o.s];

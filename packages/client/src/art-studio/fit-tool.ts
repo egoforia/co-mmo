@@ -16,13 +16,20 @@ export const SCALE_GROUPS = ['pieces', 'spots', 'stairs'];
 export interface FitState {
   offset: [number, number];
   scale: number;
+  /** The tiles it blocks (hitbox-tool.ts), from its footprint's top-left; every tile when left out. */
+  blocks?: [number, number][];
 }
 
 /** A fit kept within its limits: whole pixels, and a trim between FIT_SCALE's. */
 export function clampFit(f: FitState): FitState {
   const px = (n: number) => Math.max(-FIT_OFFSET_MOST, Math.min(FIT_OFFSET_MOST, Math.round(n)));
   const scale = Math.max(FIT_SCALE.least, Math.min(FIT_SCALE.most, Math.round(f.scale * 100) / 100));
-  return { offset: [px(f.offset[0]), px(f.offset[1])], scale };
+  return { offset: [px(f.offset[0]), px(f.offset[1])], scale, ...(f.blocks ? { blocks: f.blocks } : {}) };
+}
+
+/** True when two fits stand the picture alike and block the same tiles. */
+export function sameFit(a: FitState, b: FitState): boolean {
+  return a.offset[0] === b.offset[0] && a.offset[1] === b.offset[1] && a.scale === b.scale && JSON.stringify(a.blocks ?? null) === JSON.stringify(b.blocks ?? null);
 }
 
 /** A fit being changed in the Studio, with the steps back to where it started. */
@@ -31,8 +38,8 @@ export class FitDraft {
   private readonly saved: FitState;
   private readonly back: FitState[] = [];
 
-  constructor(fit: Pick<AssetFit, 'offset' | 'scale'> | undefined) {
-    this.saved = { offset: [fit?.offset[0] ?? 0, fit?.offset[1] ?? 0], scale: fit?.scale ?? 1 };
+  constructor(fit: Pick<AssetFit, 'offset' | 'scale' | 'blocks'> | undefined) {
+    this.saved = { offset: [fit?.offset[0] ?? 0, fit?.offset[1] ?? 0], scale: fit?.scale ?? 1, ...(fit?.blocks?.length ? { blocks: fit.blocks } : {}) };
     this.now = this.saved;
   }
 
@@ -42,19 +49,19 @@ export class FitDraft {
   }
 
   /** As an AssetFit for drawing (no scale when untrimmed). */
-  get fit(): Pick<AssetFit, 'offset' | 'scale'> {
-    return { offset: this.now.offset, ...(this.now.scale !== 1 ? { scale: this.now.scale } : {}) };
+  get fit(): Pick<AssetFit, 'offset' | 'scale' | 'blocks'> {
+    return { offset: this.now.offset, ...(this.now.scale !== 1 ? { scale: this.now.scale } : {}), ...(this.now.blocks ? { blocks: this.now.blocks } : {}) };
   }
 
   /** True when it differs from what the game shows. */
   get changed(): boolean {
-    return this.now.offset[0] !== this.saved.offset[0] || this.now.offset[1] !== this.saved.offset[1] || this.now.scale !== this.saved.scale;
+    return !sameFit(this.now, this.saved);
   }
 
   /** Changes it; `step` false while a drag goes on, so the whole drag is one step back. */
   set(next: FitState, step = true): void {
     const kept = clampFit(next);
-    if (kept.offset[0] === this.now.offset[0] && kept.offset[1] === this.now.offset[1] && kept.scale === this.now.scale) return;
+    if (sameFit(kept, this.now)) return;
     if (step) this.back.push(this.now);
     this.now = kept;
   }
@@ -79,7 +86,7 @@ export class FitDraft {
 }
 
 /** The Inspector's Offset section for an asset being fitted. */
-export function fitPanelHtml(a: StudioAsset, draft: FitDraft): string {
+export function fitPanelHtml(a: StudioAsset, draft: FitDraft, more = ''): string {
   const { offset, scale } = draft.state;
   const trim = SCALE_GROUPS.includes(a.group)
     ? `<label>Size <input type="number" name="fit-scale" min="${FIT_SCALE.least * 100}" max="${FIT_SCALE.most * 100}" step="1" value="${Math.round(scale * 100)}" /> %</label>`
@@ -97,7 +104,7 @@ export function fitPanelHtml(a: StudioAsset, draft: FitDraft): string {
       <button type="button" class="quiet" data-fit-centre title="Stand where it meets the ground on the middle of its tiles (C)">Centre on its tiles</button>
       <button type="button" data-fit-save${draft.changed ? '' : ' disabled'}>Save the fit</button>
       <button type="button" class="quiet" data-fit-reset>Back to the painter's place</button>
-    </p>`;
+    </p>${more}`;
 }
 
 /** The fit the Inspector's fields ask for. */
@@ -106,7 +113,7 @@ export function fitFromFields(el: HTMLElement, now: FitState): FitState {
     const v = Number(el.querySelector<HTMLInputElement>(`input[name=${name}]`)?.value);
     return Number.isFinite(v) ? v : fallback;
   };
-  return { offset: [num('fit-x', now.offset[0]), num('fit-y', now.offset[1])], scale: num('fit-scale', now.scale * 100) / 100 };
+  return { ...now, offset: [num('fit-x', now.offset[0]), num('fit-y', now.offset[1])], scale: num('fit-scale', now.scale * 100) / 100 };
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

@@ -19,7 +19,7 @@ interface Player {
 }
 
 async function players(): Promise<string> {
-  const { players, yours, maxCharacters } = await api<{ players: Player[]; you: string; yours: string[]; maxCharacters: number }>('players');
+  const { players, yours, maxCharacters, stashSlots } = await api<{ players: Player[]; you: string; yours: string[]; maxCharacters: number; stashSlots: number }>('players');
   const canSuspend = (p: Player) => !yours.includes(p.id) && p.role !== 'owner' && (view.owner || p.role === 'player');
   const rows = players.map((p) => `
     <tr>
@@ -38,6 +38,8 @@ async function players(): Promise<string> {
     ${view.owner ? `<form class="row" id="characters-limit">
       <label for="max-characters">Characters one account may have</label>
       <input id="max-characters" type="number" min="1" max="20" value="${maxCharacters}" />
+      <label for="stash-slots">Slots in each account's shared stash</label>
+      <input id="stash-slots" type="number" min="1" max="200" value="${stashSlots}" />
       <button type="submit" class="quiet">Save</button>
     </form>
     <p><small>A suspension or a Steward appointment counts for every character on that account.</small></p>` : ''}
@@ -66,8 +68,9 @@ async function click(t: HTMLButtonElement): Promise<Handled> {
 async function submit(form: HTMLFormElement): Promise<Handled> {
   if (form.id !== 'characters-limit') return false;
   const value = form.querySelector<HTMLInputElement>('#max-characters')!.value;
-  await api('players/limit', 'POST', { maxCharacters: Number(value) });
-  toast(`Each account may now have ${value} character${value === '1' ? '' : 's'}.`);
+  const slots = form.querySelector<HTMLInputElement>('#stash-slots')!.value;
+  await api('players/limit', 'POST', { maxCharacters: Number(value), stashSlots: Number(slots) });
+  toast(`Each account may now have ${value} character${value === '1' ? '' : 's'} and a stash of ${slots} slots.`);
   return true;
 }
 

@@ -13,7 +13,8 @@ Owner sets another number (God's View > Players, 1 to 20).
   "New character" makes another: a name, a people and Calling, and a look
   (their first wish, free, as at sign-up). They start in the Sanctum at level 1.
 - Each character keeps everything of their own: Favor, coins, the bag, gear,
-  their look, level, Path, crafts, wishes and Workshop draft.
+  their look, level, Path, crafts, wishes and Workshop draft. Things pass
+  between them through the account's shared stash (`docs/stash.md`).
 - One character is in the world at a time. Entering with another in a second
   window takes the first one out.
 - Deleting asks for the character's name and cannot be undone. The last

@@ -74,6 +74,8 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'clear'; at: TilePoint; radius: number }
   /** Stands a kit set piece (sea-cave-kit.ts) with its footprint's bottom-left tile at `at`. */
   | { kind: 'piece'; piece: string; at: TilePoint }
+  /** Stands a stash chest (rpg/stash.ts), 2 by 1 tiles, with its bottom-left tile at `at`; only in a safe area. */
+  | { kind: 'stash'; at: TilePoint }
   /** Gives the building over `at` floors above and below the ground (floors.ts), joined by stairs or ladders; 0 and 0 takes them off. */
   | { kind: 'floors'; at: TilePoint; up: number; down: number; ladders?: boolean }
   /** Gives the set piece or piece of furniture over `at` the tiles it blocks and stands on, still centred under its picture (the Art tab's hit boxes). */

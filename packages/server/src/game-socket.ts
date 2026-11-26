@@ -6,6 +6,7 @@ import type { Builds } from './builds.ts';
 import { awayFeed } from './feed.ts';
 import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
+import type { Stashes } from './stash.ts';
 import type { Account, Store } from './store.ts';
 import type { Wishes } from './wishes.ts';
 import type { Workshop } from './workshop.ts';
@@ -22,6 +23,8 @@ export interface GameSocketOptions {
   reports: Reports;
   rules: LiveRules;
   builds: Builds;
+  /** The shared stash (stash.ts). */
+  stashes: Stashes;
   /** How often idle connections are pinged, in ms. */
   heartbeatMs?: number;
   /** How the socket uses the network (socket-net.ts); everything on when missing. */
@@ -47,7 +50,7 @@ export interface GameSocket {
  * shows up in proxy or server logs.
  */
 export function openGameSocket(options: GameSocketOptions): GameSocket {
-  const { store, world, wishes, workshop, reports, rules, builds } = options;
+  const { store, world, wishes, workshop, reports, rules, builds, stashes } = options;
   const net = options.net ?? { compress: true, skipStale: true };
   const wss = new WebSocketServer({ server: options.server, path: '/ws', maxPayload: 4096, perMessageDeflate: net.compress ? deflateOptions() : false });
   // One connection per account, by the id of the record that signs in, with the character it plays:
@@ -184,6 +187,9 @@ export function openGameSocket(options: GameSocketOptions): GameSocket {
                   : parsed.action === 'sample' ? workshop.sample(who)
                   : parsed.action === 'send' ? workshop.send(who) : workshop.drop(who);
         done.catch((err) => console.error('Workshop failed:', err));
+      } else if (parsed.t === 'stash') {
+        // The stash belongs to the account, kept with the saved world, not in any region.
+        void stashes.handle(account, parsed);
       } else {
         world.handle(account.id, parsed);
       }

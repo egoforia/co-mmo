@@ -9,8 +9,8 @@ import type { Account } from './store.ts';
 // its characters. These are plain functions over the store's accounts; the
 // store calls them and saves.
 
-/** Fields that belong to signing in, kept only on the account's main record. */
-const SIGN_IN = ['tokenHash', 'sessions', 'email', 'logins', 'playing'] as const;
+/** Fields that belong to the whole account (signing in, the shared stash), kept only on its main record. */
+const SIGN_IN = ['tokenHash', 'sessions', 'email', 'logins', 'playing', 'stash'] as const;
 
 /** The record that signs in for this character: itself, or the one its `mainId` names. */
 export function mainOf(accounts: readonly Account[], account: Account): Account {

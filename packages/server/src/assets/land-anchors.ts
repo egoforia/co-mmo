@@ -17,6 +17,14 @@ export const LAND_ANCHORS: KitAsset[] = ([
     details: ['thin dark gaps between planks', 'a few knots'], mood: 'sturdy, inviting',
   },
 
+  // The shared stash's chest (docs/stash.md), stood in any land's safe area by the world editor.
+  {
+    id: 'stash-chest', name: 'Stash chest', kind: 'set-piece', biome: 'any', references: ['sanctum-shrine'],
+    silhouetteHook: 'a sturdy closed wooden storage chest with iron bands, a big brass lock and the God\'s sigil carved on its lid',
+    body: 'long low chest about as wide as two people and knee high, lid closed', materials: ['oak', 'iron', 'brass'],
+    colors: { main: 'warm honey brown wood', secondary: 'dark iron bands', accent: 'gold sigil and lock' }, details: ['a faint gold glow from the keyhole', 'worn corners'], mood: 'safe, trusted',
+  },
+
   // The Sanctum
   {
     id: 'sanctum-standing-stones', name: 'Ring of standing stones', kind: 'set-piece', biome: 'sanctum', references: ['sanctum-shrine'],

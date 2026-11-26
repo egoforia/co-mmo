@@ -12,8 +12,8 @@ import type { Sql, SqlQuery } from './db.ts';
 /** One stack a character holds, as the `holdings` table keeps it. */
 export interface Holding {
   accountId: string;
-  /** In the bag, or worn in an equipment slot. */
-  place: 'bag' | 'worn';
+  /** In the bag, worn in an equipment slot, or in the account's shared stash (kept on the account's first record). */
+  place: 'bag' | 'worn' | 'stash';
   /** The bag slot's number, or the equipment slot's name. */
   slot: string;
   item: string;
@@ -36,6 +36,11 @@ export function holdingsOf(accountId: string, character: Character): Holding[] {
   const bag = character.inventory.map((s, i) => ({ accountId, place: 'bag' as const, slot: String(i), item: s.item, qty: s.qty }));
   const worn = Object.entries(character.equipment ?? {}).flatMap(([slot, item]) => (item ? [{ accountId, place: 'worn' as const, slot, item, qty: 1 }] : []));
   return [...bag, ...worn];
+}
+
+/** What an account's shared stash holds, as rows keyed by the record that signs in. */
+export function stashHoldings(account: { id: string; stash?: { item: string; qty: number }[] }): Holding[] {
+  return (account.stash ?? []).map((s, i) => ({ accountId: account.id, place: 'stash' as const, slot: String(i), item: s.item, qty: s.qty }));
 }
 
 /** The characters tables, remembering what each row held when last written. */

@@ -24,6 +24,7 @@ import { RESTYLE } from './kinds/restyle.ts';
 import { ROAD } from './kinds/road.ts';
 import { SPAWN } from './kinds/spawn.ts';
 import { SPOT } from './kinds/spot.ts';
+import { STASH } from './kinds/stash.ts';
 import { STAIRS } from './kinds/stairs.ts';
 import { STOREY } from './kinds/storey.ts';
 import { WALL } from './kinds/wall.ts';
@@ -48,6 +49,7 @@ export const EDIT_KINDS: { [K in EditKindId]: EditKind<K> } = {
   restyle: RESTYLE,
   floors: FLOORS,
   piece: PIECE,
+  stash: STASH,
   spawn: SPAWN,
   monsters: MONSTERS,
   patrol: PATROL_PATH,

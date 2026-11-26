@@ -18,6 +18,7 @@ import {
   type IsoWay,
   type AngleReferenceType,
   type AngleTargetType,
+  MOST_STASH_SLOTS,
 } from '@co-mmo/shared';
 import { DEFAULT_MODELS, KEY_ENV, type ProviderId } from './ai/chat.ts';
 import { buildingsOverview } from './art-buildings.ts';
@@ -32,7 +33,7 @@ import type { LiveRules } from './live-rules.ts';
 import type { Reports } from './reports.ts';
 import { type Account, type Store } from './store.ts';
 import { handleSky } from './sky-settings.ts';
-import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, MOST_CHARACTERS, dailyClips, DEFAULT_WORKSHOP, maxCharacters, soundSettings, styleCheckSettings, videoSettings, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings } from './settings.ts';
+import { ART_USES, DEFAULT_BUILDS, DEFAULT_DAILY_USD, MOST_CHARACTERS, dailyClips, DEFAULT_WORKSHOP, maxCharacters, stashSlots, soundSettings, styleCheckSettings, videoSettings, type BuildSettings, type ModelChoice, type Settings, type SoundSettings, type StyleCheckSettings } from './settings.ts';
 import type { Builds } from './builds.ts';
 import type { DailyClips } from './paint-queue.ts';
 import { ArtRequestError, type ArtAsk, type ArtStudio } from './art-studio.ts';
@@ -342,17 +343,26 @@ export async function handleAdmin(
         suspended: a.suspended ? { ...a.suspended, by: store.accountById(a.suspended.by)?.name ?? 'someone' } : null,
       };
     });
-    return json(res, 200, { players, you: account.id, yours: store.charactersOf(account).map((a) => a.id), maxCharacters: maxCharacters(store.settings) }), true;
+    return json(res, 200, { players, you: account.id, yours: store.charactersOf(account).map((a) => a.id), maxCharacters: maxCharacters(store.settings), stashSlots: stashSlots(store.settings) }), true;
   }
 
-  // How many characters one account may have (docs/characters.md).
+  // How many characters one account may have (docs/characters.md), and how big its shared stash is (docs/stash.md).
   if (route === 'players/limit' && method === 'POST') {
     if (ownerOnly()) return true;
     const body = await ctx.readJson(req);
-    const max = Math.floor(Number(body?.maxCharacters));
-    if (!(max >= 1 && max <= MOST_CHARACTERS)) return json(res, 400, { error: 'invalid', message: `Choose a number from 1 to ${MOST_CHARACTERS}.` }), true;
-    store.updateSettings({ ...store.settings, characters: { max } });
-    return json(res, 200, { ok: true, maxCharacters: max }), true;
+    let next = store.settings;
+    if (body?.maxCharacters !== undefined) {
+      const max = Math.floor(Number(body.maxCharacters));
+      if (!(max >= 1 && max <= MOST_CHARACTERS)) return json(res, 400, { error: 'invalid', message: `Choose a number of characters from 1 to ${MOST_CHARACTERS}.` }), true;
+      next = { ...next, characters: { max } };
+    }
+    if (body?.stashSlots !== undefined) {
+      const slots = Math.floor(Number(body.stashSlots));
+      if (!(slots >= 1 && slots <= MOST_STASH_SLOTS)) return json(res, 400, { error: 'invalid', message: `Choose a stash size from 1 to ${MOST_STASH_SLOTS} slots.` }), true;
+      next = { ...next, stash: { slots } };
+    }
+    store.updateSettings(next);
+    return json(res, 200, { ok: true, maxCharacters: maxCharacters(next), stashSlots: stashSlots(next) }), true;
   }
 
   const suspend = route.match(/^players\/([\w-]+)\/suspend$/);

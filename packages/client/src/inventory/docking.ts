@@ -5,7 +5,7 @@
 // code needs no hooks; the bag closes again if docking opened it.
 
 /** The windows that dock beside the bag. */
-export const DOCKING = ['loot', 'shop', 'trade'] as const;
+export const DOCKING = ['loot', 'shop', 'trade', 'stash'] as const;
 
 /** Narrower than this, two windows don't fit side by side: nothing docks. */
 export const DOCK_MIN_WIDTH = 900;

@@ -58,7 +58,7 @@ export interface RpgActions {
   /** Moves, splits or sorts the bag (the server decides). */
   bag?(m: BagMessage): void;
   /** Sells one to the open shop or offers one in the open trade (Shift-click in the bag); false when neither takes it. */
-  fromBag?(item: string): boolean;
+  fromBag?(item: string, index?: number): boolean;
   /** The URL of the player's standing picture, for the bag's paper doll. */
   figure?(race?: RaceId): string;
 }
@@ -97,7 +97,7 @@ export class RpgUi {
       unequip: (slot) => actions.unequip(slot),
       bag: (m) => actions.bag?.(m),
       typing: () => actions.typing(),
-      toOther: (item) => actions.fromBag?.(item) ?? false,
+      toOther: (item, index) => actions.fromBag?.(item, index) ?? false,
     });
     new Docking({ bagOpen: () => !$('inventory').hidden, setBag: (open) => this.toggle('inventory', open) });
     this.card = new ItemCard(() => this.character, (id) => this.bag.historyWords(id));

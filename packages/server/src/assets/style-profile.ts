@@ -70,7 +70,7 @@ export const FLAT_ISOMETRIC: StyleProfile = {
       `Background: one flat solid pure magenta (${MAGENTA.hex}) filling everything behind the subject,`,
       'with no floor, scenery, gradient, glow, vignette or shadow on it. No magenta anywhere in the subject.',
     ].join('\n'),
-    negatives: ['background scenery', 'floor', 'ground shadow', 'cast shadow', 'gradient background'],
+    negatives: ['background scenery', 'floor', 'floor tile or deck under it', 'base plate', 'platform', 'ground shadow', 'cast shadow', 'gradient background'],
   },
   // Ground is painted as square textures; the game turns the tiled plane into diamonds.
   tile: {

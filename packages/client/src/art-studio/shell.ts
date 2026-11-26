@@ -63,7 +63,10 @@ export class StudioShell {
     });
     wireDocks(this.frame);
     this.drawTop();
-    this.main.addEventListener('click', (e) => artClick(e.target as HTMLElement));
+    this.main.addEventListener('click', (e) => {
+      artClick(e.target as HTMLElement);
+      this.pickCard(e.target as HTMLElement);
+    });
     this.main.addEventListener('submit', (e) => {
       e.preventDefault();
       artSubmit(e.target as HTMLFormElement);
@@ -166,6 +169,32 @@ export class StudioShell {
     if (this.frame.dataset.pane === 'assets') showPane(this.frame, 'inspector');
   }
 
+  /**
+   * Clicking a picture's card on a page (Paint, Animate, Sound) selects it,
+   * so the Inspector shows it; its buttons, links and fields keep their own
+   * clicks. The address keeps it, as the browser's own picks do.
+   */
+  private pickCard(target: HTMLElement): void {
+    if (target.closest('button, a, input, textarea, select, summary, label, details.hands, canvas, dialog')) return;
+    const card = target.closest<HTMLElement>('[data-asset-card], .walker[data-walker]');
+    const id = card?.dataset.assetCard ?? card?.dataset.walker;
+    if (!card || !id || id === this.selected) return;
+    this.selected = id;
+    this.version = undefined;
+    const [path] = location.hash.split('?');
+    history.replaceState(null, '', `${path || '#'}?${card.dataset.assetCard ? 'asset' : 'walker'}=${encodeURIComponent(id)}`);
+    this.drawInspector();
+    if (this.frame.dataset.pane === 'page' && matchMedia('(max-width: 960px)').matches) showPane(this.frame, 'inspector');
+  }
+
+  /** Marks the selected asset's card on the page. */
+  private markCard(): void {
+    for (const el of this.main.querySelectorAll('[data-picked]')) el.removeAttribute('data-picked');
+    if (!this.selected) return;
+    const id = CSS.escape(this.selected);
+    this.main.querySelector(`[data-asset-card="${id}"], .walker[data-walker="${id}"]`)?.setAttribute('data-picked', '');
+  }
+
   private deselect(): void {
     this.selected = undefined;
     const [path, query] = location.hash.split('?');
@@ -213,6 +242,7 @@ export class StudioShell {
   private drawInspector(): void {
     const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
     this.browser.select(a?.id);
+    this.markCard();
     const item = a && artState.data?.items.find((i) => i.id === a.id);
     const fit = a && this.draft ? `<section class="fit-panel">${this.fitHtml(a, this.draft)}</section>` : '';
     $('dock-right').innerHTML = inspectorHtml(a) + fit + createDockHtml(a, artState.data ?? undefined) + versionsHtml(item, this.version);

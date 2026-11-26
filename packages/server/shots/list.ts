@@ -355,6 +355,17 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine row is marked in the list', 'the Inspector shows its picture and a property table with a 2 × 1 footprint'],
   },
   {
+    name: 'art-studio-canvas',
+    about: 'The Studio canvas: the Sanctum shrine standing on its 2 by 1 tiles at game size, a player beside it, lit at dusk.',
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas',
+    open: async (page) => {
+      await page.click('.canvas-bar [data-hour="19"]');
+      await page.waitForSelector('.studio-canvas[data-lit="19"]');
+    },
+    mustSee: ['the shrine stands on two outlined tile diamonds, on painted Sanctum meadow', 'a player figure stands beside it at game size', 'the Place workspace and its Canvas tab are marked', 'the Inspector shows the shrine'],
+  },
+  {
     name: 'art-studio-phone',
     about: 'The AI Art Studio on a phone: one pane at a time, chosen with tabs.',
     page: '/art-studio.html',

@@ -4,7 +4,8 @@
 
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
-import { placeHash } from './workspaces.ts';
+import { CANVAS_GROUPS } from './canvas.ts';
+import { canvasHash, placeHash } from './workspaces.ts';
 
 const GROUP_WORDS: Record<string, string> = {
   characters: 'Character or person', monsters: 'Monster', items: 'Item', scenery: 'Scenery', pieces: 'Set piece or furniture',
@@ -24,7 +25,9 @@ export function inspectorHtml(a: StudioAsset | undefined): string {
     ['State', STATUS_WORDS[a.status]],
   ];
   const picture = a.thumb ? `<img class="inspector-picture" src="${escapeHtml(a.thumb)}" alt="${escapeHtml(a.name)}" />` : '';
-  const open = a.place.page || a.group === 'sounds' ? `<a class="button" href="${escapeHtml(placeHash(a.place))}">Show it on its page</a>` : '';
+  const page = a.place.page || a.group === 'sounds' ? `<a class="button" href="${escapeHtml(placeHash(a.place))}">Show it on its page</a>` : '';
+  const canvas = CANVAS_GROUPS.includes(a.group) ? `<a class="button" href="${escapeHtml(canvasHash(a.id))}">Stand it on its tiles</a>` : '';
+  const open = `<p class="inspector-links">${canvas} ${page}</p>`;
   return `
     <h2 class="dock-title">Inspector</h2>
     ${picture}

@@ -1,5 +1,6 @@
 import { BUILDING_STYLES, furnitureArt } from './buildings.ts';
 import { SEA_CAVE_PIECES } from './sea-cave-kit.ts';
+import { rampArtFootprint } from './floors/ramps.ts';
 import { WORLD_REGIONS, generateRegion } from './world.ts';
 
 // The tiles a picture stands on. A thing painted for the isometric camera is
@@ -21,7 +22,7 @@ let laid: Map<string, Footprint> | undefined;
  */
 export function artFootprint(id: string): Footprint | undefined {
   laid ??= layFootprints();
-  return laid.get(id) ?? furnitureFootprint(id);
+  return laid.get(id) ?? furnitureFootprint(id) ?? rampArtFootprint(id);
 }
 
 function layFootprints(): Map<string, Footprint> {

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BIOMES, stairHeading, type BiomeId, type Heading, type Stairway } from '@co-mmo/shared';
-import { stairTexture, type TextureRegistry } from '../src/stair-art.ts';
+import { rampTexture, stairTexture, type TextureRegistry } from '../src/stair-art.ts';
 
 const ART_DIR = resolve(__dirname, '../public/art');
 const MANIFEST = require('../public/art/manifest.json');
@@ -229,5 +229,31 @@ describe('stairs standardization rules', () => {
         }
       }
     }
+  });
+});
+
+describe('ramp pictures', () => {
+  const ramp: Stairway = {
+    kind: 'ramp', x: 10, y: 10, width: 1, height: 3, lower: 0, upper: 1, climbs: 'north',
+    bottom: { x: 10.5, y: 13.5 }, top: { x: 10.5, y: 9.5 }, ramp: { foot: { x: 10, y: 12 }, head: { x: 10, y: 10 } },
+    art: { up: 'ramp-wood-3-away' },
+  };
+
+  it('show only labels until one is painted', () => {
+    expect(rampTexture(fakeScene([]), 'whispering-woods', ramp)).toBeUndefined();
+    // Never a stairs picture at its ends.
+    expect(stairTexture(fakeScene(['stairs-up', 'ramp-wood-3-away']), 'whispering-woods', ramp, true)).toBeUndefined();
+  });
+
+  it("take the land's own first, then the ramp's look", () => {
+    expect(rampTexture(fakeScene(['ramp-wood-3-away']), 'whispering-woods', ramp)).toEqual({ key: 'ramp-wood-3-away', mirrored: false });
+    expect(rampTexture(fakeScene(['ramp-wood-3-away', 'ramp-whispering-woods-wood-3-away']), 'whispering-woods', ramp)).toEqual({ key: 'ramp-whispering-woods-wood-3-away', mirrored: false });
+  });
+
+  it('mirror the same pictures for ramps climbing west or east', () => {
+    const west: Stairway = { ...ramp, width: 3, height: 1, climbs: 'west', art: undefined };
+    expect(rampTexture(fakeScene(['ramp-stone-3-away']), undefined, west)).toEqual({ key: 'ramp-stone-3-away', mirrored: true });
+    const east: Stairway = { ...west, climbs: 'east' };
+    expect(rampTexture(fakeScene(['ramp-stone-3-toward']), undefined, east)).toEqual({ key: 'ramp-stone-3-toward', mirrored: true });
   });
 });

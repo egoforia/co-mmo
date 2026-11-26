@@ -282,6 +282,6 @@ export function propTexture(scene: Phaser.Scene, biome: string, kind: 'tree' | '
   return undefined;
 }
 
-export { stairTexture, type TextureRegistry } from './stair-art.ts';
+export { rampTexture, stairTexture, type TextureRegistry } from './stair-art.ts';
 
 

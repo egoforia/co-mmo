@@ -13,6 +13,7 @@ import type { ImageRequest } from '../src/assets/provider.ts';
 import { TILE_FRAMING, buildPrompt, footprintWords } from '../src/assets/style.ts';
 import { STYLE } from '../src/assets/style-profile.ts';
 import { paintKitAsset } from '../src/assets/wild-kit.ts';
+import { RAMP_KIT } from '../src/assets/ramp-kit.ts';
 
 describe("the Smugglers' Sea Cave Art Kit pictures", () => {
   afterEach(() => switchMod(SEA_CAVE_MOD, true));
@@ -36,10 +37,10 @@ describe("the Smugglers' Sea Cave Art Kit pictures", () => {
   });
 
   it('lists the kit with the scenery only while the wish is on', () => {
-    expect(kitPieces()).toHaveLength(BIOME_KIT.length + homeLandKit().length + SEA_CAVE_KIT.length + GALLEON_KIT.length);
+    expect(kitPieces()).toHaveLength(BIOME_KIT.length + homeLandKit().length + SEA_CAVE_KIT.length + GALLEON_KIT.length + RAMP_KIT.length);
     expect(pictureName('sea-cave-crates')).toBe("Smugglers' crates");
     switchMod(SEA_CAVE_MOD, false);
-    expect(kitPieces()).toEqual([...BIOME_KIT, ...homeLandKit(), ...GALLEON_KIT]);
+    expect(kitPieces()).toEqual([...BIOME_KIT, ...homeLandKit(), ...GALLEON_KIT, ...RAMP_KIT]);
     expect(pictureName('sea-cave-crates')).toBe('sea-cave-crates');
   });
 

@@ -236,7 +236,12 @@ prediction alike). A ramp (`floors/ramps.ts`, `addRamp`) is the exception:
 1 wide and 2 or 3 long, its tiles stand on the lower floor only, with an open
 foot to step on and a solid body; from the floor above you step onto its head
 (over the top tile, no floor needed) and land in front of its foot. Walkers
-head for `stairsEntry`, the end on their floor. Players, creatures, NPCs and bodies carry their floor, and
+head for `stairsEntry`, the end on their floor. Its picture (12 in the Art
+tab, `server/src/assets/ramp-kit.ts`: stone, wood or earth, 2 or 3 long,
+rising away or toward the camera) stands on its tiles like a set piece,
+mirrored for ramps climbing west or east; a land's own
+`ramp-<biome>-<look>-<length>-<way>` wins (`rampTexture` in
+`client/src/stair-art.ts`). Until one is painted a ramp shows its labels. Players, creatures, NPCs and bodies carry their floor, and
 snapshots, fights, talk, loot, trades and chat only reach the same floor.
 Walkers take stairs only on purpose (`goTo`, `stairsToward`): a creature
 follows its prey up stairs or a ramp within its leash, never up a ladder; people who

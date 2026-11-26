@@ -2,6 +2,7 @@ import { SEA_CAVE_MOD, SEA_CAVE_PIECES, modOn } from '@co-mmo/shared';
 import { BIOME_KIT, type KitAsset } from './kit.ts';
 import { homeLandKit } from './home-land-art.ts';
 import { galleonPieces } from './galleon-kit.ts';
+import { RAMP_KIT } from './ramp-kit.ts';
 
 // The Smugglers' Sea Cave Art Kit (wish #75): the Sunlit Shore's sea cave
 // painted again as pieces any land can reuse: cavern tiles that repeat, and
@@ -92,7 +93,7 @@ export function seaCaveBox(id: string): { width: number; height: number } | unde
   return piece.footprint.width > 1 ? { width: 192, height: 160 } : { width: 128, height: 192 };
 }
 
-/** Every scenery piece the Art tab lists: the biome kit, the home lands' kits, and the sea cave's and the galleon's while their wishes are on. */
+/** Every scenery piece the Art tab lists: the biome kit, the home lands' kits, the ramps, and the sea cave's and the galleon's while their wishes are on. */
 export function kitPieces(): KitAsset[] {
-  return [...BIOME_KIT, ...homeLandKit(), ...(modOn(SEA_CAVE_MOD) ? SEA_CAVE_KIT : []), ...galleonPieces()];
+  return [...BIOME_KIT, ...homeLandKit(), ...(modOn(SEA_CAVE_MOD) ? SEA_CAVE_KIT : []), ...galleonPieces(), ...RAMP_KIT];
 }

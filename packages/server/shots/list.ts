@@ -440,6 +440,30 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine\'s left tile is green and its right tile red on the canvas', 'the Inspector\'s Hitbox section says "Blocks 1 of 2 tiles" and "Done choosing"', 'Save the fit is enabled, "not saved yet"'],
   },
   {
+    name: 'art-studio-light',
+    about: "The Light tool: the shrine's glow turned blue, 150 % bright, reaching 3.5 tiles and moved 40 px up, seen at night, not saved yet.",
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas[data-lit="none"]',
+    open: async (page) => {
+      await page.waitForSelector('.light-panel input[name=light-color]');
+      const type = async (name: string, value: string) => {
+        await page.$eval(`.light-panel input[name=${name}]`, (el, v) => {
+          (el as HTMLInputElement).value = v;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }, value);
+      };
+      await type('light-color', '#66aaff');
+      await type('light-strength', '150');
+      await type('light-radius', '3.5');
+      await type('light-y', '-40');
+      await page.click('.canvas-light [data-hour="23"]');
+      await page.waitForSelector('.studio-canvas[data-lit="23"]');
+      await page.waitForFunction(() => document.querySelector('.light-panel .light-words')?.textContent?.includes('#66aaff'));
+      await page.$eval('.light-panel', (el) => el.scrollIntoView({ block: 'start' }));
+    },
+    mustSee: ['a blue marker above the shrine with a soft blue pool of light around it on the night-lit ground', 'the Inspector\'s Light section with Colour, Brightness 150 %, Reach 3.5, x 0, y -40 and Flickers unticked', 'its words say "40 px up, #66aaff, at 150 %, reaching 3.5 tiles"', 'Save the fit is enabled, "not saved yet"'],
+  },
+  {
     name: 'art-studio-frames',
     about: 'The frame strip: Bramble Ursine\'s walk, one track per way, stopped on frame 4 of front left, with Create with AI in the Inspector.',
     page: '/art-studio.html#art/canvas?asset=bramble-ursine',

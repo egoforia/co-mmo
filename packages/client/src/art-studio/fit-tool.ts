@@ -3,7 +3,8 @@
 // numbers in the Inspector, like Godot's Texture Offset. Nothing reaches the
 // game until it is saved; Ctrl Z steps back through the changes made here.
 
-import { FIT_OFFSET_MOST, FIT_SCALE, fitWords, type AssetFit } from '@co-mmo/shared';
+import { FIT_OFFSET_MOST, FIT_SCALE, fitWords, type AssetFit, type FitLight } from '@co-mmo/shared';
+import { clampLight } from './light-tool.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
 
@@ -18,18 +19,22 @@ export interface FitState {
   scale: number;
   /** The tiles it blocks (hitbox-tool.ts), from its footprint's top-left; every tile when left out. */
   blocks?: [number, number][];
+  /** Its own light (light-tool.ts); its kind's when left out. */
+  light?: FitLight;
 }
 
 /** A fit kept within its limits: whole pixels, and a trim between FIT_SCALE's. */
 export function clampFit(f: FitState): FitState {
   const px = (n: number) => Math.max(-FIT_OFFSET_MOST, Math.min(FIT_OFFSET_MOST, Math.round(n)));
   const scale = Math.max(FIT_SCALE.least, Math.min(FIT_SCALE.most, Math.round(f.scale * 100) / 100));
-  return { offset: [px(f.offset[0]), px(f.offset[1])], scale, ...(f.blocks ? { blocks: f.blocks } : {}) };
+  const light = f.light && clampLight(f.light);
+  return { offset: [px(f.offset[0]), px(f.offset[1])], scale, ...(f.blocks ? { blocks: f.blocks } : {}), ...(light ? { light } : {}) };
 }
 
-/** True when two fits stand the picture alike and block the same tiles. */
+/** True when two fits stand the picture alike, block the same tiles and light alike. */
 export function sameFit(a: FitState, b: FitState): boolean {
-  return a.offset[0] === b.offset[0] && a.offset[1] === b.offset[1] && a.scale === b.scale && JSON.stringify(a.blocks ?? null) === JSON.stringify(b.blocks ?? null);
+  const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+  return a.offset[0] === b.offset[0] && a.offset[1] === b.offset[1] && a.scale === b.scale && same(a.blocks, b.blocks) && same(a.light, b.light);
 }
 
 /** A fit being changed in the Studio, with the steps back to where it started. */
@@ -38,8 +43,13 @@ export class FitDraft {
   private readonly saved: FitState;
   private readonly back: FitState[] = [];
 
-  constructor(fit: Pick<AssetFit, 'offset' | 'scale' | 'blocks'> | undefined) {
-    this.saved = { offset: [fit?.offset[0] ?? 0, fit?.offset[1] ?? 0], scale: fit?.scale ?? 1, ...(fit?.blocks?.length ? { blocks: fit.blocks } : {}) };
+  constructor(fit: Pick<AssetFit, 'offset' | 'scale' | 'blocks' | 'light'> | undefined) {
+    this.saved = {
+      offset: [fit?.offset[0] ?? 0, fit?.offset[1] ?? 0],
+      scale: fit?.scale ?? 1,
+      ...(fit?.blocks?.length ? { blocks: fit.blocks } : {}),
+      ...(fit?.light ? { light: fit.light } : {}),
+    };
     this.now = this.saved;
   }
 
@@ -49,8 +59,9 @@ export class FitDraft {
   }
 
   /** As an AssetFit for drawing (no scale when untrimmed). */
-  get fit(): Pick<AssetFit, 'offset' | 'scale' | 'blocks'> {
-    return { offset: this.now.offset, ...(this.now.scale !== 1 ? { scale: this.now.scale } : {}), ...(this.now.blocks ? { blocks: this.now.blocks } : {}) };
+  get fit(): Pick<AssetFit, 'offset' | 'scale' | 'blocks' | 'light'> {
+    const { offset, scale, blocks, light } = this.now;
+    return { offset, ...(scale !== 1 ? { scale } : {}), ...(blocks ? { blocks } : {}), ...(light ? { light } : {}) };
   }
 
   /** True when it differs from what the game shows. */

@@ -42,6 +42,13 @@ describe('the Art Studio asset browser list', () => {
     // Back to the painter's place keeps the tiles it blocks.
     expect((await api(base, '/api/admin/art/fit', owner.token, 'DELETE', { asset: 'sanctum-shrine' })).status).toBe(200);
     expect(fitOf('sanctum-shrine')).toEqual({ asset: 'sanctum-shrine', offset: [0, 0], blocks: [[1, 0]] });
+    // Its light is saved with the fit, and kept when the picture goes back too.
+    const light = { at: [3, -12], color: '#88ccff', strength: 1.5, radius: 3.5, flicker: false };
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [0, 0], light })).status).toBe(200);
+    expect(fitOf('sanctum-shrine')?.light).toEqual(light);
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [0, 0], light: { strength: 9 } })).status).toBe(400);
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'DELETE', { asset: 'sanctum-shrine' })).status).toBe(200);
+    expect(fitOf('sanctum-shrine')?.light).toEqual(light);
     expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [0, 0] })).status).toBe(200);
     expect(fitOf('sanctum-shrine')).toBeUndefined();
   }, 30_000);

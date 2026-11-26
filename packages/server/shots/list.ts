@@ -51,6 +51,38 @@ export interface Shot {
   mustSee: string[];
 }
 
+/**
+ * Fills the API log with 60 made-up requests: the shot server sends nothing
+ * outside, so without them the side panel would have nothing to scroll.
+ */
+async function fakeApiLog(page: Page): Promise<void> {
+  const at = Date.UTC(2026, 10, 26, 12, 0, 0);
+  const calls = Array.from({ length: 60 }, (_, i) => ({
+    id: `call-${i}`, at: at - i * 90_000, ms: 400 + ((i * 337) % 9000), method: 'POST',
+    url: 'https://generativelanguage.googleapis.com/v1beta/models/x:generateContent', host: 'generativelanguage.googleapis.com',
+    service: 'Gemini', kind: i % 3 ? 'chat' : 'image', model: i % 3 ? 'gemini-3.8-flash' : 'gemini-2.5-flash-image',
+    purpose: i % 3 ? 'God chat' : 'Paint sanctum-shrine', status: i % 11 === 4 ? 429 : 200,
+    error: i % 11 === 4 ? 'Too many requests' : undefined, requestBytes: 2048 + i * 40, responseBytes: 4096 + i * 900,
+  }));
+  await page.route('**/api/admin/api-log?*', (route) => route.fulfill({ json: {
+    calls, matched: calls.length,
+    totals: { errors: calls.filter((c) => c.status !== 200).length, ms: calls.reduce((n, c) => n + c.ms, 0), sentBytes: 300_000, receivedBytes: 2_400_000, inputTokens: 52_000, outputTokens: 9_000 },
+    choices: { services: ['Gemini'], kinds: ['chat', 'image'], models: ['gemini-2.5-flash-image', 'gemini-3.8-flash'], purposes: ['God chat', 'Paint sanctum-shrine'], methods: ['POST'], statuses: [200, 429] },
+    keeping: { days: 14, maxBytes: 200 * 1024 * 1024, usedBytes: 3 * 1024 * 1024, onDisk: true },
+  } }));
+}
+
+/** Opens the API log side panel and scrolls it half way, to show it scrolls on its own. */
+const openApiLog = async (page: Page) => {
+  await fakeApiLog(page);
+  await page.click('#toggle-api-log');
+  await page.waitForSelector('#api-log-side .log.calls tbody tr');
+  await page.evaluate(() => {
+    const box = document.querySelector<HTMLElement>('#api-log-side .api-log-scroll')!;
+    box.scrollTop = (box.scrollHeight - box.clientHeight) / 2;
+  });
+};
+
 /** The middle of a building's floor, for shots inside it (moved to the nearest free tile if furniture stands there). */
 const inside = (style: string, floor = 0) => (map: RegionMap): Spot => {
   const b = map.buildings.find((x) => x.style === style);
@@ -573,6 +605,22 @@ export const SHOTS: Shot[] = [
       await page.waitForSelector('[data-centre-measure]');
     },
     mustSee: ['the Place workspace with Canvas, Centre a group and Buildings tabs, Centre a group marked', 'a button to measure the pieces shown, with their number'],
+  },
+  {
+    name: 'art-studio-api-log',
+    about: 'The API log opened from the AI Art Studio: a side panel on the right, scrolled half way through 60 requests.',
+    page: '/art-studio.html',
+    ready: '.asset-list button',
+    open: openApiLog,
+    mustSee: ['the API log panel fills the right side from top to bottom, with a Close button', 'the Studio still shows beside it, squeezed to the left, not covered', 'the request table is scrolled to its middle rows, its column names stuck at the top', 'nothing runs off the right edge'],
+  },
+  {
+    name: 'gods-view-api-log',
+    about: "The API log opened from God's View's header: the same side panel beside the World tab.",
+    page: '/gods-view.html',
+    ready: 'nav [data-tab]',
+    open: openApiLog,
+    mustSee: ["God's View's tabs on the left, with no API Log tab", 'the API log panel on the right, scrolled to its middle rows', 'the API log button in the header marked as open'],
   },
   {
     name: 'art-studio-phone',

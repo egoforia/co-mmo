@@ -5,17 +5,14 @@
 // the painting strip along the bottom.
 
 import { loadToken, rejoinWhenBack } from './api.ts';
-import { apiLogPage, wireApiLog } from './api-log-ui.ts';
+import { mountApiLogPanel } from './api-log-panel.ts';
 import { StudioShell } from './art-studio/shell.ts';
 import { GameDown, api, toast } from './gods-view/core.ts';
 import { escapeHtml } from './ui.ts';
 
 const main = document.getElementById('main')!;
-const apiLogDrawer = document.getElementById('studio-api-log-drawer')!;
-const apiLogBody = document.getElementById('studio-api-log-body')!;
 
 let waiting = false;
-let apiLogOpen = false;
 
 function waitForGame(): void {
   if (waiting) return;
@@ -42,30 +39,10 @@ async function boot(): Promise<void> {
     return;
   }
 
-  wireApiLog(
-    apiLogBody,
-    api,
-    () => apiLogOpen,
-    (err) => (err instanceof GameDown ? waitForGame() : toast(err.message)),
-  );
-  document.getElementById('toggle-api-log')?.addEventListener('click', () => void toggleApiLog());
-  document.getElementById('close-api-log')?.addEventListener('click', () => void toggleApiLog(false));
+  // The API log opens as a side panel on the right, beside the Studio.
+  mountApiLogPanel(api, (err) => (err instanceof GameDown ? waitForGame() : toast(err.message)), document.getElementById('toggle-api-log'));
 
   await new StudioShell(waitForGame).start();
-}
-
-async function toggleApiLog(force?: boolean): Promise<void> {
-  apiLogOpen = force !== undefined ? force : !apiLogOpen;
-  apiLogDrawer.hidden = !apiLogOpen;
-  if (apiLogOpen) {
-    apiLogBody.innerHTML = '<p class="note">Loading API call log…</p>';
-    try {
-      apiLogBody.innerHTML = await apiLogPage(api);
-      apiLogDrawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (err) {
-      apiLogBody.innerHTML = `<p class="note bad">${escapeHtml((err as Error).message)}</p>`;
-    }
-  }
 }
 
 void boot();

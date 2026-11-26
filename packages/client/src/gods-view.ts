@@ -2,11 +2,12 @@
 // Plain DOM over the /api/admin endpoints; the session token is the one the
 // game saved in this browser. This file is the shell: sign-in, the tab bar,
 // drawing the open tab and passing clicks to the tabs. Each tab lives in
-// gods-view/ (or art-ui.ts, loot-tab.ts and api-log-ui.ts for the bigger ones).
+// gods-view/ (or art-ui.ts and loot-tab.ts for the bigger ones). The API log
+// is a side panel (api-log-panel.ts), opened from the header.
 
 import { loadToken, rejoinWhenBack } from './api.ts';
 import { escapeHtml } from './ui.ts';
-import { apiLogPage, wireApiLog } from './api-log-ui.ts';
+import { type ApiLogPanel, mountApiLogPanel } from './api-log-panel.ts';
 import { type ArtContext } from './art-ui.ts';
 import { lootAfter, lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { GameDown, api, rerender, toast, view, type Tab } from './gods-view/core.ts';
@@ -43,9 +44,11 @@ const TABS: Tab[] = [
   serversTab,
   combatTab,
   combatLogTab,
-  { id: 'api-log', label: 'API Log', ownerOnly: true, page: () => apiLogPage(api) },
   updatesTab,
 ];
+
+/** The API log side panel, for the Owner only. */
+let apiLog: ApiLogPanel | undefined;
 
 /** Says the game is starting, and opens God's View again once it answers. */
 let waiting = false;
@@ -79,7 +82,11 @@ async function boot(): Promise<void> {
     const id = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]')?.dataset.tab;
     if (id) show(id);
   });
-  wireApiLog(main, api, () => view.tab === 'api-log', (err) => (err instanceof GameDown ? waitForGame() : toast(err.message)));
+  if (view.owner) {
+    const button = document.getElementById('toggle-api-log');
+    button?.removeAttribute('hidden');
+    apiLog = mountApiLogPanel(api, (err) => (err instanceof GameDown ? waitForGame() : toast(err.message)), button);
+  }
   view.render = () => void render();
   show(location.hash.slice(1) || 'world');
   addEventListener('hashchange', () => show(location.hash.slice(1) || 'world'));
@@ -92,6 +99,11 @@ async function boot(): Promise<void> {
 /** Opens a tab; legacy #art hashes redirect to the standalone AI Art Studio. */
 function show(id: string): void {
   const root = id.split('/')[0]!;
+  // The API log was a tab; old #api-log links open its side panel over the World tab.
+  if (root === 'api-log') {
+    if (apiLog && !apiLog.isOpen()) void apiLog.open();
+    return show('world');
+  }
   if (root === 'art') {
     const rest = id.slice(4);
     location.replace(`/art-studio.html${rest ? `#${rest}` : ''}`);

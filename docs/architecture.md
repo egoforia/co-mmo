@@ -539,8 +539,10 @@ one `*-ui.ts` per panel. God's View is
 `pages.ts` sub-tab renderers, `walkers.ts` character/ways/hand-point editors,
 `dialogs.ts` review and history modals, `buildings.ts` the Buildings page:
 each building's kit views and furniture hit boxes, `hand-status.ts` the
-"Finding hands" line, from `art/hands/status`), `loot-tab.ts` and
-`api-log-ui.ts`.
+"Finding hands" line, from `art/hands/status`) and `loot-tab.ts`. The API
+log is a right side panel in God's View and the AI Art Studio:
+`api-log-panel.ts` (the panel, its width grip and scroll) around
+`api-log-ui.ts` (filters, totals, request rows).
 
 ## Changing something big
 

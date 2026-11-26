@@ -1,5 +1,6 @@
-// God's View's API Log tab (Owner): every request the server sent to an
-// outside service, with what was sent and what came back, keys masked.
+// The API log (Owner): every request the server sent to an outside service,
+// with what was sent and what came back, keys masked. It is shown in a right
+// side panel (api-log-panel.ts) in God's View and the AI Art Studio.
 
 import { escapeHtml } from './ui.ts';
 
@@ -43,7 +44,7 @@ type Api = <T>(path: string) => Promise<T>;
 const PAGE = 100;
 const FIELDS = ['service', 'kind', 'model', 'purpose', 'method', 'status', 'text', 'slower'] as const;
 
-/** What the Owner filters by; kept while God's View is open. */
+/** What the Owner filters by; kept while the page is open. */
 const filters: Record<(typeof FIELDS)[number] | 'from' | 'to', string> = {
   from: '', to: '', service: '', kind: '', model: '', purpose: '', method: '', status: '', text: '', slower: '',
 };
@@ -75,7 +76,7 @@ function query(): string {
   return q.toString();
 }
 
-/** The tab's whole panel. */
+/** The whole log: filters, totals and one page of requests. */
 export async function apiLogPage(api: Api): Promise<string> {
   const page = await api<Page>(`api-log?${query()}`);
   const select = (name: string, label: string, values: (string | number)[], words: (v: string) => string = (v) => v, first = 'All') => {
@@ -179,15 +180,16 @@ function detailHtml(c: Call): string {
 }
 
 /**
- * Wires the tab's filters, pages and rows inside `root`; `active` says
- * whether the API Log is the tab showing.
+ * Wires the log's filters, pages and rows inside `root`; `active` says
+ * whether the log is showing. A change redraws the log where it stands.
  */
 export function wireApiLog(root: HTMLElement, api: Api, active: () => boolean, onError: (err: Error) => void): void {
   const redraw = async () => {
-    const panel = document.getElementById('panel');
-    if (!panel || !active()) return;
+    // Redraw the log inside `root` only, never the page around it.
+    const log = root.querySelector('#api-log');
+    if (!log || !active()) return;
     try {
-      panel.innerHTML = await apiLogPage(api);
+      log.outerHTML = await apiLogPage(api);
     } catch (err) {
       onError(err as Error);
     }

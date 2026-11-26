@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { ITEMS, PLAYER_COLORS, gainCreatorXp, makesCopies, pieceKey, type AcquiredHow, type OwnerEntry, hashString, upgradeCharacter, type BuildTrack, type Character, type ContentEntry, type BiomeId, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
+import { ITEMS, PLAYER_COLORS, gainCreatorXp, makesCopies, pieceKey, type AcquiredHow, type OwnerEntry, hashString, upgradeCharacter, type BuildTrack, type Character, type InventorySlot, type ContentEntry, type BiomeId, type Role, type WishDraft, type WorldEdit } from '@co-mmo/shared';
 import type { ChatTurn } from './ai/chat.ts';
 import type { SavedBody } from './region/state.ts';
 import { defaultSettings, type Settings } from './settings.ts';
@@ -9,7 +9,7 @@ import type { Sql, SqlQuery } from './db.ts';
 import { PostgresTables, migrate } from './store-postgres.ts';
 import { PostgresLogs, keptSpendFrom, type LogOp } from './store-logs.ts';
 import { MemoryKept, PostgresKept, type Kept } from './kept.ts';
-import { PostgresCharacters, holdingsOf, type Holding } from './store-characters.ts';
+import { PostgresCharacters, holdingsOf, stashHoldings, type Holding } from './store-characters.ts';
 import { charactersOf, mainOf, playingOf, removeCharacter } from './store-roster.ts';
 
 /** Days a Workshop draft is kept after its last change. */
@@ -49,6 +49,8 @@ export interface Account {
   mainId?: string;
   /** On the record that signs in: the character chosen last, played next time. */
   playing?: string;
+  /** On the record that signs in: the shared stash every character on the account opens (stash.ts). */
+  stash?: InventorySlot[];
 }
 
 export type LoginProvider = 'google' | 'github';
@@ -324,6 +326,19 @@ export class Store {
     if (this.data.drafts?.[id]) this.saveDraft(id, null);
     this.persist();
     return next;
+  }
+
+  /** The shared stash of the account a character is on (a copy: change it with saveStash). */
+  stashOf(account: Account): InventorySlot[] {
+    return structuredClone(this.mainOf(account).stash ?? []);
+  }
+
+  /** Saves the shared stash of the account a character is on. */
+  saveStash(account: Account, stash: InventorySlot[]): void {
+    const root = this.mainOf(account);
+    if (stash.length) root.stash = structuredClone(stash);
+    else delete root.stash;
+    this.persist();
   }
 
   createInvite(createdBy: string | null, role: Role = 'player'): Invite {
@@ -664,7 +679,7 @@ export class Store {
   async holders(item: string): Promise<Holding[]> {
     await this.flush();
     if (this.backend) return this.backend.holders(item);
-    return this.data.accounts.flatMap((a) => (a.character ? holdingsOf(a.id, a.character) : [])).filter((h) => h.item === item);
+    return this.data.accounts.flatMap((a) => [...(a.character ? holdingsOf(a.id, a.character) : []), ...stashHoldings(a)]).filter((h) => h.item === item);
   }
 
   // --- Gear history (combat decisions, step 2) -------------------------------------------
@@ -873,8 +888,10 @@ class PostgresBackend implements StoreBackend {
     chars?.done();
   }
 
-  holders(item: string): Promise<Holding[]> {
-    return this.characters.holders(item);
+  async holders(item: string): Promise<Holding[]> {
+    // Stashes live in the accounts table's rows, found by their contents.
+    const { rows } = await this.sql.query<{ data: Account }>(`SELECT data FROM accounts WHERE data->'stash' @> $1::jsonb`, [JSON.stringify([{ item }])]);
+    return [...(await this.characters.holders(item)), ...rows.flatMap((r) => stashHoldings(r.data)).filter((h) => h.item === item)];
   }
 
   owners(pieces: string[]): Promise<Map<string, OwnerEntry[]>> {

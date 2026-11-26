@@ -11,7 +11,7 @@ import { WorldEditor } from './world-editor.ts';
 import { workshopDef } from './workshop-lands.ts';
 import { handleWorldEdits } from './world-edit-routes.ts';
 import type { Account, Store } from './store.ts';
-import { dailyClips } from './settings.ts';
+import { dailyClips, stashSlots } from './settings.ts';
 import { AiServices } from './ai/services.ts';
 import { Budget } from './budget.ts';
 import { OfflineGod } from './god.ts';
@@ -47,6 +47,7 @@ import { ApiLog, watchFetch } from './api-log.ts';
 import { bearer, json, readJson, serveStatic } from './http.ts';
 import { handleAccount } from './account-routes.ts';
 import { handleCharacters } from './character-routes.ts';
+import { Stashes } from './stash.ts';
 import { serveArtFile } from './art-files.ts';
 import { openGameSocket } from './game-socket.ts';
 import type { NetOptions } from './socket-net.ts';
@@ -435,7 +436,8 @@ export function createApp(options: AppOptions): App {
     await store.flush();
   }
 
-  const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, heartbeatMs: options.heartbeatMs, ...(options.net ? { net: options.net } : {}) });
+  const stashes = new Stashes({ store, world, slots: () => stashSlots(store.settings) });
+  const socket = openGameSocket({ server, store, world, wishes, workshop, reports, rules, builds, stashes, heartbeatMs: options.heartbeatMs, ...(options.net ? { net: options.net } : {}) });
 
   const tickTimer = setInterval(() => meter.tick(() => {
     rulesProfiler.startTick();

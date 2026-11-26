@@ -67,7 +67,8 @@ performance overlay the host running a player's region.
 
 **HTTP and the socket.** `http.ts` (JSON, files, bearer tokens),
 `account-routes.ts`, `character-routes.ts` and `store-roster.ts` (several
-characters on one account, `docs/characters.md`), `auth.ts`, `admin.ts` (God's View API; `art-buildings.ts` lists
+characters on one account, `docs/characters.md`), `stash.ts` (the account's
+shared stash, `docs/stash.md`), `auth.ts`, `admin.ts` (God's View API; `art-buildings.ts` lists
 every building for the Art tab's Buildings page), `art-files.ts`
 (table of painted-art URLs), `game-socket.ts` (the player WebSocket).
 

@@ -76,6 +76,6 @@
 
 /* Docked (inventory/docking.ts): the bag on the left of the middle, the loot, shop or trade window on the right. */
 body[data-dock] #inventory { right: auto; left: calc(50% - min(600px, 50vw - 24px) - 8px); width: min(600px, 50vw - 24px); }
-body[data-dock="loot"] #loot, body[data-dock="shop"] #shop, body[data-dock="trade"] #trade {
+body[data-dock="loot"] #loot, body[data-dock="shop"] #shop, body[data-dock="trade"] #trade, body[data-dock="stash"] #stash {
   right: auto; left: calc(50% + 8px); width: min(460px, 50vw - 24px); z-index: 2;
 }

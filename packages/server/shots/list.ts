@@ -5,7 +5,7 @@
 // docs/screenshots.md explains the process; `/shots` runs it.
 
 import type { Page } from 'playwright';
-import type { RegionMap, Weather } from '@co-mmo/shared';
+import { EDIT_KINDS, type RegionMap, type Weather, type WorldEditDraft } from '@co-mmo/shared';
 
 /** Where the camera stands: a tile on a floor. */
 export interface Spot {
@@ -37,6 +37,10 @@ export interface Shot {
   carry?: { item: string; qty: number }[];
   /** Skills the player knows, put on hotbar keys 1, 2 and on, for shots of the hotbar. */
   skills?: string[];
+  /** World edits laid live before the page opens (a stash chest beside the player), worked out from the land and the spot. */
+  edits?: (map: RegionMap, spot: Spot) => WorldEditDraft[];
+  /** What the account's shared stash holds (docs/stash.md). */
+  stash?: { item: string; qty: number }[];
   /** More characters on the player's account, by name, for shots of the character screen (docs/characters.md). */
   characters?: string[];
   /** Hide the HUD and windows, for shots of the world itself (buildings, floors). */
@@ -73,6 +77,16 @@ const nearMonster = (kind: string, dx = 2) => (map: RegionMap): Spot => {
   const c = map.creatures.find((m) => m.kind === kind);
   if (!c) throw new Error(`No ${kind} lives here.`);
   return { x: Math.floor(c.x) + dx, y: Math.floor(c.y), floor: c.floor };
+};
+
+/** A stash chest on the first open spot just beside the player, in reach. */
+const chestBeside = (map: RegionMap, spot: Spot): WorldEditDraft[] => {
+  const x = Math.floor(spot.x);
+  const y = Math.floor(spot.y);
+  const at = [[1, -1], [-2, -1], [1, 1], [-2, 1], [0, -2], [-1, 1]].map(([dx, dy]) => [x + dx!, y + dy!] as [number, number])
+    .find((a) => !EDIT_KINDS.stash.check(map, { kind: 'stash', at: a }, { creatures: {} }));
+  if (!at) throw new Error('There is no open ground for a stash chest beside the player.');
+  return [{ kind: 'stash', at }];
 };
 
 /** Every shot, in the order the contact sheet shows them. */
@@ -343,6 +357,19 @@ export const SHOTS: Shot[] = [
       await page.waitForSelector('#switch-character');
     },
     mustSee: ['the Account window with Your look, then Characters with a Switch character button, then Signing in', 'nothing in the window cut off or overlapping'],
+  },
+  {
+    name: 'sanctum-stash',
+    about: 'The shared stash opened by a stash chest in the Sanctum, docked beside the bag.',
+    region: 'sanctum',
+    edits: chestBeside,
+    stash: [{ item: 'gold', qty: 120 }, { item: 'tonic', qty: 4 }, { item: 'goat-horn', qty: 2 }],
+    carry: [{ item: 'tonic', qty: 2 }],
+    open: async (page) => {
+      await page.keyboard.press('e');
+      await page.waitForSelector('#stash:not([hidden])');
+    },
+    mustSee: ['the bag on the left and the Shared stash window on the right, side by side', 'the stash header says 3 of 40 slots', 'gold, tonics and goat horns in the stash with their counts', 'a line saying every character on the account opens this stash'],
   },
   {
     name: 'gods-view',

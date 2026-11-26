@@ -24,7 +24,7 @@ export const GROUPS: readonly ToolGroup[] = [
   { id: 'select', name: 'Select', key: 'v', tools: ['select', 'area'] },
   { id: 'ground', name: 'Ground', key: 'g', tools: ['paint', 'scenery', 'road'] },
   { id: 'build', name: 'Build', key: 'b', tools: ['kit', 'house', 'wall', 'storey', 'stairs'] },
-  { id: 'furnish', name: 'Furnish', key: 'f', tools: ['furniture', 'piece', 'light'] },
+  { id: 'furnish', name: 'Furnish', key: 'f', tools: ['furniture', 'piece', 'stash', 'light'] },
   { id: 'life', name: 'Life', key: 'l', tools: ['person', 'spawn', 'spot'] },
   { id: 'places', name: 'Places', key: 'p', tools: ['bookmark', 'land', 'safe'] },
 ];

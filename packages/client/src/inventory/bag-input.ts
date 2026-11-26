@@ -20,8 +20,8 @@ export interface BagInputActions {
   bag(m: BagMessage): void;
   /** True while typing in chat, so letters are not shortcuts. */
   typing(): boolean;
-  /** Moves one to the docked window: sells it to the shop or offers it in the trade; false when none takes it. */
-  toOther?(item: string): boolean;
+  /** Moves one to the docked window: sells it to the shop, offers it in the trade or puts the stack in the stash; false when none takes it. */
+  toOther?(item: string, index?: number): boolean;
 }
 
 /** Arrow keys as grid moves; the bag leaves WASD to walking, and S to splitting. */
@@ -51,8 +51,9 @@ export class BagInput {
     });
     // Shift-click sends a thing to the docked window instead of using it.
     root.addEventListener('click', (e) => {
-      const item = e.shiftKey ? (e.target as HTMLElement).closest<HTMLElement>('[data-item]')?.dataset.item : undefined;
-      if (item && this.actions.toOther?.(item)) {
+      const cell = e.shiftKey ? (e.target as HTMLElement).closest<HTMLElement>('[data-item]') : null;
+      const item = cell?.dataset.item;
+      if (item && this.actions.toOther?.(item, cell.dataset.index === undefined ? undefined : Number(cell.dataset.index))) {
         e.preventDefault();
         e.stopImmediatePropagation();
       }
@@ -146,7 +147,7 @@ export class BagInput {
     if (key === 't' && chosen.dataset.item) {
       e.preventDefault();
       e.stopPropagation();
-      this.actions.toOther?.(chosen.dataset.item);
+      this.actions.toOther?.(chosen.dataset.item, chosen.dataset.index === undefined ? undefined : Number(chosen.dataset.index));
     } else if (key === 'delete' && chosen.dataset.index !== undefined) {
       e.preventDefault();
       e.stopPropagation();

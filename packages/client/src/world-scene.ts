@@ -591,6 +591,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** The creature or player we chose, sent with attacks and abilities; the server checks the range. */
+  /** Where the player stands now, as predicted, with the land's landmarks: for the stash window (stash-ui.ts). */
+  get standing(): { x: number; y: number; floor: number; landmarks: RegionMap['landmarks'] } | undefined {
+    if (!this.predictor || !this.map) return undefined;
+    const { x, y, floor } = this.predictor.position;
+    return { x, y, floor: floor ?? 0, landmarks: this.map.landmarks };
+  }
+
   get target(): string | undefined {
     return this.targeting.id ?? undefined;
   }

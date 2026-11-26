@@ -8,7 +8,7 @@ import type { ShopDef, TradeOffer } from './kit.ts';
 import type { DraftView } from './workshop.ts';
 import type { RegionDef } from './world.ts';
 import type { SkyConfig, Weather } from './sky.ts';
-import { BAG_SLOTS, EQUIP_SLOTS, MAX_STACK, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
+import { BAG_SLOTS, EQUIP_SLOTS, MAX_STACK, MOST_STASH_SLOTS, isStat, type Character, type EquipSlot, type InventorySlot, type Stats } from './rpg.ts';
 import type { DamageType } from './weapons.ts';
 import type { StatusId, StatusView } from './rpg/statuses.ts';
 import type { GaugeId } from './rpg/gauges.ts';
@@ -131,6 +131,18 @@ export interface BagMessage {
   action: 'move' | 'split' | 'sort' | 'drop';
   from?: number;
   to?: number;
+  qty?: number;
+}
+
+/**
+ * The shared stash (rpg/stash.ts): open it by a stash chest, put a bag stack
+ * in (`index` is its bag cell) or take a stash stack out (`index` is its
+ * stash cell); `qty` takes part of a stack, the whole of it when missing.
+ */
+export interface StashMessage {
+  t: 'stash';
+  action: 'open' | 'in' | 'out' | 'close';
+  index?: number;
   qty?: number;
 }
 
@@ -294,6 +306,7 @@ export type ClientMessage =
   | InteractMessage
   | UseItemMessage
   | BagMessage
+  | StashMessage
   | AcceptQuestMessage
   | PrayMessage
   | WishAnswerMessage
@@ -616,6 +629,15 @@ export interface ArtMessage {
   walks: string[];
 }
 
+/** The shared stash as it is now, after opening it or each change; `open` false when it closed (walked away). */
+export interface StashViewMessage {
+  t: 'stash';
+  open: boolean;
+  slots: InventorySlot[];
+  /** How many slots it holds. */
+  size: number;
+}
+
 /** Something happened to you worth a line in the log ("+7 XP"). */
 export interface NoticeMessage {
   t: 'notice';
@@ -746,6 +768,7 @@ export type ServerMessage =
   | CharacterMessage
   | CallingNeededMessage
   | NoticeMessage
+  | StashViewMessage
   | ArtMessage
   | DialogueMessage
   | SnapshotMessage
@@ -786,6 +809,11 @@ export function isClientMessage(value: unknown): value is ClientMessage {
   if (m.t === 'bag') {
     const cell = (n: unknown) => n === undefined || (Number.isInteger(n) && (n as number) >= 0 && (n as number) < BAG_SLOTS);
     return ['move', 'split', 'sort', 'drop'].includes(m.action as string) && cell(m.from) && cell(m.to) &&
+      (m.qty === undefined || (Number.isSafeInteger(m.qty) && (m.qty as number) > 0));
+  }
+  if (m.t === 'stash') {
+    return ['open', 'in', 'out', 'close'].includes(m.action as string) &&
+      (m.index === undefined || (Number.isInteger(m.index) && (m.index as number) >= 0 && (m.index as number) < MOST_STASH_SLOTS)) &&
       (m.qty === undefined || (Number.isSafeInteger(m.qty) && (m.qty as number) > 0));
   }
   if (m.t === 'accept') return typeof m.quest === 'string' && m.quest.length <= 64;

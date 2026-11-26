@@ -99,11 +99,13 @@ describe('several characters on one account', () => {
     const mara = account(store, 'Mara');
     const ilya = (await api(base, '/api/characters', mara.token, 'POST', { name: 'Ilya', ...NEW })).body.id as string;
     expect((await api(base, `/api/characters/${mara.id}`, mara.token, 'DELETE', { name: 'Ilia' })).status).toBe(400);
-    // Deleting the first character: the same sign-in now opens Ilya.
+    store.saveStash(store.accountById(ilya)!, [{ item: 'tonic', qty: 2 }]);
+    // Deleting the first character: the same sign-in now opens Ilya, and the shared stash goes with it.
     expect((await api(base, `/api/characters/${mara.id}`, mara.token, 'DELETE', { name: 'mara' })).status).toBe(200);
     expect(store.accountById(mara.id)).toBeUndefined();
     expect(store.accountByToken(mara.token)?.id).toBe(ilya);
     expect(store.accountById(ilya)!.mainId).toBeUndefined();
+    expect(store.stashOf(store.accountById(ilya)!)).toEqual([{ item: 'tonic', qty: 2 }]);
     const left = await api(base, '/api/characters', mara.token);
     expect(left.body.characters.map((c: { name: string }) => c.name)).toEqual(['Ilya']);
     const last = await api(base, `/api/characters/${ilya}`, mara.token, 'DELETE', { name: 'Ilya' });

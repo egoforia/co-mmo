@@ -35,6 +35,7 @@ const ROCK_BOX = { width: 128, height: 128 };
  */
 const SET_PIECE_BOX: Record<string, { width: number; height: number }> = {
   'sanctum-shrine': { width: 256, height: 256 },
+  'stash-chest': { width: 256, height: 192 },
   'sanctum-standing-stones': { width: 640, height: 512 },
   'sanctum-fountain': { width: 384, height: 320 },
   'sanctum-bell-tower': { width: 384, height: 768 },

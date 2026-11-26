@@ -49,7 +49,7 @@ export class InventoryWindow {
       : `${riskLineHtml(c, safe)}
         <div class="bag-tools"><button type="button" data-bag-action="sort">Sort</button></div>
         <div class="bag-body">${dollHtml(c, this.figure(c.race))}${bagGridHtml(c)}</div>
-        <p class="keys"><kbd>Click</kbd> use or wear · <kbd>Drag</kbd> move, wear, take off, or out to drop · <kbd>Right-click</kbd>, hold or <kbd>M</kbd> more · <kbd>S</kbd> split · <kbd>Delete</kbd> drop · <kbd>Shift-click</kbd> or <kbd>T</kbd> sell or offer to an open shop or trade · arrows choose</p>`;
+        <p class="keys"><kbd>Click</kbd> use or wear · <kbd>Drag</kbd> move, wear, take off, or out to drop · <kbd>Right-click</kbd>, hold or <kbd>M</kbd> more · <kbd>S</kbd> split · <kbd>Delete</kbd> drop · <kbd>Shift-click</kbd> or <kbd>T</kbd> sell, offer or stash in an open shop, trade or stash · arrows choose</p>`;
     return `
       <h2>Your bag <small>${goldOf(c)} gold · ${escapeHtml(slotCount(c))}</small> <button type="button" class="close" data-close aria-label="Close">×</button></h2>
       <div class="tabs" role="tablist">${tab('bag', 'Bag')}${tab('sheet', 'Sheet')}</div>

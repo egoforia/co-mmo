@@ -65,6 +65,8 @@ import {
   type EntityInspection,
   giveHomeTools,
   ITEMS,
+  nearStashChest,
+  STASH_AWAY,
   PILE_KIND,
   type AcquiredHow,
 } from '@co-mmo/shared';
@@ -441,6 +443,8 @@ export class Region {
   change(id: string, op: CharacterOp): OpResult {
     const p = this.s.players.get(id);
     if (!p) return { ok: false };
+    // The stash opens only by a stash chest; a Fallen player cannot reach it.
+    if ((op.op === 'stashNear' || op.op === 'stashIn' || op.op === 'stashOut') && (p.fallenUntil !== undefined || !nearStashChest(this.map.landmarks, p.x, p.y, p.floor))) return { ok: false, why: STASH_AWAY };
     const result = applyOp(p.character, op);
     if (op.op === 'xp') this.s.levelUps(p, result.levels ?? 0);
     if (result.ok) {

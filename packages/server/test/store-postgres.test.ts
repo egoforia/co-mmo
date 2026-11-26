@@ -62,12 +62,15 @@ describe('the world in Postgres', () => {
     const { account, token } = store.acceptInvite(store.createInvite(null).code, 'Mara', 'sanctum');
     const ilya = store.addCharacter(account, 'Ilya', 'sanctum', newCharacter(), 5);
     store.choose(account, ilya.id);
+    store.saveStash(ilya, [{ item: 'tonic', qty: 3 }]);
     await store.close();
 
     const again = await Store.postgres(db);
     const main = again.accountByToken(token)!;
     expect(again.charactersOf(main).map((a) => a.name)).toEqual(['Mara', 'Ilya']);
     expect(again.playingOf(main).id).toBe(ilya.id);
+    expect(again.stashOf(main)).toEqual([{ item: 'tonic', qty: 3 }]);
+    expect(await again.holders('tonic')).toEqual([{ accountId: main.id, place: 'stash', slot: '0', item: 'tonic', qty: 3 }]);
     again.deleteCharacter(main, main.id);
     await again.close();
 

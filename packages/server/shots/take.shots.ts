@@ -183,6 +183,11 @@ async function take(shot: Shot): Promise<Taken> {
       hardy.hotbar[i] = skill;
     }
     world.store.savePosition(id, spot.x, spot.y, regionId, { ...hardy, hp: maxHp(hardy) }, spot.floor ?? 0);
+    if (shot.stash) world.store.saveStash(world.store.accountById(id)!, shot.stash);
+    for (const edit of shot.edits?.(map, spot) ?? []) {
+      const res = await fetch(`${world.base}/api/world-edits`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ region: regionId, edit, live: true }) });
+      if (!res.ok) throw new Error(`The shot ${shot.name} could not lay ${edit.kind}: ${JSON.stringify(await res.json())}`);
+    }
     // Older characters first, so the screen lists them in a steady order.
     for (const [i, name] of (shot.characters ?? []).entries()) {
       world.store.addCharacter(world.store.accountById(id)!, name, regionId, { ...startCharacter(RACE_IDS[(i + 1) % RACE_IDS.length]!, CALLING_IDS[(i + 1) % CALLING_IDS.length]!), level: 3 + i * 4 }, 20);

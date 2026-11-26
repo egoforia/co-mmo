@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { ArtManifest, ArtPointsManifest, Character, ContentEntry, DraftView, ServerMessage, SoundId, WelcomeMessage } from '@co-mmo/shared';
-import { ITEMS, MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, heldItem, isSafe, offHandItem, sensesSpots } from '@co-mmo/shared';
+import { ITEMS, MAX_LOOK_LENGTH, MAX_NAME_LENGTH, goldOf, nearStashChest, heldItem, isSafe, offHandItem, sensesSpots } from '@co-mmo/shared';
 import { acceptInvite, accountInfo, checkInvite, clearToken, createInvite, kitHouses, listCharacters, loadToken, perfStats, redeemLogin, rejoinWhenBack, reloadWhenBack, saveToken } from './api.ts';
 import { AccountWindow, showSignIn } from './account-ui.ts';
 import { showCharacters } from './character-select.ts';
@@ -11,6 +11,7 @@ import { CHAT_HELP, ChatBox, escapeHtml, hidePanel, isEditing, isTyping, onAccou
 import { RpgUi } from './rpg-ui.ts';
 import { KitUi } from './kit-ui.ts';
 import { LootUi } from './loot-ui.ts';
+import { StashUi } from './stash-ui.ts';
 import { PrayerUi } from './prayer-ui.ts';
 import { artSrc, knowArt, lookArt, onContent, playerArt, updateContent } from './wished.ts';
 import { GameSound, soundControls } from './sound.ts';
@@ -133,6 +134,7 @@ function play(token: string): void {
   let rpg: RpgUi | null = null;
   let kit: KitUi | null = null;
   let loot: LootUi | null = null;
+  let stash: StashUi | null = null;
   let prayer: PrayerUi | null = null;
   let draft: DraftView | null = null;
   let party: PartyUi | null = null;
@@ -235,6 +237,11 @@ function play(token: string): void {
         break;
       case 'snapshot':
         scene?.onSnapshot(message);
+        // Walking away from the stash chest closes the stash.
+        if (stash?.open && scene?.standing) {
+          const at = scene.standing;
+          stash.follow(at.landmarks, at.x, at.y, at.floor);
+        }
         vitals = { hp: message.hp, energy: message.energy };
         // Strikes on us not yet seen to land are not taken off yet.
         rpg?.setVitals(message.hp + (scene?.heldHurt.amount ?? 0), message.energy);
@@ -324,6 +331,9 @@ function play(token: string): void {
         break;
       case 'loot':
         loot?.show(message.loot);
+        break;
+      case 'stash':
+        stash?.show(message);
         break;
       case 'history':
         rpg?.setHistories(message.histories);
@@ -421,7 +431,12 @@ function play(token: string): void {
       },
       readied: () => kit?.readiedCast(),
       tooEarly: (ms) => kit?.readiedTooEarly(ms),
-      interact: () => connection.send({ t: 'interact' }),
+      // By a stash chest, E opens the shared stash; anywhere else it talks or loots.
+      interact: () => {
+        const at = scene?.standing;
+        if (at && stash && nearStashChest(at.landmarks, at.x, at.y, at.floor)) stash.ask();
+        else connection.send({ t: 'interact' });
+      },
       use: (item) => {
         // A healing item goes to the player chosen as target, when there is one (the server checks they are near).
         const target = ITEMS[item]?.heal ? scene?.playerTarget : undefined;
@@ -429,7 +444,7 @@ function play(token: string): void {
       },
       unequip: (slot) => connection.send({ t: 'equip', slot }),
       bag: (m) => connection.send(m),
-      fromBag: (item) => kit?.fromBag(item) ?? false,
+      fromBag: (item, index) => stash?.fromBag(index) || (kit?.fromBag(item) ?? false),
       figure: (race) => artSrc(lookArt(myId) ?? playerArt(myId, race)),
       openShop: (npc) => kit?.openShop(npc),
       accept: (quest) => connection.send({ t: 'accept', quest }),
@@ -442,6 +457,7 @@ function play(token: string): void {
     });
     rpg.statusIcon = statusIcon;
     loot = new LootUi({ send: (m) => connection.send(m), typing: () => isTyping() || isEditing() });
+    stash = new StashUi({ send: (m) => connection.send(m) });
     kit = new KitUi(welcome.character, {
       ability: (ability) => {
         const target = scene?.target;

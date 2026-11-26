@@ -1,4 +1,4 @@
-import { addGold, addItem, ownPieces, applySkillLook, fitsAll, takeGold, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
+import { BAG_FULL, STASH_BOUND, STASH_FULL, putItem, stashRoom, stashable, type InventorySlot, addGold, addItem, ownPieces, applySkillLook, fitsAll, takeGold, changeCalling, discover, forgetVanished, gainCreatorXp, gainXp, itemCount, maxHp, takeItem, type CallingId, type Character, type RaceId } from '@co-mmo/shared';
 
 /**
  * A change to a player's character made from outside the simulation: Favor
@@ -24,12 +24,26 @@ export type CharacterOp =
   /** A Calling Wish: a skill's new name and look; fails, changing nothing, when no Calling Wish is left. */
   | { op: 'skillLook'; skill: string; name: string; description: string; wish: string }
   /** Drops items and abilities whose wish was rolled back. */
-  | { op: 'forget' };
+  | { op: 'forget' }
+  /**
+   * The shared stash (stash.ts): only by a stash chest, so the region checks
+   * where the player stands first. `stashNear` asks just that. `stashIn`
+   * takes `qty` (or all) off bag cell `index` when the account's `stash`, as
+   * it is now with `slots` slots, has room, and answers what it took;
+   * `stashOut` puts things in the bag, all or nothing.
+   */
+  | { op: 'stashNear' }
+  | { op: 'stashIn'; index: number; qty?: number; stash: InventorySlot[]; slots: number }
+  | { op: 'stashOut'; item: string; qty: number };
 
 /** How a change went; `levels` are levels gained (Creator levels for Creator XP). */
 export interface OpResult {
   ok: boolean;
   levels?: number;
+  /** What a stash change took from the bag. */
+  taken?: InventorySlot;
+  /** Why it was refused, in words for the player. */
+  why?: string;
 }
 
 /** Applies a change to a character in place. */
@@ -68,6 +82,23 @@ export function applyOp(c: Character, op: CharacterOp): OpResult {
       return { ok: applySkillLook(c, op, op.wish) };
     case 'forget':
       forgetVanished(c);
+      return { ok: true };
+    case 'stashNear':
+      return { ok: true };
+    case 'stashIn': {
+      const cell = c.inventory[op.index];
+      if (!cell) return { ok: false, why: 'Nothing to put away there.' };
+      if (!stashable(cell.item)) return { ok: false, why: STASH_BOUND };
+      const qty = Math.min(op.qty ?? cell.qty, cell.qty);
+      if (stashRoom(op.stash, cell.item, op.slots) < qty) return { ok: false, why: STASH_FULL };
+      const taken = { item: cell.item, qty };
+      cell.qty -= qty;
+      if (cell.qty === 0) c.inventory.splice(op.index, 1);
+      return { ok: true, taken };
+    }
+    case 'stashOut':
+      if (!fitsAll(c, [{ item: op.item, qty: op.qty }])) return { ok: false, why: BAG_FULL };
+      putItem(c, op.item, op.qty);
       return { ok: true };
   }
 }

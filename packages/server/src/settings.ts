@@ -1,3 +1,4 @@
+import { STASH_SLOTS } from '@co-mmo/shared';
 import type { ProviderId } from './ai/chat.ts';
 
 // The Owner's settings as saved with the world (God's View: AI models,
@@ -57,6 +58,13 @@ export interface Settings {
   sky?: import('@co-mmo/shared').SkyConfig;
   /** Characters one account may have (God's View, Players tab; missing in older saves: DEFAULT_MAX_CHARACTERS). */
   characters?: { max: number };
+  /** Slots in each account's shared stash (God's View, Players tab; missing in older saves: shared STASH_SLOTS). */
+  stash?: { slots: number };
+}
+
+/** Slots in each account's shared stash, as set on the Players tab. */
+export function stashSlots(settings: Settings): number {
+  return settings.stash?.slots ?? STASH_SLOTS;
 }
 
 /** Characters one account may have unless the Owner sets another number. */

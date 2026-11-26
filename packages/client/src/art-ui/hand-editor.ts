@@ -225,6 +225,7 @@ export function handWorkbenchHtml(w: WalkerView): string {
           <h5>Frame #${st.frame + 1} Operations</h5>
           <div class="wb-ops-stack">
             <button type="button" class="quiet" data-wb-copy-prev="${esc(w.id)}"${st.frame === 0 ? ' disabled' : ''}>📋 Copy Hands from Frame #${st.frame} (f−1 → f)</button>
+            <button type="button" class="quiet" data-wb-swap="${esc(w.id)}" data-wb-swap-frame="${st.frame}"${rightHand || leftHand ? '' : ' disabled'}>⇄ Swap R and L on Frame #${st.frame + 1}</button>
             <button type="button" class="quiet" data-wb-interpolate="${esc(w.id)}">📐 Interpolate Missing Frames in Strip</button>
             <button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [artId], frame: st.frame }))}">🔍 AI Vision Re-Find Frame #${st.frame + 1}</button>
             ${
@@ -237,6 +238,7 @@ export function handWorkbenchHtml(w: WalkerView): string {
           <h5>Full Strip Operations (${esc(facingLabel)})</h5>
           <div class="wb-ops-stack">
             <button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [artId] }))}">🔍 AI Vision Find All ${strip.frames} Frames</button>
+            <button type="button" class="quiet" data-wb-swap="${esc(w.id)}">⇄ Swap R and L on All ${strip.frames} Frames</button>
             ${
               hasTurned
                 ? `<button type="button" class="quiet" data-wb-mirror-strip="${esc(w.id)}" data-from="${esc(turnedId)}" data-to="${esc(artId)}" data-from-label="${esc(turnedLabel)}" data-label="${esc(facingLabel)}">🪞 Mirror Entire Strip from ${esc(turnedLabel)} (across X)</button>`
@@ -646,7 +648,7 @@ function interpolatePoints(points: (ArtPoint | null)[], totalFrames: number): (A
 }
 
 export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
-  const walkerId = t.dataset.wbWalker ?? t.dataset.wbPlay ?? t.dataset.wbClearHand ?? t.dataset.wbCopyPrev ?? t.dataset.wbInterpolate ?? t.dataset.wbMirrorFrame ?? t.dataset.wbMirrorStrip;
+  const walkerId = t.dataset.wbWalker ?? t.dataset.wbPlay ?? t.dataset.wbClearHand ?? t.dataset.wbCopyPrev ?? t.dataset.wbInterpolate ?? t.dataset.wbMirrorFrame ?? t.dataset.wbMirrorStrip ?? t.dataset.wbSwap;
   if (!walkerId) return false;
   const w = artState.data?.walkers.find((x) => x.id === walkerId);
   if (!w) return false;
@@ -758,6 +760,24 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
     );
     return true;
   }
+  if (t.dataset.wbSwap) {
+    const strip = getStripForKind(w, st.animKind, st.facing);
+    if (!strip) return true;
+    const artId = animationArt(w.id, st.animKind, st.facing);
+    const existing = artState.points[artId] ?? {};
+    const only = t.dataset.wbSwapFrame === undefined ? undefined : Number(t.dataset.wbSwapFrame);
+    const { hands, leftHands } = swapHands(existing.hands ?? [], existing.leftHands ?? [], strip.frames, only);
+    artState.points[artId] = { ...existing, hands, leftHands };
+    const done = only === undefined ? `Swapped R and L on all ${strip.frames} frames.` : `Swapped R and L on frame #${only + 1}.`;
+    void artState.ctx.api('art/hands/set', 'POST', { id: artId, hands, leftHands }).then(
+      () => {
+        artState.ctx.toast(done);
+        rerenderWorkbench(w);
+      },
+      (err: Error) => artState.ctx.toast(err.message),
+    );
+    return true;
+  }
   if (t.dataset.wbMirrorFrame) {
     const from = t.dataset.from!;
     const to = t.dataset.to!;
@@ -799,4 +819,23 @@ export function handleWorkbenchChange(target: HTMLElement): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * The right and left hands traded on one frame (`only`) or every frame, for
+ * when the hand finder took one hand for the other. Each list is `frames` long.
+ */
+export function swapHands(
+  right: readonly (ArtPoint | null | undefined)[],
+  left: readonly (ArtPoint | null | undefined)[],
+  frames: number,
+  only?: number,
+): { hands: (ArtPoint | null)[]; leftHands: (ArtPoint | null)[] } {
+  const hands = Array.from({ length: frames }, (_, i) => right[i] ?? null);
+  const leftHands = Array.from({ length: frames }, (_, i) => left[i] ?? null);
+  for (let i = 0; i < frames; i++) {
+    if (only !== undefined && i !== only) continue;
+    [hands[i], leftHands[i]] = [leftHands[i]!, hands[i]!];
+  }
+  return { hands, leftHands };
 }

@@ -86,7 +86,7 @@ export function fitPanelHtml(a: StudioAsset, draft: FitDraft): string {
     : '';
   return `
     <h2 class="dock-title">Offset</h2>
-    <p class="note">Drag the picture on the canvas, nudge it with the arrow keys (Shift: 10 px), or type. Ctrl Z steps back.</p>
+    <p class="note">Drag the picture on the canvas, nudge it with the arrow keys (Shift: 10 px), type, or centre it (C). Ctrl Z steps back.</p>
     <div class="fit-fields">
       <label>x <input type="number" name="fit-x" min="${-FIT_OFFSET_MOST}" max="${FIT_OFFSET_MOST}" step="1" value="${offset[0]}" /> px</label>
       <label>y <input type="number" name="fit-y" min="${-FIT_OFFSET_MOST}" max="${FIT_OFFSET_MOST}" step="1" value="${offset[1]}" /> px</label>
@@ -94,6 +94,7 @@ export function fitPanelHtml(a: StudioAsset, draft: FitDraft): string {
     </div>
     <p class="note fit-words">${escapeHtml(cap(fitWords(draft.fit)))}${draft.changed ? ' · not saved yet' : ''}</p>
     <p class="inspector-links">
+      <button type="button" class="quiet" data-fit-centre title="Stand where it meets the ground on the middle of its tiles (C)">Centre on its tiles</button>
       <button type="button" data-fit-save${draft.changed ? '' : ' disabled'}>Save the fit</button>
       <button type="button" class="quiet" data-fit-reset>Back to the painter's place</button>
     </p>`;

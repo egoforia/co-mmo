@@ -525,6 +525,12 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
     if (route === 'art/assets' && method === 'GET') return json(res, 200, { assets: await ctx.art.assets() }), true;
+    // Where pictures meet the ground, for the Studio's auto-centre (art-studio/auto-fit.ts): free, no model asked.
+    if (route === 'art/measure' && method === 'POST') {
+      const body = await ctx.readJson(req);
+      const assets = Array.isArray(body?.assets) ? body.assets.filter((a): a is string => typeof a === 'string').slice(0, 200) : [];
+      return json(res, 200, { measures: await ctx.art.measure(assets) }), true;
+    }
     // How a picture sits on its tiles (asset-fit.ts): moved and trimmed in the Studio, or put back where it was painted.
     if (route === 'art/fit' && (method === 'POST' || method === 'DELETE')) {
       const body = await ctx.readJson(req);

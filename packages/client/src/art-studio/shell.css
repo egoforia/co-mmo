@@ -558,3 +558,24 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Auto-centre for a group (art-studio/centre-page.ts). */
+.centre-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.centre-table th,
+.centre-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(90, 105, 136, 0.5);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.centre-thumb img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}

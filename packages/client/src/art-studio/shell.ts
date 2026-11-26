@@ -17,6 +17,7 @@ import {
 import { SUBTABS, artState, where } from '../art-ui/state.ts';
 import { loadArt } from '../editor/art-index.ts';
 import { GameDown, api, toast } from '../gods-view/core.ts';
+import { glowOf } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 import { AssetBrowser, type StudioAsset } from './browser.ts';
 import { centreFit, type BaseMeasure } from './auto-centre.ts';
@@ -24,6 +25,7 @@ import { CANVAS_GROUPS, StudioCanvas, canvasFloor } from './canvas.ts';
 import { centreHtml, centreIntroHtml, centreTargets, proposals, type Proposal } from './centre-page.ts';
 import { FIT_GROUPS, FitDraft, SCALE_GROUPS, fitFromFields, fitPanelHtml } from './fit-tool.ts';
 import { HITBOX_GROUPS, alikeAssets, hitboxPanelHtml, saveTiles } from './hitbox-tool.ts';
+import { LIGHT_GROUPS, lightButton, lightFromFields, lightPanelHtml } from './light-tool.ts';
 import { showPane, wireDocks } from './docks.ts';
 import { inspectorHtml } from './inspector.ts';
 import { studioKey, typingIn } from './keys.ts';
@@ -81,6 +83,10 @@ export class StudioShell {
       if (input.type === 'range') input.closest<HTMLElement>('.compare')?.style.setProperty('--cut', `${input.value}%`);
       else if (input.name.startsWith('fit-') && this.draft) {
         this.draft.set(fitFromFields($('dock-right'), this.draft.state));
+        this.canvas?.draw();
+        this.drawFitWords();
+      } else if (input.name.startsWith('light-') && this.draft && this.selected) {
+        this.draft.set(lightFromFields($('dock-right'), this.draft.state, glowOf(this.selected)));
         this.canvas?.draw();
         this.drawFitWords();
       }
@@ -223,10 +229,11 @@ export class StudioShell {
     if (panel && a && this.draft) panel.innerHTML = this.fitHtml(a, this.draft);
   }
 
-  /** The Offset section, with the Hitbox section for a set piece. */
+  /** The Offset section, with the Hitbox and Light sections for a set piece. */
   private fitHtml(a: StudioAsset, draft: FitDraft): string {
     const hitbox = HITBOX_GROUPS.includes(a.group) ? hitboxPanelHtml(a, draft, this.hitbox, alikeAssets(a, this.browser.shown()).length) : '';
-    return fitPanelHtml(a, draft, hitbox);
+    const light = LIGHT_GROUPS.includes(a.group) ? `<section class="light-panel">${lightPanelHtml(a, draft)}</section>` : '';
+    return fitPanelHtml(a, draft, hitbox + light);
   }
 
   /** Turns the Hitbox tool on or off, for a set piece on the canvas. */
@@ -255,6 +262,10 @@ export class StudioShell {
     fresh.innerHTML = this.fitHtml(a, this.draft);
     panel.querySelector('.fit-words')!.replaceWith(fresh.querySelector('.fit-words')!);
     panel.querySelector('[data-fit-save]')!.replaceWith(fresh.querySelector('[data-fit-save]')!);
+    for (const sel of ['.light-words', '[data-light-usual]', '[data-light-off]']) {
+      const now = fresh.querySelector(sel);
+      if (now) panel.querySelector(sel)?.replaceWith(now);
+    }
   }
 
   /** A workspace's own page tabs, when it holds one of the shell's pages (art-ui draws the others' tabs). */
@@ -336,7 +347,7 @@ export class StudioShell {
       let saved = 0;
       for (const p of chosen) {
         try {
-          await api('art/fit', 'POST', { asset: p.asset.id, offset: p.fit!.offset, scale: p.fit!.scale, blocks: p.asset.fit?.blocks });
+          await api('art/fit', 'POST', { asset: p.asset.id, offset: p.fit!.offset, scale: p.fit!.scale, blocks: p.asset.fit?.blocks, light: p.asset.fit?.light });
           saved++;
         } catch (err) {
           toast(`${p.asset.name}: ${(err as Error).message}`);
@@ -358,7 +369,7 @@ export class StudioShell {
   private saveFit(asset: string, reset: boolean, button: HTMLButtonElement): void {
     if (reset && !confirm('Put this picture back where it was painted, for everyone?')) return;
     button.disabled = true;
-    const body = reset ? { asset } : { asset, offset: this.draft?.state.offset, scale: this.draft?.state.scale, blocks: this.draft?.state.blocks };
+    const body = reset ? { asset } : { asset, offset: this.draft?.state.offset, scale: this.draft?.state.scale, blocks: this.draft?.state.blocks, light: this.draft?.state.light };
     void api('art/fit', reset ? 'DELETE' : 'POST', body).then(
       () => {
         toast(reset ? 'Back where it was painted. Players see it at once.' : 'Fit saved. Players see it at once; undo it in God\'s View like any wish.');
@@ -377,6 +388,12 @@ export class StudioShell {
     if (target.closest('[data-art-review]')) return void artClick(target);
     if (target.closest('[data-fit-centre]')) return void this.centreOne();
     if (target.closest('[data-hitbox-edit]')) return this.toggleHitbox();
+    const lit = this.draft && lightButton(target, this.draft.state);
+    if (lit && this.draft) {
+      this.draft.set(lit);
+      this.canvas?.draw();
+      return this.drawFitPanel();
+    }
     if (target.closest('[data-hitbox-all]') && this.draft) {
       const { blocks: _, ...every } = this.draft.state;
       this.draft.set(every);

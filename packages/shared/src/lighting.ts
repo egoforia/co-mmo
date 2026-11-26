@@ -1,4 +1,6 @@
+import { TILE_PIXELS } from './constants.ts';
 import { gameHour, type Weather } from './sky.ts';
+import { fitOf, type FitLight } from './asset-fit.ts';
 import { FLAME_LIGHT, type Light } from './light.ts';
 
 // How the world is lit, as numbers both the game's lighting and God's View's
@@ -75,7 +77,7 @@ export function lightOn(normal: [number, number, number], sky: [number, number, 
 }
 
 /** A lantern's or candle's steady warm light. */
-const LAMP_LIGHT: Light = { color: '#ffd27a', radius: 2.5, flicker: true };
+export const LAMP_LIGHT: Light = { color: '#ffd27a', radius: 2.5, flicker: true };
 /** A shrine's or altar's soft gold, steady. */
 const HOLY_LIGHT: Light = { color: '#ffe9b0', radius: 3 };
 /** The warm light from a building's windows after dark. */
@@ -91,6 +93,34 @@ export function glowOf(asset: string): Light | undefined {
   if (/lantern|lamp|candle|watchpost|mining-rig/.test(asset)) return LAMP_LIGHT;
   if (/shrine|altar/.test(asset)) return HOLY_LIGHT;
   return undefined;
+}
+
+/** How far above where a piece stands its glow sits, in game pixels, before the Art Studio moves it. */
+export const GLOW_LIFT = TILE_PIXELS * 0.6;
+
+/**
+ * The light a set piece gives off as the game shows it: its kind's
+ * (glowOf), changed by what the Art Studio chose for its picture (asset-fit.ts
+ * FitLight), and how far from the usual place the glow sits, in game pixels.
+ * A piece chosen to glow that gives no light of its own gets a lantern's.
+ */
+export function glowFor(asset: string): { light: Light; at: [number, number] } | undefined {
+  return glowWith(glowOf(asset), fitOf(asset)?.light);
+}
+
+/** A kind's light (or none) changed by a picture's own (glowFor); the Studio shows a draft's the same way. */
+export function glowWith(kind: Light | undefined, own: FitLight | undefined): { light: Light; at: [number, number] } | undefined {
+  if (!own) return kind ? { light: kind, at: [0, 0] } : undefined;
+  if (own.strength === 0) return undefined;
+  const light: Light = {
+    ...(kind ?? LAMP_LIGHT),
+    ...(own.color ? { color: own.color } : {}),
+    ...(own.radius !== undefined ? { radius: own.radius } : {}),
+    ...(own.strength !== undefined && own.strength !== 1 ? { strength: own.strength } : {}),
+  };
+  if (own.flicker === true) light.flicker = true;
+  if (own.flicker === false) delete light.flicker;
+  return { light, at: own.at ?? [0, 0] };
 }
 
 /**

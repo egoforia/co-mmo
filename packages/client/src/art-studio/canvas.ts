@@ -5,16 +5,19 @@
 // pixel under the pointer read out. The tile outlines, and the red tiles a
 // piece blocks while its hitbox is chosen (hitbox-tool.ts), are an editor
 // overlay, as the world editor's Hitboxes layer: only the Owner sees them.
+// So is a set piece's light (light-tool.ts): a marker to drag, and the pool
+// it casts, shown when a time of day is picked.
 
-import { CHARACTER_HEIGHT, PREVIEW_HOURS, biomeLook, type ArtManifest, type AssetFit, type BiomeId } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, PREVIEW_HOURS, TILE_PIXELS, biomeLook, type ArtManifest, type AssetFit, type BiomeId } from '@co-mmo/shared';
 import { groundLight, litPicture } from '../light-preview.ts';
 import { workedOutNormalMap } from '../normal-preview.ts';
 import { PROJECTION } from '../projection.ts';
-import { fittedAt, standing, type Floor } from '../tile-stand.ts';
+import { fittedAt, followFit, standing, type Floor } from '../tile-stand.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
 import type { FitDraft } from './fit-tool.ts';
 import { blockedOf, tileUnder, toggleTile } from './hitbox-tool.ts';
+import { LIGHT_GROUPS, draftGlow, glowHome } from './light-tool.ts';
 
 /** Groups the canvas can stand on tiles. */
 export const CANVAS_GROUPS = ['pieces', 'spots', 'stairs', 'scenery', 'characters', 'monsters'];
@@ -84,6 +87,8 @@ export class StudioCanvas {
   private canvas!: HTMLCanvasElement;
   private readout!: HTMLElement;
   private box: ReturnType<typeof pictureBox> | undefined;
+  /** Where the light's marker is drawn, in world pixels, and how far one game pixel of its offset moves it. */
+  private glow: { x: number; y: number; per: number } | undefined;
   private art: { asset?: HTMLImageElement | HTMLCanvasElement; ground?: HTMLImageElement; figure?: HTMLImageElement | HTMLCanvasElement } = {};
 
   constructor(
@@ -154,7 +159,7 @@ export class StudioCanvas {
       this.setZoom(nextZoom(this.zoom, e.deltaY < 0 ? 1 : -1));
     }, { passive: false });
     // Dragging the picture moves it (the Offset tool); dragging anywhere else pans.
-    let drag: { x: number; y: number; move?: { offset: [number, number] } } | undefined;
+    let drag: { x: number; y: number; move?: { offset: [number, number] }; light?: [number, number] } | undefined;
     this.canvas.addEventListener('pointerdown', (e) => {
       if (this.hitbox && this.draft) {
         const floor = canvasFloor(this.asset);
@@ -166,6 +171,13 @@ export class StudioCanvas {
           return;
         }
       }
+      // The light's marker comes first: it sits on the picture.
+      if (this.draft && this.glow && this.nearGlow(this.world(e))) {
+        this.draft.mark();
+        drag = { x: e.clientX, y: e.clientY, light: [...(this.draft.state.light?.at ?? [0, 0])] };
+        this.canvas.setPointerCapture(e.pointerId);
+        return;
+      }
       const onPicture = this.draft && this.box && this.inside(this.world(e), this.box);
       if (onPicture) this.draft!.mark();
       drag = onPicture ? { x: e.clientX, y: e.clientY, move: { offset: [...this.draft!.state.offset] } } : { x: e.clientX - this.pan.x, y: e.clientY - this.pan.y };
@@ -173,7 +185,12 @@ export class StudioCanvas {
     });
     this.canvas.addEventListener('pointermove', (e) => {
       if (drag && this.canvas.hasPointerCapture(e.pointerId)) {
-        if (drag.move && this.draft && this.box) {
+        if (drag.light && this.draft && this.glow) {
+          const per = (this.zoom / 100) * this.glow.per;
+          const at: [number, number] = [drag.light[0] + (e.clientX - drag.x) / per, drag.light[1] + (e.clientY - drag.y) / per];
+          this.draft.set({ ...this.draft.state, light: { ...this.draft.state.light, at } }, false);
+          this.changed();
+        } else if (drag.move && this.draft && this.box) {
           // Screen pixels to picture pixels: through the zoom, then the picture's own drawn size.
           const per = (this.zoom / 100) * this.box.scale;
           this.draft.set({ ...this.draft.state, offset: [drag.move.offset[0] + (e.clientX - drag.x) / per, drag.move.offset[1] + (e.clientY - drag.y) / per] }, false);
@@ -206,6 +223,12 @@ export class StudioCanvas {
     const r = this.canvas.getBoundingClientRect();
     const o = this.origin();
     return { x: ((e.clientX - r.left) * devicePixelRatio - o.x) / o.s, y: ((e.clientY - r.top) * devicePixelRatio - o.y) / o.s };
+  }
+
+  /** True when a world point is on the light's marker. */
+  private nearGlow(p: { x: number; y: number }): boolean {
+    const g = this.glow;
+    return !!g && Math.hypot(p.x - g.x, p.y - g.y) * (this.zoom / 100) <= 12;
   }
 
   private inside(p: { x: number; y: number }, b: { x: number; y: number; width: number; height: number }): boolean {
@@ -321,6 +344,52 @@ export class StudioCanvas {
       g.lineTo(ax, ay + r);
       g.stroke();
     }
+    this.drawLight(g, o, floor, size);
     this.drawn();
+  }
+
+  /** A set piece's light, as the game would place it: its pool at the hour picked, and its marker (editor overlay). */
+  private drawLight(g: CanvasRenderingContext2D, o: { x: number; y: number; s: number }, floor: Floor, size: { width: number; height: number }): void {
+    this.glow = undefined;
+    if (!this.draft || !LIGHT_GROUPS.includes(this.asset.group)) return;
+    const glow = draftGlow(this.asset, this.draft.state);
+    const at = this.draft.state.light?.at ?? [0, 0];
+    const home = glowHome(floor);
+    const plan = standing(floor, size, this.manifest[this.asset.id]?.view === 'isometric');
+    const p = followFit({ x: home.x + at[0], y: home.y + at[1] }, plan, this.draft.fit);
+    this.glow = { ...p, per: this.draft.fit.scale ?? 1 };
+    const [x, y] = [o.x + p.x * o.s, o.y + p.y * o.s];
+    if (glow && this.hour !== undefined) {
+      // How the game's lights burn (light.ts lightGlow): faint by day, strong at night.
+      const night = this.hour >= 20 || this.hour < 5 ? 1 : this.hour >= 18 || this.hour < 7 ? 0.5 : 0;
+      const r = glow.light.radius * TILE_PIXELS * o.s;
+      const pool = g.createRadialGradient(x, y, 0, x, y, r);
+      const alpha = Math.min(0.6, (0.08 + 0.22 * night) * (glow.light.strength ?? 1));
+      const hex = glow.light.color;
+      pool.addColorStop(0, `${hex}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`);
+      pool.addColorStop(1, `${hex}00`);
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = pool;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+      g.restore();
+    }
+    // The marker: a ring in its colour (grey when off), to drag.
+    const r = 8 * devicePixelRatio;
+    g.save();
+    g.lineWidth = 2 * devicePixelRatio;
+    g.fillStyle = glow?.light.color ?? '#8a8f99';
+    g.strokeStyle = 'rgba(20, 18, 30, 0.9)';
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    g.lineWidth = devicePixelRatio;
+    g.beginPath();
+    g.arc(x, y, r + 3 * devicePixelRatio, 0, Math.PI * 2);
+    g.stroke();
+    g.restore();
+    this.canvas.dataset.glow = `${Math.round(p.x)},${Math.round(p.y)}`;
   }
 }

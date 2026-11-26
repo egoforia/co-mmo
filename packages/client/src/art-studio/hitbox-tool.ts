@@ -91,7 +91,7 @@ export async function saveTiles(
   let saved = 0;
   for (const x of assets) {
     try {
-      await api('art/fit', 'POST', { asset: x.id, offset: x.fit?.offset ?? [0, 0], scale: x.fit?.scale, blocks });
+      await api('art/fit', 'POST', { asset: x.id, offset: x.fit?.offset ?? [0, 0], scale: x.fit?.scale, blocks, light: x.fit?.light });
       saved++;
     } catch (err) {
       toast(`${x.name}: ${(err as Error).message}`);

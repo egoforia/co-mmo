@@ -12,7 +12,8 @@ import {
   WINDOW_LIGHT,
   biomeLook,
   buildingKit,
-  glowOf,
+  GLOW_LIFT,
+  glowFor,
   nearBuilding,
   rand2,
   spotStateArt,
@@ -24,7 +25,7 @@ import {
   type RegionMap,
 } from '@co-mmo/shared';
 import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../kit-house-view.ts';
-import { fittedAt } from '../tile-stand.ts';
+import { fittedAt, followFit, standing } from '../tile-stand.ts';
 import { dropLight, makeLight, placeLight } from '../lights.ts';
 import { standEdgeWalls } from './edge-walls.ts';
 import { stateOf, standSpot, type SpotView } from './spot-views.ts';
@@ -293,7 +294,7 @@ const floors: FloorView[] = map.storeys.map((storey) => {
   const stairs = placeStairs(scene, map, ox, oy, views, floors, art);
   const objects = scene.children.list.filter((o) => !before.has(o));
   markScenery(objects);
-  const lamps = placeLamps(scene, map, ox, oy, views);
+  const lamps = placeLamps(scene, map, ox, oy, views, art);
   return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls, spots };
 }
 
@@ -404,20 +405,34 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
   return open;
 }
 
+/** A point on a landmark's picture, moved as its fit moves the picture (standOnTiles). */
+function followPicture(scene: Phaser.Scene, l: RegionMap['landmarks'][number], ox: number, oy: number, point: { x: number; y: number }, art: ArtManifest): { x: number; y: number } {
+  const fit = fitOf(l.asset);
+  if (!fit) return point;
+  const pic = piecePicture(l);
+  const frame = scene.textures.getFrame(l.asset);
+  const tiles = { left: ox + pic.left, top: oy + pic.top, right: ox + pic.left + pic.width, bottom: oy + pic.top + pic.height };
+  return followFit(point, standing(tiles, { width: frame.width, height: frame.height }, art[l.asset]?.view === 'isometric'), fit);
+}
+
 /** Lights for a region's fires, lanterns and shrines, the lights the editor stood on their own, and its buildings' windows. */
-export function placeLamps(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[]): Lamp[] {
+export function placeLamps(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], art: ArtManifest = {}): Lamp[] {
   const lamps: Lamp[] = [];
   const add = (light: Light, x: number, y: number, window: boolean, floor: number, tile: { x: number; y: number }) => {
     const lit = makeLight(scene, light);
     if (lit) lamps.push({ lit, x, y, window, floor, tile });
   };
   for (const l of map.landmarks) {
-    const light = glowOf(l.asset);
-    // The flame sits a little above where the piece stands.
+    const glow = glowFor(l.asset);
+    if (!glow) continue;
+    // The flame sits a little above where the piece stands, or where the Art
+    // Studio set it; it moves with the picture when the picture is fitted.
     const feet = landmarkFeet(l, ox, oy);
     const at = PROJECTION.toScreen(feet.x, feet.y);
     const floor = l.floor ?? 0;
-    if (light) add(light, at.x, at.y - floorLift(floor) - T * 0.6, false, floor, { x: Math.floor(l.x), y: Math.floor(l.y - 0.01) });
+    const home = { x: at.x + glow.at[0], y: at.y - GLOW_LIFT + glow.at[1] };
+    const placed = scene.textures.exists(l.asset) ? followPicture(scene, l, ox, oy, home, art) : home;
+    add(glow.light, placed.x, placed.y - floorLift(floor), false, floor, { x: Math.floor(l.x), y: Math.floor(l.y - 0.01) });
   }
   // Lights the world editor stood on their own.
   for (const l of map.lights ?? []) {

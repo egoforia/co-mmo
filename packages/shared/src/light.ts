@@ -14,6 +14,8 @@ export interface Light {
   radius: number;
   /** Flames flicker; glowing things shine steadily. */
   flicker?: boolean;
+  /** How bright, as a share of a lamp's usual (chosen per picture in the Art Studio); 1 when left out. */
+  strength?: number;
 }
 
 /** The farthest any light reaches, in tiles, so no wish lights a whole region. */
@@ -36,14 +38,15 @@ export function cleanLight(raw: unknown): Light | undefined {
 }
 
 /**
- * How bright a light is at `ms`, from 0.75 to 1: steady lights always 1,
+ * How bright a light is at `ms`, from 0.75 to 1 times its own strength: steady lights always 1,
  * flames waver by a few overlapping waves so no two seeds burn in step.
  */
 export function lightStrength(light: Light, ms: number, seed = 0): number {
-  if (!light.flicker) return 1;
+  const own = light.strength ?? 1;
+  if (!light.flicker) return own;
   const t = ms / 1000 + seed * 7.31;
   const wave = Math.sin(t * 9.1) * 0.5 + Math.sin(t * 15.7 + 1.3) * 0.3 + Math.sin(t * 23.3 + 2.9) * 0.2;
-  return 0.875 + wave * 0.125;
+  return (0.875 + wave * 0.125) * own;
 }
 
 /** How much light a lamp adds at its centre by day, on top of the sky's (1 is full daylight). */

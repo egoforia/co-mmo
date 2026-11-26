@@ -86,3 +86,21 @@ export function fittedAt(at: { x: number; y: number; scale: number }, fit: Pick<
   const scale = at.scale * (fit.scale ?? 1);
   return { x: at.x + fit.offset[0] * scale * (mirrored ? -1 : 1), y: at.y + fit.offset[1] * scale, scale };
 }
+
+/**
+ * Where a point on a picture (its glow) goes once the picture's fit moves
+ * and trims it, so the light stays on the flame it was set on: moved as far
+ * as the picture, and nearer or farther from where it stands as it shrinks
+ * or grows.
+ */
+export function followFit(
+  point: { x: number; y: number },
+  plan: { x: number; y: number; scale: number },
+  fit: Pick<AssetFit, 'offset' | 'scale'> | undefined,
+  mirrored = false,
+): { x: number; y: number } {
+  if (!fit) return point;
+  const at = fittedAt(plan, fit, mirrored);
+  const trim = fit.scale ?? 1;
+  return { x: at.x + (point.x - plan.x) * trim, y: at.y + (point.y - plan.y) * trim };
+}

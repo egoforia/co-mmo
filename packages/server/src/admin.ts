@@ -542,9 +542,11 @@ export async function handleAdmin(
     // How a picture sits on its tiles (asset-fit.ts): moved and trimmed in the Studio, or put back where it was painted.
     if (route === 'art/fit' && (method === 'POST' || method === 'DELETE')) {
       const body = await ctx.readJson(req);
-      // Putting the picture back keeps the tiles it blocks; its hitbox is put back with "Block every tile".
-      const kept = typeof body?.asset === 'string' ? fitOf(body.asset)?.blocks : undefined;
-      const fit = method === 'DELETE' ? { asset: body?.asset, offset: [0, 0], ...(kept ? { blocks: kept } : {}) } : { asset: body?.asset, offset: body?.offset, scale: body?.scale, blocks: body?.blocks };
+      // Putting the picture back keeps the tiles it blocks and its light; they are put back with their own buttons.
+      const now = typeof body?.asset === 'string' ? fitOf(body.asset) : undefined;
+      const fit = method === 'DELETE'
+        ? { asset: body?.asset, offset: [0, 0], ...(now?.blocks ? { blocks: now.blocks } : {}), ...(now?.light ? { light: now.light } : {}) }
+        : { asset: body?.asset, offset: body?.offset, scale: body?.scale, blocks: body?.blocks, light: body?.light };
       try {
         const record = wishes.setFit({ id: account.id, name: account.name }, fit);
         return json(res, 200, { ok: true, id: record.id }), true;

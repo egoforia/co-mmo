@@ -11,6 +11,7 @@ import { type ArtContext } from './art-ui.ts';
 import { lootAfter, lootClick, lootPage, lootSubmit } from './loot-tab.ts';
 import { GameDown, api, rerender, toast, view, type Tab } from './gods-view/core.ts';
 import { worldTab } from './gods-view/world.ts';
+import { skyTab } from './gods-view/sky.ts';
 import { wishesTab } from './gods-view/wishes.ts';
 import { rulesTab } from './gods-view/rules.ts';
 import { modsTab } from './gods-view/mods.ts';
@@ -30,6 +31,7 @@ const artContext: ArtContext = { api, toast, rerender };
 /** Every tab, in the order the tab bar shows them. Art has moved to /art-studio.html. */
 const TABS: Tab[] = [
   worldTab,
+  skyTab,
   wishesTab,
   modsTab,
   rulesTab,

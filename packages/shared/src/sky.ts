@@ -21,6 +21,8 @@ export interface SkyConfig extends SkyTiming {
   fadeSeconds?: number;
   /** The Owner's weather odds for some lands, in place of the game's own (BIOME_WEATHER). */
   odds?: Partial<Record<BiomeId, Partial<Record<Weather, number>>>>;
+  /** Weather set now over some lands (God's View, Sky tab), by region id, until a server time; then their usual odds return. */
+  forced?: Record<string, { weather: Weather; until: number }>;
 }
 
 /** A two-hour day with a third of it night, weather spells of 45 minutes that roll in over a minute. */
@@ -28,6 +30,13 @@ export const DEFAULT_SKY: SkyConfig = { dayMinutes: 120, weatherMinutes: 45, wea
 
 /** Shortest and longest days and weather spells, so a typo cannot strobe the sky or stop it. */
 export const SKY_LIMITS = { minDayMinutes: 10, maxDayMinutes: 7 * 24 * 60, minMinutes: 2, maxMinutes: 24 * 60, maxFadeSeconds: 600, maxOdds: 10 };
+
+/** The same sky with `weather` over one land from `now` for one spell, then its usual odds again. */
+export function forceWeather(sky: SkyConfig, regionId: string, weather: Weather, now: number): SkyConfig {
+  const forced = Object.fromEntries(Object.entries(sky.forced ?? {}).filter(([, f]) => f.until > now));
+  forced[regionId] = { weather, until: now + sky.weatherMinutes * 60_000 };
+  return { ...sky, forced };
+}
 
 /** A sky config with every number within bounds. */
 export function cleanSky(raw: Partial<SkyConfig> = {}): SkyConfig {
@@ -44,6 +53,8 @@ export function cleanSky(raw: Partial<SkyConfig> = {}): SkyConfig {
   };
   const odds = cleanOdds(raw.odds);
   if (odds) sky.odds = odds;
+  const forced = Object.entries(raw.forced ?? {}).filter(([, f]) => f && WEATHERS.includes(f.weather) && Number.isFinite(f.until));
+  if (forced.length) sky.forced = Object.fromEntries(forced.map(([id, f]) => [id, { weather: f.weather, until: f.until }]));
   const a = raw.anchor;
   if (a && [a.at, a.phase, a.spell].every((n) => typeof n === 'number' && Number.isFinite(n))) {
     sky.anchor = { at: a.at, phase: a.phase - Math.floor(a.phase), spell: a.spell };
@@ -153,11 +164,15 @@ function weatherOfSpell(regionId: string, biome: BiomeId, spell: number, sky: Sk
 /** The weather over a region at `ms`: the same answer on every server and screen. */
 export function weatherAt(regionId: string, biome: BiomeId, ms: number, sky: SkyConfig): Weather {
   if (!sky.weather) return 'clear';
+  const forced = sky.forced?.[regionId];
+  if (forced && ms < forced.until) return forced.weather;
   return weatherOfSpell(regionId, biome, Math.floor(spellCount(ms, sky)), sky);
 }
 
 /** The weather that comes next over a region, and when it starts. */
 export function nextWeather(regionId: string, biome: BiomeId, ms: number, sky: SkyConfig): { weather: Weather; at: number } {
+  const forced = sky.forced?.[regionId];
+  if (sky.weather && forced && ms < forced.until) return { weather: weatherAt(regionId, biome, forced.until, sky), at: forced.until };
   const at = spellEnds(ms, sky);
   return { weather: sky.weather ? weatherOfSpell(regionId, biome, Math.floor(spellCount(ms, sky)) + 1, sky) : 'clear', at };
 }

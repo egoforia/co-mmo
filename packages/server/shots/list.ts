@@ -316,6 +316,13 @@ export const SHOTS: Shot[] = [
     mustSee: ['tabs along the top, the first tab filled in', 'no error text'],
   },
   {
+    name: 'gods-view-sky',
+    about: "God's View Sky tab: day length presets, the night share, the 24-hour strip, weather odds per land and the event tools.",
+    page: '/gods-view.html#sky',
+    ready: '#sky-form',
+    mustSee: ['a strip showing night, dawn, day, dusk and night again with a mark for now', 'day length buttons from 1 h to 24 h and Follow the real day', 'a table of weather odds by land with sliders', 'Set the hour now and Change the weather in a land now', 'nothing cut off or overlapping'],
+  },
+  {
     name: 'gods-view-monsters',
     about: "God's View Monsters tab: every kind of monster with its size and loot, one size form open.",
     page: '/gods-view.html',

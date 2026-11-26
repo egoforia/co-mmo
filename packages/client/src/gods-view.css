@@ -420,3 +420,21 @@ pre.prompt mark { background: rgba(254, 174, 52, 0.28); color: var(--ink); }
 .tag.dodged { background: #444; color: #aaa; font-size: 10px; padding: 1px 4px; border-radius: 3px; }
 .log-breakdown { font-size: 10px; opacity: 0.65; margin-top: 2px; }
 .log-time { font-family: ui-monospace, monospace; opacity: 0.6; font-size: 11px; }
+
+/* --- Sky tab --- */
+.sky-strip { position: relative; display: flex; height: 26px; max-width: 640px; border: 1px solid var(--edge); font-size: 11px; line-height: 26px; text-align: center; margin: 8px 0 4px; }
+.sky-strip span { overflow: hidden; white-space: nowrap; }
+.sky-strip .sky-night { background: #2b2f5c; color: var(--muted); }
+.sky-strip .sky-dawn, .sky-strip .sky-dusk { background: #b9785e; color: #fff; }
+.sky-strip .sky-day { background: #e7d38a; color: #2b2333; }
+.sky-strip i { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--accent); }
+#sky-form { max-width: 760px; }
+.sky-odds { min-width: 640px; }
+.sky-odds td, .sky-odds th { padding: 4px 6px; }
+.sky-odds input[type='range'] { width: 56px; }
+.sky-event { margin-top: 24px; }
+.sky-odds th small { color: var(--muted); font-weight: normal; }
+#sky-form button.on { border-color: var(--accent); color: var(--accent); }
+#sky-form span button, .form.inline span button { flex: none; }
+.form .row { display: flex; gap: 8px; }
+.scroll { overflow-x: auto; }

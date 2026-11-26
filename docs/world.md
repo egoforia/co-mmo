@@ -167,6 +167,14 @@ screen agree without telling each other.
   reaches every region server in the world state, and each region tells its
   players in a `sky` message carrying the new config and the server's
   clock.
+- **God's View, Sky tab** (`client/src/gods-view/sky.ts`, routes in
+  `server/src/sky-settings.ts`): the Owner sets the day length (presets 1 h
+  to 24 h, or "Follow the real day", which lines the game's hour up with the
+  Owner's clock), the night share, the spell length, the fade, weather on or
+  off, and each land type's weather odds ("Back to the game's odds" undoes
+  them). The Owner and Stewards can set the hour now, or call a weather over
+  one land for one spell (`SkyConfig.forced`), for events. Lands with weather
+  fixed in the world editor are left alone. Every change goes in the journal.
 - NPCs keep game hours, so a longer day makes their shifts longer in real
   time; the night share is the knob for that.
 

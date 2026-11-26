@@ -22,6 +22,8 @@ import {
   type CallingId,
   type Character,
   type ServerMessage,
+  DEFAULT_SKY,
+  nextHour,
 } from '@co-mmo/shared';
 import { Region, type Connection } from './region.ts';
 
@@ -124,7 +126,8 @@ function faceTowards(region: Region, id: string, creatureId: string): void {
 
 /** One fight, start to finish. */
 export function fight(calling: CallingId, level: number, scene: Scene, seed = 1): FightResult {
-  const clock = { now: 1_000_000_000 };
+  // Early evening, before dark, as the fights were tuned in.
+  const clock = { now: nextHour(18.67, 1_000_000_000, DEFAULT_SKY) };
   const region = new Region(regionDef(LAND)!, undefined, () => clock.now, seeded(seed));
   const map = region.map;
   // Everyone else in the land goes far off, and the ground about the spot is cleared.

@@ -9,10 +9,12 @@ import {
   regionFromWish,
   removeContent,
   validateLoot,
+  validateFit,
   validateSize,
   wishArtKey,
   type ContentEntry,
   type LootWish,
+  type FitWish,
   type SizeWish,
   type RaceId,
 } from '@co-mmo/shared';
@@ -145,8 +147,15 @@ export class Granting {
     return this.grantFromGodsView(by, definition);
   }
 
+  /** The Art Studio choosing how a picture sits on its tiles (asset-fit.ts): saved and undone like a wish. */
+  setFit(by: { id: string; name: string }, raw: unknown): ContentRecord {
+    const definition = validateFit(raw);
+    if (typeof definition === 'string') throw new WishError(definition);
+    return this.grantFromGodsView(by, definition);
+  }
+
   /** A change made in God's View, granted at once: saved, applied here and sent to every region server and browser. */
-  private grantFromGodsView(by: { id: string; name: string }, definition: LootWish | SizeWish): ContentRecord {
+  private grantFromGodsView(by: { id: string; name: string }, definition: LootWish | SizeWish | FitWish): ContentRecord {
     const record: ContentRecord = {
       id: newWishId(this.now()),
       wisher: { id: by.id, name: by.name },

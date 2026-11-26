@@ -34,6 +34,7 @@ import { pictureName } from '../assets/names.ts';
 import { kitPieces } from '../assets/sea-cave-kit.ts';
 import { wildKit } from '../assets/wild-kit.ts';
 import { HOME_LAND_ANCHORS, homeLandBox } from '../assets/home-land-art.ts';
+import { readyOfState } from '../assets/gather-spot-anchors.ts';
 import { artRequest, estimateImageUsd } from '../assets/wish-art.ts';
 import { normalMapId } from '../normal-painter.ts';
 import type { ArtUse } from '../settings.ts';
@@ -82,10 +83,14 @@ export class ArtCatalog {
     for (const a of ANCHORS) {
       // A home land's creatures and people, craft tools, spots, materials and skill effects are painted the first time here.
       const paintable = Boolean(shipped[a.id] || homeLandBox(a.id));
-      const repaintable = paintable;
+      // A spot's Picked and Growing pictures are painted from its Ready picture, so that comes first.
+      const ready = readyOfState(a.id);
+      const waits = ready !== undefined && url(ready).source === 'missing';
+      const repaintable = paintable && !waits;
+      const why = !paintable ? 'Not part of the game yet.' : waits ? 'Paint its Ready picture first: this one is painted from it.' : undefined;
       const resolvedUrl = url(a.id);
       const meta = anchorMeta(a, resolvedUrl.source === 'missing', (id) => url(id).url);
-      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...resolvedUrl, estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, biome: a.biome, kind: a.kind, ...meta, ...(paintable ? {} : { why: 'Not part of the game yet.' }) });
+      items.push({ id: a.id, name: a.name ?? a.id, place: shippedPlace(a), ...resolvedUrl, estimateUsd: this.pictureUsd(useOf(a)), repaintable, takesNote: true, biome: a.biome, kind: a.kind, ...meta, ...(why ? { why } : {}) });
     }
     // Lands' buildings after their scenery, so each land's page and the list of lands start with the launch kit.
     for (const style of Object.values(BUILDING_STYLES)) {
@@ -123,7 +128,7 @@ export class ArtCatalog {
     const kits = new Map<BiomeId, ContentRecord>();
     for (const record of this.options.store.content) {
       const def = record.definition;
-      if (record.status !== 'granted' || !def || def.kind === 'recipe' || def.kind === 'loot' || def.kind === 'size' || def.kind === 'calling' || def.kind === 'skill') continue;
+      if (record.status !== 'granted' || !def || def.kind === 'recipe' || def.kind === 'loot' || def.kind === 'size' || def.kind === 'fit' || def.kind === 'calling' || def.kind === 'skill') continue;
       const item = (id: string, pictured: PicturedWish, art?: string): ArtItem => {
         const kept = record.artPrompts?.[id];
         return {
@@ -230,7 +235,18 @@ export class ArtCatalog {
   /** One group's pictures that can be painted again; refused when there are none. */
   async group(groupId: string): Promise<{ title: string; items: ArtItem[] }> {
     const painted: ArtManifest = { ...(await this.options.wishes.kitManifest()), ...this.options.buildings.manifest() };
-    const group = groupsOf(await this.items(await this.options.shipped(), painted)).find((g) => g.id === groupId);
+    const all = await this.items(await this.options.shipped(), painted);
+    // `spot-states:<spot kind or land>`: the Picked and Growing pictures not painted yet, of one spot or every spot of a land.
+    const states = /^spot-states:([\w-]+)$/.exec(groupId)?.[1];
+    if (states !== undefined) {
+      const items = all.filter((i) => {
+        const ready = readyOfState(i.id);
+        return ready && i.repaintable && i.source === 'missing' && (ready === SPOTS[states]?.art || SPOTS[ready.slice('spot-'.length)]?.biome === states);
+      });
+      if (!items.length) throw new ArtRequestError('Every state picture there is painted, or its Ready picture is not painted yet.');
+      return { title: SPOTS[states]?.name ?? landName(states as Parameters<typeof landName>[0]), items };
+    }
+    const group = groupsOf(all).find((g) => g.id === groupId);
     if (!group) throw new ArtRequestError('There is no group of pictures by that name.');
     const items = group.items.filter((i) => i.repaintable && i.source !== 'missing');
     if (!items.length) throw new ArtRequestError('Nothing in that group can be painted again.');
@@ -326,7 +342,7 @@ export class ArtCatalog {
     } else if (def?.kind === 'rule') {
       const key = Object.keys(def.items).find((k) => ruleItemId(record.id, k) === pictureId);
       if (key) return artRequest({ kind: 'item', ...def.items[key]! } as Parameters<typeof artRequest>[0], 'sanctum').prompt;
-    } else if (def && def.kind !== 'recipe' && def.kind !== 'loot' && def.kind !== 'size' && def.kind !== 'calling' && def.kind !== 'skill') {
+    } else if (def && def.kind !== 'recipe' && def.kind !== 'loot' && def.kind !== 'size' && def.kind !== 'fit' && def.kind !== 'calling' && def.kind !== 'skill') {
       return artRequest(def, 'sanctum').prompt;
     }
     throw new ArtRequestError('That wish has no picture by that name.');

@@ -5,18 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI Art Studio · co-MMO</title>
     <link rel="stylesheet" href="/src/art-studio.css" />
+    <link rel="stylesheet" href="/src/art-studio/shell.css" />
   </head>
-  <body>
-    <header class="studio-header">
+  <body class="studio-body">
+    <header class="studio-top" id="studio-top">
       <h1>✦ AI Art Studio</h1>
-      <span id="you"></span>
+      <nav class="workspaces" id="workspaces" aria-label="Workspaces"></nav>
+      <nav class="top-pages" id="top-pages" aria-label="Map editor and models"></nav>
       <div class="header-links">
-        <button type="button" class="quiet" id="toggle-api-log">📡 Art API Call Log</button>
+        <span id="you"></span>
+        <button type="button" class="quiet" id="toggle-api-log">API log</button>
         <a href="/gods-view.html">God's View</a>
         <a href="/">Back to the world</a>
       </div>
+      <nav class="pane-tabs" aria-label="Show">
+        <button type="button" data-pane-tab="assets">Assets</button>
+        <button type="button" data-pane-tab="page">Page</button>
+        <button type="button" data-pane-tab="inspector">Inspector</button>
+      </nav>
     </header>
-    <main id="main"><p class="note">Loading AI Art Studio…</p></main>
+    <div class="studio-frame" id="studio">
+      <aside class="dock dock-left" id="dock-left" aria-label="Assets"><h2 class="dock-title">Assets</h2><p class="note">Loading…</p></aside>
+      <div class="grip" data-grip="left" role="separator" aria-orientation="vertical" title="Drag to widen (double click: as it was)"></div>
+      <main id="main"><p class="note">Loading AI Art Studio…</p></main>
+      <div class="grip" data-grip="right" role="separator" aria-orientation="vertical" title="Drag to widen (double click: as it was)"></div>
+      <aside class="dock dock-right" id="dock-right" aria-label="Inspector"></aside>
+      <section class="frames" id="frames" aria-label="Frames" hidden></section>
+      <footer class="strip" id="strip"></footer>
+    </div>
     <section id="studio-api-log-drawer" class="api-log-drawer" hidden>
       <header class="studio-split-header">
         <h2>📡 Art &amp; Media API Call Log</h2>

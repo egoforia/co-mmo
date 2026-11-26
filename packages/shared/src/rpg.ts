@@ -137,6 +137,8 @@ export interface Character {
   masteries?: CraftId[];
   /** Set once the free tools of their people's home crafts were given. */
   homeTools?: boolean;
+  /** When each gathering spot they emptied grows back for them, by land and spot (spot-states.ts regrowKey). */
+  regrow?: Record<string, number>;
 }
 
 /** Favor a new character starts with: enough for a first small wish or two. */

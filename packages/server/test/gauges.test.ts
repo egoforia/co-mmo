@@ -21,8 +21,13 @@ import {
   type CallingId,
   type PlayerInfo,
   type ServerMessage,
+  DEFAULT_SKY,
+  nextHour,
 } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
+
+/** Mid-morning, as these fights were tuned in: the hour a 1,000,000 ms clock stood at under the old one-hour day. */
+const MORNING = nextHour(6.67, 1_000_000, DEFAULT_SKY);
 
 // The signature gauges (region/gauges.ts, docs/callings-build-plan.md step
 // 6): each fills, empties and is spent as docs/classes.md says, and the
@@ -57,7 +62,7 @@ function ability(effect: AbilityDef['effect'], more: Partial<AbilityDef> = {}): 
  * `foe`, which `near()` brings beside her. Dice roll `dice.v` (the middle).
  */
 function setup(calling: CallingId | undefined, regionId = 'woods', abilities: string[] = []) {
-  const clock = { now: 1_000_000 };
+  const clock = { now: MORNING };
   const dice = { v: 0.5 };
   const region = new Region(regionDef(regionId)!, undefined, () => clock.now, () => dice.v);
   // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).

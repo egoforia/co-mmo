@@ -243,9 +243,9 @@ PUBLIC_URL=http://localhost:3001 npm start
 | `DB_DIR` | `db/` next to `DATA_FILE` | Folder of the built-in Postgres, used when `DATABASE_URL` is not set |
 | `REDIS_URL` | none | Redis for the paint queue, shared by servers and kept across restarts ([docs/scale.md](docs/scale.md)) |
 | `REGION_SERVERS` | none | How many region servers `npm run dev` starts beside the game (needs `REDIS_URL`; [docs/scale.md](docs/scale.md)) |
-| `DAY_MINUTES` | `60` | Real minutes in one game day, dawn to dawn |
-| `WEATHER_MINUTES` | `20` | Real minutes each spell of weather lasts before it may turn |
-| `WEATHER` | on | `off` keeps every land's sky clear |
+| `DAY_MINUTES` | `120` | Real minutes in one game day, dawn to dawn (a sky saved in God's View wins) |
+| `WEATHER_MINUTES` | `45` | Real minutes each spell of weather lasts before it may turn (a sky saved in God's View wins) |
+| `WEATHER` | on | `off` keeps every land's sky clear, even over a saved sky |
 | `NET_COMPRESS` | on | `off` sends to players uncompressed ([docs/scale.md](docs/scale.md), Smooth play on any connection) |
 | `NET_SKIP_STALE` | on | `off` never skips a snapshot for a player whose connection has fallen behind |
 | `DATA_FILE` | `data/world.json` | An older game's world file, brought into Postgres on its first run; its folder holds `db/` and `art/` |

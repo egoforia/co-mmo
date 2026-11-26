@@ -48,6 +48,7 @@ export * from './light.ts';
 export * from './lighting.ts';
 export * from './mods.ts';
 export * from './sky.ts';
+export * from './sky-clock.ts';
 export * from './routines.ts';
 export * from './lands.ts';
 export * from './home-lands.ts';

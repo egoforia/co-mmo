@@ -17,10 +17,15 @@ import {
   type ServerMessage,
   goldOf,
   setGold,
+  DEFAULT_SKY,
+  nextHour,
 } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 import { Store } from '../src/store.ts';
 import { account, app, joined, start, wish } from './helpers.ts';
+
+/** Mid-morning, as these fights were tuned in: the hour a 1,000,000 ms clock stood at under the old one-hour day. */
+const MORNING = nextHour(6.67, 1_000_000, DEFAULT_SKY);
 
 function fakeConn() {
   const messages: ServerMessage[] = [];
@@ -34,7 +39,7 @@ const of = <T extends ServerMessage['t']>(c: { messages: ServerMessage[] }, t: T
 const notices = (c: { messages: ServerMessage[] }) => of(c, 'notice').map((m) => m.text);
 
 function setup(id: string) {
-  const clock = { now: 1_000_000 };
+  const clock = { now: MORNING };
   const region = new Region(regionDef(id)!, undefined, () => clock.now, () => 0.5);
   // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
   region.map.safe = [];
@@ -329,7 +334,7 @@ describe('people from the world editor', () => {
       return [Math.floor(m.x) + 2, Math.floor(m.y)] as [number, number];
     })();
     const draft = EDIT_KINDS.person.make({ at }, { name: 'Hesper', look: 'shore-trader', greeting: 'Mind the forge.', wares: 'tools:smithing', buys: true, teaches: 'none', masters: 'smithing', day: 'tireless' });
-    const region = new Region({ ...def, edits: [stampEdit(draft, { id: 'e1', by: 'Ego', made: 0 }, {})] }, undefined, () => 1_000_000, () => 0.5);
+    const region = new Region({ ...def, edits: [stampEdit(draft, { id: 'e1', by: 'Ego', made: 0 }, {})] }, undefined, () => MORNING, () => 0.5);
     // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
     region.map.safe = [];
     const conn = fakeConn();
@@ -356,7 +361,7 @@ describe('people from the world editor', () => {
     const quest = EDIT_KINDS.quest.make({ at, target: 'e1:person' }, { title: 'Crabs Again', offer: 'The crabs are back.', thanks: 'Thank you.', goal: 'defeat', creature: 'thorn-wolf', item: 'tonic', count: 2, xp: 30, gold: 10 });
     const snow = EDIT_KINDS.land.make({ at }, { weather: 'snow', arrive: false });
     const edits = [person, quest, snow].map((d, i) => stampEdit(d, { id: `e${i + 1}`, by: 'Ego', made: 0 }, {}));
-    const region = new Region({ ...def, edits }, undefined, () => 1_000_000, () => 0.5);
+    const region = new Region({ ...def, edits }, undefined, () => MORNING, () => 0.5);
     // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
     region.map.safe = [];
     expect(region.sky().weather).toBe('snow');

@@ -31,6 +31,7 @@ import {
   type RegionMap,
   type Side,
   type SnapshotMessage,
+  type SkyConfig,
   type Weather,
   type WelcomeMessage,
   type WorldEdit,
@@ -419,6 +420,11 @@ export class WorldScene extends Phaser.Scene {
     if (whenChanged && key === this.floorKey) return;
     this.floorKey = key;
     applyFloorView(this, this.drawn, this.welcome.region.def.id, this.map, this.shown, this.shownFloor);
+  }
+
+  /** How the sky turns changed (God's View, Sky tab). */
+  setSkyConfig(config: SkyConfig, now: number): void {
+    this.sky.setConfig(config, now);
   }
 
   /** The weather over our land turned. */

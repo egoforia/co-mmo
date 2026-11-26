@@ -1,5 +1,6 @@
 import type { BiomeId } from './biomes.ts';
 import { hash2 } from './random.ts';
+import { NIGHT_SHARE_LIMITS, spellCount, spellEnds, type SkyTiming } from './sky-clock.ts';
 
 // The sky over the world: a day that turns into night and weather that comes
 // and goes, land by land. Both follow from the time and the region alone, so
@@ -8,33 +9,63 @@ import { hash2 } from './random.ts';
 // Colours here are a light grade multiplied over the scene, like a biome's
 // light tint: nothing is drawn.
 
-/** How the sky turns, from `.env` (DAY_MINUTES, WEATHER_MINUTES, WEATHER). */
-export interface SkyConfig {
+/** How the sky turns: saved from God's View's Sky tab, first from `.env` (DAY_MINUTES, WEATHER_MINUTES, WEATHER). */
+export interface SkyConfig extends SkyTiming {
   /** Real minutes in one game day, dawn to dawn. */
   dayMinutes: number;
   /** Real minutes a spell of weather lasts before the next one. */
   weatherMinutes: number;
   /** False keeps every land clear. */
   weather: boolean;
+  /** Seconds a new weather takes to roll in on screen; unset, about a second. */
+  fadeSeconds?: number;
+  /** The Owner's weather odds for some lands, in place of the game's own (BIOME_WEATHER). */
+  odds?: Partial<Record<BiomeId, Partial<Record<Weather, number>>>>;
 }
 
-/** One game day an hour, and weather that changes about every twenty minutes. */
-export const DEFAULT_SKY: SkyConfig = { dayMinutes: 60, weatherMinutes: 20, weather: true };
+/** A two-hour day with a third of it night, weather spells of 45 minutes that roll in over a minute. */
+export const DEFAULT_SKY: SkyConfig = { dayMinutes: 120, weatherMinutes: 45, weather: true, nightShare: 1 / 3, fadeSeconds: 60 };
 
-/** Shortest and longest day and weather spells, so a typo cannot strobe the sky or stop it. */
-export const SKY_LIMITS = { minMinutes: 2, maxMinutes: 24 * 60 };
+/** Shortest and longest days and weather spells, so a typo cannot strobe the sky or stop it. */
+export const SKY_LIMITS = { minDayMinutes: 10, maxDayMinutes: 7 * 24 * 60, minMinutes: 2, maxMinutes: 24 * 60, maxFadeSeconds: 600, maxOdds: 10 };
 
 /** A sky config with every number within bounds. */
 export function cleanSky(raw: Partial<SkyConfig> = {}): SkyConfig {
-  const minutes = (v: unknown, fallback: number) => {
+  const within = (v: unknown, lo: number, hi: number, fallback: number) => {
     const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? Math.min(SKY_LIMITS.maxMinutes, Math.max(SKY_LIMITS.minMinutes, n)) : fallback;
+    return v !== undefined && v !== null && Number.isFinite(n) && n >= 0 ? Math.min(hi, Math.max(lo, n)) : fallback;
   };
-  return {
-    dayMinutes: minutes(raw.dayMinutes, DEFAULT_SKY.dayMinutes),
-    weatherMinutes: minutes(raw.weatherMinutes, DEFAULT_SKY.weatherMinutes),
+  const sky: SkyConfig = {
+    dayMinutes: Number(raw.dayMinutes) > 0 ? within(raw.dayMinutes, SKY_LIMITS.minDayMinutes, SKY_LIMITS.maxDayMinutes, DEFAULT_SKY.dayMinutes) : DEFAULT_SKY.dayMinutes,
+    weatherMinutes: Number(raw.weatherMinutes) > 0 ? within(raw.weatherMinutes, SKY_LIMITS.minMinutes, SKY_LIMITS.maxMinutes, DEFAULT_SKY.weatherMinutes) : DEFAULT_SKY.weatherMinutes,
     weather: raw.weather !== false,
+    nightShare: within(raw.nightShare, NIGHT_SHARE_LIMITS.min, NIGHT_SHARE_LIMITS.max, DEFAULT_SKY.nightShare!),
+    fadeSeconds: within(raw.fadeSeconds, 0, SKY_LIMITS.maxFadeSeconds, DEFAULT_SKY.fadeSeconds!),
   };
+  const odds = cleanOdds(raw.odds);
+  if (odds) sky.odds = odds;
+  const a = raw.anchor;
+  if (a && [a.at, a.phase, a.spell].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+    sky.anchor = { at: a.at, phase: a.phase - Math.floor(a.phase), spell: a.spell };
+  }
+  return sky;
+}
+
+/** The Owner's odds with only known lands and weathers, each 0 to 10; none left is none at all. */
+function cleanOdds(raw: SkyConfig['odds']): SkyConfig['odds'] | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: NonNullable<SkyConfig['odds']> = {};
+  for (const biome of Object.keys(BIOME_WEATHER) as BiomeId[]) {
+    const given = raw[biome];
+    if (!given || typeof given !== 'object') continue;
+    const odds: Partial<Record<Weather, number>> = {};
+    for (const w of WEATHERS) {
+      const n = Number(given[w]);
+      if (given[w] !== undefined && Number.isFinite(n) && n > 0) odds[w] = Math.min(SKY_LIMITS.maxOdds, n);
+    }
+    if (Object.keys(odds).length) out[biome] = odds;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 // --- Day and night -------------------------------------------------------------
@@ -46,12 +77,6 @@ const DAWN = 5;
 const DAY = 7;
 const DUSK = 18;
 const NIGHT = 20;
-
-/** Where the day is at `ms`, from 0 (midnight) to just under 1. */
-export function dayPhase(ms: number, sky: SkyConfig): number {
-  const day = sky.dayMinutes * 60_000;
-  return (((ms % day) + day) % day) / day;
-}
 
 /** The game's hour, 0 to just under 24. */
 export function gameHour(phase: number): number {
@@ -87,6 +112,9 @@ function glow(phase: number): number {
 
 export type Weather = 'clear' | 'cloudy' | 'rain' | 'storm' | 'fog' | 'snow' | 'sandstorm';
 
+/** Every kind of weather, in the order God's View lists them. */
+export const WEATHERS: Weather[] = ['clear', 'cloudy', 'rain', 'storm', 'fog', 'snow', 'sandstorm'];
+
 /** How likely each weather is in each land; a land's character shows in its sky. */
 export const BIOME_WEATHER: Record<BiomeId, Partial<Record<Weather, number>>> = {
   sanctum: { clear: 6, cloudy: 2, rain: 1 },
@@ -108,15 +136,30 @@ function seedOf(id: string): number {
   return h | 0;
 }
 
-/** The weather over a region at `ms`: the same answer on every server and screen. */
-export function weatherAt(regionId: string, biome: BiomeId, ms: number, sky: SkyConfig): Weather {
-  if (!sky.weather) return 'clear';
-  const spell = Math.floor(ms / (sky.weatherMinutes * 60_000));
-  const odds = Object.entries(BIOME_WEATHER[biome] ?? { clear: 1 }) as [Weather, number][];
+/** How likely each weather is over a land: the Owner's odds where set, else the game's own. */
+export function weatherOdds(biome: BiomeId, sky: Pick<SkyConfig, 'odds'>): Partial<Record<Weather, number>> {
+  return sky.odds?.[biome] ?? BIOME_WEATHER[biome] ?? { clear: 1 };
+}
+
+/** The weather a land has in spell number `spell`: the same answer on every server and screen. */
+function weatherOfSpell(regionId: string, biome: BiomeId, spell: number, sky: SkyConfig): Weather {
+  const odds = Object.entries(weatherOdds(biome, sky)) as [Weather, number][];
   const total = odds.reduce((s, [, w]) => s + w, 0);
   let r = (hash2(spell, 7, seedOf(regionId)) / 4294967296) * total;
   for (const [weather, w] of odds) if ((r -= w) < 0) return weather;
   return 'clear';
+}
+
+/** The weather over a region at `ms`: the same answer on every server and screen. */
+export function weatherAt(regionId: string, biome: BiomeId, ms: number, sky: SkyConfig): Weather {
+  if (!sky.weather) return 'clear';
+  return weatherOfSpell(regionId, biome, Math.floor(spellCount(ms, sky)), sky);
+}
+
+/** The weather that comes next over a region, and when it starts. */
+export function nextWeather(regionId: string, biome: BiomeId, ms: number, sky: SkyConfig): { weather: Weather; at: number } {
+  const at = spellEnds(ms, sky);
+  return { weather: sky.weather ? weatherOfSpell(regionId, biome, Math.floor(spellCount(ms, sky)) + 1, sky) : 'clear', at };
 }
 
 /** How each weather greys or warms the light, multiplied over the scene. */
@@ -146,6 +189,20 @@ export function skyWords(phase: number, weather: Weather): string {
   const sky = { clear: 'clear skies', cloudy: 'cloudy', rain: 'rain', storm: 'a storm', fog: 'fog', snow: 'snow', sandstorm: 'a sandstorm' }[weather];
   return `${part}, ${sky}`;
 }
+
+/** How long before the weather turns players are told it is coming. */
+export const WEATHER_SOON_MS = 2 * 60_000;
+
+/** What players hear a little before the weather turns. */
+export const WEATHER_SOON: Record<Weather, string> = {
+  clear: 'The clouds are thinning. Clear skies are on the way.',
+  cloudy: 'Clouds are gathering on the horizon.',
+  rain: 'The air smells of rain.',
+  storm: 'Dark clouds gather. A storm is coming.',
+  fog: 'A mist is rising. Fog will soon roll in.',
+  snow: 'The air turns bitter cold. Snow is on the way.',
+  sandstorm: 'The wind is picking up sand. A sandstorm is coming.',
+};
 
 /** What players hear when the weather turns. */
 export const WEATHER_NEWS: Record<Weather, string> = {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SKY,
+  nextHour,
   TICK_RATE,
   addStairs,
   addStorey,
@@ -24,7 +25,8 @@ function fakeConn() {
 
 const info = (id: string): PlayerInfo => ({ id, name: id, color: 0xffffff, role: 'player' });
 const DAY = DEFAULT_SKY.dayMinutes * 60_000;
-const hour = (h: number) => DAY * 10 + (h / 24) * DAY;
+/** The clock at game hour `h` of the eleventh day. */
+const hour = (h: number) => nextHour(h, DAY * 10, DEFAULT_SKY);
 
 /** The woods at an hour, the cottage with its floors, and a player standing in it. */
 function cottage(h = 12) {

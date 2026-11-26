@@ -53,6 +53,8 @@ export interface Settings {
   workshop?: WorkshopSettings;
   /** How fights play (God's View, Combat page; missing in older saves: shared combatRules fills it in). */
   combat?: import('@co-mmo/shared').CombatRules;
+  /** How the sky turns (God's View, Sky tab; missing in older saves: .env's sky). */
+  sky?: import('@co-mmo/shared').SkyConfig;
   /** Characters one account may have (God's View, Players tab; missing in older saves: DEFAULT_MAX_CHARACTERS). */
   characters?: { max: number };
 }

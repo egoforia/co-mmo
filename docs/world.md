@@ -140,6 +140,36 @@ Biomes that are not yet in the world, ready for wished regions
 Falcon's old watch-towers), Ember Wastes and Murkmire Swamp. A region wished at the world's edge is the young God
 remembering a place the Hush took, or dreaming a new one.
 
+## Sky: day, night and weather
+
+The sky is worked out from the clock alone (`packages/shared/src/sky.ts`,
+`sky-clock.ts`), so the gateway, every region server and every player's
+screen agree without telling each other.
+
+- **A game day** is 2 real hours by default, with night (game hours 20 to 5)
+  a third of it. The **night share** warps the hours: night's hours pass
+  faster or slower, while dawn (5 to 7), day (7 to 18) and dusk (18 to 20)
+  keep their game hours, so lights, NPC routines, creatures, scripted rules
+  and quests all follow with no change.
+- **Weather** comes in spells of 45 minutes, picked per land from its odds
+  (`BIOME_WEATHER`, or the Owner's own). A new weather rolls in over a
+  minute (`fadeSeconds`), and players are told two minutes before it turns
+  (`WEATHER_SOON`). A land given its own weather in the world editor keeps
+  it.
+- **The anchor.** The hour and the spell are counted from an anchor ("at
+  this server time, the day stood here and this many spells had passed").
+  A change of length makes a new anchor at now, so the hour and the weather
+  carry on instead of jumping (`retimeSky`). With no anchor the day starts at
+  the epoch, as it always did.
+- **Where it comes from.** A sky saved in God's View (`Settings.sky`) wins;
+  `.env` (`DAY_MINUTES`, `WEATHER_MINUTES`) is the first default.
+  `WEATHER=off` still keeps every land clear, for tests and shots. A change
+  reaches every region server in the world state, and each region tells its
+  players in a `sky` message carrying the new config and the server's
+  clock.
+- NPCs keep game hours, so a longer day makes their shifts longer in real
+  time; the night share is the knob for that.
+
 ## Tone
 
 - Cosy, mythic fantasy with real danger and real sadness under it. The Hush

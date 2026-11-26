@@ -52,6 +52,7 @@ import { openGameSocket } from './game-socket.ts';
 import type { NetOptions } from './socket-net.ts';
 import { tuningFor } from './region/far.ts';
 import { artFileReader, pointSources } from './hand-sources.ts';
+import { effectiveSky } from './sky-settings.ts';
 import { watchHitboxes } from './art-studio/hitboxes.ts';
 
 export interface AppOptions {
@@ -144,7 +145,7 @@ export function createApp(options: AppOptions): App {
   const { store } = options;
   // Each land is laid out with the world editor's saved changes over it.
   const now = options.now ?? options.wishes?.now ?? Date.now;
-  const world = new World(now, Math.random, options.sky, (regionId) => store.worldEdits(regionId).edits);
+  const world = new World(now, Math.random, effectiveSky(options.sky, store.settings.sky), (regionId) => store.worldEdits(regionId).edits);
   world.offlineCreatorXp = (playerId, amount) => store.addCreatorXp(playerId, amount);
   world.seeAcross = options.net?.seeAcross ?? true;
   world.tuning = tuningFor(options.net ?? { compress: true });

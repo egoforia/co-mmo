@@ -4,7 +4,7 @@
 // "now" give the hour and weather a shot asks for. Days are made long (about a
 // real day) so the light barely moves while the picture is taken.
 
-import { weatherAt, type BiomeId, type SkyConfig, type Weather } from '@co-mmo/shared';
+import { NATURAL_NIGHT_SHARE, weatherAt, type BiomeId, type SkyConfig, type Weather } from '@co-mmo/shared';
 
 const MINUTE = 60_000;
 /** About a real day per game day: an hour of light moves in an hour. */
@@ -20,13 +20,15 @@ export function pinnedSky(regionId: string, biome: BiomeId, hour: number, weathe
   // Whole days so far at a long day's length, then the length that lands `now` on the hour.
   const days = Math.floor(now / (LONG_DAY_MINUTES * MINUTE));
   const dayMinutes = now / (days + target) / MINUTE;
-  if (weather === 'clear') return { dayMinutes, weatherMinutes: LONG_SPELL_MINUTES, weather: false };
+  // The game's own night share, so the hour asked for is the hour shown; no fade, so the light is there at once.
+  const fixed = { nightShare: NATURAL_NIGHT_SHARE, fadeSeconds: 0 };
+  if (weather === 'clear') return { dayMinutes, weatherMinutes: LONG_SPELL_MINUTES, weather: false, ...fixed };
   // Try spell lengths until this land's spell at `now` has the weather, with time left in it.
   for (let tenths = LONG_SPELL_MINUTES * 10; tenths < LONG_SPELL_MINUTES * 30; tenths++) {
     const weatherMinutes = tenths / 10;
     const spell = weatherMinutes * MINUTE;
     if (spell - (now % spell) < SHOT_MINUTES * MINUTE) continue;
-    const sky = { dayMinutes, weatherMinutes, weather: true };
+    const sky = { dayMinutes, weatherMinutes, weather: true, ...fixed };
     if (weatherAt(regionId, biome, now, sky) === weather) return sky;
   }
   return `The ${biome} land never has ${weather}.`;

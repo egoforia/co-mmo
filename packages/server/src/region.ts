@@ -53,6 +53,9 @@ import {
   DEFAULT_SKY,
   floorName,
   WEATHER_NEWS,
+  WEATHER_SOON,
+  WEATHER_SOON_MS,
+  nextWeather,
   dayPhase,
   weatherAt,
   skyWords,
@@ -877,6 +880,8 @@ export class Region {
       skyPhase = sky.phase;
       weather = sky.weather;
       this.weatherTurns(weather);
+      this.skyRetimed(now, weather);
+      this.weatherSoon(now, weather);
     });
 
     phase('combat', () => this.combat.tick(now));
@@ -1031,6 +1036,32 @@ export class Region {
   /** What the region (or cell) `from` beside this one shows near its edge, counted from this region's corner (region/beyond.ts). */
   seeBeyond(from: string, ghosts: Ghosts): void {
     this.beyond.set(from, ghosts, this.s.tickCount);
+  }
+
+  /** The sky config last sent to players here, and its words, so a change is noticed once. */
+  private skySent?: { config: SkyConfig; key: string };
+  /** The spell end players here were last told is coming. */
+  private warnedFor = 0;
+
+  /** Tells everyone here how the sky turns when the Owner changed it, so every screen's hour moves at once. */
+  private skyRetimed(now: number, weather: Weather): void {
+    const config = this.skyConfig;
+    if (this.skySent?.config === config) return;
+    const key = JSON.stringify(config);
+    const changed = this.skySent && this.skySent.key !== key;
+    this.skySent = { config, key };
+    if (changed) this.broadcast({ t: 'sky', weather, config, now });
+  }
+
+  /** Tells everyone here a little before the weather turns, when spells are long enough for it to matter. */
+  private weatherSoon(now: number, weather: Weather): void {
+    const config = this.skyConfig;
+    if (this.map.weather || !config.weather || config.weatherMinutes * 60_000 < WEATHER_SOON_MS * 2) return;
+    const next = nextWeather(this.def.id, this.def.biome, now, config);
+    if (next.at - now > WEATHER_SOON_MS || next.at === this.warnedFor) return;
+    this.warnedFor = next.at;
+    if (next.weather === weather) return;
+    for (const p of this.s.players.values()) this.s.notice(p, WEATHER_SOON[next.weather]);
   }
 
   /** Tells everyone here when the weather turns (not when it is first worked out). */

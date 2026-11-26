@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { goldOf, setGold, newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
+import { DEFAULT_SKY, dayPhase, goldOf, retimeSky, setGold, newCharacter, type PlayerInfo, type ServerMessage } from '@co-mmo/shared';
 import { MemoryBus } from '../src/bus.ts';
 import type { Connection } from '../src/region.ts';
 import { RegionServer } from '../src/region-server.ts';
@@ -93,6 +93,26 @@ describe('regions on region servers', () => {
     expect(a.region('sanctum')!.position('m')!.y).toBeGreaterThan(start.y);
     expect(world.home.position('m')).toEqual(a.region('sanctum')!.position('m'));
     expect(world.places().find((p) => p.id === 'm')).toMatchObject({ regionId: 'sanctum' });
+  });
+
+  it('tells a player on a region server when the sky is retimed, keeping the hour', async () => {
+    const { world, server } = await gateway();
+    const a = await server('a');
+    await until(() => world.home.host === 'a');
+    const conn = fakeConn();
+    world.join(info('m', 'Mara'), conn, { regionId: 'sanctum', x: null, y: null }, newCharacter());
+    await settle();
+    a.tick();
+    await settle();
+    expect(conn.messages.some((m) => m.t === 'sky')).toBe(false);
+    const now = Date.now();
+    world.setSky(retimeSky(world.sky, { ...DEFAULT_SKY, dayMinutes: 360 }, now));
+    await settle();
+    a.tick();
+    await settle();
+    const sky = conn.messages.find((m) => m.t === 'sky') as Extract<ServerMessage, { t: 'sky' }>;
+    expect(sky.config?.dayMinutes).toBe(360);
+    expect(dayPhase(now, sky.config!)).toBeCloseTo(dayPhase(now, DEFAULT_SKY), 6);
   });
 
   it('walks a player from a region on one server into a region on another', async () => {

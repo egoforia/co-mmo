@@ -163,6 +163,11 @@ export class Wishes {
     return this.granting.setSize(by, raw);
   }
 
+  /** The Art Studio choosing how a picture sits on its tiles (asset-fit.ts). */
+  setFit(by: { id: string; name: string }, raw: unknown): ContentRecord {
+    return this.granting.setFit(by, raw);
+  }
+
   /** Undoes a granted wish everywhere. */
   rollback(id: string): ContentRecord | undefined {
     return this.granting.rollback(id);

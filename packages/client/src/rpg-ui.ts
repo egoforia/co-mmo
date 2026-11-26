@@ -19,7 +19,7 @@ import {
   type StatusView,
 } from '@co-mmo/shared';
 import { CHAPTERS } from './bible.ts';
-import { HeldStrike } from './held-strike.ts';
+import { HeldStrike, type SkillCast } from './held-strike.ts';
 import { InventoryWindow, type InventoryTab } from './inventory-ui.ts';
 import { BagInput } from './inventory/bag-input.ts';
 import { Docking } from './inventory/docking.ts';
@@ -32,6 +32,10 @@ const $ = (id: string) => document.getElementById(id)!;
 
 export interface RpgActions {
   attack(): void;
+  /** The skill readied for the next Space (kit-ui.ts), cast in place of a strike. */
+  readied?(): SkillCast | undefined;
+  /** Space came up while the readied skill still rested this long, ms. */
+  tooEarly?(restMs: number): void;
   interact(): void;
   use(item: string): void;
   /** Takes off what is worn in a slot. */
@@ -103,6 +107,8 @@ export class RpgUi {
       swing: () => {
         if (!this.actions.typing()) this.actions.attack();
       },
+      skill: () => (this.actions.typing() ? undefined : this.actions.readied?.()),
+      tooEarly: (ms) => this.actions.tooEarly?.(ms),
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('keyup', (e) => {

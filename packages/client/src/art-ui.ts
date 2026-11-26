@@ -117,8 +117,8 @@ export function afterArtRender(): void {
   }
 }
 
-/** Renders the AI Art Studio page as HTML. */
-export async function artPage(context: ArtContext, force = false): Promise<string> {
+/** Renders the AI Art Studio page as HTML; `only` keeps the page tabs to a workspace's. */
+export async function artPage(context: ArtContext, force = false, only?: readonly string[]): Promise<string> {
   artState.ctx = context;
   if (force || !artState.data) {
     let asked: { questions: HandQuestion[]; mirrored?: Record<string, string> };
@@ -172,12 +172,14 @@ export async function artPage(context: ArtContext, force = false): Promise<strin
     return '';
   };
 
+  // The Studio's workspaces show only their own pages' tabs (art-studio/workspaces.ts).
+  const tabs = only ? SUBTABS.filter(([id]) => only.includes(id)) : SUBTABS;
   const activeNavId = sub === 'now' ? 'queue' : sub === 'characters' || sub === 'monsters' ? 'entities' : sub;
 
   return `
     <p class="studio-status-bar">${o.imageModel ? `Pictures: <b>${esc(o.imageModel)}</b>` : '<b class="bad">No image model is set</b> (<a href="#models" data-art-go>AI Models tab</a>)'} · ${o.videoModel ? `Walks: <b>${esc(o.videoModel)}</b>` : 'Walks need Google AI Studio as the image model'} · ${budgetLine(o.budget)}</p>
     ${handStatusLine()}
-    <nav class="subtabs">${SUBTABS.map(([id, label]) => `<a href="${go(id)}" data-art-go${id === activeNavId ? ' aria-current="page"' : ''}>${label}${tabBadge(id)}</a>`).join('')}</nav>
+    ${tabs.length > 1 ? `<nav class="subtabs">${tabs.map(([id, label]) => `<a href="${go(id)}" data-art-go${id === activeNavId ? ' aria-current="page"' : ''}>${label}${tabBadge(id)}</a>`).join('')}</nav>` : ''}
     ${pages[sub]()}`;
 }
 

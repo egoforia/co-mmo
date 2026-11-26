@@ -290,6 +290,7 @@ function play(token: string): void {
         prayer?.setFavor(message.character.favor);
         scene?.setMyHeld(gatheringWith ?? heldItem(message.character), offHandItem(message.character));
         scene?.setSpotSense(sensesSpots(message.character));
+        scene?.setSpotTimers(message.character.regrow);
         break;
       case 'gather':
         // While gathering, the tool shows in the hand.

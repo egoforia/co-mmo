@@ -8,12 +8,14 @@ import {
   Tile,
   ITEMS,
   SPOTS,
+  SPOT_STATES,
   WINDOW_LIGHT,
   biomeLook,
   buildingKit,
   glowOf,
   nearBuilding,
   rand2,
+  spotStateArt,
   stairsLabel,
   storeyAt,
   type ArtManifest,
@@ -24,6 +26,7 @@ import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../ki
 import { fittedAt } from '../tile-stand.ts';
 import { dropLight, makeLight, placeLight } from '../lights.ts';
 import { standEdgeWalls } from './edge-walls.ts';
+import { stateOf, standSpot, type SpotView } from './spot-views.ts';
 import { PROJECTION } from '../projection.ts';
 import {
   propTexture,
@@ -281,12 +284,12 @@ const floors: FloorView[] = map.storeys.map((storey) => {
     }
   }
   placeLandmarks(scene, map, ox, oy, views, floors, art);
-  placeSpots(scene, map, ox, oy, art, kit);
+  const spots = placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);
   const objects = scene.children.list.filter((o) => !before.has(o));
   markScenery(objects);
   const lamps = placeLamps(scene, map, ox, oy, views);
-  return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls };
+  return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls, spots };
 }
 
 /** Landmarks: set pieces out in the land, furniture inside buildings, and furniture on the floors above and below. */
@@ -310,25 +313,19 @@ export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, 
   }
 }
 
-/** The picture a gathering spot shows: its own once painted, else its material's icon. */
-export function spotArt(scene: Phaser.Scene, kind: string): string | undefined {
-  const def = SPOTS[kind];
-  if (!def) return undefined;
-  if (scene.textures.exists(def.art)) return def.art;
-  const m = ITEMS[def.material];
-  return [m?.art, m?.standIn].find((key) => key && scene.textures.exists(key));
-}
-
-/** Gathering spots (gathering.ts), each standing on its tile; a spot painted later draws the land again (`kit`). */
-export function placeSpots(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, art: ArtManifest, kit: Set<string>): void {
+/** Gathering spots (gathering.ts), each standing on its tile in the state you see it in (spot-views.ts); a spot painted later draws the land again (`kit`). */
+export function placeSpots(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, art: ArtManifest, kit: Set<string>): SpotView[] {
+  const views: SpotView[] = [];
   for (const s of map.spots) {
     const def = SPOTS[s.kind];
-    if (def) kit.add(def.art);
-    const key = spotArt(scene, s.kind);
-    if (!key) continue;
-    const tiles = { left: ox + s.x, top: oy + s.y, right: ox + s.x + 1, bottom: oy + s.y + 1 };
-    standOnTiles(scene, key, tiles, art[key]?.view === 'isometric');
+    if (!def) continue;
+    for (const state of SPOT_STATES) kit.add(spotStateArt(s.kind, state.id)!);
+    kit.add(def.art);
+    const view: SpotView = { region: map.def.id, spot: s, tiles: { left: ox + s.x, top: oy + s.y, right: ox + s.x + 1, bottom: oy + s.y + 1 }, state: stateOf(map.def.id, s), images: [] };
+    standSpot(scene, view, art);
+    views.push(view);
   }
+  return views;
 }
 
 /**

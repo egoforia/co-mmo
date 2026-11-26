@@ -35,6 +35,7 @@ export * from './safe-areas.ts';
 export * from './fashion.ts';
 export * from './fashion-wishes.ts';
 export * from './gathering.ts';
+export * from './spot-states.ts';
 export * from './crafts.ts';
 export * from './recipes.ts';
 export * from './workshop.ts';

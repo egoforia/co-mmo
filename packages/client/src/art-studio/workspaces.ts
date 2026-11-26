@@ -16,7 +16,7 @@ export interface Workspace {
 export const WORKSPACES: readonly Workspace[] = [
   { id: 'paint', key: 1, label: 'Paint', about: 'Paint and repaint pictures: items, lands, building looks, HUD and effects.', pages: ['items', 'biomes', 'looks', 'hud-fx'] },
   { id: 'animate', key: 2, label: 'Animate', about: 'Characters, monsters and people: their views, walks, hands and skills.', pages: ['entities', 'characters', 'monsters'] },
-  { id: 'place', key: 3, label: 'Place', about: 'How things stand on their tiles: the canvas, buildings and their furniture.', pages: ['canvas', 'buildings'] },
+  { id: 'place', key: 3, label: 'Place', about: 'How things stand on their tiles: the canvas, buildings and their furniture.', pages: ['canvas', 'centre', 'buildings'] },
   { id: 'sound', key: 4, label: 'Sound', about: 'Sound effects and music.', pages: ['sounds'] },
   { id: 'queue', key: 5, label: 'Queue', about: 'What is painting, what is next, what is missing, and the Art Director.', pages: ['queue', 'now', 'missing', 'art-director'] },
 ];
@@ -35,8 +35,8 @@ export function pageFor(w: Workspace, last: Partial<Record<Workspace['id'], stri
   return kept && w.pages.includes(kept) ? kept : w.pages[0]!;
 }
 
-/** The Studio's own pages, drawn by the shell rather than art-ui: the canvas. */
-export const SHELL_PAGES: readonly [string, string][] = [['canvas', 'Canvas']];
+/** The Studio's own pages, drawn by the shell rather than art-ui: the canvas and auto-centre for a group. */
+export const SHELL_PAGES: readonly [string, string][] = [['canvas', 'Canvas'], ['centre', 'Centre a group']];
 
 /** The page a hash opens: the shell's own (#art/canvas), else art-ui's. */
 export function hashPage(hash: string, artPage: string): string {

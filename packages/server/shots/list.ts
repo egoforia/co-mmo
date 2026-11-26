@@ -378,6 +378,17 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine stands 20 px left of where it did, an orange cross at its anchor', 'the Inspector\'s Offset section shows x -20 and "not saved yet"', 'Save the fit is enabled'],
   },
   {
+    name: 'art-studio-centre',
+    about: 'Auto-centre for a group: the Centre page offering to measure the set pieces shown.',
+    page: '/art-studio.html#art/centre',
+    ready: '.asset-list button',
+    open: async (page) => {
+      await page.click('.asset-chips [data-group="pieces"]');
+      await page.waitForSelector('[data-centre-measure]');
+    },
+    mustSee: ['the Place workspace with Canvas, Centre a group and Buildings tabs, Centre a group marked', 'a button to measure the pieces shown, with their number'],
+  },
+  {
     name: 'art-studio-phone',
     about: 'The AI Art Studio on a phone: one pane at a time, chosen with tabs.',
     page: '/art-studio.html',

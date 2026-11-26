@@ -67,6 +67,8 @@ export class AssetBrowser {
   constructor(
     private readonly el: HTMLElement,
     private readonly pick: (asset: StudioAsset) => void,
+    /** Called when the filters change what is shown. */
+    private readonly filtered: () => void = () => {},
   ) {
     el.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -98,6 +100,11 @@ export class AssetBrowser {
   set(assets: StudioAsset[]): void {
     this.assets = assets;
     this.draw();
+  }
+
+  /** The assets the filters keep now. */
+  shown(): StudioAsset[] {
+    return filterAssets(this.assets, this.filter);
   }
 
   /** Marks the selected asset's row. */
@@ -139,6 +146,7 @@ export class AssetBrowser {
       const feet = a.footprint ? ` · ${a.footprint.width} × ${a.footprint.height}` : '';
       return `<li><button type="button" data-asset="${escapeHtml(a.id)}" class="${a.id === this.selected ? 'selected' : ''}">${thumb}<span><b>${escapeHtml(a.name)}</b><small class="${a.status}">${STATUS_WORDS[a.status]}${feet}</small></span></button></li>`;
     }).join('');
+    this.filtered();
     more.textContent = !kept.length ? 'Nothing matches.' : kept.length > SHOWN ? `Showing ${SHOWN} of ${kept.length}. Search to narrow them.` : `${kept.length} shown.`;
   }
 }

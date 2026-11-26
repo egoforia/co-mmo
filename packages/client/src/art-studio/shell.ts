@@ -19,8 +19,10 @@ import { loadArt } from '../editor/art-index.ts';
 import { GameDown, api, toast } from '../gods-view/core.ts';
 import { escapeHtml } from '../ui.ts';
 import { AssetBrowser, type StudioAsset } from './browser.ts';
-import { CANVAS_GROUPS, StudioCanvas } from './canvas.ts';
-import { FIT_GROUPS, FitDraft, fitFromFields, fitPanelHtml } from './fit-tool.ts';
+import { centreFit, type BaseMeasure } from './auto-centre.ts';
+import { CANVAS_GROUPS, StudioCanvas, canvasFloor } from './canvas.ts';
+import { centreHtml, centreIntroHtml, centreTargets, proposals, type Proposal } from './centre-page.ts';
+import { FIT_GROUPS, FitDraft, SCALE_GROUPS, fitFromFields, fitPanelHtml } from './fit-tool.ts';
 import { showPane, wireDocks } from './docks.ts';
 import { inspectorHtml } from './inspector.ts';
 import { studioKey, typingIn } from './keys.ts';
@@ -46,7 +48,11 @@ export class StudioShell {
   private readonly context: ArtContext = { api, toast, rerender: (force?: boolean) => void this.render(force ?? true) };
 
   constructor(private readonly onDown: () => void) {
-    this.browser = new AssetBrowser($('dock-left'), (a) => this.pick(a));
+    this.browser = new AssetBrowser($('dock-left'), (a) => this.pick(a), () => {
+      // The Centre page works on what the browser shows, so it follows the filters until measured.
+      const page = this.main.querySelector('.centre-page');
+      if (page && !this.centring.length) page.innerHTML = centreIntroHtml(centreTargets(this.browser.shown()));
+    });
     wireDocks(this.frame);
     this.drawTop();
     this.main.addEventListener('click', (e) => artClick(e.target as HTMLElement));
@@ -54,7 +60,11 @@ export class StudioShell {
       e.preventDefault();
       artSubmit(e.target as HTMLFormElement);
     });
-    this.main.addEventListener('change', (e) => artChange(e.target as HTMLElement));
+    this.main.addEventListener('change', (e) => {
+      if ((e.target as HTMLInputElement).name === 'centre') return this.countTicked();
+      artChange(e.target as HTMLElement);
+    });
+    this.main.addEventListener('click', (e) => this.centreClick(e.target as HTMLElement));
     $('studio-top').addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-pane-tab]');
       if (tab) showPane(this.frame, tab.dataset.paneTab as 'assets' | 'page' | 'inspector');
@@ -105,6 +115,7 @@ export class StudioShell {
       const typing = this.main.contains(document.activeElement) && typingIn(document.activeElement) && (document.activeElement as HTMLInputElement).type !== 'checkbox';
       const nav = this.pagesNav(space, page);
       if (page === 'canvas') await this.drawCanvas(nav);
+      else if (page === 'centre') this.drawCentre(nav);
       else if (!typing) {
         this.canvas = this.draft = undefined;
         this.main.innerHTML = nav + html;
@@ -155,9 +166,10 @@ export class StudioShell {
     if (document.querySelector('dialog[open]')) return;
     const k = studioKey(e, typingIn(document.activeElement));
     if (!k) return;
-    // The arrows and Ctrl Z belong to the page unless a picture is being fitted.
-    if (('nudge' in k || 'undo' in k) && !this.draft) return;
+    // The arrows, C and Ctrl Z belong to the page unless a picture is being fitted.
+    if (('nudge' in k || 'undo' in k || 'centre' in k) && !this.draft) return;
     e.preventDefault();
+    if ('centre' in k) return void this.centreOne();
     if ('nudge' in k || 'undo' in k) {
       if (!this.draft || !this.canvas) return;
       if ('nudge' in k) this.draft.nudge(k.nudge[0], k.nudge[1]);
@@ -232,6 +244,81 @@ export class StudioShell {
     await this.canvas.mount();
   }
 
+  /** Where the selected picture meets the ground, centred on its tiles in the draft (not saved yet). */
+  private async centreOne(): Promise<void> {
+    const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
+    if (!a || !this.draft || !this.canvas) return;
+    try {
+      const { measures } = await api<{ measures: Record<string, BaseMeasure | { why: string }> }>('art/measure', 'POST', { assets: [a.id] });
+      const m = measures[a.id];
+      if (!m || 'why' in m) return toast(m?.why ?? 'It could not be measured.');
+      const art = await loadArt();
+      this.draft.set(centreFit(m, canvasFloor(a), art[a.id]?.view === 'isometric', SCALE_GROUPS.includes(a.group)));
+      this.canvas.draw();
+      this.drawFitPanel();
+      if (m.sure === 'low') toast('Centred, but its foot is in pieces: check it by eye before saving.');
+    } catch (err) {
+      toast((err as Error).message);
+    }
+  }
+
+  private centring: Proposal[] = [];
+
+  /** The Centre page: the fittable assets shown on the left, measured on request. */
+  private drawCentre(nav: string): void {
+    this.canvas = this.draft = undefined;
+    this.centring = [];
+    this.main.innerHTML = `${nav}<div class="centre-page">${centreIntroHtml(centreTargets(this.browser.shown()))}</div>`;
+  }
+
+  private centreClick(target: HTMLElement): void {
+    const page = this.main.querySelector<HTMLElement>('.centre-page');
+    if (!page) return;
+    const measure = target.closest<HTMLButtonElement>('[data-centre-measure]');
+    if (measure) {
+      measure.disabled = true;
+      measure.textContent = 'Measuring…';
+      const targets = centreTargets(this.browser.shown());
+      void Promise.all([api<{ measures: Record<string, BaseMeasure | { why: string }> }>('art/measure', 'POST', { assets: targets.map((a) => a.id) }), loadArt()]).then(
+        ([{ measures }, art]) => {
+          this.centring = proposals(targets, measures, art);
+          page.innerHTML = centreHtml(this.centring);
+        },
+        (err: Error) => {
+          measure.disabled = false;
+          toast(err.message);
+        },
+      );
+      return;
+    }
+    const save = target.closest<HTMLButtonElement>('[data-centre-save]');
+    if (!save) return;
+    const ticked = new Set([...page.querySelectorAll<HTMLInputElement>('input[name=centre]:checked')].map((i) => i.value));
+    const chosen = this.centring.filter((p) => p.fit && ticked.has(p.asset.id));
+    if (!chosen.length) return toast('Tick the ones to keep first.');
+    save.disabled = true;
+    void (async () => {
+      let saved = 0;
+      for (const p of chosen) {
+        try {
+          await api('art/fit', 'POST', { asset: p.asset.id, offset: p.fit!.offset, scale: p.fit!.scale });
+          saved++;
+        } catch (err) {
+          toast(`${p.asset.name}: ${(err as Error).message}`);
+        }
+      }
+      toast(`Centred ${saved} of ${chosen.length}. Players see them at once.`);
+      void this.render(true);
+    })();
+  }
+
+  /** The save button's count, as boxes are ticked. */
+  private countTicked(): void {
+    const n = this.main.querySelectorAll('.centre-page input[name=centre]:checked').length;
+    const save = this.main.querySelector('[data-centre-save]');
+    if (save) save.textContent = `Save the ${n} ticked`;
+  }
+
   /** Saves the fit being changed, or puts the picture back where it was painted: players see it at once. */
   private saveFit(asset: string, reset: boolean, button: HTMLButtonElement): void {
     if (reset && !confirm('Put this picture back where it was painted, for everyone?')) return;
@@ -251,6 +338,7 @@ export class StudioShell {
 
   /** The Versions dock's buttons: lay a version against the one shown now, or put it back. */
   private versionClick(target: HTMLElement): void {
+    if (target.closest('[data-fit-centre]')) return void this.centreOne();
     const save = target.closest<HTMLButtonElement>('[data-fit-save]');
     const reset = target.closest<HTMLButtonElement>('[data-fit-reset]');
     if ((save || reset) && this.selected) return this.saveFit(this.selected, !!reset, (save ?? reset)!);

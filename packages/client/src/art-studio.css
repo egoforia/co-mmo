@@ -964,16 +964,6 @@ button.queue-add-btn.staged {
   font-size: 12px;
 }
 
-/* --- Collapsible API Log Drawer ------------------------------------------- */
-
-.api-log-drawer {
-  max-width: 1380px;
-  margin: 0 auto 48px;
-  padding: 16px 24px;
-  background: var(--panel);
-  border-top: 2px solid var(--gold);
-}
-
 /* --- Building Look Biome Scene Preview ------------------------------------ */
 
 .looks {

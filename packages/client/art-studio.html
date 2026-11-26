@@ -14,7 +14,7 @@
       <nav class="top-pages" id="top-pages" aria-label="Map editor and models"></nav>
       <div class="header-links">
         <span id="you"></span>
-        <button type="button" class="quiet" id="toggle-api-log">API log</button>
+        <button type="button" class="quiet" id="toggle-api-log" aria-pressed="false">API log</button>
         <a href="/gods-view.html">God's View</a>
         <a href="/">Back to the world</a>
       </div>
@@ -33,13 +33,6 @@
       <section class="frames" id="frames" aria-label="Frames" hidden></section>
       <footer class="strip" id="strip"></footer>
     </div>
-    <section id="studio-api-log-drawer" class="api-log-drawer" hidden>
-      <header class="studio-split-header">
-        <h2>📡 Art &amp; Media API Call Log</h2>
-        <button type="button" class="quiet" id="close-api-log">Close ✕</button>
-      </header>
-      <div id="studio-api-log-body"></div>
-    </section>
     <div id="toast" role="status" hidden></div>
     <script type="module" src="/src/art-studio.ts"></script>
   </body>

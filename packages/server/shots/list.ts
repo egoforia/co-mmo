@@ -35,6 +35,8 @@ export interface Shot {
   screen?: 'desktop' | 'phone';
   /** Things the player carries besides the Bible, for shots of the bag and what it does. */
   carry?: { item: string; qty: number }[];
+  /** Skills the player knows, put on hotbar keys 1, 2 and on, for shots of the hotbar. */
+  skills?: string[];
   /** More characters on the player's account, by name, for shots of the character screen (docs/characters.md). */
   characters?: string[];
   /** Hide the HUD and windows, for shots of the world itself (buildings, floors). */
@@ -166,6 +168,18 @@ export const SHOTS: Shot[] = [
     about: 'Mushroom Hollow at its arrival point.',
     region: 'mushroom-hollow',
     mustSee: ['mushrooms and ground are painted, not blank or magenta'],
+  },
+  {
+    name: 'sanctum-readied-skill',
+    about: 'A skill readied with Shift and its number, waiting for the next Space.',
+    region: 'sanctum',
+    skills: ['shield-bash', 'lunge'],
+    open: async (page) => {
+      await page.waitForSelector('#abilities button:not(.empty)');
+      await page.keyboard.press('Shift+Digit1');
+      await page.waitForSelector('#abilities button.readied');
+    },
+    mustSee: ['the first hotbar button is ringed as readied, the others are not', 'nothing was cast: no skill effect on the player'],
   },
   {
     name: 'sanctum-bag',

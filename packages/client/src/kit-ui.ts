@@ -38,6 +38,8 @@ import {
   type TradeRequestMessage,
   type TradeView,
 } from '@co-mmo/shared';
+import { PRESS_KEPT_MS, type SkillCast } from './held-strike.ts';
+import { ReadiedSkill, readyKey } from './readied-skill.ts';
 import { SpellbookUi } from './spellbook-ui.ts';
 import { escapeHtml } from './ui.ts';
 import { itemIcon } from './wished.ts';
@@ -56,6 +58,8 @@ export interface KitActions {
   trade(message: TradeActionMessage): void;
   /** True while typing in chat, so keys are not shortcuts. */
   typing(): boolean;
+  /** A line in the player's log. */
+  say?(text: string): void;
 }
 
 /** An item's picture and name, coloured by rarity. */
@@ -81,22 +85,30 @@ export class KitUi {
   private readonly spellbook: SpellbookUi;
   /** The attribute the player's crafted gear leans toward; the server checks it is one their people lifts. */
   private lean: keyof Stats | undefined;
+  /** The skill readied with Ctrl or Shift and its key, cast by the next Space (readied-skill.ts). */
+  private readonly readied: ReadiedSkill;
 
   constructor(character: Character, private readonly actions: KitActions) {
     this.character = character;
     this.energy = character.energy;
     this.spellbook = new SpellbookUi(character, (slots) => actions.hotbar(slots));
+    // A readied skill shows its tiles on the ground until it is cast.
+    this.readied = new ReadiedSkill((id) => {
+      this.renderBar();
+      actions.aim?.(id);
+    });
     window.addEventListener('keydown', (e) => this.onKey(e));
     $('abilities').addEventListener('click', (e) => {
       const id = (e.target as HTMLElement).closest<HTMLElement>('[data-ability]')?.dataset.ability;
       if ((e.target as HTMLElement).closest('[data-open-book]')) this.spellbook.toggle(true);
       (e.target as HTMLElement).closest('button')?.blur();
-      if (id) this.use(id);
+      if (id && (e.ctrlKey || e.shiftKey)) this.readied.toggle(id);
+      else if (id) this.use(id);
     });
     $('abilities').addEventListener('pointerover', (e) => {
-      actions.aim?.((e.target as HTMLElement).closest<HTMLElement>('[data-ability]')?.dataset.ability);
+      actions.aim?.((e.target as HTMLElement).closest<HTMLElement>('[data-ability]')?.dataset.ability ?? this.readied.current);
     });
-    $('abilities').addEventListener('pointerleave', () => actions.aim?.(undefined));
+    $('abilities').addEventListener('pointerleave', () => actions.aim?.(this.readied.current));
     $('keys').addEventListener('click', (e) => {
       const open = (e.target as HTMLElement).closest<HTMLElement>('[data-open]')?.dataset.open;
       if (open === 'crafting') this.toggleCrafting(true);
@@ -192,7 +204,16 @@ export class KitUi {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (this.actions.typing() || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (this.actions.typing()) return;
+    const ready = readyKey(e);
+    if (ready) {
+      // Ctrl + a number would switch the browser's tab.
+      e.preventDefault();
+      const id = this.character.hotbar[ready - 1];
+      if (id && ABILITIES[id]) this.readied.toggle(id);
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const n = Number(e.key);
     if (n >= 1 && n <= HOTBAR_SIZE) {
       // The key as the bar shows it: an ability whose wish is switched off does nothing.
@@ -203,15 +224,58 @@ export class KitUi {
     } else if (e.key.toLowerCase() === 'k') {
       this.spellbook.toggle();
     } else if (e.key === 'Escape') {
+      this.readied.clear();
       $('crafting').hidden = true;
       this.spellbook.toggle(false);
       this.closeShop();
     }
   }
 
+  /** Casts a skill now; one that will be ready within PRESS_KEPT_MS is sent too, and the server keeps it until then. */
   private use(id: string): void {
-    if ((this.readyAt.get(id) ?? 0) > performance.now()) return;
+    if (this.restMs(id) > PRESS_KEPT_MS) return;
     this.actions.ability(id);
+  }
+
+  /** How long a skill still rests, ms. */
+  private restMs(id: string): number {
+    return Math.max(0, (this.readyAt.get(id) ?? 0) - performance.now());
+  }
+
+  /** The readied skill for the next Space (held-strike.ts), or none. A skill taken off the hotbar is put down. */
+  readiedCast(): SkillCast | undefined {
+    const id = this.readied.current;
+    if (!id) return undefined;
+    const a = ABILITIES[id];
+    if (!a || !this.character.hotbar.includes(id)) {
+      this.readied.clear();
+      return undefined;
+    }
+    return {
+      restMs: this.restMs(id),
+      cast: () => {
+        if (this.energy < a.energy) {
+          this.actions.say?.(`Not enough Energy for ${skillName(this.character, id)}.`);
+          return false;
+        }
+        this.readied.clear();
+        this.actions.ability(id);
+        return true;
+      },
+    };
+  }
+
+  /** Space came up while the readied skill still rested: says how long is left. */
+  readiedTooEarly(restMs: number): void {
+    const id = this.readied.current;
+    if (!id) return;
+    const seconds = Math.max(1, Math.ceil(restMs / 1000));
+    this.actions.say?.(`${skillName(this.character, id)} is ready in ${seconds} second${seconds === 1 ? '' : 's'}.`);
+  }
+
+  /** Puts the readied skill down (falling, or opening the world editor). */
+  clearReadied(): void {
+    this.readied.clear();
   }
 
   private closeShop(): void {
@@ -239,8 +303,10 @@ export class KitUi {
         const low = this.energy < a.energy;
         // A Calling Wish may have renamed it (calling-wish.ts).
         const name = skillName(this.character, id);
-        return `<button type="button" data-ability="${escapeHtml(id)}" class="${low ? 'low' : ''}${wait ? ' resting' : ''}"
-          title="${escapeHtml(`${name}: ${a.description} Costs ${a.energy} Energy, rests ${a.cooldown} s.`)}">
+        const readied = this.readied.current === id;
+        const tip = `${name}: ${a.description} Costs ${a.energy} Energy, rests ${a.cooldown} s.${readied ? ' Readied: Space casts it.' : ' Ctrl or Shift + its key readies it for Space.'}`;
+        return `<button type="button" data-ability="${escapeHtml(id)}" class="${low ? 'low' : ''}${wait ? ' resting' : ''}${readied ? ' readied' : ''}"
+          ${readied ? 'aria-pressed="true" ' : ''}title="${escapeHtml(tip)}">
           <kbd>${i + 1}</kbd> ${escapeHtml(name)}${wait ? `<span class="wait">${Math.ceil(wait)}</span>` : ''}</button>`;
       })
       .join('');

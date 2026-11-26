@@ -6,6 +6,7 @@ import { SPOTS } from '../gathering.ts';
 import { floorName, stairwayAt, type Heading, type Stairway } from '../floors.ts';
 import { setPiece } from '../sea-cave-kit.ts';
 import { WALL_HEIGHTS, wallOn, type EdgeWall, type WallSide } from '../edge-walls.ts';
+import { isKitHouse, wallLookAt, wallTileOwner } from '../wall-looks.ts';
 import { Tile, storeyAt, type Landmark, type RegionMap } from '../world.ts';
 import type { Outline } from './kind.ts';
 import { sideOutline } from './kinds/wall.ts';
@@ -39,7 +40,7 @@ export interface Picked {
   /** A monster's home: the kind of monster living there, whose size and loot God's View sets. */
   creature?: string;
   /** A Wall-tool wall: the wall, kept as the north or west side of the tile at the box's corner. */
-  wall?: { side: WallSide; style: string; height: EdgeWall['height']; run: number };
+  wall?: { side: WallSide; style: string; height: EdgeWall['height']; run: number } | { tile: true; style: string };
 }
 
 /**
@@ -75,6 +76,12 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number, within?: [n
   if (way) {
     return { kind: 'stairway', ...(way.id ? { id: way.id } : {}), name: way.kind === 'ladder' ? 'A ladder' : 'Stairs', level, box: tile(way.x, way.y, way.width, way.height), details: [`From ${floorName(way.lower)} up to ${floorName(way.upper)}`, `Climbing ${climbing(way)}`] };
   }
+  const walled = wallTileOwner(map, x, y, level);
+  if (walled && !isKitHouse(map, walled)) {
+    const look = wallLookAt(walled, x, y);
+    const own = look !== walled.style;
+    return { kind: 'wall', name: `${BUILDING_STYLES[look]?.name ?? look} wall tile`, level, box: tile(x, y), details: [own ? `Its own look; the rest of its walls are ${BUILDING_STYLES[walled.style]?.name ?? walled.style}` : 'The same look as the rest of its walls'], wall: { tile: true, style: look } };
+  }
   const storey = level ? storeyAt(map, x, y, level) : undefined;
   if (storey) {
     const look = BUILDING_STYLES[storey.style]?.name ?? storey.style;
@@ -83,7 +90,8 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number, within?: [n
   const building = !level ? buildingAt(map, at) : undefined;
   if (building) {
     const look = BUILDING_STYLES[building.style]?.name ?? building.style;
-    return { kind: 'building', ...(building.id ? { id: building.id } : {}), name: look, level, box: tile(building.x, building.y, building.width, building.height), details: [`${building.width} × ${building.height} tiles, walls included`] };
+    const kitWall = walled && isKitHouse(map, walled) ? ['This is a kit house: its walls change together. Change them in Look and size.'] : [];
+    return { kind: 'building', ...(building.id ? { id: building.id } : {}), name: look, level, box: tile(building.x, building.y, building.width, building.height), details: [`${building.width} × ${building.height} tiles, walls included`, ...kitWall] };
   }
   return undefined;
 }
@@ -148,7 +156,7 @@ export function monsterHome(map: RegionMap, region: string, id: string): { at: T
 
 /** The edit that takes a picked thing away. */
 export function removeDraft(p: Picked): WorldEditDraft {
-  if (p.wall) return { kind: 'wall', side: p.wall.side, tiles: [[p.box.x, p.box.y]], style: p.wall.style, height: p.wall.height, down: true, ...(p.level ? { level: p.level } : {}) };
+  if (p.wall && 'side' in p.wall) return { kind: 'wall', side: p.wall.side, tiles: [[p.box.x, p.box.y]], style: p.wall.style, height: p.wall.height, down: true, ...(p.level ? { level: p.level } : {}) };
   return { kind: 'remove', at: [p.box.x, p.box.y], level: p.level, ...(p.id ? { target: p.id } : {}) };
 }
 
@@ -202,7 +210,7 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
     }
     case 'wall':
       // The same wall on the same side of the tile clicked.
-      return p.wall && { kind: 'wall', side: p.wall.side, tiles: [to], style: p.wall.style, height: p.wall.height, ...(p.level ? { level: p.level } : {}) };
+      return p.wall && 'side' in p.wall ? { kind: 'wall', side: p.wall.side, tiles: [to], style: p.wall.style, height: p.wall.height, ...(p.level ? { level: p.level } : {}) } : undefined;
     case 'bookmark': {
       const b = map.bookmarks?.find((m) => m.floor === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
       // Names are one to a land: a copy takes the next free number.

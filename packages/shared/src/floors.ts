@@ -47,6 +47,8 @@ export interface Storey extends TileRect {
   art?: TileArt;
   /** True when this storey is an open outdoor balcony, terrace, or rooftop visible from the ground below. */
   open?: boolean;
+  /** Wall tiles drawn in a look of their own ("x,y" → a key of BUILDING_STYLES; wall-looks.ts). */
+  wallLooks?: Record<string, string>;
 }
 
 /** Stairs anyone can take; a ladder only those with hands to climb it (players and people, not creatures). */

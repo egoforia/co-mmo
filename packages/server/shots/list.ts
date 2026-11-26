@@ -135,6 +135,26 @@ export const SHOTS: Shot[] = [
     mustSee: ['the floor the player is on is drawn; the land outside is hidden or dimmed', 'walls of other floors are not drawn'],
   },
   {
+    name: 'woods-cave-wall-looks',
+    hideUi: true,
+    about: "The Whispering Woods cave's south wall from outside, with four wall tiles each side of the doorway given looks of their own (W2): grey castle stone on the left, the inn's walls on the right.",
+    region: 'woods',
+    at: () => ({ x: 66.5, y: 184 }),
+    open: async (page) => {
+      // Laid live through the editor's API, as a published change would be.
+      const tiles = (xs: number[]) => xs.map((x) => ({ kind: 'wall-look', at: [x, 181] }));
+      const edits = [...tiles([62, 63, 64, 65]).map((e) => ({ ...e, style: 'woods-castle' })), ...tiles([68, 69, 70, 71]).map((e) => ({ ...e, style: 'sanctum-inn' }))];
+      await page.evaluate(async (body) => {
+        const token = localStorage.getItem('co-mmo.token');
+        const res = await fetch('/api/world-edits', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(await res.text());
+      }, { region: 'woods', edits, live: true });
+      // The land is laid out again and every screen in it welcomed afresh.
+      await page.waitForTimeout(3000);
+    },
+    mustSee: ['the cave seen closed from a few tiles away: its wall left of the doorway in green-grey castle stone for four tiles, right of it in the pale inn wall for four tiles', 'the rest of the cave wall in its own dark rock', 'no gaps where the looks meet, only the change of texture'],
+  },
+  {
     name: 'desert-noon',
     about: 'Mirage Desert in bright sun.',
     region: 'desert',

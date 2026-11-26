@@ -113,6 +113,7 @@ export class Inspector {
   action(action: string): ToolStep {
     const p = this.picked;
     if (!p) return {};
+    if (p.thing.wall && 'tile' in p.thing.wall && ['remove', 'copy', 'move'].includes(action)) return { say: 'A wall tile is part of its building. Change its look below.' };
     if (action === 'remove') {
       this.reset();
       return { draft: removeDraft(p.thing), region: p.region };
@@ -172,7 +173,9 @@ export class Inspector {
     const p = this.picked;
     if (!p) return `<p class="note">${this.box ? 'Drag over the area to pick it.' : 'Nothing picked yet. Click something, or drag over bare ground to pick an area.'}</p>`;
     const { thing } = p;
-    const actions = p.placing
+    // A wall tile of a building or storey only changes its look: it is part of the building.
+    const fixed = !!thing.wall && 'tile' in thing.wall;
+    const actions = fixed ? '' : p.placing
       ? `<p class="note">Click where its top-left corner goes${thing.kind === 'person' ? ', on any floor' : ''}. Esc to stop.</p>`
       : `<span class="pick-actions"><button type="button" class="quiet" data-pick="move">Move <kbd>M</kbd></button><button type="button" class="quiet" data-pick="copy">Copy <kbd>Ctrl C</kbd></button><button type="button" class="quiet" data-pick="remove">Take away <kbd>Del</kbd></button></span>`;
     const sections = p.placing ? [] : inspecting(thing.kind).map((k) => {

@@ -195,7 +195,24 @@ between two tiles instead of filling a tile (`RegionMap.edgeWalls`, shared
 storey high (`ground.height * 2`, 160 px) or half that, the east-facing ones
 tinted `EAST_WALL_TINT`, sorted at the middle of their edge. They are
 painted, never drawn: a look whose wall is not painted borrows the fallback
-look's. One standing in front of the player turns see-through.
+look's. One standing in front of the player turns see-through. Select picks
+one (pointer near its side of the tile) and the `wall-look` edit changes its
+look and height, or its whole run's.
+
+## One wall tile in its own look
+
+A walled building or storey (a cave, a tomb, a tree house, a galleon, any
+floor off the ground) may give single wall tiles a look of their own:
+`wallLooks` ("x,y" → a key of `BUILDING_STYLES`) on the `Building` or
+`Storey`, read through shared `wall-looks.ts`. One with none draws exactly
+as before. `rockWalls` asks each wall tile's own look (`lookAt`) and
+registers that look's faces once, so the upright faces of that tile are its
+look's seamless `<style>-wall.png`; the thin rim on top keeps the building's
+own tiles. Kit houses build their walls as whole bays, one look per house:
+their wall tiles (and their storeys') are refused in plain words, and the
+world editor sends you to Look and size instead. Picked wall tiles can only
+change look: they are part of their building, so Move, Copy and Take away
+are not offered.
 
 ## Wished buildings
 

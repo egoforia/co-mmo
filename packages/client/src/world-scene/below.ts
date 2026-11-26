@@ -7,7 +7,7 @@ import { Tile, storeyAt, type RegionMap, type TileRect } from '@co-mmo/shared';
 import { type BuildingView, type DrawnRegion, type FloorView, overlaps, setDepthShade, setShown } from './types.ts';
 import { standHouseBottom } from '../kit-house-view.ts';
 import { floorLift } from './depth.ts';
-import { rockWalls } from './walls.ts';
+import { ownLooks, rockWalls } from './walls.ts';
 
 type Wall = Phaser.GameObjects.Image | Phaser.Tilemaps.TilemapLayer;
 
@@ -53,7 +53,7 @@ function closedWalls(scene: Phaser.Scene, region: DrawnRegion, key: BuildingView
   } else if ('building' in key) {
     const b = key.building;
     cutFrom.set(key, undefined);
-    walls = rockWalls(scene, rowsOf(map.tiles, map.width, b, b), ox + b.x, oy + b.y, b.style, b.art, region.tilemaps, true, false, false, 0);
+    walls = rockWalls(scene, rowsOf(map.tiles, map.width, b, b), ox + b.x, oy + b.y, b.style, b.art, region.tilemaps, true, false, false, 0, false, undefined, undefined, undefined, ownLooks(b, ox, oy));
   } else {
     const s = key.storey;
     const neighbourTile = (wx: number, wy: number): Tile | undefined => {
@@ -76,6 +76,8 @@ function closedWalls(scene: Phaser.Scene, region: DrawnRegion, key: BuildingView
       Boolean(s.open),
       neighbourTile,
       () => 0,
+      undefined,
+      ownLooks(s, ox, oy),
     );
   }
   for (const w of walls) w.setData('shell', false).setVisible(false);

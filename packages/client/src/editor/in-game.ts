@@ -343,7 +343,7 @@ export class EditorUi {
     const picked = pickAt(map, at, level, within);
     if (!picked?.wall) return this.render('Alt-click near a wall to copy its look and height.');
     this.core.set('style', picked.wall.style);
-    this.core.set('height', picked.wall.height);
+    if ('height' in picked.wall) this.core.set('height', picked.wall.height);
     this.render(`Copied the look and height of this ${picked.name} into the Wall tool.`);
   }
 

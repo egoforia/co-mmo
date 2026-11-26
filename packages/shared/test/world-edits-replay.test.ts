@@ -57,13 +57,13 @@ const LANDS: RegionDef[] = [...WORLD_REGIONS, ARCH_TESTBED_REGION];
 // Fingerprints updated: open outdoor terraces in Sanctum, Frostpeak and Arch-Testbed now use
 // 100% walkable Tile.Floor and native cutaway edge walls along their perimeter.
 const EXPECTED: Record<string, number> = {
-  sanctum: 3838001393,
-  woods: 1736359563,
-  shore: 1518853151,
-  desert: 2102079442,
-  frostpeak: 3219299390,
-  'mushroom-hollow': 1416057618,
-  'arch-testbed': 3753119378,
+  sanctum: 2692192402,
+  woods: 868971857,
+  shore: 2340170047,
+  desert: 1955278895,
+  frostpeak: 627671598,
+  'mushroom-hollow': 3079168074,
+  'arch-testbed': 2836699154,
 };
 
 describe('world edits replay', () => {

@@ -69,7 +69,7 @@ describe('the Select tool', () => {
     const copied = lay(map, [copyDraft(map, terrace, [160, 40])!, copyDraft(map, house, [160, 100])!, copyDraft(map, table, [20, 20])!]);
     expect(copied.storeys.find((s) => s.x === 160 && s.y === 40)).toMatchObject({ floor: 1, width: 12, height: 12, open: true, style: 'frostpeak-eyrie' });
     expect(copied.buildings.find((b) => b.x === 160 && b.y === 100)).toMatchObject({ width: 10, height: 10, style: 'sanctum-inn' });
-    expect(copied.landmarks.find((l) => l.asset === 'sanctum-inn-furniture-dining-table' && l.x === 21.5 && l.y === 21.5)).toBeTruthy();
+    expect(copied.landmarks.find((l) => l.asset === 'sanctum-inn-furniture-dining-table' && l.x === 21.5 && l.y === 22.5)).toBeTruthy();
   });
 
   it('moves a building in one step: taken away, laid again', () => {
@@ -88,7 +88,7 @@ describe('the Select tool', () => {
     const [move] = moveDrafts(map, table, [45, 45])!;
     expect(move).toMatchObject({ kind: 'move', target: 'testbed-03:landmark:0' });
     const moved = lay(map, [move!]);
-    expect(moved.landmarks.find((l) => l.asset === 'sanctum-inn-furniture-dining-table')).toMatchObject({ x: 46.5, y: 46.5 });
+    expect(moved.landmarks.find((l) => l.asset === 'sanctum-inn-furniture-dining-table')).toMatchObject({ x: 46.5, y: 47.5 });
   });
 });
 

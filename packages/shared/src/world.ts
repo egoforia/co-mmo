@@ -985,27 +985,27 @@ export interface TileBox {
 
 /**
  * The whole tiles a piece standing with its bottom row centred under (x, y)
- * blocks: from the tile under its left edge, as many tiles as its width
- * rounded up (a width of 1.5 blocks 2, 2.6 blocks 3).
+ * blocks: every tile its picture (piecePicture) covers any of, so nobody
+ * walks into a picture. A piece placed between tiles (a width of 3 centred
+ * on a tile's edge, or 1.5) blocks the part tiles at its sides too.
  */
 export function pieceBox(l: Pick<Landmark, 'x' | 'y' | 'footprint'>): TileBox {
-  const left = Math.floor(l.x - l.footprint.width / 2);
-  const bottom = Math.floor(l.y - 0.01);
-  const width = Math.max(1, Math.ceil(l.footprint.width - 1e-6));
-  const height = Math.max(1, Math.ceil(l.footprint.height - 1e-6));
-  return { left, top: bottom - height + 1, width, height };
+  const pic = piecePicture(l);
+  const left = Math.floor(pic.left + 1e-6);
+  const top = Math.floor(pic.top + 1e-6);
+  const right = Math.max(left + 1, Math.ceil(pic.left + pic.width - 1e-6));
+  const bottom = Math.max(top + 1, Math.ceil(pic.top + pic.height - 1e-6));
+  return { left, top, width: right - left, height: bottom - top };
 }
 
 /**
- * Where a piece's picture stands, in tiles: its painted width, centred on the
- * tiles it blocks (pieceBox), its feet on their bottom row. A piece once
- * stood at (x, y) itself, and 108 built-in pieces stood up to half a tile off
- * the tiles they block, so players walked into what looked like open ground.
+ * Where a piece's picture stands, in tiles: where its room or land put it,
+ * its bottom row centred under (x, y). (Moving pictures onto rounded tiles
+ * instead slid whole rooms of furniture half a tile; egoforia 2026-11-26.)
  */
 export function piecePicture(l: Pick<Landmark, 'x' | 'y' | 'footprint'>): TileBox {
-  const t = pieceBox(l);
-  const width = l.footprint.width;
-  return { left: t.left + t.width / 2 - width / 2, top: t.top, width, height: t.height };
+  const { width, height } = l.footprint;
+  return { left: l.x - width / 2, top: l.y - height, width, height };
 }
 
 /** Blocks the footprint whose bottom row is centred under (x, y). */

@@ -28,8 +28,8 @@ import { showPane, wireDocks } from './docks.ts';
 import { inspectorHtml } from './inspector.ts';
 import { studioKey, typingIn } from './keys.ts';
 import { stripHtml } from './strip.ts';
-import { createDockHtml } from './create-dock.ts';
-import { FrameStrip } from './frame-strip.ts';
+import { createDockHtml, spotKindOf } from './create-dock.ts';
+import { FrameStrip, spotStatesHtml } from './frame-strip.ts';
 import { versionsHtml } from './versions.ts';
 import { SHELL_PAGES, TOP_PAGES, WORKSPACES, canvasHash, hashPage, pageFor, pageHash, placeHash, workspaceOf, type Workspace } from './workspaces.ts';
 
@@ -210,7 +210,10 @@ export class StudioShell {
     const item = a && artState.data?.items.find((i) => i.id === a.id);
     const fit = a && this.draft ? `<section class="fit-panel">${this.fitHtml(a, this.draft)}</section>` : '';
     $('dock-right').innerHTML = inspectorHtml(a) + fit + createDockHtml(a, artState.data ?? undefined) + versionsHtml(item, this.version);
-    this.frames.show(a && artState.data?.walkers.find((w) => w.id === a.id));
+    const walker = a && artState.data?.walkers.find((w) => w.id === a.id);
+    const spot = a && !walker ? spotKindOf(a.id) ?? spotKindOf(a.id.replace(/-(?:picked|growing)$/, '')) : undefined;
+    if (spot) this.frames.showHtml(spotStatesHtml(spot, artState.data?.items ?? []));
+    else this.frames.show(walker);
   }
 
   /** Draws the Offset section again, keeping the field being typed in. */

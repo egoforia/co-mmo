@@ -435,6 +435,13 @@ export const SHOTS: Shot[] = [
     mustSee: ['four tracks of walk frames along the bottom, front left frame 4 marked', 'the preview shows that frame and the button says Play', 'the Inspector has a Create with AI section with paint buttons and their costs'],
   },
   {
+    name: 'art-studio-spot-states',
+    about: 'A gathering spot in the Studio: the strip shows its Ready, Picked and Growing pictures side by side (none painted on the shot server).',
+    page: '/art-studio.html#art/canvas?asset=spot-sanctum-sage',
+    ready: '.frames:not([hidden]) .spot-state',
+    mustSee: ['the bottom strip says "States · Sage Bush" with three boxes, Ready, Picked and Growing', 'the Inspector shows the Sage Bush and Create with AI'],
+  },
+  {
     name: 'art-studio-centre',
     about: 'Auto-centre for a group: the Centre page offering to measure the set pieces shown.',
     page: '/art-studio.html#art/centre',

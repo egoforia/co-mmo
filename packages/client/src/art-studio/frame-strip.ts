@@ -4,9 +4,9 @@
 // and hands that frame to the hand workbench (art-ui/hand-editor.ts), which
 // edits the frame under the playhead.
 
-import { ISO_WAYS, ISO_WAY_LABELS, type IsoWay } from '@co-mmo/shared';
+import { ISO_WAYS, ISO_WAY_LABELS, SPOTS, SPOT_STATES, spotStateArt, type IsoWay } from '@co-mmo/shared';
 import { getStripForKind, getWorkbenchState, rerenderWorkbench } from '../art-ui/hand-editor.ts';
-import type { WalkStrip, WalkerView } from '../art-ui/state.ts';
+import type { ArtItem, WalkStrip, WalkerView } from '../art-ui/state.ts';
 import { escapeHtml } from '../ui.ts';
 
 /** The animations the strip shows, in its order. */
@@ -48,7 +48,24 @@ export function framesHtml(w: WalkerView, kind: Kind, way: IsoWay, frame: number
     <div class="frames-tracks">${tracks}</div>`;
 }
 
-/** The strip along the bottom for the selected walker; hidden for anything else. */
+/** A gathering spot's states side by side (spot-states.ts): Ready, Picked and Growing, each as painted or not yet. */
+export function spotStatesHtml(kind: string, items: readonly ArtItem[]): string {
+  const def = SPOTS[kind];
+  if (!def) return '';
+  const cells = [{ id: 'ready', name: 'Ready' }, ...SPOT_STATES].map((st) => {
+    const item = items.find((i) => i.id === spotStateArt(kind, st.id as 'ready'));
+    const picture = item?.url ? `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(`${def.name}, ${st.name}`)}" />` : '<span class="note">Not painted yet</span>';
+    return `<figure class="spot-state">${picture}<figcaption>${escapeHtml(st.name)}</figcaption></figure>`;
+  }).join('');
+  return `
+    <div class="frames-side">
+      <span class="strip-title">States · ${escapeHtml(def.name)}</span>
+      <span class="note">Each player sees their own: Picked once they gather, Growing past half way, then Ready. Until a state is painted, the Ready picture shows.</span>
+    </div>
+    <div class="spot-states">${cells}</div>`;
+}
+
+/** The strip along the bottom for the selected walker or spot; hidden for anything else. */
 export class FrameStrip {
   private walker: WalkerView | undefined;
   private kind: Kind = 'walk';
@@ -59,6 +76,14 @@ export class FrameStrip {
 
   constructor(private readonly el: HTMLElement) {
     el.addEventListener('click', (e) => this.click(e.target as HTMLElement));
+  }
+
+  /** Shows other contents than a walker's frames (a spot's states), or hides the strip when empty. */
+  showHtml(html: string): void {
+    this.walker = undefined;
+    this.el.hidden = !html;
+    this.loop();
+    this.el.innerHTML = html;
   }
 
   /** Shows a walker's frames, or hides the strip. */

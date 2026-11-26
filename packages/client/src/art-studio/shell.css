@@ -415,6 +415,40 @@
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+.spot-states {
+  display: flex;
+  gap: 12px;
+}
+
+.spot-state {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  width: 112px;
+}
+
+.spot-state img,
+.spot-state .note {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.spot-state figcaption {
+  color: var(--muted);
+}
+
+.frames-side .note {
+  max-width: 240px;
+  margin: 0;
+}
+
 .frames-way {
   color: var(--muted);
   white-space: nowrap;

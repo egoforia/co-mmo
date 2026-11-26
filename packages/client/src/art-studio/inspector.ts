@@ -2,6 +2,7 @@
 // as Tiled's Properties and Godot's Inspector show them. Later steps add the
 // offset, scale trim and blocked tiles here (asset-fit).
 
+import { fitWords } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
 import { CANVAS_GROUPS } from './canvas.ts';
@@ -23,6 +24,7 @@ export function inspectorHtml(a: StudioAsset | undefined): string {
     ...(a.land ? [['Land', escapeHtml(a.land.replace(/-/g, ' '))] as [string, string]] : []),
     ...(a.footprint ? [['Footprint', `${a.footprint.width} × ${a.footprint.height} tiles`] as [string, string]] : []),
     ['State', STATUS_WORDS[a.status]],
+    ...(a.fit ? [['Fit', escapeHtml(fitWords(a.fit))] as [string, string]] : []),
   ];
   const picture = a.thumb ? `<img class="inspector-picture" src="${escapeHtml(a.thumb)}" alt="${escapeHtml(a.name)}" />` : '';
   const page = a.place.page || a.group === 'sounds' ? `<a class="button" href="${escapeHtml(placeHash(a.place))}">Show it on its page</a>` : '';

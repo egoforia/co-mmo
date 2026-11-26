@@ -9,6 +9,7 @@
 
 import Phaser from 'phaser';
 import {
+  onFitChange,
   Predictor,
   SnapshotClock,
   bodiesSeen,
@@ -331,6 +332,9 @@ export class WorldScene extends Phaser.Scene {
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     setCoords({ x: this.shown.x, y: this.shown.y, floor: this.floor });
     this.events.once('shutdown', () => setCoords(undefined));
+    // The Owner fitted a picture in the Art Studio (asset-fit.ts): stand everything again.
+    onFitChange(() => this.relayFits());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => onFitChange(undefined));
     this.events.once('destroy', () => setCoords(undefined));
     this.revealBuildings(true);
     cam.startFollow(this.me.body, true, 0.2, 0.2);
@@ -782,6 +786,20 @@ export class WorldScene extends Phaser.Scene {
         if ([...region.kit].some((k) => this.painted.has(k))) undrawRegion(this, id, region, this.drawn);
       }
       this.painted.clear();
+      this.showRegion(this.welcome);
+      this.revealBuildings(true);
+    });
+  }
+
+  private relaying = false;
+
+  /** Draws every region again once fits stop arriving, so pictures stand where the Art Studio put them. */
+  private relayFits(): void {
+    if (this.relaying || !this.predictor) return;
+    this.relaying = true;
+    this.time.delayedCall(300, () => {
+      this.relaying = false;
+      for (const [id, region] of this.drawn) undrawRegion(this, id, region, this.drawn);
       this.showRegion(this.welcome);
       this.revealBuildings(true);
     });

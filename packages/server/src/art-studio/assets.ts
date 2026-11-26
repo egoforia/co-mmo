@@ -5,7 +5,7 @@
 // reads; stairs and ladders come from the shipped manifest, since the catalog
 // has no page for them yet.
 
-import { BUILDING_STYLES, WORLD_REGIONS, generateRegion, type ArtManifest } from '@co-mmo/shared';
+import { BUILDING_STYLES, WORLD_REGIONS, fitOf, generateRegion, type ArtManifest, type AssetFit } from '@co-mmo/shared';
 import type { SoundItem } from '../sound-maker.ts';
 import type { ArtItem, WalkerView } from './types.ts';
 
@@ -26,6 +26,8 @@ export interface StudioAsset {
   status: 'painted' | 'stand-in' | 'missing';
   /** Its picture, for the thumbnail. */
   thumb?: string;
+  /** How it sits on its tiles, when the Owner fitted it (asset-fit.ts). */
+  fit?: AssetFit;
   /** Where today's page for it is: tab, page, and the walker or asset to focus. */
   place: { tab: string; page?: string; walker?: string; asset?: string };
 }
@@ -103,6 +105,10 @@ export function studioAssets(o: { items: ArtItem[]; walkers: WalkerView[]; sound
   }
   for (const id of Object.keys(shipped).filter((k) => /^(stairs|ladder)-/.test(k)).sort()) {
     list.push({ id, name: stairName(id), group: 'stairs', status: 'painted', footprint: stairFootprint(id), thumb: `/${shipped[id]!.file}`.replace(/^\/+/, '/'), place: { tab: 'biomes' } });
+  }
+  for (const a of list) {
+    const fit = a.group === 'sounds' || a.group === 'characters' || a.group === 'monsters' ? undefined : fitOf(a.id);
+    if (fit) a.fit = fit;
   }
   for (const s of o.sounds) {
     list.push({ id: s.id, name: s.name, group: 'sounds', status: s.url ? 'painted' : 'missing', place: { tab: 'sounds', asset: s.id } });

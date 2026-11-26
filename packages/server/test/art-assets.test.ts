@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
+import { fitOf } from '@co-mmo/shared';
 import { pictureGroup, stairName, studioAssets } from '../src/art-studio/assets.ts';
 import { account, api, start } from './helpers.ts';
 
@@ -21,6 +22,22 @@ describe('the Art Studio asset browser list', () => {
     const groups = new Set(assets.map((a) => a.group));
     for (const g of ['characters', 'monsters', 'items', 'scenery', 'pieces']) expect(groups).toContain(g);
     expect(assets.find((a) => a.id === 'sanctum-shrine')).toMatchObject({ group: 'pieces', footprint: { width: 2, height: 1 } });
+  }, 30_000);
+
+  it('saves a fit from the Studio as an entry undone like a wish, and puts it back', async () => {
+    const { base, store } = await start({ anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+    const steward = account(store, 'Sam', 'steward');
+    expect((await api(base, '/api/admin/art/fit', steward.token, 'POST', { asset: 'sanctum-shrine', offset: [4, -2] })).status).toBe(403);
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [999, 0] })).status).toBe(400);
+    const saved = await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [4, -2], scale: 0.95 });
+    expect(saved.status).toBe(200);
+    expect(fitOf('sanctum-shrine')).toMatchObject({ offset: [4, -2], scale: 0.95 });
+    expect(store.content.find((r) => r.id === saved.body.id)?.definition).toMatchObject({ kind: 'fit' });
+    const listed = (await api(base, '/api/admin/art/assets', owner.token)).body.assets as { id: string; fit?: unknown }[];
+    expect(listed.find((a) => a.id === 'sanctum-shrine')?.fit).toMatchObject({ offset: [4, -2] });
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'DELETE', { asset: 'sanctum-shrine' })).status).toBe(200);
+    expect(fitOf('sanctum-shrine')).toBeUndefined();
   }, 30_000);
 
   it('sorts pictures into the browser groups', () => {

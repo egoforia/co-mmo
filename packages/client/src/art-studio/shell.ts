@@ -20,6 +20,7 @@ import { GameDown, api, toast } from '../gods-view/core.ts';
 import { escapeHtml } from '../ui.ts';
 import { AssetBrowser, type StudioAsset } from './browser.ts';
 import { CANVAS_GROUPS, StudioCanvas } from './canvas.ts';
+import { FIT_GROUPS, FitDraft, fitFromFields, fitPanelHtml } from './fit-tool.ts';
 import { showPane, wireDocks } from './docks.ts';
 import { inspectorHtml } from './inspector.ts';
 import { studioKey, typingIn } from './keys.ts';
@@ -36,6 +37,9 @@ export class StudioShell {
   private readonly browser: AssetBrowser;
   private readonly last: Partial<Record<Workspace['id'], string>> = {};
   private selected: string | undefined;
+  /** The canvas shown now, and the fit being changed on it. */
+  private canvas: StudioCanvas | undefined;
+  private draft: FitDraft | undefined;
   /** The earlier version laid against the one shown now in the Versions dock. */
   private version: string | undefined;
   private waiting = false;
@@ -57,8 +61,13 @@ export class StudioShell {
     });
     $('dock-right').addEventListener('click', (e) => this.versionClick(e.target as HTMLElement));
     $('dock-right').addEventListener('input', (e) => {
-      const range = e.target as HTMLInputElement;
-      if (range.type === 'range') range.closest<HTMLElement>('.compare')?.style.setProperty('--cut', `${range.value}%`);
+      const input = e.target as HTMLInputElement;
+      if (input.type === 'range') input.closest<HTMLElement>('.compare')?.style.setProperty('--cut', `${input.value}%`);
+      else if (input.name.startsWith('fit-') && this.draft) {
+        this.draft.set(fitFromFields($('dock-right'), this.draft.state));
+        this.canvas?.draw();
+        this.drawFitWords();
+      }
     });
     addEventListener('hashchange', () => void this.render(false));
     addEventListener('keydown', (e) => this.key(e));
@@ -97,6 +106,7 @@ export class StudioShell {
       const nav = this.pagesNav(space, page);
       if (page === 'canvas') await this.drawCanvas(nav);
       else if (!typing) {
+        this.canvas = this.draft = undefined;
         this.main.innerHTML = nav + html;
         afterArtRender();
       }
@@ -145,7 +155,17 @@ export class StudioShell {
     if (document.querySelector('dialog[open]')) return;
     const k = studioKey(e, typingIn(document.activeElement));
     if (!k) return;
+    // The arrows and Ctrl Z belong to the page unless a picture is being fitted.
+    if (('nudge' in k || 'undo' in k) && !this.draft) return;
     e.preventDefault();
+    if ('nudge' in k || 'undo' in k) {
+      if (!this.draft || !this.canvas) return;
+      if ('nudge' in k) this.draft.nudge(k.nudge[0], k.nudge[1]);
+      else this.draft.undo();
+      this.canvas.draw();
+      this.drawFitPanel();
+      return;
+    }
     if ('workspace' in k) {
       const space = WORKSPACES.find((w) => w.key === k.workspace);
       if (space) location.hash = pageHash(pageFor(space, this.last));
@@ -169,7 +189,26 @@ export class StudioShell {
     const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
     this.browser.select(a?.id);
     const item = a && artState.data?.items.find((i) => i.id === a.id);
-    $('dock-right').innerHTML = inspectorHtml(a) + versionsHtml(item, this.version);
+    const fit = a && this.draft ? `<section class="fit-panel">${fitPanelHtml(a, this.draft)}</section>` : '';
+    $('dock-right').innerHTML = inspectorHtml(a) + fit + versionsHtml(item, this.version);
+  }
+
+  /** Draws the Offset section again, keeping the field being typed in. */
+  private drawFitPanel(): void {
+    const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
+    const panel = $('dock-right').querySelector('.fit-panel');
+    if (panel && a && this.draft) panel.innerHTML = fitPanelHtml(a, this.draft);
+  }
+
+  /** The words under the Offset fields, while they are typed in. */
+  private drawFitWords(): void {
+    const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
+    const panel = $('dock-right').querySelector('.fit-panel');
+    if (!panel || !a || !this.draft) return;
+    const fresh = document.createElement('div');
+    fresh.innerHTML = fitPanelHtml(a, this.draft);
+    panel.querySelector('.fit-words')!.replaceWith(fresh.querySelector('.fit-words')!);
+    panel.querySelector('[data-fit-save]')!.replaceWith(fresh.querySelector('[data-fit-save]')!);
   }
 
   /** A workspace's own page tabs, when it holds one of the shell's pages (art-ui draws the others' tabs). */
@@ -187,11 +226,34 @@ export class StudioShell {
       return;
     }
     this.main.innerHTML = `${nav}<div class="canvas-page"></div>`;
-    await new StudioCanvas(this.main.querySelector('.canvas-page')!, a, await loadArt()).mount();
+    this.draft = FIT_GROUPS.includes(a.group) ? new FitDraft(a.fit) : undefined;
+    this.canvas = new StudioCanvas(this.main.querySelector('.canvas-page')!, a, await loadArt(), this.draft, () => this.drawFitPanel());
+    this.drawInspector();
+    await this.canvas.mount();
+  }
+
+  /** Saves the fit being changed, or puts the picture back where it was painted: players see it at once. */
+  private saveFit(asset: string, reset: boolean, button: HTMLButtonElement): void {
+    if (reset && !confirm('Put this picture back where it was painted, for everyone?')) return;
+    button.disabled = true;
+    const body = reset ? { asset } : { asset, offset: this.draft?.state.offset, scale: this.draft?.state.scale };
+    void api('art/fit', reset ? 'DELETE' : 'POST', body).then(
+      () => {
+        toast(reset ? 'Back where it was painted. Players see it at once.' : 'Fit saved. Players see it at once; undo it in God\'s View like any wish.');
+        void this.render(true);
+      },
+      (err: Error) => {
+        button.disabled = false;
+        toast(err.message);
+      },
+    );
   }
 
   /** The Versions dock's buttons: lay a version against the one shown now, or put it back. */
   private versionClick(target: HTMLElement): void {
+    const save = target.closest<HTMLButtonElement>('[data-fit-save]');
+    const reset = target.closest<HTMLButtonElement>('[data-fit-reset]');
+    if ((save || reset) && this.selected) return this.saveFit(this.selected, !!reset, (save ?? reset)!);
     const pick = target.closest<HTMLElement>('[data-version]');
     if (pick) {
       this.version = pick.dataset.version;

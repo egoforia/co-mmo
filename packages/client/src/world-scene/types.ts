@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import {
+  piecePicture,
   FLAME_LIGHT,
   ISO_WAY_STEPS,
   TILE_PIXELS,
@@ -235,10 +236,10 @@ export function wayOnScreen(way: Facing): { x: number; y: number } {
   return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
 }
 
-/** Where a landmark stands: its footprint's bottom row is centred under (l.x, l.y). */
+/** Where a landmark stands: the middle of the bottom of the tiles it blocks (piecePicture). */
 export function landmarkFeet(l: { x: number; y: number; footprint: { width: number; height: number } }, ox: number, oy: number): { x: number; y: number } {
-  const { width, height } = l.footprint;
-  return PROJECTION.stand(ox + l.x - width / 2, oy + l.y - height, width, height);
+  const pic = piecePicture(l);
+  return PROJECTION.stand(ox + pic.left, oy + pic.top, pic.width, pic.height);
 }
 
 /** The drawn storey of a floor over a tile. */

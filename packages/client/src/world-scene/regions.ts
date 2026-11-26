@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import {
+  piecePicture,
   Tile,
   ITEMS,
   SPOTS,
@@ -287,10 +288,9 @@ const floors: FloorView[] = map.storeys.map((storey) => {
 export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[], art: ArtManifest): void {
   for (const l of map.landmarks) {
     if (!scene.textures.exists(l.asset)) continue;
-    const { width, height } = l.footprint;
-    const left = ox + l.x - width / 2;
-    const top = oy + l.y - height;
-    const tiles = { left, top, right: left + width, bottom: top + height };
+    // Its picture stands centred on the tiles it blocks (piecePicture).
+    const pic = piecePicture(l);
+    const tiles = { left: ox + pic.left, top: oy + pic.top, right: ox + pic.left + pic.width, bottom: oy + pic.top + pic.height };
     const floor = l.floor ?? 0;
     const lift = floorLift(floor);
     const depthOff = floorDepthOffset(floor);

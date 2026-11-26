@@ -21,7 +21,7 @@ export interface AssetFit {
   offset: [number, number];
   /** Its size trimmed, FIT_SCALE.least to FIT_SCALE.most; 1 when left out. */
   scale?: number;
-  /** The tiles it blocks, from its footprint's top-left (world.ts blockedTiles); every tile when left out. */
+  /** The tiles it blocks, from its footprint's top-left, up to FIT_BLOCKS_REACH tiles past it (world.ts blockedTiles); every footprint tile when left out. */
   blocks?: [number, number][];
   /** Its own light, changed from the one its kind gives (lighting.ts glowFor). */
   light?: FitLight;
@@ -88,19 +88,28 @@ export function validateFit(raw: unknown): FitWish | string {
   };
 }
 
-/** The most tiles a footprint has a side, so a hitbox's tiles are 0 to FIT_BLOCKS_SIDE - 1 from its top-left. */
+/** The most tiles a footprint has a side. */
 export const FIT_BLOCKS_SIDE = 8;
+/**
+ * How many tiles past its footprint a hitbox may reach on each side, so a
+ * picture painted wider than its footprint (a fountain's basin) can block the
+ * ground it covers. A hitbox's tiles run -FIT_BLOCKS_REACH to
+ * FIT_BLOCKS_SIDE + FIT_BLOCKS_REACH - 1 from the footprint's top-left.
+ */
+export const FIT_BLOCKS_REACH = 2;
 
 /** A hitbox's tiles made clean (sorted, each once), or what is wrong with them. */
 function blocksOf(raw: unknown): [number, number][] | string {
-  const wrong = `Choose hitbox tiles inside its footprint, at most ${FIT_BLOCKS_SIDE} a side.`;
-  if (!Array.isArray(raw) || raw.length > FIT_BLOCKS_SIDE * FIT_BLOCKS_SIDE) return wrong;
+  const R = FIT_BLOCKS_REACH;
+  const span = FIT_BLOCKS_SIDE + 2 * R;
+  const wrong = `Choose hitbox tiles on its footprint or at most ${R} tiles around it.`;
+  if (!Array.isArray(raw) || raw.length > span * span) return wrong;
   const seen = new Set<number>();
   for (const t of raw) {
-    if (!Array.isArray(t) || t.length !== 2 || !t.every((n) => Number.isInteger(n) && n >= 0 && n < FIT_BLOCKS_SIDE)) return wrong;
-    seen.add(t[1] * FIT_BLOCKS_SIDE + t[0]);
+    if (!Array.isArray(t) || t.length !== 2 || !t.every((n) => Number.isInteger(n) && n >= -R && n < FIT_BLOCKS_SIDE + R)) return wrong;
+    seen.add((t[1] + R) * span + t[0] + R);
   }
-  return [...seen].sort((a, b) => a - b).map((n) => [n % FIT_BLOCKS_SIDE, Math.floor(n / FIT_BLOCKS_SIDE)]);
+  return [...seen].sort((a, b) => a - b).map((n) => [(n % span) - R, Math.floor(n / span) - R]);
 }
 
 /** True when a fit changes anything from how the picture was painted. */

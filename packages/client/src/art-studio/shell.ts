@@ -28,6 +28,8 @@ import { showPane, wireDocks } from './docks.ts';
 import { inspectorHtml } from './inspector.ts';
 import { studioKey, typingIn } from './keys.ts';
 import { stripHtml } from './strip.ts';
+import { createDockHtml } from './create-dock.ts';
+import { FrameStrip } from './frame-strip.ts';
 import { versionsHtml } from './versions.ts';
 import { SHELL_PAGES, TOP_PAGES, WORKSPACES, canvasHash, hashPage, pageFor, pageHash, placeHash, workspaceOf, type Workspace } from './workspaces.ts';
 
@@ -38,6 +40,7 @@ export class StudioShell {
   private readonly main = $('main');
   private readonly frame = $('studio');
   private readonly browser: AssetBrowser;
+  private readonly frames = new FrameStrip($('frames'));
   private readonly last: Partial<Record<Workspace['id'], string>> = {};
   private selected: string | undefined;
   /** The canvas shown now, and the fit being changed on it. */
@@ -206,7 +209,8 @@ export class StudioShell {
     this.browser.select(a?.id);
     const item = a && artState.data?.items.find((i) => i.id === a.id);
     const fit = a && this.draft ? `<section class="fit-panel">${this.fitHtml(a, this.draft)}</section>` : '';
-    $('dock-right').innerHTML = inspectorHtml(a) + fit + versionsHtml(item, this.version);
+    $('dock-right').innerHTML = inspectorHtml(a) + fit + createDockHtml(a, artState.data ?? undefined) + versionsHtml(item, this.version);
+    this.frames.show(a && artState.data?.walkers.find((w) => w.id === a.id));
   }
 
   /** Draws the Offset section again, keeping the field being typed in. */
@@ -366,6 +370,8 @@ export class StudioShell {
 
   /** The Versions dock's buttons: lay a version against the one shown now, or put it back. */
   private versionClick(target: HTMLElement): void {
+    // Create with AI opens the same review as the pages (art-ui/dialogs.ts).
+    if (target.closest('[data-art-review]')) return void artClick(target);
     if (target.closest('[data-fit-centre]')) return void this.centreOne();
     if (target.closest('[data-hitbox-edit]')) return this.toggleHitbox();
     if (target.closest('[data-hitbox-all]') && this.draft) {

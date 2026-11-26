@@ -82,9 +82,10 @@
   min-height: 0;
   display: grid;
   grid-template-columns: var(--dock-left) 6px minmax(0, 1fr) 6px var(--dock-right);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   grid-template-areas:
     'left lgrip page rgrip right'
+    'frames frames frames frames frames'
     'strip strip strip strip strip';
 }
 
@@ -334,6 +335,95 @@
   color: var(--accent);
 }
 
+/* The frame strip (art-studio/frame-strip.ts): a walker's frames, one track per way. */
+.frames {
+  grid-area: frames;
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--edge);
+  font-size: 13px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.frames[hidden] {
+  display: none;
+}
+
+.frames-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.frames-preview {
+  width: 80px;
+  height: 80px;
+  background-color: rgba(0, 0, 0, 0.25);
+  background-repeat: no-repeat;
+  border-radius: 4px;
+}
+
+.frames-kinds button,
+.frames-side > button {
+  padding: 2px 8px;
+  font-weight: 400;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--edge);
+}
+
+.frames-kinds button[aria-pressed='true'] {
+  color: var(--bg);
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.frames-tracks {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 10px;
+  align-items: center;
+}
+
+.frames-track {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+}
+
+.frames-track button {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background-color: rgba(0, 0, 0, 0.25);
+  background-repeat: no-repeat;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+}
+
+.frames-track button[aria-current='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.frames-way {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.frames-tracks .note {
+  margin: 0;
+}
+
 /* Narrow screens: one pane at a time, chosen with the tabs in the top bar. */
 @media (max-width: 900px) {
   .studio-top {
@@ -376,7 +466,7 @@
 
   .studio-frame {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'pane' 'strip';
+    grid-template-areas: 'pane' 'frames' 'strip';
   }
 
   .grip { display: none; }
@@ -456,6 +546,17 @@
 
 .studio-canvas:active {
   cursor: grabbing;
+}
+
+/* The Create with AI dock (art-studio/create-dock.ts). */
+.create-dock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.create-dock button {
+  text-align: left;
 }
 
 /* The Inspector's links and the Versions dock. */

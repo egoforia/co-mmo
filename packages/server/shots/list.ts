@@ -400,6 +400,28 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine\'s left tile is green and its right tile red on the canvas', 'the Inspector\'s Hitbox section says "Blocks 1 of 2 tiles" and "Done choosing"', 'Save the fit is enabled, "not saved yet"'],
   },
   {
+    name: 'art-studio-frames',
+    about: 'The frame strip: Bramble Ursine\'s walk, one track per way, stopped on frame 4 of front left, with Create with AI in the Inspector.',
+    page: '/art-studio.html#art/canvas?asset=bramble-ursine',
+    ready: '.asset-list button',
+    open: async (page) => {
+      // The shot server ships no art manifest, so Bramble Ursine's shipped walk sheets (12 frames each) are added to what it says.
+      await page.route('**/api/admin/art', async (route) => {
+        const res = await route.fetch();
+        const body = await res.json();
+        const strip = (d: string) => ({ url: `/art/bramble-ursine-walk-${d}.png`, frames: 12, width: 1656, height: 185, cycleSeconds: 1.5, versions: [] });
+        for (const w of body.walkers ?? []) if (w.id === 'bramble-ursine') w.walks = Object.fromEntries(['front-left', 'front-right', 'back-left', 'back-right'].map((d) => [d, strip(d)]));
+        await route.fulfill({ response: res, json: body });
+      });
+      await page.reload();
+      await page.waitForSelector('.frames:not([hidden]) .frames-track button');
+      await page.click('.frames-track [data-way="front-left"][data-frame="3"]');
+      await page.waitForSelector('.frames [data-way="front-left"][data-frame="3"][aria-current="true"]');
+      await page.evaluate(() => document.querySelector('.create-dock')?.scrollIntoView({ block: 'center' }));
+    },
+    mustSee: ['four tracks of walk frames along the bottom, front left frame 4 marked', 'the preview shows that frame and the button says Play', 'the Inspector has a Create with AI section with paint buttons and their costs'],
+  },
+  {
     name: 'art-studio-centre',
     about: 'Auto-centre for a group: the Centre page offering to measure the set pieces shown.',
     page: '/art-studio.html#art/centre',

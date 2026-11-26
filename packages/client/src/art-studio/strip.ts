@@ -1,6 +1,6 @@
-// The strip along the bottom, as a video editor's timeline: for now the jobs
-// painting and waiting, newest last, each opening its asset. A later step puts
-// a walker's frames, a spot's states and a still's versions here.
+// The strip along the bottom: the jobs painting and waiting, newest last,
+// each opening its asset. A walker's frames have their own strip above it
+// (frame-strip.ts).
 
 import { assetHref, isOpen, type ArtJob, STATUS } from '../art-ui/state.ts';
 import { escapeHtml } from '../ui.ts';

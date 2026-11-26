@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { TILE_PIXELS, Tile, type RegionMap } from '@co-mmo/shared';
+import { TILE_PIXELS, Tile, piecePicture, type RegionMap } from '@co-mmo/shared';
 import { TILE_MARGIN, propTexture, registerBuildingTileset, registerStoreyTileset, registerTileset, stairTexture } from './textures.ts';
 
 // The mini map's pictures of each floor, put together from the same painted
@@ -92,7 +92,8 @@ function tiles(width: number, height: number, pick: (x: number, y: number) => HT
 function landmarks(scene: Phaser.Scene, ctx: CanvasRenderingContext2D, map: RegionMap, floor: number, ox: number, oy: number): void {
   for (const l of map.landmarks) {
     if ((l.floor ?? 0) !== floor || !scene.textures.exists(l.asset)) continue;
-    stand(ctx, source(scene, l.asset), l.x - ox, l.y - oy, l.footprint.width);
+    const pic = piecePicture(l);
+    stand(ctx, source(scene, l.asset), pic.left + pic.width / 2 - ox, pic.top + pic.height - oy, pic.width);
   }
 }
 

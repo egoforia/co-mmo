@@ -35,6 +35,8 @@ export interface Shot {
   screen?: 'desktop' | 'phone';
   /** Things the player carries besides the Bible, for shots of the bag and what it does. */
   carry?: { item: string; qty: number }[];
+  /** Skills the player knows, put on hotbar keys 1, 2 and on, for shots of the hotbar. */
+  skills?: string[];
   /** More characters on the player's account, by name, for shots of the character screen (docs/characters.md). */
   characters?: string[];
   /** Hide the HUD and windows, for shots of the world itself (buildings, floors). */
@@ -166,6 +168,18 @@ export const SHOTS: Shot[] = [
     about: 'Mushroom Hollow at its arrival point.',
     region: 'mushroom-hollow',
     mustSee: ['mushrooms and ground are painted, not blank or magenta'],
+  },
+  {
+    name: 'sanctum-readied-skill',
+    about: 'A skill readied with Shift and its number, waiting for the next Space.',
+    region: 'sanctum',
+    skills: ['shield-bash', 'lunge'],
+    open: async (page) => {
+      await page.waitForSelector('#abilities button:not(.empty)');
+      await page.keyboard.press('Shift+Digit1');
+      await page.waitForSelector('#abilities button.readied');
+    },
+    mustSee: ['the first hotbar button is ringed as readied, the others are not', 'nothing was cast: no skill effect on the player'],
   },
   {
     name: 'sanctum-bag',
@@ -328,10 +342,130 @@ export const SHOTS: Shot[] = [
     mustSee: ['the walking mushrooms stand about two thirds of the player\'s height (112 against 168 px before the camera shrinks them)', 'their feet stand on the ground'],
   },
   {
+    name: 'gather-spot-hover',
+    about: 'A gathering spot in the Sanctum hovered: it says it is ready to gather. Its state pictures (Picked, Growing) are not painted, so it shows its Ready picture.',
+    region: 'sanctum',
+    // One tile west of the first spot, so it stands just right of the player.
+    at: (map) => ({ x: map.spots[0]!.x - 0.5, y: map.spots[0]!.y + 0.5 }),
+    open: async (page) => {
+      // The spot's tile is one tile east (80, 40 world px) of us at zoom 0.6; aim a little up its picture.
+      await page.mouse.move(640 + 48, 400 + 24 - 20);
+      await page.waitForTimeout(400);
+    },
+    mustSee: ['a gathering spot just right of the player, with a label above it naming it and saying "Ready to gather"'],
+  },
+  {
     name: 'art-studio',
     about: 'The AI Art Studio, where the Owner reviews and paints pictures.',
     page: '/art-studio.html',
-    mustSee: ['pictures load (no broken image icons)', 'buttons and labels are readable'],
+    ready: '.asset-list button',
+    mustSee: ['pictures load (no broken image icons)', 'buttons and labels are readable', 'workspaces along the top, assets docked left, the Inspector right, the painting strip along the bottom'],
+  },
+  {
+    name: 'art-studio-picked',
+    about: 'The AI Art Studio with a set piece picked in the asset browser.',
+    page: '/art-studio.html',
+    ready: '.asset-list button',
+    open: async (page) => {
+      await page.click('.asset-chips [data-group="pieces"]');
+      await page.fill('.dock-left input[name=search]', 'shrine');
+      await page.click('.asset-list button[data-asset="sanctum-shrine"]');
+      await page.waitForSelector('.dock-right .props');
+    },
+    mustSee: ['the shrine row is marked in the list', 'the Inspector shows its picture and a property table with a 2 × 1 footprint'],
+  },
+  {
+    name: 'art-studio-canvas',
+    about: 'The Studio canvas: the Sanctum shrine standing on its 2 by 1 tiles at game size, a player beside it, lit at dusk.',
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas',
+    open: async (page) => {
+      await page.click('.canvas-bar [data-hour="19"]');
+      await page.waitForSelector('.studio-canvas[data-lit="19"]');
+    },
+    mustSee: ['the shrine stands on two outlined tile diamonds, on painted Sanctum meadow', 'a player figure stands beside it at game size', 'the Place workspace and its Canvas tab are marked', 'the Inspector shows the shrine'],
+  },
+  {
+    name: 'art-studio-offset',
+    about: 'The Offset tool: the shrine nudged 20 px left on the canvas, not saved yet.',
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas[data-lit="none"]',
+    open: async (page) => {
+      await page.keyboard.press('Shift+ArrowLeft');
+      await page.keyboard.press('Shift+ArrowLeft');
+      await page.waitForSelector('.fit-panel input[name=fit-x][value="-20"]');
+    },
+    mustSee: ['the shrine stands 20 px left of where it did, an orange cross at its anchor', 'the Inspector\'s Offset section shows x -20 and "not saved yet"', 'Save the fit is enabled'],
+  },
+  {
+    name: 'art-studio-hitbox',
+    about: 'The Hitbox tool: the shrine with its left tile opened, so only its right tile blocks walking, not saved yet.',
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas[data-lit="none"]',
+    open: async (page) => {
+      await page.keyboard.press('b');
+      await page.waitForSelector('.studio-canvas[data-hitbox="true"]');
+      // The shrine's left tile (0, 0): its middle is 80 px right of the canvas world origin's projection.
+      await page.evaluate(() => {
+        const c = document.querySelector<HTMLCanvasElement>('.studio-canvas')!;
+        const r = c.getBoundingClientRect();
+        // The tiles' middle (1, 0.5) sits at the canvas middle, 62 % down; tile (0, 0)'s middle is (0.5, 0.5), 40 px left and 20 px up of it.
+        const x = r.left + r.width / 2 - 40;
+        const y = r.top + r.height * 0.62 - 20;
+        for (const type of ['pointerdown', 'pointerup']) c.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerId: 1 }));
+      });
+      await page.waitForSelector('.fit-panel .hitbox-words');
+      await page.waitForFunction(() => document.querySelector('.fit-panel .hitbox-words')?.textContent?.startsWith('Blocks 1 of 2'));
+    },
+    mustSee: ['the shrine\'s left tile is green and its right tile red on the canvas', 'the Inspector\'s Hitbox section says "Blocks 1 of 2 tiles" and "Done choosing"', 'Save the fit is enabled, "not saved yet"'],
+  },
+  {
+    name: 'art-studio-frames',
+    about: 'The frame strip: Bramble Ursine\'s walk, one track per way, stopped on frame 4 of front left, with Create with AI in the Inspector.',
+    page: '/art-studio.html#art/canvas?asset=bramble-ursine',
+    ready: '.asset-list button',
+    open: async (page) => {
+      // The shot server ships no art manifest, so Bramble Ursine's shipped walk sheets (12 frames each) are added to what it says.
+      await page.route('**/api/admin/art', async (route) => {
+        const res = await route.fetch();
+        const body = await res.json();
+        const strip = (d: string) => ({ url: `/art/bramble-ursine-walk-${d}.png`, frames: 12, width: 1656, height: 185, cycleSeconds: 1.5, versions: [] });
+        for (const w of body.walkers ?? []) if (w.id === 'bramble-ursine') w.walks = Object.fromEntries(['front-left', 'front-right', 'back-left', 'back-right'].map((d) => [d, strip(d)]));
+        await route.fulfill({ response: res, json: body });
+      });
+      await page.reload();
+      await page.waitForSelector('.frames:not([hidden]) .frames-track button');
+      await page.click('.frames-track [data-way="front-left"][data-frame="3"]');
+      await page.waitForSelector('.frames [data-way="front-left"][data-frame="3"][aria-current="true"]');
+      await page.evaluate(() => document.querySelector('.create-dock')?.scrollIntoView({ block: 'center' }));
+    },
+    mustSee: ['four tracks of walk frames along the bottom, front left frame 4 marked', 'the preview shows that frame and the button says Play', 'the Inspector has a Create with AI section with paint buttons and their costs'],
+  },
+  {
+    name: 'art-studio-spot-states',
+    about: 'A gathering spot in the Studio: the strip shows its Ready, Picked and Growing pictures side by side (none painted on the shot server).',
+    page: '/art-studio.html#art/canvas?asset=spot-sanctum-sage',
+    ready: '.frames:not([hidden]) .spot-state',
+    mustSee: ['the bottom strip says "States · Sage Bush" with three boxes, Ready, Picked and Growing', 'the Inspector shows the Sage Bush and Create with AI'],
+  },
+  {
+    name: 'art-studio-centre',
+    about: 'Auto-centre for a group: the Centre page offering to measure the set pieces shown.',
+    page: '/art-studio.html#art/centre',
+    ready: '.asset-list button',
+    open: async (page) => {
+      await page.click('.asset-chips [data-group="pieces"]');
+      await page.waitForSelector('[data-centre-measure]');
+    },
+    mustSee: ['the Place workspace with Canvas, Centre a group and Buildings tabs, Centre a group marked', 'a button to measure the pieces shown, with their number'],
+  },
+  {
+    name: 'art-studio-phone',
+    about: 'The AI Art Studio on a phone: one pane at a time, chosen with tabs.',
+    page: '/art-studio.html',
+    ready: '#strip .strip-title',
+    screen: 'phone',
+    mustSee: ['the page fills the screen, no docks squeezed beside it', 'the Assets, Page and Inspector tabs are readable', 'nothing runs off the right edge'],
   },
   {
     name: 'testbed-terrace-rim',

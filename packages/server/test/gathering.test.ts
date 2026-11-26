@@ -41,7 +41,9 @@ describe('gathering on the server', () => {
     expect(conn.messages.some((m) => m.t === 'gather' && !('tool' in m && m.tool))).toBe(true);
 
     region.handle('a', { t: 'interact' });
-    expect(notices(conn).at(-1)).toMatch(/nothing left for you yet/);
+    expect(notices(conn).at(-1)).toMatch(/nothing left for you yet\. It grows back in about 5 minutes\./);
+    // The timer is kept on the character, so a restart or a move between servers keeps it.
+    expect(Object.values(region.character('a')!.regrow ?? {})).toEqual([clock.now + REGROW_MS]);
 
     // Someone else finds it full.
     const other = fakeConn();

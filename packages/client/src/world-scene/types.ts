@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import {
+  piecePicture,
   FLAME_LIGHT,
   ISO_WAY_STEPS,
   TILE_PIXELS,
@@ -21,6 +22,7 @@ import {
 import type { HouseSource } from '../kit-house-view.ts';
 import type { LitPoint } from '../lights.ts';
 import type { EdgeWallView } from './edge-walls.ts';
+import type { SpotView } from './spot-views.ts';
 import { PROJECTION } from '../projection.ts';
 
 export interface Avatar {
@@ -120,6 +122,8 @@ export interface DrawnRegion {
   stairs: Phaser.GameObjects.GameObject[];
   /** Walls standing on one side of a tile, each see-through while it stands in front of us. */
   edgeWalls: EdgeWallView[];
+  /** Its gathering spots, each in the state we see it in (spot-views.ts). */
+  spots: SpotView[];
 }
 
 /** A storey drawn over its rectangle: its tiles, its furniture, and its stairs' pictures and labels. */
@@ -235,10 +239,10 @@ export function wayOnScreen(way: Facing): { x: number; y: number } {
   return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
 }
 
-/** Where a landmark stands: its footprint's bottom row is centred under (l.x, l.y). */
+/** Where a landmark stands: the middle of the bottom of the tiles it blocks (piecePicture). */
 export function landmarkFeet(l: { x: number; y: number; footprint: { width: number; height: number } }, ox: number, oy: number): { x: number; y: number } {
-  const { width, height } = l.footprint;
-  return PROJECTION.stand(ox + l.x - width / 2, oy + l.y - height, width, height);
+  const pic = piecePicture(l);
+  return PROJECTION.stand(ox + pic.left, oy + pic.top, pic.width, pic.height);
 }
 
 /** The drawn storey of a floor over a tile. */

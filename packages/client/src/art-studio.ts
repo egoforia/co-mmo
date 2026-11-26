@@ -1,22 +1,12 @@
-// Standalone AI Art Studio (/art-studio.html):
-// Dedicated creative workspace for the Owner, decoupled from God's View.
-// Hosts the "Up Next" Queue, Missing & Stand-In Art Navigator, AI Art Director,
-// Unified Characters/Monsters/NPCs Studio (with Interactive Hand Workbench & Attack/Skill Stage),
-// Items, Biomes, Building Kit Looks, Buildings, HUD & FX, Sounds, In-Studio Map Editor,
-// and Art/Video/Audio AI Models.
+// The AI Art Studio (/art-studio.html), the Owner's workspace for every
+// picture, walk and sound. This entry signs in and opens the Studio's window
+// (art-studio/shell.ts): workspaces along the top, the asset browser and
+// Inspector docked either side, today's pages (art-ui/*) in the middle and
+// the painting strip along the bottom.
 
 import { loadToken, rejoinWhenBack } from './api.ts';
 import { apiLogPage, wireApiLog } from './api-log-ui.ts';
-import {
-  afterArtRender,
-  artChange,
-  artClick,
-  artPage,
-  artSubmit,
-  refreshArtJobs,
-  refreshHandStatus,
-  type ArtContext,
-} from './art-ui.ts';
+import { StudioShell } from './art-studio/shell.ts';
 import { GameDown, api, toast } from './gods-view/core.ts';
 import { escapeHtml } from './ui.ts';
 
@@ -26,12 +16,6 @@ const apiLogBody = document.getElementById('studio-api-log-body')!;
 
 let waiting = false;
 let apiLogOpen = false;
-
-const artContext: ArtContext = {
-  api,
-  toast,
-  rerender: (force?: boolean) => void render(force ?? true),
-};
 
 function waitForGame(): void {
   if (waiting) return;
@@ -58,9 +42,6 @@ async function boot(): Promise<void> {
     return;
   }
 
-  addEventListener('hashchange', () => void render(false));
-
-  // Wire the collapsible Art API Call Log drawer
   wireApiLog(
     apiLogBody,
     api,
@@ -70,14 +51,7 @@ async function boot(): Promise<void> {
   document.getElementById('toggle-api-log')?.addEventListener('click', () => void toggleApiLog());
   document.getElementById('close-api-log')?.addEventListener('click', () => void toggleApiLog(false));
 
-  await render(true);
-
-  // Keep live job status and background hand-finder progress fresh
-  setInterval(() => {
-    if (document.visibilityState !== 'visible') return;
-    void refreshArtJobs(artContext);
-    void refreshHandStatus(artContext);
-  }, 3000);
+  await new StudioShell(waitForGame).start();
 }
 
 async function toggleApiLog(force?: boolean): Promise<void> {
@@ -93,38 +67,5 @@ async function toggleApiLog(force?: boolean): Promise<void> {
     }
   }
 }
-
-async function render(force = false): Promise<void> {
-  if (waiting) return;
-  try {
-    const html = await artPage(artContext, force);
-    // Preserve active text input focus if the user is typing
-    if (
-      main.contains(document.activeElement) &&
-      (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) &&
-      document.activeElement.type !== 'checkbox'
-    ) {
-      return;
-    }
-    main.innerHTML = html;
-    afterArtRender();
-  } catch (err) {
-    if (err instanceof GameDown) return waitForGame();
-    main.innerHTML = `<p class="note">${escapeHtml((err as Error).message)}</p>`;
-  }
-}
-
-main.addEventListener('click', (e) => {
-  artClick(e.target as HTMLElement);
-});
-
-main.addEventListener('submit', (e) => {
-  e.preventDefault();
-  artSubmit(e.target as HTMLFormElement);
-});
-
-main.addEventListener('change', (e) => {
-  artChange(e.target as HTMLElement);
-});
 
 void boot();

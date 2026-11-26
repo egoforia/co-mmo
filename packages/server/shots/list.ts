@@ -448,7 +448,7 @@ export const SHOTS: Shot[] = [
   },
   {
     name: 'art-studio-hitbox',
-    about: 'The Hitbox tool: the shrine with its left tile opened, so only its right tile blocks walking, not saved yet.',
+    about: 'The Hitbox tool: the shrine with its left tile opened and the tile left of its footprint blocked, not saved yet.',
     page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
     ready: '.studio-canvas[data-lit="none"]',
     open: async (page) => {
@@ -459,14 +459,16 @@ export const SHOTS: Shot[] = [
         const c = document.querySelector<HTMLCanvasElement>('.studio-canvas')!;
         const r = c.getBoundingClientRect();
         // The tiles' middle (1, 0.5) sits at the canvas middle, 62 % down; tile (0, 0)'s middle is (0.5, 0.5), 40 px left and 20 px up of it.
-        const x = r.left + r.width / 2 - 40;
-        const y = r.top + r.height * 0.62 - 20;
-        for (const type of ['pointerdown', 'pointerup']) c.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerId: 1 }));
+        // Tile (-1, 0), just past the footprint, is 120 px left and 60 px up of it.
+        for (const [dx, dy] of [[-40, -20], [-120, -60]]) {
+          const [x, y] = [r.left + r.width / 2 + dx, r.top + r.height * 0.62 + dy];
+          for (const type of ['pointerdown', 'pointerup']) c.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerId: 1 }));
+        }
       });
       await page.waitForSelector('.fit-panel .hitbox-words');
-      await page.waitForFunction(() => document.querySelector('.fit-panel .hitbox-words')?.textContent?.startsWith('Blocks 1 of 2'));
+      await page.waitForFunction(() => document.querySelector('.fit-panel .hitbox-words')?.textContent?.startsWith('Blocks 2 tiles'));
     },
-    mustSee: ['the shrine\'s left tile is green and its right tile red on the canvas', 'the Inspector\'s Hitbox section says "Blocks 1 of 2 tiles" and "Done choosing"', 'Save the fit is enabled, "not saved yet"'],
+    mustSee: ['the shrine\'s left tile is green and its right tile red on the canvas', 'the tile just left of the footprint is red, and faint outlined tiles ring the footprint two deep', 'the Inspector\'s Hitbox section says "Blocks 2 tiles; its footprint is 2 by 1" and "Done choosing"', 'Save the fit is enabled, "not saved yet"'],
   },
   {
     name: 'art-studio-light',

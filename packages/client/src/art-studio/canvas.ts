@@ -8,7 +8,7 @@
 // So is a set piece's light (light-tool.ts): a marker to drag, and the pool
 // it casts, shown when a time of day is picked.
 
-import { CHARACTER_HEIGHT, PREVIEW_HOURS, TILE_PIXELS, biomeLook, type ArtManifest, type AssetFit, type BiomeId } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, FIT_BLOCKS_REACH, PREVIEW_HOURS, TILE_PIXELS, biomeLook, type ArtManifest, type AssetFit, type BiomeId } from '@co-mmo/shared';
 import { groundLight, litPicture } from '../light-preview.ts';
 import { workedOutNormalMap } from '../normal-preview.ts';
 import { PROJECTION } from '../projection.ts';
@@ -16,7 +16,7 @@ import { fittedAt, followFit, standing, type Floor } from '../tile-stand.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
 import type { FitDraft } from './fit-tool.ts';
-import { blockedOf, tileUnder, toggleTile } from './hitbox-tool.ts';
+import { blockedOf, inReach, tileUnder, toggleTile } from './hitbox-tool.ts';
 import { LIGHT_GROUPS, draftGlow, glowHome } from './light-tool.ts';
 
 /** Groups the canvas can stand on tiles. */
@@ -164,7 +164,7 @@ export class StudioCanvas {
       if (this.hitbox && this.draft) {
         const floor = canvasFloor(this.asset);
         const tile = tileUnder(this.world(e));
-        if (tile[0] >= 0 && tile[1] >= 0 && tile[0] < floor.right && tile[1] < floor.bottom) {
+        if (inReach(tile, floor.right, floor.bottom)) {
           this.draft.set(toggleTile(this.draft.state, tile, floor.right, floor.bottom));
           this.changed();
           this.draw();
@@ -323,10 +323,14 @@ export class StudioCanvas {
     if (this.hitbox && this.draft) {
       const blocked = blockedOf(this.draft.state, floor.right, floor.bottom);
       g.save();
-      g.strokeStyle = 'rgba(242, 220, 107, 0.95)';
-      for (let ty = floor.top; ty < floor.bottom; ty++) {
-        for (let tx = floor.left; tx < floor.right; tx++) {
-          g.fillStyle = blocked.some(([x, y]) => x === tx && y === ty) ? 'rgba(229, 72, 77, 0.5)' : 'rgba(80, 200, 120, 0.25)';
+      // The footprint shows green where open; the tiles around it only when blocked, outlined where they can be picked.
+      const R = FIT_BLOCKS_REACH;
+      for (let ty = floor.top - R; ty < floor.bottom + R; ty++) {
+        for (let tx = floor.left - R; tx < floor.right + R; tx++) {
+          const on = blocked.some(([x, y]) => x === tx && y === ty);
+          const own = tx >= floor.left && ty >= floor.top && tx < floor.right && ty < floor.bottom;
+          g.fillStyle = on ? 'rgba(229, 72, 77, 0.5)' : own ? 'rgba(80, 200, 120, 0.25)' : 'rgba(80, 200, 120, 0.06)';
+          g.strokeStyle = own ? 'rgba(242, 220, 107, 0.95)' : 'rgba(242, 220, 107, 0.3)';
           diamond(tx, ty, true);
         }
       }

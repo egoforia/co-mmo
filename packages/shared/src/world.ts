@@ -16,7 +16,7 @@ import type { Weather } from './sky.ts';
 import type { Routine } from './routines.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
-import { fitOf } from './asset-fit.ts';
+import { FIT_BLOCKS_REACH, fitOf } from './asset-fit.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -1016,11 +1016,14 @@ export function block(map: RegionMap, x: number, y: number, w: number, h: number
 /**
  * The tiles a piece blocks: every tile of its box, or only those its picture's
  * hitbox (asset-fit.ts, chosen in the Art Studio) names, from the box's
- * top-left. Hitbox tiles outside the box (a footprint made smaller since) are
- * left out, and a hitbox with none left inside blocks the whole box again.
+ * top-left. A hitbox may reach FIT_BLOCKS_REACH tiles past the box, for a
+ * picture wider than its footprint; tiles further out (a footprint made
+ * smaller since) are left out, and a hitbox with none left blocks the whole
+ * box again.
  */
 export function blockedTiles(t: TileBox, asset?: string): [number, number][] {
-  const chosen = asset ? fitOf(asset)?.blocks?.filter(([dx, dy]) => dx < t.width && dy < t.height) : undefined;
+  const R = FIT_BLOCKS_REACH;
+  const chosen = asset ? fitOf(asset)?.blocks?.filter(([dx, dy]) => dx >= -R && dy >= -R && dx < t.width + R && dy < t.height + R) : undefined;
   if (chosen?.length) return chosen.map(([dx, dy]) => [t.left + dx, t.top + dy]);
   const all: [number, number][] = [];
   for (let ty = t.top; ty < t.top + t.height; ty++) for (let tx = t.left; tx < t.left + t.width; tx++) all.push([tx, ty]);

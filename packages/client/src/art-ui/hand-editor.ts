@@ -10,6 +10,7 @@ import {
   HELD_SIZE,
   TURNED,
   animationArt,
+  walkStandArt,
   facingSide,
   heldBehind,
   type AnimationKind,
@@ -27,9 +28,12 @@ import {
   esc,
 } from './state.ts';
 
+/** What the workbench edits: an animation, or the standing picture of each way (one frame). */
+export type WorkbenchKind = AnimationKind | 'stand';
+
 export interface HandWorkbenchState {
   walkerId: string;
-  animKind: AnimationKind;
+  animKind: WorkbenchKind;
   facing: IsoWay;
   frame: number;
   activeSide: 'right' | 'left';
@@ -64,7 +68,12 @@ export function getWorkbenchState(w: WalkerView): HandWorkbenchState {
   return st;
 }
 
-export function getStripForKind(w: WalkerView, kind: AnimationKind, facing: Facing): WalkStrip | undefined {
+export function getStripForKind(w: WalkerView, kind: WorkbenchKind, facing: Facing): WalkStrip | undefined {
+  // A standing picture is a strip of one frame; its size comes from the picture once loaded.
+  if (kind === 'stand') {
+    const url = w.standing[facing]?.url;
+    return url ? { url, frames: 1, width: 0, height: 0, cycleSeconds: 1, versions: [] } : undefined;
+  }
   if (kind === 'walk') return w.walks[facing];
   if (kind === 'run') return w.runs?.[facing];
   if (kind === 'attack') return w.attacks?.[facing];
@@ -79,7 +88,7 @@ export function holdableItems(): ArtItem[] {
 export function handWorkbenchHtml(w: WalkerView): string {
   const st = getWorkbenchState(w);
   const strip = getStripForKind(w, st.animKind, st.facing);
-  const artId = animationArt(w.id, st.animKind, st.facing);
+  const artId = workbenchArt(w.id, st.animKind, st.facing);
   const pts = artState.points[artId];
   const frameCount = strip?.frames ?? 8;
   if (st.frame >= frameCount) st.frame = 0;
@@ -88,7 +97,7 @@ export function handWorkbenchHtml(w: WalkerView): string {
   const leftHand = pts?.leftHands?.[st.frame] ?? null;
 
   const [turnedFacing, turnedLabel] = WAYS.find(([o]) => o === TURNED[st.facing])!;
-  const turnedId = animationArt(w.id, st.animKind, turnedFacing);
+  const turnedId = workbenchArt(w.id, st.animKind, turnedFacing);
   const hasTurned = !!(artState.points[turnedId]?.hands || artState.points[turnedId]?.leftHands);
   const facingLabel = WAYS.find(([o]) => o === st.facing)?.[1] ?? st.facing;
 
@@ -128,9 +137,9 @@ export function handWorkbenchHtml(w: WalkerView): string {
         </div>
         <div class="wb-selectors">
           <div class="btn-group" role="group" aria-label="Animation kind">
-            ${ANIMATION_KINDS.map(
-              (def) =>
-                `<button type="button" class="quiet${st.animKind === def.id ? ' active-pill' : ''}" data-wb-kind="${def.id}" data-wb-walker="${esc(w.id)}">${esc(def.label)}</button>`,
+            ${[...ANIMATION_KINDS.map((def) => [def.id, def.label] as const), ['stand', 'Standing'] as const].map(
+              ([id, label]) =>
+                `<button type="button" class="quiet${st.animKind === id ? ' active-pill' : ''}" data-wb-kind="${id}" data-wb-walker="${esc(w.id)}">${esc(label)}</button>`,
             ).join('')}
           </div>
           <div class="btn-group" role="group" aria-label="Facing direction">
@@ -237,8 +246,8 @@ export function handWorkbenchHtml(w: WalkerView): string {
 
           <h5>Full Strip Operations (${esc(facingLabel)})</h5>
           <div class="wb-ops-stack">
-            <button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [artId] }))}">🔍 AI Vision Find All ${strip.frames} Frames</button>
-            <button type="button" class="quiet" data-wb-swap="${esc(w.id)}">⇄ Swap R and L on All ${strip.frames} Frames</button>
+            <button type="button" class="quiet" data-hands-find="${esc(JSON.stringify({ ids: [artId] }))}">🔍 AI Vision Find ${strip.frames > 1 ? `All ${strip.frames} Frames` : 'the Hands'}</button>
+            <button type="button" class="quiet" data-wb-swap="${esc(w.id)}">⇄ Swap R and L on ${strip.frames > 1 ? `All ${strip.frames} Frames` : 'the Picture'}</button>
             ${
               hasTurned
                 ? `<button type="button" class="quiet" data-wb-mirror-strip="${esc(w.id)}" data-from="${esc(turnedId)}" data-to="${esc(artId)}" data-from-label="${esc(turnedLabel)}" data-label="${esc(facingLabel)}">🪞 Mirror Entire Strip from ${esc(turnedLabel)} (across X)</button>`
@@ -254,7 +263,7 @@ export function handWorkbenchHtml(w: WalkerView): string {
           const r = pts?.hands?.[i];
           const l = pts?.leftHands?.[i];
           const h = 88;
-          const fw = Math.round((strip.width / strip.frames) * (h / strip.height));
+          const fw = strip.height ? Math.round((strip.width / strip.frames) * (h / strip.height)) : h;
           return `
             <button type="button" class="wb-frame-thumb${i === st.frame ? ' selected' : ''}" data-wb-frame="${i}" data-wb-walker="${esc(w.id)}" style="width:${fw}px;height:${h + 20}px">
               <div class="wb-thumb-sprite" style="width:${fw}px;height:${h}px;background-image:url('${esc(strip.url)}');background-size:${strip.frames * 100}% 100%;background-position:${strip.frames > 1 ? (i * 100) / (strip.frames - 1) : 0}% 0">
@@ -383,8 +392,8 @@ function drawWorkbenchCanvas(canvas: HTMLCanvasElement, w: WalkerView): void {
   const img = loadCachedImage(strip.url, () => drawWorkbenchCanvas(canvas, w));
   if (!img) return;
 
-  const fw = strip.width / strip.frames;
-  const fh = strip.height;
+  const fw = (strip.width || img.naturalWidth) / strip.frames;
+  const fh = strip.height || img.naturalHeight;
   const scale = Math.min((canvas.width - 24) / fw, (canvas.height - 24) / fh);
   const drawW = fw * scale;
   const drawH = fh * scale;
@@ -434,7 +443,7 @@ function drawWorkbenchCanvas(canvas: HTMLCanvasElement, w: WalkerView): void {
     ctx.restore();
   }
 
-  const artId = animationArt(w.id, st.animKind, st.facing);
+  const artId = workbenchArt(w.id, st.animKind, st.facing);
   const pts = artState.points[artId];
   const rHand = pts?.hands?.[st.frame] ?? null;
   const lHand = pts?.leftHands?.[st.frame] ?? null;
@@ -518,15 +527,15 @@ function drawLoopCanvas(canvas: HTMLCanvasElement, w: WalkerView): void {
   if (!img) return;
 
   const frameIdx = st.playing ? loopTick % strip.frames : st.frame;
-  const fw = strip.width / strip.frames;
-  const fh = strip.height;
+  const fw = (strip.width || img.naturalWidth) / strip.frames;
+  const fh = strip.height || img.naturalHeight;
   const scale = Math.min((canvas.width - 12) / fw, (canvas.height - 12) / fh);
   const drawW = fw * scale;
   const drawH = fh * scale;
   const ox = Math.round((canvas.width - drawW) / 2);
   const oy = Math.round((canvas.height - drawH) / 2);
 
-  const artId = animationArt(w.id, st.animKind, st.facing);
+  const artId = workbenchArt(w.id, st.animKind, st.facing);
   const pts = artState.points[artId];
   const rHand = pts?.hands?.[frameIdx] ?? null;
   const lHand = pts?.leftHands?.[frameIdx] ?? null;
@@ -557,7 +566,7 @@ function wireWorkbenchCanvasDrag(canvas: HTMLCanvasElement, w: WalkerView): void
     const st = getWorkbenchState(w);
     const strip = getStripForKind(w, st.animKind, st.facing);
     if (!strip) return;
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const existing = artState.points[artId] ?? {};
     const key = st.activeSide === 'right' ? 'hands' : 'leftHands';
     const arr = Array.from({ length: strip.frames }, (_, i) => existing[key]?.[i] ?? null);
@@ -581,7 +590,7 @@ function wireWorkbenchCanvasDrag(canvas: HTMLCanvasElement, w: WalkerView): void
     if (!dragging) return;
     dragging = false;
     const st = getWorkbenchState(w);
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const pts = artState.points[artId];
     if (!pts) return;
     void saveFrameHandPoint(w, artId, st.frame, pts.hands?.[st.frame] ?? null, pts.leftHands?.[st.frame] ?? null);
@@ -655,7 +664,7 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
   const st = getWorkbenchState(w);
 
   if (t.dataset.wbKind) {
-    st.animKind = t.dataset.wbKind as AnimationKind;
+    st.animKind = t.dataset.wbKind as WorkbenchKind;
     st.frame = 0;
     rerenderWorkbench(w);
     return true;
@@ -688,7 +697,7 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
   }
   if (t.dataset.wbNudge) {
     const [dx, dy] = t.dataset.wbNudge.split(',').map(Number);
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const pts = artState.points[artId];
     const key = st.activeSide === 'right' ? 'hands' : 'leftHands';
     const cur = pts?.[key]?.[st.frame] ?? [0.5, 0.5];
@@ -709,7 +718,7 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
     return true;
   }
   if (t.dataset.wbClearHand) {
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const pts = artState.points[artId];
     const right = st.activeSide === 'right' ? null : (pts?.hands?.[st.frame] ?? null);
     const left = st.activeSide === 'left' ? null : (pts?.leftHands?.[st.frame] ?? null);
@@ -726,7 +735,7 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
   }
   if (t.dataset.wbCopyPrev) {
     if (st.frame <= 0) return true;
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const pts = artState.points[artId];
     const rPrev = pts?.hands?.[st.frame - 1] ?? null;
     const lPrev = pts?.leftHands?.[st.frame - 1] ?? null;
@@ -746,7 +755,7 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
   if (t.dataset.wbInterpolate) {
     const strip = getStripForKind(w, st.animKind, st.facing);
     if (!strip) return true;
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const existing = artState.points[artId] ?? {};
     const hands = interpolatePoints(existing.hands ?? [], strip.frames);
     const leftHands = interpolatePoints(existing.leftHands ?? [], strip.frames);
@@ -763,7 +772,7 @@ export function handleWorkbenchClick(t: HTMLButtonElement): boolean {
   if (t.dataset.wbSwap) {
     const strip = getStripForKind(w, st.animKind, st.facing);
     if (!strip) return true;
-    const artId = animationArt(w.id, st.animKind, st.facing);
+    const artId = workbenchArt(w.id, st.animKind, st.facing);
     const existing = artState.points[artId] ?? {};
     const only = t.dataset.wbSwapFrame === undefined ? undefined : Number(t.dataset.wbSwapFrame);
     const { hands, leftHands } = swapHands(existing.hands ?? [], existing.leftHands ?? [], strip.frames, only);
@@ -838,4 +847,9 @@ export function swapHands(
     [hands[i], leftHands[i]] = [leftHands[i]!, hands[i]!];
   }
   return { hands, leftHands };
+}
+
+/** The art id whose hand points the workbench edits: an animation strip, or a way's standing picture (walk.ts walkStandArt). */
+export function workbenchArt(look: string, kind: WorkbenchKind, facing: Facing): string {
+  return kind === 'stand' ? walkStandArt(look, facing) : animationArt(look, kind, facing);
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtItem, SoundItem, WalkerView } from '../src/art-ui/state.ts';
 import type { StudioAsset } from '../src/art-studio/browser.ts';
-import { createActions, stateActions } from '../src/art-studio/create-dock.ts';
+import { NO_FLOOR_WORDS, createActions, createDockHtml, sentAlong, stateActions } from '../src/art-studio/create-dock.ts';
 import { frameStyle, framesHtml, nextFrame, spotStatesHtml } from '../src/art-studio/frame-strip.ts';
 
 const strip = { url: '/art/bear-walk.png', frames: 12, width: 1200, height: 100, cycleSeconds: 1, versions: [] };
@@ -45,6 +45,18 @@ describe('Create with AI', () => {
     const acts = createActions(asset('cup', 'items'), data);
     expect(Array.isArray(acts) && acts.map((a) => a.ask)).toEqual([{ what: 'paint', asset: 'cup' }, { what: 'normal', asset: 'cup' }]);
     expect(createActions(asset('logo', 'hud'), data)).toBe('Drawn by hand.');
+  });
+
+  it('offers a piece on its tiles Remove its floor, with the words written in, when its picture is sent along', () => {
+    const acts = createActions(asset('cup', 'pieces'), data);
+    if (!Array.isArray(acts)) throw new Error(acts);
+    const floor = acts.find((x) => x.label === 'Remove its floor');
+    expect(floor).toMatchObject({ ask: { what: 'paint', asset: 'cup' }, note: true, words: NO_FLOOR_WORDS });
+    expect(createDockHtml(asset('cup', 'pieces'), data)).toContain('data-note-text="Remove the floor');
+    // Not for things that do not stand on tiles, nor pictures painted from words only.
+    expect(Array.isArray(createActions(asset('cup', 'items'), data)) && (createActions(asset('cup', 'items'), data) as { label: string }[]).some((x) => x.label === 'Remove its floor')).toBe(false);
+    expect(sentAlong('galleon-cannon')).toBe(true);
+    expect(sentAlong('42:crystal')).toBe(false);
   });
 
   it('offers a walker its four ways, each way, and clips for the ways painted', () => {

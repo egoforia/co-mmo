@@ -4,7 +4,7 @@
 // art-ui/dialogs.ts). What is sent and what it costs are shown there, and
 // nothing is painted until it is approved.
 
-import { ISO_WAYS, ISO_WAY_LABELS, SPOTS, SPOT_STATES, spotStateArt } from '@co-mmo/shared';
+import { BUILDING_STYLES, ISO_WAYS, ISO_WAY_LABELS, SPOTS, SPOT_STATES, spotStateArt } from '@co-mmo/shared';
 import { usd, type ArtOverview, type Ask } from '../art-ui/state.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
@@ -16,7 +16,15 @@ export interface CreateAction {
   usd: number;
   /** True when the review asks for the Owner's words too. */
   note?: boolean;
+  /** Words already written in the review's "Anything to change?", which the Owner can still change. */
+  words?: string;
 }
+
+/** What Remove its floor asks: the picture painted again from itself, the same but for the floor patch some were painted standing on. */
+export const NO_FLOOR_WORDS = 'Remove the floor, ground patch, deck, tile, rug or base plate under it, so it stands straight on the magenta background. Keep everything else exactly the same: the same shape, colours, size, position and angle.';
+
+/** Groups whose pictures stand on tiles, and so may have been painted with a floor under them. */
+const FLOORED_GROUPS = ['pieces', 'spots', 'stairs', 'scenery'];
 
 /** The paints an asset can have, from the Art tab's own overview. */
 export function createActions(a: StudioAsset, data: Pick<ArtOverview, 'items' | 'walkers' | 'sounds'>): CreateAction[] | string {
@@ -44,8 +52,21 @@ export function createActions(a: StudioAsset, data: Pick<ArtOverview, 'items' | 
   const normal: CreateAction[] = item.normalPaintable && item.url
     ? [{ label: item.normalMap ? 'Paint its normal map again' : 'Paint a normal map', ask: { what: 'normal', asset: item.id }, usd: item.estimateUsd }]
     : [];
-  const all = [...paint, ...normal, ...stateActions(item.id, data.items)];
+  // Painted again from itself (a repaint sends the picture along), told to leave the floor out.
+  const floor: CreateAction[] = item.repaintable && item.url && FLOORED_GROUPS.includes(a.group) && sentAlong(item.id)
+    ? [{ label: 'Remove its floor', ask: { what: 'paint', asset: item.id }, usd: item.estimateUsd, note: true, words: NO_FLOOR_WORDS }]
+    : [];
+  const all = [...paint, ...floor, ...normal, ...stateActions(item.id, data.items)];
   return all.length ? all : item.why ?? 'It cannot be painted here.';
+}
+
+/**
+ * True when painting it again sends its own picture along, so it comes back
+ * the same but for what the words change: the game's own kit pictures. A
+ * wish's pictures and building furniture are painted from words only.
+ */
+export function sentAlong(id: string): boolean {
+  return !id.includes(':') && !Object.values(BUILDING_STYLES).some((s) => id.startsWith(`${s.id}-`));
 }
 
 /** The Create with AI section, or nothing while the Art tab's overview is loading. */
@@ -54,7 +75,7 @@ export function createDockHtml(a: StudioAsset | undefined, data: Pick<ArtOvervie
   const actions = createActions(a, data);
   const body = typeof actions === 'string'
     ? `<p class="note">${escapeHtml(actions)}</p>`
-    : `<p class="create-dock">${actions.map((x) => `<button type="button" class="quiet" data-art-review="${escapeHtml(JSON.stringify(x.ask))}" data-note="${x.note ? 'yes' : ''}">${escapeHtml(x.label)} · about ${usd(x.usd)}</button>`).join('')}</p>`;
+    : `<p class="create-dock">${actions.map((x) => `<button type="button" class="quiet" data-art-review="${escapeHtml(JSON.stringify(x.ask))}" data-note="${x.note ? 'yes' : ''}"${x.words ? ` data-note-text="${escapeHtml(x.words)}"` : ''}>${escapeHtml(x.label)} · about ${usd(x.usd)}</button>`).join('')}</p>`;
   return `
     <h2 class="dock-title">Create with AI</h2>
     <p class="note">Each shows exactly what is sent to the model and what it costs. Nothing is painted until you approve it.</p>

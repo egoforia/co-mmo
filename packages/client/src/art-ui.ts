@@ -190,7 +190,8 @@ const BUTTON_ACTIONS: Record<string, (t: HTMLButtonElement) => void> = {
     // A walk clip moves the way the body picked on its card does.
     const body = t.closest('.walker')?.querySelector<HTMLSelectElement>('select[name=body]')?.value;
     if (ask.what === 'clip' && t.dataset.walkerBody !== undefined && body) ask.body = body;
-    void openReview(ask, t.dataset.note === 'yes');
+    // Some buttons come with the Owner's words already written (the Studio's Remove its floor).
+    void openReview(ask, t.dataset.note === 'yes', t.dataset.noteText ?? '');
   },
   normalShow: (t) => {
     t.disabled = true;

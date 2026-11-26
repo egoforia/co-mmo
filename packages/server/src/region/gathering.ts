@@ -13,6 +13,9 @@ import {
   gainCraftXp,
   gatherPractice,
   gatherYield,
+  growsBackWords,
+  readyAt,
+  setRegrow,
   spotNear,
   spotNeeds,
   wearTool,
@@ -23,13 +26,11 @@ import type { PlayerState, RegionState } from './state.ts';
 /**
  * Gathering at spots (gathering.ts): pressing E beside one starts it, and a
  * moment later it gives its material, unless the player was hit or walked
- * off. Each player has their own regrow timer on each spot, so one player
- * never empties a spot for another.
+ * off. Each player has their own regrow timer on each spot, kept on their
+ * character (spot-states.ts), so one player never empties a spot for another
+ * and a restart forgets nothing.
  */
 export class Gathering {
-  /** When each spot grows back for each player, by player id then spot id. */
-  private readonly regrow = new Map<string, Map<string, number>>();
-
   constructor(private readonly s: RegionState) {}
 
   /** Starts gathering at the spot beside the player; false when there is none, so E does something else. */
@@ -45,10 +46,9 @@ export class Gathering {
       return true;
     }
     const now = this.s.now();
-    const ready = this.regrow.get(p.info.id)?.get(spot.id) ?? 0;
-    if (now < ready) {
-      const minutes = Math.ceil((ready - now) / 60_000);
-      this.s.notice(p, `The ${def.name} has nothing left for you yet. It grows back in about ${minutes} minute${minutes === 1 ? '' : 's'}.`);
+    const ready = readyAt(p.character, this.s.map.def.id, spot.id, now);
+    if (ready !== undefined) {
+      this.s.notice(p, `The ${def.name} has nothing left for you yet. It ${growsBackWords(ready, now).replace(/^Grows/, 'grows')}.`);
       return true;
     }
     const tool = bestTool(p.character, spotNeeds(spot.kind)!.craft)!;
@@ -92,9 +92,7 @@ export class Gathering {
     const level = gainCraftXp(ch, needs.craft, gatherPractice(spot.kind));
     const tool = bestTool(ch, needs.craft);
     const broke = tool ? wearTool(ch, tool, this.s.random) : undefined;
-    let mine = this.regrow.get(p.info.id);
-    if (!mine) this.regrow.set(p.info.id, (mine = new Map()));
-    mine.set(spot.id, now + REGROW_MS);
+    setRegrow(ch, this.s.map.def.id, spot.id, now + REGROW_MS, now);
     delete p.gathering;
     p.conn.send({ t: 'gather' });
     const grew = level ? ` Your ${CRAFTS[needs.craft].name} rises to level ${level}.` : '';

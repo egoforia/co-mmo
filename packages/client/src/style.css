@@ -435,6 +435,8 @@ kbd { color: var(--ink); font-family: inherit; font-weight: 700; }
 #abilities button.low { color: var(--muted); }
 #abilities button.resting { color: var(--muted); }
 #abilities button.empty { color: var(--muted); border-style: dashed; }
+/* A skill readied with Ctrl or Shift and its key: the next Space casts it. */
+#abilities button.readied { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); color: var(--ink); }
 #abilities .wait {
   position: absolute; inset: 0; display: grid; place-items: center;
   background: rgba(24, 20, 37, 0.7); color: var(--ink); font-weight: 700; font-size: 14px;

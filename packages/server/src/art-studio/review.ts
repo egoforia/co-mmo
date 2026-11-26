@@ -216,7 +216,7 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
     const parts: ArtReview['parts'] = [];
     for (const item of group.items) parts.push({ name: item.name, recipe: await previewPaint(item.id, '', options, catalog, redoneDir) });
     return {
-      title: `Paint all ${group.items.length} pictures of ${group.title} again`,
+      title: ask.group.startsWith('spot-states:') ? `Paint ${group.items.length} spot state pictures: ${group.title}` : `Paint all ${group.items.length} pictures of ${group.title} again`,
       parts,
     };
   },

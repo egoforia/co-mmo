@@ -44,7 +44,7 @@ export const MOVE: EditKind<'move'> = {
       }
       piece.x += to[0] - from[0];
       piece.y += to[1] - from[1];
-      blockOn(map, floor, piece.x, piece.y, piece.footprint.width, piece.footprint.height);
+      blockOn(map, floor, piece.x, piece.y, piece.footprint.width, piece.footprint.height, piece.asset);
       return true;
     }
     const tile = tileOf(map, from);

@@ -1,4 +1,4 @@
-import { isoSpan } from '@co-mmo/shared';
+import { isoSpan, type AssetFit } from '@co-mmo/shared';
 import { PROJECTION } from './projection.ts';
 
 // How a picture stands on the tiles under it in the isometric camera, worked
@@ -73,4 +73,16 @@ export function standing(floor: Floor, size: { width: number; height: number }, 
     plan.strips.push({ x0, width, depth: depthAt(at, run) });
   }
   return plan;
+}
+
+/**
+ * Where a picture stands once its fit (asset-fit.ts, chosen in the Art
+ * Studio) moves and trims it: the offset is in the picture's own pixels, so
+ * it moves as far as the picture is drawn big. A mirrored picture moves the
+ * other way across, so it still sits where it was fitted.
+ */
+export function fittedAt(at: { x: number; y: number; scale: number }, fit: Pick<AssetFit, 'offset' | 'scale'> | undefined, mirrored = false): { x: number; y: number; scale: number } {
+  if (!fit) return at;
+  const scale = at.scale * (fit.scale ?? 1);
+  return { x: at.x + fit.offset[0] * scale * (mirrored ? -1 : 1), y: at.y + fit.offset[1] * scale, scale };
 }

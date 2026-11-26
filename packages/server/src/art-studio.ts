@@ -23,6 +23,8 @@ import { ArtHistory } from './art-history.ts';
 import { plain, type ArtJob, type ArtJobHandle } from './art-jobs.ts';
 import { keepingImage } from './art-recipes.ts';
 import { ArtDirector } from './art-studio/art-director.ts';
+import { studioAssets, type StudioAsset } from './art-studio/assets.ts';
+import { measureBase, type BaseMeasure } from './art-studio/auto-fit.ts';
 import { ArtCatalog } from './art-studio/catalog.ts';
 import { normalAsk, reviewAsk, sheetAsk } from './art-studio/review.ts';
 import { UpNextQueue } from './art-studio/up-next-queue.ts';
@@ -154,6 +156,27 @@ export class ArtStudio {
       effectsModel: this.options.sounds?.models().effects ?? null,
       musicModel: this.options.sounds?.models().music ?? null,
     };
+  }
+
+  /** The Art Studio's asset browser: every picture, walker and sound in one flat list (art-studio/assets.ts). */
+  async assets(): Promise<StudioAsset[]> {
+    return studioAssets(await this.overview(), await this.options.shipped());
+  }
+
+  /** Where each picture meets the ground (art-studio/auto-fit.ts), for auto-centre; or why it cannot be read. */
+  async measure(assets: string[]): Promise<Record<string, BaseMeasure | { why: string }>> {
+    const out: Record<string, BaseMeasure | { why: string }> = {};
+    for (const asset of assets) {
+      const file = await this.catalog.pictureFile(asset);
+      const png = file && this.options.readArt ? await this.options.readArt(file).catch(() => undefined) : undefined;
+      if (!png) {
+        out[asset] = { why: 'Its picture could not be read here.' };
+        continue;
+      }
+      const m = await measureBase(png).catch(() => undefined);
+      out[asset] = m ?? { why: 'It has no see-through edges to find its foot from.' };
+    }
+    return out;
   }
 
   /** Everything the Art tab shows. */

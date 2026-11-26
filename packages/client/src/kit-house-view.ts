@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { buildingKit } from '@co-mmo/shared';
+import { buildingKit, fitOf } from '@co-mmo/shared';
 import { PROJECTION } from './projection.ts';
-import { STRIP, depthAt, standing, type Floor } from './tile-stand.ts';
+import { STRIP, depthAt, fittedAt, standing, type Floor } from './tile-stand.ts';
 
 // Kit houses in the world, for the isometric camera: the server draws each
 // view of a house (its outside, and a cutaway per storey) on one frame, with
@@ -141,8 +141,10 @@ export function standHouseBottom(scene: Phaser.Scene, texture: string, frame: Fr
 export function standOnTiles(scene: Phaser.Scene, texture: string, floor: Floor, fitted: boolean, mirrored = false): Phaser.GameObjects.Image[] {
   const frame = scene.textures.getFrame(texture);
   const plan = standing(floor, { width: frame.width, height: frame.height }, fitted);
+  // Moved and trimmed as the Owner fitted it in the Art Studio; it still sorts by its tiles.
+  const at = fittedAt(plan, fitOf(texture), mirrored);
   return plan.strips.map((s) => {
-    const img = scene.add.image(plan.x, plan.y, texture).setOrigin(0.5, plan.originY).setScale(plan.scale).setFlipX(mirrored);
+    const img = scene.add.image(at.x, at.y, texture).setOrigin(0.5, plan.originY).setScale(at.scale).setFlipX(mirrored);
     // Flipped first: Phaser then reads the crop on the picture as shown, so each strip keeps its place on screen.
     if (plan.strips.length > 1) img.setCrop(s.x0, 0, s.width, frame.height);
     return img.setDepth(s.depth);

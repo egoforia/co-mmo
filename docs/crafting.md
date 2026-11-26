@@ -88,9 +88,11 @@ Pressing **E** checks for these in order: an NPC to talk to, a body to loot, a s
 
 - takes `GATHER_MS` (2 s), and being hit or walking off stops it;
 - gives 1 to 3 of the spot's material and practice to the craft;
-- starts a regrow timer of `REGROW_MS` (5 minutes), separate for each player and spot, so nobody empties a spot for anyone else.
+- starts a regrow timer of `REGROW_MS` (5 minutes), separate for each player and spot, so nobody empties a spot for anyone else. Timers are kept on the character (`Character.regrow`, keyed by land and spot), so a restart or a move between region servers keeps them.
 
-The tool shows in the hand while gathering. Its own picture is used once it is painted; until then a shipped stand-in shows. Cervid players see spots on the mini map (Mycelial Sense, `sensesSpots`).
+Each player sees a spot in their own state (`shared/src/spot-states.ts`): **Ready**, **Picked** for the first half of its regrow time, then **Growing**. A state shows its own picture (`spot-<kind>-picked`, `spot-<kind>-growing`) once painted; until then the spot keeps its Ready picture. Pictures swap only when a state changes, checked once a second. Hovering a spot says "Ready to gather" or when it grows back. A wish can add states to `SPOT_STATES`.
+
+The tool shows in the hand while gathering. Its own picture is used once it is painted; until then a shipped stand-in shows. Cervid players see the spots ready for them on the mini map (Mycelial Sense, `sensesSpots`).
 
 ## Recipes
 

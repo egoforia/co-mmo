@@ -6,9 +6,19 @@ import { DIAGONAL_COST, isDiagonal, squareTiles, stepped, type StepWay, type Til
 // (blocking tiles, walls on tile sides); who else stands where is the claims'
 // business (claims.ts).
 
-/** True when a body can stand on this tile of a floor: nothing solid fills it. */
+/**
+ * True when a body can stand on this tile of a floor: nothing solid fills it,
+ * or it is a ramp's head (floors/ramps.ts), stepped onto from the floor above
+ * with no floor under it, and left at once down the ramp.
+ */
 export function openTile(map: RegionMap, tx: number, ty: number, floor = 0): boolean {
-  return !isBlocking(tileAt(map, tx + 0.5, ty + 0.5, floor));
+  return !isBlocking(tileAt(map, tx + 0.5, ty + 0.5, floor)) || rampHead(map, tx, ty, floor);
+}
+
+/** True when a ramp's head is on this tile of a floor. */
+function rampHead(map: RegionMap, tx: number, ty: number, floor: number): boolean {
+  for (const s of map.stairways ?? []) if (s.ramp && s.upper === floor && s.ramp.head.x === tx && s.ramp.head.y === ty) return true;
+  return false;
 }
 
 /** True when every tile of a `width`-wide square is open. */

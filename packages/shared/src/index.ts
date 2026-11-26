@@ -6,6 +6,7 @@ export * from './world.ts';
 export * from './movement.ts';
 export * from './edge-walls.ts';
 export * from './floors.ts';
+export * from './floors/ramps.ts';
 export * from './wall-looks.ts';
 export * from './hit-boxes.ts';
 export * from './tiles.ts';

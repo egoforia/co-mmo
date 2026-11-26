@@ -3,6 +3,7 @@ import {
   DEFAULT_SKY,
   nextHour,
   TICK_RATE,
+  addRamp,
   addStairs,
   addStorey,
   floorChecks,
@@ -131,6 +132,72 @@ describe('floors in a building', () => {
     // Out in the woods there is no floor 1: they stand on the ground.
     region.join(info('b'), conn, { x: 128.5, y: 129.5, floor: 1 }, newCharacter());
     expect(region.position('b')).toEqual({ x: 128.5, y: 129.5 });
+  });
+});
+
+/** The woods at an hour, the cottage with only a floor above, up a ramp 3 long rising north, and a player south of it. */
+function rampHouse(h = 12) {
+  const clock = { now: hour(h) };
+  const region = new Region(regionDef('woods')!, undefined, () => clock.now, () => 0.5);
+  const map = region.map;
+  const home = map.buildings[0]!;
+  addStorey(map, home, 1, home.style);
+  const ramp = addRamp(map, { x: 104, y: 127, length: 3, from: 0, climbs: 'north' });
+  const conn = fakeConn();
+  region.join(info('a'), conn, { x: 104.5, y: 131.5 }, newCharacter());
+  let seq = 0;
+  const tick = (n = 1) => {
+    for (let i = 0; i < n; i++) {
+      clock.now += 1000 / TICK_RATE;
+      region.tick();
+    }
+  };
+  const walk = (dx: number, dy: number, n: number) => {
+    for (let i = 0; i < n; i++) {
+      region.handle('a', { t: 'input', seq: ++seq, dx, dy });
+      tick();
+    }
+  };
+  return { region, map, ramp, conn, tick, walk, clock };
+}
+
+describe('a ramp in a building', () => {
+  it('is laid out soundly, and takes a player up and back down', () => {
+    const { map, region, walk, conn } = rampHouse();
+    expect(floorChecks(map)).toEqual([]);
+    const notices = () => conn.messages.filter((m) => m.t === 'notice').map((m) => (m as { text: string }).text);
+    walk(0, -1, 30);
+    expect(notices()).toContain('You walk up the ramp to floor 1.');
+    expect(region.position('a')?.floor).toBe(1);
+    walk(0, 1, 30);
+    expect(notices()).toContain('You walk down the ramp to the ground floor.');
+    expect(region.position('a')?.floor).toBeUndefined();
+  });
+
+  it('lets a creature chase a player up it', () => {
+    const { region, tick, ramp } = rampHouse();
+    const [mushroom] = region.creatureIds();
+    region.placeCreature(mushroom!, 104.5, 132.5);
+    region.facePlayer('a', 0, 1);
+    region.handle('a', { t: 'attack' });
+    expect(region.creatureMood(mushroom!)?.aggro).toBe('a');
+    region.placePlayer('a', ramp.top.x, ramp.top.y - 1, 1);
+    tick(5 * TICK_RATE);
+    expect(region.floorOf(mushroom!)).toBe(1);
+    expect(region.creatureMood(mushroom!)?.aggro).toBe('a');
+  });
+
+  it('brings people who live upstairs down to the square at dusk', () => {
+    const { region, clock, tick } = rampHouse(17.95);
+    region.remove('a');
+    region.addNpc({ id: 'test-lodger', name: 'Lodger', asset: 'woods-herbalist', x: 110.5, y: 122.5, floor: 1 });
+    tick();
+    expect(region.floorOf('test-lodger')).toBe(1);
+    clock.now = hour(18.2);
+    tick(60 * TICK_RATE);
+    const lodger = region.npc('test-lodger')!;
+    expect(region.floorOf('test-lodger')).toBe(0);
+    expect(Math.hypot(lodger.x - region.map.spawn.x, lodger.y - region.map.spawn.y)).toBeLessThan(8);
   });
 });
 

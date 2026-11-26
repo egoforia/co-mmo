@@ -1,4 +1,4 @@
-import { PERSON_RADIUS, TICK_RATE, dayPart, routineOf, routineWords, stairsMiddle, stairsToward, takeStairs, type DayPart, type Among, type Bodies, type NpcPlacement, type Placed, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
+import { PERSON_RADIUS, TICK_RATE, dayPart, routineOf, routineWords, stairsEntry, stairsToward, takeStairs, type DayPart, type Among, type Bodies, type NpcPlacement, type Placed, type RegionMap, type RoutinePlace } from '@co-mmo/shared';
 import { findPath, findSpots, keepStepping, moveToward, standClear, wander, type Walker } from './walkers.ts';
 
 // The people of a region going about their day (routines.ts): walking to
@@ -113,7 +113,7 @@ function plan(map: RegionMap, n: Townsperson, spot: Placed): Spot[] {
   if (n.floor !== spot.floor) {
     const way = stairsToward(map, n, spot.floor);
     if (!way) return [];
-    const middle = stairsMiddle(way);
+    const middle = stairsEntry(way, n.floor);
     return findPath(map, n, middle) ?? [middle];
   }
   const far = Math.hypot(spot.x - n.x, spot.y - n.y) > STROLL_RADIUS;

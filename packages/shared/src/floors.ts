@@ -51,8 +51,12 @@ export interface Storey extends TileRect {
   wallLooks?: Record<string, string>;
 }
 
-/** Stairs anyone can take; a ladder only those with hands to climb it (players and people, not creatures). */
-export type StairKind = 'stairs' | 'ladder';
+/**
+ * Stairs anyone can take; a ladder only those with hands to climb it
+ * (players and people, not creatures); a ramp anyone can take, standing on
+ * the lower floor only (floors/ramps.ts).
+ */
+export type StairKind = 'stairs' | 'ladder' | 'ramp';
 
 /** Stairs or a ladder between a floor and the one above it. */
 export interface Stairway extends TileRect {
@@ -71,6 +75,12 @@ export interface Stairway extends TileRect {
   art?: { up?: string; down?: string };
   /** What the floors it joins are called there (the sea cave's "Smugglers' Loft"), for its label and what players are told. */
   names?: { lower?: string; upper?: string };
+  /**
+   * A ramp's two ends (tiles): its foot on the lower floor, the way on, and
+   * its head over its top tile on the upper floor, which needs no floor
+   * there. Its other tiles are its solid body on the lower floor.
+   */
+  ramp?: { foot: { x: number; y: number }; head: { x: number; y: number } };
 }
 
 /** A floor in plain words. */
@@ -321,9 +331,22 @@ function on(r: TileRect, x: number, y: number): boolean {
   return tx >= r.x && ty >= r.y && tx < r.x + r.width && ty < r.y + r.height;
 }
 
-/** The stairs or ladder under a point on a floor, if any. */
+/** The stairs or ladder under a point on a floor, if any; a ramp only at its foot (lower floor) or head (upper floor). */
 export function stairwayAt(map: RegionMap, x: number, y: number, floor: number): Stairway | undefined {
-  return map.stairways.find((s) => (s.lower === floor || s.upper === floor) && on(s, x, y));
+  return map.stairways.find((s) => (s.ramp ? rampEndAt(s, x, y, floor) : (s.lower === floor || s.upper === floor) && on(s, x, y)));
+}
+
+/** True when a point is on a ramp's foot on its lower floor, or its head on its upper floor. */
+function rampEndAt(s: Stairway, x: number, y: number, floor: number): boolean {
+  const end = floor === s.lower ? s.ramp!.foot : floor === s.upper ? s.ramp!.head : undefined;
+  return !!end && Math.floor(x) === end.x && Math.floor(y) === end.y;
+}
+
+/** Where walkers head to take a way between floors from `floor`: a ramp's foot or head, else the middle of the stairs. */
+export function stairsEntry(s: Stairway, floor: number): { x: number; y: number } {
+  if (!s.ramp) return stairsMiddle(s);
+  const end = floor === s.lower ? s.ramp.foot : s.ramp.head;
+  return { x: end.x + 0.5, y: end.y + 0.5 };
 }
 
 /** Where taking these stairs from a floor puts you. */
@@ -378,7 +401,7 @@ const STAIRS_REACH = 32;
  */
 export function stairsToward(map: RegionMap, from: Placed, floor: number, climbs = true): Stairway | undefined {
   if (from.floor === floor) return undefined;
-  const ways = map.stairways.filter((s) => climbs || s.kind === 'stairs');
+  const ways = map.stairways.filter((s) => climbs || s.kind !== 'ladder');
   // Steps from each floor to the one wanted, counted back from it.
   const steps = new Map<number, number>([[floor, 0]]);
   for (let frontier = [floor]; frontier.length;) {
@@ -419,7 +442,7 @@ export function stairsLabel(s: Stairway, floor: number): string {
   const up = floor === s.lower;
   const name = up ? s.names?.upper : s.names?.lower;
   const to = floorName(up ? s.upper : s.lower);
-  return `${s.kind === 'ladder' ? 'Ladder' : 'Stairs'} ${up ? 'up' : 'down'} to ${name ? `${name} (${to})` : to}`;
+  return `${{ ladder: 'Ladder', ramp: 'Ramp', stairs: 'Stairs' }[s.kind]} ${up ? 'up' : 'down'} to ${name ? `${name} (${to})` : to}`;
 }
 
 /** What a player is told on taking a stairway from a floor. */
@@ -428,6 +451,7 @@ export function climbWords(s: Stairway, floor: number): string {
   const name = up ? s.names?.upper : s.names?.lower;
   const to = name ? `${name}, ${floorName(up ? s.upper : s.lower)}` : floorName(up ? s.upper : s.lower);
   if (s.kind === 'ladder') return `You climb ${up ? 'up' : 'down'} the ladder to ${to}.`;
+  if (s.kind === 'ramp') return `You walk ${up ? 'up' : 'down'} the ramp to ${to}.`;
   return up ? `You climb the stairs to ${to}.` : `You go down the stairs to ${to}.`;
 }
 
@@ -450,7 +474,12 @@ export function floorChecks(map: RegionMap): string[] {
   map.stairways.forEach((s, i) => {
     const where = `the ${s.kind} at (${s.x}, ${s.y})`;
     if (s.upper !== s.lower + 1) problems.push(`${where} joins ${floorName(s.lower)} and ${floorName(s.upper)}, which are not next to each other.`);
-    for (const floor of [s.lower, s.upper]) {
+    if (s.ramp) {
+      // A ramp stands on the lower floor only: its foot is open, its body solid; its head needs no floor above.
+      if (isBlocking(tileAt(map, s.ramp.foot.x, s.ramp.foot.y, s.lower))) problems.push(`The foot of ${where} is not open floor on ${floorName(s.lower)}.`);
+      if (tileAt(map, s.bottom.x, s.bottom.y, s.lower) === Tile.Door) problems.push(`The landing at the foot of ${where} is in a doorway, so it would block the way in.`);
+    }
+    for (const floor of s.ramp ? [] : [s.lower, s.upper]) {
       for (let ty = s.y; ty < s.y + s.height; ty++) {
         for (let tx = s.x; tx < s.x + s.width; tx++) {
           if (isBlocking(tileAt(map, tx, ty, floor))) problems.push(`${where} stands on something solid on ${floorName(floor)} at (${tx}, ${ty}).`);

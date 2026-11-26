@@ -232,10 +232,14 @@ a `Storey` on the map, its own tiles over a rectangle (`tileAt` and
 (stairs, or a ladder only players and people climb) takes up the same tiles
 on the two floors it joins; stepping onto it puts you on the landing beside
 it on the other floor (`walkOn`, used by the server and by each browser's
-prediction alike). Players, creatures, NPCs and bodies carry their floor, and
+prediction alike). A ramp (`floors/ramps.ts`, `addRamp`) is the exception:
+1 wide and 2 or 3 long, its tiles stand on the lower floor only, with an open
+foot to step on and a solid body; from the floor above you step onto its head
+(over the top tile, no floor needed) and land in front of its foot. Walkers
+head for `stairsEntry`, the end on their floor. Players, creatures, NPCs and bodies carry their floor, and
 snapshots, fights, talk, loot, trades and chat only reach the same floor.
 Walkers take stairs only on purpose (`goTo`, `stairsToward`): a creature
-follows its prey up stairs within its leash, never up a ladder; people who
+follows its prey up stairs or a ramp within its leash, never up a ladder; people who
 live upstairs come down to the square. `buildFloors` gives a building floors
 and finds room for each flight; the world editor's Floors tool uses it. The
 browser draws your active floor along with non-occluding upper storeys above

@@ -1,6 +1,7 @@
 // The Inspector dock: the selected asset's properties as a two-column table,
-// as Tiled's Properties and Godot's Inspector show them. Later steps add the
-// offset, scale trim and blocked tiles here (asset-fit).
+// as Tiled's Properties and Godot's Inspector show them. The shell adds the
+// Offset and Hitbox sections (fit-tool.ts, hitbox-tool.ts) and Create with
+// AI (create-dock.ts) below it.
 
 import { fitWords } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';

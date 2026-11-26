@@ -65,10 +65,20 @@ drag again to take walls away. A wall standing in front of your character
 turns see-through so it never hides them. With **Hitboxes** on, each wall shows a thin red band along its
 edge: the part that stops you, not a whole tile.
 
+**Changing one wall.** With Select, point near a wall's side of the tile
+(within a fifth of a tile) and click: that one wall is picked and outlined.
+Its **Look and height** fold changes its look and height, for **this wall
+only** or **the whole run** it was stood with in one drag (the `wall-look`
+edit, named by tile, side and floor, so it survives other edits, goes
+through drafts and Publish, and undoes like any edit). Move, Copy and Take
+away work on a picked wall too. **Alt-click** a wall with the Wall tool to
+copy its look and height into the tool (an eyedropper).
+
 ## Select first, then change
 
 Select (V) picks the smallest thing on a tile: a bookmark, spot, person,
-monster's home, piece, stairs, storey or building. The panel then says what
+monster's home, piece, stairs, storey or building, or the wall on the side
+of the tile the pointer is near. The panel then says what
 it is and holds what can be done to it: **Move** (M), **Copy** (Ctrl C),
 **Take away** (Delete), and a fold for each kind of change that fits it
 (look and size, floors above and below, a monster's level and hours, a

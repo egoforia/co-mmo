@@ -33,7 +33,7 @@ export const GROUPS: readonly ToolGroup[] = [
  * already there, so it is selected first. They stay in the finder (Move
  * still lifts trees, rocks and water, which cannot be selected).
  */
-export const FOLDED: readonly ToolId[] = ['move', 'remove', 'restyle', 'floors', 'footprint', 'monsters', 'patrol', 'clear', 'quest'];
+export const FOLDED: readonly ToolId[] = ['move', 'remove', 'restyle', 'wall-look', 'floors', 'footprint', 'monsters', 'patrol', 'clear', 'quest'];
 const MORE: Omit<ToolGroup, 'tools'> = { id: 'more', name: 'More', key: 'm' };
 
 /** The groups with the tools on offer now (set pieces only while their wish is on), and More for any tool no group names. */

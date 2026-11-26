@@ -41,7 +41,7 @@ const sideOf = (v: Record<string, FieldValue>): WallSide => (WALL_SIDES.includes
 export const WALL: EditKind<'wall'> = {
   kind: 'wall',
   name: 'Wall',
-  hint: 'Drag along tiles to stand a wall on one side of each. R turns the side (Shift R turns it back). The tiles stay open; only the line between them is closed.',
+  hint: 'Drag along tiles to stand a wall on one side of each. R turns the side (Shift R turns it back). The tiles stay open; only the line between them is closed. Alt-click a wall to copy its look and height.',
   pointer: 'drag',
   onFloors: true,
   fields: [

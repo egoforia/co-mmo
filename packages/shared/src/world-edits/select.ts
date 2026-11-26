@@ -5,8 +5,10 @@ import { routineOf } from '../routines.ts';
 import { SPOTS } from '../gathering.ts';
 import { floorName, stairwayAt, type Heading, type Stairway } from '../floors.ts';
 import { setPiece } from '../sea-cave-kit.ts';
+import { WALL_HEIGHTS, wallOn, type EdgeWall, type WallSide } from '../edge-walls.ts';
 import { Tile, storeyAt, type Landmark, type RegionMap } from '../world.ts';
 import type { Outline } from './kind.ts';
+import { sideOutline } from './kinds/wall.ts';
 import { buildingAt, footprint, landmarkAt, tileOn } from './tiles.ts';
 import type { TilePoint, WorldEditDraft } from './types.ts';
 
@@ -17,7 +19,10 @@ import type { TilePoint, WorldEditDraft } from './types.ts';
 // name, so they find it again whatever the tile.
 
 /** What can be picked. */
-export type PickKind = 'building' | 'storey' | 'stairway' | 'landmark' | 'spot' | 'monster' | 'person' | 'bookmark' | 'light';
+export type PickKind = 'building' | 'storey' | 'stairway' | 'landmark' | 'spot' | 'monster' | 'person' | 'bookmark' | 'light' | 'wall';
+
+/** How near a side of a tile the pointer must be, in tiles, to pick the wall standing on it. */
+export const WALL_PICK_REACH = 0.2;
 
 /** A thing picked on a land: what it is, its name there, and its box on the floor. */
 export interface Picked {
@@ -33,11 +38,19 @@ export interface Picked {
   details: string[];
   /** A monster's home: the kind of monster living there, whose size and loot God's View sets. */
   creature?: string;
+  /** A Wall-tool wall: the wall, kept as the north or west side of the tile at the box's corner. */
+  wall?: { side: WallSide; style: string; height: EdgeWall['height']; run: number };
 }
 
-/** The thing standing on a tile of a floor, the smallest and nearest first; undefined on bare ground. */
-export function pickAt(map: RegionMap, at: TilePoint, level: number): Picked | undefined {
+/**
+ * The thing standing on a tile of a floor, the smallest and nearest first;
+ * undefined on bare ground. `within` is where in the tile the pointer is (0
+ * to 1 each way): near a side with a wall on it, that wall is picked.
+ */
+export function pickAt(map: RegionMap, at: TilePoint, level: number, within?: [number, number]): Picked | undefined {
   const [x, y] = at;
+  const wall = within ? wallPick(map, at, level, within) : undefined;
+  if (wall) return wall;
   const tile = (bx: number, by: number, w = 1, h = 1): Outline => ({ x: bx, y: by, w, h });
   const mark = map.bookmarks?.find((b) => b.floor === level && Math.floor(b.x) === x && Math.floor(b.y) === y);
   if (mark) return { kind: 'bookmark', name: `Bookmark “${mark.name}”`, level, box: tile(x, y), details: mark.note ? [mark.note] : [] };
@@ -75,6 +88,35 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number): Picked | u
   return undefined;
 }
 
+/** The Wall-tool wall on the side of a tile nearest the pointer, when the pointer is near enough to it. */
+function wallPick(map: RegionMap, [x, y]: TilePoint, level: number, [fx, fy]: [number, number]): Picked | undefined {
+  if (!map.edgeWalls?.length) return undefined;
+  const sides: [WallSide, number][] = [['north', fy], ['south', 1 - fy], ['west', fx], ['east', 1 - fx]];
+  sides.sort((a, b) => a[1] - b[1]);
+  for (const [side, d] of sides) {
+    if (d >= WALL_PICK_REACH) break;
+    const w = wallOn(map, x, y, side, level);
+    if (w) return wallPicked(map, w, level);
+  }
+  return undefined;
+}
+
+/** A wall as picked: kept as the north side (along 'h') or west side (along 'v') of the tile at its edge's corner. */
+export function wallPicked(map: RegionMap, w: EdgeWall, level: number): Picked {
+  const side: WallSide = w.along === 'h' ? 'north' : 'west';
+  const look = BUILDING_STYLES[w.style]?.name ?? w.style;
+  const run = (map.edgeWalls ?? []).filter((o) => o.id === w.id).length;
+  const facing = w.along === 'h' ? 'running east to west' : 'running north to south';
+  return {
+    kind: 'wall',
+    name: `${look} wall`,
+    level,
+    box: sideOutline([w.x, w.y], side),
+    details: [`${WALL_HEIGHTS[w.height]}, ${facing}`, run > 1 ? `Stood with ${run - 1} more in one go` : 'Stood on its own'],
+    wall: { side, style: w.style, height: w.height, run },
+  };
+}
+
 /** What a set piece or piece of furniture is called. */
 function pieceName(l: Landmark): string {
   const piece = setPiece(l.asset);
@@ -106,6 +148,7 @@ export function monsterHome(map: RegionMap, region: string, id: string): { at: T
 
 /** The edit that takes a picked thing away. */
 export function removeDraft(p: Picked): WorldEditDraft {
+  if (p.wall) return { kind: 'wall', side: p.wall.side, tiles: [[p.box.x, p.box.y]], style: p.wall.style, height: p.wall.height, down: true, ...(p.level ? { level: p.level } : {}) };
   return { kind: 'remove', at: [p.box.x, p.box.y], level: p.level, ...(p.id ? { target: p.id } : {}) };
 }
 
@@ -157,6 +200,9 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
       const l = map.lights?.find((m) => m.floor === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
       return l && { kind: 'light', at: to, color: l.light.color, radius: l.light.radius, ...(l.light.flicker ? { flicker: true } : {}), ...(p.level ? { level: p.level } : {}) };
     }
+    case 'wall':
+      // The same wall on the same side of the tile clicked.
+      return p.wall && { kind: 'wall', side: p.wall.side, tiles: [to], style: p.wall.style, height: p.wall.height, ...(p.level ? { level: p.level } : {}) };
     case 'bookmark': {
       const b = map.bookmarks?.find((m) => m.floor === p.level && Math.floor(m.x) === x && Math.floor(m.y) === y);
       // Names are one to a land: a copy takes the next free number.

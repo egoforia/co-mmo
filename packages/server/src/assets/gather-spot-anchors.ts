@@ -1,4 +1,4 @@
-import { SPOTS } from '@co-mmo/shared';
+import { SPOTS, SPOT_STATES, spotStateArt, type SpotState } from '@co-mmo/shared';
 import type { TieredAsset } from './skill-anchors.ts';
 
 // The gathering spots' pictures (gather and craft plan, step 5), described
@@ -35,14 +35,50 @@ const LOOKS: Record<string, { hook: string; materials: string[]; colors: [main: 
   'hollow-truffle': { hook: 'a little dug hollow in violet soil with black knobbly truffles', materials: ['soil', 'truffles'], colors: ['violet soil', 'truffle black', 'moss green'] },
 };
 
-/** One picture per kind of spot, by its art id (`spot-<kind>`). */
-export const GATHER_SPOT_ANCHORS: TieredAsset[] = Object.entries(SPOTS).map(([kind, def]) => {
-  const look = LOOKS[kind] ?? { hook: def.name.toLowerCase(), materials: [], colors: ['', '', ''] as [string, string, string] };
-  return {
+/** How each state other than Ready changes the Ready picture, for the painter. */
+const STATE_WORDS: Record<Exclude<SpotState, 'ready'>, { name: string; change: string; mood: string }> = {
+  picked: {
+    name: 'picked',
+    change: 'just gathered: picked over and bare, what was worth taking gone (leaves stripped, ore chipped away, wood carried off), only what is left behind remains',
+    mood: 'quiet, spent, clearly nothing left to take yet',
+  },
+  growing: {
+    name: 'growing back',
+    change: 'growing back: about half of what was gathered has returned, small and fresh, not yet full',
+    mood: 'hopeful, coming back, not ready yet',
+  },
+};
+
+const lookOf = (kind: string, name: string) => LOOKS[kind] ?? { hook: name.toLowerCase(), materials: [], colors: ['', '', ''] as [string, string, string] };
+
+/** One picture per kind of spot (`spot-<kind>`), then its Picked and Growing pictures (`spot-<kind>-picked`, `-growing`). */
+export const GATHER_SPOT_ANCHORS: TieredAsset[] = Object.entries(SPOTS).flatMap(([kind, def]): TieredAsset[] => {
+  const look = lookOf(kind, def.name);
+  const ready: TieredAsset = {
     id: def.art, name: def.name, kind: 'prop', biome: def.biome, references: ['woods-mushroom'],
     silhouetteHook: look.hook,
     body: 'a small thing standing on one ground tile, about knee high, seen from the isometric camera', materials: look.materials,
     colors: { main: look.colors[0], secondary: look.colors[1], accent: look.colors[2] },
     details: ['sits on the ground with a soft shadow'], mood: 'inviting, worth a closer look', extra: { category: 'gathering spot' },
   };
+  const states = SPOT_STATES.map(({ id }): TieredAsset => {
+    const words = STATE_WORDS[id as Exclude<SpotState, 'ready'>];
+    return {
+      ...ready,
+      id: spotStateArt(kind, id)!,
+      name: `${def.name}, ${words.name}`,
+      // Painted from its Ready picture, so it is the very same spot.
+      references: [def.art],
+      silhouetteHook: `the very same ${look.hook} as in the reference picture, ${words.change}`,
+      details: ['exactly the same shape, size, ground, camera and place on the tile as the reference picture', 'sits on the ground with a soft shadow'],
+      mood: words.mood,
+      extra: { category: 'gathering spot state' },
+    };
+  });
+  return [ready, ...states];
 });
+
+/** The Ready picture a spot state's picture is painted from, when `id` is one. */
+export function readyOfState(id: string): string | undefined {
+  return /^(spot-.+)-(?:picked|growing)$/.exec(id)?.[1];
+}

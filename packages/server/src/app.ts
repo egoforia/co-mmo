@@ -53,6 +53,7 @@ import type { NetOptions } from './socket-net.ts';
 import { tuningFor } from './region/far.ts';
 import { artFileReader, pointSources } from './hand-sources.ts';
 import { effectiveSky } from './sky-settings.ts';
+import { watchHitboxes } from './art-studio/hitboxes.ts';
 
 export interface AppOptions {
   store: Store;
@@ -264,6 +265,8 @@ export function createApp(options: AppOptions): App {
   });
   const workshop = new Workshop(store, world, wishes, { anchorDir: options.wishes.anchorDir, artDir: options.wishes.artDir, now: options.wishes.now, ai, budget });
   wishes.restore();
+  // Hitboxes chosen in the Art Studio block tiles, so their lands are laid out with them.
+  const stopHitboxes = watchHitboxes(world);
   const painterOptions: BuildingPainterOptions = {
     provider: () => ai.image('buildings'),
     overBudget: () => budget.paused(),
@@ -465,6 +468,7 @@ export function createApp(options: AppOptions): App {
     apiLog,
     ready,
     async close() {
+      stopHitboxes();
       clearInterval(tickTimer);
       meter.close();
       clearTimeout(dayTimer);

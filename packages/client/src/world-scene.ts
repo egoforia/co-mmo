@@ -9,6 +9,7 @@
 
 import Phaser from 'phaser';
 import {
+  onFitChange,
   Predictor,
   SnapshotClock,
   bodiesSeen,
@@ -82,8 +83,8 @@ import {
   raiseHouses,
   revealBuildings,
   undrawRegion,
-  spotArt,
 } from './world-scene/regions.ts';
+import { restateSpots, setSpotTimers, spotArt, stateOf } from './world-scene/spot-views.ts';
 import {
   type Avatar,
   type BuildingView,
@@ -332,6 +333,10 @@ export class WorldScene extends Phaser.Scene {
     this.placeAvatar(this.me, this.shown.x, this.shown.y);
     setCoords({ x: this.shown.x, y: this.shown.y, floor: this.floor });
     this.events.once('shutdown', () => setCoords(undefined));
+    // The Owner fitted a picture in the Art Studio (asset-fit.ts): stand everything again.
+    const offFits = onFitChange(() => this.relayFits());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offFits);
+    this.watchSpots();
     this.events.once('destroy', () => setCoords(undefined));
     this.revealBuildings(true);
     cam.startFollow(this.me.body, true, 0.2, 0.2);
@@ -468,6 +473,8 @@ export class WorldScene extends Phaser.Scene {
     if (this.spotSense && !this.floor) {
       const spots: MapFigure[] = [];
       for (const s of this.map.spots) {
+        // Only those ready for us: a sense for what can be gathered now.
+        if (stateOf(this.map.def.id, s) !== 'ready') continue;
         const art = spotArt(this, s.kind);
         if (art) spots.push({ x: s.x + 0.5, y: s.y + 1, art, kind: 'spot' });
       }
@@ -476,6 +483,33 @@ export class WorldScene extends Phaser.Scene {
     // While the world editor's camera is free, the map follows the camera instead of us.
     const centre = this.freeCam.active ? this.cameraLocal() : undefined;
     return { scene: this, map: this.map, artLoaded: this.artLoaded, floor: this.floor, figures, ...(centre ? { centre } : {}) };
+  }
+
+  /** Our gathering spot timers (Character.regrow): spots show Picked, Growing or Ready by them. */
+  setSpotTimers(regrow: Record<string, number> | undefined): void {
+    setSpotTimers(regrow);
+    this.restateSpots();
+  }
+
+  /** Draws again the spots whose state changed: when a timer passes, checked once a second. */
+  private restateSpots(): void {
+    for (const region of this.drawn.values()) restateSpots(this, region.spots, region.objects, this.options.art);
+  }
+
+  /** Checks spot states once a second, and says when a hovered spot grows back. */
+  private watchSpots(): void {
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.restateSpots() });
+    let tip: Phaser.GameObjects.Text | undefined;
+    this.events.on('spot-tip', (words: string | undefined, img: Phaser.GameObjects.Image) => {
+      tip?.destroy();
+      tip = undefined;
+      if (!words || !img.active) return;
+      const top = img.getTopCenter();
+      tip = this.add
+        .text(top.x ?? img.x, (top.y ?? img.y) - 6, words, { fontFamily: 'sans-serif', fontSize: `${Math.round(15 / this.cameras.main.zoom)}px`, color: '#f4ecd2', backgroundColor: '#1b1410dd', padding: { x: 8, y: 4 } })
+        .setOrigin(0.5, 1)
+        .setDepth(LABEL_DEPTH - 2);
+    });
   }
 
   /** Whether gathering spots show on the mini map (sensesSpots). */
@@ -788,6 +822,20 @@ export class WorldScene extends Phaser.Scene {
         if ([...region.kit].some((k) => this.painted.has(k))) undrawRegion(this, id, region, this.drawn);
       }
       this.painted.clear();
+      this.showRegion(this.welcome);
+      this.revealBuildings(true);
+    });
+  }
+
+  private relaying = false;
+
+  /** Draws every region again once fits stop arriving, so pictures stand where the Art Studio put them. */
+  private relayFits(): void {
+    if (this.relaying || !this.predictor) return;
+    this.relaying = true;
+    this.time.delayedCall(300, () => {
+      this.relaying = false;
+      for (const [id, region] of this.drawn) undrawRegion(this, id, region, this.drawn);
       this.showRegion(this.welcome);
       this.revealBuildings(true);
     });

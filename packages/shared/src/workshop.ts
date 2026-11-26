@@ -572,6 +572,7 @@ export function worldLines(def: WishDefinition): string[] {
       ];
     }
     case 'size':
+    case 'fit':
       return [def.description];
   }
 }

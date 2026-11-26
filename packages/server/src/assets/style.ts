@@ -59,7 +59,8 @@ export function paintedFootprint(id: string, kind = 'set-piece'): Footprint | un
 export function footprintWords(fp: Footprint): string {
   const tiles = (n: number) => (n === 1 ? 'one tile' : `${n} tiles`);
   const sides = fp.width === fp.height ? `${tiles(fp.width)} along each side` : `${tiles(fp.width)} from the left corner down to the front corner, and ${tiles(fp.height)} from the front corner up to the right corner`;
-  return `Footprint: it stands on a diamond-shaped patch of ground ${sides}. Its base fills that patch exactly, from the patch's left corner to its right corner, and nothing on the ground reaches past it.`;
+  // Said twice over on purpose: told only where it stands, the models paint the patch too (a deck, a floor tile, a rug) under it.
+  return `Footprint: it stands on a diamond-shaped patch of ground ${sides}. Its base fills that patch exactly, from the patch's left corner to its right corner, and nothing on the ground reaches past it. The patch itself is NOT drawn: no floor, tile, deck, planks, paving, rug, mat, plinth or base plate under it; the game paints the ground. Only the thing itself, its own feet, wheels or base touching the magenta.`;
 }
 
 /** Builds the full text prompt: base style, biome signatures, subject, the tiles it stands on, things to avoid. */

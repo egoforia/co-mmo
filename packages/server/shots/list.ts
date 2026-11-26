@@ -338,7 +338,29 @@ export const SHOTS: Shot[] = [
     name: 'art-studio',
     about: 'The AI Art Studio, where the Owner reviews and paints pictures.',
     page: '/art-studio.html',
-    mustSee: ['pictures load (no broken image icons)', 'buttons and labels are readable'],
+    ready: '.asset-list button',
+    mustSee: ['pictures load (no broken image icons)', 'buttons and labels are readable', 'workspaces along the top, assets docked left, the Inspector right, the painting strip along the bottom'],
+  },
+  {
+    name: 'art-studio-picked',
+    about: 'The AI Art Studio with a set piece picked in the asset browser.',
+    page: '/art-studio.html',
+    ready: '.asset-list button',
+    open: async (page) => {
+      await page.click('.asset-chips [data-group="pieces"]');
+      await page.fill('.dock-left input[name=search]', 'shrine');
+      await page.click('.asset-list button[data-asset="sanctum-shrine"]');
+      await page.waitForSelector('.dock-right .props');
+    },
+    mustSee: ['the shrine row is marked in the list', 'the Inspector shows its picture and a property table with a 2 × 1 footprint'],
+  },
+  {
+    name: 'art-studio-phone',
+    about: 'The AI Art Studio on a phone: one pane at a time, chosen with tabs.',
+    page: '/art-studio.html',
+    ready: '#strip .strip-title',
+    screen: 'phone',
+    mustSee: ['the page fills the screen, no docks squeezed beside it', 'the Assets, Page and Inspector tabs are readable', 'nothing runs off the right edge'],
   },
   {
     name: 'testbed-terrace-rim',

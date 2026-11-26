@@ -23,6 +23,7 @@ import { ArtHistory } from './art-history.ts';
 import { plain, type ArtJob, type ArtJobHandle } from './art-jobs.ts';
 import { keepingImage } from './art-recipes.ts';
 import { ArtDirector } from './art-studio/art-director.ts';
+import { studioAssets, type StudioAsset } from './art-studio/assets.ts';
 import { ArtCatalog } from './art-studio/catalog.ts';
 import { normalAsk, reviewAsk, sheetAsk } from './art-studio/review.ts';
 import { UpNextQueue } from './art-studio/up-next-queue.ts';
@@ -153,6 +154,11 @@ export class ArtStudio {
       effectsModel: this.options.sounds?.models().effects ?? null,
       musicModel: this.options.sounds?.models().music ?? null,
     };
+  }
+
+  /** The Art Studio's asset browser: every picture, walker and sound in one flat list (art-studio/assets.ts). */
+  async assets(): Promise<StudioAsset[]> {
+    return studioAssets(await this.overview(), await this.options.shipped());
   }
 
   /** Everything the Art tab shows. */

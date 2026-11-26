@@ -242,6 +242,8 @@ function play(token: string): void {
         if (scene?.currentMap) rpg?.setSafe(isSafe(scene.currentMap, scene.playerPosition.x, scene.playerPosition.y));
         rpg?.setStatuses(message.statuses);
         kit?.setEnergy(message.energy);
+        // Falling, or opening the world editor, puts a readied skill down.
+        if (message.fallen !== undefined || isEditing()) kit?.clearReadied();
         scene?.setWeakened(rpg?.weakened ?? false, message.fallen !== undefined);
         fallen?.show(message.fallen);
         setHud(name, message.online, region, scene?.skyText());
@@ -289,6 +291,7 @@ function play(token: string): void {
         prayer?.setFavor(message.character.favor);
         scene?.setMyHeld(gatheringWith ?? heldItem(message.character), offHandItem(message.character));
         scene?.setSpotSense(sensesSpots(message.character));
+        scene?.setSpotTimers(message.character.regrow);
         break;
       case 'gather':
         // While gathering, the tool shows in the hand.
@@ -373,7 +376,7 @@ function play(token: string): void {
       else if (intent.t === 'problem') chat?.add({ kind: 'error', text: intent.text });
       else if (intent.t !== 'chat' || intent.text) connection.send(intent);
     });
-    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 6 use abilities (K arranges them), Tab or a click chooses a target, E talks or opens the loot of a fallen creature, I opens your bag (right-click a thing in it for more), C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
+    chat.add({ kind: 'system', text: 'Move with WASD or the arrow keys. Space strikes, 1 to 6 use abilities (K arranges them; Ctrl or Shift with a number readies one for the next Space), Tab or a click chooses a target, E talks or opens the loot of a fallen creature, I opens your bag (right-click a thing in it for more), C crafts, B opens the Bible, G prays to the God. Press Enter to chat; type /help for chat commands.' });
     party = new PartyUi((m) => connection.send(m));
     fallen = new FallenUi(() => connection.send({ t: 'wake' }));
     party.start(myId);
@@ -416,6 +419,8 @@ function play(token: string): void {
         sound.play('swing');
         scene?.swing();
       },
+      readied: () => kit?.readiedCast(),
+      tooEarly: (ms) => kit?.readiedTooEarly(ms),
       interact: () => connection.send({ t: 'interact' }),
       use: (item) => {
         // A healing item goes to the player chosen as target, when there is one (the server checks they are near).
@@ -444,6 +449,7 @@ function play(token: string): void {
         sound.play('spell');
       },
       aim: (ability) => scene?.aim(ability),
+      say: (text) => chat?.add({ kind: 'system', text }),
       hotbar: (slots) => connection.send({ t: 'hotbar', slots }),
       craft: (recipe, lean) => connection.send({ t: 'craft', recipe, ...(lean ? { lean } : {}) }),
       shop: (action, npc, id, qty, replace) => connection.send({ t: 'shop', action, npc, id, ...(qty ? { qty } : {}), ...(replace ? { replace } : {}) }),

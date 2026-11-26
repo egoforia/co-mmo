@@ -48,7 +48,7 @@ export const FURNITURE: EditKind<'furniture'> = {
     const floor = floorOf(edit);
     const landmark: Landmark = { asset: edit.asset, x: edit.at[0], y: edit.at[1], footprint: { width: edit.footprint[0], height: edit.footprint[1] }, floor };
     map.landmarks.push(landmark);
-    if (!edit.walkable) blockOn(map, floor, landmark.x, landmark.y, edit.footprint[0], edit.footprint[1]);
+    if (!edit.walkable) blockOn(map, floor, landmark.x, landmark.y, edit.footprint[0], edit.footprint[1], edit.asset);
     return true;
   },
   keep: (d) => ({ kind: 'furniture', asset: d.asset, at: d.at, footprint: d.footprint, ...(d.walkable ? { walkable: true } : {}) }),

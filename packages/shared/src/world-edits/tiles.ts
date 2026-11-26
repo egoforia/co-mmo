@@ -1,5 +1,5 @@
 import { setOn } from '../floors.ts';
-import { Tile, isBlocking, set, tileAt, type Building, type Landmark, type RegionMap } from '../world.ts';
+import { Tile, isBlocking, pieceBox, set, tileAt, type Building, type Landmark, type RegionMap, type TileBox } from '../world.ts';
 import { thingById } from './names.ts';
 import type { EditPlace, TilePoint } from './types.ts';
 
@@ -52,10 +52,8 @@ export function pieceTiles(at: TilePoint, footprint: { width: number; height: nu
 }
 
 /** The tiles a landmark's footprint blocks (see block() in world.ts). */
-export function footprint(l: Landmark): { left: number; top: number; width: number; height: number } {
-  const left = Math.floor(l.x - l.footprint.width / 2);
-  const bottom = Math.floor(l.y - 0.01);
-  return { left, top: bottom - l.footprint.height + 1, width: l.footprint.width, height: l.footprint.height };
+export function footprint(l: Landmark): TileBox {
+  return pieceBox(l);
 }
 
 /** The set piece (or piece of furniture) standing on a tile of a floor, the one drawn in front first. */

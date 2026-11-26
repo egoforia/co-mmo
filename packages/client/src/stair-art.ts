@@ -1,4 +1,4 @@
-import { stairHeading, type Stairway } from '@co-mmo/shared';
+import { rampLook, rampMirrored, rampWay, stairHeading, type Stairway } from '@co-mmo/shared';
 
 export interface TextureRegistry {
   textures: {
@@ -21,11 +21,11 @@ export function stairTexture(
   s: Stairway,
   isUp: boolean,
 ): string | undefined {
+  // A ramp's picture stands on its tiles (rampTexture), not at its ends.
+  if (s.kind === 'ramp') return undefined;
+
   const explicit = isUp ? s.art?.up : s.art?.down;
   if (explicit && scene.textures.exists(explicit)) return explicit;
-
-  // A ramp has pictures of its own (ramps.ts rampArt), or only its label.
-  if (s.kind === 'ramp') return undefined;
 
   const heading = stairHeading(s);
   const dir = isUp ? 'up' : 'down';
@@ -56,4 +56,22 @@ export function stairTexture(
   if (scene.textures.exists(defaultStairsHeading)) return defaultStairsHeading;
   const defaultStairs = `stairs-${dir}`;
   return scene.textures.exists(defaultStairs) ? defaultStairs : undefined;
+}
+
+/**
+ * A ramp's picture, standing on its tiles on the floor below, and whether it
+ * shows mirrored (a ramp climbing west or east):
+ * 1. The land's own, if loaded (`ramp-${biome}-${look}-${length}-${way}`)
+ * 2. Its explicit art id, if loaded (`s.art.up`)
+ * 3. The look's shared picture, if loaded (`ramp-${look}-${length}-${way}`)
+ * Undefined until one is painted: then it shows only its labels.
+ */
+export function rampTexture(scene: TextureRegistry, biome: string | undefined, s: Stairway): { key: string; mirrored: boolean } | undefined {
+  if (s.kind !== 'ramp' || !s.climbs) return undefined;
+  const look = rampLook(s) ?? 'stone';
+  const length = Math.max(s.width, s.height);
+  const way = rampWay(s.climbs);
+  const keys = [biome && `ramp-${biome}-${look}-${length}-${way}`, s.art?.up, `ramp-${look}-${length}-${way}`];
+  const key = keys.find((k): k is string => !!k && scene.textures.exists(k));
+  return key ? { key, mirrored: rampMirrored(s.climbs) } : undefined;
 }

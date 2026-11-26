@@ -1,5 +1,5 @@
 import { MAX_FLOORS, addStairs, type Heading } from '../../floors.ts';
-import { RAMP_LENGTHS, addRamp, rampProblem, rampTiles } from '../../floors/ramps.ts';
+import { RAMP_LENGTHS, RAMP_LOOKS, addRamp, rampProblem, rampTiles } from '../../floors/ramps.ts';
 import type { RegionMap } from '../../world.ts';
 import type { EditKind, FieldValue, Outline } from '../kind.ts';
 import { OFF_EDGE, inside } from '../tiles.ts';
@@ -13,12 +13,6 @@ const WAYS = [
   { id: 'stairs', name: 'Stairs' },
   { id: 'ladder', name: 'A ladder (monsters cannot climb it)' },
   { id: 'ramp', name: 'A ramp (1 wide, on the floor below only)' },
-];
-/** The looks a ramp's picture is painted in. */
-export const RAMP_LOOKS = [
-  { id: 'stone', name: 'Stone' },
-  { id: 'wood', name: 'Wood' },
-  { id: 'earth', name: 'Earth' },
 ];
 const STEP: Record<Heading, [number, number]> = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] };
 
@@ -76,7 +70,7 @@ export const STAIRS: EditKind<'stairs'> = {
     { key: 'width', label: 'Across', type: 'number', min: 1, max: 6, default: 2, when: (v) => v.way !== 'ramp' },
     { key: 'height', label: 'Deep', type: 'number', min: 1, max: 6, default: 3, when: (v) => v.way !== 'ramp' },
     { key: 'length', label: 'Long', type: 'number', min: RAMP_LENGTHS[0], max: RAMP_LENGTHS.at(-1)!, default: 3, when: (v) => v.way === 'ramp' },
-    { key: 'look', label: 'Look', type: 'choice', choices: () => RAMP_LOOKS, default: () => 'stone', when: (v) => v.way === 'ramp' },
+    { key: 'look', label: 'Look', type: 'choice', choices: () => RAMP_LOOKS.map((l) => ({ ...l })), default: () => 'stone', when: (v) => v.way === 'ramp' },
   ],
   shape: '{"kind":"stairs","at":[x,y],"size":[2,3],"from":0,"climbs":"north"} (add "way":"ladder", or "way":"ramp" with "size":[1,3] rising north or south, [3,1] east or west, and "look":"stone"|"wood"|"earth")',
   outline: (_map, { at }, v) => (v.way === 'ramp' ? rampOutline(at, v) : [{ x: at[0], y: at[1], w: Number(v.width) || 1, h: Number(v.height) || 1 }]),

@@ -17,6 +17,31 @@ import { floorName, setOn, stairwayAt, type Heading, type Stairway } from '../fl
 /** How long a ramp may be, in tiles. */
 export const RAMP_LENGTHS = [2, 3] as const;
 
+/** The looks a ramp's picture is painted in. */
+export const RAMP_LOOKS = [
+  { id: 'stone', name: 'Stone' },
+  { id: 'wood', name: 'Wood' },
+  { id: 'earth', name: 'Earth' },
+] as const;
+
+/** Which way a ramp's picture rises: away from the camera (north; west mirrors it) or toward it (south; east mirrors it). */
+export type RampWay = 'away' | 'toward';
+
+/** Every ramp picture the game asks for: one per look, length and way, 12 in all. */
+export const RAMP_ARTS: { id: string; look: string; length: number; way: RampWay }[] = RAMP_LOOKS.flatMap((l) =>
+  RAMP_LENGTHS.flatMap((length) => (['away', 'toward'] as const).map((way) => ({ id: `ramp-${l.id}-${length}-${way}`, look: l.id, length, way }))),
+);
+
+/**
+ * The tiles a ramp picture stands on, from its id (a land's own
+ * `ramp-<biome>-<look>-<length>-<way>` too): 1 across and its length deep,
+ * as a ramp rising north or south lies. Undefined for any other id.
+ */
+export function rampArtFootprint(id: string): { width: number; height: number } | undefined {
+  const m = /^ramp-.+-([23])-(?:away|toward)$/.exec(id);
+  return m ? { width: 1, height: Number(m[1]) } : undefined;
+}
+
 /** What a ramp needs: its tiles' top-left corner, its length, the floor it climbs from and which way it rises. */
 export interface RampPlan {
   x: number;
@@ -108,7 +133,17 @@ export function addRamp(map: RegionMap, plan: RampPlan): Stairway {
  * (north, mirrored for west) or toward it (south, mirrored for east).
  */
 export function rampArt(look: string, length: number, climbs: Heading): string {
-  return `ramp-${look}-${length}-${climbs === 'north' || climbs === 'west' ? 'away' : 'toward'}`;
+  return `ramp-${look}-${length}-${rampWay(climbs)}`;
+}
+
+/** Which way a ramp's picture rises for a ramp climbing this way. */
+export function rampWay(climbs: Heading): RampWay {
+  return climbs === 'north' || climbs === 'west' ? 'away' : 'toward';
+}
+
+/** True when a ramp climbing this way shows its picture mirrored: west and east lie across the other grid line. */
+export function rampMirrored(climbs: Heading): boolean {
+  return climbs === 'west' || climbs === 'east';
 }
 
 /** Takes a ramp away, giving its body's tiles back what stood there before. */

@@ -28,6 +28,7 @@ import {
   registerKitTileset,
   registerStoreyTileset,
   registerTileset,
+  rampTexture,
   stairTexture,
 } from '../textures.ts';
 import {
@@ -280,7 +281,7 @@ const floors: FloorView[] = map.storeys.map((storey) => {
   }
   placeLandmarks(scene, map, ox, oy, views, floors, art);
   placeSpots(scene, map, ox, oy, art, kit);
-  const stairs = placeStairs(scene, map, ox, oy, views, floors);
+  const stairs = placeStairs(scene, map, ox, oy, views, floors, art);
   const objects = scene.children.list.filter((o) => !before.has(o));
   markScenery(objects);
   const lamps = placeLamps(scene, map, ox, oy, views);
@@ -335,9 +336,25 @@ export function placeSpots(scene: Phaser.Scene, map: RegionMap, ox: number, oy: 
  * picture going up or down once there is one, and always a label saying
  * where it goes, since nothing about it is drawn in code.
  */
-export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[]): Phaser.GameObjects.GameObject[] {
+export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[], manifest: ArtManifest = {}): Phaser.GameObjects.GameObject[] {
   const open: Phaser.GameObjects.GameObject[] = [];
   for (const s of map.stairways) {
+    // A ramp's picture stands on its tiles on the floor below, like a set piece.
+    const ramp = rampTexture(scene, map.def.biome, s);
+    if (ramp) {
+      const tiles = { left: ox + s.x, top: oy + s.y, right: ox + s.x + s.width, bottom: oy + s.y + s.height };
+      const parts = standOnTiles(scene, ramp.key, tiles, manifest[ramp.key]?.view === 'isometric', ramp.mirrored);
+      for (const part of parts) {
+        part.y -= floorLift(s.lower);
+        part.setDepth(part.depth + floorDepthOffset(s.lower));
+      }
+      if (s.lower) floorAt(floors, s.x, s.y, s.lower)?.objects.push(...parts);
+      else {
+        const inside = views.find((v) => within(v.building, s.x, s.y));
+        if (inside) inside.inside.push(...parts);
+        else open.push(...parts);
+      }
+    }
     for (const floor of [s.lower, s.upper]) {
       const parts: Phaser.GameObjects.GameObject[] = [];
       const isUp = floor === s.lower;

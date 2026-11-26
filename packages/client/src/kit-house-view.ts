@@ -134,12 +134,16 @@ export function standHouseBottom(scene: Phaser.Scene, texture: string, frame: Fr
 /**
  * Stands a picture of a thing on the tiles it covers, as `standing` plans
  * it: one picture, or upright strips sorted by the near edges of its tiles.
+ * `mirrored` shows it flipped left to right (a ramp painted rising north,
+ * climbing west): its tiles lie across the other grid line, and the diamond
+ * they make is the painted one mirrored.
  */
-export function standOnTiles(scene: Phaser.Scene, texture: string, floor: Floor, fitted: boolean): Phaser.GameObjects.Image[] {
+export function standOnTiles(scene: Phaser.Scene, texture: string, floor: Floor, fitted: boolean, mirrored = false): Phaser.GameObjects.Image[] {
   const frame = scene.textures.getFrame(texture);
   const plan = standing(floor, { width: frame.width, height: frame.height }, fitted);
   return plan.strips.map((s) => {
-    const img = scene.add.image(plan.x, plan.y, texture).setOrigin(0.5, plan.originY).setScale(plan.scale);
+    const img = scene.add.image(plan.x, plan.y, texture).setOrigin(0.5, plan.originY).setScale(plan.scale).setFlipX(mirrored);
+    // Flipped first: Phaser then reads the crop on the picture as shown, so each strip keeps its place on screen.
     if (plan.strips.length > 1) img.setCrop(s.x0, 0, s.width, frame.height);
     return img.setDepth(s.depth);
   });

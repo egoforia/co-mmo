@@ -395,6 +395,19 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine row is marked in the list', 'the Inspector shows its picture and a property table with a 2 × 1 footprint'],
   },
   {
+    name: 'art-studio-paint-pick',
+    about: "The Paint workspace's Items page with a picture's card clicked: it is outlined and the Inspector shows it.",
+    page: '/art-studio.html#art/items',
+    ready: '.art-item[data-asset-card]',
+    open: async (page) => {
+      const id = await page.$$eval('.art-item[data-asset-card]', (els) => (els[Math.min(2, els.length - 1)] as HTMLElement).dataset.assetCard!);
+      await page.click(`[data-asset-card="${id}"] figcaption b`);
+      await page.waitForSelector(`[data-asset-card="${id}"][data-picked]`);
+      await page.waitForFunction((x) => document.querySelector('#dock-right')?.textContent?.includes(x), id);
+    },
+    mustSee: ['a picture card on the Items page outlined in gold', "the Inspector on the right shows that picture's name, id and kind", 'the address ends with ?asset= and its id'],
+  },
+  {
     name: 'art-studio-canvas',
     about: 'The Studio canvas: the Sanctum shrine standing on its 2 by 1 tiles at game size, a player beside it, lit at dusk.',
     page: '/art-studio.html#art/canvas?asset=sanctum-shrine',

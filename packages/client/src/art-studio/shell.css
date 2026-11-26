@@ -714,3 +714,7 @@
   height: 40px;
   object-fit: contain;
 }
+
+/* A page's picture cards select their asset when clicked (shell.ts pickCard). */
+#main [data-asset-card], #main .walker[data-walker] { cursor: pointer; }
+#main [data-picked] { outline: 2px solid var(--gold); outline-offset: 2px; }

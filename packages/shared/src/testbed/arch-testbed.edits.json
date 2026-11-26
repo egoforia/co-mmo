@@ -32,6 +32,7 @@
   {"id": "testbed-31", "by": "the game", "made": 0, "kind": "storey", "at": [142, 158], "size": [6, 8], "storey": 1, "style": "frostpeak-eyrie", "open": true},
   {"id": "testbed-32", "by": "the game", "made": 0, "kind": "storey", "at": [142, 152], "size": [6, 8], "storey": 2, "style": "frostpeak-eyrie", "open": true},
   {"id": "testbed-33", "by": "the game", "made": 0, "kind": "stairs", "at": [144, 158], "size": [2, 2], "from": 1, "climbs": "north"},
+  {"id": "testbed-59", "by": "the game", "made": 0, "kind": "stairs", "at": [100, 161], "size": [1, 3], "from": 0, "climbs": "north", "way": "ramp", "look": "stone"},
   {"id": "testbed-34", "by": "the game", "made": 0, "kind": "bookmark", "at": [44.5, 55], "name": "G1-A", "note": "Closed exterior seen from afar", "level": 0},
   {"id": "testbed-35", "by": "the game", "made": 0, "kind": "bookmark", "at": [44.5, 49.5], "name": "G1-B", "note": "Doorway threshold cutaway trigger", "level": 0},
   {"id": "testbed-36", "by": "the game", "made": 0, "kind": "bookmark", "at": [44.5, 44.5], "name": "G1-C", "note": "Active interior cutaway on central marker", "level": 0},
@@ -56,5 +57,6 @@
   {"id": "testbed-55", "by": "the game", "made": 0, "kind": "bookmark", "at": [111, 159], "name": "G6-B", "note": "Indoor stairs inside building", "level": 0},
   {"id": "testbed-56", "by": "the game", "made": 0, "kind": "bookmark", "at": [123, 160], "name": "G6-C", "note": "Crypt descent to Floor -1", "level": 0},
   {"id": "testbed-57", "by": "the game", "made": 0, "kind": "bookmark", "at": [134, 162], "name": "G6-D", "note": "Isolated viaduct bridge over chasm void", "level": 1},
-  {"id": "testbed-58", "by": "the game", "made": 0, "kind": "bookmark", "at": [145, 161.5], "name": "G6-E", "note": "Terrace stairs connecting Floor 1 to Floor 2", "level": 1}
+  {"id": "testbed-58", "by": "the game", "made": 0, "kind": "bookmark", "at": [145, 161.5], "name": "G6-E", "note": "Terrace stairs connecting Floor 1 to Floor 2", "level": 1},
+  {"id": "testbed-60", "by": "the game", "made": 0, "kind": "bookmark", "at": [100.5, 165], "name": "G6-F", "note": "Stone ramp up onto the terrace (Ground to Floor 1)", "level": 0}
 ]

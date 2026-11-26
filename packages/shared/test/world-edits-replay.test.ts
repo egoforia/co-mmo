@@ -63,7 +63,7 @@ const EXPECTED: Record<string, number> = {
   desert: 2102079442,
   frostpeak: 3219299390,
   'mushroom-hollow': 1416057618,
-  'arch-testbed': 4091346125,
+  'arch-testbed': 3753119378,
 };
 
 describe('world edits replay', () => {

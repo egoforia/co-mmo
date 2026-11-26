@@ -82,8 +82,11 @@ export type WorldEditDraft = EditPlace & (
   | { kind: 'spot'; spot: string | null; at: TilePoint; count?: number }
   /** A floor above or below the ground over a rectangle, walled round, or an open terrace with low parapets (floors.ts addStorey). */
   | { kind: 'storey'; at: TilePoint; size: [width: number, height: number]; storey: number; style: string; open?: boolean }
-  /** A flight of stairs (or a ladder) with its top-left tile at `at`, from floor `from` up to the one above, climbed walking `climbs`. */
-  | { kind: 'stairs'; at: TilePoint; size: [width: number, height: number]; from: number; climbs?: 'north' | 'south' | 'east' | 'west'; ladder?: boolean }
+  /**
+   * A flight of stairs, a ladder or a ramp (`way`) with its top-left tile at `at`, from floor `from` up to the one
+   * above, climbed walking `climbs`. A ramp is 1 wide and 2 or 3 long, painted in `look`. Older edits say `ladder: true`.
+   */
+  | { kind: 'stairs'; at: TilePoint; size: [width: number, height: number]; from: number; climbs?: 'north' | 'south' | 'east' | 'west'; way?: 'ladder' | 'ramp'; look?: string; ladder?: boolean }
   /** A building style's piece of furniture standing on the edit's floor, its picture's bottom centre at `at` (tiles, may be halves); it blocks its footprint unless `walkable`. */
   | { kind: 'furniture'; asset: string; at: TilePoint; footprint: [width: number, height: number]; walkable?: boolean }
   /** Takes away the thing named by `target` (a building, storey, stairs or piece), or else the bookmark, gathering spot, person or monster's home on `at`. */

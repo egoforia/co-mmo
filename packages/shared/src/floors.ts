@@ -1,4 +1,4 @@
-import { standWall, takeDownWall } from './edge-walls.ts';
+import { standWall, takeDownWall, wallOn } from './edge-walls.ts';
 import { collides } from './movement.ts';
 import { anchorNear, spotMiddle, type TileSpot } from './tiles/grid.ts';
 import { openTile } from './tiles/steps.ts';
@@ -80,7 +80,7 @@ export interface Stairway extends TileRect {
    * its head over its top tile on the upper floor, which needs no floor
    * there. Its other tiles are its solid body on the lower floor.
    */
-  ramp?: { foot: { x: number; y: number }; head: { x: number; y: number } };
+  ramp?: { foot: { x: number; y: number }; head: { x: number; y: number }; under?: number[] };
 }
 
 /** A floor in plain words. */
@@ -478,6 +478,7 @@ export function floorChecks(map: RegionMap): string[] {
       // A ramp stands on the lower floor only: its foot is open, its body solid; its head needs no floor above.
       if (isBlocking(tileAt(map, s.ramp.foot.x, s.ramp.foot.y, s.lower))) problems.push(`The foot of ${where} is not open floor on ${floorName(s.lower)}.`);
       if (tileAt(map, s.bottom.x, s.bottom.y, s.lower) === Tile.Door) problems.push(`The landing at the foot of ${where} is in a doorway, so it would block the way in.`);
+      if (s.climbs && wallOn(map, s.ramp.head.x, s.ramp.head.y, s.climbs, s.upper)) problems.push(`A wall on ${floorName(s.upper)} stands between the top of ${where} and its landing.`);
     }
     for (const floor of s.ramp ? [] : [s.lower, s.upper]) {
       for (let ty = s.y; ty < s.y + s.height; ty++) {
@@ -491,7 +492,9 @@ export function floorChecks(map: RegionMap): string[] {
       else if (stairwayAt(map, spot.x, spot.y, floor)) problems.push(`The landing at the ${name} of ${where} is on stairs, so you would be carried straight on.`);
     }
     for (const o of map.stairways.slice(i + 1)) {
-      const shared = [o.lower, o.upper].some((f) => f === s.lower || f === s.upper);
+      // A ramp's tiles stand on its lower floor only.
+      const floorsOf = (w: Stairway) => (w.ramp ? [w.lower] : [w.lower, w.upper]);
+      const shared = floorsOf(o).some((f) => floorsOf(s).includes(f));
       if (shared && overlap(s, o)) problems.push(`${where} overlaps the ${o.kind} at (${o.x}, ${o.y}) on a floor they share.`);
     }
   });

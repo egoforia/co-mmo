@@ -1,5 +1,6 @@
 import { Tile, set, type Building, type RegionMap } from '../../world.ts';
 import type { TileRect } from '../../floors.ts';
+import { takeAwayRamp } from '../../floors/ramps.ts';
 import type { EditKind } from '../kind.ts';
 import { thingById } from '../names.ts';
 import { OFF_EDGE, clearUnder, floorOf, footprint, inside } from '../tiles.ts';
@@ -51,13 +52,14 @@ function takeAway(map: RegionMap, edit: EditOf<'remove'> | (Omit<EditOf<'remove'
       map.landmarks = drop(map.landmarks, (l) => l === named.thing);
       return true;
     case 'stairway':
-      map.stairways = drop(map.stairways, (s) => s === named.thing);
+      // A ramp gives back the floor its body stood on.
+      takeAwayRamp(map, named.thing);
       return true;
     case 'storey': {
       // Its stairs and furniture go with it.
       const s = named.thing;
       map.storeys = drop(map.storeys, (t) => t === s);
-      map.stairways = drop(map.stairways, (w) => (w.lower === s.floor || w.upper === s.floor) && within(w, s));
+      for (const w of map.stairways.filter((w) => (w.lower === s.floor || w.upper === s.floor) && within(w, s))) takeAwayRamp(map, w);
       map.landmarks = drop(map.landmarks, (l) => (l.floor ?? 0) === s.floor && within(pieceRect(l), s));
       return true;
     }

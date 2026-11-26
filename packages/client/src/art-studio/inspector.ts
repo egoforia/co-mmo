@@ -35,5 +35,22 @@ export function inspectorHtml(a: StudioAsset | undefined): string {
     <h2 class="dock-title">Inspector</h2>
     ${picture}
     <table class="props"><tbody>${rows.map(([k, v]) => `<tr><th scope="row">${k}</th><td>${v}</td></tr>`).join('')}</tbody></table>
-    ${open}`;
+    ${open}
+    ${handsHtml(a)}`;
+}
+
+/** Groups whose assets walk, so have hands found in their frames. */
+export const HAND_GROUPS = ['characters', 'monsters'];
+
+/**
+ * The Hands section for a walker: the hand workbench (the hands found in each
+ * frame, moved by hand, and gear tried on in either hand) lives on its page
+ * in Animate, so this leads there and opens it.
+ */
+export function handsHtml(a: StudioAsset): string {
+  if (!HAND_GROUPS.includes(a.group) || !a.place.walker) return '';
+  return `
+    <h2 class="dock-title">Hands and gear</h2>
+    <p class="note">Where its hands were found in each frame, moving them, and trying a weapon, tool or shield in each hand are on its Animate page.</p>
+    <p class="inspector-links"><a class="button" href="${escapeHtml(placeHash(a.place))}" data-art-go data-hands-focus="${escapeHtml(a.place.walker)}" data-hands-to="workbench">Edit hands and try gear (H)</a></p>`;
 }

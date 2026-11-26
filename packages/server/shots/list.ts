@@ -517,6 +517,19 @@ export const SHOTS: Shot[] = [
     mustSee: ['four tracks of walk frames along the bottom, front left frame 4 marked', 'the preview shows that frame and the button says Play', 'the Inspector has a Create with AI section with paint buttons and their costs'],
   },
   {
+    name: 'art-studio-hands',
+    about: 'Hands and gear: from Sylvan Cervid on the canvas, H opens its hand workbench on its Animate page.',
+    page: '/art-studio.html#art/canvas?asset=sylvan-cervid',
+    ready: '.asset-list button',
+    open: async (page) => {
+      await page.waitForSelector('#dock-right a[data-hands-to]');
+      await page.keyboard.press('h');
+      await page.waitForSelector('.hand-workbench[data-wb-walker="sylvan-cervid"]');
+      await page.waitForTimeout(1200);
+    },
+    mustSee: ['the Animate workspace is open on Sylvan Cervid\'s page', 'the hand workbench is at the top of the page, with Walk/Run/Attack, the four ways, and Right Hand and Left Hand item choices', 'the Inspector shows a Hands and gear section with "Edit hands and try gear (H)"'],
+  },
+  {
     name: 'art-studio-spot-states',
     about: 'A gathering spot in the Studio: the strip shows its Ready, Picked and Growing pictures side by side (none painted on the shot server).',
     page: '/art-studio.html#art/canvas?asset=spot-sanctum-sage',

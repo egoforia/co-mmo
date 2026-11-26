@@ -94,10 +94,13 @@ function markLooking(): void {
 
 /** The hand finder to open and scroll to once the page it leads to is drawn: a walker's id, or '' for the first. */
 let focusing: string | undefined;
+/** True when the hand workbench, not the hand overview, is scrolled to. */
+let toWorkbench = false;
 
 /** Follows the line: the page it leads to is drawn, then its hand finder is opened and focused. */
 export function followHandStatus(link: HTMLAnchorElement): void {
   focusing = link.dataset.handsFocus ?? '';
+  toWorkbench = link.dataset.handsTo === 'workbench';
   if (focusing) artState.openHands.add(focusing);
   // The same page is drawn again, so its hand finder is still opened.
   if (location.hash === link.getAttribute('href')) artState.ctx.rerender();
@@ -110,9 +113,15 @@ export function focusHandFinder(): void {
   const walker = focusing;
   focusing = undefined;
   const panel = document.querySelector<HTMLDetailsElement>(walker ? `details.hands[data-walker="${CSS.escape(walker)}"]` : 'details.hands');
+  if (panel) {
+    panel.open = true;
+    if (panel.dataset.walker) artState.openHands.add(panel.dataset.walker);
+  }
+  // The Studio's Inspector leads to the workbench, which every walker has, painted walks or not.
+  const bench = toWorkbench && walker ? document.querySelector<HTMLElement>(`.hand-workbench[data-wb-walker="${CSS.escape(walker)}"]`) : null;
+  toWorkbench = false;
+  if (bench) return bench.scrollIntoView({ block: 'start', behavior: 'smooth' });
   if (!panel) return;
-  panel.open = true;
-  if (panel.dataset.walker) artState.openHands.add(panel.dataset.walker);
   panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
   panel.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true });
 }

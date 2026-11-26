@@ -22,6 +22,7 @@ import {
 import type { HouseSource } from '../kit-house-view.ts';
 import type { LitPoint } from '../lights.ts';
 import type { EdgeWallView } from './edge-walls.ts';
+import type { SpotView } from './spot-views.ts';
 import { PROJECTION } from '../projection.ts';
 
 export interface Avatar {
@@ -121,6 +122,8 @@ export interface DrawnRegion {
   stairs: Phaser.GameObjects.GameObject[];
   /** Walls standing on one side of a tile, each see-through while it stands in front of us. */
   edgeWalls: EdgeWallView[];
+  /** Its gathering spots, each in the state we see it in (spot-views.ts). */
+  spots: SpotView[];
 }
 
 /** A storey drawn over its rectangle: its tiles, its furniture, and its stairs' pictures and labels. */

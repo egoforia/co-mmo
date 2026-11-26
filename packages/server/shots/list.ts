@@ -335,6 +335,19 @@ export const SHOTS: Shot[] = [
     mustSee: ['the walking mushrooms stand about two thirds of the player\'s height (112 against 168 px before the camera shrinks them)', 'their feet stand on the ground'],
   },
   {
+    name: 'gather-spot-hover',
+    about: 'A gathering spot in the Sanctum hovered: it says it is ready to gather. Its state pictures (Picked, Growing) are not painted, so it shows its Ready picture.',
+    region: 'sanctum',
+    // One tile west of the first spot, so it stands just right of the player.
+    at: (map) => ({ x: map.spots[0]!.x - 0.5, y: map.spots[0]!.y + 0.5 }),
+    open: async (page) => {
+      // The spot's tile is one tile east (80, 40 world px) of us at zoom 0.6; aim a little up its picture.
+      await page.mouse.move(640 + 48, 400 + 24 - 20);
+      await page.waitForTimeout(400);
+    },
+    mustSee: ['a gathering spot just right of the player, with a label above it naming it and saying "Ready to gather"'],
+  },
+  {
     name: 'art-studio',
     about: 'The AI Art Studio, where the Owner reviews and paints pictures.',
     page: '/art-studio.html',

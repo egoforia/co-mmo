@@ -4,7 +4,7 @@
 // art-ui/dialogs.ts). What is sent and what it costs are shown there, and
 // nothing is painted until it is approved.
 
-import { ISO_WAYS, ISO_WAY_LABELS } from '@co-mmo/shared';
+import { ISO_WAYS, ISO_WAY_LABELS, SPOTS, SPOT_STATES, spotStateArt } from '@co-mmo/shared';
 import { usd, type ArtOverview, type Ask } from '../art-ui/state.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
@@ -44,7 +44,7 @@ export function createActions(a: StudioAsset, data: Pick<ArtOverview, 'items' | 
   const normal: CreateAction[] = item.normalPaintable && item.url
     ? [{ label: item.normalMap ? 'Paint its normal map again' : 'Paint a normal map', ask: { what: 'normal', asset: item.id }, usd: item.estimateUsd }]
     : [];
-  const all = [...paint, ...normal];
+  const all = [...paint, ...normal, ...stateActions(item.id, data.items)];
   return all.length ? all : item.why ?? 'It cannot be painted here.';
 }
 
@@ -59,4 +59,25 @@ export function createDockHtml(a: StudioAsset | undefined, data: Pick<ArtOvervie
     <h2 class="dock-title">Create with AI</h2>
     <p class="note">Each shows exactly what is sent to the model and what it costs. Nothing is painted until you approve it.</p>
     ${body}`;
+}
+
+/** The spot kind whose Ready picture `id` is, if it is one. */
+export function spotKindOf(id: string): string | undefined {
+  return Object.keys(SPOTS).find((k) => SPOTS[k]!.art === id);
+}
+
+/** A spot's Picked and Growing pictures not painted yet, in one review; and those of every spot of its land. */
+export function stateActions(id: string, items: ArtOverview['items']): CreateAction[] {
+  const kind = spotKindOf(id);
+  const ready = kind ? items.find((i) => i.id === id) : undefined;
+  if (!kind || !ready?.url) return [];
+  const missing = (kinds: string[]) => items.filter((i) => kinds.some((k) => SPOT_STATES.some((st) => spotStateArt(k, st.id) === i.id)) && i.repaintable && i.source === 'missing');
+  const mine = missing([kind]);
+  const land = SPOTS[kind]!.biome;
+  const all = missing(Object.keys(SPOTS).filter((k) => SPOTS[k]!.biome === land));
+  const cost = (list: typeof items) => list.reduce((n, i) => n + i.estimateUsd, 0);
+  return [
+    ...(mine.length ? [{ label: `Paint its ${mine.length === 2 ? 'Picked and Growing pictures' : 'missing state picture'}`, ask: { what: 'paint-group', group: `spot-states:${kind}` } as Ask, usd: cost(mine) }] : []),
+    ...(all.length > mine.length ? [{ label: `Paint the ${all.length} missing state pictures of every spot in its land`, ask: { what: 'paint-group', group: `spot-states:${land}` } as Ask, usd: cost(all) }] : []),
+  ];
 }

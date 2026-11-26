@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtItem, SoundItem, WalkerView } from '../src/art-ui/state.ts';
 import type { StudioAsset } from '../src/art-studio/browser.ts';
-import { createActions } from '../src/art-studio/create-dock.ts';
-import { frameStyle, framesHtml, nextFrame } from '../src/art-studio/frame-strip.ts';
+import { createActions, stateActions } from '../src/art-studio/create-dock.ts';
+import { frameStyle, framesHtml, nextFrame, spotStatesHtml } from '../src/art-studio/frame-strip.ts';
 
 const strip = { url: '/art/bear-walk.png', frames: 12, width: 1200, height: 100, cycleSeconds: 1, versions: [] };
 const walker = {
@@ -57,5 +57,28 @@ describe('Create with AI', () => {
 
   it('offers a sound to be made', () => {
     expect(createActions(asset('chime', 'sounds'), data)).toEqual([{ label: 'Make it', ask: { what: 'sound', sound: 'chime' }, usd: 0.01, note: true }]);
+  });
+});
+
+describe('spot state pictures in the Studio', () => {
+  const pic = (id: string, url?: string, more: Partial<ArtItem> = {}) => ({ id, name: id, source: url ? 'painted' : 'missing', ...(url ? { url } : {}), place: { tab: 'biomes', page: 'x' }, estimateUsd: 0.04, repaintable: true, takesNote: true, ...more }) as ArtItem;
+
+  it('offers a spot\'s missing states in one review once its Ready picture is painted, and its land\'s', () => {
+    const items = [pic('spot-sanctum-sage', '/s.png'), pic('spot-sanctum-sage-picked'), pic('spot-sanctum-sage-growing'), pic('spot-sanctum-flax', '/f.png'), pic('spot-sanctum-flax-picked'), pic('spot-woods-moss-picked')];
+    const acts = stateActions('spot-sanctum-sage', items);
+    expect(acts.map((a) => [a.ask, Math.round(a.usd * 100)])).toEqual([
+      [{ what: 'paint-group', group: 'spot-states:sanctum-sage' }, 8],
+      [{ what: 'paint-group', group: 'spot-states:sanctum' }, 12],
+    ]);
+    expect(stateActions('spot-sanctum-sage', [pic('spot-sanctum-sage'), pic('spot-sanctum-sage-picked')])).toEqual([]);
+    expect(stateActions('item-cup', items)).toEqual([]);
+  });
+
+  it('shows a spot\'s three states side by side', () => {
+    const html = spotStatesHtml('sanctum-sage', [pic('spot-sanctum-sage', '/s.png'), pic('spot-sanctum-sage-picked')]);
+    expect(html.match(/<figure/g)).toHaveLength(3);
+    expect(html).toContain('src="/s.png"');
+    expect(html.match(/Not painted yet/g)).toHaveLength(2);
+    expect(html).toContain('Growing');
   });
 });

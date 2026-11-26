@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import {
+  fitOf,
   piecePicture,
   Tile,
   ITEMS,
@@ -20,6 +21,7 @@ import {
   type RegionMap,
 } from '@co-mmo/shared';
 import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../kit-house-view.ts';
+import { fittedAt } from '../tile-stand.ts';
 import { dropLight, makeLight, placeLight } from '../lights.ts';
 import { standEdgeWalls } from './edge-walls.ts';
 import { PROJECTION } from '../projection.ts';
@@ -95,8 +97,11 @@ export function drawChunk(scene: Phaser.Scene, region: DrawnRegion, x0: number, 
       const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
       const feet = PROJECTION.stand(ox + x, oy + y, 1, 1);
       const at = PROJECTION.toScreen(feet.x, feet.y);
-      const img = scene.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
-      img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
+      // Moved as the Owner fitted it in the Art Studio, the other way across when mirrored.
+      const flip = rand2(x, y, 8) > 0.5;
+      const fit = fittedAt({ x: at.x + jitter, y: at.y, scale: 0.85 + rand2(x, y, 7) * 0.3 }, fitOf(key), flip);
+      const img = scene.add.image(fit.x, fit.y, key).setOrigin(0.5, 0.97);
+      img.setScale(fit.scale).setFlipX(flip);
       img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1);
       setDepthShade(img, groundDelta);
       objects.push(img.setVisible(currentFloor >= 0));
@@ -343,7 +348,8 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
       const lift = floorLift(floor);
       const depthOff = floorDepthOffset(floor);
       if (art && scene.textures.exists(art)) {
-        const img = scene.add.image(at.x, at.y - lift, art).setOrigin(0.5, 0.92);
+        const fit = fittedAt({ x: at.x, y: at.y - lift, scale: 1 }, fitOf(art));
+        const img = scene.add.image(fit.x, fit.y, art).setOrigin(0.5, 0.92).setScale(fit.scale);
         img.setDepth(depthOff + PROJECTION.depth(feet.x, feet.y) - 1);
         img.setInteractive({ useHandCursor: true });
         img.on('pointerover', () => img.setTint(0xfff8d0));

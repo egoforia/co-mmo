@@ -366,6 +366,18 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine stands on two outlined tile diamonds, on painted Sanctum meadow', 'a player figure stands beside it at game size', 'the Place workspace and its Canvas tab are marked', 'the Inspector shows the shrine'],
   },
   {
+    name: 'art-studio-offset',
+    about: 'The Offset tool: the shrine nudged 20 px left on the canvas, not saved yet.',
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas[data-lit="none"]',
+    open: async (page) => {
+      await page.keyboard.press('Shift+ArrowLeft');
+      await page.keyboard.press('Shift+ArrowLeft');
+      await page.waitForSelector('.fit-panel input[name=fit-x][value="-20"]');
+    },
+    mustSee: ['the shrine stands 20 px left of where it did, an orange cross at its anchor', 'the Inspector\'s Offset section shows x -20 and "not saved yet"', 'Save the fit is enabled'],
+  },
+  {
     name: 'art-studio-phone',
     about: 'The AI Art Studio on a phone: one pane at a time, chosen with tabs.',
     page: '/art-studio.html',

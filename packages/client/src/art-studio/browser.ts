@@ -3,6 +3,7 @@
 // filter and a search, like the asset browsers of Godot and Krita. Picking one
 // selects it for the Inspector and opens it on its page.
 
+import type { AssetFit } from '@co-mmo/shared';
 import { escapeHtml } from '../ui.ts';
 
 /** The browser's groups, in chip order, with their words. */
@@ -20,6 +21,8 @@ export interface StudioAsset {
   footprint?: { width: number; height: number };
   status: 'painted' | 'stand-in' | 'missing';
   thumb?: string;
+  /** How it sits on its tiles, when fitted in the Studio (asset-fit.ts). */
+  fit?: AssetFit;
   place: { tab: string; page?: string; walker?: string; asset?: string };
 }
 

@@ -5,13 +5,14 @@
 // pixel under the pointer read out. The tile outlines are an editor overlay,
 // as the world editor's Hitboxes layer: only the Owner sees them.
 
-import { CHARACTER_HEIGHT, PREVIEW_HOURS, biomeLook, type ArtManifest, type BiomeId } from '@co-mmo/shared';
+import { CHARACTER_HEIGHT, PREVIEW_HOURS, biomeLook, type ArtManifest, type AssetFit, type BiomeId } from '@co-mmo/shared';
 import { groundLight, litPicture } from '../light-preview.ts';
 import { workedOutNormalMap } from '../normal-preview.ts';
 import { PROJECTION } from '../projection.ts';
-import { standing, type Floor } from '../tile-stand.ts';
+import { fittedAt, standing, type Floor } from '../tile-stand.ts';
 import { escapeHtml } from '../ui.ts';
 import type { StudioAsset } from './browser.ts';
+import type { FitDraft } from './fit-tool.ts';
 
 /** Groups the canvas can stand on tiles. */
 export const CANVAS_GROUPS = ['pieces', 'spots', 'stairs', 'scenery', 'characters', 'monsters'];
@@ -29,12 +30,18 @@ export function canvasFloor(a: Pick<StudioAsset, 'footprint'>): Floor {
   return { left: 0, top: 0, right: w, bottom: h };
 }
 
-/** Where a picture drawn by a standing plan lies, in canvas world pixels. */
-export function pictureBox(floor: Floor, size: { width: number; height: number }, fitted: boolean): { x: number; y: number; width: number; height: number; scale: number } {
+/** Where a picture lies as the game stands it, moved by its fit: in canvas world pixels, with its anchor. */
+export function pictureBox(
+  floor: Floor,
+  size: { width: number; height: number },
+  fitted: boolean,
+  fit?: Pick<AssetFit, 'offset' | 'scale'>,
+): { x: number; y: number; width: number; height: number; scale: number; anchor: { x: number; y: number } } {
   const plan = standing(floor, size, fitted);
-  const width = size.width * plan.scale;
-  const height = size.height * plan.scale;
-  return { x: plan.x - width / 2, y: plan.y - height * plan.originY, width, height, scale: plan.scale };
+  const at = fittedAt(plan, fit);
+  const width = size.width * at.scale;
+  const height = size.height * at.scale;
+  return { x: at.x - width / 2, y: at.y - height * plan.originY, width, height, scale: at.scale, anchor: { x: at.x, y: at.y } };
 }
 
 /** The next zoom step in or out from `now`. */
@@ -75,7 +82,14 @@ export class StudioCanvas {
   private box: ReturnType<typeof pictureBox> | undefined;
   private art: { asset?: HTMLImageElement | HTMLCanvasElement; ground?: HTMLImageElement; figure?: HTMLImageElement | HTMLCanvasElement } = {};
 
-  constructor(private readonly el: HTMLElement, private readonly asset: StudioAsset, private readonly manifest: ArtManifest) {}
+  constructor(
+    private readonly el: HTMLElement,
+    private readonly asset: StudioAsset,
+    private readonly manifest: ArtManifest,
+    /** The fit being changed, when the picture can be fitted; dragging it moves the picture. */
+    private readonly draft?: FitDraft,
+    private readonly changed: () => void = () => {},
+  ) {}
 
   /** Draws the canvas and its bar, and wires zoom, pan, light and the readout. */
   async mount(): Promise<void> {
@@ -128,14 +142,22 @@ export class StudioCanvas {
       e.preventDefault();
       this.setZoom(nextZoom(this.zoom, e.deltaY < 0 ? 1 : -1));
     }, { passive: false });
-    let drag: { x: number; y: number } | undefined;
+    // Dragging the picture moves it (the Offset tool); dragging anywhere else pans.
+    let drag: { x: number; y: number; move?: { offset: [number, number] } } | undefined;
     this.canvas.addEventListener('pointerdown', (e) => {
-      drag = { x: e.clientX - this.pan.x, y: e.clientY - this.pan.y };
+      const onPicture = this.draft && this.box && this.inside(this.world(e), this.box);
+      if (onPicture) this.draft!.mark();
+      drag = onPicture ? { x: e.clientX, y: e.clientY, move: { offset: [...this.draft!.state.offset] } } : { x: e.clientX - this.pan.x, y: e.clientY - this.pan.y };
       this.canvas.setPointerCapture(e.pointerId);
     });
     this.canvas.addEventListener('pointermove', (e) => {
       if (drag && this.canvas.hasPointerCapture(e.pointerId)) {
-        this.pan = { x: e.clientX - drag.x, y: e.clientY - drag.y };
+        if (drag.move && this.draft && this.box) {
+          // Screen pixels to picture pixels: through the zoom, then the picture's own drawn size.
+          const per = (this.zoom / 100) * this.box.scale;
+          this.draft.set({ ...this.draft.state, offset: [drag.move.offset[0] + (e.clientX - drag.x) / per, drag.move.offset[1] + (e.clientY - drag.y) / per] }, false);
+          this.changed();
+        } else this.pan = { x: e.clientX - drag.x, y: e.clientY - drag.y };
         this.draw();
       }
       this.read(e);
@@ -158,13 +180,21 @@ export class StudioCanvas {
     return { x: this.canvas.width / 2 + this.pan.x * devicePixelRatio - mid.x * s, y: this.canvas.height * 0.62 + this.pan.y * devicePixelRatio - mid.y * s, s };
   }
 
-  private read(e: PointerEvent): void {
+  /** The world pixel under the pointer. */
+  private world(e: PointerEvent): { x: number; y: number } {
     const r = this.canvas.getBoundingClientRect();
     const o = this.origin();
-    const wx = ((e.clientX - r.left) * devicePixelRatio - o.x) / o.s;
-    const wy = ((e.clientY - r.top) * devicePixelRatio - o.y) / o.s;
+    return { x: ((e.clientX - r.left) * devicePixelRatio - o.x) / o.s, y: ((e.clientY - r.top) * devicePixelRatio - o.y) / o.s };
+  }
+
+  private inside(p: { x: number; y: number }, b: { x: number; y: number; width: number; height: number }): boolean {
+    return p.x >= b.x && p.y >= b.y && p.x < b.x + b.width && p.y < b.y + b.height;
+  }
+
+  private read(e: PointerEvent): void {
+    const { x: wx, y: wy } = this.world(e);
     const b = this.box;
-    if (b && wx >= b.x && wy >= b.y && wx < b.x + b.width && wy < b.y + b.height) {
+    if (b && this.inside({ x: wx, y: wy }, b)) {
       this.readout.textContent = `picture x ${Math.floor((wx - b.x) / b.scale)} · y ${Math.floor((wy - b.y) / b.scale)}`;
     } else this.readout.textContent = '';
   }
@@ -188,7 +218,8 @@ export class StudioCanvas {
       for (let tx = -MARGIN; tx < floor.right + MARGIN; tx++) {
         const at = PROJECTION.toScreen(tx, ty);
         g.setTransform(half.x * o.s, half.y * o.s, -half.x * o.s, half.y * o.s, o.x + at.x * o.s, o.y + at.y * o.s);
-        if (ground) g.drawImage(ground, 0, 0, 1, 1);
+        // A hair over a tile each, so no seam shows between them.
+        if (ground) g.drawImage(ground, -0.005, -0.005, 1.01, 1.01);
       }
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -238,11 +269,23 @@ export class StudioCanvas {
       ? (() => {
           const scale = this.asset.group === 'characters' ? CHARACTER_HEIGHT / art.height : 1;
           const feet = PROJECTION.toScreen(0.5, 0.5);
-          return { x: feet.x - (art.width * scale) / 2, y: feet.y - art.height * scale * 0.95, width: art.width * scale, height: art.height * scale, scale };
+          return { x: feet.x - (art.width * scale) / 2, y: feet.y - art.height * scale * 0.95, width: art.width * scale, height: art.height * scale, scale, anchor: feet };
         })()
-      : pictureBox(floor, size, this.manifest[this.asset.id]?.view === 'isometric');
+      : pictureBox(floor, size, this.manifest[this.asset.id]?.view === 'isometric', this.draft?.fit);
     this.box = box;
     g.drawImage(art, o.x + box.x * o.s, o.y + box.y * o.s, box.width * o.s, box.height * o.s);
+    // The picture's anchor, the point it stands on (editor overlay).
+    if (this.draft) {
+      const [ax, ay] = [o.x + box.anchor.x * o.s, o.y + box.anchor.y * o.s];
+      const r = 7 * devicePixelRatio;
+      g.strokeStyle = 'rgba(254, 174, 52, 0.95)';
+      g.beginPath();
+      g.moveTo(ax - r, ay);
+      g.lineTo(ax + r, ay);
+      g.moveTo(ax, ay - r);
+      g.lineTo(ax, ay + r);
+      g.stroke();
+    }
     this.drawn();
   }
 }

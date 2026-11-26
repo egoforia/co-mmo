@@ -525,6 +525,18 @@ export async function handleAdmin(
     if (ownerOnly()) return true;
     if (route === 'art' && method === 'GET') return json(res, 200, await ctx.art.overview()), true;
     if (route === 'art/assets' && method === 'GET') return json(res, 200, { assets: await ctx.art.assets() }), true;
+    // How a picture sits on its tiles (asset-fit.ts): moved and trimmed in the Studio, or put back where it was painted.
+    if (route === 'art/fit' && (method === 'POST' || method === 'DELETE')) {
+      const body = await ctx.readJson(req);
+      const fit = method === 'DELETE' ? { asset: body?.asset, offset: [0, 0] } : { asset: body?.asset, offset: body?.offset, scale: body?.scale };
+      try {
+        const record = wishes.setFit({ id: account.id, name: account.name }, fit);
+        return json(res, 200, { ok: true, id: record.id }), true;
+      } catch (err) {
+        if (!(err instanceof WishError)) throw err;
+        return json(res, 400, { error: 'invalid', message: err.message }), true;
+      }
+    }
     if (route === 'art/hands' && method === 'GET') return json(res, 200, { questions: (await ctx.hands?.questions()) ?? [], mirrored: (await ctx.hands?.mirrored()) ?? {} }), true;
     // What the hand finder is doing, for the Art tab's "Finding hands" line.
     if (route === 'art/hands/status' && method === 'GET') return json(res, 200, (await ctx.hands?.status()) ?? { running: false, done: 0, total: 0, waiting: 0 }), true;

@@ -538,3 +538,23 @@
   bottom: 6px;
   width: 100%;
 }
+
+/* The Offset tool (art-studio/fit-tool.ts). */
+.fit-panel .dock-title {
+  margin-top: 18px;
+}
+
+.fit-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.fit-fields input {
+  width: 64px;
+}
+
+.fit-panel button[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}

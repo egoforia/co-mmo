@@ -13,9 +13,14 @@ import {
   type PlayerInfo,
   type ServerMessage,
   type WelcomeMessage,
+  DEFAULT_SKY,
+  nextHour,
 } from '@co-mmo/shared';
 import { Region, type Connection } from '../src/region.ts';
 import { account, connect, start } from './helpers.ts';
+
+/** Mid-morning, as these fights were tuned in: the hour a 1,000,000 ms clock stood at under the old one-hour day. */
+const MORNING = nextHour(6.67, 1_000_000, DEFAULT_SKY);
 
 // Calling core skills in play (docs/callings-build-plan.md, step 7a): each
 // Calling's gauge-spending skill, the hotbar the server keeps, and the
@@ -48,7 +53,7 @@ function hero(calling: CallingId, level: number): Character {
  * `near()` brings beside her. Dice roll the middle.
  */
 function setup(calling: CallingId, level: number, regionId = 'woods') {
-  const clock = { now: 1_000_000 };
+  const clock = { now: MORNING };
   const region = new Region(regionDef(regionId)!, { worldChat: () => undefined, online: () => 2, party: () => ['a', 'b'] }, () => clock.now, () => 0.5);
   // Tests fight beside the arrival square: no safe areas here (safe-areas.ts has its own tests).
   region.map.safe = [];

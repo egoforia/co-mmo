@@ -23,6 +23,7 @@ import { centreFit, type BaseMeasure } from './auto-centre.ts';
 import { CANVAS_GROUPS, StudioCanvas, canvasFloor } from './canvas.ts';
 import { centreHtml, centreIntroHtml, centreTargets, proposals, type Proposal } from './centre-page.ts';
 import { FIT_GROUPS, FitDraft, SCALE_GROUPS, fitFromFields, fitPanelHtml } from './fit-tool.ts';
+import { HITBOX_GROUPS, alikeAssets, hitboxPanelHtml, saveTiles } from './hitbox-tool.ts';
 import { showPane, wireDocks } from './docks.ts';
 import { inspectorHtml } from './inspector.ts';
 import { studioKey, typingIn } from './keys.ts';
@@ -42,6 +43,8 @@ export class StudioShell {
   /** The canvas shown now, and the fit being changed on it. */
   private canvas: StudioCanvas | undefined;
   private draft: FitDraft | undefined;
+  /** True while the Hitbox tool is on (B). */
+  private hitbox = false;
   /** The earlier version laid against the one shown now in the Versions dock. */
   private version: string | undefined;
   private waiting = false;
@@ -166,10 +169,11 @@ export class StudioShell {
     if (document.querySelector('dialog[open]')) return;
     const k = studioKey(e, typingIn(document.activeElement));
     if (!k) return;
-    // The arrows, C and Ctrl Z belong to the page unless a picture is being fitted.
-    if (('nudge' in k || 'undo' in k || 'centre' in k) && !this.draft) return;
+    // The arrows, B, C and Ctrl Z belong to the page unless a picture is being fitted.
+    if (('nudge' in k || 'undo' in k || 'centre' in k || 'hitbox' in k) && !this.draft) return;
     e.preventDefault();
     if ('centre' in k) return void this.centreOne();
+    if ('hitbox' in k) return this.toggleHitbox();
     if ('nudge' in k || 'undo' in k) {
       if (!this.draft || !this.canvas) return;
       if ('nudge' in k) this.draft.nudge(k.nudge[0], k.nudge[1]);
@@ -201,7 +205,7 @@ export class StudioShell {
     const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
     this.browser.select(a?.id);
     const item = a && artState.data?.items.find((i) => i.id === a.id);
-    const fit = a && this.draft ? `<section class="fit-panel">${fitPanelHtml(a, this.draft)}</section>` : '';
+    const fit = a && this.draft ? `<section class="fit-panel">${this.fitHtml(a, this.draft)}</section>` : '';
     $('dock-right').innerHTML = inspectorHtml(a) + fit + versionsHtml(item, this.version);
   }
 
@@ -209,7 +213,30 @@ export class StudioShell {
   private drawFitPanel(): void {
     const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
     const panel = $('dock-right').querySelector('.fit-panel');
-    if (panel && a && this.draft) panel.innerHTML = fitPanelHtml(a, this.draft);
+    if (panel && a && this.draft) panel.innerHTML = this.fitHtml(a, this.draft);
+  }
+
+  /** The Offset section, with the Hitbox section for a set piece. */
+  private fitHtml(a: StudioAsset, draft: FitDraft): string {
+    const hitbox = HITBOX_GROUPS.includes(a.group) ? hitboxPanelHtml(a, draft, this.hitbox, alikeAssets(a, this.browser.shown()).length) : '';
+    return fitPanelHtml(a, draft, hitbox);
+  }
+
+  /** Turns the Hitbox tool on or off, for a set piece on the canvas. */
+  private toggleHitbox(): void {
+    const a = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
+    if (!a || !HITBOX_GROUPS.includes(a.group) || !this.canvas) return;
+    this.hitbox = !this.hitbox;
+    this.canvas.setHitbox(this.hitbox);
+    this.drawFitPanel();
+  }
+
+  /** Gives the other set pieces shown with this footprint the tiles chosen here, each keeping its own offset and size. */
+  private saveAlike(a: StudioAsset, button: HTMLButtonElement): void {
+    const alike = alikeAssets(a, this.browser.shown());
+    if (!this.draft || !alike.length || !confirm(`Give ${alike.length} other set pieces these blocked tiles, for everyone?`)) return;
+    button.disabled = true;
+    void saveTiles(alike, this.draft.state.blocks, api, toast).then(() => this.render(true));
   }
 
   /** The words under the Offset fields, while they are typed in. */
@@ -218,7 +245,7 @@ export class StudioShell {
     const panel = $('dock-right').querySelector('.fit-panel');
     if (!panel || !a || !this.draft) return;
     const fresh = document.createElement('div');
-    fresh.innerHTML = fitPanelHtml(a, this.draft);
+    fresh.innerHTML = this.fitHtml(a, this.draft);
     panel.querySelector('.fit-words')!.replaceWith(fresh.querySelector('.fit-words')!);
     panel.querySelector('[data-fit-save]')!.replaceWith(fresh.querySelector('[data-fit-save]')!);
   }
@@ -239,6 +266,7 @@ export class StudioShell {
     }
     this.main.innerHTML = `${nav}<div class="canvas-page"></div>`;
     this.draft = FIT_GROUPS.includes(a.group) ? new FitDraft(a.fit) : undefined;
+    this.hitbox = false;
     this.canvas = new StudioCanvas(this.main.querySelector('.canvas-page')!, a, await loadArt(), this.draft, () => this.drawFitPanel());
     this.drawInspector();
     await this.canvas.mount();
@@ -253,7 +281,7 @@ export class StudioShell {
       const m = measures[a.id];
       if (!m || 'why' in m) return toast(m?.why ?? 'It could not be measured.');
       const art = await loadArt();
-      this.draft.set(centreFit(m, canvasFloor(a), art[a.id]?.view === 'isometric', SCALE_GROUPS.includes(a.group)));
+      this.draft.set({ ...this.draft.state, ...centreFit(m, canvasFloor(a), art[a.id]?.view === 'isometric', SCALE_GROUPS.includes(a.group)) });
       this.canvas.draw();
       this.drawFitPanel();
       if (m.sure === 'low') toast('Centred, but its foot is in pieces: check it by eye before saving.');
@@ -301,7 +329,7 @@ export class StudioShell {
       let saved = 0;
       for (const p of chosen) {
         try {
-          await api('art/fit', 'POST', { asset: p.asset.id, offset: p.fit!.offset, scale: p.fit!.scale });
+          await api('art/fit', 'POST', { asset: p.asset.id, offset: p.fit!.offset, scale: p.fit!.scale, blocks: p.asset.fit?.blocks });
           saved++;
         } catch (err) {
           toast(`${p.asset.name}: ${(err as Error).message}`);
@@ -323,7 +351,7 @@ export class StudioShell {
   private saveFit(asset: string, reset: boolean, button: HTMLButtonElement): void {
     if (reset && !confirm('Put this picture back where it was painted, for everyone?')) return;
     button.disabled = true;
-    const body = reset ? { asset } : { asset, offset: this.draft?.state.offset, scale: this.draft?.state.scale };
+    const body = reset ? { asset } : { asset, offset: this.draft?.state.offset, scale: this.draft?.state.scale, blocks: this.draft?.state.blocks };
     void api('art/fit', reset ? 'DELETE' : 'POST', body).then(
       () => {
         toast(reset ? 'Back where it was painted. Players see it at once.' : 'Fit saved. Players see it at once; undo it in God\'s View like any wish.');
@@ -339,6 +367,16 @@ export class StudioShell {
   /** The Versions dock's buttons: lay a version against the one shown now, or put it back. */
   private versionClick(target: HTMLElement): void {
     if (target.closest('[data-fit-centre]')) return void this.centreOne();
+    if (target.closest('[data-hitbox-edit]')) return this.toggleHitbox();
+    if (target.closest('[data-hitbox-all]') && this.draft) {
+      const { blocks: _, ...every } = this.draft.state;
+      this.draft.set(every);
+      this.canvas?.draw();
+      return this.drawFitPanel();
+    }
+    const alike = target.closest<HTMLButtonElement>('[data-hitbox-alike]');
+    const picked = this.selected ? this.browser.all.find((x) => x.id === this.selected) : undefined;
+    if (alike && picked) return this.saveAlike(picked, alike);
     const save = target.closest<HTMLButtonElement>('[data-fit-save]');
     const reset = target.closest<HTMLButtonElement>('[data-fit-reset]');
     if ((save || reset) && this.selected) return this.saveFit(this.selected, !!reset, (save ?? reset)!);

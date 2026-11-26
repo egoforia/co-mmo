@@ -333,8 +333,8 @@ export class WorldScene extends Phaser.Scene {
     setCoords({ x: this.shown.x, y: this.shown.y, floor: this.floor });
     this.events.once('shutdown', () => setCoords(undefined));
     // The Owner fitted a picture in the Art Studio (asset-fit.ts): stand everything again.
-    onFitChange(() => this.relayFits());
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => onFitChange(undefined));
+    const offFits = onFitChange(() => this.relayFits());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offFits);
     this.events.once('destroy', () => setCoords(undefined));
     this.revealBuildings(true);
     cam.startFollow(this.me.body, true, 0.2, 0.2);

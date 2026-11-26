@@ -36,7 +36,13 @@ describe('the Art Studio asset browser list', () => {
     expect(store.content.find((r) => r.id === saved.body.id)?.definition).toMatchObject({ kind: 'fit' });
     const listed = (await api(base, '/api/admin/art/assets', owner.token)).body.assets as { id: string; fit?: unknown }[];
     expect(listed.find((a) => a.id === 'sanctum-shrine')?.fit).toMatchObject({ offset: [4, -2] });
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [4, -2], blocks: [[1, 0], [1, 0]] })).status).toBe(200);
+    expect(fitOf('sanctum-shrine')?.blocks).toEqual([[1, 0]]);
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [0, 0], blocks: [[9, 0]] })).status).toBe(400);
+    // Back to the painter's place keeps the tiles it blocks.
     expect((await api(base, '/api/admin/art/fit', owner.token, 'DELETE', { asset: 'sanctum-shrine' })).status).toBe(200);
+    expect(fitOf('sanctum-shrine')).toEqual({ asset: 'sanctum-shrine', offset: [0, 0], blocks: [[1, 0]] });
+    expect((await api(base, '/api/admin/art/fit', owner.token, 'POST', { asset: 'sanctum-shrine', offset: [0, 0] })).status).toBe(200);
     expect(fitOf('sanctum-shrine')).toBeUndefined();
   }, 30_000);
 

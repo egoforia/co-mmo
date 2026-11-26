@@ -1,6 +1,6 @@
 // How a picture sits on its tiles, chosen in the Art Studio: moved by some
-// pixels (Godot's Texture Offset), trimmed a little in size, and later which
-// of its tiles it blocks. The picture's own pixels never change; the fit is
+// pixels (Godot's Texture Offset), trimmed a little in size, and which of
+// its tiles it blocks (its hitbox). The picture's own pixels never change; the fit is
 // kept beside it. Every choice is a content entry like a monster's size
 // (creature-size.ts): saved, shared with every region server and browser,
 // and undone like any wish. The newest choice that stands wins. "Back to the
@@ -20,7 +20,7 @@ export interface AssetFit {
   offset: [number, number];
   /** Its size trimmed, FIT_SCALE.least to FIT_SCALE.most; 1 when left out. */
   scale?: number;
-  /** The tiles it blocks, from its footprint's top-left (A5). */
+  /** The tiles it blocks, from its footprint's top-left (world.ts blockedTiles); every tile when left out. */
   blocks?: [number, number][];
 }
 
@@ -45,23 +45,46 @@ export function validateFit(raw: unknown): FitWish | string {
   if (scale !== undefined && !(scale >= FIT_SCALE.least && scale <= FIT_SCALE.most)) {
     return `Its size can be trimmed between ${FIT_SCALE.least * 100} % and ${FIT_SCALE.most * 100} %.`;
   }
-  const fit: AssetFit = { asset, offset: [offset[0] as number, offset[1] as number], ...(scale !== undefined ? { scale: Math.round(scale * 1000) / 1000 } : {}) };
-  const moved = fit.offset[0] || fit.offset[1] || fit.scale;
+  const blocks = d.blocks === undefined ? undefined : blocksOf(d.blocks);
+  if (typeof blocks === 'string') return blocks;
+  const fit: AssetFit = {
+    asset,
+    offset: [offset[0] as number, offset[1] as number],
+    ...(scale !== undefined ? { scale: Math.round(scale * 1000) / 1000 } : {}),
+    ...(blocks?.length ? { blocks } : {}),
+  };
+  const moved = fit.offset[0] || fit.offset[1] || fit.scale || fit.blocks;
   return {
     kind: 'fit',
     name: `${asset} fit`,
-    description: moved ? `${asset} moved ${fitWords(fit)} on its tiles.` : `${asset} back where it was painted.`,
+    description: moved ? `${asset} fitted on its tiles: ${fitWords(fit)}.` : `${asset} back where it was painted.`,
     fit,
   };
 }
 
+/** The most tiles a footprint has a side, so a hitbox's tiles are 0 to FIT_BLOCKS_SIDE - 1 from its top-left. */
+export const FIT_BLOCKS_SIDE = 8;
+
+/** A hitbox's tiles made clean (sorted, each once), or what is wrong with them. */
+function blocksOf(raw: unknown): [number, number][] | string {
+  const wrong = `Choose hitbox tiles inside its footprint, at most ${FIT_BLOCKS_SIDE} a side.`;
+  if (!Array.isArray(raw) || raw.length > FIT_BLOCKS_SIDE * FIT_BLOCKS_SIDE) return wrong;
+  const seen = new Set<number>();
+  for (const t of raw) {
+    if (!Array.isArray(t) || t.length !== 2 || !t.every((n) => Number.isInteger(n) && n >= 0 && n < FIT_BLOCKS_SIDE)) return wrong;
+    seen.add(t[1] * FIT_BLOCKS_SIDE + t[0]);
+  }
+  return [...seen].sort((a, b) => a - b).map((n) => [n % FIT_BLOCKS_SIDE, Math.floor(n / FIT_BLOCKS_SIDE)]);
+}
+
 /** A fit in words: "6 px left, 3 px down, at 95 %". */
-export function fitWords(fit: Pick<AssetFit, 'offset' | 'scale'>): string {
+export function fitWords(fit: Pick<AssetFit, 'offset' | 'scale' | 'blocks'>): string {
   const [x, y] = fit.offset;
   const parts = [
     ...(x ? [`${Math.abs(x)} px ${x < 0 ? 'left' : 'right'}`] : []),
     ...(y ? [`${Math.abs(y)} px ${y < 0 ? 'up' : 'down'}`] : []),
     ...(fit.scale && fit.scale !== 1 ? [`at ${Math.round(fit.scale * 100)} %`] : []),
+    ...(fit.blocks?.length ? [`blocking ${fit.blocks.length} ${fit.blocks.length === 1 ? 'tile' : 'tiles'}`] : []),
   ];
   return parts.join(', ') || 'where it was painted';
 }
@@ -72,25 +95,36 @@ interface FitChange {
 }
 
 const CHANGES = new Map<string, FitChange>();
-/** Called when a fit changes, so the browser can stand the pictures again. */
-let onChange: ((asset: string) => void) | undefined;
+/** Told when a fit changes: the browser stands the pictures again, the game server lays out the lands a hitbox changed. */
+const LISTENERS = new Set<(asset: string) => void>();
+const changed = (asset: string) => {
+  for (const run of LISTENERS) run(asset);
+};
 
 /** Notes a granted fit, replacing an earlier copy of the same entry. */
 export function applyFit(id: string, change: FitChange): void {
   CHANGES.set(id, change);
-  onChange?.(change.fit.asset);
+  changed(change.fit.asset);
 }
 
 /** Forgets a fit that was undone or switched off. */
 export function removeFit(id: string): void {
   const was = CHANGES.get(id);
   CHANGES.delete(id);
-  if (was) onChange?.(was.fit.asset);
+  if (was) changed(was.fit.asset);
 }
 
-/** Tells `run` each time a picture's fit changes (one listener: the world scene). */
-export function onFitChange(run: ((asset: string) => void) | undefined): void {
-  onChange = run;
+/** Tells `run` each time a picture's fit changes, until the returned function is called. */
+export function onFitChange(run: (asset: string) => void): () => void {
+  LISTENERS.add(run);
+  return () => LISTENERS.delete(run);
+}
+
+/** Every picture whose fit names hitbox tiles now. */
+export function hitboxAssets(): string[] {
+  const assets = new Set<string>();
+  for (const c of CHANGES.values()) if (fitOf(c.fit.asset)?.blocks?.length) assets.add(c.fit.asset);
+  return [...assets];
 }
 
 /**

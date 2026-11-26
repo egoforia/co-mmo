@@ -6,6 +6,7 @@ import {
   TURNED,
   WishError,
   engineModId,
+  fitOf,
   isFacing,
   movingArt,
   skyWords,
@@ -534,7 +535,9 @@ export async function handleAdmin(
     // How a picture sits on its tiles (asset-fit.ts): moved and trimmed in the Studio, or put back where it was painted.
     if (route === 'art/fit' && (method === 'POST' || method === 'DELETE')) {
       const body = await ctx.readJson(req);
-      const fit = method === 'DELETE' ? { asset: body?.asset, offset: [0, 0] } : { asset: body?.asset, offset: body?.offset, scale: body?.scale };
+      // Putting the picture back keeps the tiles it blocks; its hitbox is put back with "Block every tile".
+      const kept = typeof body?.asset === 'string' ? fitOf(body.asset)?.blocks : undefined;
+      const fit = method === 'DELETE' ? { asset: body?.asset, offset: [0, 0], ...(kept ? { blocks: kept } : {}) } : { asset: body?.asset, offset: body?.offset, scale: body?.scale, blocks: body?.blocks };
       try {
         const record = wishes.setFit({ id: account.id, name: account.name }, fit);
         return json(res, 200, { ok: true, id: record.id }), true;

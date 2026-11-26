@@ -378,6 +378,28 @@ export const SHOTS: Shot[] = [
     mustSee: ['the shrine stands 20 px left of where it did, an orange cross at its anchor', 'the Inspector\'s Offset section shows x -20 and "not saved yet"', 'Save the fit is enabled'],
   },
   {
+    name: 'art-studio-hitbox',
+    about: 'The Hitbox tool: the shrine with its left tile opened, so only its right tile blocks walking, not saved yet.',
+    page: '/art-studio.html#art/canvas?asset=sanctum-shrine',
+    ready: '.studio-canvas[data-lit="none"]',
+    open: async (page) => {
+      await page.keyboard.press('b');
+      await page.waitForSelector('.studio-canvas[data-hitbox="true"]');
+      // The shrine's left tile (0, 0): its middle is 80 px right of the canvas world origin's projection.
+      await page.evaluate(() => {
+        const c = document.querySelector<HTMLCanvasElement>('.studio-canvas')!;
+        const r = c.getBoundingClientRect();
+        // The tiles' middle (1, 0.5) sits at the canvas middle, 62 % down; tile (0, 0)'s middle is (0.5, 0.5), 40 px left and 20 px up of it.
+        const x = r.left + r.width / 2 - 40;
+        const y = r.top + r.height * 0.62 - 20;
+        for (const type of ['pointerdown', 'pointerup']) c.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, pointerId: 1 }));
+      });
+      await page.waitForSelector('.fit-panel .hitbox-words');
+      await page.waitForFunction(() => document.querySelector('.fit-panel .hitbox-words')?.textContent?.startsWith('Blocks 1 of 2'));
+    },
+    mustSee: ['the shrine\'s left tile is green and its right tile red on the canvas', 'the Inspector\'s Hitbox section says "Blocks 1 of 2 tiles" and "Done choosing"', 'Save the fit is enabled, "not saved yet"'],
+  },
+  {
     name: 'art-studio-centre',
     about: 'Auto-centre for a group: the Centre page offering to measure the set pieces shown.',
     page: '/art-studio.html#art/centre',

@@ -16,6 +16,7 @@ import type { Weather } from './sky.ts';
 import type { Routine } from './routines.ts';
 import { layOutSpots, type GatherSpot } from './gathering.ts';
 import { addStairs, addStorey, setOn } from './floors.ts';
+import { fitOf } from './asset-fit.ts';
 
 export enum Tile {
   /** The biome's own ground (meadow, moss, sand, dunes). */
@@ -413,7 +414,7 @@ function layOut(def: RegionDef, size: number): RegionMap {
     map.entries[side] = { x: edge.x + 1 + inward[0]! * 1.5, y: edge.y + 1 + inward[1]! * 1.5 };
   }
   // NPCs stroll around their spot, so only landmarks block tiles. Those on other floors blocked theirs when placed.
-  for (const l of map.landmarks) if (!l.floor) block(map, l.x, l.y, l.footprint.width, l.footprint.height);
+  for (const l of map.landmarks) if (!l.floor) block(map, l.x, l.y, l.footprint.width, l.footprint.height, l.asset);
   openUp(map);
   // The biome's gathering spots, on open ground the trails leave alone.
   map.spots = layOutSpots({ width: size, height: size, seed: map.seed, biome: def.biome, open: (x, y) => map.tiles[y * size + x] === Tile.Ground });
@@ -1006,9 +1007,22 @@ export function piecePicture(l: Pick<Landmark, 'x' | 'y' | 'footprint'>): TileBo
 }
 
 /** Blocks the footprint whose bottom row is centred under (x, y). */
-export function block(map: RegionMap, x: number, y: number, w: number, h: number): void {
-  const t = pieceBox({ x, y, footprint: { width: w, height: h } });
-  for (let ty = t.top; ty < t.top + t.height; ty++) for (let tx = t.left; tx < t.left + t.width; tx++) set(map, tx, ty, Tile.Blocked);
+export function block(map: RegionMap, x: number, y: number, w: number, h: number, asset?: string): void {
+  for (const [tx, ty] of blockedTiles(pieceBox({ x, y, footprint: { width: w, height: h } }), asset)) set(map, tx, ty, Tile.Blocked);
+}
+
+/**
+ * The tiles a piece blocks: every tile of its box, or only those its picture's
+ * hitbox (asset-fit.ts, chosen in the Art Studio) names, from the box's
+ * top-left. Hitbox tiles outside the box (a footprint made smaller since) are
+ * left out, and a hitbox with none left inside blocks the whole box again.
+ */
+export function blockedTiles(t: TileBox, asset?: string): [number, number][] {
+  const chosen = asset ? fitOf(asset)?.blocks?.filter(([dx, dy]) => dx < t.width && dy < t.height) : undefined;
+  if (chosen?.length) return chosen.map(([dx, dy]) => [t.left + dx, t.top + dy]);
+  const all: [number, number][] = [];
+  for (let ty = t.top; ty < t.top + t.height; ty++) for (let tx = t.left; tx < t.left + t.width; tx++) all.push([tx, ty]);
+  return all;
 }
 
 /** Where a road meets an edge, `along` tiles from its west or north end. */

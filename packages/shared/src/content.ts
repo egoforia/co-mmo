@@ -14,6 +14,7 @@ import { STYLE_CHOICES } from './fashion.ts';
 import { RACES, isRace, type RaceId } from './races.ts';
 import { CALLINGS, isCalling, type CallingId } from './classes.ts';
 import { applyLoot, removeLoot } from './loot.ts';
+import { applyFit, removeFit, type FitWish } from './asset-fit.ts';
 import { applySize, removeSize, type SizeWish } from './creature-size.ts';
 import { levelStats } from './creature-tune.ts';
 import { cleanLight, type Light } from './light.ts';
@@ -228,18 +229,18 @@ export interface LootWish {
   mode: 'add' | 'set';
 }
 
-export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | CallingWish | SkillLookWish | RecipeWish | AbilityWish | RegionWish | LootWish | SizeWish;
+export type WishDefinition = ItemWish | CreatureWish | NpcWish | PlayerLookWish | CallingWish | SkillLookWish | RecipeWish | AbilityWish | RegionWish | LootWish | SizeWish | FitWish;
 
 /**
  * Wished things that have one picture of their own (not recipes, regions,
  * loot, a Calling, or a skill's new look, which is painted with the skill
  * effects in build plan step 10).
  */
-export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish | SizeWish | CallingWish | SkillLookWish>;
+export type PicturedWish = Exclude<WishDefinition, RecipeWish | RegionWish | LootWish | SizeWish | FitWish | CallingWish | SkillLookWish>;
 
 /** Whether a wish paints a picture of its own (recipes and loot use pictures that exist; regions paint their parts). */
 export function isPictured(def: Definition): def is PicturedWish {
-  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'size' && def.kind !== 'rule' && def.kind !== 'calling' && def.kind !== 'skill';
+  return def.kind !== 'recipe' && def.kind !== 'region' && def.kind !== 'loot' && def.kind !== 'size' && def.kind !== 'fit' && def.kind !== 'rule' && def.kind !== 'calling' && def.kind !== 'skill';
 }
 
 /** An item a scripted rule brings with it (fish for fishing, a rod). */
@@ -563,6 +564,7 @@ export function placeholderArt(def: WishDefinition | RuleItem): string {
   if (def.kind === 'calling') return 'player-mara';
   if (def.kind === 'region') return 'sanctum-shrine';
   if (def.kind === 'loot' || def.kind === 'size') return CREATURES[def.creature]?.art ?? 'woods-mushroom';
+  if (def.kind === 'fit') return def.fit.asset;
   return def.behavior === 'chase' ? 'desert-scarab' : def.behavior === 'guard' ? 'shore-crab-knight' : 'woods-mushroom';
 }
 
@@ -921,6 +923,7 @@ export function applyContent(entry: ContentEntry): void {
   else if (d.kind === 'npc') NPC_GREETINGS[entry.id] = d.greeting;
   else if (d.kind === 'loot') applyLoot({ id: entry.id, at: entry.at, creature: d.creature, mode: d.mode, drops: d.drops });
   else if (d.kind === 'size') applySize(entry.id, { at: entry.at, creature: d.creature, size: d.size });
+  else if (d.kind === 'fit') applyFit(entry.id, { at: entry.at, fit: d.fit });
   else if (d.kind === 'recipe') RECIPES[entry.id] = { name: d.name, materials: d.materials, result: d.result, level: 1 };
   else if (d.kind === 'ability') {
     ABILITIES[entry.id] = abilityFromWish(d);
@@ -981,6 +984,7 @@ export function removeContent(entry: ContentEntry): void {
   delete ABILITIES[entry.id];
   removeLoot(entry.id);
   removeSize(entry.id);
+  removeFit(entry.id);
   WISHERS.delete(entry.id);
 }
 

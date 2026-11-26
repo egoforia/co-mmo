@@ -65,7 +65,7 @@ export const FOOTPRINT: EditKind<'footprint'> = {
     }
     clearUnder(map, old, floor);
     piece.footprint = { width, height };
-    blockOn(map, floor, piece.x, piece.y, width, height);
+    blockOn(map, floor, piece.x, piece.y, width, height, piece.asset);
     return true;
   },
   keep: (d) => ({ kind: 'footprint', at: d.at, footprint: [d.footprint[0], d.footprint[1]] }),

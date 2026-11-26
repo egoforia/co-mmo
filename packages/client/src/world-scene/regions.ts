@@ -3,15 +3,19 @@
 
 import Phaser from 'phaser';
 import {
+  fitOf,
+  piecePicture,
   Tile,
   ITEMS,
   SPOTS,
+  SPOT_STATES,
   WINDOW_LIGHT,
   biomeLook,
   buildingKit,
   glowOf,
   nearBuilding,
   rand2,
+  spotStateArt,
   stairsEntry,
   stairsLabel,
   storeyAt,
@@ -20,8 +24,10 @@ import {
   type RegionMap,
 } from '@co-mmo/shared';
 import { type HouseArt, type HouseSource, standHouse, standOnTiles } from '../kit-house-view.ts';
+import { fittedAt } from '../tile-stand.ts';
 import { dropLight, makeLight, placeLight } from '../lights.ts';
 import { standEdgeWalls } from './edge-walls.ts';
+import { stateOf, standSpot, type SpotView } from './spot-views.ts';
 import { PROJECTION } from '../projection.ts';
 import {
   propTexture,
@@ -95,8 +101,11 @@ export function drawChunk(scene: Phaser.Scene, region: DrawnRegion, x0: number, 
       const jitter = (rand2(x, y, 6) - 0.5) * T * 0.2;
       const feet = PROJECTION.stand(ox + x, oy + y, 1, 1);
       const at = PROJECTION.toScreen(feet.x, feet.y);
-      const img = scene.add.image(at.x + jitter, at.y, key).setOrigin(0.5, 0.97);
-      img.setScale(0.85 + rand2(x, y, 7) * 0.3).setFlipX(rand2(x, y, 8) > 0.5);
+      // Moved as the Owner fitted it in the Art Studio, the other way across when mirrored.
+      const flip = rand2(x, y, 8) > 0.5;
+      const fit = fittedAt({ x: at.x + jitter, y: at.y, scale: 0.85 + rand2(x, y, 7) * 0.3 }, fitOf(key), flip);
+      const img = scene.add.image(fit.x, fit.y, key).setOrigin(0.5, 0.97);
+      img.setScale(fit.scale).setFlipX(flip);
       img.setDepth(PROJECTION.depth(feet.x, feet.y) - 1);
       setDepthShade(img, groundDelta);
       objects.push(img.setVisible(currentFloor >= 0));
@@ -279,22 +288,21 @@ const floors: FloorView[] = map.storeys.map((storey) => {
     }
   }
   placeLandmarks(scene, map, ox, oy, views, floors, art);
-  placeSpots(scene, map, ox, oy, art, kit);
+  const spots = placeSpots(scene, map, ox, oy, art, kit);
   const stairs = placeStairs(scene, map, ox, oy, views, floors);
   const objects = scene.children.list.filter((o) => !before.has(o));
   markScenery(objects);
   const lamps = placeLamps(scene, map, ox, oy, views);
-  return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls };
+  return { layout, objects, tilemaps, buildings: views, kit, map, ground: data, chunks: new Map(), lamps, floors, stairs, edgeWalls, spots };
 }
 
 /** Landmarks: set pieces out in the land, furniture inside buildings, and furniture on the floors above and below. */
 export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, views: BuildingView[], floors: FloorView[], art: ArtManifest): void {
   for (const l of map.landmarks) {
     if (!scene.textures.exists(l.asset)) continue;
-    const { width, height } = l.footprint;
-    const left = ox + l.x - width / 2;
-    const top = oy + l.y - height;
-    const tiles = { left, top, right: left + width, bottom: top + height };
+    // Its picture stands centred on the tiles it blocks (piecePicture).
+    const pic = piecePicture(l);
+    const tiles = { left: ox + pic.left, top: oy + pic.top, right: ox + pic.left + pic.width, bottom: oy + pic.top + pic.height };
     const floor = l.floor ?? 0;
     const lift = floorLift(floor);
     const depthOff = floorDepthOffset(floor);
@@ -309,25 +317,19 @@ export function placeLandmarks(scene: Phaser.Scene, map: RegionMap, ox: number, 
   }
 }
 
-/** The picture a gathering spot shows: its own once painted, else its material's icon. */
-export function spotArt(scene: Phaser.Scene, kind: string): string | undefined {
-  const def = SPOTS[kind];
-  if (!def) return undefined;
-  if (scene.textures.exists(def.art)) return def.art;
-  const m = ITEMS[def.material];
-  return [m?.art, m?.standIn].find((key) => key && scene.textures.exists(key));
-}
-
-/** Gathering spots (gathering.ts), each standing on its tile; a spot painted later draws the land again (`kit`). */
-export function placeSpots(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, art: ArtManifest, kit: Set<string>): void {
+/** Gathering spots (gathering.ts), each standing on its tile in the state you see it in (spot-views.ts); a spot painted later draws the land again (`kit`). */
+export function placeSpots(scene: Phaser.Scene, map: RegionMap, ox: number, oy: number, art: ArtManifest, kit: Set<string>): SpotView[] {
+  const views: SpotView[] = [];
   for (const s of map.spots) {
     const def = SPOTS[s.kind];
-    if (def) kit.add(def.art);
-    const key = spotArt(scene, s.kind);
-    if (!key) continue;
-    const tiles = { left: ox + s.x, top: oy + s.y, right: ox + s.x + 1, bottom: oy + s.y + 1 };
-    standOnTiles(scene, key, tiles, art[key]?.view === 'isometric');
+    if (!def) continue;
+    for (const state of SPOT_STATES) kit.add(spotStateArt(s.kind, state.id)!);
+    kit.add(def.art);
+    const view: SpotView = { region: map.def.id, spot: s, tiles: { left: ox + s.x, top: oy + s.y, right: ox + s.x + 1, bottom: oy + s.y + 1 }, state: stateOf(map.def.id, s), images: [] };
+    standSpot(scene, view, art);
+    views.push(view);
   }
+  return views;
 }
 
 /**
@@ -349,7 +351,8 @@ export function placeStairs(scene: Phaser.Scene, map: RegionMap, ox: number, oy:
       const lift = floorLift(floor);
       const depthOff = floorDepthOffset(floor);
       if (art && scene.textures.exists(art)) {
-        const img = scene.add.image(at.x, at.y - lift, art).setOrigin(0.5, 0.92);
+        const fit = fittedAt({ x: at.x, y: at.y - lift, scale: 1 }, fitOf(art));
+        const img = scene.add.image(fit.x, fit.y, art).setOrigin(0.5, 0.92).setScale(fit.scale);
         img.setDepth(depthOff + PROJECTION.depth(feet.x, feet.y) - 1);
         img.setInteractive({ useHandCursor: true });
         img.on('pointerover', () => img.setTint(0xfff8d0));

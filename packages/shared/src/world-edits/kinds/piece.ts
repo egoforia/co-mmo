@@ -38,7 +38,7 @@ export const PIECE: EditKind<'piece'> = {
     // Bottom centre of its footprint, as block() and the scene read a landmark.
     const landmark: Landmark = { asset: piece.id, x: at[0] + piece.footprint.width / 2, y: at[1] + 1, footprint: { ...piece.footprint }, ...(floor ? { floor } : {}) };
     map.landmarks.push(landmark);
-    blockOn(map, floor, landmark.x, landmark.y, piece.footprint.width, piece.footprint.height);
+    blockOn(map, floor, landmark.x, landmark.y, piece.footprint.width, piece.footprint.height, piece.id);
     return true;
   },
   keep: (d) => ({ kind: 'piece', piece: d.piece, at: d.at }),

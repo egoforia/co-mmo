@@ -73,6 +73,27 @@ cooldown from when it was ready, so a held key keeps the Calling's full pace.
 Anything earlier is still dropped, so nothing ever strikes faster than its
 cooldown.
 
+## Readying a skill for Space
+
+Ctrl or Shift with a hotbar number (or a Ctrl- or Shift-click on its button)
+readies that skill instead of using it (`client/src/readied-skill.ts`). Its
+button is ringed, and nothing is sent. The next Space casts it in place of a
+strike; after that one cast Space strikes again. The same key again, or Esc,
+puts it down; another key swaps it. Shift always works, Ctrl where the browser
+lets a page have Ctrl with a number.
+
+- A tap casts only the skill. Held on past 250 ms (`HELD_AFTER_CAST_MS`),
+  Space carries on striking at the Calling's pace.
+- Held while the skill still rests, Space waits and casts it the moment it is
+  ready; it never swaps it for a strike. A tap within 150 ms of it being ready
+  is kept, the same window as strikes (the server keeps it too, see above). A
+  tap earlier than that casts nothing and says how long is left.
+- Not enough Energy: the skill stays readied and the game says so.
+- Falling, or opening the editor, puts it down. A skill the server refuses
+  (out of range, no target) is not readied again: the server's notice says why.
+- Plain number keys now also get the 150 ms window, so a skill pressed just
+  before it is ready is sent instead of dropped.
+
 ## Bag and gold (combat decisions, step 1)
 
 Decided with egoforia on 2026-11-17 (doc "Combat decisions: the five whys").

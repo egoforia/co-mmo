@@ -100,7 +100,7 @@ function placeProps(map: RegionMap, b: Building, plans: KitPlans, plan: CaveFloo
     if ((x - start) % width !== 0) return;
     const at = { x: b.x + x + width / 2, y: b.y + y + 1 };
     map.landmarks.push({ asset: piece.id, x: at.x, y: at.y, footprint: { ...piece.footprint }, ...(plan.floor ? { floor: plan.floor } : {}) });
-    blockOn(map, plan.floor, at.x, at.y, width, piece.footprint.height);
+    blockOn(map, plan.floor, at.x, at.y, width, piece.footprint.height, piece.id);
   });
 }
 

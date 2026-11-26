@@ -7,8 +7,8 @@
 // - Bay 3: Multi-Storey Enclosed Buildings (Two-Storey House & Mezzanine)
 // - Bay 4: The Overlap Bug Lab (Terrace Overlap & Cutaway Isolation)
 // - Bay 5: Subterranean Cavern Vaults (Floors -1 and -2)
-// - Bay 6: Vertical Proving Runway (Stairs, Crypts, Viaduct Bridges)
-// Its 25 places to look from are bookmark edits in the same file; this file
+// - Bay 6: Vertical Proving Runway (Stairs, a Ramp, Crypts, Viaduct Bridges)
+// Its 26 places to look from are bookmark edits in the same file; this file
 // hands them to the camera checks by name.
 import EDITS from './arch-testbed.edits.json';
 

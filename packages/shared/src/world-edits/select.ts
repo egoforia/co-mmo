@@ -4,6 +4,7 @@ import { NPC_GREETINGS } from '../rpg.ts';
 import { routineOf } from '../routines.ts';
 import { SPOTS } from '../gathering.ts';
 import { floorName, stairwayAt, type Heading, type Stairway } from '../floors.ts';
+import { rampLook, rampWords } from '../floors/ramps.ts';
 import { setPiece } from '../sea-cave-kit.ts';
 import { WALL_HEIGHTS, wallOn, type EdgeWall, type WallSide } from '../edge-walls.ts';
 import { isKitHouse, wallLookAt, wallTileOwner } from '../wall-looks.ts';
@@ -72,9 +73,9 @@ export function pickAt(map: RegionMap, at: TilePoint, level: number, within?: [n
     const f = footprint(piece);
     return { kind: 'landmark', ...(piece.id ? { id: piece.id } : {}), name: pieceName(piece), level, box: tile(f.left, f.top, f.width, f.height), details: [`${f.width} × ${f.height} tiles`] };
   }
-  const way = stairwayAt(map, x + 0.5, y + 0.5, level);
+  const way = stairwayOver(map, x, y, level);
   if (way) {
-    return { kind: 'stairway', ...(way.id ? { id: way.id } : {}), name: way.kind === 'ladder' ? 'A ladder' : 'Stairs', level, box: tile(way.x, way.y, way.width, way.height), details: [`From ${floorName(way.lower)} up to ${floorName(way.upper)}`, `Climbing ${climbing(way)}`] };
+    return { kind: 'stairway', ...(way.id ? { id: way.id } : {}), name: way.kind === 'ramp' ? rampWords(way) : way.kind === 'ladder' ? 'A ladder' : 'Stairs', level, box: tile(way.x, way.y, way.width, way.height), details: [`From ${floorName(way.lower)} up to ${floorName(way.upper)}`, `Climbing ${climbing(way)}`] };
   }
   const walled = wallTileOwner(map, x, y, level);
   if (walled && !isKitHouse(map, walled)) {
@@ -135,6 +136,11 @@ function pieceName(l: Landmark): string {
   return 'A piece';
 }
 
+/** The stairs on a tile of a floor, or the ramp whose body stands there (its body is not a way on, so stairwayAt passes it by). */
+function stairwayOver(map: RegionMap, x: number, y: number, level: number): Stairway | undefined {
+  return stairwayAt(map, x + 0.5, y + 0.5, level) ?? map.stairways.find((s) => s.kind === 'ramp' && s.lower === level && x >= s.x && y >= s.y && x < s.x + s.width && y < s.y + s.height);
+}
+
 /** Which way a flight is climbed, from where its top landing lies. */
 function climbing(s: Stairway): Heading {
   if (s.top.y < s.y) return 'north';
@@ -178,8 +184,8 @@ export function copyDraft(map: RegionMap, p: Picked, to: TilePoint): WorldEditDr
       return s && { kind: 'storey', at: [s.x + dx, s.y + dy], size: [s.width, s.height], storey: s.floor, style: s.style, ...(s.open ? { open: true } : {}) };
     }
     case 'stairway': {
-      const s = stairwayAt(map, x + 0.5, y + 0.5, p.level);
-      return s && { kind: 'stairs', at: [s.x + dx, s.y + dy], size: [s.width, s.height], from: s.lower, climbs: climbing(s), ...(s.kind === 'ladder' ? { ladder: true } : {}) };
+      const s = stairwayOver(map, x, y, p.level);
+      return s && { kind: 'stairs', at: [s.x + dx, s.y + dy], size: [s.width, s.height], from: s.lower, climbs: climbing(s), ...(s.kind !== 'stairs' ? { way: s.kind } : {}), ...(s.kind === 'ramp' && rampLook(s) ? { look: rampLook(s) } : {}) };
     }
     case 'landmark': {
       const l = landmarkAt(map, [x, y], p.level);

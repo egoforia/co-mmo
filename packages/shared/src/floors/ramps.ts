@@ -77,6 +77,8 @@ export function addRamp(map: RegionMap, plan: RampPlan): Stairway {
   const foot = tiles[0]!;
   const head = tiles.at(-1)!;
   // The body is solid; the foot stays open to step on.
+  // What stood under the body, so taking the ramp away gives it back.
+  const under = tiles.slice(1).map((t) => tileAt(map, t.x, t.y, lower));
   for (const t of tiles.slice(1)) setOn(map, lower, t.x, t.y, Tile.Blocked);
   // A terrace's parapet between the top landing and the head would stop the step down.
   takeDownWall(map, head.x, head.y, plan.climbs, upper);
@@ -93,7 +95,7 @@ export function addRamp(map: RegionMap, plan: RampPlan): Stairway {
     bottom: { x: foot.x - dx + 0.5, y: foot.y - dy + 0.5 },
     top: { x: head.x + dx + 0.5, y: head.y + dy + 0.5 },
     climbs: plan.climbs,
-    ramp: { foot, head },
+    ramp: { foot, head, under },
     ...(plan.look ? { art: { up: rampArt(plan.look, plan.length, plan.climbs) } } : {}),
     ...(plan.names ? { names: plan.names } : {}),
   };
@@ -107,4 +109,22 @@ export function addRamp(map: RegionMap, plan: RampPlan): Stairway {
  */
 export function rampArt(look: string, length: number, climbs: Heading): string {
   return `ramp-${look}-${length}-${climbs === 'north' || climbs === 'west' ? 'away' : 'toward'}`;
+}
+
+/** Takes a ramp away, giving its body's tiles back what stood there before. */
+export function takeAwayRamp(map: RegionMap, way: Stairway): void {
+  map.stairways = map.stairways.filter((s) => s !== way);
+  if (!way.ramp) return;
+  const tiles = rampTiles({ x: way.x, y: way.y, length: Math.max(way.width, way.height), climbs: way.climbs ?? 'north' });
+  tiles.slice(1).forEach((t, i) => setOn(map, way.lower, t.x, t.y, way.ramp!.under?.[i] ?? Tile.Ground));
+}
+
+/** The look a ramp's picture is painted in (stone, wood or earth), from its picture's id; undefined when it has none. */
+export function rampLook(way: Stairway): string | undefined {
+  return way.art?.up?.match(/^ramp-(.+)-\d+-(?:away|toward)$/)?.[1];
+}
+
+/** A ramp in plain words: "A ramp, 3 long, rising north". */
+export function rampWords(way: Stairway): string {
+  return `A ramp, ${Math.max(way.width, way.height)} long, rising ${way.climbs ?? 'north'}`;
 }

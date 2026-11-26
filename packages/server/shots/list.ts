@@ -378,6 +378,14 @@ export const SHOTS: Shot[] = [
     mustSee: ['the stairs between the two terraces', 'both terraces drawn whole, nothing floating'],
   },
   {
+    name: 'testbed-ramp',
+    about: "The testbed's bookmark G6-F: a stone ramp 3 long rising north from the ground onto the terrace's south edge. Its picture is not painted yet, so it shows its label.",
+    region: 'arch-testbed',
+    at: bookmark('G6-F'),
+    hideUi: true,
+    mustSee: ['a "Ramp up to floor 1" label on the ground south of the terrace', 'a "Ramp down to the ground floor" label at the terrace\'s south edge', 'no ramp picture yet: it is painted in R3'],
+  },
+  {
     name: 'editor-testbed',
     about: 'The world editor open in the Architectural Testbed, beside the mini map.',
     region: 'arch-testbed',

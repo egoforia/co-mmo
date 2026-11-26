@@ -53,6 +53,20 @@ world:
   and drafts work here. The Art Studio's **Map editor** tab opens the game
   straight into the Plan camera.
 
+## Stairs, ladders and ramps
+
+**Stairs** (under Build) lays a way up from a floor to the one above. Its
+**What** setting picks Stairs, a Ladder (monsters cannot climb it) or a
+Ramp. **R** turns which way it climbs, and Shift R turns it back.
+
+A ramp is 1 tile wide and 2 or 3 long, in stone, wood or earth. It stands on
+the lower floor only, rising toward the floor above, and needs open floor in
+front of both ends. Its ghost shows the ramp's tiles and, a shade apart, the
+two landings: where you stand before walking up, and where you arrive on top.
+Select names a ramp from any of its tiles ("A ramp, 3 long, rising north"),
+and taking it away gives back the floor it stood on. The Checks panel warns
+when a wall later blocks its top. The testbed's bookmark G6-F shows one.
+
 ## Walls on one side of a tile
 
 **Wall** (under Build) stands an upright wall on one side of each tile you

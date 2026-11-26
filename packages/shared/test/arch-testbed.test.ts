@@ -98,16 +98,20 @@ describe('arch-testbed: architectural clean-room proving ground', () => {
 
     // Fixture E: Terrace stairs (Floor 1 to Floor 2), up through the upper terrace so both floors are open under them.
     expect(map.stairways.some((s) => s.x === 144 && s.y === 158 && s.lower === 1 && s.upper === 2)).toBe(true);
+
+    // Fixture F: a stone ramp 3 long, rising north from the ground onto the terrace's south edge.
+    const ramp = map.stairways.find((s) => s.kind === 'ramp');
+    expect(ramp).toMatchObject({ x: 100, y: 161, width: 1, height: 3, lower: 0, upper: 1, top: { x: 100.5, y: 160.5 }, art: { up: 'ramp-stone-3-away' } });
   });
 
-  it('defines valid test waypoints for all 25 architectural combinations', () => {
+  it('defines valid test waypoints for all 26 architectural combinations', () => {
     const expectedKeys = [
       'G1-A', 'G1-B', 'G1-C', 'G1-D', 'G1-E',
       'G2-A', 'G2-B', 'G2-C', 'G2-D', 'G2-E',
       'G3-A', 'G3-B', 'G3-C', 'G3-D',
       'D1', 'D2', 'D3', 'D4',
       'G5-A', 'G5-B',
-      'G6-A', 'G6-B', 'G6-C', 'G6-D', 'G6-E',
+      'G6-A', 'G6-B', 'G6-C', 'G6-D', 'G6-E', 'G6-F',
     ];
 
     expect(Object.keys(ARCH_TESTBED_WAYPOINTS)).toEqual(expectedKeys);

@@ -90,7 +90,8 @@ describe('world edits', () => {
     expect([grown.x, grown.y, grown.footprint]).toEqual([fountain.x, fountain.y, { width: 4, height: 2 }]);
     expect(blocked(wider) - blocked(plain)).toBe(8 - 2);
     const smaller = edited(stamp({ kind: 'footprint', at, footprint: [1, 1] }));
-    expect(blocked(plain) - blocked(smaller)).toBe(1);
+    // One tile wide, centred on the edge between its two tiles, it still covers (and blocks) both.
+    expect(blocked(plain) - blocked(smaller)).toBe(0);
     expect(checkEdit(plain, { kind: 'footprint', at, footprint: [9, 1] }, CREATURES)).toMatch(/1 to 8/);
     expect(checkEdit(plain, { kind: 'footprint', at: openGround(plain, at), footprint: [2, 2] }, CREATURES)).toMatch(/no set piece/);
     // Furniture against a wall cannot grow into it.

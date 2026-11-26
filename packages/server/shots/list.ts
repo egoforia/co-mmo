@@ -107,6 +107,22 @@ export const SHOTS: Shot[] = [
     mustSee: ['near walls are cut low so the room shows', 'far walls are tall and join at the corners', 'furniture stands on the floor, inside the walls', 'the room is lit by its own lights'],
   },
   {
+    name: 'sanctum-temple-inside',
+    hideUi: true,
+    about: 'Inside the temple: furniture where it was designed, centred in the room.',
+    region: 'sanctum',
+    at: inside('sanctum-temple'),
+    mustSee: ['the altar and benches sit centred in the room, not slid to one side', 'no piece overlaps another', 'furniture stands on the floor, inside the walls'],
+  },
+  {
+    name: 'sanctum-inn-inside',
+    hideUi: true,
+    about: 'Inside the inn: tables and benches where they were designed.',
+    region: 'sanctum',
+    at: inside('sanctum-inn'),
+    mustSee: ['each bench stands beside its table, not under it', 'no piece overlaps another', 'furniture stands on the floor, inside the walls'],
+  },
+  {
     name: 'woods-noon',
     about: 'Whispering Woods at its arrival point.',
     region: 'woods',

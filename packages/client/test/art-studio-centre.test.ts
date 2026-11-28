@@ -45,6 +45,48 @@ describe('auto-centre', () => {
     expect(centreTargets([asset('x', 'characters'), asset('y', 'scenery')]).map((a) => a.id)).toEqual(['y']);
   });
 
+  it('stands found feet on the left, front and right corners of the tiles', () => {
+    for (const floor of [{ left: 0, top: 0, right: 2, bottom: 1 }, { left: 0, top: 0, right: 1, bottom: 1 }]) {
+      for (const fitted of [true]) {
+        // An isometric picture with its feet a little in from its sides (13..243 of 256), so it must grow to reach the corners.
+        const run = floor.right - floor.left;
+        const front = { x: 13 + (230 * run) / (run + 1), y: 240 };
+        const feet = { left: { foot: { x: 13, y: 240 - (115 * run) / (run + 1) }, degrees: 26.6, judged: true }, front, right: { foot: { x: 243, y: 240 - 115 / (run + 1) }, degrees: 26.6, judged: true } };
+        const fit = centreFit({ ...m(120, 230, 200), feet }, floor, fitted, true);
+        const box = pictureBox(floor, { width: 256, height: 256 }, fitted, { offset: fit.offset, scale: fit.scale });
+        const at = (p: { x: number; y: number }) => ({ x: box.x + p.x * box.scale, y: box.y + p.y * box.scale });
+        const corners = [PROJECTION.toScreen(floor.left, floor.bottom), PROJECTION.toScreen(floor.right, floor.bottom), PROJECTION.toScreen(floor.right, floor.top)];
+        const placed = [at(feet.left.foot), at(front), at(feet.right.foot)];
+        // Whole pixels and a size kept within its limits leave each foot within a few pixels of its corner.
+        placed.forEach((p, i) => {
+          expect(Math.abs(p.x - corners[i]!.x)).toBeLessThan(2);
+          expect(Math.abs(p.y - corners[i]!.y)).toBeLessThan(2);
+        });
+      }
+    }
+  });
+
+  it('keeps to the middle when a base edge could not be read', () => {
+    const floor = { left: 0, top: 0, right: 1, bottom: 1 };
+    const feet = { left: { foot: { x: 20, y: 200 }, degrees: 26.6, judged: false }, front: { x: 120, y: 240 }, right: { foot: { x: 220, y: 200 }, degrees: 26.6, judged: true } };
+    expect(centreFit({ ...m(150, 230, 90), feet }, floor, true, false)).toEqual(centreFit(m(150, 230, 90), floor, true, false));
+  });
+
+  it('lists the pictures painted at the wrong angle, and says why', () => {
+    const list = proposals(
+      [asset('rack', 'pieces', { footprint: { width: 2, height: 1 } }), asset('pot', 'pieces', { footprint: { width: 1, height: 1 } })],
+      {
+        rack: { ...m(120, 230, 200), verdict: { ok: false, words: 'Painted at the wrong angle: its right edge at 39°, where the tiles slope at 27°. Paint it again.' } },
+        pot: { ...m(120, 230, 200), verdict: { ok: true, words: "Its base runs at the tiles' angle (left 27°)." } },
+      },
+      {},
+    );
+    const html = centreHtml(list);
+    expect(html).toContain('1 of 2 are painted at the wrong angle');
+    expect(html).toContain('<small class="bad">Painted at the wrong angle: its right edge at 39°');
+    expect(html).toContain("Its base runs at the tiles&#39; angle");
+  });
+
   it('centres with C', () => {
     expect(studioKey({ key: 'c', ctrlKey: false, altKey: false, metaKey: false }, false)).toEqual({ centre: true });
   });

@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
 import { biomeLook, hasShippedKit, type ArtEntry, type ArtManifest, type BiomeId } from '@co-mmo/shared';
+import { GUIDE_LABEL, footprintGuide } from './footprint-guide.ts';
 import type { KitAsset } from './kit.ts';
 import { pictureName } from './names.ts';
 import { makeSeamless, removeKeyBackground } from './postprocess.ts';
@@ -275,7 +276,13 @@ export async function paintKitAsset(
     sent.push(ref);
     labels.push(resolved.label);
   }
-  const words = buildPrompt(asset, paintedFootprint(asset.id, asset.kind));
+  const footprint = paintedFootprint(asset.id, asset.kind);
+  // Last, as its words say: the patch it stands on, at the camera's exact angle.
+  if (footprint) {
+    references.push({ mimeType: 'image/png', data: await footprintGuide(footprint) });
+    labels.push(GUIDE_LABEL);
+  }
+  const words = buildPrompt(asset, footprint);
   const prompt = extra.prompt?.trim() ? extra.prompt : extra.note?.trim() ? `${words}\nAlso: ${extra.note.trim()}` : words;
   const image = await provider.generate({ prompt, references, labels });
   // The untouched picture is kept, so it can be processed again for free.

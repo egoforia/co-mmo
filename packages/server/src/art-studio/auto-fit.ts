@@ -6,6 +6,7 @@
 // shadow's edge), and its middle is what goes on the middle of the tiles.
 
 import sharp from 'sharp';
+import { measureFeet, type BaseVerdict, type Feet } from '../assets/feet.ts';
 
 /** How solid a pixel must be to count, of 255. */
 const SOLID = 32;
@@ -24,6 +25,10 @@ export interface BaseMeasure {
   bottom: number;
   /** How sure the reading is: low when the band is broken into several pieces. */
   sure: 'high' | 'low';
+  /** Where its feet are and how its base edges slope (assets/feet.ts), for standing them on the tiles' corners. */
+  feet?: Feet;
+  /** For a picture with a footprint: whether its base runs at the tiles' angle and way, in words. */
+  verdict?: BaseVerdict;
 }
 
 /** Solid runs in each row of an alpha channel, specks left out. */
@@ -72,12 +77,14 @@ export function measureAlpha(alpha: Uint8Array, width: number, height: number): 
     right = Math.max(right, runs[runs.length - 1]![1]);
   }
   if (!counted) return undefined;
+  const feet = measureFeet(alpha, width, height);
   return {
     width,
     height,
     base: { x: (left + right) / 2, y: (bandTop + bottom + 1) / 2, width: right - left },
     bottom: bottom + 1,
     sure: pieces > 2 ? 'low' : 'high',
+    ...(feet ? { feet } : {}),
   };
 }
 

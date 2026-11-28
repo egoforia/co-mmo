@@ -353,7 +353,7 @@ export function createApp(options: AppOptions): App {
   // Paintings a restart cut short are asked for again, behind start-up painting.
   const resuming = paintRequests.resume({
     wish: (request) => wishes.resumePaint(request),
-    repaint: (request) => artStudio.repaint(request.asset, request.note),
+    repaint: (request) => artStudio.repaint(request.asset, request.note, request.references, request.tiles),
     view: (request) => artStudio.paintView(request.walker, request.direction, request.prompt, request.from),
     ways: (request) => artStudio.paintWays(request.walker, request.note, request.references),
     clip: (request) => artStudio.makeClip(request.walker, request.body, request.direction, request.prompt),

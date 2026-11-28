@@ -37,6 +37,8 @@ export interface BuildingArtJob {
   width?: number;
   /** Furniture painted for the isometric camera: the tiles it stands on, which it is sized to. */
   footprint?: Footprint;
+  /** The tiles its footprint guide shows, when the Owner picked other than its footprint (it is still sized to its footprint). */
+  tiles?: Footprint;
 }
 
 /** Widest the outside art is kept, in pixels: sharp at the closest camera zoom without huge downloads. */
@@ -140,7 +142,7 @@ export async function paintBuildingArt(
   }
   // Last, as its words say: the patch the furniture stands on, at the camera's exact angle.
   if (job.footprint) {
-    references.push({ mimeType: 'image/png', data: await footprintGuide(job.footprint) });
+    references.push({ mimeType: 'image/png', data: await footprintGuide(job.tiles ?? job.footprint) });
     labels.push(GUIDE_LABEL);
   }
   const image = await provider.generate({ prompt: job.prompt, references, labels, aspectRatio: job.aspectRatio, size: job.size });

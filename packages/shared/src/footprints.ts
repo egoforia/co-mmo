@@ -43,3 +43,22 @@ function furnitureFootprint(id: string): Footprint | undefined {
   }
   return undefined;
 }
+
+/** The fewest and most tiles a side of a footprint guide may show, when the Owner picks them for a painting. */
+export const GUIDE_TILES = { least: 0.5, most: 6 } as const;
+
+/**
+ * Tiles picked for a footprint guide (the Art Studio's paint review), made
+ * clean: each side a number of tiles within GUIDE_TILES, to a tenth; or
+ * undefined when they are not.
+ */
+export function guideTiles(raw: unknown): Footprint | undefined {
+  const d = (raw ?? {}) as Record<string, unknown>;
+  const side = (v: unknown) => {
+    const n = Math.round(Number(v) * 10) / 10;
+    return Number.isFinite(n) && n >= GUIDE_TILES.least && n <= GUIDE_TILES.most ? n : undefined;
+  };
+  const width = side(d.width);
+  const height = side(d.height);
+  return width !== undefined && height !== undefined ? { width, height } : undefined;
+}

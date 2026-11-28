@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import sharp from 'sharp';
 import {
   BUILDING_STYLES,
+  type Footprint,
 } from '@co-mmo/shared';
 import { plain } from '../art-jobs.ts';
 import { Previewed, dryImage, recipeUsd, type Recipe } from '../art-recipes.ts';
@@ -16,7 +17,7 @@ import { seaCaveBox } from '../assets/sea-cave-kit.ts';
 import { rampBox } from '../assets/ramp-kit.ts';
 import { galleonBox } from '../assets/galleon-kit.ts';
 import { homeLandBox } from '../assets/home-land-art.ts';
-import { KEY_COLOR } from '../assets/style.ts';
+import { KEY_COLOR, paintedFootprint } from '../assets/style.ts';
 import { paintKitAsset, resolveReferenceImage } from '../assets/wild-kit.ts';
 import { estimateImageUsd } from '../assets/wish-art.ts';
 import { normalRequest } from '../normal-painter.ts';
@@ -43,6 +44,7 @@ export async function previewPaint(
   catalog: ArtCatalog,
   redoneDir: string,
   references?: string[],
+  tiles?: Footprint,
 ): Promise<Recipe> {
   note = note.trim().slice(0, 1000);
   const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
@@ -51,7 +53,7 @@ export async function previewPaint(
     if (!record || record.status !== 'granted') throw new ArtRequestError('That wish is not granted, so it has no picture to paint again.');
     return options.wishes.preview(record, pictureId, note ? `${catalog.promptOf(record, pictureId)}\nAlso: ${note}` : undefined);
   }
-  if (Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`))) return options.buildings.preview(asset, note);
+  if (Object.values(BUILDING_STYLES).some((s) => asset.startsWith(`${s.id}-`))) return options.buildings.preview(asset, note, tiles);
   const kit = catalog.kitAsset(asset);
   if (!kit) throw new ArtRequestError('There is no picture by that name.');
   // A sea cave or home land piece is painted the first time at its kit's size.
@@ -64,6 +66,7 @@ export async function previewPaint(
     box: { width: box.width, height: box.height },
     note,
     references,
+    ...(tiles ? { tiles } : {}),
     artDir: options.artDir,
     readArt: options.readArt,
     nameOf: (id) => catalog.nameOf(id),
@@ -129,11 +132,12 @@ type ReviewHandler<K extends ArtAsk['kind']> = (
   options: ArtStudioOptions,
   catalog: ArtCatalog,
   redoneDir: string,
-) => Promise<{ title: string; parts: ArtReview['parts']; references?: ArtReferenceInfo[] }>;
+) => Promise<{ title: string; parts: ArtReview['parts']; references?: ArtReferenceInfo[]; tiles?: ArtReview['tiles'] }>;
 
 /** Handler registry keyed by ArtAsk['kind']. Add new reviewable art asks here. */
 const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
   paint: async (ask, options, catalog, redoneDir) => {
+    const footprint = paintedFootprint(ask.asset.includes(':') ? '' : ask.asset, catalog.kitAsset(ask.asset)?.kind ?? 'furniture');
     const name = await catalog.nameOf(ask.asset);
     const kit = catalog.kitAsset(ask.asset);
     const defaultRefs = kit ? withSelf(kit).references ?? [] : [];
@@ -207,8 +211,10 @@ const REVIEW_HANDLERS: { [K in ArtAsk['kind']]: ReviewHandler<K> } = {
     }
     return {
       title: `Paint ${name} again`,
-      parts: [{ name, recipe: await previewPaint(ask.asset, ask.note ?? '', options, catalog, redoneDir, ask.references) }],
+      parts: [{ name, recipe: await previewPaint(ask.asset, ask.note ?? '', options, catalog, redoneDir, ask.references, ask.tiles) }],
       references: refInfos,
+      // A picture that stands on tiles shows them in its footprint guide; the Owner may pick others.
+      ...(footprint ? { tiles: { shown: ask.tiles ?? footprint, footprint } } : {}),
     };
   },
   group: async (ask, options, catalog, redoneDir) => {
@@ -400,9 +406,9 @@ export async function reviewAsk(
 ): Promise<ArtReview> {
   try {
     const handler = REVIEW_HANDLERS[ask.kind] as ReviewHandler<typeof ask.kind>;
-    const { title, parts, references } = await handler(ask, options, catalog, redoneDir);
+    const { title, parts, references, tiles } = await handler(ask, options, catalog, redoneDir);
     const estimateUsd = parts.reduce((n, p) => n + recipeUsd(p.recipe), 0);
-    return { title, parts, estimateUsd, fingerprint: fingerprint(parts), ...(references ? { references } : {}) };
+    return { title, parts, estimateUsd, fingerprint: fingerprint(parts), ...(references ? { references } : {}), ...(tiles ? { tiles } : {}) };
   } catch (err) {
     if (err instanceof ArtRequestError) throw err;
     throw new ArtRequestError(plain(err));

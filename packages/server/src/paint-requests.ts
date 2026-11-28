@@ -1,5 +1,6 @@
 import { readFile, rename } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
+import type { Footprint } from '@co-mmo/shared';
 import type { Kept } from './kept.ts';
 
 // Painting a wish or an Owner's request can wait a long time behind the
@@ -13,7 +14,7 @@ export type PaintRequest =
   /** A granted wish's pictures; `only` one of them, `force` when the Owner asked for it again. */
   | { kind: 'wish'; record: string; force: boolean; only?: string; prompts?: Record<string, string> }
   /** The Owner's "Paint again" on a building or shipped picture. */
-  | { kind: 'repaint'; asset: string; note: string; references?: string[] }
+  | { kind: 'repaint'; asset: string; note: string; references?: string[]; tiles?: Footprint }
   /** The Owner's "Paint standing picture" for one walk direction, with the prompt they approved. */
   | { kind: 'view'; walker: string; direction: string; prompt?: string; from?: string[] }
   /** The Owner's "Paint the four ways together" for one walker: its isometric ways on one sheet. */

@@ -647,6 +647,37 @@ describe('the Art tab', () => {
   });
 });
 
+describe('the tiles a footprint guide shows', () => {
+  it('are the piece\'s own footprint unless the Owner picks others in the review, and are painted with', async () => {
+    const { base, store } = await start({ shippedArt: await shippedManifest(await tmp()), anchorDir });
+    const owner = account(store, 'Ego', 'owner');
+    const asset = 'sanctum-arcanum-furniture-herb-rack';
+    const own = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'paint', asset });
+    expect(own.status).toBe(200);
+    expect(own.body.tiles).toEqual({ shown: { width: 2, height: 1 }, footprint: { width: 2, height: 1 } });
+    const step = (r: any) => r.body.parts[0].recipe.steps[0];
+    expect(step(own).prompt).toContain('2 tiles from the left corner down to the front corner, and one tile');
+    expect(step(own).pictures.at(-1).name).toBe('Footprint guide: the tiles it stands on');
+
+    const picked = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'paint', asset, tiles: { width: 3, height: 1 } });
+    expect(picked.body.tiles).toEqual({ shown: { width: 3, height: 1 }, footprint: { width: 2, height: 1 } });
+    expect(step(picked).prompt).toContain('3 tiles from the left corner down to the front corner, and one tile');
+    expect(step(picked).prompt).not.toContain('2 tiles from the left corner');
+    // Another guide picture, so approving the first review does not paint the second.
+    expect(step(picked).pictures.at(-1).url).not.toBe(step(own).pictures.at(-1).url);
+    expect(picked.body.fingerprint).not.toBe(own.body.fingerprint);
+
+    // Tiles out of reach are left out: its own footprint is shown.
+    const silly = await api(base, '/api/admin/art/review', owner.token, 'POST', { what: 'paint', asset, tiles: { width: 40, height: 1 } });
+    expect(silly.body.tiles.shown).toEqual({ width: 2, height: 1 });
+
+    // Approving with other tiles than were reviewed is refused; with the same, it paints.
+    expect((await api(base, '/api/admin/art/paint', owner.token, 'POST', { asset, tiles: { width: 1, height: 4 }, approved: picked.body.fingerprint })).status).toBe(409);
+    expect((await api(base, '/api/admin/art/paint', owner.token, 'POST', { asset, tiles: { width: 3, height: 1 }, approved: picked.body.fingerprint })).status).toBe(202);
+    await app!.art.idle();
+  });
+});
+
 /** Reviews a paid request as God's View does, then approves exactly what it showed. */
 async function ask(base: string, token: string, what: string, body: Record<string, unknown>): Promise<{ status: number; body: any }> {
   const review = await api(base, '/api/admin/art/review', token, 'POST', { what, ...body });

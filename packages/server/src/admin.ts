@@ -9,6 +9,7 @@ import {
   WishError,
   engineModId,
   fitOf,
+  guideTiles,
   isFacing,
   movingArt,
   skyWords,
@@ -584,9 +585,11 @@ export async function handleAdmin(
     const textures = Array.isArray(body?.textures) ? body.textures.filter((t): t is string => typeof t === 'string').slice(0, 20) : [];
     // Custom reference images sent along to guide the painter.
     const references = Array.isArray(body?.references) ? body.references.filter((r): r is string => typeof r === 'string' && r.trim().length > 0) : undefined;
+    // The tiles a footprint guide shows, picked in the paint review in place of the picture's own footprint.
+    const tiles = guideTiles(body?.tiles);
     // Each paid request is one of these; the Owner reviews it, then approves exactly that.
     const asks: Record<string, () => ArtAsk> = {
-      'art/paint': () => ({ kind: 'paint', asset: String(body?.asset ?? ''), note, ...(references ? { references } : {}) }),
+      'art/paint': () => ({ kind: 'paint', asset: String(body?.asset ?? ''), note, ...(references ? { references } : {}), ...(tiles ? { tiles } : {}) }),
       'art/paint-group': () => ({ kind: 'group', group: String(body?.group ?? '') }),
       'art/sound': () => ({ kind: 'sound', sound: String(body?.sound ?? ''), note }),
       'art/view': () => ({ kind: 'view', walker: String(body?.walker ?? ''), direction: String(body?.direction ?? '') as Facing, ...(prompt ? { prompt } : {}), ...(from ? { from } : {}) }),
@@ -611,7 +614,7 @@ export async function handleAdmin(
       }
       if (asks[route] && method === 'POST') await ctx.art.approved(asks[route]!(), body?.approved);
       if (route === 'art/paint' && method === 'POST') {
-        const done = await ctx.art.repaint(String(body?.asset ?? ''), note, references);
+        const done = await ctx.art.repaint(String(body?.asset ?? ''), note, references, tiles);
         return json(res, 202, { ok: true, ...done }), true;
       }
       if (route === 'art/paint-group' && method === 'POST') {

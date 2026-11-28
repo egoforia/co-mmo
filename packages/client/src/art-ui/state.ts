@@ -178,7 +178,8 @@ export interface ArtReferenceInfo {
 
 /** A paid request, as the server's review and approval take it. */
 export type Ask =
-  | { what: 'paint'; asset: string; references?: string[] }
+  /** `tiles`: the tiles the footprint guide shows, picked in the review in place of the picture's own footprint. */
+  | { what: 'paint'; asset: string; references?: string[]; tiles?: { width: number; height: number } }
   | { what: 'paint-group'; group: string }
   | { what: 'view'; walker: string; direction: Facing; prompt?: string; from?: string[] }
   | { what: 'ways'; walker?: string; references?: string[]; prompt?: string }
@@ -193,6 +194,8 @@ export interface Review {
   estimateUsd: number;
   fingerprint: string;
   references?: ArtReferenceInfo[];
+  /** A picture that stands on tiles: the tiles its footprint guide shows, and its own footprint. */
+  tiles?: { shown: { width: number; height: number }; footprint: { width: number; height: number } };
 }
 
 /** The questions the hand finder asks: one for a look's own picture, which faces us, and one per way of facing. */

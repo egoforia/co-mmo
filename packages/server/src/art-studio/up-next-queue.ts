@@ -198,7 +198,7 @@ export class UpNextQueue {
 async function dispatchAsk(studio: ArtStudio, ask: ArtAsk): Promise<{ estimateUsd: number }> {
   switch (ask.kind) {
     case 'paint':
-      return studio.repaint(ask.asset, ask.note ?? '');
+      return studio.repaint(ask.asset, ask.note ?? '', ask.references, ask.tiles);
     case 'group':
       return studio.repaintGroup(ask.group);
     case 'view':

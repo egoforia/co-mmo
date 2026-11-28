@@ -5,7 +5,9 @@
 // docs/screenshots.md explains the process; `/shots` runs it.
 
 import type { Page } from 'playwright';
-import { EDIT_KINDS, type RegionMap, type Weather, type WorldEditDraft } from '@co-mmo/shared';
+import { EDIT_KINDS, type Footprint, type RegionMap, type Weather, type WorldEditDraft } from '@co-mmo/shared';
+import { GUIDE_LABEL, footprintGuide } from '../src/assets/footprint-guide.ts';
+import { footprintWords } from '../src/assets/style.ts';
 
 /** Where the camera stands: a tile on a floor. */
 export interface Spot {
@@ -436,6 +438,35 @@ export const SHOTS: Shot[] = [
       await page.waitForSelector('.dock-right .props');
     },
     mustSee: ['the shrine row is marked in the list', 'the Inspector shows its picture and a property table with a 2 × 1 footprint'],
+  },
+  {
+    name: 'art-studio-review-tiles',
+    about: "The paint review for the Bramble cottage's herb rack, with 3 × 1 tiles picked for its footprint guide in place of its own 2 × 1.",
+    page: '/art-studio.html',
+    ready: '.asset-list button',
+    open: async (page) => {
+      await page.click('.asset-chips [data-group="pieces"]');
+      await page.fill('.dock-left input[name=search]', 'herb rack');
+      await page.click('.asset-list button[data-asset="bramble-cottage-furniture-herb-rack"]');
+      // The shot server has no image model, so the review is answered as the server shapes it, with the real guide and words for the tiles asked.
+      await page.route('**/api/admin/art/review', async (route) => {
+        const asked = route.request().postDataJSON() as { tiles?: Footprint };
+        const shown = asked.tiles ?? { width: 2, height: 1 };
+        const guide = `data:image/png;base64,${(await footprintGuide(shown)).toString('base64')}`;
+        const prompt = ['Subject: the herb rack inside Bramble Cottage: a wooden drying rack hung with bundles of herbs and flowers.', footprintWords(shown)].join('\n');
+        await route.fulfill({ json: {
+          title: 'Paint herb rack again', estimateUsd: 0.039, fingerprint: `shot-${shown.width}x${shown.height}`,
+          parts: [{ name: 'herb rack', recipe: { at: 0, steps: [{ label: 'herb rack', media: 'picture', provider: 'gemini', model: 'gemini-3.1-flash-image', prompt, pictures: [{ name: GUIDE_LABEL, url: guide }], settings: ['1:1', '1K'], usd: 0.039 }] } }],
+          tiles: { shown, footprint: { width: 2, height: 1 } },
+        } });
+      });
+      await page.click('.dock-right [data-art-review]');
+      await page.waitForSelector('form.review-tiles');
+      await page.fill('form.review-tiles input[name=width]', '3');
+      await page.click('form.review-tiles button[type=submit]');
+      await page.waitForFunction(() => document.querySelector('form.review-tiles')?.textContent?.includes('3 × 1 tiles, not its own'));
+    },
+    mustSee: ['the review dialog for the herb rack', 'a tile picker saying the guide shows 3 × 1 tiles, not its own 2 × 1, with a button back to its own footprint', 'the prompt names 3 tiles and the last picture sent is the footprint guide'],
   },
   {
     name: 'art-studio-paint-pick',

@@ -31,6 +31,7 @@ import {
   usd,
   when,
 } from './state.ts';
+import { guideTilesHtml, pickedTiles } from './guide-tiles.ts';
 
 /** What one recipe sent, step by step; with `other`, prompt lines that differ from it are marked. */
 export function recipeHtml(recipe: Recipe | undefined, other?: Recipe, planned = false): string {
@@ -90,6 +91,7 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
       <p class="note">This is everything that will be sent to the AI model${many ? 's' : ''}. Nothing is painted until you approve it.</p>
       ${ask.what === 'view' ? sourcesHtml(ask) : ''}
       ${review.references ? referencesHtml(review) : ''}
+      ${ask.what === 'paint' ? guideTilesHtml(review) : ''}
       ${ask.what === 'ways' ? waysGuideHtml() : ''}
       ${editable ? `<form class="form review-prompt"><label>Prompt${editable.prompt ? ' (your own words)' : ' (the usual words; edit them if you like)'}<span><textarea name="prompt" rows="8" maxlength="4000">${esc(review.parts[0]?.recipe.steps[0]?.prompt ?? '')}</textarea></span></label>
         <div class="card-actions"><button type="submit" class="quiet">Show with this prompt</button><button type="button" class="quiet director-btn" data-harmonize-prompt>✦ Harmonize with Art Director</button>${'walker' in ask ? '<button type="button" class="quiet" data-angle-turnaround-review>✦ Turn from another angle</button>' : ''}${editable.prompt ? '<button type="button" class="quiet" data-usual>Back to the usual prompt</button>' : ''}</div></form>` : ''}
@@ -202,6 +204,20 @@ export async function openReview(ask: Ask, takesNote: boolean, note = ''): Promi
   d.querySelector('[data-usual]')?.addEventListener('click', () => {
     const { prompt: _, ...usual } = editable!;
     void openReview(usual, false);
+  });
+  // The tiles the footprint guide shows; the words typed so far are kept.
+  const typed = () => String(d.querySelector<HTMLTextAreaElement>('form.review-note textarea[name="note"]')?.value ?? note).trim();
+  d.querySelector('form.review-tiles')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (ask.what !== 'paint' || !review.tiles) return;
+    const { tiles: _, ...rest } = ask;
+    const tiles = pickedTiles(e.target as HTMLFormElement, review.tiles.footprint);
+    void openReview(tiles ? { ...rest, tiles } : rest, takesNote, typed());
+  });
+  d.querySelector('[data-own-tiles]')?.addEventListener('click', () => {
+    if (ask.what !== 'paint') return;
+    const { tiles: _, ...rest } = ask;
+    void openReview(rest, takesNote, typed());
   });
   d.querySelector('form.review-note')?.addEventListener('submit', (e) => {
     e.preventDefault();

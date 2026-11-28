@@ -18,6 +18,7 @@ import {
   type AngleTargetType,
   type AngleTurnaroundResult,
   type ArtManifest,
+  type Footprint,
   type IsoWay,
 } from '@co-mmo/shared';
 import { ArtHistory } from './art-history.ts';
@@ -310,7 +311,7 @@ export class ArtStudio {
    * character or item, or a granted wish's (`<wish id>:<picture id>`).
    * The Owner's `note` and `references` are sent to the image model.
    */
-  async repaint(asset: string, note = '', references?: string[]): Promise<{ estimateUsd: number }> {
+  async repaint(asset: string, note = '', references?: string[], tiles?: Footprint): Promise<{ estimateUsd: number }> {
     this.refuseWhenSpent();
     note = note.trim().slice(0, 1000);
     const [wishId, pictureId] = asset.includes(':') ? asset.split(':', 2) : [];
@@ -335,8 +336,8 @@ export class ArtStudio {
       if (!handle) throw new ArtRequestError('There is no building picture by that name.');
       this.enqueue(async () => {
         await this.keepCurrent(asset);
-        await this.options.buildings.repaint(asset, note, handle);
-      }, handle, { kind: 'repaint', asset, note, ...(references ? { references } : {}) });
+        await this.options.buildings.repaint(asset, note, handle, tiles);
+      }, handle, { kind: 'repaint', asset, note, ...(references ? { references } : {}), ...(tiles ? { tiles } : {}) });
       return { estimateUsd };
     }
     if (!kit) throw new ArtRequestError('There is no picture by that name.');
@@ -345,8 +346,8 @@ export class ArtStudio {
     const handle = this.options.jobs.add(asset, kit.name ?? asset, 'picture', 'gods-view', estimateUsd);
     this.enqueue(async () => {
       await this.keepCurrent(asset);
-      await this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle, references);
-    }, handle, { kind: 'repaint', asset, note, ...(references ? { references } : {}) });
+      await this.repaintShipped(kit, { width: shipped.width, height: shipped.height }, note, handle, references, tiles);
+    }, handle, { kind: 'repaint', asset, note, ...(references ? { references } : {}), ...(tiles ? { tiles } : {}) });
     return { estimateUsd };
   }
 
@@ -580,7 +581,7 @@ export class ArtStudio {
     if (request.kind === 'view') return this.paintView(request.walker, request.direction, request.prompt, request.from);
     if (request.kind === 'ways') return this.paintWays(request.walker, request.note, request.references);
     if (request.kind === 'clip') return this.makeClip(request.walker, request.body, request.direction, request.prompt);
-    if (request.kind === 'repaint') return this.repaint(request.asset, request.note, request.references);
+    if (request.kind === 'repaint') return this.repaint(request.asset, request.note, request.references, request.tiles);
     if (request.kind === 'sheet') return this.paintSheet(request.look, request.textures, request.note);
     return undefined;
   }
@@ -634,6 +635,7 @@ export class ArtStudio {
     note: string,
     handle: ArtJobHandle,
     references?: string[],
+    tiles?: Footprint,
   ): Promise<void> {
     const provider = this.options.ai.image(useOf(asset));
     if (!provider) return handle.skip("No image model is set in God's View.");
@@ -643,6 +645,7 @@ export class ArtStudio {
       box,
       note,
       references,
+      ...(tiles ? { tiles } : {}),
       artDir: this.options.artDir,
       readArt: this.options.readArt,
       nameOf: (id) => this.catalog.nameOf(id),

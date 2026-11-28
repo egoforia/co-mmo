@@ -1,8 +1,9 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
-import { BUILDING_STYLES, type ArtManifest } from '@co-mmo/shared';
+import { BUILDING_STYLES, type ArtManifest, type Footprint } from '@co-mmo/shared';
 import { buildingArtJobs, paintBuildingArt, type BuildingArtJob } from './assets/building-art.ts';
 import type { ImageProvider } from './assets/provider.ts';
+import { footprintWords } from './assets/style.ts';
 import { estimateImageUsd, imageUsd } from './assets/wish-art.ts';
 import { plain, type ArtJobHandle, type ArtJobSource, type ArtJobs } from './art-jobs.ts';
 import { Previewed, dryImage, keepingImage, type Recipe, type RecipeBook } from './art-recipes.ts';
@@ -95,8 +96,8 @@ export class BuildingPainter {
    * shipped with the game: the new one replaces it. `note` adds the Owner's
    * own words to the prompt.
    */
-  async repaint(id: string, note = '', handle?: ArtJobHandle): Promise<void> {
-    const job = withNote(id, note);
+  async repaint(id: string, note = '', handle?: ArtJobHandle, tiles?: Footprint): Promise<void> {
+    const job = withNote(id, note, tiles);
     const provider = this.options.provider();
     if (!provider) throw new Error("No image model is set in God's View.");
     await this.load();
@@ -104,8 +105,8 @@ export class BuildingPainter {
   }
 
   /** Exactly what painting one building picture again would send, without painting it. */
-  async preview(id: string, note = ''): Promise<Recipe> {
-    const job = withNote(id, note);
+  async preview(id: string, note = '', tiles?: Footprint): Promise<Recipe> {
+    const job = withNote(id, note, tiles);
     const provider = this.options.provider();
     if (!provider) throw new Error("No image model is set in God's View.");
     const dry = dryImage(provider);
@@ -185,10 +186,15 @@ export class BuildingPainter {
   }
 }
 
-/** A building picture to paint, with the Owner's own words added to its prompt. */
-function withNote(id: string, note: string): BuildingArtJob {
-  const job = allBuildingArt().find((j) => j.id === id);
+/**
+ * A building picture to paint, with the Owner's own words added to its
+ * prompt, and furniture's footprint guide and words showing the `tiles` the
+ * Owner picked in place of its own footprint.
+ */
+function withNote(id: string, note: string, tiles?: Footprint): BuildingArtJob {
+  let job = allBuildingArt().find((j) => j.id === id);
   if (!job) throw new Error('There is no building picture by that name.');
+  if (tiles && job.footprint) job = { ...job, tiles, prompt: job.prompt.replace(footprintWords(job.footprint), footprintWords(tiles)) };
   return note.trim() ? { ...job, prompt: `${job.prompt}\nAlso: ${note.trim()}` } : job;
 }
 

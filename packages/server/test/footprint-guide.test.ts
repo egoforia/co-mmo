@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { BUILDING_STYLES } from '@co-mmo/shared';
+import { BUILDING_STYLES, isoSpan } from '@co-mmo/shared';
 import { buildingArtJobs, paintBuildingArt } from '../src/assets/building-art.ts';
 import { GUIDE_LABEL, GUIDE_SIZE, footprintGuide, guidePatch } from '../src/assets/footprint-guide.ts';
 import type { ImageRequest } from '../src/assets/provider.ts';
@@ -55,6 +55,19 @@ describe('the footprint guide', () => {
     expect(sent.references?.at(-1)?.data.equals(await footprintGuide({ width: 2, height: 1 }))).toBe(true);
     expect(sent.prompt).toContain(FOOTPRINT_GUIDE_WORDS);
     expect(sent.prompt).toContain('The last image is a footprint guide');
+  });
+
+  it('shows the tiles the Owner picked, while the picture is still sized to its own footprint', async () => {
+    const boulder = SEA_CAVE_KIT.find((a) => a.id === 'sea-cave-boulder')!;
+    const dir = await mkdtemp(join(tmpdir(), 'painted-'));
+    const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#ff00ff' } }).composite([{ input: await sharp({ create: { width: 30, height: 20, channels: 3, background: '#777' } }).png().toBuffer(), left: 17, top: 30 }]).png().toBuffer();
+    const asked: ImageRequest[] = [];
+    const provider = { id: 'gemini', model: 'gemini-3.1-flash-image', generate: async (r: ImageRequest) => (asked.push(r), { mimeType: 'image/png', data: png }) };
+    const { entry } = await paintKitAsset(boulder, provider, dir, dir, { tiles: { width: 1, height: 4 } });
+    expect(asked[0]!.references?.at(-1)?.data.equals(await footprintGuide({ width: 1, height: 4 }))).toBe(true);
+    expect(asked[0]!.prompt).toContain(footprintWords({ width: 1, height: 4 }));
+    expect(asked[0]!.prompt).not.toContain(footprintWords({ width: 2, height: 1 }));
+    expect(entry.width).toBe(isoSpan(2, 1));
   });
 
   it('is sent with furniture, and not with a building’s outside or its floor', async () => {

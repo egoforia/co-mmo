@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
-import { biomeLook, hasShippedKit, type ArtEntry, type ArtManifest, type BiomeId } from '@co-mmo/shared';
+import { biomeLook, hasShippedKit, type ArtEntry, type ArtManifest, type BiomeId, type Footprint } from '@co-mmo/shared';
 import { GUIDE_LABEL, footprintGuide } from './footprint-guide.ts';
 import type { KitAsset } from './kit.ts';
 import { pictureName } from './names.ts';
@@ -257,6 +257,8 @@ export async function paintKitAsset(
     artDir?: string;
     readArt?: (file: string) => Promise<Buffer>;
     nameOf?: (id: string) => Promise<string> | string;
+    /** The tiles its footprint guide shows and its words name, in place of its own footprint (the Owner's pick); it is still sized to its own. */
+    tiles?: Footprint;
   } = {},
 ): Promise<{ image: GeneratedImage; entry: ArtEntry; prompt: string; references: string[] }> {
   const references: GeneratedImage[] = [];
@@ -276,7 +278,8 @@ export async function paintKitAsset(
     sent.push(ref);
     labels.push(resolved.label);
   }
-  const footprint = paintedFootprint(asset.id, asset.kind);
+  const own = paintedFootprint(asset.id, asset.kind);
+  const footprint = own && extra.tiles ? extra.tiles : own;
   // Last, as its words say: the patch it stands on, at the camera's exact angle.
   if (footprint) {
     references.push({ mimeType: 'image/png', data: await footprintGuide(footprint) });

@@ -5,7 +5,7 @@
 // or a whole group from the Centre page, each proposal checked before it is
 // saved. Free: no model is asked.
 
-import { FIT_SCALE, isoSpan } from '@co-mmo/shared';
+import { FIT_AUTO_SCALE, isoSpan } from '@co-mmo/shared';
 import { PROJECTION } from '../projection.ts';
 import type { Floor } from '../tile-stand.ts';
 import { pictureBox } from './canvas.ts';
@@ -34,7 +34,7 @@ export function centreFit(m: BaseMeasure, floor: Floor, fitted: boolean, trim: b
   const middle = PROJECTION.toScreen((floor.left + floor.right) / 2, (floor.top + floor.bottom) / 2);
   const wanted = isoSpan(floor.right - floor.left, floor.bottom - floor.top) * FOOT_SHARE;
   const ratio = (m.base.width * box.scale) / wanted;
-  const scale = trim && (ratio < TRIM_BELOW || ratio > TRIM_ABOVE) ? Math.max(FIT_SCALE.least, Math.min(FIT_SCALE.most, 1 / ratio)) : 1;
+  const scale = trim && (ratio < TRIM_BELOW || ratio > TRIM_ABOVE) ? Math.max(FIT_AUTO_SCALE.least, Math.min(FIT_AUTO_SCALE.most, 1 / ratio)) : 1;
   // Trimmed about its anchor, the foot moves towards it.
   const trimmed = { x: anchor.x + (foot.x - anchor.x) * scale, y: anchor.y + (foot.y - anchor.y) * scale };
   const per = box.scale * scale;

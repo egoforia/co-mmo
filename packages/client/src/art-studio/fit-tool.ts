@@ -100,7 +100,7 @@ export class FitDraft {
 export function fitPanelHtml(a: StudioAsset, draft: FitDraft, more = ''): string {
   const { offset, scale } = draft.state;
   const trim = SCALE_GROUPS.includes(a.group)
-    ? `<label>Size <input type="number" name="fit-scale" min="${FIT_SCALE.least * 100}" max="${FIT_SCALE.most * 100}" step="1" value="${Math.round(scale * 100)}" /> %</label>`
+    ? `<label>Size <input type="number" name="fit-scale" min="${Math.round(FIT_SCALE.least * 100)}" max="${Math.round(FIT_SCALE.most * 100)}" step="1" value="${Math.round(scale * 100)}" /> %</label>`
     : '';
   return `
     <h2 class="dock-title">Offset</h2>

@@ -575,6 +575,24 @@ export const SHOTS: Shot[] = [
     mustSee: ['the Place workspace with Canvas, Centre a group and Buildings tabs, Centre a group marked', 'a button to measure the pieces shown, with their number'],
   },
   {
+    name: 'art-studio-centre-measured',
+    about: 'The Centre page after measuring two shrines: each with its auto-centre and its base check, those painted at the wrong angle or turned the wrong way counted at the top.',
+    page: '/art-studio.html#art/centre',
+    ready: '.asset-list button',
+    open: async (page) => {
+      // The shot server paints nothing, so the measures are answered as the server gives them for two painted pieces (assets/feet.ts).
+      await page.route('**/api/admin/art/measure', (route) => route.fulfill({ json: { measures: {
+        'sanctum-shrine': { width: 240, height: 247, base: { x: 120, y: 240, width: 236 }, bottom: 247, sure: 'high', verdict: { ok: false, words: 'Painted at the wrong angle: its left edge at 19°, where the tiles slope at 27°. Paint it again.' } },
+        'shore-tide-shrine': { width: 240, height: 230, base: { x: 120, y: 224, width: 230 }, bottom: 230, sure: 'high', verdict: { ok: true, words: "Its base runs at the tiles' angle (left 27°, right 28°)." } },
+      } } }));
+      await page.click('.asset-chips [data-group="pieces"]');
+      await page.fill('.dock-left input[name=search]', 'shrine');
+      await page.click('[data-centre-measure]');
+      await page.waitForSelector('.centre-table');
+    },
+    mustSee: ['a table of the two shrines with Asset, Now, Auto-centre and Base columns', "Base says for each whether it runs at the tiles' angle, wrong ones in the warning colour", 'a line above the table counting the pieces painted at the wrong angle'],
+  },
+  {
     name: 'art-studio-phone',
     about: 'The AI Art Studio on a phone: one pane at a time, chosen with tabs.',
     page: '/art-studio.html',

@@ -16,7 +16,7 @@ const GROUP_WORDS: Record<string, string> = {
 const STATUS_WORDS: Record<StudioAsset['status'], string> = { painted: 'Painted', 'stand-in': 'Not painted yet; a stand-in shows', missing: 'Not painted yet' };
 
 /** The Inspector's HTML for an asset, or a hint when none is selected. */
-export function inspectorHtml(a: StudioAsset | undefined): string {
+export function inspectorHtml(a: StudioAsset | undefined, base?: { ok?: boolean; words: string }): string {
   if (!a) return '<h2 class="dock-title">Inspector</h2><p class="note">Pick an asset on the left to see it here.</p>';
   const rows: [string, string][] = [
     ['Name', escapeHtml(a.name)],
@@ -26,6 +26,8 @@ export function inspectorHtml(a: StudioAsset | undefined): string {
     ...(a.footprint ? [['Footprint', `${a.footprint.width} × ${a.footprint.height} tiles`] as [string, string]] : []),
     ['State', STATUS_WORDS[a.status]],
     ...(a.fit ? [['Fit', escapeHtml(fitWords(a.fit))] as [string, string]] : []),
+    // Whether its base runs at its tiles' angle and way (measured on the server, free).
+    ...(base ? [['Base', base.ok === false ? `<span class="bad">${escapeHtml(base.words)}</span>` : escapeHtml(base.words)] as [string, string]] : []),
   ];
   const picture = a.thumb ? `<img class="inspector-picture" src="${escapeHtml(a.thumb)}" alt="${escapeHtml(a.name)}" />` : '';
   const page = a.place.page || a.group === 'sounds' ? `<a class="button" href="${escapeHtml(placeHash(a.place))}">Show it on its page</a>` : '';

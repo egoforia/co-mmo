@@ -246,11 +246,34 @@ export class StudioShell {
     this.markCard();
     const item = a && artState.data?.items.find((i) => i.id === a.id);
     const fit = a && this.draft ? `<section class="fit-panel">${this.fitHtml(a, this.draft)}</section>` : '';
-    $('dock-right').innerHTML = inspectorHtml(a) + fit + createDockHtml(a, artState.data ?? undefined) + versionsHtml(item, this.version);
+    $('dock-right').innerHTML = inspectorHtml(a, a && this.baseOf(a)) + fit + createDockHtml(a, artState.data ?? undefined) + versionsHtml(item, this.version);
     const walker = a && artState.data?.walkers.find((w) => w.id === a.id);
     const spot = a && !walker ? spotKindOf(a.id) ?? spotKindOf(a.id.replace(/-(?:picked|growing)$/, '')) : undefined;
     if (spot) this.frames.showHtml(spotStatesHtml(spot, artState.data?.items ?? []));
     else this.frames.show(walker);
+  }
+
+  /** Each picture's base check, by its picture's address (a repaint has a new one); null while it is measured or when it cannot be. */
+  private bases = new Map<string, { ok?: boolean; words: string } | null>();
+
+  /**
+   * The base check for a picture that stands on tiles (assets/feet.ts on the
+   * server, free): known, or asked for now and the Inspector drawn again
+   * when it comes.
+   */
+  private baseOf(a: StudioAsset): { ok?: boolean; words: string } | undefined {
+    if (!a.footprint || a.status === 'missing') return undefined;
+    const key = a.thumb ?? a.id;
+    if (this.bases.has(key)) return this.bases.get(key) ?? undefined;
+    this.bases.set(key, null);
+    void api<{ measures: Record<string, BaseMeasure | { why: string }> }>('art/measure', 'POST', { assets: [a.id] }).then(({ measures }) => {
+      const m = measures[a.id];
+      const verdict = !m ? undefined : 'why' in m ? { words: m.why } : m.verdict;
+      if (!verdict) return;
+      this.bases.set(key, verdict);
+      if (this.selected === a.id) this.drawInspector();
+    }, () => undefined);
+    return undefined;
   }
 
   /** Draws the Offset section again, keeping the field being typed in. */

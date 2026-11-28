@@ -10,6 +10,7 @@ import { resolve } from 'node:path';
 import sharp from 'sharp';
 import {
   BODY_TYPES,
+  artFootprint,
   BUILDING_STYLES,
   generateAngleTurnaroundPrompt,
   walkArt,
@@ -25,6 +26,7 @@ import { keepingImage } from './art-recipes.ts';
 import { ArtDirector } from './art-studio/art-director.ts';
 import { studioAssets, type StudioAsset } from './art-studio/assets.ts';
 import { measureBase, type BaseMeasure } from './art-studio/auto-fit.ts';
+import { judgeBase } from './assets/feet.ts';
 import { ArtCatalog } from './art-studio/catalog.ts';
 import { normalAsk, reviewAsk, sheetAsk } from './art-studio/review.ts';
 import { UpNextQueue } from './art-studio/up-next-queue.ts';
@@ -174,7 +176,9 @@ export class ArtStudio {
         continue;
       }
       const m = await measureBase(png).catch(() => undefined);
-      out[asset] = m ?? { why: 'It has no see-through edges to find its foot from.' };
+      // A picture that stands on tiles is also checked against them: its base's angle and which way it runs.
+      const footprint = artFootprint(asset);
+      out[asset] = m ? { ...m, ...(footprint ? { verdict: judgeBase(m.feet, footprint) } : {}) } : { why: 'It has no see-through edges to find its foot from.' };
     }
     return out;
   }

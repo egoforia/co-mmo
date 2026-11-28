@@ -13,6 +13,7 @@ import {
   type Footprint,
 } from '@co-mmo/shared';
 import { makeSeamless, pixelate, removeKeyBackground, removeKeySpill, trimRows } from './postprocess.ts';
+import { GUIDE_LABEL, footprintGuide } from './footprint-guide.ts';
 import { pictureName } from './names.ts';
 import type { GeneratedImage, ImageProvider, ImageRequest } from './provider.ts';
 import { BASE_PROMPT, KEY_COLOR, NEGATIVE_PROMPT, footprintWords, paintedFootprint } from './style.ts';
@@ -136,6 +137,11 @@ export async function paintBuildingArt(
       labels.push(pictureName(ref));
       break;
     }
+  }
+  // Last, as its words say: the patch the furniture stands on, at the camera's exact angle.
+  if (job.footprint) {
+    references.push({ mimeType: 'image/png', data: await footprintGuide(job.footprint) });
+    labels.push(GUIDE_LABEL);
   }
   const image = await provider.generate({ prompt: job.prompt, references, labels, aspectRatio: job.aspectRatio, size: job.size });
   await mkdir(dirs.rawDir, { recursive: true });

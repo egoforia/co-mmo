@@ -60,8 +60,15 @@ export function footprintWords(fp: Footprint): string {
   const tiles = (n: number) => (n === 1 ? 'one tile' : `${n} tiles`);
   const sides = fp.width === fp.height ? `${tiles(fp.width)} along each side` : `${tiles(fp.width)} from the left corner down to the front corner, and ${tiles(fp.height)} from the front corner up to the right corner`;
   // Said twice over on purpose: told only where it stands, the models paint the patch too (a deck, a floor tile, a rug) under it.
-  return `Footprint: it stands on a diamond-shaped patch of ground ${sides}. Its base fills that patch exactly, from the patch's left corner to its right corner, and nothing on the ground reaches past it. The patch itself is NOT drawn: no floor, tile, deck, planks, paving, rug, mat, plinth or base plate under it; the game paints the ground. Only the thing itself, its own feet, wheels or base touching the magenta.`;
+  return `Footprint: it stands on a diamond-shaped patch of ground ${sides}. Its base fills that patch exactly, from the patch's left corner to its right corner, and nothing on the ground reaches past it. The patch itself is NOT drawn: no floor, tile, deck, planks, paving, rug, mat, plinth or base plate under it; the game paints the ground. Only the thing itself, its own feet, wheels or base touching the magenta.\n${FOOTPRINT_GUIDE_WORDS}`;
 }
+
+/**
+ * Words for the footprint guide (footprint-guide.ts), sent as the last image
+ * with every painting that has a footprint: told only in words, the models
+ * guessed the angle and the depth of the patch.
+ */
+export const FOOTPRINT_GUIDE_WORDS = "The last image is a footprint guide: on magenta, thin white lines outline that patch at the game's exact camera angle, dashed lines split it into its tiles, and a dot marks each of its four corners. Seen from that same angle, stand the thing on the patch: its base's front edges run along the two lower white lines, sloping one step down for every two across, and its feet or base corners sit on the left, front and right dots. The guide only shows where it stands: do not paint the lines, the dots or the patch.";
 
 /** Builds the full text prompt: base style, biome signatures, subject, the tiles it stands on, things to avoid. */
 export function buildPrompt(d: AssetDescription, footprint?: Footprint): string {

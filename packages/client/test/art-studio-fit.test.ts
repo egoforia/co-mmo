@@ -25,8 +25,10 @@ describe('a fit applied where a picture stands', () => {
 });
 
 describe('the Offset tool', () => {
-  it('keeps fits to whole pixels within limits and trims between 85 and 115 %', () => {
+  it('keeps fits to whole pixels within limits and trims between 25 and 115 %', () => {
     expect(clampFit({ offset: [3.6, -999], scale: 2 })).toEqual({ offset: [4, -256], scale: 1.15 });
+    expect(clampFit({ offset: [0, 0], scale: 0.5 }).scale).toBe(0.5);
+    expect(clampFit({ offset: [0, 0], scale: 0.1 }).scale).toBe(0.25);
   });
 
   it('steps back through changes, a whole drag as one step', () => {

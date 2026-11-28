@@ -9,8 +9,15 @@
 
 /** The most a picture moves, in its own pixels, either way. */
 export const FIT_OFFSET_MOST = 256;
-/** How far a picture's size may be trimmed: pieces, spots and stairs only, so similar things stay similar sizes. */
-export const FIT_SCALE = { least: 0.85, most: 1.15 } as const;
+/**
+ * How far a picture's size may be changed by hand: pieces, spots and stairs
+ * only. Down to a quarter, so a picture painted far too big for its tiles can
+ * be brought back to the size of its kind; the Owner keeps similar things
+ * similar sizes.
+ */
+export const FIT_SCALE = { least: 0.25, most: 1.15 } as const;
+/** The gentler trim Auto-centre may choose on its own, so no picture is shrunk far without someone looking. */
+export const FIT_AUTO_SCALE = { least: 0.85, most: 1.15 } as const;
 /** Ids of pictures a fit may be for: the game's own, or a wish's (`<wish>:<id>`). */
 const ASSET_ID = /^[\w-]+(?::[\w-]+)?$/;
 
@@ -66,7 +73,7 @@ export function validateFit(raw: unknown): FitWish | string {
   }
   const scale = d.scale === undefined || d.scale === 1 ? undefined : Number(d.scale);
   if (scale !== undefined && !(scale >= FIT_SCALE.least && scale <= FIT_SCALE.most)) {
-    return `Its size can be trimmed between ${FIT_SCALE.least * 100} % and ${FIT_SCALE.most * 100} %.`;
+    return `Its size can be set between ${Math.round(FIT_SCALE.least * 100)} % and ${Math.round(FIT_SCALE.most * 100)} %.`;
   }
   const blocks = d.blocks === undefined ? undefined : blocksOf(d.blocks);
   if (typeof blocks === 'string') return blocks;

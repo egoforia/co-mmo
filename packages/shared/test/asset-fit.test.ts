@@ -21,6 +21,8 @@ describe('asset fits', () => {
     expect(typeof validateFit({ asset: 'a', offset: [0.5, 0] })).toBe('string');
     expect(typeof validateFit({ asset: 'a', offset: [FIT_OFFSET_MOST + 1, 0] })).toBe('string');
     expect(typeof validateFit({ asset: 'a', offset: [0, 0], scale: 1.5 })).toBe('string');
+    expect(validateFit({ asset: 'a', offset: [0, 0], scale: 0.3 })).toMatchObject({ fit: { scale: 0.3 } });
+    expect(validateFit({ asset: 'a', offset: [0, 0], scale: 0.2 })).toBe('Its size can be set between 25 % and 115 %.');
     expect(validateFit({ asset: 'a', offset: [0, 0], scale: 1 })).toMatchObject({ fit: { asset: 'a', offset: [0, 0] }, description: 'a back where it was painted.' });
   });
 
